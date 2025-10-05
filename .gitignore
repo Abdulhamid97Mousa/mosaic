@@ -1,0 +1,25 @@
+
+
+#Ignore vscode AI rules
+.github/instructions/codacy.instructions.md
+
+# Local environment overrides for the Gym GUI project
+.env
+
+
+PyQt-Fluent-Widgets/
+PyQt5-Apps/
+graphrag/
+openshot-qt/
+pyqtgraph/
+qt-material/
+qt-python-mvc/
+qtawesome/
+qtpy/
+
+.venv
+
+.codacy
+.vscode
+
+spadeBDI_RL/

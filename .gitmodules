@@ -1,0 +1,31 @@
+[submodule "openshot-qt"]
+	path = openshot-qt
+	url = https://github.com/OpenShot/openshot-qt.git
+
+[submodule "PyQt5-Apps"]
+  path = PyQt5-Apps
+  url = https://github.com/username/PyQt5-Apps.git
+
+[submodule "PyQt-Fluent-Widgets"]
+  path = PyQt-Fluent-Widgets
+  url = https://github.com/username/PyQt-Fluent-Widgets.git
+
+[submodule "pyqtgraph"]
+  path = pyqtgraph
+  url = https://github.com/pyqtgraph/pyqtgraph.git
+
+[submodule "qtawesome"]
+  path = qtawesome
+  url = https://github.com/username/qtawesome.git
+
+[submodule "qt-material"]
+  path = qt-material
+  url = https://github.com/username/qt-material.git
+
+[submodule "qtpy"]
+  path = qtpy
+  url = https://github.com/username/qtpy.git
+
+[submodule "qt-python-mvc"]
+  path = qt-python-mvc
+  url = https://github.com/username/qt-python-mvc.git

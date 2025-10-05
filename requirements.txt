@@ -1,0 +1,17 @@
+python-dotenv>=1.0
+qtpy>=2.4
+PyQt6>=6.7
+gymnasium[box2d]>=1.2
+python-dotenv=1.1.1
+# sudo apt-get install -y swig
+# sudo apt-get install -y python3.12-dev
+# sudo apt-get install -y \
+#   libxcb-cursor0 libxkbcommon-x11-0 \
+#   libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
+#   libxcb-render-util0 libxcb-randr0 libxcb-shape0 \
+#   libxcb-xinerama0 libxcb-xkb1
+PyQt6==6.9.1
+PyQt6-Qt6==6.9.2
+PyQt6-sip==13.10.2
+packaging==25.0
+qtpy==2.4.3
