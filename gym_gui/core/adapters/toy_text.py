@@ -15,6 +15,7 @@ _TOY_TEXT_DATA_DIR = Path(__file__).resolve().parents[2] / "runtime" / "data" / 
 _TOY_TEXT_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 _ANSI_ESCAPE_RE = re.compile(r"\x1b\[(?P<codes>[0-9;]*)m")
+_AGENT_TOKEN_HINTS = {"x"}
 
 
 def _ansi_to_grid(ansi: str) -> Tuple[List[List[str]], Tuple[int, int] | None]:
@@ -52,7 +53,12 @@ def _ansi_to_grid(ansi: str) -> Tuple[List[List[str]], Tuple[int, int] | None]:
                                 current_bg = value
                     i = match.end()
                     continue
-            if char != " ":
+            if char == " ":
+                # Preserve spacing so the grid matches the rendered layout and can be highlighted.
+                row_chars.append(" ")
+                if current_bg is not None:
+                    agent_pos = (len(rows), len(row_chars) - 1)
+            else:
                 row_chars.append(char)
                 if current_bg is not None:
                     agent_pos = (len(rows), len(row_chars) - 1)
@@ -60,7 +66,24 @@ def _ansi_to_grid(ansi: str) -> Tuple[List[List[str]], Tuple[int, int] | None]:
         if row_chars:
             rows.append(row_chars)
 
+    if agent_pos is None:
+        hint = _find_agent_token(rows)
+        if hint is not None:
+            agent_pos = hint
+
     return rows, agent_pos
+
+
+def _find_agent_token(grid: List[List[str]]) -> Tuple[int, int] | None:
+    for r, row in enumerate(grid):
+        for c, value in enumerate(row):
+            if not value:
+                continue
+            if value.strip() == "":
+                continue
+            if value.lower() in _AGENT_TOKEN_HINTS:
+                return r, c
+    return None
 
 
 class ToyTextAdapter(EnvironmentAdapter[int, int]):
@@ -89,6 +112,9 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
         ansi_raw = env.render()
         ansi = str(ansi_raw)
         grid, agent_pos = _ansi_to_grid(ansi)
+        env_position = self._agent_position_from_state(grid)
+        if env_position is not None:
+            agent_pos = env_position
         snapshot_path = _TOY_TEXT_DATA_DIR / f"{self.id}_latest.txt"
         snapshot_path.write_text(ansi, encoding="utf-8")
         return {
@@ -101,6 +127,73 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
 
     def gym_kwargs(self) -> dict[str, Any]:
         return {}
+
+    def _agent_position_from_state(self, grid: List[List[str]]) -> Tuple[int, int] | None:
+        env = self._require_env()
+        unwrapped = getattr(env, "unwrapped", env)
+        try:
+            state = getattr(unwrapped, "s", None)
+            width: int | None = None
+            height: int | None = None
+            row: int | None = None
+            col: int | None = None
+
+            if self.id == GameId.TAXI.value:
+                decode = getattr(unwrapped, "decode", None)
+                if state is None or decode is None:
+                    return None
+                taxi_row, taxi_col, *_ = decode(int(state))
+                row = int(taxi_row)
+                col = int(taxi_col)
+                # Taxi map is always 5x5.
+                height = 5
+                width = 5
+            else:
+                if state is None:
+                    return None
+                if hasattr(unwrapped, "ncol"):
+                    width = int(getattr(unwrapped, "ncol"))
+                if hasattr(unwrapped, "nrow"):
+                    height = int(getattr(unwrapped, "nrow"))
+                if (width is None or height is None) and hasattr(unwrapped, "desc"):
+                    desc = getattr(unwrapped, "desc")
+                    try:
+                        height = height or len(desc)
+                        width = width or (len(desc[0]) if height else None)
+                    except Exception:
+                        pass
+                if (width is None or height is None) and hasattr(unwrapped, "shape"):
+                    shape = getattr(unwrapped, "shape")
+                    if shape and len(shape) >= 2:
+                        if height is None:
+                            height = int(shape[0])
+                        if width is None:
+                            width = int(shape[1])
+                if width is None or height is None:
+                    return None
+                row = int(state) // width
+                col = int(state) % width
+
+            if row is None or col is None or not grid:
+                return None
+            grid_row = min(max(row, 0), len(grid) - 1)
+            row_chars = grid[grid_row]
+            if not row_chars:
+                return None
+            if width <= 1:
+                grid_col = 0
+            else:
+                span = len(row_chars) - 1
+                base = width - 1
+                if base <= 0:
+                    grid_col = 0
+                else:
+                    ratio = col / base
+                    grid_col = int(round(ratio * span))
+            grid_col = min(max(grid_col, 0), len(row_chars) - 1)
+            return grid_row, grid_col
+        except Exception:
+            return None
 
 
 class FrozenLakeAdapter(ToyTextAdapter):

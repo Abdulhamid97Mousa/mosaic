@@ -145,8 +145,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._config_layout = QtWidgets.QFormLayout(self._config_group)
         panel_layout.addWidget(self._config_group)
 
-        self._frozen_slippery_checkbox = QtWidgets.QCheckBox("Enable slippery ice (stochastic)", panel)
-        self._frozen_slippery_checkbox.stateChanged.connect(self._on_frozen_slippery_toggled)
+        self._frozen_slippery_checkbox: QtWidgets.QCheckBox | None = None
 
         # Mode selector
         mode_group = QtWidgets.QGroupBox("Control Mode")
@@ -302,11 +301,14 @@ class MainWindow(QtWidgets.QMainWindow):
                 settings_overrides=dict(overrides),
             )
         else:
+            if self._frozen_slippery_checkbox is not None:
+                self._frozen_slippery_checkbox.blockSignals(True)
+                self._frozen_slippery_checkbox.setChecked(enabled)
+                self._frozen_slippery_checkbox.blockSignals(False)
             self._status_bar.showMessage(
                 f"Frozen Lake slippery ice {status}. Reload to apply.",
                 5000,
             )
-        self._refresh_game_config_ui()
 
     def _on_session_initialized(self, game_id: str, mode: str, step: object) -> None:
         try:
@@ -402,9 +404,27 @@ class MainWindow(QtWidgets.QMainWindow):
         self._active_time_label.setText(timers.first_move_elapsed_formatted())
         self._outcome_time_label.setText(timers.outcome_timestamp_formatted())
 
+    def _clear_config_layout(self) -> None:
+        while self._config_layout.count():
+            item = self._config_layout.takeAt(0)
+            if item is None:
+                continue
+            widget = item.widget()
+            if widget is not None:
+                widget.deleteLater()
+            layout = item.layout()
+            if layout is not None:
+                layout.deleteLater()
+
     def _refresh_game_config_ui(self) -> None:
-        while self._config_layout.rowCount():
-            self._config_layout.removeRow(0)
+        self._clear_config_layout()
+        if self._frozen_slippery_checkbox is not None:
+            try:
+                self._frozen_slippery_checkbox.deleteLater()
+            except RuntimeError:
+                pass
+            self._frozen_slippery_checkbox = None
+
         if self._current_game == GameId.FROZEN_LAKE:
             overrides = self._game_overrides.setdefault(GameId.FROZEN_LAKE, {})
             value = overrides.get(
@@ -412,10 +432,11 @@ class MainWindow(QtWidgets.QMainWindow):
                 self._settings.frozen_lake_is_slippery,
             )
             overrides["frozen_lake_is_slippery"] = value
-            self._frozen_slippery_checkbox.blockSignals(True)
-            self._frozen_slippery_checkbox.setChecked(value)
-            self._frozen_slippery_checkbox.blockSignals(False)
-            self._config_layout.addRow("Slippery ice", self._frozen_slippery_checkbox)
+            checkbox = QtWidgets.QCheckBox("Enable slippery ice (stochastic)", self._config_group)
+            checkbox.setChecked(bool(value))
+            checkbox.stateChanged.connect(self._on_frozen_slippery_toggled)
+            self._frozen_slippery_checkbox = checkbox
+            self._config_layout.addRow("Slippery ice", checkbox)
         else:
             placeholder = QtWidgets.QLabel("No overrides available for this game.")
             placeholder.setWordWrap(True)
