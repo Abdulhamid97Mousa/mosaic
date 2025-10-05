@@ -11,23 +11,9 @@ __pycache__/
 # Local environment overrides for the Gym GUI project
 .env
 
-
-PyQt-Fluent-Widgets/
-PyQt5-Apps/
-graphrag/
-openshot-qt/
-pyqtgraph/
-graphrag/
-openshot-qt/
-pyqtgraph/
-qt-material/
-qt-python-mvc/
-qtawesome/
-qtpy/
-
 .venv
 
 .codacy
 .vscode
 
-spadeBDI_RL/
+spadeBDI_RL
