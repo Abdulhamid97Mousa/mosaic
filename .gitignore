@@ -1,7 +1,13 @@
-
-
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
+.github/
+
+# Ignore __pycache__ directories recursively
+__pycache__/
+*/__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
 
 # Local environment overrides for the Gym GUI project
 .env
@@ -9,6 +15,9 @@
 
 PyQt-Fluent-Widgets/
 PyQt5-Apps/
+graphrag/
+openshot-qt/
+pyqtgraph/
 graphrag/
 openshot-qt/
 pyqtgraph/
