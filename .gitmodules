@@ -33,3 +33,7 @@
 [submodule "graphrag"]
   path = graphrag
   url = https://github.com/microsoft/graphrag.git
+
+[submodule "spadeBDI_RL"]
+  path = spadeBDI_RL
+  url = https://github.com/ZahraD-a/spadeBDI_RL.git

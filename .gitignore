@@ -1,5 +1,6 @@
 #Ignore vscode AI rules
 .github/instructions/codacy.instructions.md
+.github/instructions/
 .github/
 
 # Ignore __pycache__ directories recursively
