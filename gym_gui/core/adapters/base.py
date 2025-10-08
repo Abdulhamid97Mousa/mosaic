@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 import logging
-from typing import Any, Callable, Generic, Mapping, TypeVar
+from typing import Any, Callable, Generic, Mapping, Sequence, TypeVar
 
 import gymnasium as gym
 
@@ -30,6 +30,54 @@ class AdapterContext:
 
 
 @dataclass(slots=True)
+class AgentSnapshot:
+    """State for a single agent participant in the environment."""
+
+    name: str
+    role: str | None = None
+    position: tuple[int, int] | None = None
+    orientation: str | None = None
+    info: Mapping[str, Any] = field(default_factory=dict)
+
+    def as_dict(self) -> dict[str, Any]:
+        return {
+            "name": self.name,
+            "role": self.role,
+            "position": self.position,
+            "orientation": self.orientation,
+            "info": dict(self.info),
+        }
+
+
+@dataclass(slots=True)
+class StepState:
+    """Machine-readable snapshot of an environment step."""
+
+    active_agent: str | None = None
+    agents: Sequence[AgentSnapshot] = field(default_factory=tuple)
+    objectives: Sequence[Mapping[str, Any]] = field(default_factory=tuple)
+    hazards: Sequence[Mapping[str, Any]] = field(default_factory=tuple)
+    inventory: Mapping[str, Any] = field(default_factory=dict)
+    metrics: Mapping[str, Any] = field(default_factory=dict)
+    environment: Mapping[str, Any] = field(default_factory=dict)
+    raw: Mapping[str, Any] = field(default_factory=dict)
+
+    def as_dict(self) -> dict[str, Any]:
+        """Return a plain dictionary representation for policies and UI."""
+
+        return {
+            "active_agent": self.active_agent,
+            "agents": [agent.as_dict() for agent in self.agents],
+            "objectives": [dict(obj) for obj in self.objectives],
+            "hazards": [dict(hazard) for hazard in self.hazards],
+            "inventory": dict(self.inventory),
+            "metrics": dict(self.metrics),
+            "environment": dict(self.environment),
+            "raw": dict(self.raw),
+        }
+
+
+@dataclass(slots=True)
 class AdapterStep(Generic[ObservationT]):
     """Standardised step result consumed by orchestrators."""
 
@@ -39,6 +87,7 @@ class AdapterStep(Generic[ObservationT]):
     truncated: bool
     info: Mapping[str, Any]
     render_payload: Any | None = None
+    state: StepState = field(default_factory=StepState)
 
 
 class AdapterNotReadyError(RuntimeError):
@@ -141,7 +190,13 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT]):
             truncated=truncated,
             info=info,
             render_payload=self.render(),
+            state=self.build_step_state(observation, info),
         )
+
+    def build_step_state(self, observation: ObservationT, info: Mapping[str, Any]) -> StepState:
+        """Construct the canonical :class:`StepState` for the current step."""
+
+        return StepState()
 
     # ------------------------------------------------------------------
     # Optional utilities
@@ -187,4 +242,6 @@ __all__ = [
     "AdapterNotReadyError",
     "UnsupportedModeError",
     "EnvironmentAdapter",
+    "StepState",
+    "AgentSnapshot",
 ]

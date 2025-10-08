@@ -42,18 +42,18 @@ _TOY_TEXT_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
         ShortcutMapping(_key_sequences("Key_Up", "Key_W"), 3),
     ),
     GameId.CLIFF_WALKING: (
-        ShortcutMapping(_key_sequences("Key_Left", "Key_A"), 0),
-        ShortcutMapping(_key_sequences("Key_Down", "Key_S"), 1),
-        ShortcutMapping(_key_sequences("Key_Right", "Key_D"), 2),
-        ShortcutMapping(_key_sequences("Key_Up", "Key_W"), 3),
+        ShortcutMapping(_key_sequences("Key_Up", "Key_W"), 0),     # UP
+        ShortcutMapping(_key_sequences("Key_Right", "Key_D"), 1),  # RIGHT
+        ShortcutMapping(_key_sequences("Key_Down", "Key_S"), 2),   # DOWN
+        ShortcutMapping(_key_sequences("Key_Left", "Key_A"), 3),   # LEFT
     ),
     GameId.TAXI: (
-        ShortcutMapping(_key_sequences("Key_Left", "Key_A"), 0),
-        ShortcutMapping(_key_sequences("Key_Down", "Key_S"), 1),
-        ShortcutMapping(_key_sequences("Key_Right", "Key_D"), 2),
-        ShortcutMapping(_key_sequences("Key_Up", "Key_W"), 3),
-        ShortcutMapping(_key_sequences("Key_Space"), 4),
-        ShortcutMapping(_key_sequences("Key_E"), 5),
+        ShortcutMapping(_key_sequences("Key_Down", "Key_S"), 0),   # SOUTH
+        ShortcutMapping(_key_sequences("Key_Up", "Key_W"), 1),     # NORTH
+        ShortcutMapping(_key_sequences("Key_Right", "Key_D"), 2),  # EAST
+        ShortcutMapping(_key_sequences("Key_Left", "Key_A"), 3),   # WEST
+        ShortcutMapping(_key_sequences("Key_Space"), 4),           # PICKUP
+        ShortcutMapping(_key_sequences("Key_E"), 5),               # DROPOFF
     ),
 }
 
@@ -66,7 +66,6 @@ class HumanInputController(QtCore.QObject):
         self._widget = widget
         self._session = session
         self._shortcuts: List[QShortcut] = []
-        self._enabled = True
         self._mode_allows_input = True
         self._requested_enabled = True
         self._logger = logging.getLogger("gym_gui.controllers.human_input")
@@ -90,15 +89,14 @@ class HumanInputController(QtCore.QObject):
                 shortcut_label = sequence.toString() or repr(sequence)
                 shortcut.activated.connect(self._make_activation(mapping.action, shortcut_label))
                 self._shortcuts.append(shortcut)
+        self._update_shortcuts_enabled()
 
     def set_enabled(self, enabled: bool) -> None:
         self._requested_enabled = enabled
-        self._enabled = self._mode_allows_input and self._requested_enabled
+        self._update_shortcuts_enabled()
 
     def _make_activation(self, action: int, shortcut_label: str) -> Callable[[], None]:
         def trigger() -> None:
-            if not self._enabled:
-                return
             self._logger.debug("Shortcut activated key='%s' action=%s", shortcut_label, action)
             self._session.perform_human_action(action, key_label=shortcut_label)
 
@@ -131,7 +129,15 @@ class HumanInputController(QtCore.QObject):
             ControlMode.HYBRID_TURN_BASED,
             ControlMode.HYBRID_HUMAN_AGENT,
         }
-        self._enabled = self._mode_allows_input and self._requested_enabled
+        self._update_shortcuts_enabled()
+
+    def _update_shortcuts_enabled(self) -> None:
+        """Enable or disable all shortcuts based on current state."""
+        enabled = self._mode_allows_input and self._requested_enabled
+        for shortcut in self._shortcuts:
+            shortcut.setEnabled(enabled)
+        self._logger.debug("Shortcuts enabled=%s (mode_allows=%s, requested=%s)", 
+                          enabled, self._mode_allows_input, self._requested_enabled)
 
 
 __all__ = ["HumanInputController"]

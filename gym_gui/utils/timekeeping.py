@@ -77,7 +77,10 @@ class SessionTimers:
     def elapsed_since_first_move(self) -> timedelta | None:
         if self.first_move_at is None:
             return None
-        return datetime.now() - self.first_move_at
+        # If episode has ended, calculate time from first move to outcome
+        # Otherwise, calculate time from first move to now
+        end_time = self.outcome_at if self.outcome_at is not None else datetime.now()
+        return end_time - self.first_move_at
 
     def launch_elapsed_formatted(self) -> str:
         return format_timedelta(self.elapsed_since_launch())
@@ -88,3 +91,14 @@ class SessionTimers:
 
     def outcome_timestamp_formatted(self) -> str:
         return format_timestamp(self.outcome_at)
+
+    def episode_duration(self) -> timedelta | None:
+        """Calculate the total episode duration (first move to outcome)."""
+        if self.first_move_at is None or self.outcome_at is None:
+            return None
+        return self.outcome_at - self.first_move_at
+
+    def episode_duration_formatted(self) -> str:
+        """Return formatted episode duration."""
+        delta = self.episode_duration()
+        return format_timedelta(delta) if delta is not None else "—"

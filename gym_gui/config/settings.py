@@ -51,7 +51,11 @@ def _parse_control_mode(raw: str | None) -> ControlMode:
 
 @dataclass(frozen=True, slots=True)
 class Settings:
-    """Typed view over the environment configuration."""
+    """Typed view over the environment configuration.
+    
+    Note: Game-specific configurations (like FrozenLake's is_slippery or
+    Taxi's is_raining) are now in gym_gui.config.game_configs module.
+    """
 
     qt_api: str = "pyqt6"
     gym_default_env: str = "FrozenLake-v1"
@@ -61,7 +65,6 @@ class Settings:
     use_gpu: bool = False
     default_control_mode: ControlMode = ControlMode.HUMAN_ONLY
     agent_ids: tuple[str, ...] = field(default_factory=tuple)
-    frozen_lake_is_slippery: bool = False
 
     @property
     def video_dir(self) -> Path | None:
@@ -101,9 +104,6 @@ def get_settings() -> Settings:
         or os.getenv("GYM_CONTROL_MODE")
     )
     agent_ids = _split_csv(os.getenv("AGENT_IDS"))
-    frozen_lake_is_slippery = _normalize_bool(
-        os.getenv("FROZEN_LAKE_IS_SLIPPERY"), default=defaults.frozen_lake_is_slippery
-    )
 
     return Settings(
         qt_api=qt_api,
@@ -114,7 +114,6 @@ def get_settings() -> Settings:
         use_gpu=use_gpu,
         default_control_mode=default_control_mode,
         agent_ids=agent_ids,
-        frozen_lake_is_slippery=frozen_lake_is_slippery,
     )
 
 

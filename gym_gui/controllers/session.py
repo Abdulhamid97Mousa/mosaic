@@ -8,6 +8,7 @@ from typing import Any, Optional
 
 from qtpy import QtCore
 
+from gym_gui.config.game_configs import CliffWalkingConfig, FrozenLakeConfig, TaxiConfig
 from gym_gui.config.settings import Settings
 from gym_gui.core.adapters.base import AdapterContext, AdapterStep, EnvironmentAdapter
 from gym_gui.core.enums import ControlMode, GameId
@@ -71,6 +72,7 @@ class SessionController(QtCore.QObject):
         *,
         seed: int | None = None,
         settings_overrides: dict[str, Any] | None = None,
+        game_config: FrozenLakeConfig | TaxiConfig | CliffWalkingConfig | None = None,
     ) -> None:
         self.stop_auto_play()
         self._dispose_adapter()
@@ -88,7 +90,7 @@ class SessionController(QtCore.QObject):
             logger_factory=logging.getLogger,
         )
         try:
-            adapter = create_adapter(game_id, context)
+            adapter = create_adapter(game_id, context, game_config=game_config)
             adapter.ensure_control_mode(control_mode)
             adapter.load()
             initial_step = adapter.reset(seed=seed)
@@ -340,11 +342,18 @@ class SessionController(QtCore.QObject):
         )
 
     def _update_status(self, step: AdapterStep, *, prefix: str | None = None) -> None:
+        # Avoid emitting routine per-step status messages to the global status bar.
+        # Only emit when an explicit prefix is supplied (for notable events like
+        # environment ready or environment reset). Emitting per-step details
+        # causes noisy status text such as "reward=... terminated=... truncated=..."
+        # to appear in the UI which is undesirable.
+        if prefix is None:
+            return
+
         message = (
             f"reward={step.reward:.2f} terminated={step.terminated} truncated={step.truncated}"
         )
-        if prefix:
-            message = f"{prefix}: {message}"
+        message = f"{prefix}: {message}"
         self.status_message.emit(message)
 
 

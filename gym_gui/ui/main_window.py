@@ -8,12 +8,17 @@ from typing import Any, Dict, List
 
 from qtpy import QtCore, QtGui, QtWidgets
 
+from gym_gui.config.game_configs import CliffWalkingConfig, FrozenLakeConfig, TaxiConfig
 from gym_gui.config.settings import Settings
 from gym_gui.core.enums import ControlMode, GameId, RenderMode
 from gym_gui.core.factories.adapters import available_games
 from gym_gui.controllers.human_input import HumanInputController
 from gym_gui.controllers.session import SessionController
+from gym_gui.rendering.grid_renderer import GridRenderer
 from gym_gui.ui.logging_bridge import LogRecordPayload, QtLogHandler
+from gym_gui.ui.presenters.main_window_presenter import MainWindowPresenter, MainWindowView
+from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWidget
+from gym_gui.docs.game_info import get_game_info
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -37,17 +42,33 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self, settings: Settings, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
+        self.logger = logging.getLogger(__name__)
         self._settings = settings
         self._session = SessionController(settings, self)
         self._log_handler = QtLogHandler(parent=self)
         self._log_records: List[LogRecordPayload] = []
-        self._current_game: GameId | None = None
-        self._current_mode: ControlMode = settings.default_control_mode
         self._auto_running = False
+        self._episode_finished = False  # Track episode termination state
         self._human_input = HumanInputController(self, self._session)
-        self._game_overrides: Dict[GameId, Dict[str, Any]] = {
-            GameId.FROZEN_LAKE: {"frozen_lake_is_slippery": settings.frozen_lake_is_slippery}
-        }
+        
+        # Build control panel config
+        available_modes = {}
+        for game in available_games():
+            available_modes[game] = SessionController.supported_control_modes(game)
+        
+        control_config = ControlPanelConfig(
+            available_modes=available_modes,
+            default_mode=settings.default_control_mode,
+            frozen_lake_config=FrozenLakeConfig(is_slippery=True),
+            taxi_config=TaxiConfig(is_raining=False, fickle_passenger=False),
+            cliff_walking_config=CliffWalkingConfig(is_slippery=False),
+        )
+        
+        self._control_panel = ControlPanelWidget(config=control_config, parent=self)
+        
+        # Create presenter to coordinate
+        self._presenter = MainWindowPresenter(self._session, self._human_input, parent=self)
+        
         status_bar = self.statusBar()
         if status_bar is None:
             status_bar = QtWidgets.QStatusBar(self)
@@ -64,6 +85,22 @@ class MainWindow(QtWidgets.QMainWindow):
         self._time_refresh_timer.timeout.connect(self._refresh_time_labels)
         self._time_refresh_timer.start()
         self._refresh_time_labels()
+        
+        # Bind presenter to view
+        self._wire_presenter()
+
+    def _wire_presenter(self) -> None:
+        """Wire the MainWindowPresenter to coordinate SessionController signals."""
+        view = MainWindowView(
+            control_panel=self._control_panel,
+            status_message_sink=lambda msg, timeout: self._status_bar.showMessage(msg, timeout or 0),
+            awaiting_label_setter=lambda waiting: self._on_awaiting_human(waiting, ""),
+            turn_label_setter=lambda turn: self._control_panel.set_turn(turn),
+            render_adapter=lambda payload: self._render_view.display(payload),
+            time_refresher=self._refresh_time_labels,
+            game_info_setter=self._set_game_info,
+        )
+        self._presenter.bind_view(view)
 
     # ------------------------------------------------------------------
     # UI setup
@@ -88,7 +125,7 @@ class MainWindow(QtWidgets.QMainWindow):
         splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal, central)
         layout.addWidget(splitter)
 
-        self._control_panel = self._build_control_panel()
+        # Use the ControlPanelWidget created in __init__
         splitter.addWidget(self._control_panel)
 
         right_panel = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical, central)
@@ -116,105 +153,42 @@ class MainWindow(QtWidgets.QMainWindow):
         self._log_console.setLineWrapMode(QtWidgets.QPlainTextEdit.LineWrapMode.NoWrap)
         log_layout.addWidget(self._log_console, 1)
         right_panel.addWidget(self._log_group)
-        right_panel.setStretchFactor(0, 2)
-        right_panel.setStretchFactor(1, 1)
 
-    def _build_control_panel(self) -> QtWidgets.QWidget:
-        panel = QtWidgets.QWidget()
-        panel_layout = QtWidgets.QVBoxLayout(panel)
-        panel_layout.setSpacing(12)
+        # Game information panel (right-most column)
+        self._info_group = QtWidgets.QGroupBox("Game Info", self)
+        info_layout = QtWidgets.QVBoxLayout(self._info_group)
+        self._game_info = QtWidgets.QTextBrowser(self._info_group)
+        self._game_info.setReadOnly(True)
+        self._game_info.setOpenExternalLinks(True)
+        info_layout.addWidget(self._game_info)
+        splitter.addWidget(self._info_group)
 
-        # Environment picker
-        env_group = QtWidgets.QGroupBox("Environment")
-        env_layout = QtWidgets.QVBoxLayout(env_group)
-        self._game_combo = QtWidgets.QComboBox()
-        self._seed_spin = QtWidgets.QSpinBox()
-        self._seed_spin.setRange(0, 10_000_000)
-        self._seed_spin.setValue(0)
-        load_button = QtWidgets.QPushButton("Load")
-        load_button.clicked.connect(self._on_load_clicked)
-        env_layout.addWidget(QtWidgets.QLabel("Select environment"))
-        env_layout.addWidget(self._game_combo)
-        env_layout.addWidget(QtWidgets.QLabel("Seed"))
-        env_layout.addWidget(self._seed_spin)
-        env_layout.addWidget(load_button)
-        panel_layout.addWidget(env_group)
-
-        # Game configuration placeholder (populated per environment)
-        self._config_group = QtWidgets.QGroupBox("Game Configuration")
-        self._config_layout = QtWidgets.QFormLayout(self._config_group)
-        panel_layout.addWidget(self._config_group)
-
-        self._frozen_slippery_checkbox: QtWidgets.QCheckBox | None = None
-
-        # Mode selector
-        mode_group = QtWidgets.QGroupBox("Control Mode")
-        mode_layout = QtWidgets.QVBoxLayout(mode_group)
-        self._mode_buttons: Dict[ControlMode, QtWidgets.QRadioButton] = {}
-        mode_button_group = QtWidgets.QButtonGroup(mode_group)
-        for mode in ControlMode:
-            label = self.CONTROL_MODE_LABELS.get(mode, mode.name.replace("_", " ").title())
-            button = QtWidgets.QRadioButton(label)
-            button.setEnabled(False)
-            mode_button_group.addButton(button)
-            mode_layout.addWidget(button)
-            self._mode_buttons[mode] = button
-            button.toggled.connect(self._on_mode_toggled)
-        panel_layout.addWidget(mode_group)
-
-        # Control buttons
-        controls_group = QtWidgets.QGroupBox("Controls")
-        controls_layout = QtWidgets.QHBoxLayout(controls_group)
-        self._play_button = QtWidgets.QPushButton("Play")
-        self._pause_button = QtWidgets.QPushButton("Pause")
-        self._step_button = QtWidgets.QPushButton("Agent Step")
-        self._reset_button = QtWidgets.QPushButton("Reset")
-        controls_layout.addWidget(self._play_button)
-        controls_layout.addWidget(self._pause_button)
-        controls_layout.addWidget(self._step_button)
-        controls_layout.addWidget(self._reset_button)
-        panel_layout.addWidget(controls_group)
-
-        self._play_button.clicked.connect(self._session.start_auto_play)
-        self._pause_button.clicked.connect(self._session.stop_auto_play)
-        self._step_button.clicked.connect(self._session.perform_agent_step)
-        self._reset_button.clicked.connect(self._on_reset_clicked)
-
-        # Status group
-        status_group = QtWidgets.QGroupBox("Status")
-        status_layout = QtWidgets.QFormLayout(status_group)
-        self._step_label = QtWidgets.QLabel("0")
-        self._reward_label = QtWidgets.QLabel("0.0")
-        self._terminated_label = QtWidgets.QLabel("No")
-        self._truncated_label = QtWidgets.QLabel("No")
-        self._turn_label = QtWidgets.QLabel("human")
-        self._awaiting_label = QtWidgets.QLabel("–")
-        self._session_time_label = QtWidgets.QLabel("00:00:00")
-        self._active_time_label = QtWidgets.QLabel("—")
-        self._outcome_time_label = QtWidgets.QLabel("—")
-        status_layout.addRow("Step", self._step_label)
-        status_layout.addRow("Reward", self._reward_label)
-        status_layout.addRow("Episode Finished", self._terminated_label)
-        status_layout.addRow("Episode Aborted", self._truncated_label)
-        status_layout.addRow("Turn", self._turn_label)
-        status_layout.addRow("Awaiting Input", self._awaiting_label)
-        status_layout.addRow("Session Uptime", self._session_time_label)
-        status_layout.addRow("Active Play Time", self._active_time_label)
-        status_layout.addRow("Outcome Logged At", self._outcome_time_label)
-        panel_layout.addWidget(status_group)
-
-        panel_layout.addStretch(1)
-        return panel
+        # Configure splitter stretch: control panel (left) small, right_panel (middle) large, info (right) small
+        splitter.setStretchFactor(0, 1)
+        splitter.setStretchFactor(1, 3)
+        splitter.setStretchFactor(2, 1)
 
     def _connect_signals(self) -> None:
-        self._game_combo.currentIndexChanged.connect(self._on_game_changed)
+        # Connect control panel signals to session controller
+        self._control_panel.load_requested.connect(self._on_load_requested)
+        self._control_panel.reset_requested.connect(self._on_reset_requested)
+        self._control_panel.play_requested.connect(self._session.start_auto_play)
+        self._control_panel.pause_requested.connect(self._session.stop_auto_play)
+        self._control_panel.agent_step_requested.connect(self._session.perform_agent_step)
+        self._control_panel.game_changed.connect(self._on_game_changed)
+        self._control_panel.control_mode_changed.connect(self._on_mode_changed)
+        self._control_panel.slippery_toggled.connect(self._on_slippery_toggled)
+        self._control_panel.taxi_config_changed.connect(self._on_taxi_config_changed)
+        self._control_panel.cliff_config_changed.connect(self._on_cliff_config_changed)
+        
+        # Connect log filter
         self._log_filter.currentTextChanged.connect(self._on_log_filter_changed)
 
         self._session.session_initialized.connect(self._on_session_initialized)
         self._session.step_processed.connect(self._on_step_processed)
         self._session.episode_finished.connect(self._on_episode_finished)
         self._session.status_message.connect(self._on_status_message)
-        self._session.awaiting_human.connect(self._on_awaiting_human)
+        # Note: awaiting_human is handled by MainWindowPresenter, not directly here
         self._session.turn_changed.connect(self._on_turn_changed)
         self._session.error_occurred.connect(self._on_error)
         self._session.auto_play_state_changed.connect(self._on_auto_play_state)
@@ -222,93 +196,150 @@ class MainWindow(QtWidgets.QMainWindow):
         self._log_handler.emitter.record_emitted.connect(self._append_log_record)
 
     def _populate_environments(self) -> None:
+        """Populate control panel with available games."""
         games = sorted(available_games(), key=lambda g: g.value)
-        for game in games:
-            self._game_combo.addItem(game.value, game)
-        if games:
-            default = GameId(self._settings.gym_default_env)
-            index = self._game_combo.findData(default)
-            if index >= 0:
-                self._game_combo.setCurrentIndex(index)
-            else:
-                self._game_combo.setCurrentIndex(0)
-            self._on_game_changed(self._game_combo.currentIndex())
+        default = GameId(self._settings.gym_default_env) if games else None
+        self._control_panel.populate_games(games, default=default)
 
     # ------------------------------------------------------------------
-    # Slots
+    # Slots - Control Panel Signal Handlers
     # ------------------------------------------------------------------
-    def _on_game_changed(self, index: int) -> None:
-        game = self._game_combo.itemData(index)
-        if not isinstance(game, GameId):
-            return
-        self._current_game = game
-        supported = SessionController.supported_control_modes(game)
-        for mode, button in self._mode_buttons.items():
-            button.blockSignals(True)
-            button.setEnabled(mode in supported)
-            button.blockSignals(False)
-        # Select default mode if current one unsupported
-        if self._current_mode not in supported:
-            self._current_mode = supported[0]
-        self._mode_buttons[self._current_mode].setChecked(True)
-        self._status_bar.showMessage(f"Selected {game.value}. Load to begin.")
-        self._update_control_states()
-        self._refresh_game_config_ui()
+    def _on_game_changed(self, game_id: GameId) -> None:
+        """Handle game selection from control panel."""
+        self._status_bar.showMessage(f"Selected {game_id.value}. Load to begin.")
+        # Update game info panel with a short description from centralized docs
+        desc = get_game_info(game_id)
+        if desc:
+            self._set_game_info(desc)
+        # HumanInputController will be configured when environment loads
 
-    def _on_mode_toggled(self, checked: bool) -> None:
-        if not checked:
-            return
-        sender = self.sender()
-        for mode, button in self._mode_buttons.items():
-            if button is sender:
-                self._current_mode = mode
-                label = self.CONTROL_MODE_LABELS.get(mode, mode.value)
-                self._status_bar.showMessage(f"Mode set to {label}")
-                self._update_control_states()
-                break
+    def _on_mode_changed(self, mode: ControlMode) -> None:
+        """Handle control mode change from control panel."""
+        label = self.CONTROL_MODE_LABELS.get(mode, mode.value)
+        self._status_bar.showMessage(f"Mode set to {label}")
+        self._human_input.update_for_mode(mode)
 
-    def _on_load_clicked(self) -> None:
-        if self._current_game is None:
-            return
-        seed = int(self._seed_spin.value())
-        overrides = dict(self._game_overrides.get(self._current_game, {}))
+    def _on_load_requested(self, game_id: GameId, mode: ControlMode, seed: int) -> None:
+        """Handle load request from control panel."""
+        self._episode_finished = False  # Reset episode state on new load
+        overrides = self._control_panel.get_overrides(game_id)
+        game_config = self._build_game_config(game_id, overrides)
         self._session.load_environment(
-            self._current_game,
-            self._current_mode,
+            game_id,
+            mode,
             seed=seed,
-            settings_overrides=overrides or None,
+            game_config=game_config,
         )
 
-    def _on_reset_clicked(self) -> None:
-        seed = int(self._seed_spin.value())
+    def _on_reset_requested(self, seed: int) -> None:
+        """Handle reset request from control panel."""
+        self._episode_finished = False  # Reset episode state on reset
         self._session.reset_environment(seed=seed)
 
-    def _on_frozen_slippery_toggled(self, state: int) -> None:
-        enabled = state == QtCore.Qt.CheckState.Checked
-        overrides = self._game_overrides.setdefault(GameId.FROZEN_LAKE, {})
-        overrides["frozen_lake_is_slippery"] = enabled
+    def _on_slippery_toggled(self, enabled: bool) -> None:
+        """Handle slippery ice toggle from control panel."""
         status = "enabled" if enabled else "disabled"
-        if self._current_game == GameId.FROZEN_LAKE and self._session.game_id == GameId.FROZEN_LAKE:
+        current_game = self._control_panel.current_game()
+        
+        if current_game == GameId.FROZEN_LAKE and self._session.game_id == GameId.FROZEN_LAKE:
+            # Reload environment with new setting
             self._status_bar.showMessage(
                 f"Frozen Lake slippery ice {status}. Reloading environment...",
                 5000,
             )
-            seed = int(self._seed_spin.value())
+            mode = self._control_panel.current_mode()
+            seed = self._control_panel.current_seed()
+            overrides = self._control_panel.get_overrides(GameId.FROZEN_LAKE)
+            game_config = self._build_game_config(GameId.FROZEN_LAKE, overrides)
             self._session.load_environment(
-                self._current_game,
-                self._current_mode,
+                GameId.FROZEN_LAKE,
+                mode,
                 seed=seed,
-                settings_overrides=dict(overrides),
+                game_config=game_config,
             )
         else:
-            if self._frozen_slippery_checkbox is not None:
-                self._frozen_slippery_checkbox.blockSignals(True)
-                self._frozen_slippery_checkbox.setChecked(enabled)
-                self._frozen_slippery_checkbox.blockSignals(False)
+            # Just update the setting for next load
             self._status_bar.showMessage(
                 f"Frozen Lake slippery ice {status}. Reload to apply.",
                 5000,
             )
+
+    def _on_taxi_config_changed(self, param_name: str, value: bool) -> None:
+        """Handle Taxi configuration changes from control panel."""
+        status = "enabled" if value else "disabled"
+        param_label = "rain" if param_name == "is_raining" else "fickle passenger"
+        current_game = self._control_panel.current_game()
+        
+        if current_game == GameId.TAXI and self._session.game_id == GameId.TAXI:
+            # Reload environment with new setting
+            self._status_bar.showMessage(
+                f"Taxi {param_label} {status}. Reloading environment...",
+                5000,
+            )
+            mode = self._control_panel.current_mode()
+            seed = self._control_panel.current_seed()
+            overrides = self._control_panel.get_overrides(GameId.TAXI)
+            game_config = self._build_game_config(GameId.TAXI, overrides)
+            self._session.load_environment(
+                GameId.TAXI,
+                mode,
+                seed=seed,
+                game_config=game_config,
+            )
+        else:
+            # Just update the setting for next load
+            self._status_bar.showMessage(
+                f"Taxi {param_label} {status}. Reload to apply.",
+                5000,
+            )
+
+    def _on_cliff_config_changed(self, param_name: str, value: bool) -> None:
+        """Handle CliffWalking configuration changes from control panel."""
+        status = "enabled" if value else "disabled"
+        param_label = "slippery cliff"
+        current_game = self._control_panel.current_game()
+        
+        if current_game == GameId.CLIFF_WALKING and self._session.game_id == GameId.CLIFF_WALKING:
+            # Reload environment with new setting
+            self._status_bar.showMessage(
+                f"Cliff Walking {param_label} {status}. Reloading environment...",
+                5000,
+            )
+            mode = self._control_panel.current_mode()
+            seed = self._control_panel.current_seed()
+            overrides = self._control_panel.get_overrides(GameId.CLIFF_WALKING)
+            game_config = self._build_game_config(GameId.CLIFF_WALKING, overrides)
+            self._session.load_environment(
+                GameId.CLIFF_WALKING,
+                mode,
+                seed=seed,
+                game_config=game_config,
+            )
+        else:
+            # Just update the setting for next load
+            self._status_bar.showMessage(
+                f"Cliff Walking {param_label} {status}. Reload to apply.",
+                5000,
+            )
+
+    def _build_game_config(
+        self,
+        game_id: GameId,
+        overrides: dict[str, Any],
+    ) -> FrozenLakeConfig | TaxiConfig | CliffWalkingConfig | None:
+        """Build game configuration from control panel overrides."""
+        if game_id == GameId.FROZEN_LAKE:
+            is_slippery = bool(overrides.get("is_slippery", True))
+            return FrozenLakeConfig(is_slippery=is_slippery)
+        elif game_id == GameId.TAXI:
+            is_raining = bool(overrides.get("is_raining", False))
+            fickle_passenger = bool(overrides.get("fickle_passenger", False))
+            return TaxiConfig(is_raining=is_raining, fickle_passenger=fickle_passenger)
+        elif game_id == GameId.CLIFF_WALKING:
+            is_slippery = bool(overrides.get("is_slippery", False))
+            return CliffWalkingConfig(is_slippery=is_slippery)
+        else:
+            return None
 
     def _on_session_initialized(self, game_id: str, mode: str, step: object) -> None:
         try:
@@ -316,13 +347,35 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             mode_label = mode
         self._status_bar.showMessage(f"Loaded {game_id} in {mode_label} mode")
-        self._log_console.appendPlainText(f"Loaded {game_id} ({mode_label})")
+        self.logger.info("Loaded %s (%s)", game_id, mode_label)
         self._auto_running = False
         self._human_input.configure(self._session.game_id, self._session.action_space)
-        self._update_control_states()
+        self._control_panel.set_auto_running(False)
         self._refresh_time_labels()
+        
+        # Notify render view of current game for asset selection
+        if self._session.game_id is not None:
+            self._render_view.set_current_game(self._session.game_id)
+            # Update game info with a slightly more detailed description (include mode)
+            try:
+                gid = GameId(self._session.game_id)
+            except Exception:
+                gid = None
+            if gid is not None:
+                desc = get_game_info(gid)
+                if desc:
+                    self._set_game_info(desc + f"<p><b>Mode:</b> {mode}</p>")
+
+    def _set_game_info(self, html: str) -> None:
+        """Set the HTML content of the Game Info panel."""
+        if not hasattr(self, "_game_info"):
+            return
+        if not html:
+            html = "<p>Select an environment to begin. The Game Info panel will show rules, controls, and rewards for the chosen environment.</p>"
+        self._game_info.setHtml(html)
 
     def _on_step_processed(self, step: object, index: int) -> None:
+        """Handle step processed from session controller."""
         if not hasattr(step, "reward"):
             return
         reward = getattr(step, "reward", 0.0)
@@ -330,29 +383,64 @@ class MainWindow(QtWidgets.QMainWindow):
         truncated = getattr(step, "truncated", False)
         render_payload = getattr(step, "render_payload", None)
 
-        self._step_label.setText(str(index))
-        self._reward_label.setText(f"{reward:.2f}")
-        self._terminated_label.setText(self._format_bool(terminated))
-        self._truncated_label.setText(self._format_bool(truncated))
+        # Update control panel status (awaiting_human and turn updated via separate signals)
+        self._control_panel.set_status(
+            step=index,
+            reward=reward,
+            terminated=terminated,
+            truncated=truncated,
+            turn=self._session._turn,
+            awaiting_human=False,  # Will be updated via awaiting_human signal
+            session_time=self._session._timers.launch_elapsed_formatted(),
+            active_time=self._session._timers.first_move_elapsed_formatted(),
+            episode_duration=self._session._timers.episode_duration_formatted(),
+            outcome_time=self._session._timers.outcome_timestamp_formatted(),
+        )
+        
         self._render_view.display(render_payload)
-        self._refresh_time_labels()
 
     def _on_episode_finished(self, finished: bool) -> None:
+        self._episode_finished = finished
         if finished:
+            # Disable shortcuts when episode terminates
+            self._human_input.set_enabled(False)
             self._status_bar.showMessage("Episode finished")
 
     def _on_status_message(self, message: str) -> None:
         self._status_bar.showMessage(message, 5000)
 
     def _on_awaiting_human(self, waiting: bool, message: str) -> None:
-        self._awaiting_label.setText("Yes" if waiting else "No")
+        """
+        Handle awaiting_human signal to update UI and keyboard shortcuts.
+        
+        Shortcuts are disabled if the episode has finished, regardless of mode.
+        In HUMAN_ONLY mode, shortcuts stay enabled during active episodes.
+        In hybrid modes, shortcuts are only enabled when waiting for human input.
+        """
+        self._control_panel.set_awaiting_human(waiting)
         if message:
             self._status_bar.showMessage(message, 5000)
-        enable_shortcuts = waiting or self._current_mode == ControlMode.HUMAN_ONLY
-        self._human_input.set_enabled(enable_shortcuts)
+        
+        # Never allow input if episode has finished
+        if self._episode_finished:
+            self._human_input.set_enabled(False)
+            return
+        
+        mode = self._control_panel.current_mode()
+        
+        # In HUMAN_ONLY mode, shortcuts should always stay enabled during active episodes
+        if mode == ControlMode.HUMAN_ONLY:
+            # Only enable if waiting=True (to turn them on initially)
+            # Never disable them (ignore waiting=False) unless episode finished
+            if waiting:
+                self._human_input.set_enabled(True)
+            # If waiting=False, do nothing - keep shortcuts enabled
+        else:
+            # In hybrid modes, enable/disable based on whose turn it is
+            self._human_input.set_enabled(waiting)
 
     def _on_turn_changed(self, turn: str) -> None:
-        self._turn_label.setText(turn)
+        self._control_panel.set_turn(turn)
 
     def _on_error(self, message: str) -> None:
         QtWidgets.QMessageBox.critical(self, "Session Error", message)
@@ -360,7 +448,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _on_auto_play_state(self, running: bool) -> None:
         self._auto_running = running
-        self._update_control_states()
+        self._control_panel.set_auto_running(running)
 
     def _append_log_record(self, payload: LogRecordPayload) -> None:
         self._log_records.append(payload)
@@ -399,64 +487,13 @@ class MainWindow(QtWidgets.QMainWindow):
         return "Yes" if value else "No"
 
     def _refresh_time_labels(self) -> None:
-        timers = self._session.timers
-        self._session_time_label.setText(timers.launch_elapsed_formatted())
-        self._active_time_label.setText(timers.first_move_elapsed_formatted())
-        self._outcome_time_label.setText(timers.outcome_timestamp_formatted())
-
-    def _clear_config_layout(self) -> None:
-        while self._config_layout.count():
-            item = self._config_layout.takeAt(0)
-            if item is None:
-                continue
-            widget = item.widget()
-            if widget is not None:
-                widget.deleteLater()
-            layout = item.layout()
-            if layout is not None:
-                layout.deleteLater()
-
-    def _refresh_game_config_ui(self) -> None:
-        self._clear_config_layout()
-        if self._frozen_slippery_checkbox is not None:
-            try:
-                self._frozen_slippery_checkbox.deleteLater()
-            except RuntimeError:
-                pass
-            self._frozen_slippery_checkbox = None
-
-        if self._current_game == GameId.FROZEN_LAKE:
-            overrides = self._game_overrides.setdefault(GameId.FROZEN_LAKE, {})
-            value = overrides.get(
-                "frozen_lake_is_slippery",
-                self._settings.frozen_lake_is_slippery,
-            )
-            overrides["frozen_lake_is_slippery"] = value
-            checkbox = QtWidgets.QCheckBox("Enable slippery ice (stochastic)", self._config_group)
-            checkbox.setChecked(bool(value))
-            checkbox.stateChanged.connect(self._on_frozen_slippery_toggled)
-            self._frozen_slippery_checkbox = checkbox
-            self._config_layout.addRow("Slippery ice", checkbox)
-        else:
-            placeholder = QtWidgets.QLabel("No overrides available for this game.")
-            placeholder.setWordWrap(True)
-            self._config_layout.addRow(placeholder)
-
-    def _update_control_states(self) -> None:
-        is_human = self._current_mode == ControlMode.HUMAN_ONLY
-        if self._auto_running:
-            self._play_button.setEnabled(False)
-            self._pause_button.setEnabled(True)
-        else:
-            self._play_button.setEnabled(not is_human)
-            self._pause_button.setEnabled(False)
-        self._step_button.setEnabled((not is_human) and not self._auto_running)
-        self._human_input.update_for_mode(self._current_mode)
-        base_enabled = (
-            self._current_mode in {ControlMode.HUMAN_ONLY, ControlMode.HYBRID_HUMAN_AGENT}
-            or self._awaiting_label.text().lower() == "yes"
+        """Update time labels in control panel."""
+        timers = self._session._timers
+        self._control_panel.set_time_labels(
+            session_time=timers.launch_elapsed_formatted(),
+            active_time=timers.first_move_elapsed_formatted(),
+            outcome_time=timers.outcome_timestamp_formatted(),
         )
-        self._human_input.set_enabled(base_enabled)
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:  # pragma: no cover - GUI only
         logging.getLogger().removeHandler(self._log_handler)
@@ -471,31 +508,50 @@ class RenderView(QtWidgets.QTabWidget):
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
-        self._grid_table = QtWidgets.QTableWidget()
-        self._grid_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
-        horizontal_header = self._grid_table.horizontalHeader()
-        if horizontal_header is not None:
-            horizontal_header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
-        vertical_header = self._grid_table.verticalHeader()
-        if vertical_header is not None:
-            vertical_header.setSectionResizeMode(QtWidgets.QHeaderView.ResizeMode.Stretch)
-        self._grid_table.setAlternatingRowColors(True)
-        self._grid_table.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-
+        
+        # Use QGraphicsView for responsive, scalable rendering
+        self._grid_view = QtWidgets.QGraphicsView()
+        self._grid_view.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        # Set background to match typical game backgrounds
+        self._grid_view.setBackgroundBrush(QtGui.QBrush(QtGui.QColor(240, 240, 240)))
+        
         self._raw_text = QtWidgets.QPlainTextEdit()
         self._raw_text.setReadOnly(True)
         self._raw_text.setLineWrapMode(QtWidgets.QPlainTextEdit.LineWrapMode.NoWrap)
 
-        self.addTab(self._grid_table, "Grid")
+        self.addTab(self._grid_view, "Grid")
         self.addTab(self._raw_text, "Raw")
         self.setTabEnabled(0, False)
+        
+        # Initialize grid renderer with QGraphicsView
+        self._grid_renderer = GridRenderer(self._grid_view)
+        self._current_game: GameId | None = None
 
     def display(self, payload: object) -> None:
         if isinstance(payload, dict):
             mode = payload.get("mode")
+            game_id_str = payload.get("game_id")  # We'll need to pass this
+            
             if mode == RenderMode.GRID.value and "grid" in payload:
+                grid = payload["grid"]
                 agent_pos = payload.get("agent_position")
-                self._render_grid(payload["grid"], agent_pos)
+                taxi_state = payload.get("taxi_state")
+                terminated = payload.get("terminated", False)
+                
+                # Infer game from grid or use last known
+                if self._current_game is not None:
+                    game_id = self._current_game
+                else:
+                    # Try to infer from payload or default
+                    game_id = GameId.FROZEN_LAKE
+                
+                self._render_grid_with_assets(grid, game_id, agent_pos, taxi_state, terminated, payload)
+                
+                # Update raw tab with ANSI codes stripped
+                ansi = payload.get("ansi", "")
+                if ansi:
+                    clean_text = self._strip_ansi_codes(ansi)
+                    self._raw_text.setPlainText(clean_text)
             else:
                 text = payload.get("ansi") or payload.get("text") or str(payload)
                 self._raw_text.setPlainText(text)
@@ -510,31 +566,42 @@ class RenderView(QtWidgets.QTabWidget):
             self.setTabEnabled(0, False)
             self.setCurrentWidget(self._raw_text)
 
-    def _render_grid(self, grid: List[List[str]], agent_position: tuple[int, int] | None = None) -> None:
+    def set_current_game(self, game_id: GameId) -> None:
+        """Set the current game for rendering context."""
+        self._current_game = game_id
+
+    @staticmethod
+    def _strip_ansi_codes(text: str) -> str:
+        """Remove ANSI escape codes and action indicators from text for clean display."""
+        import re
+        # Pattern matches ANSI escape sequences like [41m, [0m, etc.
+        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
+        text = ansi_escape.sub('', text)
+        
+        # Remove Gymnasium action indicators like "  (Right)", "  (Up)", etc.
+        # They appear at the start of the render output
+        action_indicator = re.compile(r'^\s*\([A-Za-z]+\)\s*\n?', re.MULTILINE)
+        text = action_indicator.sub('', text)
+        
+        return text.strip()
+
+    def _render_grid_with_assets(
+        self,
+        grid: List[List[str]],
+        game_id: GameId,
+        agent_position: tuple[int, int] | None = None,
+        taxi_state: dict | None = None,
+        terminated: bool = False,
+        payload: dict | None = None,
+    ) -> None:
+        """Render grid using asset-based renderer."""
         # Support legacy payloads that provide a list of strings
         if grid and isinstance(grid[0], str):
             grid = [list(row) for row in grid]
 
-        rows = len(grid)
-        cols = len(grid[0]) if rows else 0
-        self._grid_table.clearContents()
-        self._grid_table.setRowCount(rows)
-        self._grid_table.setColumnCount(cols)
-        for r, row in enumerate(grid):
-            for c, value in enumerate(row):
-                item = QtWidgets.QTableWidgetItem(value)
-                item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-                self._grid_table.setItem(r, c, item)
-        if agent_position is not None:
-            r, c = agent_position
-            item = self._grid_table.item(r, c)
-            if item is not None:
-                item.setBackground(QtGui.QColor("#4CAF50"))
-                item.setForeground(QtGui.QColor("#ffffff"))
+        self._grid_renderer.render(grid, game_id, agent_position, taxi_state, terminated, payload)
         self.setTabEnabled(0, True)
-        self.setCurrentWidget(self._grid_table)
-        # Ensure raw tab mirrors latest ansi if available
-        self._raw_text.setPlainText("\n".join("".join(row) for row in grid))
+        self.setCurrentWidget(self._grid_view)
 
 
 __all__ = ["MainWindow", "RenderView"]
