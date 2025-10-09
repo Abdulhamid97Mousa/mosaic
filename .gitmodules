@@ -37,3 +37,20 @@
 [submodule "spadeBDI_RL"]
   path = spadeBDI_RL
   url = https://github.com/ZahraD-a/spadeBDI_RL.git
+
+[submodule "fbs"]
+  path = fbs
+  url = https://github.com/mherrmann/fbs.git
+
+[submodule "fbs-tutorial"]
+  path = fbs-tutorial
+  url = https://github.com/mherrmann/fbs-tutorial
+
+[submodule "BallonsTranslator"]
+  path = BallonsTranslator
+  url = https://github.com/dmMaze/BallonsTranslator.git
+
+[submodule "pyqt-examples"]
+  path = pyqt-examples
+  url = https://github.com/pyqt/examples.git
+  
