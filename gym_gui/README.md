@@ -83,7 +83,6 @@ gym_gui/
    services/                 # Cross-cutting services (e.g., orchestrators)
    storage/
       __init__.py
-      filesystem.py           # Persistence helpers for sessions/replays
    ui/                       # Qt Designer files and resources (future phases)
    utils/
       __init__.py

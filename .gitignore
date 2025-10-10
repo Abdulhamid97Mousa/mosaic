@@ -13,6 +13,11 @@ __pycache__/
 *.pyd
 *.pyo
 
+gym_gui/*.pyc
+gym_gui/*.pyo
+gym_gui/*.pyd
+gym_gui/*.pyo
+
 # Local environment overrides for the Gym GUI project
 .env
 
