@@ -7,6 +7,11 @@ from gym_gui.core.adapters import (
 	CliffWalkingAdapter,
 	TaxiAdapter,
 	TOY_TEXT_ADAPTERS,
+	Box2DAdapter,
+	LunarLanderAdapter,
+	CarRacingAdapter,
+	BipedalWalkerAdapter,
+	BOX2D_ADAPTERS,
 )
 
 __all__ = [
@@ -16,4 +21,9 @@ __all__ = [
 	"CliffWalkingAdapter",
 	"TaxiAdapter",
 	"TOY_TEXT_ADAPTERS",
+	"Box2DAdapter",
+	"LunarLanderAdapter",
+	"CarRacingAdapter",
+	"BipedalWalkerAdapter",
+	"BOX2D_ADAPTERS",
 ]

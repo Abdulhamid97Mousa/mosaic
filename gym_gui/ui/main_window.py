@@ -8,17 +8,26 @@ from typing import Any, Dict, List
 
 from qtpy import QtCore, QtGui, QtWidgets
 
-from gym_gui.config.game_configs import CliffWalkingConfig, FrozenLakeConfig, TaxiConfig
+from gym_gui.config.game_configs import (
+    CliffWalkingConfig,
+    CarRacingConfig,
+    BipedalWalkerConfig,
+    FrozenLakeConfig,
+    LunarLanderConfig,
+    TaxiConfig,
+)
 from gym_gui.config.settings import Settings
-from gym_gui.core.enums import ControlMode, GameId, RenderMode
+from gym_gui.core.enums import ControlMode, GameId
 from gym_gui.core.factories.adapters import available_games
 from gym_gui.controllers.human_input import HumanInputController
 from gym_gui.controllers.session import SessionController
-from gym_gui.rendering.grid_renderer import GridRenderer
 from gym_gui.ui.logging_bridge import LogRecordPayload, QtLogHandler
 from gym_gui.ui.presenters.main_window_presenter import MainWindowPresenter, MainWindowView
 from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWidget
+from gym_gui.ui.widgets.render_tabs import RenderTabs
 from gym_gui.docs.game_info import get_game_info
+from gym_gui.services.service_locator import get_service_locator
+from gym_gui.services.telemetry import TelemetryService
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -50,6 +59,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._auto_running = False
         self._episode_finished = False  # Track episode termination state
         self._human_input = HumanInputController(self, self._session)
+        locator = get_service_locator()
+        self._telemetry_service = locator.resolve(TelemetryService)
         
         # Build control panel config
         available_modes = {}
@@ -62,6 +73,9 @@ class MainWindow(QtWidgets.QMainWindow):
             frozen_lake_config=FrozenLakeConfig(is_slippery=True),
             taxi_config=TaxiConfig(is_raining=False, fickle_passenger=False),
             cliff_walking_config=CliffWalkingConfig(is_slippery=False),
+            lunar_lander_config=LunarLanderConfig(),
+            car_racing_config=CarRacingConfig.from_env(),
+            bipedal_walker_config=BipedalWalkerConfig.from_env(),
         )
         
         self._control_panel = ControlPanelWidget(config=control_config, parent=self)
@@ -85,6 +99,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._time_refresh_timer.timeout.connect(self._refresh_time_labels)
         self._time_refresh_timer.start()
         self._refresh_time_labels()
+        self._render_tabs.refresh_replays()
         
         # Bind presenter to view
         self._wire_presenter()
@@ -96,7 +111,7 @@ class MainWindow(QtWidgets.QMainWindow):
             status_message_sink=lambda msg, timeout: self._status_bar.showMessage(msg, timeout or 0),
             awaiting_label_setter=lambda waiting: self._on_awaiting_human(waiting, ""),
             turn_label_setter=lambda turn: self._control_panel.set_turn(turn),
-            render_adapter=lambda payload: self._render_view.display(payload),
+            render_adapter=lambda payload: self._render_tabs.display_payload(payload),
             time_refresher=self._refresh_time_labels,
             game_info_setter=self._set_game_info,
         )
@@ -134,8 +149,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._render_group = QtWidgets.QGroupBox("Render View", right_panel)
         render_layout = QtWidgets.QVBoxLayout(self._render_group)
-        self._render_view = RenderView(self._render_group)
-        render_layout.addWidget(self._render_view)
+        self._render_tabs = RenderTabs(
+            self._render_group,
+            telemetry_service=self._telemetry_service,
+        )
+        render_layout.addWidget(self._render_tabs)
         right_panel.addWidget(self._render_group)
 
         self._log_group = QtWidgets.QGroupBox("Runtime Log", right_panel)
@@ -180,6 +198,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._control_panel.slippery_toggled.connect(self._on_slippery_toggled)
         self._control_panel.taxi_config_changed.connect(self._on_taxi_config_changed)
         self._control_panel.cliff_config_changed.connect(self._on_cliff_config_changed)
+        self._control_panel.lunar_config_changed.connect(self._on_lunar_config_changed)
+        self._control_panel.car_config_changed.connect(self._on_car_config_changed)
+        self._control_panel.bipedal_config_changed.connect(self._on_bipedal_config_changed)
         
         # Connect log filter
         self._log_filter.currentTextChanged.connect(self._on_log_filter_changed)
@@ -322,11 +343,126 @@ class MainWindow(QtWidgets.QMainWindow):
                 5000,
             )
 
+    def _on_lunar_config_changed(self, param_name: str, value: object) -> None:
+        """Handle LunarLander configuration changes from control panel."""
+        label_map = {
+            "continuous": "continuous control",
+            "gravity": "gravity",
+            "enable_wind": "wind",
+            "wind_power": "wind power",
+            "turbulence_power": "turbulence",
+        }
+        current_game = self._control_panel.current_game()
+        descriptor = label_map.get(param_name, param_name)
+        if value is None:
+            value_str = "default"
+        elif isinstance(value, bool):
+            value_str = "enabled" if value else "disabled"
+        elif isinstance(value, (int, float)):
+            value_str = f"{value:.2f}"
+        else:
+            value_str = str(value)
+        reloading = current_game == GameId.LUNAR_LANDER and self._session.game_id == GameId.LUNAR_LANDER
+        message = f"Lunar Lander {descriptor} updated to {value_str}."
+        if reloading:
+            message += " Reloading to apply..."
+        self._status_bar.showMessage(message, 5000 if reloading else 4000)
+
+        if reloading:
+            mode = self._control_panel.current_mode()
+            seed = self._control_panel.current_seed()
+            overrides = self._control_panel.get_overrides(GameId.LUNAR_LANDER)
+            game_config = self._build_game_config(GameId.LUNAR_LANDER, overrides)
+            self._session.load_environment(
+                GameId.LUNAR_LANDER,
+                mode,
+                seed=seed,
+                game_config=game_config,
+            )
+
+    def _on_car_config_changed(self, param_name: str, value: object) -> None:
+        """Handle CarRacing configuration changes from control panel."""
+        label_map = {
+            "continuous": "continuous control",
+            "domain_randomize": "domain randomization",
+            "lap_complete_percent": "lap completion requirement",
+            "max_episode_steps": "episode step limit",
+            "max_episode_seconds": "episode time limit",
+        }
+        current_game = self._control_panel.current_game()
+        descriptor = label_map.get(param_name, param_name)
+        if isinstance(value, bool):
+            value_str = "enabled" if value else "disabled"
+        elif isinstance(value, (int, float)):
+            value_str = f"{value:.2f}"
+        else:
+            value_str = str(value)
+        reloading = current_game == GameId.CAR_RACING and self._session.game_id == GameId.CAR_RACING
+        message = f"Car Racing {descriptor} updated to {value_str}."
+        if reloading:
+            message += " Reloading to apply..."
+        self._status_bar.showMessage(message, 5000 if reloading else 4000)
+
+        if reloading:
+            mode = self._control_panel.current_mode()
+            seed = self._control_panel.current_seed()
+            overrides = self._control_panel.get_overrides(GameId.CAR_RACING)
+            game_config = self._build_game_config(GameId.CAR_RACING, overrides)
+            self._session.load_environment(
+                GameId.CAR_RACING,
+                mode,
+                seed=seed,
+                game_config=game_config,
+            )
+
+    def _on_bipedal_config_changed(self, param_name: str, value: object) -> None:
+        """Handle BipedalWalker configuration changes from control panel."""
+        label_map = {
+            "hardcore": "hardcore terrain",
+            "max_episode_steps": "episode step limit",
+            "max_episode_seconds": "episode time limit",
+        }
+        current_game = self._control_panel.current_game()
+        descriptor = label_map.get(param_name, param_name)
+        if value is None:
+            value_str = "default"
+        elif isinstance(value, bool):
+            value_str = "enabled" if value else "disabled"
+        elif isinstance(value, (int, float)):
+            value_str = f"{value:.2f}"
+        else:
+            value_str = str(value)
+        reloading = current_game == GameId.BIPEDAL_WALKER and self._session.game_id == GameId.BIPEDAL_WALKER
+        message = f"Bipedal Walker {descriptor} {value_str}."
+        if reloading:
+            message += " Reloading to apply..."
+        self._status_bar.showMessage(message, 5000 if reloading else 4000)
+
+        if reloading:
+            mode = self._control_panel.current_mode()
+            seed = self._control_panel.current_seed()
+            overrides = self._control_panel.get_overrides(GameId.BIPEDAL_WALKER)
+            game_config = self._build_game_config(GameId.BIPEDAL_WALKER, overrides)
+            self._session.load_environment(
+                GameId.BIPEDAL_WALKER,
+                mode,
+                seed=seed,
+                game_config=game_config,
+            )
+
     def _build_game_config(
         self,
         game_id: GameId,
         overrides: dict[str, Any],
-    ) -> FrozenLakeConfig | TaxiConfig | CliffWalkingConfig | None:
+    ) -> (
+        FrozenLakeConfig
+        | TaxiConfig
+        | CliffWalkingConfig
+        | LunarLanderConfig
+        | CarRacingConfig
+        | BipedalWalkerConfig
+        | None
+    ):
         """Build game configuration from control panel overrides."""
         if game_id == GameId.FROZEN_LAKE:
             is_slippery = bool(overrides.get("is_slippery", True))
@@ -338,6 +474,69 @@ class MainWindow(QtWidgets.QMainWindow):
         elif game_id == GameId.CLIFF_WALKING:
             is_slippery = bool(overrides.get("is_slippery", False))
             return CliffWalkingConfig(is_slippery=is_slippery)
+        elif game_id == GameId.LUNAR_LANDER:
+            continuous = bool(overrides.get("continuous", False))
+            gravity = overrides.get("gravity", -10.0)
+            enable_wind = bool(overrides.get("enable_wind", False))
+            wind_power = overrides.get("wind_power", 15.0)
+            turbulence_power = overrides.get("turbulence_power", 1.5)
+            try:
+                gravity_value = float(gravity)
+            except (TypeError, ValueError):
+                gravity_value = -10.0
+            try:
+                wind_power_value = float(wind_power)
+            except (TypeError, ValueError):
+                wind_power_value = 15.0
+            try:
+                turbulence_value = float(turbulence_power)
+            except (TypeError, ValueError):
+                turbulence_value = 1.5
+            return LunarLanderConfig(
+                continuous=continuous,
+                gravity=gravity_value,
+                enable_wind=enable_wind,
+                wind_power=wind_power_value,
+                turbulence_power=turbulence_value,
+            )
+        elif game_id == GameId.CAR_RACING:
+            continuous = bool(overrides.get("continuous", False))
+            domain_randomize = bool(overrides.get("domain_randomize", False))
+            lap_percent = overrides.get("lap_complete_percent", 0.95)
+            try:
+                lap_value = float(lap_percent)
+            except (TypeError, ValueError):
+                lap_value = 0.95
+            steps_override = overrides.get("max_episode_steps")
+            seconds_override = overrides.get("max_episode_seconds")
+            max_steps: int | None = None
+            max_seconds: float | None = None
+            if isinstance(steps_override, (int, float)) and int(steps_override) > 0:
+                max_steps = int(steps_override)
+            if isinstance(seconds_override, (int, float)) and float(seconds_override) > 0:
+                max_seconds = float(seconds_override)
+            return CarRacingConfig(
+                continuous=continuous,
+                domain_randomize=domain_randomize,
+                lap_complete_percent=lap_value,
+                max_episode_steps=max_steps,
+                max_episode_seconds=max_seconds,
+            )
+        elif game_id == GameId.BIPEDAL_WALKER:
+            hardcore = bool(overrides.get("hardcore", False))
+            steps_override = overrides.get("max_episode_steps")
+            seconds_override = overrides.get("max_episode_seconds")
+            max_steps: int | None = None
+            max_seconds: float | None = None
+            if isinstance(steps_override, (int, float)) and int(steps_override) > 0:
+                max_steps = int(steps_override)
+            if isinstance(seconds_override, (int, float)) and float(seconds_override) > 0:
+                max_seconds = float(seconds_override)
+            return BipedalWalkerConfig(
+                hardcore=hardcore,
+                max_episode_steps=max_steps,
+                max_episode_seconds=max_seconds,
+            )
         else:
             return None
 
@@ -355,7 +554,7 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # Notify render view of current game for asset selection
         if self._session.game_id is not None:
-            self._render_view.set_current_game(self._session.game_id)
+            self._render_tabs.set_current_game(self._session.game_id)
             # Update game info with a slightly more detailed description (include mode)
             try:
                 gid = GameId(self._session.game_id)
@@ -394,10 +593,11 @@ class MainWindow(QtWidgets.QMainWindow):
             session_time=self._session._timers.launch_elapsed_formatted(),
             active_time=self._session._timers.first_move_elapsed_formatted(),
             episode_duration=self._session._timers.episode_duration_formatted(),
-            outcome_time=self._session._timers.outcome_timestamp_formatted(),
+            outcome_time=self._session._timers.outcome_elapsed_formatted(),
+            outcome_wall_clock=self._session._timers.outcome_wall_clock_formatted(),
         )
         
-        self._render_view.display(render_payload)
+        self._render_tabs.display_payload(render_payload)
 
     def _on_episode_finished(self, finished: bool) -> None:
         self._episode_finished = finished
@@ -405,6 +605,7 @@ class MainWindow(QtWidgets.QMainWindow):
             # Disable shortcuts when episode terminates
             self._human_input.set_enabled(False)
             self._status_bar.showMessage("Episode finished")
+            self._render_tabs.on_episode_finished()
 
     def _on_status_message(self, message: str) -> None:
         self._status_bar.showMessage(message, 5000)
@@ -492,7 +693,8 @@ class MainWindow(QtWidgets.QMainWindow):
         self._control_panel.set_time_labels(
             session_time=timers.launch_elapsed_formatted(),
             active_time=timers.first_move_elapsed_formatted(),
-            outcome_time=timers.outcome_timestamp_formatted(),
+            outcome_time=timers.outcome_elapsed_formatted(),
+            outcome_timestamp=timers.outcome_wall_clock_formatted(),
         )
 
     def closeEvent(self, event: QtGui.QCloseEvent) -> None:  # pragma: no cover - GUI only
@@ -501,107 +703,4 @@ class MainWindow(QtWidgets.QMainWindow):
         if hasattr(self, "_time_refresh_timer") and self._time_refresh_timer.isActive():
             self._time_refresh_timer.stop()
         super().closeEvent(event)
-
-
-class RenderView(QtWidgets.QTabWidget):
-    """Render pane supporting grid and raw text displays."""
-
-    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
-        super().__init__(parent)
-        
-        # Use QGraphicsView for responsive, scalable rendering
-        self._grid_view = QtWidgets.QGraphicsView()
-        self._grid_view.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        # Set background to match typical game backgrounds
-        self._grid_view.setBackgroundBrush(QtGui.QBrush(QtGui.QColor(240, 240, 240)))
-        
-        self._raw_text = QtWidgets.QPlainTextEdit()
-        self._raw_text.setReadOnly(True)
-        self._raw_text.setLineWrapMode(QtWidgets.QPlainTextEdit.LineWrapMode.NoWrap)
-
-        self.addTab(self._grid_view, "Grid")
-        self.addTab(self._raw_text, "Raw")
-        self.setTabEnabled(0, False)
-        
-        # Initialize grid renderer with QGraphicsView
-        self._grid_renderer = GridRenderer(self._grid_view)
-        self._current_game: GameId | None = None
-
-    def display(self, payload: object) -> None:
-        if isinstance(payload, dict):
-            mode = payload.get("mode")
-            game_id_str = payload.get("game_id")  # We'll need to pass this
-            
-            if mode == RenderMode.GRID.value and "grid" in payload:
-                grid = payload["grid"]
-                agent_pos = payload.get("agent_position")
-                taxi_state = payload.get("taxi_state")
-                terminated = payload.get("terminated", False)
-                
-                # Infer game from grid or use last known
-                if self._current_game is not None:
-                    game_id = self._current_game
-                else:
-                    # Try to infer from payload or default
-                    game_id = GameId.FROZEN_LAKE
-                
-                self._render_grid_with_assets(grid, game_id, agent_pos, taxi_state, terminated, payload)
-                
-                # Update raw tab with ANSI codes stripped
-                ansi = payload.get("ansi", "")
-                if ansi:
-                    clean_text = self._strip_ansi_codes(ansi)
-                    self._raw_text.setPlainText(clean_text)
-            else:
-                text = payload.get("ansi") or payload.get("text") or str(payload)
-                self._raw_text.setPlainText(text)
-                self.setTabEnabled(0, False)
-                self.setCurrentWidget(self._raw_text)
-        elif payload is None:
-            self._raw_text.setPlainText("No render payload yet.")
-            self.setTabEnabled(0, False)
-            self.setCurrentWidget(self._raw_text)
-        else:
-            self._raw_text.setPlainText(str(payload))
-            self.setTabEnabled(0, False)
-            self.setCurrentWidget(self._raw_text)
-
-    def set_current_game(self, game_id: GameId) -> None:
-        """Set the current game for rendering context."""
-        self._current_game = game_id
-
-    @staticmethod
-    def _strip_ansi_codes(text: str) -> str:
-        """Remove ANSI escape codes and action indicators from text for clean display."""
-        import re
-        # Pattern matches ANSI escape sequences like [41m, [0m, etc.
-        ansi_escape = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
-        text = ansi_escape.sub('', text)
-        
-        # Remove Gymnasium action indicators like "  (Right)", "  (Up)", etc.
-        # They appear at the start of the render output
-        action_indicator = re.compile(r'^\s*\([A-Za-z]+\)\s*\n?', re.MULTILINE)
-        text = action_indicator.sub('', text)
-        
-        return text.strip()
-
-    def _render_grid_with_assets(
-        self,
-        grid: List[List[str]],
-        game_id: GameId,
-        agent_position: tuple[int, int] | None = None,
-        taxi_state: dict | None = None,
-        terminated: bool = False,
-        payload: dict | None = None,
-    ) -> None:
-        """Render grid using asset-based renderer."""
-        # Support legacy payloads that provide a list of strings
-        if grid and isinstance(grid[0], str):
-            grid = [list(row) for row in grid]
-
-        self._grid_renderer.render(grid, game_id, agent_position, taxi_state, terminated, payload)
-        self.setTabEnabled(0, True)
-        self.setCurrentWidget(self._grid_view)
-
-
-__all__ = ["MainWindow", "RenderView"]
+__all__ = ["MainWindow"]

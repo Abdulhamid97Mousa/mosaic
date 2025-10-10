@@ -6,7 +6,9 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 import os
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, TYPE_CHECKING
+import yaml  # type: ignore[import-not-found]
+
 
 from dotenv import load_dotenv
 
@@ -15,6 +17,7 @@ from gym_gui.core.enums import ControlMode
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 _PROJECT_ROOT = _PACKAGE_ROOT.parent
 _ENV_FILE = _PROJECT_ROOT / ".env"
+_STORAGE_PROFILE_FILE = _PROJECT_ROOT / "gym_gui" / "config" / "storage_profiles.yaml"
 
 # Load environment variables from the project root if present. We do this once at
 # import time so that any module importing settings has access to the values.
@@ -126,3 +129,32 @@ def reload_settings() -> Settings:
 
 
 __all__ = ["Settings", "get_settings", "reload_settings"]
+
+
+@lru_cache(maxsize=1)
+def get_storage_profile_config() -> dict[str, dict[str, object]]:
+    """Load raw storage profile settings from YAML configuration."""
+
+    if not _STORAGE_PROFILE_FILE.exists():
+        return {}
+
+    if yaml is None:
+        raise RuntimeError(
+            "PyYAML is required to load storage profiles. Run 'pip install -r requirements.txt'."
+        )
+
+    with _STORAGE_PROFILE_FILE.open("r", encoding="utf-8") as handle:
+        data = yaml.safe_load(handle) or {}
+
+    if not isinstance(data, dict):
+        raise ValueError("storage_profiles.yaml must define a mapping of profiles")
+
+    normalized: dict[str, dict[str, object]] = {}
+    for name, raw in data.items():
+        if isinstance(raw, dict):
+            normalized[name] = raw
+
+    return normalized
+
+
+__all__.append("get_storage_profile_config")

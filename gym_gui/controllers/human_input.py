@@ -30,30 +30,47 @@ def _qt_key(name: str) -> int:
     return legacy
 
 
-def _key_sequences(*names: str) -> Tuple[QKeySequence, ...]:
-    return tuple(QKeySequence(_qt_key(name)) for name in names)
+def _mapping(names: Iterable[str], action: int) -> ShortcutMapping:
+    sequences = tuple(QKeySequence(_qt_key(name)) for name in names)
+    return ShortcutMapping(sequences, action)
 
 
 _TOY_TEXT_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
     GameId.FROZEN_LAKE: (
-        ShortcutMapping(_key_sequences("Key_Left", "Key_A"), 0),
-        ShortcutMapping(_key_sequences("Key_Down", "Key_S"), 1),
-        ShortcutMapping(_key_sequences("Key_Right", "Key_D"), 2),
-        ShortcutMapping(_key_sequences("Key_Up", "Key_W"), 3),
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Down", "Key_S"), 1),
+        _mapping(("Key_Right", "Key_D"), 2),
+        _mapping(("Key_Up", "Key_W"), 3),
     ),
     GameId.CLIFF_WALKING: (
-        ShortcutMapping(_key_sequences("Key_Up", "Key_W"), 0),     # UP
-        ShortcutMapping(_key_sequences("Key_Right", "Key_D"), 1),  # RIGHT
-        ShortcutMapping(_key_sequences("Key_Down", "Key_S"), 2),   # DOWN
-        ShortcutMapping(_key_sequences("Key_Left", "Key_A"), 3),   # LEFT
+        _mapping(("Key_Up", "Key_W"), 0),     # UP
+        _mapping(("Key_Right", "Key_D"), 1),  # RIGHT
+        _mapping(("Key_Down", "Key_S"), 2),   # DOWN
+        _mapping(("Key_Left", "Key_A"), 3),   # LEFT
     ),
     GameId.TAXI: (
-        ShortcutMapping(_key_sequences("Key_Down", "Key_S"), 0),   # SOUTH
-        ShortcutMapping(_key_sequences("Key_Up", "Key_W"), 1),     # NORTH
-        ShortcutMapping(_key_sequences("Key_Right", "Key_D"), 2),  # EAST
-        ShortcutMapping(_key_sequences("Key_Left", "Key_A"), 3),   # WEST
-        ShortcutMapping(_key_sequences("Key_Space"), 4),           # PICKUP
-        ShortcutMapping(_key_sequences("Key_E"), 5),               # DROPOFF
+        _mapping(("Key_Down", "Key_S"), 0),   # SOUTH
+        _mapping(("Key_Up", "Key_W"), 1),     # NORTH
+        _mapping(("Key_Right", "Key_D"), 2),  # EAST
+        _mapping(("Key_Left", "Key_A"), 3),   # WEST
+        _mapping(("Key_Space",), 4),            # PICKUP
+        _mapping(("Key_E",), 5),                # DROPOFF
+    ),
+}
+
+_BOX_2D_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
+    GameId.LUNAR_LANDER: (
+        _mapping(("Key_Space", "Key_S"), 0),  # Idle / cut thrust
+        _mapping(("Key_Left", "Key_A"), 1),   # Fire left engine
+        _mapping(("Key_Up", "Key_W"), 2),     # Fire main engine
+        _mapping(("Key_Right", "Key_D"), 3),  # Fire right engine
+    ),
+    GameId.CAR_RACING: (
+        _mapping(("Key_Space",), 0),           # Neutral / coast
+        _mapping(("Key_Right", "Key_D"), 1), # Steer right
+        _mapping(("Key_Left", "Key_A"), 2),  # Steer left
+        _mapping(("Key_Up", "Key_W"), 3),    # Accelerate
+        _mapping(("Key_Down", "Key_S"), 4),  # Brake
     ),
 }
 
@@ -76,6 +93,8 @@ class HumanInputController(QtCore.QObject):
             return
 
         mappings = _TOY_TEXT_MAPPINGS.get(game_id)
+        if mappings is None:
+            mappings = _BOX_2D_MAPPINGS.get(game_id)
         if mappings is None and isinstance(action_space, spaces.Discrete):
             mappings = self._fallback_mappings(action_space)
 
@@ -120,7 +139,7 @@ class HumanInputController(QtCore.QObject):
         for keys, action in base_mappings:
             if action >= action_space.n:
                 continue
-            sequences.append(ShortcutMapping(_key_sequences(*keys), action))
+            sequences.append(_mapping(keys, action))
         return tuple(sequences)
 
     def update_for_mode(self, mode: ControlMode) -> None:

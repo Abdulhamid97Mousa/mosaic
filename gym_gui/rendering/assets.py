@@ -53,6 +53,18 @@ class AssetManager:
         self._cache.clear()
 
 
+_ASSET_MANAGER_SINGLETON: AssetManager | None = None
+
+
+def get_asset_manager() -> AssetManager:
+    """Return the process-wide asset manager instance."""
+
+    global _ASSET_MANAGER_SINGLETON
+    if _ASSET_MANAGER_SINGLETON is None:
+        _ASSET_MANAGER_SINGLETON = AssetManager()
+    return _ASSET_MANAGER_SINGLETON
+
+
 class FrozenLakeAssets:
     """Asset mappings for FrozenLake environment."""
 
@@ -304,6 +316,7 @@ class CliffWalkingAssets:
 
 __all__ = [
     "AssetManager",
+    "get_asset_manager",
     "FrozenLakeAssets",
     "TaxiAssets",
     "CliffWalkingAssets",

@@ -9,6 +9,7 @@ from typing import Any
 
 from gym_gui.config.settings import Settings, get_settings
 from gym_gui.logging_config.logger import configure_logging
+from gym_gui.services.bootstrap import bootstrap_default_services
 
 
 def _format_settings(settings: Settings) -> str:
@@ -34,6 +35,8 @@ def main() -> int:
     logger = logging.getLogger("gym_gui.app")
     logger.debug("Settings loaded: qt_api=%s default_env=%s", settings.qt_api, settings.gym_default_env)
     print("[gym_gui] Loaded settings:\n" + _format_settings(settings))
+
+    bootstrap_default_services()
 
     try:
         from qtpy.QtWidgets import QApplication

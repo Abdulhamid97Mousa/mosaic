@@ -5,9 +5,17 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any, Iterable, Mapping, TypeVar
 
-from gym_gui.config.game_configs import CliffWalkingConfig, FrozenLakeConfig, TaxiConfig
+from gym_gui.config.game_configs import (
+    CliffWalkingConfig,
+    CarRacingConfig,
+    BipedalWalkerConfig,
+    FrozenLakeConfig,
+    LunarLanderConfig,
+    TaxiConfig,
+)
 from gym_gui.core.adapters.base import AdapterContext, EnvironmentAdapter
 from gym_gui.core.adapters.toy_text import TOY_TEXT_ADAPTERS, ToyTextAdapter
+from gym_gui.core.adapters.box2d import BOX2D_ADAPTERS
 from gym_gui.core.enums import GameId
 
 AdapterT = TypeVar("AdapterT", bound=EnvironmentAdapter)
@@ -27,6 +35,7 @@ def _registry() -> Mapping[GameId, type[EnvironmentAdapter]]:
 
     return {
         **TOY_TEXT_ADAPTERS,
+        **BOX2D_ADAPTERS,
     }
 
 
@@ -49,7 +58,15 @@ def create_adapter(
     game_id: GameId,
     context: AdapterContext | None = None,
     *,
-    game_config: FrozenLakeConfig | TaxiConfig | CliffWalkingConfig | None = None,
+    game_config: (
+        FrozenLakeConfig
+        | TaxiConfig
+        | CliffWalkingConfig
+        | LunarLanderConfig
+        | CarRacingConfig
+        | BipedalWalkerConfig
+        | None
+    ) = None,
 ) -> EnvironmentAdapter:
     """Instantiate the adapter bound to the optional ``context`` and ``game_config``."""
 
@@ -61,6 +78,11 @@ def create_adapter(
         FrozenLakeAdapter,
         TaxiAdapter,
     )
+    from gym_gui.core.adapters.box2d import (
+        BipedalWalkerAdapter,
+        CarRacingAdapter,
+        LunarLanderAdapter,
+    )
     
     # Pass game config to appropriate adapter constructor
     if game_config is not None:
@@ -70,6 +92,12 @@ def create_adapter(
             adapter = TaxiAdapter(context, game_config=game_config)
         elif adapter_cls is CliffWalkingAdapter and isinstance(game_config, CliffWalkingConfig):
             adapter = CliffWalkingAdapter(context, game_config=game_config)
+        elif adapter_cls is LunarLanderAdapter and isinstance(game_config, LunarLanderConfig):
+            adapter = LunarLanderAdapter(context, config=game_config)
+        elif adapter_cls is CarRacingAdapter and isinstance(game_config, CarRacingConfig):
+            adapter = CarRacingAdapter(context, config=game_config)
+        elif adapter_cls is BipedalWalkerAdapter and isinstance(game_config, BipedalWalkerConfig):
+            adapter = BipedalWalkerAdapter(context, config=game_config)
         else:
             adapter = adapter_cls(context)
     else:

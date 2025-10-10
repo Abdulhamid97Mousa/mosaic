@@ -6,7 +6,14 @@ from typing import Dict, Iterable, Optional
 from qtpy import QtCore, QtWidgets
 from PyQt6.QtCore import pyqtSignal as Signal
 
-from gym_gui.config.game_configs import CliffWalkingConfig, FrozenLakeConfig, TaxiConfig
+from gym_gui.config.game_configs import (
+    CliffWalkingConfig,
+    CarRacingConfig,
+    BipedalWalkerConfig,
+    FrozenLakeConfig,
+    LunarLanderConfig,
+    TaxiConfig,
+)
 from gym_gui.core.enums import ControlMode, GameId
 
 
@@ -19,6 +26,9 @@ class ControlPanelConfig:
     frozen_lake_config: FrozenLakeConfig
     taxi_config: TaxiConfig
     cliff_walking_config: CliffWalkingConfig
+    lunar_lander_config: LunarLanderConfig
+    car_racing_config: CarRacingConfig
+    bipedal_walker_config: BipedalWalkerConfig
 
 
 class ControlPanelWidget(QtWidgets.QWidget):
@@ -29,6 +39,9 @@ class ControlPanelWidget(QtWidgets.QWidget):
     slippery_toggled = Signal(bool)
     taxi_config_changed = Signal(str, bool)  # (param_name, value)
     cliff_config_changed = Signal(str, bool)  # (param_name, value)
+    lunar_config_changed = Signal(str, object)  # (param_name, value)
+    car_config_changed = Signal(str, object)  # (param_name, value)
+    bipedal_config_changed = Signal(str, object)  # (param_name, value)
     play_requested = Signal()
     pause_requested = Signal()
     agent_step_requested = Signal()
@@ -49,6 +62,25 @@ class ControlPanelWidget(QtWidgets.QWidget):
                 "fickle_passenger": config.taxi_config.fickle_passenger,
             },
             GameId.CLIFF_WALKING: {"is_slippery": config.cliff_walking_config.is_slippery},
+            GameId.LUNAR_LANDER: {
+                "continuous": config.lunar_lander_config.continuous,
+                "gravity": config.lunar_lander_config.gravity,
+                "enable_wind": config.lunar_lander_config.enable_wind,
+                "wind_power": config.lunar_lander_config.wind_power,
+                "turbulence_power": config.lunar_lander_config.turbulence_power,
+            },
+            GameId.CAR_RACING: {
+                "continuous": config.car_racing_config.continuous,
+                "domain_randomize": config.car_racing_config.domain_randomize,
+                "lap_complete_percent": config.car_racing_config.lap_complete_percent,
+                "max_episode_steps": config.car_racing_config.max_episode_steps,
+                "max_episode_seconds": config.car_racing_config.max_episode_seconds,
+            },
+            GameId.BIPEDAL_WALKER: {
+                "hardcore": config.bipedal_walker_config.hardcore,
+                "max_episode_steps": config.bipedal_walker_config.max_episode_steps,
+                "max_episode_seconds": config.bipedal_walker_config.max_episode_seconds,
+            },
         }
 
         self._current_game: Optional[GameId] = None
@@ -67,6 +99,25 @@ class ControlPanelWidget(QtWidgets.QWidget):
             },
             GameId.CLIFF_WALKING: {
                 "is_slippery": config.cliff_walking_config.is_slippery,
+            },
+            GameId.LUNAR_LANDER: {
+                "continuous": config.lunar_lander_config.continuous,
+                "gravity": config.lunar_lander_config.gravity,
+                "enable_wind": config.lunar_lander_config.enable_wind,
+                "wind_power": config.lunar_lander_config.wind_power,
+                "turbulence_power": config.lunar_lander_config.turbulence_power,
+            },
+            GameId.CAR_RACING: {
+                "continuous": config.car_racing_config.continuous,
+                "domain_randomize": config.car_racing_config.domain_randomize,
+                "lap_complete_percent": config.car_racing_config.lap_complete_percent,
+                "max_episode_steps": config.car_racing_config.max_episode_steps,
+                "max_episode_seconds": config.car_racing_config.max_episode_seconds,
+            },
+            GameId.BIPEDAL_WALKER: {
+                "hardcore": config.bipedal_walker_config.hardcore,
+                "max_episode_steps": config.bipedal_walker_config.max_episode_steps,
+                "max_episode_seconds": config.bipedal_walker_config.max_episode_seconds,
             },
         }
 
@@ -126,6 +177,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         active_time: str,
         episode_duration: str,
         outcome_time: str = "—",
+        outcome_wall_clock: str | None = None,
     ) -> None:
         self._step_label.setText(str(step))
         self._reward_label.setText(f"{reward:.2f}")
@@ -133,7 +185,12 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._truncated_label.setText(self._format_bool(truncated))
         self._turn_label.setText(turn)
         self.set_awaiting_human(awaiting_human)
-        self.set_time_labels(session_time, active_time, outcome_time)
+        self.set_time_labels(
+            session_time,
+            active_time,
+            outcome_time,
+            outcome_timestamp=outcome_wall_clock,
+        )
 
     def set_turn(self, turn: str) -> None:
         self._turn_label.setText(turn)
@@ -188,10 +245,23 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._awaiting_label.setText("Yes" if awaiting else "No")
         self._update_control_states()
 
-    def set_time_labels(self, session_time: str, active_time: str, outcome_time: str) -> None:
+    def set_time_labels(
+        self,
+        session_time: str,
+        active_time: str,
+        outcome_time: str,
+        *,
+        outcome_timestamp: str | None = None,
+    ) -> None:
         self._session_time_label.setText(session_time)
         self._active_time_label.setText(active_time)
         self._outcome_time_label.setText(outcome_time)
+        tooltip = "Elapsed time between the first move and the recorded outcome."
+        if outcome_timestamp and outcome_timestamp != "—":
+            tooltip += f"\nOutcome recorded at {outcome_timestamp}."
+        elif outcome_timestamp == "—":
+            tooltip += "\nOutcome not recorded yet."
+        self._outcome_time_label.setToolTip(tooltip)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -334,7 +404,11 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self.reset_requested.emit(self.current_seed())
 
     def _on_slippery_toggled(self, state: int) -> None:
-        enabled = state == QtCore.Qt.CheckState.Checked
+        try:
+            state_enum = QtCore.Qt.CheckState(state)
+        except ValueError:
+            state_enum = QtCore.Qt.CheckState.Unchecked
+        enabled = state_enum == QtCore.Qt.CheckState.Checked
         overrides = self._game_overrides.setdefault(GameId.FROZEN_LAKE, {})
         overrides["is_slippery"] = enabled
         self.slippery_toggled.emit(enabled)
@@ -350,6 +424,24 @@ class ControlPanelWidget(QtWidgets.QWidget):
         overrides = self._game_overrides.setdefault(GameId.CLIFF_WALKING, {})
         overrides[param_name] = value
         self.cliff_config_changed.emit(param_name, value)
+
+    def _on_lunar_config_changed(self, param_name: str, value: object) -> None:
+        """Handle changes to LunarLander configuration parameters."""
+        overrides = self._game_overrides.setdefault(GameId.LUNAR_LANDER, {})
+        overrides[param_name] = value
+        self.lunar_config_changed.emit(param_name, value)
+
+    def _on_car_config_changed(self, param_name: str, value: object) -> None:
+        """Handle changes to CarRacing configuration parameters."""
+        overrides = self._game_overrides.setdefault(GameId.CAR_RACING, {})
+        overrides[param_name] = value
+        self.car_config_changed.emit(param_name, value)
+
+    def _on_bipedal_config_changed(self, param_name: str, value: object) -> None:
+        """Handle changes to BipedalWalker configuration parameters."""
+        overrides = self._game_overrides.setdefault(GameId.BIPEDAL_WALKER, {})
+        overrides[param_name] = value
+        self.bipedal_config_changed.emit(param_name, value)
 
     # ------------------------------------------------------------------
     # UI state helpers
@@ -401,6 +493,86 @@ class ControlPanelWidget(QtWidgets.QWidget):
             checkbox.stateChanged.connect(self._on_slippery_toggled)
             self._frozen_slippery_checkbox = checkbox
             self._config_layout.addRow("Slippery ice", checkbox)
+        elif self._current_game == GameId.LUNAR_LANDER:
+            overrides = self._game_overrides.setdefault(GameId.LUNAR_LANDER, {})
+            defaults = self._config.lunar_lander_config
+
+            continuous = bool(overrides.get("continuous", defaults.continuous))
+            overrides["continuous"] = continuous
+            continuous_checkbox = QtWidgets.QCheckBox(
+                "Continuous control (Box actions)", self._config_group
+            )
+            continuous_checkbox.setChecked(continuous)
+            continuous_checkbox.toggled.connect(
+                lambda checked: self._on_lunar_config_changed("continuous", bool(checked))
+            )
+            continuous_checkbox.setToolTip(
+                "Continuous control uses analog thrusters. Human-only mode will rely on passive actions."
+            )
+            self._config_layout.addRow("Action space", continuous_checkbox)
+
+            gravity_raw = overrides.get("gravity", defaults.gravity)
+            gravity_value = float(gravity_raw) if isinstance(gravity_raw, (int, float)) else defaults.gravity
+            overrides["gravity"] = gravity_value
+            gravity_spin = QtWidgets.QDoubleSpinBox(self._config_group)
+            gravity_spin.setRange(-12.0, 0.0)
+            gravity_spin.setSingleStep(0.1)
+            gravity_spin.setDecimals(2)
+            gravity_spin.setValue(gravity_value)
+            gravity_spin.valueChanged.connect(
+                lambda value: self._on_lunar_config_changed("gravity", float(value))
+            )
+            gravity_spin.setToolTip("Gravity constant applied to the lander (0 to -12).")
+            self._config_layout.addRow("Gravity", gravity_spin)
+
+            enable_wind = bool(overrides.get("enable_wind", defaults.enable_wind))
+            overrides["enable_wind"] = enable_wind
+            wind_checkbox = QtWidgets.QCheckBox("Enable wind", self._config_group)
+            wind_checkbox.setChecked(enable_wind)
+            self._config_layout.addRow("Wind", wind_checkbox)
+
+            wind_power_raw = overrides.get("wind_power", defaults.wind_power)
+            wind_power_value = float(wind_power_raw) if isinstance(wind_power_raw, (int, float)) else defaults.wind_power
+            overrides["wind_power"] = wind_power_value
+            wind_spin = QtWidgets.QDoubleSpinBox(self._config_group)
+            wind_spin.setRange(0.0, 20.0)
+            wind_spin.setSingleStep(0.5)
+            wind_spin.setDecimals(2)
+            wind_spin.setValue(wind_power_value)
+            wind_spin.setEnabled(enable_wind)
+            wind_spin.valueChanged.connect(
+                lambda value: self._on_lunar_config_changed("wind_power", float(value))
+            )
+            wind_spin.setToolTip("Maximum horizontal wind magnitude (0-20).")
+            self._config_layout.addRow("Wind power", wind_spin)
+
+            turbulence_raw = overrides.get("turbulence_power", defaults.turbulence_power)
+            turbulence_value = (
+                float(turbulence_raw)
+                if isinstance(turbulence_raw, (int, float))
+                else defaults.turbulence_power
+            )
+            overrides["turbulence_power"] = turbulence_value
+            turbulence_spin = QtWidgets.QDoubleSpinBox(self._config_group)
+            turbulence_spin.setRange(0.0, 5.0)
+            turbulence_spin.setSingleStep(0.1)
+            turbulence_spin.setDecimals(2)
+            turbulence_spin.setValue(turbulence_value)
+            turbulence_spin.setEnabled(enable_wind)
+            turbulence_spin.valueChanged.connect(
+                lambda value: self._on_lunar_config_changed("turbulence_power", float(value))
+            )
+            turbulence_spin.setToolTip("Maximum rotational gust strength (0-5).")
+            self._config_layout.addRow("Turbulence", turbulence_spin)
+
+            def _update_wind_controls(enabled: bool, *, emit: bool = True) -> None:
+                wind_spin.setEnabled(enabled)
+                turbulence_spin.setEnabled(enabled)
+                if emit:
+                    self._on_lunar_config_changed("enable_wind", bool(enabled))
+
+            wind_checkbox.toggled.connect(lambda checked: _update_wind_controls(checked, emit=True))
+            _update_wind_controls(enable_wind, emit=False)
         elif self._current_game == GameId.TAXI:
             # Add Taxi-specific configuration options
             overrides = self._game_overrides.setdefault(GameId.TAXI, {})
@@ -437,6 +609,129 @@ class ControlPanelWidget(QtWidgets.QWidget):
                 lambda state: self._on_cliff_config_changed("is_slippery", state == QtCore.Qt.CheckState.Checked.value)
             )
             self._config_layout.addRow("Slippery", slippery_checkbox)
+        elif self._current_game == GameId.CAR_RACING:
+            overrides = self._game_overrides.setdefault(GameId.CAR_RACING, {})
+            defaults = self._config.car_racing_config
+
+            continuous = bool(overrides.get("continuous", defaults.continuous))
+            overrides["continuous"] = continuous
+            continuous_checkbox = QtWidgets.QCheckBox("Continuous control (Box actions)", self._config_group)
+            continuous_checkbox.setChecked(continuous)
+            continuous_checkbox.toggled.connect(
+                lambda checked: self._on_car_config_changed("continuous", bool(checked))
+            )
+            continuous_checkbox.setToolTip(
+                "Continuous control exposes steering, gas, and brake as float actions."
+            )
+            self._config_layout.addRow("Action space", continuous_checkbox)
+
+            domain_randomize = bool(overrides.get("domain_randomize", defaults.domain_randomize))
+            overrides["domain_randomize"] = domain_randomize
+            domain_checkbox = QtWidgets.QCheckBox("Enable domain randomization", self._config_group)
+            domain_checkbox.setChecked(domain_randomize)
+            domain_checkbox.toggled.connect(
+                lambda checked: self._on_car_config_changed("domain_randomize", bool(checked))
+            )
+            domain_checkbox.setToolTip("Randomize track and background colours on reset.")
+            self._config_layout.addRow("Domain randomize", domain_checkbox)
+
+            lap_raw = overrides.get("lap_complete_percent", defaults.lap_complete_percent)
+            lap_value = float(lap_raw) if isinstance(lap_raw, (int, float)) else defaults.lap_complete_percent
+            overrides["lap_complete_percent"] = lap_value
+            lap_spin = QtWidgets.QDoubleSpinBox(self._config_group)
+            lap_spin.setRange(0.50, 1.00)
+            lap_spin.setSingleStep(0.01)
+            lap_spin.setDecimals(2)
+            lap_spin.setValue(lap_value)
+            lap_spin.valueChanged.connect(
+                lambda value: self._on_car_config_changed("lap_complete_percent", float(value))
+            )
+            lap_spin.setToolTip("Percentage of tiles required to complete a lap (0.50 - 1.00).")
+            self._config_layout.addRow("Lap completion", lap_spin)
+
+            steps_raw = overrides.get("max_episode_steps", defaults.max_episode_steps)
+            steps_value = int(steps_raw) if isinstance(steps_raw, (int, float)) and int(steps_raw) > 0 else 0
+            overrides["max_episode_steps"] = None if steps_value == 0 else steps_value
+            steps_spin = QtWidgets.QSpinBox(self._config_group)
+            steps_spin.setRange(0, 20000)
+            steps_spin.setSpecialValueText("Disabled (unlimited)")
+            steps_spin.setValue(steps_value)
+            steps_spin.valueChanged.connect(
+                lambda value: self._on_car_config_changed("max_episode_steps", None if value == 0 else int(value))
+            )
+            steps_spin.setToolTip("Maximum number of steps before truncation (0 disables the step limit).")
+            self._config_layout.addRow("Max steps", steps_spin)
+
+            seconds_raw = overrides.get("max_episode_seconds", defaults.max_episode_seconds)
+            seconds_value = (
+                float(seconds_raw)
+                if isinstance(seconds_raw, (int, float)) and float(seconds_raw) > 0
+                else 0.0
+            )
+            overrides["max_episode_seconds"] = None if seconds_value == 0 else seconds_value
+            seconds_spin = QtWidgets.QDoubleSpinBox(self._config_group)
+            seconds_spin.setRange(0.0, 3600.0)
+            seconds_spin.setSingleStep(5.0)
+            seconds_spin.setDecimals(1)
+            seconds_spin.setSpecialValueText("Use Gym default (disabled)")
+            seconds_spin.setValue(seconds_value)
+            seconds_spin.valueChanged.connect(
+                lambda value: self._on_car_config_changed(
+                    "max_episode_seconds", None if value == 0 else float(value)
+                )
+            )
+            seconds_spin.setToolTip("Maximum wall-clock seconds before truncation (0 disables the limit).")
+            self._config_layout.addRow("Time limit (s)", seconds_spin)
+        elif self._current_game == GameId.BIPEDAL_WALKER:
+            overrides = self._game_overrides.setdefault(GameId.BIPEDAL_WALKER, {})
+            defaults = self._config.bipedal_walker_config
+
+            hardcore = bool(overrides.get("hardcore", defaults.hardcore))
+            overrides["hardcore"] = hardcore
+            hardcore_checkbox = QtWidgets.QCheckBox("Enable hardcore terrain", self._config_group)
+            hardcore_checkbox.setChecked(hardcore)
+            hardcore_checkbox.toggled.connect(
+                lambda checked: self._on_bipedal_config_changed("hardcore", bool(checked))
+            )
+            hardcore_checkbox.setToolTip("Adds ladders, stumps, and pits to the terrain.")
+            self._config_layout.addRow("Hardcore mode", hardcore_checkbox)
+
+            steps_raw = overrides.get("max_episode_steps", defaults.max_episode_steps)
+            steps_value = int(steps_raw) if isinstance(steps_raw, (int, float)) and int(steps_raw) > 0 else 0
+            overrides["max_episode_steps"] = None if steps_value == 0 else steps_value
+            steps_spin = QtWidgets.QSpinBox(self._config_group)
+            steps_spin.setRange(0, 20000)
+            default_steps = 2000 if defaults.hardcore else 1600
+            steps_spin.setSpecialValueText(f"Use Gym default ({default_steps})")
+            steps_spin.setValue(steps_value)
+            steps_spin.valueChanged.connect(
+                lambda value: self._on_bipedal_config_changed(
+                    "max_episode_steps", None if value == 0 else int(value)
+                )
+            )
+            steps_spin.setToolTip("Maximum steps before truncation (0 keeps Gym default).")
+            self._config_layout.addRow("Max steps", steps_spin)
+
+            seconds_raw = overrides.get("max_episode_seconds", defaults.max_episode_seconds)
+            seconds_value = (
+                float(seconds_raw)
+                if isinstance(seconds_raw, (int, float)) and float(seconds_raw) > 0
+                else 0.0
+            )
+            overrides["max_episode_seconds"] = None if seconds_value == 0 else seconds_value
+            seconds_spin = QtWidgets.QDoubleSpinBox(self._config_group)
+            seconds_spin.setRange(0.0, 3600.0)
+            seconds_spin.setSingleStep(5.0)
+            seconds_spin.setDecimals(1)
+            seconds_spin.setSpecialValueText("Use Gym default (disabled)")
+            seconds_spin.setValue(seconds_value)
+            seconds_spin.valueChanged.connect(
+                lambda value: self._on_bipedal_config_changed(
+                    "max_episode_seconds", None if value == 0 else float(value)
+                )
+            )
+            seconds_spin.setToolTip("Maximum wall-clock seconds before truncation (0 disables limit).")
+            self._config_layout.addRow("Time limit (s)", seconds_spin)
         else:
             placeholder = QtWidgets.QLabel("No overrides available for this game.")
             placeholder.setWordWrap(True)

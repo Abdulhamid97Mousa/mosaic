@@ -13,6 +13,13 @@ from .toy_text import (
     TaxiAdapter,
     TOY_TEXT_ADAPTERS,
 )
+from .box2d import (
+    Box2DAdapter,
+    LunarLanderAdapter,
+    CarRacingAdapter,
+    BipedalWalkerAdapter,
+    BOX2D_ADAPTERS,
+)
 
 __all__ = [
     "AdapterContext",
@@ -24,4 +31,9 @@ __all__ = [
     "CliffWalkingAdapter",
     "TaxiAdapter",
     "TOY_TEXT_ADAPTERS",
+    "Box2DAdapter",
+    "LunarLanderAdapter",
+    "CarRacingAdapter",
+    "BipedalWalkerAdapter",
+    "BOX2D_ADAPTERS",
 ]

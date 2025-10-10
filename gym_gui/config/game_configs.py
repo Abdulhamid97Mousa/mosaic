@@ -7,7 +7,12 @@ These configs are separate from global application settings.
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from typing import Any, Dict
+
+
+def _clamp(value: float, low: float, high: float) -> float:
+    return max(low, min(high, value))
 
 
 @dataclass(frozen=True)
@@ -62,17 +67,174 @@ class CliffWalkingConfig:
         return {"is_slippery": self.is_slippery}
 
 
+@dataclass(frozen=True)
+class LunarLanderConfig:
+    """Configuration for LunarLander environment."""
+
+    continuous: bool = False
+    gravity: float = -10.0
+    enable_wind: bool = False
+    wind_power: float = 15.0
+    turbulence_power: float = 1.5
+
+    def to_gym_kwargs(self) -> Dict[str, Any]:
+        kwargs: Dict[str, Any] = {
+            "continuous": self.continuous,
+            "gravity": _clamp(self.gravity, -12.0, 0.0),
+        }
+        if self.enable_wind:
+            kwargs.update(
+                enable_wind=True,
+                wind_power=max(0.0, self.wind_power),
+                turbulence_power=max(0.0, self.turbulence_power),
+            )
+        else:
+            kwargs["enable_wind"] = False
+        return kwargs
+
+
+@dataclass(frozen=True)
+class CarRacingConfig:
+    """Configuration for CarRacing environment."""
+
+    continuous: bool = False
+    domain_randomize: bool = False
+    lap_complete_percent: float = 0.95
+    max_episode_steps: int | None = None
+    max_episode_seconds: float | None = None
+
+    @classmethod
+    def from_env(cls) -> "CarRacingConfig":
+        steps_raw = os.getenv("CAR_RACING_MAX_EPISODE_STEPS")
+        seconds_raw = os.getenv("CAR_RACING_MAX_EPISODE_SECONDS")
+        continuous_raw = os.getenv("CAR_RACING_CONTINUOUS")
+        domain_raw = os.getenv("CAR_RACING_DOMAIN_RANDOMIZE")
+        lap_raw = os.getenv("CAR_RACING_LAP_COMPLETE_PERCENT")
+
+        steps: int | None
+        seconds: float | None
+        continuous = False
+        domain_randomize = False
+        lap_percent = 0.95
+
+        try:
+            steps = int(steps_raw) if steps_raw not in (None, "", "0") else None
+        except (TypeError, ValueError):
+            steps = None
+
+        try:
+            seconds = float(seconds_raw) if seconds_raw not in (None, "", "0") else None
+        except (TypeError, ValueError):
+            seconds = None
+
+        if continuous_raw is not None:
+            continuous = continuous_raw.strip().lower() in {"1", "true", "yes", "on"}
+        if domain_raw is not None:
+            domain_randomize = domain_raw.strip().lower() in {"1", "true", "yes", "on"}
+        if lap_raw:
+            try:
+                lap_percent = float(lap_raw)
+            except (TypeError, ValueError):
+                lap_percent = 0.95
+
+        return cls(
+            continuous=continuous,
+            domain_randomize=domain_randomize,
+            lap_complete_percent=lap_percent,
+            max_episode_steps=steps,
+            max_episode_seconds=seconds,
+        )
+
+    def to_gym_kwargs(self) -> Dict[str, Any]:
+        percent = _clamp(self.lap_complete_percent, 0.5, 1.0)
+        kwargs: Dict[str, Any] = {
+            "continuous": self.continuous,
+            "domain_randomize": self.domain_randomize,
+            "lap_complete_percent": percent,
+        }
+        return kwargs
+
+    def sanitized_time_limits(self) -> tuple[int | None, float | None]:
+        steps = int(self.max_episode_steps) if self.max_episode_steps and self.max_episode_steps > 0 else None
+        seconds = (
+            float(self.max_episode_seconds)
+            if self.max_episode_seconds and self.max_episode_seconds > 0
+            else None
+        )
+        return steps, seconds
+
+
+@dataclass(frozen=True)
+class BipedalWalkerConfig:
+    """Configuration for BipedalWalker environment."""
+
+    hardcore: bool = False
+    max_episode_steps: int | None = None
+    max_episode_seconds: float | None = None
+
+    @classmethod
+    def from_env(cls) -> "BipedalWalkerConfig":
+        hardcore_raw = os.getenv("BIPEDAL_HARDCORE")
+        steps_raw = os.getenv("BIPEDAL_MAX_EPISODE_STEPS")
+        seconds_raw = os.getenv("BIPEDAL_MAX_EPISODE_SECONDS")
+
+        hardcore = False
+        steps: int | None
+        seconds: float | None
+
+        if hardcore_raw is not None:
+            hardcore = hardcore_raw.strip().lower() in {"1", "true", "yes", "on"}
+
+        try:
+            steps = int(steps_raw) if steps_raw not in (None, "", "0") else None
+        except (TypeError, ValueError):
+            steps = None
+
+        try:
+            seconds = float(seconds_raw) if seconds_raw not in (None, "", "0") else None
+        except (TypeError, ValueError):
+            seconds = None
+
+        return cls(
+            hardcore=hardcore,
+            max_episode_steps=steps,
+            max_episode_seconds=seconds,
+        )
+
+    def to_gym_kwargs(self) -> Dict[str, Any]:
+        kwargs: Dict[str, Any] = {"hardcore": self.hardcore}
+        return kwargs
+
+    def sanitized_time_limits(self) -> tuple[int | None, float | None]:
+        steps = int(self.max_episode_steps) if self.max_episode_steps and self.max_episode_steps > 0 else None
+        seconds = (
+            float(self.max_episode_seconds)
+            if self.max_episode_seconds and self.max_episode_seconds > 0
+            else None
+        )
+        return steps, seconds
+
+
 # Default configurations for each game
 DEFAULT_FROZEN_LAKE_CONFIG = FrozenLakeConfig(is_slippery=True)
 DEFAULT_TAXI_CONFIG = TaxiConfig(is_raining=False, fickle_passenger=False)
 DEFAULT_CLIFF_WALKING_CONFIG = CliffWalkingConfig(is_slippery=False)
+DEFAULT_LUNAR_LANDER_CONFIG = LunarLanderConfig()
+DEFAULT_CAR_RACING_CONFIG = CarRacingConfig.from_env()
+DEFAULT_BIPEDAL_WALKER_CONFIG = BipedalWalkerConfig.from_env()
 
 
 __all__ = [
     "FrozenLakeConfig",
     "TaxiConfig",
     "CliffWalkingConfig",
+    "LunarLanderConfig",
+    "CarRacingConfig",
+    "BipedalWalkerConfig",
     "DEFAULT_FROZEN_LAKE_CONFIG",
     "DEFAULT_TAXI_CONFIG",
     "DEFAULT_CLIFF_WALKING_CONFIG",
+    "DEFAULT_LUNAR_LANDER_CONFIG",
+    "DEFAULT_CAR_RACING_CONFIG",
+    "DEFAULT_BIPEDAL_WALKER_CONFIG",
 ]

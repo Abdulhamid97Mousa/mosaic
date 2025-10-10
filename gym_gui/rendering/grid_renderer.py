@@ -8,10 +8,10 @@ from qtpy import QtCore, QtGui, QtWidgets
 
 from gym_gui.core.enums import GameId
 from gym_gui.rendering.assets import (
-    AssetManager,
     CliffWalkingAssets,
     FrozenLakeAssets,
     TaxiAssets,
+    get_asset_manager,
 )
 
 
@@ -35,7 +35,7 @@ class GridRenderer:
         self._view.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._view.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         
-        self._asset_manager = AssetManager()
+        self._asset_manager = get_asset_manager()
         self._current_game: GameId | None = None
         self._current_grid: List[List[str]] = []  # Store for context-aware rendering
         self._tile_size = 48  # Base tile size in scene coordinates

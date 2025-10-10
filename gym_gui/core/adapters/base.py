@@ -125,7 +125,12 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT]):
     def load(self) -> None:
         """Instantiate underlying Gymnasium environment resources."""
 
-        env = gym.make(self.id, render_mode=self.default_render_mode.value)
+        kwargs: dict[str, Any] = {"render_mode": self.default_render_mode.value}
+        extra_kwargs = self.gym_kwargs()
+        if extra_kwargs:
+            kwargs.update(extra_kwargs)
+        env = gym.make(self.id, **kwargs)
+        env = self.apply_wrappers(env)
         self._logger.debug("Created Gymnasium environment '%s'", self.id)
         self._set_env(env)
 
@@ -174,6 +179,11 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT]):
         """Keyword arguments forwarded to :func:`gymnasium.make`."""
 
         return {}
+
+    def apply_wrappers(self, env: gym.Env[Any, Any]) -> gym.Env[Any, Any]:
+        """Hook for subclasses to apply Gymnasium wrappers before use."""
+
+        return env
 
     def _package_step(
         self,

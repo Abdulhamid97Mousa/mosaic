@@ -32,8 +32,8 @@ class GameId(StrEnum):
     FROZEN_LAKE = "FrozenLake-v1"
     CLIFF_WALKING = "CliffWalking-v1"
     TAXI = "Taxi-v3"
-    LUNAR_LANDER = "LunarLander-v2"
-    CAR_RACING = "CarRacing-v2"
+    LUNAR_LANDER = "LunarLander-v3"
+    CAR_RACING = "CarRacing-v3"
     BIPEDAL_WALKER = "BipedalWalker-v3"
 
 
@@ -128,24 +128,24 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
         ControlMode.MULTI_AGENT_COMPETITIVE,
     ),
     GameId.LUNAR_LANDER: (
-        ControlMode.AGENT_ONLY,
         ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
         ControlMode.HYBRID_TURN_BASED,
         ControlMode.HYBRID_HUMAN_AGENT,
         ControlMode.MULTI_AGENT_COOP,
         ControlMode.MULTI_AGENT_COMPETITIVE,
     ),
     GameId.CAR_RACING: (
-        ControlMode.AGENT_ONLY,
         ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
         ControlMode.HYBRID_TURN_BASED,
         ControlMode.HYBRID_HUMAN_AGENT,
         ControlMode.MULTI_AGENT_COOP,
         ControlMode.MULTI_AGENT_COMPETITIVE,
     ),
     GameId.BIPEDAL_WALKER: (
-        ControlMode.AGENT_ONLY,
         ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
         ControlMode.HYBRID_TURN_BASED,
         ControlMode.HYBRID_HUMAN_AGENT,
         ControlMode.MULTI_AGENT_COOP,

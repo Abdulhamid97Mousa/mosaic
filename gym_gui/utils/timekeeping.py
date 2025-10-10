@@ -89,7 +89,25 @@ class SessionTimers:
         delta = self.elapsed_since_first_move()
         return format_timedelta(delta) if delta is not None else "—"
 
+    def outcome_elapsed_formatted(self) -> str:
+        """Return elapsed time between the first move and the outcome.
+
+        The control panel labels this as "Outcome Time" to emphasise how long
+        it took to finish the episode after the first interaction. When an
+        outcome has not been recorded yet the em dash placeholder is returned.
+        """
+
+        delta = self.episode_duration()
+        return format_timedelta(delta) if delta is not None else "—"
+
     def outcome_timestamp_formatted(self) -> str:
+        """Backward-compatible alias for :meth:`outcome_elapsed_formatted`."""
+
+        return self.outcome_elapsed_formatted()
+
+    def outcome_wall_clock_formatted(self) -> str:
+        """Return the wall-clock timestamp for the recorded outcome."""
+
         return format_timestamp(self.outcome_at)
 
     def episode_duration(self) -> timedelta | None:
