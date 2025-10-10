@@ -6,7 +6,11 @@
 # Ignore __pycache__ directories recursively
 __pycache__/
 **/__pycache__/
+
+# Ignore compiled Python bytecode
 *.pyc
+*.pyo
+*.pyd
 *.pyo
 
 # Local environment overrides for the Gym GUI project
@@ -16,5 +20,8 @@ __pycache__/
 
 .codacy
 .vscode
-codacy-analysis-cli-master
+
+gym_gui/runtime/data/episodes/*
+
+
 spadeBDI_RL
