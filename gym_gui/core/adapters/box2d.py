@@ -66,6 +66,31 @@ class LunarLanderAdapter(Box2DAdapter):
         kwargs.update(self._config.to_gym_kwargs())
         return kwargs
 
+    def step(self, action: Any) -> AdapterStep:
+        """Override step to handle discrete keyboard actions in continuous mode."""
+        # Convert discrete keyboard actions to continuous if needed
+        if self._config.continuous and isinstance(action, (int, np.integer)):
+            # Map discrete actions (0-3) to continuous control
+            # 0: idle/no thrust, 1: left engine, 2: main engine, 3: right engine
+            action = self._discrete_to_continuous(int(action))
+        return super().step(action)
+
+    @staticmethod
+    def _discrete_to_continuous(discrete_action: int) -> np.ndarray:
+        """Convert discrete keyboard action to continuous control array.
+        
+        Returns array [main_engine, side_engines] where:
+        - main_engine: 0.0 to 1.0 (throttle)
+        - side_engines: -1.0 to 1.0 (left/right)
+        """
+        mapping = {
+            0: np.array([0.0, 0.0], dtype=np.float32),   # Idle
+            1: np.array([0.0, -1.0], dtype=np.float32),  # Fire left engine
+            2: np.array([1.0, 0.0], dtype=np.float32),   # Fire main engine
+            3: np.array([0.0, 1.0], dtype=np.float32),   # Fire right engine
+        }
+        return mapping.get(discrete_action, np.array([0.0, 0.0], dtype=np.float32))
+
     def _extract_metrics(self, observation: np.ndarray, info: Mapping[str, Any]) -> dict[str, Any]:
         metrics: dict[str, Any] = {}
         if observation is not None:

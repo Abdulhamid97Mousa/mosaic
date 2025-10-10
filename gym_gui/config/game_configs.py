@@ -31,26 +31,28 @@ class FrozenLakeConfig:
 
 @dataclass(frozen=True)
 class TaxiConfig:
-    """Configuration for Taxi-v3 environment."""
+    """Configuration for Taxi-v3 environment.
+    
+    Note: Taxi-v3 in Gymnasium does not support is_raining or fickle_passenger
+    parameters. These were present in older versions but removed in modern Gymnasium.
+    The environment always uses deterministic movement.
+    """
     
     is_raining: bool = False
-    """If True, the cab will move in intended direction with 80% probability,
-    else will move left or right of target direction with 10% probability each.
-    If False, cab always moves in intended direction."""
+    """[NOT SUPPORTED] If True, the cab would move in intended direction with 80% probability.
+    This parameter is kept for UI compatibility but has no effect."""
     
     fickle_passenger: bool = False
-    """If True, passenger has 30% chance of changing destinations when cab
-    has moved one square away from passenger's source location.
-    Fickleness only triggers on first pickup and successful movement."""
+    """[NOT SUPPORTED] If True, passenger would change destinations randomly.
+    This parameter is kept for UI compatibility but has no effect."""
     
     def to_gym_kwargs(self) -> Dict[str, Any]:
-        """Convert to Gymnasium environment kwargs."""
-        kwargs = {}
-        if self.is_raining:
-            kwargs["is_raining"] = True
-        if self.fickle_passenger:
-            kwargs["fickle_passenger"] = True
-        return kwargs
+        """Convert to Gymnasium environment kwargs.
+        
+        Note: Returns empty dict as Taxi-v3 doesn't accept custom parameters.
+        """
+        # Taxi-v3 doesn't support is_raining or fickle_passenger in current Gymnasium
+        return {}
 
 
 @dataclass(frozen=True)

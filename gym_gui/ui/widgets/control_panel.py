@@ -42,8 +42,10 @@ class ControlPanelWidget(QtWidgets.QWidget):
     lunar_config_changed = Signal(str, object)  # (param_name, value)
     car_config_changed = Signal(str, object)  # (param_name, value)
     bipedal_config_changed = Signal(str, object)  # (param_name, value)
-    play_requested = Signal()
-    pause_requested = Signal()
+    start_game_requested = Signal()
+    pause_game_requested = Signal()
+    continue_game_requested = Signal()
+    terminate_game_requested = Signal()
     agent_step_requested = Signal()
 
     def __init__(
@@ -87,6 +89,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._current_mode: ControlMode = config.default_mode
         self._awaiting_human: bool = False
         self._auto_running: bool = False
+        self._game_started: bool = False
+        self._game_paused: bool = False
 
         # Store game configurations
         self._game_configs: Dict[GameId, Dict[str, object]] = {
@@ -236,6 +240,18 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._auto_running = running
         self._update_control_states()
 
+    def set_game_started(self, started: bool) -> None:
+        """Set whether the game has been started."""
+        self._game_started = started
+        if not started:
+            self._game_paused = False
+        self._update_control_states()
+
+    def set_game_paused(self, paused: bool) -> None:
+        """Set whether the game is paused."""
+        self._game_paused = paused
+        self._update_control_states()
+
     def set_slippery_visible(self, visible: bool) -> None:
         if self._frozen_slippery_checkbox is not None:
             self._frozen_slippery_checkbox.setVisible(visible)
@@ -306,17 +322,30 @@ class ControlPanelWidget(QtWidgets.QWidget):
             self._mode_buttons[mode] = button
         layout.addWidget(mode_group)
 
-        # Control buttons
-        controls_group = QtWidgets.QGroupBox("Controls", self)
-        controls_layout = QtWidgets.QHBoxLayout(controls_group)
-        self._play_button = QtWidgets.QPushButton("Play", controls_group)
-        self._pause_button = QtWidgets.QPushButton("Pause", controls_group)
+        # Control buttons - renamed group
+        controls_group = QtWidgets.QGroupBox("Game Control Flow", self)
+        controls_layout = QtWidgets.QVBoxLayout(controls_group)
+        
+        # First row: Start, Pause, Continue
+        row1_layout = QtWidgets.QHBoxLayout()
+        self._start_button = QtWidgets.QPushButton("Start Game", controls_group)
+        self._pause_button = QtWidgets.QPushButton("Pause Game", controls_group)
+        self._continue_button = QtWidgets.QPushButton("Continue Game", controls_group)
+        row1_layout.addWidget(self._start_button)
+        row1_layout.addWidget(self._pause_button)
+        row1_layout.addWidget(self._continue_button)
+        controls_layout.addLayout(row1_layout)
+        
+        # Second row: Terminate, Agent Step, Reset
+        row2_layout = QtWidgets.QHBoxLayout()
+        self._terminate_button = QtWidgets.QPushButton("Terminate Game", controls_group)
         self._step_button = QtWidgets.QPushButton("Agent Step", controls_group)
         self._reset_button = QtWidgets.QPushButton("Reset", controls_group)
-        controls_layout.addWidget(self._play_button)
-        controls_layout.addWidget(self._pause_button)
-        controls_layout.addWidget(self._step_button)
-        controls_layout.addWidget(self._reset_button)
+        row2_layout.addWidget(self._terminate_button)
+        row2_layout.addWidget(self._step_button)
+        row2_layout.addWidget(self._reset_button)
+        controls_layout.addLayout(row2_layout)
+        
         layout.addWidget(controls_group)
 
         # Status group
@@ -350,8 +379,10 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._wire_mode_buttons()
 
         self._load_button.clicked.connect(self._on_load_clicked)
-        self._play_button.clicked.connect(self._on_play_clicked)
+        self._start_button.clicked.connect(self._on_start_clicked)
         self._pause_button.clicked.connect(self._on_pause_clicked)
+        self._continue_button.clicked.connect(self._on_continue_clicked)
+        self._terminate_button.clicked.connect(self._on_terminate_clicked)
         self._step_button.clicked.connect(self._on_step_clicked)
         self._reset_button.clicked.connect(self._on_reset_clicked)
 
@@ -391,16 +422,35 @@ class ControlPanelWidget(QtWidgets.QWidget):
             return
         self.load_requested.emit(self._current_game, self._current_mode, self.current_seed())
 
-    def _on_play_clicked(self) -> None:
-        self.play_requested.emit()
+    def _on_start_clicked(self) -> None:
+        self._game_started = True
+        self._game_paused = False
+        self._update_control_states()
+        self.start_game_requested.emit()
 
     def _on_pause_clicked(self) -> None:
-        self.pause_requested.emit()
+        self._game_paused = True
+        self._update_control_states()
+        self.pause_game_requested.emit()
+
+    def _on_continue_clicked(self) -> None:
+        self._game_paused = False
+        self._update_control_states()
+        self.continue_game_requested.emit()
+
+    def _on_terminate_clicked(self) -> None:
+        self._game_started = False
+        self._game_paused = False
+        self._update_control_states()
+        self.terminate_game_requested.emit()
 
     def _on_step_clicked(self) -> None:
         self.agent_step_requested.emit()
 
     def _on_reset_clicked(self) -> None:
+        self._game_started = False
+        self._game_paused = False
+        self._update_control_states()
         self.reset_requested.emit(self.current_seed())
 
     def _on_slippery_toggled(self, state: int) -> None:
@@ -451,10 +501,28 @@ class ControlPanelWidget(QtWidgets.QWidget):
             button.toggled.connect(lambda checked, m=mode: self._on_mode_toggled(checked, m))
 
     def _update_control_states(self) -> None:
+        """Update button states based on game flow."""
         is_human = self._current_mode == ControlMode.HUMAN_ONLY
-        self._play_button.setEnabled(not self._auto_running and not is_human)
-        self._pause_button.setEnabled(self._auto_running)
-        self._step_button.setEnabled(not self._auto_running and not is_human)
+        
+        # Start button: enabled only if game not started and environment loaded
+        self._start_button.setEnabled(not self._game_started)
+        
+        # Pause button: enabled only if game started and not paused
+        self._pause_button.setEnabled(self._game_started and not self._game_paused)
+        
+        # Continue button: enabled only if game paused
+        self._continue_button.setEnabled(self._game_paused)
+        
+        # Terminate button: enabled only if game started
+        self._terminate_button.setEnabled(self._game_started)
+        
+        # Agent Step: enabled only if game started, not paused, not human-only, and not auto-running
+        self._step_button.setEnabled(
+            self._game_started and not self._game_paused and not is_human and not self._auto_running
+        )
+        
+        # Reset: always enabled (can reset even during active game)
+        self._reset_button.setEnabled(True)
 
     @staticmethod
     def _format_bool(value: bool) -> str:

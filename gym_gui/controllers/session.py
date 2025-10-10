@@ -23,7 +23,7 @@ from gym_gui.config.game_configs import (
 from gym_gui.config.settings import Settings
 from gym_gui.core.adapters.base import AdapterContext, AdapterStep, EnvironmentAdapter
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
-from gym_gui.core.enums import ControlMode, GameId
+from gym_gui.core.enums import ControlMode, GameId, EnvironmentFamily, ENVIRONMENT_FAMILY_BY_GAME
 from gym_gui.core.factories.adapters import create_adapter, get_adapter_cls
 from gym_gui.services.actor import ActorService, EpisodeSummary, StepSnapshot
 from gym_gui.services.service_locator import get_service_locator
@@ -63,6 +63,8 @@ class SessionController(QtCore.QObject):
         self._control_mode: ControlMode = settings.default_control_mode
         self._step_index: int = -1
         self._turn: str = "human"
+        self._game_started: bool = False
+        self._game_paused: bool = False
         self._auto_timer = QtCore.QTimer(self)
         self._auto_timer.setInterval(600)
         self._auto_timer.timeout.connect(self._auto_step)
@@ -97,6 +99,46 @@ class SessionController(QtCore.QObject):
         self._auto_timer.setInterval(interval)
         self._user_idle_interval = interval
         self._update_idle_timer()
+
+    def start_game(self) -> None:
+        """Mark the game as started and enable input controls."""
+        if self._adapter is None:
+            self.status_message.emit("⚠ No environment loaded. Click 'Load Environment' first.")
+            return
+
+        self._game_started = True
+        self._game_paused = False
+        # Note: Human input controller is set up in main_window, not here
+        self.status_message.emit("Game started! Use controls to play.")
+
+    def pause_game(self) -> None:
+        """Pause the game - stops all actions."""
+        if not self._game_started:
+            self.status_message.emit("⚠ No game to pause.")
+            return
+        self.stop_auto_play()
+        self._stop_idle_tick()  # Stop the idle timer for Box2D games
+        self._game_paused = True
+        self.status_message.emit("Game paused.")
+
+    def resume_game(self) -> None:
+        """Resume the game from paused state."""
+        if not self._game_started:
+            self.status_message.emit("⚠ No game to resume.")
+            return
+        self._game_paused = False
+        self._update_idle_timer()  # Restart idle timer if needed for Box2D games
+        self.status_message.emit("Game resumed.")
+
+    def terminate_game(self) -> None:
+        """Stop the game and mark episode as finished."""
+        self.stop_auto_play()
+        self._game_started = False
+        self._game_paused = False
+        if self._episode_active and self._last_step is not None:
+            self._finalize_episode(self._last_step, aborted=True)
+        self.episode_finished.emit(True)
+        self.status_message.emit("Game terminated. Click 'Start Game' to play again.")
 
     def load_environment(
         self,
@@ -145,17 +187,15 @@ class SessionController(QtCore.QObject):
         self._control_mode = control_mode
         self._step_index = 0
         self._turn = "human"
-        self._awaiting_human = control_mode in {
-            ControlMode.HUMAN_ONLY,
-            ControlMode.HYBRID_TURN_BASED,
-            ControlMode.HYBRID_HUMAN_AGENT,
-        }
+        self._game_started = False  # Game not started until user clicks "Start Game"
+        self._game_paused = False
+        self._awaiting_human = False  # Don't await input until game starts
         self._begin_episode(game_id, control_mode)
         self._timers.reset_episode()
         self.session_initialized.emit(game_id.value, control_mode.value, initial_step)
         self.step_processed.emit(initial_step, self._step_index)
         self._update_status(initial_step, prefix="Environment ready")
-        self.awaiting_human.emit(self._awaiting_human, "Awaiting human action" if self._awaiting_human else "")
+        self.awaiting_human.emit(False, "Click 'Start Game' to begin")
         self.turn_changed.emit(self._turn)
         self._last_agent_position = self._extract_agent_position(initial_step)
         self._last_step = initial_step
@@ -176,15 +216,13 @@ class SessionController(QtCore.QObject):
             return
         self._step_index = 0
         self._turn = "human"
-        self._awaiting_human = self._control_mode in {
-            ControlMode.HUMAN_ONLY,
-            ControlMode.HYBRID_TURN_BASED,
-            ControlMode.HYBRID_HUMAN_AGENT,
-        }
+        self._game_started = False  # Reset requires "Start Game" again
+        self._game_paused = False
+        self._awaiting_human = False
         self._begin_episode(self._game_id, self._control_mode)
         self.step_processed.emit(step, self._step_index)
         self._update_status(step, prefix="Environment reset")
-        self.awaiting_human.emit(self._awaiting_human, "Awaiting human action" if self._awaiting_human else "")
+        self.awaiting_human.emit(False, "Click 'Start Game' to begin")
         self.turn_changed.emit(self._turn)
         self._last_agent_position = self._extract_agent_position(step)
         self._timers.reset_episode()
@@ -196,6 +234,12 @@ class SessionController(QtCore.QObject):
 
     def perform_human_action(self, action: int, *, key_label: str | None = None) -> None:
         if self._adapter is None:
+            return
+        if not self._game_started:
+            self.status_message.emit("Click 'Start Game' before taking actions")
+            return
+        if self._game_paused:
+            self.status_message.emit("Game is paused. Click 'Continue' to resume.")
             return
         if self._control_mode not in {
             ControlMode.HUMAN_ONLY,
@@ -224,6 +268,12 @@ class SessionController(QtCore.QObject):
     def start_auto_play(self) -> None:
         if self._adapter is None:
             return
+        if not self._game_started:
+            self.status_message.emit("Click 'Start Game' before auto-play")
+            return
+        if self._game_paused:
+            self.status_message.emit("Game is paused. Click 'Continue' to resume.")
+            return
         if self._auto_timer.isActive():
             return
         self._auto_timer.start()
@@ -238,6 +288,12 @@ class SessionController(QtCore.QObject):
 
     def perform_agent_step(self) -> None:
         if self._adapter is None:
+            return
+        if not self._game_started:
+            self.status_message.emit("Click 'Start Game' before agent step")
+            return
+        if self._game_paused:
+            self.status_message.emit("Game is paused. Click 'Continue' to resume.")
             return
         action = self._select_agent_action()
         if action is None:
@@ -295,6 +351,10 @@ class SessionController(QtCore.QObject):
 
     def _auto_step(self) -> None:
         if self._adapter is None:
+            self.stop_auto_play()
+            return
+        if self._game_paused:
+            # Auto-play should be stopped when paused, but add safety check
             self.stop_auto_play()
             return
         action = self._select_agent_action()
@@ -510,7 +570,13 @@ class SessionController(QtCore.QObject):
         return 180
 
     def _should_idle_tick(self) -> bool:
-        if self._adapter is None:
+        if self._adapter is None or self._game_id is None:
+            return False
+        # Don't idle tick when game is paused
+        if self._game_paused:
+            return False
+        # Only allow idle tick for Box2D games
+        if ENVIRONMENT_FAMILY_BY_GAME.get(self._game_id) != EnvironmentFamily.BOX2D:
             return False
         if self._control_mode != ControlMode.HUMAN_ONLY:
             return False
@@ -535,7 +601,10 @@ class SessionController(QtCore.QObject):
             self._stop_idle_tick()
 
     def _resolve_passive_action(self) -> Any | None:
-        if self._adapter is None:
+        if self._adapter is None or self._game_id is None:
+            return None
+        # Only provide a passive action for Box2D games
+        if ENVIRONMENT_FAMILY_BY_GAME.get(self._game_id) != EnvironmentFamily.BOX2D:
             return None
         space = self._adapter.action_space
         if isinstance(space, spaces.Discrete):

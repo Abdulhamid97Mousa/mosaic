@@ -43,8 +43,8 @@ TAXI_HTML = (
     "<li>Dropoff → E</li>"
     "</ul>"
     "<h4>Arguments / Config</h4>"
-    "<p><code>is_raining</code>: when True, movement succeeds with 80% probability; else 10% slip left/right.</p>"
-    "<p><code>fickle_passenger</code>: when True, passenger may change destination on first pickup with 30% chance.</p>"
+    "<p><strong>Note:</strong> The current Gymnasium Taxi-v3 environment uses deterministic movement and does not support stochastic variants.</p>"
+    "<p><code>is_raining</code> and <code>fickle_passenger</code> parameters shown in the UI are for reference only and have no effect in the current implementation.</p>"
     "<p>See the docs: <a href=\"https://gymnasium.farama.org/environments/toy_text/taxi/\">Taxi (Gymnasium)</a></p>"
 )
 

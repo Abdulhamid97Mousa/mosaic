@@ -190,8 +190,10 @@ class MainWindow(QtWidgets.QMainWindow):
         # Connect control panel signals to session controller
         self._control_panel.load_requested.connect(self._on_load_requested)
         self._control_panel.reset_requested.connect(self._on_reset_requested)
-        self._control_panel.play_requested.connect(self._session.start_auto_play)
-        self._control_panel.pause_requested.connect(self._session.stop_auto_play)
+        self._control_panel.start_game_requested.connect(self._on_start_game)
+        self._control_panel.pause_game_requested.connect(self._on_pause_game)
+        self._control_panel.continue_game_requested.connect(self._on_continue_game)
+        self._control_panel.terminate_game_requested.connect(self._on_terminate_game)
         self._control_panel.agent_step_requested.connect(self._session.perform_agent_step)
         self._control_panel.game_changed.connect(self._on_game_changed)
         self._control_panel.control_mode_changed.connect(self._on_mode_changed)
@@ -256,6 +258,41 @@ class MainWindow(QtWidgets.QMainWindow):
         """Handle reset request from control panel."""
         self._episode_finished = False  # Reset episode state on reset
         self._session.reset_environment(seed=seed)
+
+    def _on_start_game(self) -> None:
+        """Handle Start Game button."""
+        self._session.start_game()
+        self._control_panel.set_game_started(True)
+        # Enable human input if in a human-involved mode
+        mode = self._control_panel.current_mode()
+        if mode in {ControlMode.HUMAN_ONLY, ControlMode.HYBRID_TURN_BASED, ControlMode.HYBRID_HUMAN_AGENT}:
+            self._human_input.set_enabled(True)
+        self._status_bar.showMessage("Game started", 3000)
+
+    def _on_pause_game(self) -> None:
+        """Handle Pause Game button."""
+        self._session.pause_game()
+        self._control_panel.set_game_paused(True)
+        self._human_input.set_enabled(False)  # Disable input while paused
+        self._status_bar.showMessage("Game paused", 3000)
+
+    def _on_continue_game(self) -> None:
+        """Handle Continue Game button."""
+        self._session.resume_game()
+        self._control_panel.set_game_paused(False)
+        # Re-enable input based on mode
+        mode = self._control_panel.current_mode()
+        if mode == ControlMode.HUMAN_ONLY:
+            self._human_input.set_enabled(True)
+        self._status_bar.showMessage("Game continued", 3000)
+
+    def _on_terminate_game(self) -> None:
+        """Handle Terminate Game button."""
+        self._session.terminate_game()
+        self._control_panel.set_game_started(False)
+        self._human_input.set_enabled(False)
+        self._episode_finished = True
+        self._status_bar.showMessage("Game terminated", 3000)
 
     def _on_slippery_toggled(self, enabled: bool) -> None:
         """Handle slippery ice toggle from control panel."""
@@ -545,11 +582,12 @@ class MainWindow(QtWidgets.QMainWindow):
             mode_label = self.CONTROL_MODE_LABELS[ControlMode(mode)]
         except Exception:
             mode_label = mode
-        self._status_bar.showMessage(f"Loaded {game_id} in {mode_label} mode")
+        self._status_bar.showMessage(f"Loaded {game_id} in {mode_label} mode - Click 'Start Game' to begin")
         self.logger.info("Loaded %s (%s)", game_id, mode_label)
         self._auto_running = False
         self._human_input.configure(self._session.game_id, self._session.action_space)
         self._control_panel.set_auto_running(False)
+        self._control_panel.set_game_started(False)  # Reset game state on new load
         self._refresh_time_labels()
         
         # Notify render view of current game for asset selection
@@ -604,6 +642,7 @@ class MainWindow(QtWidgets.QMainWindow):
         if finished:
             # Disable shortcuts when episode terminates
             self._human_input.set_enabled(False)
+            self._control_panel.set_game_started(False)  # Reset game state
             self._status_bar.showMessage("Episode finished")
             self._render_tabs.on_episode_finished()
 
@@ -614,25 +653,25 @@ class MainWindow(QtWidgets.QMainWindow):
         """
         Handle awaiting_human signal to update UI and keyboard shortcuts.
         
-        Shortcuts are disabled if the episode has finished, regardless of mode.
-        In HUMAN_ONLY mode, shortcuts stay enabled during active episodes.
+        Shortcuts are disabled if the episode has finished OR if the game hasn't been started.
+        In HUMAN_ONLY mode, shortcuts stay enabled during active started episodes.
         In hybrid modes, shortcuts are only enabled when waiting for human input.
         """
         self._control_panel.set_awaiting_human(waiting)
         if message:
             self._status_bar.showMessage(message, 5000)
         
-        # Never allow input if episode has finished
-        if self._episode_finished:
+        # Never allow input if episode has finished or game not started
+        if self._episode_finished or not self._session._game_started:
             self._human_input.set_enabled(False)
             return
         
         mode = self._control_panel.current_mode()
         
-        # In HUMAN_ONLY mode, shortcuts should always stay enabled during active episodes
+        # In HUMAN_ONLY mode, shortcuts should always stay enabled during active started episodes
         if mode == ControlMode.HUMAN_ONLY:
             # Only enable if waiting=True (to turn them on initially)
-            # Never disable them (ignore waiting=False) unless episode finished
+            # Never disable them (ignore waiting=False) unless episode finished or game not started
             if waiting:
                 self._human_input.set_enabled(True)
             # If waiting=False, do nothing - keep shortcuts enabled
