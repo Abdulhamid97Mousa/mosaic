@@ -11,17 +11,6 @@ __pycache__/
 *.pyc
 *.pyo
 *.pyd
-*.pyo
-
-gym_gui/*.pyc
-gym_gui/*.pyo
-gym_gui/*.pyd
-gym_gui/*.pyo
-
-*.pyc
-*.pyo
-*.pyd
-*.pyo
 
 # Local environment overrides for the Gym GUI project
 .env
@@ -33,6 +22,6 @@ gym_gui/*.pyo
 
 gym_gui/doc.qt.io/
 gym_gui/runtime/data/episodes/*
-gym_gui/runtime/data/telemetry/telemetry.sqlite
+gym_gui/runtime/data/telemetry/
 
 spadeBDI_RL
