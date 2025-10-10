@@ -50,7 +50,15 @@
   path = BallonsTranslator
   url = https://github.com/dmMaze/BallonsTranslator.git
 
-[submodule "pyqt-examples"]
-  path = pyqt-examples
+[submodule "Cura"]
+  path = Cura
+  url = https://github.com/Ultimaker/Cura.git
+
+
+[submodule "examples"]
+  path = examples
   url = https://github.com/pyqt/examples.git
-  
+
+[submodule "BallonsTranslator"]
+  path = BallonsTranslator
+  url = https://github.com/dmMaze/BallonsTranslator.git
