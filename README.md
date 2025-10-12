@@ -24,7 +24,7 @@
 
 ## 🎯 Vision
 
-Jumanji turns the raw telemetry of Gymnasium environments into an interactive operations console. It mixes real-time visualization, structured storage, and service-oriented orchestration so researchers can prototype agents, replay episodes, and curate datasets—all without leaving a unified desktop shell.
+Jumanji turns the raw telemetry of Gymnasium environments into an interactive mission-control GUI. It mixes real-time visualization, structured storage, and service-oriented orchestration so researchers can prototype agents, replay episodes, and curate datasets—all without leaving a unified desktop shell.
 
 <p align="center">
 	<img src="gym_gui/assets/gui_images/FULL_GUI_LAYOUT.png" alt="Jumanji full GUI layout" width="900" />
@@ -47,14 +47,13 @@ Key ambitions:
 
 ### Headline Capabilities
 
-- **Qt shell with modular renderers** – Grid and RGB payloads share a pluggable renderer interface, keeping the UI honest as we add new game families.
-- **Service locator architecture** – Telemetry, storage, actors, and action mapping register through a bootstrap pipeline, isolating domain logic from UI glue.
+- **Qt shell with modular renderers** – Grid and RGB payloads share a pluggable renderer interface so adapters can draw into a consistent viewport.
+- **Service locator architecture** – Telemetry, storage, actors, and action mapping register through a bootstrap pipeline, keeping UI glue thin and testable.
 - **Box2D-ready control flow** – Centralized input gating prevents “frozen start” states while shared discrete→continuous mappings translate keyboard intents into float action spaces.
-- **Telemetry everywhere** – `TelemetryService` streams step records to ring buffers, JSONL episode logs, and a WAL-backed SQLite store ready for analytics.
-- **Storage recorder profiles** – Configurable retention and data tiers (JSONL, frame dumps, upcoming Parquet/Zarr) keep disks from saturating during long auto-play sessions.
+- **Real-time telemetry analysis** – Live reward charts, termination flags, and actor state roll in as episodes run, giving researchers immediate feedback without leaving the shell.
+- **Storage pipeline you can trust** – `TelemetryService` writes JSONL episode logs and a WAL-backed SQLite database, so every run has durable, queryable artifacts.
 - **Actor registry** – Register human, scripted, and learning agents with metadata so the control panel can advertise capabilities and swap modes live.
-- **Day-by-day design logs** – Architectural intent stays aligned through living memoranda (`1.0_DAY_*`).
-- **Future-proof service slots** – Resource compiler, settings governor, and exporter bridge planned to mirror mature Qt apps like OpenShot and Cura.
+- **Day-by-day design logs** – Architectural intent stays aligned through living memoranda (`1.0_DAY_*`) that document decisions and refactors.
 
 ## 🧠 Architecture
 
