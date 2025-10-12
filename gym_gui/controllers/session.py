@@ -520,7 +520,7 @@ class SessionController(QtCore.QObject):
                 numpy_signature,
             ]
         )
-        fingerprint = hashlib.sha1(fingerprint_source.encode("utf-8")).hexdigest()[:8]
+    fingerprint = hashlib.sha256(fingerprint_source.encode("utf-8")).hexdigest()[:8]
         self._episode_id = f"{game_id.value}-{seed_label}-ep{self._episode_counter:04d}-{fingerprint}"
         self._episode_reward = 0.0
         self._episode_metadata = {

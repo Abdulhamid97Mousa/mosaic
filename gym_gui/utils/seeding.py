@@ -71,7 +71,7 @@ def _encode_json(obj: Any) -> str:
 
 
 def _digest(obj: Any) -> str:
-    return hashlib.sha1(json_serialization.dumps(obj)).hexdigest()
+    return hashlib.sha256(json_serialization.dumps(obj)).hexdigest()
 
 
 Callback = Callable[[int], None]

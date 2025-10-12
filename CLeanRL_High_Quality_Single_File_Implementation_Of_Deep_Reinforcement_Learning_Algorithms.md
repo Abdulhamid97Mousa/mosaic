@@ -324,7 +324,7 @@ MountainCar-v0 -200.00±0.00 -200.00±0.
 The following tables report the final episodic returns obtained by the agent in Gym’s Atari
 tasks (Brockman et al., 2016; Bellemare et al., 2013):
 
-Environment ppoatari.py openai/baselies’ PPO (Huang et al., 2022)[ˆ1]
+Environment ppoatari.py openai/baselies’ PPO [Huang et al., 2022](ˆ1)
 
 BreakoutNoFrameskip-v4 416.31±43.92 406.57±31.
 PongNoFrameskip-v4 20.59±0.35 20.512±0.
