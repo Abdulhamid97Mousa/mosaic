@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from gym_gui.services.action_mapping import ContinuousActionMapper, create_default_action_mapper
 from gym_gui.services.actor import ActorService, BDIQAgent, HumanKeyboardActor, LLMMultiStepAgent
 from gym_gui.services.service_locator import ServiceLocator, get_service_locator
 from gym_gui.services.storage import StorageRecorderService
@@ -41,16 +42,20 @@ def bootstrap_default_services() -> ServiceLocator:
         description="Delegates decisions to an integrated language model pipeline.",
     )
 
+    action_mapper: ContinuousActionMapper = create_default_action_mapper()
+
     locator.register(StorageRecorderService, storage)
     locator.register(TelemetryService, telemetry)
     locator.register(TelemetrySQLiteStore, telemetry_store)
     locator.register(ActorService, actors)
+    locator.register(ContinuousActionMapper, action_mapper)
 
     # Also register under string keys for convenience in legacy code.
     locator.register("storage", storage)
     locator.register("telemetry", telemetry)
     locator.register("telemetry_store", telemetry_store)
     locator.register("actors", actors)
+    locator.register("action_mapper", action_mapper)
 
     return locator
 

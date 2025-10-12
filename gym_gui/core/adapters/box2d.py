@@ -12,6 +12,8 @@ from gym_gui.core.wrappers.time_limits import EpisodeTimeLimitSeconds, configure
 from gym_gui.config.game_configs import BipedalWalkerConfig, CarRacingConfig, LunarLanderConfig
 from gym_gui.core.adapters.base import AdapterContext, AdapterStep, EnvironmentAdapter, StepState
 from gym_gui.core.enums import ControlMode, GameId, RenderMode
+from gym_gui.services.action_mapping import ContinuousActionMapper
+from gym_gui.services.service_locator import get_service_locator
 
 
 class Box2DAdapter(EnvironmentAdapter[np.ndarray, Any]):
@@ -36,6 +38,26 @@ class Box2DAdapter(EnvironmentAdapter[np.ndarray, Any]):
 
     def _extract_metrics(self, observation: np.ndarray, info: Mapping[str, Any]) -> dict[str, Any]:
         return {}
+
+    @staticmethod
+    def _resolve_action_mapper() -> ContinuousActionMapper | None:
+        locator = get_service_locator()
+        return locator.resolve(ContinuousActionMapper)
+
+    def _map_discrete_action(
+        self,
+        game_id: GameId,
+        discrete_action: int,
+        *,
+        fallback: np.ndarray | None = None,
+    ) -> np.ndarray | None:
+        mapper = self._resolve_action_mapper()
+        if mapper is None:
+            return fallback.copy() if fallback is not None else None
+        vector = mapper.map(game_id, discrete_action)
+        if vector is None:
+            return fallback.copy() if fallback is not None else None
+        return vector
 
 
 class LunarLanderAdapter(Box2DAdapter):
@@ -69,26 +91,19 @@ class LunarLanderAdapter(Box2DAdapter):
         """Override step to handle discrete keyboard actions in continuous mode."""
         # Convert discrete keyboard actions to continuous if needed
         if self._config.continuous and isinstance(action, (int, np.integer)):
-            # Map discrete actions (0-3) to continuous control
-            # 0: idle/no thrust, 1: left engine, 2: main engine, 3: right engine
-            action = self._discrete_to_continuous(int(action))
+            mapped = self._map_discrete_action(
+                GameId.LUNAR_LANDER,
+                int(action),
+                fallback=np.zeros(2, dtype=np.float32),
+            )
+            if mapped is not None:
+                action = mapped
+            else:
+                self.logger.warning(
+                    "No continuous action mapping available for Lunar Lander; using idle thrust"
+                )
+                action = np.zeros(2, dtype=np.float32)
         return super().step(action)
-
-    @staticmethod
-    def _discrete_to_continuous(discrete_action: int) -> np.ndarray:
-        """Convert discrete keyboard action to continuous control array.
-        
-        Returns array [main_engine, side_engines] where:
-        - main_engine: 0.0 to 1.0 (throttle)
-        - side_engines: -1.0 to 1.0 (left/right)
-        """
-        mapping = {
-            0: np.array([0.0, 0.0], dtype=np.float32),   # Idle
-            1: np.array([0.0, -1.0], dtype=np.float32),  # Fire left engine
-            2: np.array([1.0, 0.0], dtype=np.float32),   # Fire main engine
-            3: np.array([0.0, 1.0], dtype=np.float32),   # Fire right engine
-        }
-        return mapping.get(discrete_action, np.array([0.0, 0.0], dtype=np.float32))
 
     def _extract_metrics(self, observation: np.ndarray, info: Mapping[str, Any]) -> dict[str, Any]:
         metrics: dict[str, Any] = {}
@@ -126,14 +141,6 @@ class CarRacingAdapter(Box2DAdapter):
         ControlMode.HYBRID_HUMAN_AGENT,
     )
 
-    _HUMAN_ACTION_PRESETS: dict[int, np.ndarray] = {
-        0: np.array([0.0, 0.0, 0.0], dtype=np.float32),   # coast
-        1: np.array([1.0, 0.3, 0.0], dtype=np.float32),   # steer right
-        2: np.array([-1.0, 0.3, 0.0], dtype=np.float32),  # steer left
-        3: np.array([0.0, 1.0, 0.0], dtype=np.float32),   # accelerate
-        4: np.array([0.0, 0.0, 0.8], dtype=np.float32),   # brake
-    }
-
     def __init__(
         self,
         context: AdapterContext | None = None,
@@ -166,10 +173,14 @@ class CarRacingAdapter(Box2DAdapter):
 
         if isinstance(action, (int, np.integer)):
             if is_continuous:
-                preset = self._HUMAN_ACTION_PRESETS.get(int(action))
-                if preset is None:
+                mapped = self._map_discrete_action(
+                    GameId.CAR_RACING,
+                    int(action),
+                    fallback=np.zeros(3, dtype=np.float32),
+                )
+                if mapped is None:
                     raise ValueError(f"Unknown human action preset '{action}' for CarRacing")
-                action = preset
+                action = mapped
             else:
                 action = int(action)
         else:
@@ -206,14 +217,6 @@ class BipedalWalkerAdapter(Box2DAdapter):
         ControlMode.HYBRID_HUMAN_AGENT,
     )
 
-    _HUMAN_ACTION_PRESETS: dict[int, np.ndarray] = {
-        0: np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32),  # neutral stance
-        1: np.array([0.8, 0.6, -0.8, -0.6], dtype=np.float32),  # stride forward
-        2: np.array([-0.8, -0.6, 0.8, 0.6], dtype=np.float32),  # stride backward
-        3: np.array([0.4, -1.0, 0.4, -1.0], dtype=np.float32),  # crouch / dip
-        4: np.array([-0.4, 1.0, -0.4, 1.0], dtype=np.float32),  # hop / push
-    }
-
     def __init__(
         self,
         context: AdapterContext | None = None,
@@ -237,10 +240,14 @@ class BipedalWalkerAdapter(Box2DAdapter):
         is_continuous = isinstance(env_space, spaces.Box)
 
         if isinstance(action, (int, np.integer)):
-            preset = self._HUMAN_ACTION_PRESETS.get(int(action))
-            if preset is None:
+            mapped = self._map_discrete_action(
+                GameId.BIPEDAL_WALKER,
+                int(action),
+                fallback=np.zeros(4, dtype=np.float32),
+            )
+            if mapped is None:
                 raise ValueError(f"Unknown human action preset '{action}' for BipedalWalker")
-            action = preset
+            action = mapped
         else:
             action_array = np.asarray(action, dtype=np.float32)
             if is_continuous:
