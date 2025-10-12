@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any, Iterable, Mapping, TypeVar
+from typing import Iterable, Mapping, TypeVar
 
 from gym_gui.config.game_configs import (
     CliffWalkingConfig,
@@ -14,7 +14,7 @@ from gym_gui.config.game_configs import (
     TaxiConfig,
 )
 from gym_gui.core.adapters.base import AdapterContext, EnvironmentAdapter
-from gym_gui.core.adapters.toy_text import TOY_TEXT_ADAPTERS, ToyTextAdapter
+from gym_gui.core.adapters.toy_text import TOY_TEXT_ADAPTERS
 from gym_gui.core.adapters.box2d import BOX2D_ADAPTERS
 from gym_gui.core.enums import GameId
 

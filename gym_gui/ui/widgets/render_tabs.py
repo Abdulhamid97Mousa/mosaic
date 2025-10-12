@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Iterable, List, Mapping, Optional
+from typing import Any, List, Mapping, Optional
 
 import numpy as np
 from qtpy import QtCore, QtGui, QtWidgets

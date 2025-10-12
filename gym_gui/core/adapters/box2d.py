@@ -12,7 +12,6 @@ from gym_gui.core.wrappers.time_limits import EpisodeTimeLimitSeconds, configure
 from gym_gui.config.game_configs import BipedalWalkerConfig, CarRacingConfig, LunarLanderConfig
 from gym_gui.core.adapters.base import AdapterContext, AdapterStep, EnvironmentAdapter, StepState
 from gym_gui.core.enums import ControlMode, GameId, RenderMode
-from gym_gui.core.wrappers.time_limits import EpisodeTimeLimitSeconds
 
 
 class Box2DAdapter(EnvironmentAdapter[np.ndarray, Any]):

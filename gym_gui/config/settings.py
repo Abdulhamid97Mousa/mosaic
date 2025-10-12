@@ -6,7 +6,6 @@ from dataclasses import dataclass, field
 from functools import lru_cache
 import os
 from pathlib import Path
-from typing import Iterable, TYPE_CHECKING
 import yaml  # type: ignore[import-not-found]
 
 

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
+from abc import ABC
 from dataclasses import dataclass, field
 import logging
 from typing import Any, Callable, Generic, Mapping, Sequence, TypeVar

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
-from typing import Any, List, Tuple, Type
+from typing import Any, List, Sequence, Tuple, Type, cast
 
 import gymnasium as gym
 
@@ -168,13 +168,18 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
             unwrapped = getattr(env, "unwrapped", env)
             state = getattr(unwrapped, "s", None)
             decode = getattr(unwrapped, "decode", None)
-            if state is not None and decode is not None:
-                taxi_row, taxi_col, pass_idx, dest_idx = decode(int(state))
-                payload["taxi_state"] = {
-                    "taxi_position": (int(taxi_row), int(taxi_col)),
-                    "passenger_index": int(pass_idx),  # 0-3 = at depot R/G/Y/B, 4 = in taxi
-                    "destination_index": int(dest_idx),  # 0-3 = depot R/G/Y/B
-                }
+            if state is not None and callable(decode):
+                decoded = cast(Sequence[Any], decode(int(state)))
+                if len(decoded) >= 4:
+                    taxi_row = decoded[0]
+                    taxi_col = decoded[1]
+                    pass_idx = decoded[2]
+                    dest_idx = decoded[3]
+                    payload["taxi_state"] = {
+                        "taxi_position": (int(taxi_row), int(taxi_col)),
+                        "passenger_index": int(pass_idx),  # 0-3 = at depot R/G/Y/B, 4 = in taxi
+                        "destination_index": int(dest_idx),  # 0-3 = depot R/G/Y/B
+                    }
         
         return payload
 
@@ -193,9 +198,13 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
 
             if self.id == GameId.TAXI.value:
                 decode = getattr(unwrapped, "decode", None)
-                if state is None or decode is None:
+                if state is None or not callable(decode):
                     return None
-                taxi_row, taxi_col, *_ = decode(int(state))
+                decoded = cast(Sequence[Any], decode(int(state)))
+                if len(decoded) < 2:
+                    return None
+                taxi_row = decoded[0]
+                taxi_col = decoded[1]
                 row = int(taxi_row)
                 col = int(taxi_col)
                 # Taxi map is always 5x5.
@@ -332,7 +341,6 @@ class CliffWalkingAdapter(ToyTextAdapter):
             
             # CliffWalking is 4 rows × 12 columns
             width = 12
-            height = 4
             
             # State is a single integer from 0-47
             row = int(state) // width
