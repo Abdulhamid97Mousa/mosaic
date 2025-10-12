@@ -76,3 +76,15 @@
 [submodule "fbs-tutorial"]
   path = fbs-tutorial
   url = https://github.com/mherrmann/fbs-tutorial.git 
+
+[submodule "CORL"]
+  path = CORL
+  url = https://github.com/corl-team/CORL.git
+
+[submodule "katakomba"]
+  path = katakomba
+  url = https://github.com/corl-team/katakomba.git
+
+[submodule "LeanRL"]
+  path = LeanRL
+  url = https://github.com/meta-pytorch/LeanRL.git
