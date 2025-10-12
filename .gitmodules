@@ -62,3 +62,17 @@
 [submodule "BallonsTranslator"]
   path = BallonsTranslator
   url = https://github.com/dmMaze/BallonsTranslator.git
+
+
+[submodule "cleanrl"]
+  path = cleanrl
+  url = https://github.com/vwxyzjn/cleanrl.git
+
+[submodule "openrlbenchmark"]
+  path = openrlbenchmark
+  url = https://github.com/openrlbenchmark/openrlbenchmark.git
+
+
+[submodule "fbs-tutorial"]
+  path = fbs-tutorial
+  url = https://github.com/mherrmann/fbs-tutorial.git 
