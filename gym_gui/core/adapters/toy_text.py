@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 import re
+from collections.abc import Iterable
 from typing import Any, List, Sequence, Tuple, Type, cast
 
 import gymnasium as gym
@@ -24,6 +25,14 @@ _TOY_TEXT_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 _ANSI_ESCAPE_RE = re.compile(r"\x1b\[(?P<codes>[0-9;]*)m")
 _AGENT_TOKEN_HINTS = {"x"}
+
+
+def _ensure_sequence(value: Any) -> Sequence[Any]:
+    if isinstance(value, Sequence):
+        return value
+    if isinstance(value, Iterable):
+        return tuple(value)
+    return (value,)
 
 
 def _ansi_to_grid(ansi: str) -> Tuple[List[List[str]], Tuple[int, int] | None]:
@@ -169,7 +178,8 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
             state = getattr(unwrapped, "s", None)
             decode = getattr(unwrapped, "decode", None)
             if state is not None and callable(decode):
-                decoded = cast(Sequence[Any], decode(int(state)))
+                raw_decoded = decode(int(state))
+                decoded = _ensure_sequence(raw_decoded)
                 if len(decoded) >= 4:
                     taxi_row = decoded[0]
                     taxi_col = decoded[1]
@@ -200,7 +210,8 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
                 decode = getattr(unwrapped, "decode", None)
                 if state is None or not callable(decode):
                     return None
-                decoded = cast(Sequence[Any], decode(int(state)))
+                raw_decoded = decode(int(state))
+                decoded = _ensure_sequence(raw_decoded)
                 if len(decoded) < 2:
                     return None
                 taxi_row = decoded[0]
