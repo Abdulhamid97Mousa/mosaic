@@ -286,7 +286,7 @@ In short, the submodules provide the algorithms, environments, and benchmarks; J
 
 ## 📄 License
 
-A formal license has not been published in this repository yet. Please contact the maintainers before redistributing or reusing the codebase.
+All rights reserved. This repository is provided for evaluation and collaboration only. Redistribution, modification, or any commercial use requires prior written permission from the maintainers. Please reach out through the issue tracker or direct contact channels to discuss licensing terms.
 
 ---
 
