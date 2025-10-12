@@ -19,7 +19,7 @@ def _clamp(value: float, low: float, high: float) -> float:
 class FrozenLakeConfig:
     """Configuration for FrozenLake environment."""
     
-    is_slippery: bool = True
+    is_slippery: bool = False
     """If True, agent moves in intended direction with 33.33% probability,
     and in perpendicular directions with 33.33% probability each.
     If False, agent always moves in intended direction."""
@@ -218,7 +218,7 @@ class BipedalWalkerConfig:
 
 
 # Default configurations for each game
-DEFAULT_FROZEN_LAKE_CONFIG = FrozenLakeConfig(is_slippery=True)
+DEFAULT_FROZEN_LAKE_CONFIG = FrozenLakeConfig(is_slippery=False)
 DEFAULT_TAXI_CONFIG = TaxiConfig(is_raining=False, fickle_passenger=False)
 DEFAULT_CLIFF_WALKING_CONFIG = CliffWalkingConfig(is_slippery=False)
 DEFAULT_LUNAR_LANDER_CONFIG = LunarLanderConfig()

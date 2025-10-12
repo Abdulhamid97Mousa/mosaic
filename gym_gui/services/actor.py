@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Actor abstractions and registry for human and autonomous agents."""
 
+import logging
 from dataclasses import dataclass, field
 from typing import Dict, Iterable, Optional, Protocol
 
@@ -30,6 +31,7 @@ class StepSnapshot:
     reward: float
     terminated: bool
     truncated: bool
+    seed: int | None = None
     info: dict[str, object] = field(default_factory=dict)
 
 
@@ -43,23 +45,50 @@ class EpisodeSummary:
     metadata: dict[str, object] = field(default_factory=dict)
 
 
+@dataclass(frozen=True)
+class ActorDescriptor:
+    """Metadata describing a registered actor for UI presentation."""
+
+    actor_id: str
+    display_name: str
+    description: str | None = None
+
+
 class ActorService:
     """Registry that coordinates active actors for the current session."""
 
     def __init__(self) -> None:
         self._actors: Dict[str, Actor] = {}
+        self._descriptors: Dict[str, ActorDescriptor] = {}
         self._active_actor_id: Optional[str] = None
+        self._last_seed: int | None = None
+        self._logger = logging.getLogger("gym_gui.services.actor")
 
     # ------------------------------------------------------------------
     # Registration
     # ------------------------------------------------------------------
-    def register_actor(self, actor: Actor, *, activate: bool = False) -> None:
-        self._actors[actor.id] = actor
+    def register_actor(
+        self,
+        actor: Actor,
+        *,
+        display_name: str | None = None,
+        description: str | None = None,
+        activate: bool = False,
+    ) -> None:
+        actor_id = actor.id
+        label = display_name or actor_id.replace("_", " ").title()
+        self._actors[actor_id] = actor
+        self._descriptors[actor_id] = ActorDescriptor(actor_id=actor_id, display_name=label, description=description)
         if activate or self._active_actor_id is None:
-            self._active_actor_id = actor.id
+            self._active_actor_id = actor_id
 
     def available_actor_ids(self) -> Iterable[str]:
         return self._actors.keys()
+
+    def describe_actors(self) -> tuple[ActorDescriptor, ...]:
+        """Return metadata for all registered actors in registration order."""
+
+        return tuple(self._descriptors[actor_id] for actor_id in self._actors.keys())
 
     # ------------------------------------------------------------------
     # Activation
@@ -73,6 +102,12 @@ class ActorService:
         if self._active_actor_id is None:
             return None
         return self._actors.get(self._active_actor_id)
+
+    def get_active_actor_id(self) -> Optional[str]:
+        return self._active_actor_id
+
+    def get_actor_descriptor(self, actor_id: str) -> Optional[ActorDescriptor]:
+        return self._descriptors.get(actor_id)
 
     # ------------------------------------------------------------------
     # High-level helpers
@@ -94,6 +129,26 @@ class ActorService:
         if actor is None:
             return
         actor.on_episode_end(summary)
+
+    # ------------------------------------------------------------------
+    # Seeding
+    # ------------------------------------------------------------------
+    def seed(self, seed: int) -> None:
+        """Propagate a deterministic seed to all registered actors."""
+
+        self._last_seed = seed
+        for actor_id, actor in self._actors.items():
+            callback = getattr(actor, "seed", None)
+            if not callable(callback):
+                continue
+            try:
+                callback(seed)
+            except Exception:  # pragma: no cover - defensive guard
+                self._logger.exception("Actor '%s' failed during seeding", actor_id)
+
+    @property
+    def last_seed(self) -> Optional[int]:
+        return self._last_seed
 
 
 # Placeholder implementations -------------------------------------------------
@@ -153,6 +208,7 @@ class LLMMultiStepAgent:
 __all__ = [
     "Actor",
     "ActorService",
+    "ActorDescriptor",
     "StepSnapshot",
     "EpisodeSummary",
     "HumanKeyboardActor",

@@ -15,6 +15,7 @@ from gym_gui.config.game_configs import (
     TaxiConfig,
 )
 from gym_gui.core.enums import ControlMode, GameId
+from gym_gui.services.actor import ActorDescriptor
 
 
 @dataclass(frozen=True)
@@ -29,6 +30,10 @@ class ControlPanelConfig:
     lunar_lander_config: LunarLanderConfig
     car_racing_config: CarRacingConfig
     bipedal_walker_config: BipedalWalkerConfig
+    default_seed: int
+    allow_seed_reuse: bool
+    actors: tuple[ActorDescriptor, ...]
+    default_actor_id: Optional[str] = None
 
 
 class ControlPanelWidget(QtWidgets.QWidget):
@@ -47,6 +52,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
     continue_game_requested = Signal()
     terminate_game_requested = Signal()
     agent_step_requested = Signal()
+    actor_changed = Signal(str)
 
     def __init__(
         self,
@@ -57,6 +63,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
         super().__init__(parent)
         self._config = config
         self._available_modes = config.available_modes
+        self._default_seed = max(1, config.default_seed)
+        self._allow_seed_reuse = config.allow_seed_reuse
         self._game_overrides: Dict[GameId, Dict[str, object]] = {
             GameId.FROZEN_LAKE: {"is_slippery": config.frozen_lake_config.is_slippery},
             GameId.TAXI: {
@@ -91,6 +99,14 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._auto_running: bool = False
         self._game_started: bool = False
         self._game_paused: bool = False
+        self._actor_descriptors: Dict[str, ActorDescriptor] = {
+            descriptor.actor_id: descriptor for descriptor in config.actors
+        }
+        self._actor_order: tuple[ActorDescriptor, ...] = config.actors
+        default_actor = config.default_actor_id
+        if default_actor is None and self._actor_order:
+            default_actor = self._actor_order[0].actor_id
+        self._active_actor_id: Optional[str] = default_actor
 
         # Store game configurations
         self._game_configs: Dict[GameId, Dict[str, object]] = {
@@ -127,6 +143,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
 
         self._build_ui()
         self._connect_signals()
+        self._populate_actor_combo()
 
     # ------------------------------------------------------------------
     # Public API
@@ -151,6 +168,21 @@ class ControlPanelWidget(QtWidgets.QWidget):
         if isinstance(chosen_game, GameId):
             self._emit_game_changed(chosen_game)
 
+    def current_actor(self) -> Optional[str]:
+        return self._active_actor_id
+
+    def set_active_actor(self, actor_id: str) -> None:
+        if actor_id == self._active_actor_id:
+            return
+        index = self._actor_combo.findData(actor_id)
+        if index < 0:
+            return
+        self._actor_combo.blockSignals(True)
+        self._actor_combo.setCurrentIndex(index)
+        self._actor_combo.blockSignals(False)
+        self._active_actor_id = actor_id
+        self._update_actor_description()
+
     def update_modes(self, game_id: GameId) -> None:
         supported = tuple(self._available_modes.get(game_id, ()))
         if not supported:
@@ -173,6 +205,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         *,
         step: int,
         reward: float,
+        total_reward: float,
         terminated: bool,
         truncated: bool,
         turn: str,
@@ -185,6 +218,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
     ) -> None:
         self._step_label.setText(str(step))
         self._reward_label.setText(f"{reward:.2f}")
+        self._total_reward_label.setText(f"{total_reward:.2f}")
         self._terminated_label.setText(self._format_bool(terminated))
         self._truncated_label.setText(self._format_bool(truncated))
         self._turn_label.setText(turn)
@@ -291,8 +325,14 @@ class ControlPanelWidget(QtWidgets.QWidget):
         env_layout = QtWidgets.QVBoxLayout(env_group)
         self._game_combo = QtWidgets.QComboBox(env_group)
         self._seed_spin = QtWidgets.QSpinBox(env_group)
-        self._seed_spin.setRange(0, 10_000_000)
-        self._seed_spin.setValue(0)
+        self._seed_spin.setRange(1, 10_000_000)
+        self._seed_spin.setValue(self._default_seed)
+        if self._allow_seed_reuse:
+            self._seed_spin.setToolTip(
+                "Seeds auto-increment by default. Adjust before loading to reuse a previous seed."
+            )
+        else:
+            self._seed_spin.setToolTip("Seed increments automatically after each episode.")
         self._load_button = QtWidgets.QPushButton("Load", env_group)
         env_layout.addWidget(QtWidgets.QLabel("Select environment", env_group))
         env_layout.addWidget(self._game_combo)
@@ -309,18 +349,35 @@ class ControlPanelWidget(QtWidgets.QWidget):
 
         # Mode selector
         mode_group = QtWidgets.QGroupBox("Control Mode", self)
-        mode_layout = QtWidgets.QVBoxLayout(mode_group)
+        mode_layout = QtWidgets.QGridLayout(mode_group)
         self._mode_buttons: Dict[ControlMode, QtWidgets.QRadioButton] = {}
         mode_button_group = QtWidgets.QButtonGroup(mode_group)
-        for mode in ControlMode:
+        modes_tuple = tuple(ControlMode)
+        columns = 2
+        for index, mode in enumerate(modes_tuple):
             button = QtWidgets.QRadioButton(
                 mode.value.replace("_", " ").title(), mode_group
             )
             button.setEnabled(False)
             mode_button_group.addButton(button)
-            mode_layout.addWidget(button)
+            row = index // columns
+            column = index % columns
+            mode_layout.addWidget(button, row, column, QtCore.Qt.AlignmentFlag.AlignLeft)
             self._mode_buttons[mode] = button
+        for column in range(columns):
+            mode_layout.setColumnStretch(column, 1)
         layout.addWidget(mode_group)
+
+        # Actor selector
+        actor_group = QtWidgets.QGroupBox("Active Actor", self)
+        actor_layout = QtWidgets.QVBoxLayout(actor_group)
+        self._actor_combo = QtWidgets.QComboBox(actor_group)
+        self._actor_combo.setEnabled(bool(self._actor_order))
+        actor_layout.addWidget(self._actor_combo)
+        self._actor_description = QtWidgets.QLabel("—", actor_group)
+        self._actor_description.setWordWrap(True)
+        actor_layout.addWidget(self._actor_description)
+        layout.addWidget(actor_group)
 
         # Control buttons - renamed group
         controls_group = QtWidgets.QGroupBox("Game Control Flow", self)
@@ -350,9 +407,10 @@ class ControlPanelWidget(QtWidgets.QWidget):
 
         # Status group
         status_group = QtWidgets.QGroupBox("Status", self)
-        status_layout = QtWidgets.QFormLayout(status_group)
+        status_layout = QtWidgets.QGridLayout(status_group)
         self._step_label = QtWidgets.QLabel("0", status_group)
         self._reward_label = QtWidgets.QLabel("0.0", status_group)
+        self._total_reward_label = QtWidgets.QLabel("0.00", status_group)
         self._terminated_label = QtWidgets.QLabel("No", status_group)
         self._truncated_label = QtWidgets.QLabel("No", status_group)
         self._turn_label = QtWidgets.QLabel("human", status_group)
@@ -360,15 +418,32 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._session_time_label = QtWidgets.QLabel("00:00:00", status_group)
         self._active_time_label = QtWidgets.QLabel("—", status_group)
         self._outcome_time_label = QtWidgets.QLabel("—", status_group)
-        status_layout.addRow("Step", self._step_label)
-        status_layout.addRow("Reward", self._reward_label)
-        status_layout.addRow("Episode Finished", self._terminated_label)
-        status_layout.addRow("Episode Aborted", self._truncated_label)
-        status_layout.addRow("Turn", self._turn_label)
-        status_layout.addRow("Awaiting Input", self._awaiting_label)
-        status_layout.addRow("Session Uptime", self._session_time_label)
-        status_layout.addRow("Active Play Time", self._active_time_label)
-        status_layout.addRow("Outcome Time", self._outcome_time_label)
+
+        fields: list[tuple[str, QtWidgets.QLabel]] = [
+            ("Step", self._step_label),
+            ("Reward", self._reward_label),
+            ("Total Reward", self._total_reward_label),
+            ("Episode Finished", self._terminated_label),
+            ("Episode Aborted", self._truncated_label),
+            ("Turn", self._turn_label),
+            ("Awaiting Input", self._awaiting_label),
+            ("Session Uptime", self._session_time_label),
+            ("Active Play Time", self._active_time_label),
+            ("Outcome Time", self._outcome_time_label),
+        ]
+
+        midpoint = (len(fields) + 1) // 2
+        columns = [fields[:midpoint], fields[midpoint:]]
+        for col_index, column_fields in enumerate(columns):
+            for row_index, (title, value_label) in enumerate(column_fields):
+                title_label = QtWidgets.QLabel(f"{title}", status_group)
+                title_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter)
+                base_col = col_index * 2
+                status_layout.addWidget(title_label, row_index, base_col)
+                status_layout.addWidget(value_label, row_index, base_col + 1)
+
+        status_layout.setColumnStretch(1, 1)
+        status_layout.setColumnStretch(3, 1)
         layout.addWidget(status_group)
 
         layout.addStretch(1)
@@ -385,6 +460,16 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._terminate_button.clicked.connect(self._on_terminate_clicked)
         self._step_button.clicked.connect(self._on_step_clicked)
         self._reset_button.clicked.connect(self._on_reset_clicked)
+        self._actor_combo.currentIndexChanged.connect(self._on_actor_selection_changed)
+
+    def set_seed_value(self, seed: int) -> None:
+        clamped = max(1, min(seed, self._seed_spin.maximum()))
+        if self._seed_spin.value() == clamped:
+            return
+        self._seed_spin.blockSignals(True)
+        self._seed_spin.setValue(clamped)
+        self._seed_spin.blockSignals(False)
+        self._update_control_states()
 
     # ------------------------------------------------------------------
     # Signal emitters
@@ -523,6 +608,52 @@ class ControlPanelWidget(QtWidgets.QWidget):
         
         # Reset: always enabled (can reset even during active game)
         self._reset_button.setEnabled(True)
+
+        # Enable actor selector only when an agent can participate
+        has_agent_component = self._current_mode != ControlMode.HUMAN_ONLY
+        self._actor_combo.setEnabled(has_agent_component and self._actor_combo.count() > 0)
+
+        self._update_actor_description()
+
+    def _populate_actor_combo(self) -> None:
+        self._actor_combo.blockSignals(True)
+        self._actor_combo.clear()
+        for descriptor in self._actor_order:
+            self._actor_combo.addItem(descriptor.display_name, descriptor.actor_id)
+        self._actor_combo.blockSignals(False)
+
+        if not self._actor_order:
+            self._actor_description.setText("No actors registered")
+            return
+
+        default_id = self._active_actor_id or self._actor_order[0].actor_id
+        index = self._actor_combo.findData(default_id)
+        if index < 0:
+            index = 0
+        self._actor_combo.setCurrentIndex(index)
+        current_data = self._actor_combo.currentData()
+        self._active_actor_id = current_data if isinstance(current_data, str) else None
+        self._update_actor_description()
+
+    def _on_actor_selection_changed(self, index: int) -> None:
+        actor_id = self._actor_combo.itemData(index)
+        if not isinstance(actor_id, str):
+            return
+        if actor_id == self._active_actor_id:
+            return
+        self._active_actor_id = actor_id
+        self._update_actor_description()
+        self.actor_changed.emit(actor_id)
+
+    def _update_actor_description(self) -> None:
+        if self._active_actor_id is None:
+            self._actor_description.setText("—")
+            return
+        descriptor = self._actor_descriptors.get(self._active_actor_id)
+        if descriptor is None or descriptor.description is None:
+            self._actor_description.setText("—")
+            return
+        self._actor_description.setText(descriptor.description)
 
     @staticmethod
     def _format_bool(value: bool) -> str:

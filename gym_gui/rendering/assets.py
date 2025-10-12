@@ -101,9 +101,9 @@ class FrozenLakeAssets:
         return mapping.get(cell_value.strip().upper(), FrozenLakeAssets.ICE)
 
     @staticmethod
-    def get_agent_asset(direction: str = "down") -> str:
+    def get_actor_asset(direction: str = "down") -> str:
         """
-        Get agent sprite based on movement direction.
+        Get actor sprite based on movement direction.
 
         Args:
             direction: Movement direction ('up', 'down', 'left', 'right')
@@ -118,6 +118,9 @@ class FrozenLakeAssets:
             "right": FrozenLakeAssets.AGENT_RIGHT,
         }
         return mapping.get(direction.lower(), FrozenLakeAssets.AGENT_DOWN)
+
+    # Backwards compatibility (historical name)
+    get_agent_asset = get_actor_asset
 
 
 class TaxiAssets:
@@ -260,6 +263,13 @@ class CliffWalkingAssets:
 
     @staticmethod
     def get_tile_asset(cell_value: str, row: int = 0, col: int = 0) -> str:
+        layers = CliffWalkingAssets.get_tile_layers(cell_value, row, col)
+        if layers:
+            return layers[-1]
+        return CliffWalkingAssets.MOUNTAIN_BG1
+
+    @staticmethod
+    def get_tile_layers(cell_value: str, row: int = 0, col: int = 0) -> list[str]:
         """
         Map grid cell character to tile asset with position-based variation.
 
@@ -269,35 +279,49 @@ class CliffWalkingAssets:
             col: Column position in the grid (0-indexed)
 
         Returns:
-            Asset filename for the tile
+            Ordered list of asset filenames representing layered rendering
         """
         # CliffWalking grid is 4x12:
         # Row 0-2: safe ground with visual variety
         # Row 3 (bottom): start(x), cliffs(C), goal(T)
         cell = cell_value.strip().upper()
-        
+
+        def _safe_base(r: int, c: int) -> str:
+            if r == 0:
+                return CliffWalkingAssets.MOUNTAIN_BG1
+            if r == 1:
+                return CliffWalkingAssets.MOUNTAIN_BG2
+            if r == 2:
+                # Path row – alternate underlay for visual rhythm
+                return CliffWalkingAssets.MOUNTAIN_BG2 if c % 2 == 0 else CliffWalkingAssets.MOUNTAIN_BG1
+            # Default for bottom row when not overridden
+            return CliffWalkingAssets.MOUNTAIN_BG1
+
+        layers: list[str] = []
+
+        is_start = row == 3 and col == 0
+        is_goal = cell in {"T", "G"} or (row == 3 and col == 11)
+
+        if is_start:
+            layers.append(CliffWalkingAssets.MOUNTAIN_BG2)
+        elif is_goal:
+            layers.append(CliffWalkingAssets.MOUNTAIN_BG1)
+        else:
+            layers.append(_safe_base(row, col))
+
         if cell == "C":
-            return CliffWalkingAssets.MOUNTAIN_CLIFF
-        elif cell == "T":
-            return CliffWalkingAssets.COOKIE  # Goal position uses cookie
-        elif cell == "X":
-            # Start position - use stool
-            return CliffWalkingAssets.STOOL
-        elif cell == "O" or cell == " " or not cell:
-            # Safe ground - add variation based on position
-            if row == 2:  # Row just above the cliff/goal row
-                # Use near-cliff variants for visual interest
-                return CliffWalkingAssets.MOUNTAIN_NEAR_CLIFF1 if col % 2 == 0 else CliffWalkingAssets.MOUNTAIN_NEAR_CLIFF2
-            else:
-                # Alternate between bg1 and bg2 for visual variety
-                return CliffWalkingAssets.MOUNTAIN_BG1 if (row + col) % 2 == 0 else CliffWalkingAssets.MOUNTAIN_BG2
-        
-        return CliffWalkingAssets.MOUNTAIN_BG1
+            layers.append(CliffWalkingAssets.MOUNTAIN_CLIFF)
+        elif is_goal:
+            layers.append(CliffWalkingAssets.COOKIE)
+        elif is_start:
+            layers.append(CliffWalkingAssets.STOOL)
+
+        return layers
 
     @staticmethod
-    def get_agent_asset(direction: str = "down") -> str:
+    def get_actor_asset(direction: str = "down") -> str:
         """
-        Get agent sprite based on movement direction.
+        Get actor sprite based on movement direction.
 
         Args:
             direction: Movement direction ('up', 'down', 'left', 'right')
@@ -312,6 +336,9 @@ class CliffWalkingAssets:
             "right": CliffWalkingAssets.AGENT_RIGHT,
         }
         return mapping.get(direction.lower(), CliffWalkingAssets.AGENT_DOWN)
+
+    # Backwards compatibility
+    get_agent_asset = get_actor_asset
 
 
 __all__ = [

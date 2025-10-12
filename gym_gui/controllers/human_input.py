@@ -72,6 +72,13 @@ _BOX_2D_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
         _mapping(("Key_Up", "Key_W"), 3),    # Accelerate
         _mapping(("Key_Down", "Key_S"), 4),  # Brake
     ),
+    GameId.BIPEDAL_WALKER: (
+        _mapping(("Key_Space",), 0),            # Neutral stance
+        _mapping(("Key_Right", "Key_D"), 1),  # Lean forward / step
+        _mapping(("Key_Left", "Key_A"), 2),   # Lean backward / step back
+        _mapping(("Key_Up", "Key_W"), 3),     # Crouch / prepare jump
+        _mapping(("Key_Down", "Key_S"), 4),   # Extend legs / hop
+    ),
 }
 
 

@@ -1,6 +1,7 @@
 """Shared services such as logging, persistence, and orchestration."""
 
 from .actor import (
+	ActorDescriptor,
 	ActorService,
 	BDIQAgent,
 	EpisodeSummary,
@@ -13,6 +14,7 @@ from .storage import StorageProfile, StorageRecorderService
 from .telemetry import TelemetryService
 
 __all__ = [
+	"ActorDescriptor",
 	"ActorService",
 	"BDIQAgent",
 	"EpisodeSummary",

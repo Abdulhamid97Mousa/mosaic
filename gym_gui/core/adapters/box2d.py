@@ -200,6 +200,20 @@ class BipedalWalkerAdapter(Box2DAdapter):
     """Adapter for the BipedalWalker-v3 environment."""
 
     id = GameId.BIPEDAL_WALKER.value
+    supported_control_modes = (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+    )
+
+    _HUMAN_ACTION_PRESETS: dict[int, np.ndarray] = {
+        0: np.array([0.0, 0.0, 0.0, 0.0], dtype=np.float32),  # neutral stance
+        1: np.array([0.8, 0.6, -0.8, -0.6], dtype=np.float32),  # stride forward
+        2: np.array([-0.8, -0.6, 0.8, 0.6], dtype=np.float32),  # stride backward
+        3: np.array([0.4, -1.0, 0.4, -1.0], dtype=np.float32),  # crouch / dip
+        4: np.array([-0.4, 1.0, -0.4, 1.0], dtype=np.float32),  # hop / push
+    }
 
     def __init__(
         self,
@@ -214,6 +228,32 @@ class BipedalWalkerAdapter(Box2DAdapter):
         kwargs = super().gym_kwargs()
         kwargs.update(self._config.to_gym_kwargs())
         return kwargs
+
+    def step(self, action: np.ndarray | int) -> AdapterStep[np.ndarray]:
+        env_space = None
+        try:
+            env_space = self.action_space
+        except Exception:
+            env_space = None
+        is_continuous = isinstance(env_space, spaces.Box)
+
+        if isinstance(action, (int, np.integer)):
+            preset = self._HUMAN_ACTION_PRESETS.get(int(action))
+            if preset is None:
+                raise ValueError(f"Unknown human action preset '{action}' for BipedalWalker")
+            action = preset
+        else:
+            action_array = np.asarray(action, dtype=np.float32)
+            if is_continuous:
+                if env_space is not None and isinstance(env_space, spaces.Box):
+                    low = np.asarray(env_space.low, dtype=np.float32)
+                    high = np.asarray(env_space.high, dtype=np.float32)
+                    action = np.clip(action_array, low, high)
+                else:
+                    action = action_array
+            else:
+                action = int(action_array.item()) if action_array.size else 0
+        return super().step(action)
 
     def _extract_metrics(self, observation: np.ndarray, info: Mapping[str, Any]) -> dict[str, Any]:
         metrics: dict[str, Any] = {}

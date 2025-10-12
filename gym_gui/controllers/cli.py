@@ -35,7 +35,7 @@ def main(argv: list[str] | None = None) -> int:
         default=ControlMode.HUMAN_ONLY,
         help="Control mode to validate (must be supported by the adapter)",
     )
-    parser.add_argument("--seed", type=int, default=0, help="Seed passed to adapter.reset")
+    parser.add_argument("--seed", type=int, default=1, help="Seed passed to adapter.reset")
     parser.add_argument("--max-steps", type=int, default=100, help="Maximum number of actions before exiting")
     parser.add_argument("--log-level", default="DEBUG", help="Logging level (e.g. INFO, DEBUG)")
     args = parser.parse_args(argv)

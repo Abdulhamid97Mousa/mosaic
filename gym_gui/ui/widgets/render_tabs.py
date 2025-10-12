@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from datetime import datetime
 from typing import Any, Iterable, List, Mapping, Optional
 
 import numpy as np
@@ -111,6 +112,7 @@ class _GridTab:
         view.setBackgroundBrush(QtGui.QBrush(QtGui.QColor(240, 240, 240)))
         self.widget = view
         self._renderer = GridRenderer(self.widget)
+        self._current_game = None
 
     def set_current_game(self, game_id: GameId | None) -> None:
         self._current_game = game_id
@@ -285,6 +287,9 @@ class _ReplayTab(QtWidgets.QWidget):
     _loader: EpisodeReplayLoader | None
     _current_game: GameId | None
     _load_button: QtWidgets.QPushButton
+    _delete_button: QtWidgets.QPushButton
+    _clear_button: QtWidgets.QPushButton
+    _order_button: QtWidgets.QPushButton
     _episodes: QtWidgets.QTableWidget
     _placeholder: QtWidgets.QLabel
     _details_group: QtWidgets.QGroupBox
@@ -294,6 +299,7 @@ class _ReplayTab(QtWidgets.QWidget):
     _step_label: QtWidgets.QLabel
     _step_view: QtWidgets.QPlainTextEdit
     _current_replay: Optional[EpisodeReplay]
+    _current_replay_game: GameId | None
 
     def __init__(
         self,
@@ -305,46 +311,10 @@ class _ReplayTab(QtWidgets.QWidget):
         self._telemetry = telemetry_service
         self._loader = EpisodeReplayLoader(telemetry_service) if telemetry_service else None
         self._current_game = None
+        self._sort_descending = True
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
-
-        header = QtWidgets.QHBoxLayout()
-        header.addWidget(QtWidgets.QLabel("Recent Episodes"))
-        header.addStretch(1)
-        self._load_button = QtWidgets.QPushButton("Load Replay")
-        self._load_button.clicked.connect(self._load_selected_episode)
-        self._load_button.setEnabled(False)
-        header.addWidget(self._load_button)
-        refresh_button = QtWidgets.QPushButton("Refresh")
-        refresh_button.clicked.connect(self.refresh)
-        header.addWidget(refresh_button)
-        layout.addLayout(header)
-
-        self._episodes = QtWidgets.QTableWidget(0, 5, self)
-        self._episodes.setHorizontalHeaderLabels([
-            "Episode",
-            "Steps",
-            "Reward",
-            "Terminated",
-            "Timestamp",
-        ])
-        header = self._episodes.horizontalHeader()
-        if header is not None:
-            header.setStretchLastSection(True)
-        self._episodes.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
-        self._episodes.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
-        self._episodes.itemSelectionChanged.connect(self._on_episode_selection_changed)
-        self._episodes.itemDoubleClicked.connect(lambda *_: self._load_selected_episode())
-        layout.addWidget(self._episodes, 1)
-
-        self._placeholder = QtWidgets.QLabel(
-            "Telemetry playback data will appear here once episodes are recorded.",
-            self,
-        )
-        self._placeholder.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        self._placeholder.setWordWrap(True)
-        layout.addWidget(self._placeholder)
 
         self._details_group = QtWidgets.QGroupBox("Episode Playback", self)
         details_layout = QtWidgets.QVBoxLayout(self._details_group)
@@ -375,8 +345,67 @@ class _ReplayTab(QtWidgets.QWidget):
 
         layout.addWidget(self._details_group)
 
+        footer = QtWidgets.QHBoxLayout()
+        footer_label = QtWidgets.QLabel("Recent Episodes")
+        footer.addWidget(footer_label)
+        self._order_button = QtWidgets.QPushButton(self)
+        self._order_button.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        self._order_button.clicked.connect(self._toggle_sort_order)
+        footer.addWidget(self._order_button)
+        footer.addStretch(1)
+        self._load_button = QtWidgets.QPushButton("Load Replay")
+        self._load_button.clicked.connect(self._load_selected_episode)
+        self._load_button.setEnabled(False)
+        footer.addWidget(self._load_button)
+        self._copy_button = QtWidgets.QPushButton("Copy to Clipboard")
+        self._copy_button.clicked.connect(self._copy_table_to_clipboard)
+        self._copy_button.setEnabled(False)
+        footer.addWidget(self._copy_button)
+        self._delete_button = QtWidgets.QPushButton("Delete Selected")
+        self._delete_button.clicked.connect(self._delete_selected_episode)
+        self._delete_button.setEnabled(False)
+        footer.addWidget(self._delete_button)
+        refresh_button = QtWidgets.QPushButton("Refresh")
+        refresh_button.clicked.connect(self.refresh)
+        footer.addWidget(refresh_button)
+        self._clear_button = QtWidgets.QPushButton("Clear All")
+        self._clear_button.clicked.connect(self._clear_all_episodes)
+        self._clear_button.setEnabled(False)
+        footer.addWidget(self._clear_button)
+        layout.addLayout(footer)
+
+        self._update_order_button()
+
+        self._episodes = QtWidgets.QTableWidget(0, 7, self)
+        self._episodes.setHorizontalHeaderLabels([
+            "Seed",
+            "Episode",
+            "Game",
+            "Steps",
+            "Reward",
+            "Outcome",
+            "Timestamp",
+        ])
+        header = self._episodes.horizontalHeader()
+        if header is not None:
+            header.setStretchLastSection(True)
+        self._episodes.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self._episodes.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._episodes.itemSelectionChanged.connect(self._on_episode_selection_changed)
+        self._episodes.itemDoubleClicked.connect(lambda *_: self._load_selected_episode())
+        layout.addWidget(self._episodes, 1)
+
+        self._placeholder = QtWidgets.QLabel(
+            "Telemetry playback data will appear here once episodes are recorded.",
+            self,
+        )
+        self._placeholder.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self._placeholder.setWordWrap(True)
+        layout.addWidget(self._placeholder)
+
         self._update_placeholder_visibility()
         self._current_replay = None
+        self._current_replay_game = None
 
     def set_current_game(self, game_id: GameId | None) -> None:
         self._current_game = game_id
@@ -384,40 +413,95 @@ class _ReplayTab(QtWidgets.QWidget):
 
     def refresh(self) -> None:
         records = self._fetch_recent_episodes()
+        records.sort(
+            key=lambda record: record.get("timestamp_sort", datetime.min),
+            reverse=self._sort_descending,
+        )
         self._episodes.setRowCount(0)
-        for record in records:
+        for display_index, record in enumerate(records, start=1):
             row = self._episodes.rowCount()
             self._episodes.insertRow(row)
-            for column, value in enumerate(record):
+            episode_label = record.get("episode_index")
+            episode_display = (
+                str(episode_label)
+                if episode_label is not None
+                else str(display_index)
+            )
+            display_values = [
+                str(record["seed"]),
+                episode_display,
+                record.get("game", "—"),
+                str(record["steps"]),
+                str(record["reward"]),
+                str(record["terminated"]),
+                str(record["timestamp"]),
+            ]
+            for column, value in enumerate(display_values):
                 item = QtWidgets.QTableWidgetItem(value)
-                if column == 2:  # reward column alignment
+                if column == 1:
+                    item.setData(QtCore.Qt.ItemDataRole.UserRole, record["episode_id"])
+                if column == 4:  # reward column alignment
                     item.setTextAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
                 self._episodes.setItem(row, column, item)
         self._update_placeholder_visibility()
-        self._load_button.setEnabled(self._episodes.rowCount() > 0)
+        self._on_episode_selection_changed()
         if self._episodes.rowCount() == 0:
             self._clear_replay_details()
+
+    def _copy_table_to_clipboard(self) -> None:
+        if self._episodes.rowCount() == 0:
+            return
+        clipboard = QtWidgets.QApplication.clipboard()
+        if clipboard is None:
+            return
+        headers: List[str] = []
+        for column_index in range(self._episodes.columnCount()):
+            header_item = self._episodes.horizontalHeaderItem(column_index)
+            headers.append(header_item.text() if header_item is not None else "")
+        rows: List[str] = ["\t".join(headers)]
+        for row_index in range(self._episodes.rowCount()):
+            row_values: List[str] = []
+            for column_index in range(self._episodes.columnCount()):
+                item = self._episodes.item(row_index, column_index)
+                row_values.append(item.text() if item is not None else "")
+            rows.append("\t".join(row_values))
+        clipboard.setText("\n".join(rows))
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
-    def _fetch_recent_episodes(self) -> List[List[str]]:
+    def _fetch_recent_episodes(self) -> List[dict[str, Any]]:
         if self._telemetry is None:
             return []
         episodes = list(self._telemetry.recent_episodes())
-        rows: List[List[str]] = []
+        rows: List[dict[str, Any]] = []
         for episode in episodes:
-            if self._current_game is not None:
-                meta_game = episode.metadata.get("game_id") if isinstance(episode.metadata, Mapping) else None
-                if meta_game and meta_game != self._current_game.value:
-                    continue
-            rows.append([
-                episode.episode_id,
-                str(episode.steps),
-                f"{episode.total_reward:.2f}",
-                "Yes" if episode.terminated else ("Aborted" if episode.truncated else "No"),
-                episode.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            ])
+            seed_value = None
+            episode_index = None
+            game_label = "—"
+            if isinstance(episode.metadata, Mapping):
+                seed_value = episode.metadata.get("seed")
+                episode_index = episode.metadata.get("episode_index")
+                meta_game = episode.metadata.get("game_id")
+                if isinstance(meta_game, GameId):
+                    game_label = meta_game.value
+                elif isinstance(meta_game, str):
+                    try:
+                        game_label = GameId(meta_game).value
+                    except ValueError:
+                        game_label = meta_game
+            seed_display = str(seed_value) if seed_value is not None else "—"
+            rows.append({
+                "episode_id": episode.episode_id,
+                "episode_index": int(episode_index) if episode_index is not None else None,
+                "seed": seed_display,
+                "game": game_label,
+                "steps": str(episode.steps),
+                "reward": f"{episode.total_reward:.2f}",
+                "terminated": "Yes" if episode.terminated else ("Aborted" if episode.truncated else "No"),
+                "timestamp": episode.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+                "timestamp_sort": episode.timestamp,
+            })
         return rows
 
     def _update_placeholder_visibility(self) -> None:
@@ -425,10 +509,30 @@ class _ReplayTab(QtWidgets.QWidget):
         self._episodes.setVisible(has_rows)
         self._placeholder.setVisible(not has_rows)
         self._details_group.setVisible(has_rows)
+        self._clear_button.setEnabled(has_rows and self._telemetry is not None)
+        self._copy_button.setEnabled(has_rows)
+        if not has_rows:
+            self._load_button.setEnabled(False)
+            self._delete_button.setEnabled(False)
+
+    def _update_order_button(self) -> None:
+        if self._sort_descending:
+            self._order_button.setText("Newest ↓")
+            self._order_button.setToolTip("Show oldest episodes first")
+        else:
+            self._order_button.setText("Oldest ↑")
+            self._order_button.setToolTip("Show newest episodes first")
+
+    def _toggle_sort_order(self) -> None:
+        self._sort_descending = not self._sort_descending
+        self._update_order_button()
+        self.refresh()
 
     def _on_episode_selection_changed(self) -> None:
         indexes = self._episodes.selectionModel()
-        self._load_button.setEnabled(bool(indexes and indexes.hasSelection()))
+        has_selection = bool(indexes and indexes.hasSelection())
+        self._load_button.setEnabled(has_selection)
+        self._delete_button.setEnabled(has_selection and self._telemetry is not None)
 
     def _load_selected_episode(self) -> None:
         if self._loader is None:
@@ -437,10 +541,12 @@ class _ReplayTab(QtWidgets.QWidget):
         if selection is None or not selection.hasSelection():
             return
         row = selection.selectedRows()[0].row()
-        episode_id_item = self._episodes.item(row, 0)
+        episode_id_item = self._episodes.item(row, 1)
         if episode_id_item is None:
             return
-        episode_id = episode_id_item.text()
+        episode_id = episode_id_item.data(QtCore.Qt.ItemDataRole.UserRole)
+        if not isinstance(episode_id, str):
+            episode_id = episode_id_item.text()
         replay = self._loader.load_episode(episode_id)
         if replay is None:
             self._episode_summary.setText("No telemetry data available for the selected episode.")
@@ -449,8 +555,12 @@ class _ReplayTab(QtWidgets.QWidget):
             self._step_view.setPlainText("")
             self._preview.clear()
             self._current_replay = None
+            self._current_replay_game = None
             return
         self._current_replay = replay
+        self._current_replay_game = self._resolve_game_from_metadata(replay.rollup.metadata)
+        if self._current_replay_game is not None:
+            self._preview.set_current_game(self._current_replay_game)
         self._episode_summary.setText(
             f"Episode {replay.episode_id}\nTotal reward: {replay.total_reward:.2f}\nSteps: {len(replay.steps)}"
         )
@@ -461,6 +571,30 @@ class _ReplayTab(QtWidgets.QWidget):
         self._slider.setValue(0)
         self._slider.blockSignals(False)
         self._display_step(0)
+
+    def _delete_selected_episode(self) -> None:
+        if self._telemetry is None:
+            return
+        selection = self._episodes.selectionModel()
+        if selection is None or not selection.hasSelection():
+            return
+        row = selection.selectedRows()[0].row()
+        episode_item = self._episodes.item(row, 1)
+        if episode_item is None:
+            return
+        episode_id = episode_item.data(QtCore.Qt.ItemDataRole.UserRole)
+        if not isinstance(episode_id, str):
+            episode_id = episode_item.text()
+        self._telemetry.delete_episode(episode_id)
+        self.refresh()
+        self._clear_replay_details()
+
+    def _clear_all_episodes(self) -> None:
+        if self._telemetry is None:
+            return
+        self._telemetry.clear_all_episodes()
+        self.refresh()
+        self._clear_replay_details()
 
     def _on_slider_changed(self, value: int) -> None:
         self._display_step(value)
@@ -475,7 +609,7 @@ class _ReplayTab(QtWidgets.QWidget):
         step = self._current_replay.steps[index]
         self._step_label.setText(f"Step {index + 1} / {len(self._current_replay.steps)}")
         self._step_view.setPlainText(self._format_step(step))
-        self._preview.display(step.render_payload, self._current_game)
+        self._preview.display(step.render_payload, self._current_replay_game or self._current_game)
 
     def _clear_replay_details(self) -> None:
         self._episode_summary.setText("Select an episode to load its replay.")
@@ -485,6 +619,7 @@ class _ReplayTab(QtWidgets.QWidget):
         self._step_view.setPlainText("")
         self._preview.clear()
         self._current_replay = None
+        self._current_replay_game = None
 
     def _format_step(self, step: StepRecord) -> str:
         observation_preview = self._summarise_value(step.observation)
@@ -499,6 +634,20 @@ class _ReplayTab(QtWidgets.QWidget):
             f"Observation:\n{observation_preview}\n\n"
             f"Info:\n{info_preview}"
         )
+
+    @staticmethod
+    def _resolve_game_from_metadata(metadata: Any) -> GameId | None:
+        if not isinstance(metadata, Mapping):
+            return None
+        raw_game = metadata.get("game_id")
+        if isinstance(raw_game, GameId):
+            return raw_game
+        if isinstance(raw_game, str):
+            try:
+                return GameId(raw_game)
+            except ValueError:
+                return None
+        return None
 
     @staticmethod
     def _summarise_value(value: Any, *, max_length: int = 800) -> str:

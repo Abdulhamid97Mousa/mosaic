@@ -39,6 +39,7 @@ class GridRenderer:
         self._current_game: GameId | None = None
         self._current_grid: List[List[str]] = []  # Store for context-aware rendering
         self._tile_size = 48  # Base tile size in scene coordinates
+        self._last_actor_position: tuple[int, int] | None = None
 
     def render(
         self,
@@ -69,9 +70,21 @@ class GridRenderer:
         self._scene.clear()
 
         # Render each cell as a QGraphicsPixmapItem
+        effective_actor_position = agent_position
+        if terminated and effective_actor_position is None and self._last_actor_position is not None:
+            effective_actor_position = self._last_actor_position
+
         for r, row in enumerate(grid):
             for c, cell_value in enumerate(row):
-                pixmap = self._create_cell_pixmap(r, c, cell_value, agent_position, taxi_state, terminated, payload)
+                pixmap = self._create_cell_pixmap(
+                    r,
+                    c,
+                    cell_value,
+                    effective_actor_position,
+                    taxi_state,
+                    terminated,
+                    payload,
+                )
                 if pixmap and not pixmap.isNull():
                     # Create pixmap item at scene coordinates
                     item = self._scene.addPixmap(pixmap)
@@ -84,18 +97,23 @@ class GridRenderer:
         # Fit the scene in the view (responsive scaling)
         self._view.fitInView(self._scene.sceneRect(), QtCore.Qt.AspectRatioMode.KeepAspectRatio)
 
+        if agent_position is not None:
+            self._last_actor_position = agent_position
+        elif not terminated:
+            self._last_actor_position = None
+
     def _create_cell_pixmap(
         self,
         row: int,
         col: int,
         cell_value: str,
-        agent_position: tuple[int, int] | None,
+        actor_position: tuple[int, int] | None,
         taxi_state: Dict[str, Any] | None,
         terminated: bool = False,
         payload: Dict[str, Any] | None = None,
     ) -> QtGui.QPixmap | None:
         """Create a pixmap for a single grid cell with appropriate assets composited."""
-        is_agent_cell = agent_position is not None and agent_position == (row, col)
+        is_actor_cell = actor_position is not None and actor_position == (row, col)
 
         # LAYER 1: Base background (for Taxi game, every cell gets taxi_background.png)
         if self._current_game == GameId.TAXI:
@@ -103,13 +121,40 @@ class GridRenderer:
             if pixmap is None:
                 return None
         elif self._current_game == GameId.FROZEN_LAKE:
-            # For FrozenLake, check if agent fell into hole (terminated and on agent position)
-            if terminated and is_agent_cell and cell_value.strip().upper() == 'H':
-                # Use cracked_hole.png when agent is on hole and terminated
-                asset_name = "cracked_hole.png"
+            base_pixmap = self._asset_manager.get_pixmap(FrozenLakeAssets.ICE)
+            if base_pixmap is None:
+                return None
+            pixmap = base_pixmap
+
+            tile_code = cell_value.strip().upper()
+            overlay_asset: str | None
+            if terminated and is_actor_cell and tile_code == "H":
+                overlay_asset = FrozenLakeAssets.CRACKED_HOLE
+            elif tile_code == "H":
+                overlay_asset = FrozenLakeAssets.HOLE
+            elif tile_code == "G":
+                overlay_asset = FrozenLakeAssets.GOAL
+            elif tile_code == "S":
+                overlay_asset = FrozenLakeAssets.STOOL
             else:
-                asset_name = self._get_tile_asset(cell_value, row, col)
-            pixmap = self._asset_manager.get_pixmap(asset_name)
+                overlay_asset = None
+
+            if overlay_asset:
+                overlay_pixmap = self._asset_manager.get_pixmap(overlay_asset)
+                if overlay_pixmap:
+                    pixmap = self._composite_pixmaps(pixmap, overlay_pixmap)
+        elif self._current_game == GameId.CLIFF_WALKING:
+            # Build layered pixmap for CliffWalking tiles (background + overlay)
+            layer_names = CliffWalkingAssets.get_tile_layers(cell_value, row, col)
+            pixmap = None
+            for asset_name in layer_names:
+                layer_pixmap = self._asset_manager.get_pixmap(asset_name)
+                if layer_pixmap is None:
+                    continue
+                if pixmap is None:
+                    pixmap = layer_pixmap
+                else:
+                    pixmap = self._composite_pixmaps(pixmap, layer_pixmap)
             if pixmap is None:
                 return None
         else:
@@ -164,12 +209,18 @@ class GridRenderer:
                             pixmap = self._composite_pixmaps(pixmap, hotel_scaled)
 
         # LAYER 4: Agent overlay if present
-        if is_agent_cell:
-            agent_asset = self._get_agent_asset(taxi_state, payload)
-            agent_pixmap = self._asset_manager.get_pixmap(agent_asset)
-            if agent_pixmap is not None:
-                # Composite agent onto tile
-                pixmap = self._composite_pixmaps(pixmap, agent_pixmap)
+        skip_actor_overlay = (
+            self._current_game == GameId.FROZEN_LAKE
+            and terminated
+            and is_actor_cell
+            and cell_value.strip().upper() == "H"
+        )
+
+        if is_actor_cell and not skip_actor_overlay:
+            actor_asset = self._get_actor_asset(taxi_state, payload)
+            actor_pixmap = self._asset_manager.get_pixmap(actor_asset)
+            if actor_pixmap is not None:
+                pixmap = self._composite_pixmaps(pixmap, actor_pixmap)
         
         # Scale to tile size
         if not pixmap.isNull():
@@ -193,10 +244,21 @@ class GridRenderer:
             # Fallback
             return "ice.png"
 
-    def _get_agent_asset(self, taxi_state: Dict[str, Any] | None = None, payload: Dict[str, Any] | None = None) -> str:
-        """Get the agent sprite asset name, with optional taxi_state for directional rendering."""
+    def _get_actor_asset(self, taxi_state: Dict[str, Any] | None = None, payload: Dict[str, Any] | None = None) -> str:
+        """Get the actor sprite asset name, with optional state for directional rendering."""
         if self._current_game == GameId.FROZEN_LAKE:
-            return FrozenLakeAssets.get_agent_asset("down")
+            direction = "down"
+            if payload and payload.get("last_action") is not None:
+                action = int(payload["last_action"])
+                # FrozenLake actions: 0=Left, 1=Down, 2=Right, 3=Up
+                direction_lookup = {
+                    0: "left",
+                    1: "down",
+                    2: "right",
+                    3: "up",
+                }
+                direction = direction_lookup.get(action, direction)
+            return FrozenLakeAssets.get_actor_asset(direction)
         elif self._current_game == GameId.TAXI:
             # Select cab direction based on last action
             direction = "front"  # default
@@ -227,7 +289,7 @@ class GridRenderer:
                     direction = "down"
                 elif action == 3:  # LEFT
                     direction = "left"
-            return CliffWalkingAssets.get_agent_asset(direction)
+            return CliffWalkingAssets.get_actor_asset(direction)
         else:
             return "elf_down.png"
 

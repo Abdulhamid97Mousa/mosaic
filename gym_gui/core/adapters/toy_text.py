@@ -132,6 +132,15 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
         result = super().step(action)
         self._last_terminated = bool(result.terminated)
         self._last_truncated = bool(result.truncated)
+
+        payload = result.render_payload
+        if isinstance(payload, dict):
+            enriched = dict(payload)
+            enriched["terminated"] = self._last_terminated
+            enriched["truncated"] = self._last_truncated
+            enriched.setdefault("game_id", self.id)
+            result.render_payload = enriched
+
         return result
 
     def render(self) -> dict[str, Any]:
@@ -151,6 +160,7 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
             "ansi": ansi,
             "snapshot_path": str(snapshot_path),
             "agent_position": agent_pos,
+            "game_id": self.id,
         }
         
         # Add Taxi-specific state info
@@ -253,10 +263,21 @@ class FrozenLakeAdapter(ToyTextAdapter):
         """Initialize with optional game-specific configuration."""
         super().__init__(context)
         self._game_config = game_config or DEFAULT_FROZEN_LAKE_CONFIG
+        self._last_action: int | None = None
 
     def gym_kwargs(self) -> dict[str, Any]:
         """Return Gymnasium environment kwargs from game configuration."""
         return self._game_config.to_gym_kwargs()
+
+    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
+        """Reset state and clear the last action tracker."""
+        self._last_action = None
+        return super().reset(seed=seed, options=options)
+
+    def step(self, action: int):
+        """Record the most recent action for orientation-aware rendering."""
+        self._last_action = int(action)
+        return super().step(action)
 
     def render(self) -> dict[str, Any]:
         """Render with FrozenLake-specific terminated state."""
@@ -265,6 +286,7 @@ class FrozenLakeAdapter(ToyTextAdapter):
         # Add terminated state for cracked_hole visualization
         payload["terminated"] = self._last_terminated
         payload["truncated"] = self._last_truncated
+        payload["last_action"] = self._last_action
         
         return payload
 

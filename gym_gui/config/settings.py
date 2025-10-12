@@ -68,6 +68,8 @@ class Settings:
     use_gpu: bool = False
     default_control_mode: ControlMode = ControlMode.HUMAN_ONLY
     agent_ids: tuple[str, ...] = field(default_factory=tuple)
+    default_seed: int = 1
+    allow_seed_reuse: bool = False
 
     @property
     def video_dir(self) -> Path | None:
@@ -107,6 +109,15 @@ def get_settings() -> Settings:
         or os.getenv("GYM_CONTROL_MODE")
     )
     agent_ids = _split_csv(os.getenv("AGENT_IDS"))
+    default_seed_raw = os.getenv("GYM_DEFAULT_SEED") or os.getenv("DEFAULT_SEED")
+    try:
+        default_seed = int(default_seed_raw) if default_seed_raw is not None else defaults.default_seed
+    except (TypeError, ValueError):
+        default_seed = defaults.default_seed
+    allow_seed_reuse = _normalize_bool(
+        os.getenv("GYM_ALLOW_SEED_REUSE") or os.getenv("ALLOW_SEED_REUSE"),
+        default=defaults.allow_seed_reuse,
+    )
 
     return Settings(
         qt_api=qt_api,
@@ -117,6 +128,8 @@ def get_settings() -> Settings:
         use_gpu=use_gpu,
         default_control_mode=default_control_mode,
         agent_ids=agent_ids,
+        default_seed=max(1, default_seed),
+        allow_seed_reuse=allow_seed_reuse,
     )
 
 

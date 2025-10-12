@@ -24,9 +24,22 @@ def bootstrap_default_services() -> ServiceLocator:
     telemetry.attach_store(telemetry_store)
 
     actors = ActorService()
-    actors.register_actor(HumanKeyboardActor(), activate=True)
-    actors.register_actor(BDIQAgent())
-    actors.register_actor(LLMMultiStepAgent())
+    actors.register_actor(
+        HumanKeyboardActor(),
+        display_name="Human (Keyboard)",
+        description="Forward keyboard input captured by the UI.",
+        activate=True,
+    )
+    actors.register_actor(
+        BDIQAgent(),
+        display_name="BDI-Q Agent",
+        description="Belief-Desire-Intention agent with Q-learning hooks.",
+    )
+    actors.register_actor(
+        LLMMultiStepAgent(),
+        display_name="LLM Multi-Step Agent",
+        description="Delegates decisions to an integrated language model pipeline.",
+    )
 
     locator.register(StorageRecorderService, storage)
     locator.register(TelemetryService, telemetry)

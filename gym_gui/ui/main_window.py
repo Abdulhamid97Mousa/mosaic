@@ -26,6 +26,7 @@ from gym_gui.ui.presenters.main_window_presenter import MainWindowPresenter, Mai
 from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWidget
 from gym_gui.ui.widgets.render_tabs import RenderTabs
 from gym_gui.docs.game_info import get_game_info
+from gym_gui.services.actor import ActorService
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
 
@@ -60,25 +61,39 @@ class MainWindow(QtWidgets.QMainWindow):
         self._episode_finished = False  # Track episode termination state
         self._human_input = HumanInputController(self, self._session)
         locator = get_service_locator()
-        self._telemetry_service = locator.resolve(TelemetryService)
-        
+        telemetry_service = locator.resolve(TelemetryService)
+        actor_service = locator.resolve(ActorService)
+        if telemetry_service is None or actor_service is None:
+            raise RuntimeError("Required services are not registered in the locator")
+        self._telemetry_service: TelemetryService = telemetry_service
+        self._actor_service: ActorService = actor_service
+
         # Build control panel config
         available_modes = {}
         for game in available_games():
             available_modes[game] = SessionController.supported_control_modes(game)
+
+        actor_descriptors = self._actor_service.describe_actors()
+        default_actor_id = self._actor_service.get_active_actor_id()
         
         control_config = ControlPanelConfig(
             available_modes=available_modes,
             default_mode=settings.default_control_mode,
-            frozen_lake_config=FrozenLakeConfig(is_slippery=True),
+            frozen_lake_config=FrozenLakeConfig(is_slippery=False),
             taxi_config=TaxiConfig(is_raining=False, fickle_passenger=False),
             cliff_walking_config=CliffWalkingConfig(is_slippery=False),
             lunar_lander_config=LunarLanderConfig(),
             car_racing_config=CarRacingConfig.from_env(),
             bipedal_walker_config=BipedalWalkerConfig.from_env(),
+            default_seed=settings.default_seed,
+            allow_seed_reuse=settings.allow_seed_reuse,
+            actors=actor_descriptors,
+            default_actor_id=default_actor_id,
         )
         
         self._control_panel = ControlPanelWidget(config=control_config, parent=self)
+        if default_actor_id is not None:
+            self._control_panel.set_active_actor(default_actor_id)
         
         # Create presenter to coordinate
         self._presenter = MainWindowPresenter(self._session, self._human_input, parent=self)
@@ -99,7 +114,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._time_refresh_timer.timeout.connect(self._refresh_time_labels)
         self._time_refresh_timer.start()
         self._refresh_time_labels()
-        self._render_tabs.refresh_replays()
+        QtCore.QTimer.singleShot(0, self._render_tabs.refresh_replays)
         
         # Bind presenter to view
         self._wire_presenter()
@@ -156,7 +171,15 @@ class MainWindow(QtWidgets.QMainWindow):
         render_layout.addWidget(self._render_tabs)
         right_panel.addWidget(self._render_group)
 
-        self._log_group = QtWidgets.QGroupBox("Runtime Log", right_panel)
+        # Game information panel (right-most column)
+        self._info_group = QtWidgets.QGroupBox("Game Info", self)
+        info_layout = QtWidgets.QVBoxLayout(self._info_group)
+        self._game_info = QtWidgets.QTextBrowser(self._info_group)
+        self._game_info.setReadOnly(True)
+        self._game_info.setOpenExternalLinks(True)
+        info_layout.addWidget(self._game_info, 1)
+
+        self._log_group = QtWidgets.QGroupBox("Runtime Log", self._info_group)
         log_layout = QtWidgets.QVBoxLayout(self._log_group)
         filter_row = QtWidgets.QHBoxLayout()
         filter_label = QtWidgets.QLabel("Filter:")
@@ -170,15 +193,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._log_console.setReadOnly(True)
         self._log_console.setLineWrapMode(QtWidgets.QPlainTextEdit.LineWrapMode.NoWrap)
         log_layout.addWidget(self._log_console, 1)
-        right_panel.addWidget(self._log_group)
-
-        # Game information panel (right-most column)
-        self._info_group = QtWidgets.QGroupBox("Game Info", self)
-        info_layout = QtWidgets.QVBoxLayout(self._info_group)
-        self._game_info = QtWidgets.QTextBrowser(self._info_group)
-        self._game_info.setReadOnly(True)
-        self._game_info.setOpenExternalLinks(True)
-        info_layout.addWidget(self._game_info)
+        info_layout.addWidget(self._log_group, 1)
         splitter.addWidget(self._info_group)
 
         # Configure splitter stretch: control panel (left) small, right_panel (middle) large, info (right) small
@@ -197,12 +212,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self._control_panel.agent_step_requested.connect(self._session.perform_agent_step)
         self._control_panel.game_changed.connect(self._on_game_changed)
         self._control_panel.control_mode_changed.connect(self._on_mode_changed)
+        self._control_panel.actor_changed.connect(self._on_actor_changed)
         self._control_panel.slippery_toggled.connect(self._on_slippery_toggled)
         self._control_panel.taxi_config_changed.connect(self._on_taxi_config_changed)
         self._control_panel.cliff_config_changed.connect(self._on_cliff_config_changed)
         self._control_panel.lunar_config_changed.connect(self._on_lunar_config_changed)
         self._control_panel.car_config_changed.connect(self._on_car_config_changed)
         self._control_panel.bipedal_config_changed.connect(self._on_bipedal_config_changed)
+        self._session.seed_applied.connect(self._on_seed_applied)
         
         # Connect log filter
         self._log_filter.currentTextChanged.connect(self._on_log_filter_changed)
@@ -242,6 +259,19 @@ class MainWindow(QtWidgets.QMainWindow):
         self._status_bar.showMessage(f"Mode set to {label}")
         self._human_input.update_for_mode(mode)
 
+    def _on_actor_changed(self, actor_id: str) -> None:
+        """Handle active actor selection from the control panel."""
+        try:
+            self._actor_service.set_active_actor(actor_id)
+        except KeyError:
+            self.logger.error("Attempted to activate unknown actor '%s'", actor_id)
+            self._status_bar.showMessage(f"Unknown actor '{actor_id}'", 5000)
+            return
+
+        descriptor = self._actor_service.get_actor_descriptor(actor_id)
+        label = descriptor.display_name if descriptor is not None else actor_id
+        self._status_bar.showMessage(f"Active actor set to {label}", 4000)
+
     def _on_load_requested(self, game_id: GameId, mode: ControlMode, seed: int) -> None:
         """Handle load request from control panel."""
         self._episode_finished = False  # Reset episode state on new load
@@ -257,17 +287,25 @@ class MainWindow(QtWidgets.QMainWindow):
     def _on_reset_requested(self, seed: int) -> None:
         """Handle reset request from control panel."""
         self._episode_finished = False  # Reset episode state on reset
+
         self._session.reset_environment(seed=seed)
 
     def _on_start_game(self) -> None:
         """Handle Start Game button."""
+        status = "Game started"
+        if self._episode_finished:
+            seed = self._control_panel.current_seed()
+            self._session.reset_environment(seed=seed)
+            self._episode_finished = False
+            status = f"Loaded new episode with seed {seed}. Game started"
+
         self._session.start_game()
         self._control_panel.set_game_started(True)
         # Enable human input if in a human-involved mode
         mode = self._control_panel.current_mode()
         if mode in {ControlMode.HUMAN_ONLY, ControlMode.HYBRID_TURN_BASED, ControlMode.HYBRID_HUMAN_AGENT}:
             self._human_input.set_enabled(True)
-        self._status_bar.showMessage("Game started", 3000)
+        self._status_bar.showMessage(status, 3000)
 
     def _on_pause_game(self) -> None:
         """Handle Pause Game button."""
@@ -502,7 +540,7 @@ class MainWindow(QtWidgets.QMainWindow):
     ):
         """Build game configuration from control panel overrides."""
         if game_id == GameId.FROZEN_LAKE:
-            is_slippery = bool(overrides.get("is_slippery", True))
+            is_slippery = bool(overrides.get("is_slippery", False))
             return FrozenLakeConfig(is_slippery=is_slippery)
         elif game_id == GameId.TAXI:
             is_raining = bool(overrides.get("is_raining", False))
@@ -624,6 +662,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._control_panel.set_status(
             step=index,
             reward=reward,
+            total_reward=self._session.current_episode_reward,
             terminated=terminated,
             truncated=truncated,
             turn=self._session._turn,
@@ -643,8 +682,22 @@ class MainWindow(QtWidgets.QMainWindow):
             # Disable shortcuts when episode terminates
             self._human_input.set_enabled(False)
             self._control_panel.set_game_started(False)  # Reset game state
-            self._status_bar.showMessage("Episode finished")
             self._render_tabs.on_episode_finished()
+            next_seed = self._session.next_seed
+            self._control_panel.set_seed_value(next_seed)
+            self._status_bar.showMessage(
+                f"Episode finished. Next seed prepared: {next_seed}", 4000
+            )
+
+    def _on_seed_applied(self, seed: int) -> None:
+        self._control_panel.set_seed_value(seed)
+        if self._settings.allow_seed_reuse:
+            message = (
+                f"Seed {seed} applied. Override by adjusting the seed before the next run."
+            )
+        else:
+            message = "Seed applied. Episode will reuse this value until it finishes."
+        self._status_bar.showMessage(message, 4000)
 
     def _on_status_message(self, message: str) -> None:
         self._status_bar.showMessage(message, 5000)

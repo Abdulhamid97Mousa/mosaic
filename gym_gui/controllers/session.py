@@ -3,6 +3,7 @@ from __future__ import annotations
 """Qt session controller that bridges Gym adapters to the GUI."""
 
 from dataclasses import dataclass, replace
+import hashlib
 import logging
 from datetime import datetime
 from typing import Any, Optional
@@ -28,6 +29,7 @@ from gym_gui.core.factories.adapters import create_adapter, get_adapter_cls
 from gym_gui.services.actor import ActorService, EpisodeSummary, StepSnapshot
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
+from gym_gui.utils.seeding import SessionSeedManager
 from gym_gui.utils.timekeeping import SessionTimers
 
 
@@ -54,6 +56,7 @@ class SessionController(QtCore.QObject):
     turn_changed = QtCore.Signal(str)  # type: ignore[attr-defined]
     error_occurred = QtCore.Signal(str)  # type: ignore[attr-defined]
     auto_play_state_changed = QtCore.Signal(bool)  # type: ignore[attr-defined]
+    seed_applied = QtCore.Signal(int)  # type: ignore[attr-defined]
 
     def __init__(self, settings: Settings, parent: Optional[QtCore.QObject] = None) -> None:
         super().__init__(parent)
@@ -67,9 +70,19 @@ class SessionController(QtCore.QObject):
         self._game_paused: bool = False
         self._auto_timer = QtCore.QTimer(self)
         self._auto_timer.setInterval(600)
+        if hasattr(self._auto_timer, "setTimerType"):
+            try:
+                self._auto_timer.setTimerType(QtCore.Qt.TimerType.PreciseTimer)  # type: ignore[attr-defined]
+            except Exception:
+                pass
         self._auto_timer.timeout.connect(self._auto_step)
         self._idle_timer = QtCore.QTimer(self)
         self._idle_timer.setInterval(600)
+        if hasattr(self._idle_timer, "setTimerType"):
+            try:
+                self._idle_timer.setTimerType(QtCore.Qt.TimerType.PreciseTimer)  # type: ignore[attr-defined]
+            except Exception:
+                pass
         self._idle_timer.timeout.connect(self._idle_step)
         self._user_idle_interval: int | None = None
         self._current_idle_interval = self._idle_timer.interval()
@@ -78,18 +91,27 @@ class SessionController(QtCore.QObject):
         self._pending_input_label: str | None = None
         self._last_agent_position: tuple[int, int] | None = None
         self._timers = SessionTimers()
+        self._seed_manager = SessionSeedManager()
         self._settings_overrides: dict[str, Any] = {}
         self._effective_settings: Settings = settings
         locator = get_service_locator()
         self._telemetry = locator.resolve(TelemetryService)
         self._actor_service = locator.resolve(ActorService)
+        if self._actor_service is not None:
+            self._seed_manager.register_consumer("actor_service", self._actor_service.seed)
+        self._seed_manager.register_consumer("session_timers", self._seed_timers)
         self._episode_counter = 0
         self._episode_id: str | None = None
         self._episode_active = False
         self._episode_reward = 0.0
         self._episode_metadata: dict[str, Any] = {}
+        self._last_seed_state: dict[str, Any] | None = None
         self._last_step: AdapterStep | None = None
         self._passive_action: Any | None = None
+        self._allow_seed_reuse = settings.allow_seed_reuse
+        self._last_seed = 0
+        self._next_seed = max(1, settings.default_seed)
+        self._current_seed = self._next_seed
 
     # ------------------------------------------------------------------
     # Public API
@@ -172,11 +194,12 @@ class SessionController(QtCore.QObject):
             control_mode=control_mode,
             logger_factory=logging.getLogger,
         )
+        seed_to_use = self._activate_seed(seed, advance_next=False)
         try:
             adapter = create_adapter(game_id, context, game_config=game_config)
             adapter.ensure_control_mode(control_mode)
             adapter.load()
-            initial_step = adapter.reset(seed=seed)
+            initial_step = adapter.reset(seed=seed_to_use)
         except Exception as exc:  # pragma: no cover - UI surfaces error
             self._logger.exception("Failed to load environment", exc_info=exc)
             self.error_occurred.emit(str(exc))
@@ -208,8 +231,9 @@ class SessionController(QtCore.QObject):
         if self._adapter is None or self._game_id is None:
             return
         self.stop_auto_play()
+        seed_to_use = self._activate_seed(seed, advance_next=False)
         try:
-            step = self._adapter.reset(seed=seed)
+            step = self._adapter.reset(seed=seed_to_use)
         except Exception as exc:  # pragma: no cover - UI surfaces error
             self._logger.exception("Failed to reset environment", exc_info=exc)
             self.error_occurred.emit(str(exc))
@@ -326,8 +350,17 @@ class SessionController(QtCore.QObject):
         return self._game_id
 
     @property
+    def next_seed(self) -> int:
+        return self._next_seed
+
+    @property
     def timers(self) -> SessionTimers:
         return self._timers
+
+    @property
+    def current_episode_reward(self) -> float:
+        """Return the cumulative reward for the active episode."""
+        return float(self._episode_reward)
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -464,12 +497,38 @@ class SessionController(QtCore.QObject):
         if self._episode_active and self._last_step is not None:
             self._finalize_episode(self._last_step, aborted=True, timestamp=datetime.utcnow())
         self._episode_counter += 1
-        timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
-        self._episode_id = f"{game_id.value}-{timestamp}-{self._episode_counter:04d}"
+        state_snapshot = self._seed_manager.capture_state()
+        self._last_seed_state = state_snapshot
+        seed_component = state_snapshot.get("seed")
+        seed_label = f"seed{seed_component:010d}" if isinstance(seed_component, int) else "seedNA"
+        python_signature = (
+            state_snapshot.get("python_random_digest")
+            or state_snapshot.get("python_random_json")
+            or ""
+        )
+        numpy_signature = (
+            state_snapshot.get("numpy_random_digest")
+            or state_snapshot.get("numpy_random_json")
+            or ""
+        )
+        fingerprint_source = "|".join(
+            [
+                game_id.value,
+                seed_label,
+                str(self._episode_counter),
+                python_signature,
+                numpy_signature,
+            ]
+        )
+        fingerprint = hashlib.sha1(fingerprint_source.encode("utf-8")).hexdigest()[:8]
+        self._episode_id = f"{game_id.value}-{seed_label}-ep{self._episode_counter:04d}-{fingerprint}"
         self._episode_reward = 0.0
         self._episode_metadata = {
             "game_id": game_id.value,
             "control_mode": control_mode.value,
+            "seed": self._current_seed,
+            "episode_index": self._episode_counter,
+            "rng_state": state_snapshot,
         }
         self._episode_active = True
         self._last_step = None
@@ -493,9 +552,10 @@ class SessionController(QtCore.QObject):
                 self._actor_service.notify_step(snapshot)
             except Exception:  # pragma: no cover - defensive safeguard
                 self._logger.exception("Actor service failed during notify_step")
-        info_payload = dict(step.info)
+        info_payload = dict(snapshot.info)
         if input_source is not None:
             info_payload.setdefault("input_source", input_source)
+        # Ensure telemetry StepRecord mirrors the augmented snapshot information.
         record = StepRecord(
             episode_id=self._episode_id,
             step_index=self._step_index,
@@ -635,13 +695,19 @@ class SessionController(QtCore.QObject):
         return None
 
     def _build_step_snapshot(self, step: AdapterStep) -> StepSnapshot:
+        info_payload = dict(step.info)
+        if self._current_seed is not None:
+            info_payload.setdefault("seed", self._current_seed)
+        if self._last_seed_state is not None and self._step_index == 0:
+            info_payload.setdefault("rng_state", self._last_seed_state)
         return StepSnapshot(
             step_index=self._step_index,
             observation=step.observation,
             reward=step.reward,
             terminated=step.terminated,
             truncated=step.truncated,
-            info=dict(step.info),
+            seed=self._current_seed,
+            info=info_payload,
         )
 
     def _finalize_episode(
@@ -677,6 +743,54 @@ class SessionController(QtCore.QObject):
             self._telemetry.complete_episode(rollup)
         self._episode_active = False
         self._episode_id = None
+
+        if self._current_seed is not None:
+            self._register_seed(self._current_seed, advance_next=True, notify=False)
+
+    def _activate_seed(self, seed: int | None, *, advance_next: bool, notify: bool = True) -> int:
+        resolved = self._resolve_seed(seed)
+        self._seed_manager.apply(resolved)
+        self._last_seed_state = self._seed_manager.capture_state()
+        self._register_seed(resolved, advance_next=advance_next, notify=notify)
+        return resolved
+
+    def _resolve_seed(self, seed: int | None) -> int:
+        if seed is None or seed <= 0:
+            candidate = self._next_seed
+        else:
+            candidate = seed
+        if self._allow_seed_reuse:
+            return candidate
+        if candidate <= self._last_seed:
+            if seed is not None and seed <= self._last_seed:
+                self.status_message.emit(
+                    f"Seed {seed} already used. Advancing to {self._last_seed + 1}."
+                )
+            candidate = self._last_seed + 1
+        if candidate < self._next_seed:
+            candidate = self._next_seed
+        return candidate
+
+    def _register_seed(self, seed: int, *, advance_next: bool = True, notify: bool = True) -> None:
+        self._last_seed = max(seed, self._last_seed)
+        self._current_seed = seed
+        if advance_next:
+            self._next_seed = self._last_seed + 1
+        else:
+            self._next_seed = max(self._next_seed, seed)
+        if notify:
+            self.seed_applied.emit(seed)
+
+    def _seed_timers(self, seed: int) -> None:
+        del seed
+        auto_active = self._auto_timer.isActive()
+        idle_active = self._idle_timer.isActive()
+        self._auto_timer.stop()
+        self._idle_timer.stop()
+        if auto_active:
+            self._auto_timer.start(self._auto_timer.interval())
+        if idle_active:
+            self._idle_timer.start(self._idle_timer.interval())
 
     def _extract_agent_position(self, step: AdapterStep) -> tuple[int, int] | None:
         payload = getattr(step, "render_payload", None)
