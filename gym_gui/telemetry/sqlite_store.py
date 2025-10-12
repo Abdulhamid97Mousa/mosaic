@@ -340,8 +340,9 @@ class TelemetrySQLiteStore:
     def __del__(self) -> None:  # pragma: no cover - defensive shutdown
         try:
             self.close()
-        except Exception:
-            pass
+        except Exception:  # pragma: no cover - best-effort logging during GC
+            logger = getattr(self, "_logger", logging.getLogger("gym_gui.telemetry.sqlite_store"))
+            logger.warning("TelemetrySQLiteStore close during __del__ failed", exc_info=True)
 
     # ------------------------------------------------------------------
     def recent_steps(self, limit: int = 100) -> Sequence[StepRecord]:

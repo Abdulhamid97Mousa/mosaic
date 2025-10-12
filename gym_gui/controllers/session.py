@@ -61,6 +61,7 @@ class SessionController(QtCore.QObject):
     def __init__(self, settings: Settings, parent: Optional[QtCore.QObject] = None) -> None:
         super().__init__(parent)
         self._settings = settings
+        self._logger = logging.getLogger("gym_gui.controllers.session")
         self._adapter: EnvironmentAdapter | None = None
         self._game_id: GameId | None = None
         self._control_mode: ControlMode = settings.default_control_mode
@@ -74,7 +75,10 @@ class SessionController(QtCore.QObject):
             try:
                 self._auto_timer.setTimerType(QtCore.Qt.TimerType.PreciseTimer)  # type: ignore[attr-defined]
             except Exception:
-                pass
+                self._logger.warning(
+                    "Unable to apply precise timer type to auto timer; continuing with default",
+                    exc_info=True,
+                )
         self._auto_timer.timeout.connect(self._auto_step)
         self._idle_timer = QtCore.QTimer(self)
         self._idle_timer.setInterval(600)
@@ -82,11 +86,13 @@ class SessionController(QtCore.QObject):
             try:
                 self._idle_timer.setTimerType(QtCore.Qt.TimerType.PreciseTimer)  # type: ignore[attr-defined]
             except Exception:
-                pass
+                self._logger.warning(
+                    "Unable to apply precise timer type to idle timer; continuing with default",
+                    exc_info=True,
+                )
         self._idle_timer.timeout.connect(self._idle_step)
         self._user_idle_interval: int | None = None
         self._current_idle_interval = self._idle_timer.interval()
-        self._logger = logging.getLogger("gym_gui.controllers.session")
         self._awaiting_human = False
         self._pending_input_label: str | None = None
         self._last_agent_position: tuple[int, int] | None = None
@@ -520,7 +526,7 @@ class SessionController(QtCore.QObject):
                 numpy_signature,
             ]
         )
-    fingerprint = hashlib.sha256(fingerprint_source.encode("utf-8")).hexdigest()[:8]
+        fingerprint = hashlib.sha256(fingerprint_source.encode("utf-8")).hexdigest()[:8]
         self._episode_id = f"{game_id.value}-{seed_label}-ep{self._episode_counter:04d}-{fingerprint}"
         self._episode_reward = 0.0
         self._episode_metadata = {

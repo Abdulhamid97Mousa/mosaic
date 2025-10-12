@@ -9,7 +9,7 @@ from typing import Any, Iterable, List, Mapping, Optional
 import numpy as np
 from qtpy import QtCore, QtGui, QtWidgets
 
-from gym_gui.core.data_model import StepRecord
+from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.core.enums import GameId, RenderMode
 from gym_gui.rendering.grid_renderer import GridRenderer
 from gym_gui.replays import EpisodeReplay, EpisodeReplayLoader
@@ -474,35 +474,56 @@ class _ReplayTab(QtWidgets.QWidget):
         if self._telemetry is None:
             return []
         episodes = list(self._telemetry.recent_episodes())
-        rows: List[dict[str, Any]] = []
-        for episode in episodes:
-            seed_value = None
-            episode_index = None
-            game_label = "—"
-            if isinstance(episode.metadata, Mapping):
-                seed_value = episode.metadata.get("seed")
-                episode_index = episode.metadata.get("episode_index")
-                meta_game = episode.metadata.get("game_id")
-                if isinstance(meta_game, GameId):
-                    game_label = meta_game.value
-                elif isinstance(meta_game, str):
-                    try:
-                        game_label = GameId(meta_game).value
-                    except ValueError:
-                        game_label = meta_game
-            seed_display = str(seed_value) if seed_value is not None else "—"
-            rows.append({
-                "episode_id": episode.episode_id,
-                "episode_index": int(episode_index) if episode_index is not None else None,
-                "seed": seed_display,
-                "game": game_label,
-                "steps": str(episode.steps),
-                "reward": f"{episode.total_reward:.2f}",
-                "terminated": "Yes" if episode.terminated else ("Aborted" if episode.truncated else "No"),
-                "timestamp": episode.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-                "timestamp_sort": episode.timestamp,
-            })
-        return rows
+        return [self._format_episode_row(ep) for ep in episodes]
+
+    def _format_episode_row(self, episode: EpisodeRollup) -> dict[str, Any]:
+        seed_value, episode_index, game_label = self._parse_episode_metadata(episode.metadata)
+        return {
+            "episode_id": episode.episode_id,
+            "episode_index": episode_index,
+            "seed": seed_value,
+            "game": game_label,
+            "steps": str(episode.steps),
+            "reward": f"{episode.total_reward:.2f}",
+            "terminated": self._termination_label(episode),
+            "timestamp": episode.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
+            "timestamp_sort": episode.timestamp,
+        }
+
+    def _parse_episode_metadata(
+        self, metadata: Any
+    ) -> tuple[str, int | None, str]:
+        if not isinstance(metadata, Mapping):
+            return "—", None, "—"
+        seed_value = metadata.get("seed")
+        episode_index_raw = metadata.get("episode_index")
+        game_label = self._resolve_game_label(metadata.get("game_id"))
+        seed_display = str(seed_value) if seed_value is not None else "—"
+        episode_index = None
+        if episode_index_raw is not None:
+            try:
+                episode_index = int(episode_index_raw)
+            except (TypeError, ValueError):
+                episode_index = None
+        return seed_display, episode_index, game_label
+
+    def _resolve_game_label(self, raw_game: Any) -> str:
+        if isinstance(raw_game, GameId):
+            return raw_game.value
+        if isinstance(raw_game, str):
+            try:
+                return GameId(raw_game).value
+            except ValueError:
+                return raw_game
+        return "—"
+
+    @staticmethod
+    def _termination_label(episode: EpisodeRollup) -> str:
+        if episode.terminated:
+            return "Yes"
+        if episode.truncated:
+            return "Aborted"
+        return "No"
 
     def _update_placeholder_visibility(self) -> None:
         has_rows = self._episodes.rowCount() > 0

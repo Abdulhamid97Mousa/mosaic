@@ -244,54 +244,69 @@ class GridRenderer:
             # Fallback
             return "ice.png"
 
-    def _get_actor_asset(self, taxi_state: Dict[str, Any] | None = None, payload: Dict[str, Any] | None = None) -> str:
+    def _get_actor_asset(
+        self,
+        taxi_state: Dict[str, Any] | None = None,
+        payload: Dict[str, Any] | None = None,
+    ) -> str:
         """Get the actor sprite asset name, with optional state for directional rendering."""
+
         if self._current_game == GameId.FROZEN_LAKE:
-            direction = "down"
-            if payload and payload.get("last_action") is not None:
-                action = int(payload["last_action"])
-                # FrozenLake actions: 0=Left, 1=Down, 2=Right, 3=Up
-                direction_lookup = {
-                    0: "left",
-                    1: "down",
-                    2: "right",
-                    3: "up",
-                }
-                direction = direction_lookup.get(action, direction)
-            return FrozenLakeAssets.get_actor_asset(direction)
-        elif self._current_game == GameId.TAXI:
-            # Select cab direction based on last action
-            direction = "front"  # default
-            if taxi_state and "last_action" in taxi_state:
-                action = taxi_state["last_action"]
-                # Taxi actions: 0=SOUTH (down), 1=NORTH (up), 2=EAST (right), 3=WEST (left), 4=PICKUP, 5=DROPOFF
-                if action == 0:  # SOUTH
-                    direction = "front"
-                elif action == 1:  # NORTH
-                    direction = "rear"
-                elif action == 2:  # EAST
-                    direction = "right"
-                elif action == 3:  # WEST
-                    direction = "left"
-                # For PICKUP/DROPOFF, keep current direction (default to front)
-            return TaxiAssets.get_cab_asset(direction)
-        elif self._current_game == GameId.CLIFF_WALKING:
-            # Select elf direction based on last action
-            direction = "down"  # default
-            if payload and "last_action" in payload:
-                action = payload["last_action"]
-                # CliffWalking actions: 0=UP, 1=RIGHT, 2=DOWN, 3=LEFT
-                if action == 0:  # UP
-                    direction = "up"
-                elif action == 1:  # RIGHT
-                    direction = "right"
-                elif action == 2:  # DOWN
-                    direction = "down"
-                elif action == 3:  # LEFT
-                    direction = "left"
-            return CliffWalkingAssets.get_actor_asset(direction)
-        else:
-            return "elf_down.png"
+            return self._frozen_lake_actor_asset(payload)
+        if self._current_game == GameId.TAXI:
+            return self._taxi_actor_asset(taxi_state)
+        if self._current_game == GameId.CLIFF_WALKING:
+            return self._cliff_walking_actor_asset(payload)
+        return "elf_down.png"
+
+    def _frozen_lake_actor_asset(self, payload: Dict[str, Any] | None) -> str:
+        default_direction = "down"
+        action = self._safe_int((payload or {}).get("last_action"))
+        direction_lookup = {
+            0: "left",
+            1: "down",
+            2: "right",
+            3: "up",
+        }
+        direction = (
+            direction_lookup.get(action, default_direction)
+            if action is not None
+            else default_direction
+        )
+        return FrozenLakeAssets.get_actor_asset(direction)
+
+    def _taxi_actor_asset(self, taxi_state: Dict[str, Any] | None) -> str:
+        action = None
+        if taxi_state is not None:
+            action = self._safe_int(taxi_state.get("last_action"))
+        direction_map = {
+            0: "front",  # SOUTH
+            1: "rear",   # NORTH
+            2: "right",  # EAST
+            3: "left",   # WEST
+        }
+        direction = direction_map.get(action, "front") if action is not None else "front"
+        return TaxiAssets.get_cab_asset(direction)
+
+    def _cliff_walking_actor_asset(self, payload: Dict[str, Any] | None) -> str:
+        action = self._safe_int((payload or {}).get("last_action"))
+        direction_map = {
+            0: "up",
+            1: "right",
+            2: "down",
+            3: "left",
+        }
+        direction = direction_map.get(action, "down") if action is not None else "down"
+        return CliffWalkingAssets.get_actor_asset(direction)
+
+    @staticmethod
+    def _safe_int(value: Any | None) -> int | None:
+        if value is None:
+            return None
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            return None
 
     @staticmethod
     def _get_taxi_depot_position(depot_index: int) -> tuple[int, int]:

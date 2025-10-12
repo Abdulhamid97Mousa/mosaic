@@ -285,38 +285,48 @@ class CliffWalkingAssets:
         # Row 0-2: safe ground with visual variety
         # Row 3 (bottom): start(x), cliffs(C), goal(T)
         cell = cell_value.strip().upper()
-
-        def _safe_base(r: int, c: int) -> str:
-            if r == 0:
-                return CliffWalkingAssets.MOUNTAIN_BG1
-            if r == 1:
-                return CliffWalkingAssets.MOUNTAIN_BG2
-            if r == 2:
-                # Path row – alternate underlay for visual rhythm
-                return CliffWalkingAssets.MOUNTAIN_BG2 if c % 2 == 0 else CliffWalkingAssets.MOUNTAIN_BG1
-            # Default for bottom row when not overridden
-            return CliffWalkingAssets.MOUNTAIN_BG1
-
-        layers: list[str] = []
-
-        is_start = row == 3 and col == 0
-        is_goal = cell in {"T", "G"} or (row == 3 and col == 11)
-
-        if is_start:
-            layers.append(CliffWalkingAssets.MOUNTAIN_BG2)
-        elif is_goal:
-            layers.append(CliffWalkingAssets.MOUNTAIN_BG1)
-        else:
-            layers.append(_safe_base(row, col))
-
-        if cell == "C":
-            layers.append(CliffWalkingAssets.MOUNTAIN_CLIFF)
-        elif is_goal:
-            layers.append(CliffWalkingAssets.COOKIE)
-        elif is_start:
-            layers.append(CliffWalkingAssets.STOOL)
-
+        base_layer = CliffWalkingAssets._base_layer(cell, row, col)
+        overlay = CliffWalkingAssets._overlay_layer(cell, row, col)
+        layers = [base_layer]
+        if overlay is not None:
+            layers.append(overlay)
         return layers
+
+    @staticmethod
+    def _base_layer(cell: str, row: int, col: int) -> str:
+        if CliffWalkingAssets._is_start(row, col):
+            return CliffWalkingAssets.MOUNTAIN_BG2
+        if CliffWalkingAssets._is_goal(cell, row, col):
+            return CliffWalkingAssets.MOUNTAIN_BG1
+        if row == 0:
+            return CliffWalkingAssets.MOUNTAIN_BG1
+        if row == 1:
+            return CliffWalkingAssets.MOUNTAIN_BG2
+        if row == 2:
+            return (
+                CliffWalkingAssets.MOUNTAIN_BG2
+                if col % 2 == 0
+                else CliffWalkingAssets.MOUNTAIN_BG1
+            )
+        return CliffWalkingAssets.MOUNTAIN_BG1
+
+    @staticmethod
+    def _overlay_layer(cell: str, row: int, col: int) -> str | None:
+        if cell == "C":
+            return CliffWalkingAssets.MOUNTAIN_CLIFF
+        if CliffWalkingAssets._is_goal(cell, row, col):
+            return CliffWalkingAssets.COOKIE
+        if CliffWalkingAssets._is_start(row, col):
+            return CliffWalkingAssets.STOOL
+        return None
+
+    @staticmethod
+    def _is_start(row: int, col: int) -> bool:
+        return row == 3 and col == 0
+
+    @staticmethod
+    def _is_goal(cell: str, row: int, col: int) -> bool:
+        return cell in {"T", "G"} or (row == 3 and col == 11)
 
     @staticmethod
     def get_actor_asset(direction: str = "down") -> str:
