@@ -21,9 +21,17 @@ __pycache__/
 .vscode
 
 gym_gui/doc.qt.io/
-gym_gui/runtime/data/episodes/*
-gym_gui/runtime/data/telemetry/
 gym_gui/runtime/log_output/gym_gui.log
+gym_gui/var/records/*
+!gym_gui/var/records/README.md
+gym_gui/var/telemetry/*
+!gym_gui/var/telemetry/README.md
+gym_gui/var/cache/*
+!gym_gui/var/cache/README.md
+gym_gui/var/tmp/*
+!gym_gui/var/tmp/README.md
+gym_gui/var/logs/*
+!gym_gui/var/logs/README.md
 
 spadeBDI_RL
 graphrag
