@@ -3,9 +3,9 @@ from __future__ import annotations
 """Storage recorder service wiring episode/session persistence."""
 
 from dataclasses import dataclass, field
-from pathlib import Path
 from typing import Any, Dict, Iterable, Optional
 
+from gym_gui.config.paths import VAR_RECORDS_DIR, ensure_var_directories
 from gym_gui.config.settings import get_storage_profile_config
 from gym_gui.storage.session import EpisodeRecord, SessionRecorder
 
@@ -20,10 +20,6 @@ class StorageProfile:
     telemetry_only: bool = False
     telemetry_store: str = "jsonl"
     extras: dict[str, Any] = field(default_factory=dict)
-
-
-_PACKAGE_ROOT = Path(__file__).resolve().parent.parent
-_EPISODE_OUTPUT_DIR = _PACKAGE_ROOT / "runtime" / "data" / "episodes"
 
 
 def _as_int(value: Any, *, default: int) -> int:
@@ -121,7 +117,8 @@ class StorageRecorderService:
     def _ensure_recorder(self) -> SessionRecorder:
         if self._recorder is not None:
             return self._recorder
-        base_dir = _EPISODE_OUTPUT_DIR
+        ensure_var_directories()
+        base_dir = VAR_RECORDS_DIR
         base_dir.mkdir(parents=True, exist_ok=True)
         profile = self.get_active_profile()
         self._recorder = SessionRecorder(

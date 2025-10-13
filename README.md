@@ -206,9 +206,9 @@ Passive actions remain synchronized across human, idle, and agent ticks via the 
 
 ## 📦 Data & Storage Layout
 
-- `runtime/data/episodes/` – JSONL step logs per episode.
-- `runtime/data/telemetry/telemetry.sqlite` – WAL-backed store for analytics & dashboards.
-- Planned `var/` hierarchy – Future home for frame archives (`var/records/`), caches, and pruning tools.
+- `gym_gui/var/records/` – JSONL step logs per episode and replay snapshots (gitignored).
+- `gym_gui/var/telemetry/telemetry.sqlite` – WAL-backed store for analytics & dashboards.
+- `gym_gui/var/cache/` & `gym_gui/var/tmp/` – Derived caches and scratch space safe to purge.
 
 Retention knobs such as `max_record_bytes`, `max_sessions`, and `prune_on_start` will live in `gym_gui/config/storage_profiles.yaml` to keep large Box2D runs manageable.
 

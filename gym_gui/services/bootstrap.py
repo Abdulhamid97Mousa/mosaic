@@ -2,8 +2,8 @@ from __future__ import annotations
 
 """Helpers to bootstrap shared services for the application."""
 
-from pathlib import Path
-
+from gym_gui.config.paths import VAR_TELEMETRY_DIR, ensure_var_directories
+from gym_gui.rendering import RendererRegistry, create_default_renderer_registry
 from gym_gui.services.action_mapping import ContinuousActionMapper, create_default_action_mapper
 from gym_gui.services.actor import ActorService, BDIQAgent, HumanKeyboardActor, LLMMultiStepAgent
 from gym_gui.services.service_locator import ServiceLocator, get_service_locator
@@ -20,7 +20,8 @@ def bootstrap_default_services() -> ServiceLocator:
     storage = StorageRecorderService()
     telemetry = TelemetryService()
     telemetry.attach_storage(storage)
-    telemetry_db = Path(__file__).resolve().parent.parent / "runtime" / "data" / "telemetry" / "telemetry.sqlite"
+    ensure_var_directories()
+    telemetry_db = VAR_TELEMETRY_DIR / "telemetry.sqlite"
     telemetry_store = TelemetrySQLiteStore(telemetry_db)
     telemetry.attach_store(telemetry_store)
     telemetry_store.delete_all_episodes(wait=True)
@@ -44,12 +45,14 @@ def bootstrap_default_services() -> ServiceLocator:
     )
 
     action_mapper: ContinuousActionMapper = create_default_action_mapper()
+    renderer_registry: RendererRegistry = create_default_renderer_registry()
 
     locator.register(StorageRecorderService, storage)
     locator.register(TelemetryService, telemetry)
     locator.register(TelemetrySQLiteStore, telemetry_store)
     locator.register(ActorService, actors)
     locator.register(ContinuousActionMapper, action_mapper)
+    locator.register(RendererRegistry, renderer_registry)
 
     # Also register under string keys for convenience in legacy code.
     locator.register("storage", storage)
@@ -57,6 +60,7 @@ def bootstrap_default_services() -> ServiceLocator:
     locator.register("telemetry_store", telemetry_store)
     locator.register("actors", actors)
     locator.register("action_mapper", action_mapper)
+    locator.register("renderer_registry", renderer_registry)
 
     return locator
 

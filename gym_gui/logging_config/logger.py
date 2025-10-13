@@ -3,9 +3,11 @@
 from __future__ import annotations
 
 import logging
-from pathlib import Path
 
-LOG_DIR = Path(__file__).resolve().parent.parent / "runtime" / "log_output"
+from gym_gui.config.paths import VAR_LOGS_DIR, ensure_var_directories
+
+ensure_var_directories()
+LOG_DIR = VAR_LOGS_DIR
 LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 _DEFAULT_FORMAT = "%(asctime)s | %(levelname)-7s | %(name)s | %(message)s"

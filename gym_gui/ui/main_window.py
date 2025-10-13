@@ -572,6 +572,8 @@ class MainWindow(QtWidgets.QMainWindow):
             enable_wind = bool(overrides.get("enable_wind", False))
             wind_power = overrides.get("wind_power", 15.0)
             turbulence_power = overrides.get("turbulence_power", 1.5)
+            steps_override = overrides.get("max_episode_steps")
+            max_steps: int | None = None
             try:
                 gravity_value = float(gravity)
             except (TypeError, ValueError):
@@ -584,12 +586,15 @@ class MainWindow(QtWidgets.QMainWindow):
                 turbulence_value = float(turbulence_power)
             except (TypeError, ValueError):
                 turbulence_value = 1.5
+            if isinstance(steps_override, (int, float)) and int(steps_override) > 0:
+                max_steps = int(steps_override)
             return LunarLanderConfig(
                 continuous=continuous,
                 gravity=gravity_value,
                 enable_wind=enable_wind,
                 wind_power=wind_power_value,
                 turbulence_power=turbulence_value,
+                max_episode_steps=max_steps,
             )
         elif game_id == GameId.CAR_RACING:
             continuous = bool(overrides.get("continuous", False))

@@ -78,6 +78,7 @@ class LunarLanderConfig:
     enable_wind: bool = False
     wind_power: float = 15.0
     turbulence_power: float = 1.5
+    max_episode_steps: int | None = None
 
     def to_gym_kwargs(self) -> Dict[str, Any]:
         kwargs: Dict[str, Any] = {
@@ -93,6 +94,18 @@ class LunarLanderConfig:
         else:
             kwargs["enable_wind"] = False
         return kwargs
+
+    def sanitized_step_limit(self) -> int | None:
+        steps = self.max_episode_steps
+        if steps is None:
+            return None
+        if isinstance(steps, bool):
+            return None
+        try:
+            value = int(steps)
+        except (TypeError, ValueError):
+            return None
+        return value if value > 0 else None
 
 
 @dataclass(frozen=True)

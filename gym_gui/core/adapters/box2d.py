@@ -20,6 +20,7 @@ class Box2DAdapter(EnvironmentAdapter[np.ndarray, Any]):
     """Shared behaviour for Box2D environments that render RGB arrays."""
 
     default_render_mode = RenderMode.RGB_ARRAY
+    supported_render_modes = (RenderMode.RGB_ARRAY,)
     supported_control_modes = (ControlMode.AGENT_ONLY,)
 
     def render(self) -> dict[str, Any]:
@@ -86,6 +87,12 @@ class LunarLanderAdapter(Box2DAdapter):
         kwargs = super().gym_kwargs()
         kwargs.update(self._config.to_gym_kwargs())
         return kwargs
+
+    def apply_wrappers(self, env: gym.Env[Any, Any]) -> gym.Env[Any, Any]:
+        env = super().apply_wrappers(env)
+        max_steps = self._config.sanitized_step_limit()
+        env = configure_step_limit(env, max_steps)
+        return env
 
     def step(self, action: Any) -> AdapterStep:
         """Override step to handle discrete keyboard actions in continuous mode."""

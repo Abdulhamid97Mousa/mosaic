@@ -107,6 +107,7 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
     """Base adapter for Gymnasium toy-text environments."""
 
     default_render_mode = RenderMode.GRID
+    supported_render_modes = (RenderMode.GRID,)
     _gym_render_mode = "ansi"
 
     supported_control_modes = (

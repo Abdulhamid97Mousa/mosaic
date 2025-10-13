@@ -103,6 +103,7 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT]):
 
     id: str
     supported_control_modes: tuple[ControlMode, ...]
+    supported_render_modes: tuple[RenderMode, ...] = ()
     default_render_mode: RenderMode
 
     def __init__(self, context: AdapterContext | None = None) -> None:
@@ -220,6 +221,11 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT]):
             raise UnsupportedModeError(
                 f"Adapter '{self.id}' does not support control mode '{mode.value}'."
             )
+
+    def supports_render_mode(self, mode: RenderMode) -> bool:
+        if self.supported_render_modes:
+            return mode in self.supported_render_modes
+        return mode == self.default_render_mode
 
     # ------------------------------------------------------------------
     # Convenience accessors

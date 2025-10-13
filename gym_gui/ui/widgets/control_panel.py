@@ -78,6 +78,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
                 "enable_wind": config.lunar_lander_config.enable_wind,
                 "wind_power": config.lunar_lander_config.wind_power,
                 "turbulence_power": config.lunar_lander_config.turbulence_power,
+                "max_episode_steps": config.lunar_lander_config.max_episode_steps,
             },
             GameId.CAR_RACING: {
                 "continuous": config.car_racing_config.continuous,
@@ -126,6 +127,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
                 "enable_wind": config.lunar_lander_config.enable_wind,
                 "wind_power": config.lunar_lander_config.wind_power,
                 "turbulence_power": config.lunar_lander_config.turbulence_power,
+                "max_episode_steps": config.lunar_lander_config.max_episode_steps,
             },
             GameId.CAR_RACING: {
                 "continuous": config.car_racing_config.continuous,
@@ -763,6 +765,28 @@ class ControlPanelWidget(QtWidgets.QWidget):
             )
             turbulence_spin.setToolTip("Maximum rotational gust strength (0-5).")
             self._config_layout.addRow("Turbulence", turbulence_spin)
+
+            steps_raw = overrides.get("max_episode_steps", defaults.max_episode_steps)
+            steps_value = (
+                int(steps_raw)
+                if isinstance(steps_raw, (int, float)) and int(steps_raw) > 0
+                else 0
+            )
+            overrides["max_episode_steps"] = None if steps_value == 0 else steps_value
+            steps_spin = QtWidgets.QSpinBox(self._config_group)
+            steps_spin.setRange(0, 20000)
+            steps_spin.setSpecialValueText("Use Gym default (1000)")
+            steps_spin.setValue(steps_value)
+            steps_spin.valueChanged.connect(
+                lambda value: self._on_lunar_config_changed(
+                    "max_episode_steps",
+                    None if value == 0 else int(value),
+                )
+            )
+            steps_spin.setToolTip(
+                "Maximum number of steps before truncation (0 keeps Gymnasium's default of 1000)."
+            )
+            self._config_layout.addRow("Max steps", steps_spin)
 
             def _update_wind_controls(enabled: bool, *, emit: bool = True) -> None:
                 wind_spin.setEnabled(enabled)

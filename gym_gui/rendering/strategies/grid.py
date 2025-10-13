@@ -1,75 +1,180 @@
-"""Grid renderer that uses AssetManager to display Gymnasium toy-text environments."""
+"""Grid renderer strategy that wraps the legacy GridRenderer helper."""
 
 from __future__ import annotations
 
-from typing import Any, Dict, List
+from typing import Any, Dict, Iterable, List, Mapping
 
 from qtpy import QtCore, QtGui, QtWidgets
 
-from gym_gui.core.enums import GameId
+from gym_gui.core.enums import GameId, RenderMode
 from gym_gui.rendering.assets import (
     CliffWalkingAssets,
     FrozenLakeAssets,
     TaxiAssets,
     get_asset_manager,
 )
+from gym_gui.rendering.interfaces import RendererContext, RendererStrategy
 
 
-class GridRenderer:
-    """Renders toy-text environment grids using image assets with QGraphicsView for responsive scaling."""
+class GridRendererStrategy(RendererStrategy):
+    """Renderer strategy for grid-based environments."""
+
+    mode = RenderMode.GRID
+
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        self._view = QtWidgets.QGraphicsView(parent)
+        self._view.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+        self._view.setBackgroundBrush(QtGui.QBrush(QtGui.QColor(240, 240, 240)))
+        self._renderer = _GridRenderer(self._view)
+        self._current_game: GameId | None = None
+
+    # ------------------------------------------------------------------
+    # RendererStrategy API
+    # ------------------------------------------------------------------
+    @property
+    def widget(self) -> QtWidgets.QWidget:
+        return self._view
+
+    def render(self, payload: Mapping[str, object], *, context: RendererContext | None = None) -> None:
+        if not self.supports(payload):
+            self.reset()
+            return
+
+        grid_payload = payload.get("grid")
+        if grid_payload is None:
+            self.reset()
+            return
+
+        rows = _normalise_grid(grid_payload)
+        if not rows:
+            self.reset()
+            return
+
+        game_id = _resolve_game_id(context, payload) or GameId.FROZEN_LAKE
+        agent_pos = payload.get("agent_position")
+        taxi_state = payload.get("taxi_state")
+        terminated = bool(payload.get("terminated", False))
+
+        self._renderer.render(
+            rows,
+            game_id,
+            agent_position=_as_tuple(agent_pos),
+            taxi_state=_as_dict(taxi_state),
+            terminated=terminated,
+            payload=dict(payload),
+        )
+        self._current_game = game_id
+
+    def supports(self, payload: Mapping[str, object]) -> bool:
+        return "grid" in payload
+
+    def reset(self) -> None:
+        scene = self._view.scene()
+        if scene is not None:
+            scene.clear()
+        self._current_game = None
+
+
+# ----------------------------------------------------------------------
+# Helpers
+# ----------------------------------------------------------------------
+
+def _normalise_grid(raw_grid: object) -> List[List[str]]:
+    rows: List[List[str]] = []
+    if isinstance(raw_grid, str):
+        rows.append(list(raw_grid))
+        return rows
+    if isinstance(raw_grid, Mapping):  # incompatible structure
+        return rows
+
+    iterable: Iterable[Any]
+    if isinstance(raw_grid, Iterable):
+        iterable = raw_grid  # type: ignore[assignment]
+    else:
+        return rows
+
+    for row in iterable:
+        if isinstance(row, str):
+            rows.append(list(row))
+        elif isinstance(row, Iterable):
+            rows.append([str(cell) for cell in list(row)])
+        else:
+            rows.append([str(row)])
+    return rows
+
+
+def _resolve_game_id(context: RendererContext | None, payload: Mapping[str, object]) -> GameId | None:
+    if context and context.game_id is not None:
+        return context.game_id
+    raw_game = payload.get("game_id")
+    if raw_game is None:
+        return None
+    if isinstance(raw_game, GameId):
+        return raw_game
+    if isinstance(raw_game, str):
+        try:
+            return GameId(raw_game)
+        except ValueError:
+            return None
+    return None
+
+
+def _as_tuple(value: object) -> tuple[int, int] | None:
+    if isinstance(value, tuple) and len(value) == 2:
+        try:
+            return int(value[0]), int(value[1])
+        except (TypeError, ValueError):
+            return None
+    if isinstance(value, list) and len(value) == 2:
+        try:
+            return int(value[0]), int(value[1])
+        except (TypeError, ValueError):
+            return None
+    return None
+
+
+def _as_dict(value: object) -> dict[str, Any] | None:
+    if isinstance(value, Mapping):
+        return dict(value)
+    return None
+
+
+class _GridRenderer:
+    """Legacy asset-backed grid renderer used by the grid strategy."""
 
     def __init__(self, graphics_view: QtWidgets.QGraphicsView) -> None:
-        """
-        Initialize the grid renderer.
-
-        Args:
-            graphics_view: The QGraphicsView to render into
-        """
         self._view = graphics_view
         self._scene = QtWidgets.QGraphicsScene()
         self._view.setScene(self._scene)
-        
-        # Configure view for responsive rendering
+
         self._view.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
         self._view.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform)
         self._view.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._view.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        
+
         self._asset_manager = get_asset_manager()
         self._current_game: GameId | None = None
-        self._current_grid: List[List[str]] = []  # Store for context-aware rendering
-        self._tile_size = 48  # Base tile size in scene coordinates
+        self._current_grid: List[List[str]] = []
+        self._tile_size = 48
         self._last_actor_position: tuple[int, int] | None = None
 
     def render(
         self,
         grid: List[List[str]],
         game_id: GameId,
+        *,
         agent_position: tuple[int, int] | None = None,
         taxi_state: Dict[str, Any] | None = None,
         terminated: bool = False,
         payload: Dict[str, Any] | None = None,
     ) -> None:
-        """
-        Render a grid with assets using Graphics View for responsive scaling.
-
-        Args:
-            grid: 2D list of characters
-            game_id: Which game to render for
-            agent_position: (row, col) of the agent
-            taxi_state: Taxi-specific state dict (taxi_position, passenger_index, destination_index)
-            terminated: Whether the episode terminated (for FrozenLake cracked_hole)
-            payload: General payload dict containing game-specific data (last_action, etc.)
-        """
         self._current_game = game_id
-        self._current_grid = grid  # Store for context-aware asset selection
+        self._current_grid = grid
         rows = len(grid)
         cols = len(grid[0]) if rows > 0 else 0
 
-        # Clear existing scene
         self._scene.clear()
 
-        # Render each cell as a QGraphicsPixmapItem
         effective_actor_position = agent_position
         if terminated and effective_actor_position is None and self._last_actor_position is not None:
             effective_actor_position = self._last_actor_position
@@ -86,15 +191,11 @@ class GridRenderer:
                     payload,
                 )
                 if pixmap and not pixmap.isNull():
-                    # Create pixmap item at scene coordinates
                     item = self._scene.addPixmap(pixmap)
                     if item is not None:
                         item.setPos(c * self._tile_size, r * self._tile_size)
-                    
-        # Set scene rect to match grid dimensions
+
         self._scene.setSceneRect(0, 0, cols * self._tile_size, rows * self._tile_size)
-        
-        # Fit the scene in the view (responsive scaling)
         self._view.fitInView(self._scene.sceneRect(), QtCore.Qt.AspectRatioMode.KeepAspectRatio)
 
         if agent_position is not None:
@@ -112,10 +213,8 @@ class GridRenderer:
         terminated: bool = False,
         payload: Dict[str, Any] | None = None,
     ) -> QtGui.QPixmap | None:
-        """Create a pixmap for a single grid cell with appropriate assets composited."""
         is_actor_cell = actor_position is not None and actor_position == (row, col)
 
-        # LAYER 1: Base background (for Taxi game, every cell gets taxi_background.png)
         if self._current_game == GameId.TAXI:
             pixmap = self._asset_manager.get_pixmap("taxi_background.png")
             if pixmap is None:
@@ -144,7 +243,6 @@ class GridRenderer:
                 if overlay_pixmap:
                     pixmap = self._composite_pixmaps(pixmap, overlay_pixmap)
         elif self._current_game == GameId.CLIFF_WALKING:
-            # Build layered pixmap for CliffWalking tiles (background + overlay)
             layer_names = CliffWalkingAssets.get_tile_layers(cell_value, row, col)
             pixmap = None
             for asset_name in layer_names:
@@ -158,57 +256,48 @@ class GridRenderer:
             if pixmap is None:
                 return None
         else:
-            # For other games, get the tile-specific asset
             asset_name = self._get_tile_asset(cell_value, row, col)
             pixmap = self._asset_manager.get_pixmap(asset_name)
             if pixmap is None:
                 return None
 
-        # LAYER 2: Walls, borders, and structural elements (for Taxi game only)
         if self._current_game == GameId.TAXI and cell_value != ':' and cell_value.strip():
-            # Skip depot letters - they'll be handled in layer 3
             if cell_value not in ('R', 'G', 'Y', 'B'):
                 structural_asset = self._get_tile_asset(cell_value, row, col)
                 structural_pixmap = self._asset_manager.get_pixmap(structural_asset)
                 if structural_pixmap:
                     pixmap = self._composite_pixmaps(pixmap, structural_pixmap)
 
-        # LAYER 3: Depot letters and passenger/destination overlays for Taxi game
         if self._current_game == GameId.TAXI:
-            # Render depot letters (R, G, Y, B) with colored squares
             if cell_value in ('R', 'G', 'Y', 'B'):
                 depot_pixmap = self._create_depot_letter_pixmap(cell_value)
                 if depot_pixmap:
                     pixmap = self._composite_pixmaps(pixmap, depot_pixmap)
-            
-            # Passenger and destination overlays (only when taxi_state is provided)
+
             if taxi_state:
-                # Passenger location overlay (if passenger is at a depot, not in taxi)
                 pass_idx = taxi_state.get("passenger_index", -1)
-                if pass_idx < 4:  # 0-3 = at depot R/G/Y/B
+                if pass_idx < 4:
                     pass_pos = self._get_taxi_depot_position(pass_idx)
                     if pass_pos == (row, col):
                         passenger_pixmap = self._asset_manager.get_pixmap("passenger.png")
                         if passenger_pixmap:
                             pixmap = self._composite_pixmaps(pixmap, passenger_pixmap)
-                
-                # Destination marker overlay - scaled down to show colored background
+
                 dest_idx = taxi_state.get("destination_index", -1)
                 if dest_idx < 4:
                     dest_pos = self._get_taxi_depot_position(dest_idx)
                     if dest_pos == (row, col):
                         hotel_pixmap = self._asset_manager.get_pixmap("hotel.png")
                         if hotel_pixmap:
-                            # Scale hotel icon to 65% of tile size to show colored border
                             scaled_size = int(self._tile_size * 0.65)
                             hotel_scaled = hotel_pixmap.scaled(
-                                scaled_size, scaled_size,
+                                scaled_size,
+                                scaled_size,
                                 QtCore.Qt.AspectRatioMode.KeepAspectRatio,
-                                QtCore.Qt.TransformationMode.SmoothTransformation
+                                QtCore.Qt.TransformationMode.SmoothTransformation,
                             )
                             pixmap = self._composite_pixmaps(pixmap, hotel_scaled)
 
-        # LAYER 4: Agent overlay if present
         skip_actor_overlay = (
             self._current_game == GameId.FROZEN_LAKE
             and terminated
@@ -221,36 +310,31 @@ class GridRenderer:
             actor_pixmap = self._asset_manager.get_pixmap(actor_asset)
             if actor_pixmap is not None:
                 pixmap = self._composite_pixmaps(pixmap, actor_pixmap)
-        
-        # Scale to tile size
+
         if not pixmap.isNull():
             pixmap = pixmap.scaled(
-                self._tile_size, self._tile_size,
+                self._tile_size,
+                self._tile_size,
                 QtCore.Qt.AspectRatioMode.KeepAspectRatio,
-                QtCore.Qt.TransformationMode.SmoothTransformation
+                QtCore.Qt.TransformationMode.SmoothTransformation,
             )
 
         return pixmap
 
     def _get_tile_asset(self, cell_value: str, row: int, col: int) -> str:
-        """Get the appropriate tile asset name for a cell."""
         if self._current_game == GameId.FROZEN_LAKE:
             return FrozenLakeAssets.get_tile_asset(cell_value)
-        elif self._current_game == GameId.TAXI:
+        if self._current_game == GameId.TAXI:
             return TaxiAssets.get_tile_asset(cell_value, row, col, self._current_grid)
-        elif self._current_game == GameId.CLIFF_WALKING:
+        if self._current_game == GameId.CLIFF_WALKING:
             return CliffWalkingAssets.get_tile_asset(cell_value, row, col)
-        else:
-            # Fallback
-            return "ice.png"
+        return "ice.png"
 
     def _get_actor_asset(
         self,
         taxi_state: Dict[str, Any] | None = None,
         payload: Dict[str, Any] | None = None,
     ) -> str:
-        """Get the actor sprite asset name, with optional state for directional rendering."""
-
         if self._current_game == GameId.FROZEN_LAKE:
             return self._frozen_lake_actor_asset(payload)
         if self._current_game == GameId.TAXI:
@@ -280,10 +364,10 @@ class GridRenderer:
         if taxi_state is not None:
             action = self._safe_int(taxi_state.get("last_action"))
         direction_map = {
-            0: "front",  # SOUTH
-            1: "rear",   # NORTH
-            2: "right",  # EAST
-            3: "left",   # WEST
+            0: "front",
+            1: "rear",
+            2: "right",
+            3: "left",
         }
         direction = direction_map.get(action, "front") if action is not None else "front"
         return TaxiAssets.get_cab_asset(direction)
@@ -310,82 +394,51 @@ class GridRenderer:
 
     @staticmethod
     def _get_taxi_depot_position(depot_index: int) -> tuple[int, int]:
-        """
-        Get grid position for Taxi depot by index in 11×11 grid coordinates.
-        
-        Args:
-            depot_index: 0=Red, 1=Green, 2=Yellow, 3=Blue
-            
-        Returns:
-            (row, col) position in 11×11 grid
-        """
-        # Depot positions in 11×11 character grid:
-        # R: [1, 1]
-        # G: [1, 9]
-        # Y: [5, 1]
-        # B: [5, 7]
         depot_positions = {
-            0: (1, 1),  # Red
-            1: (1, 9),  # Green
-            2: (5, 1),  # Yellow
-            3: (5, 7),  # Blue
+            0: (1, 1),
+            1: (1, 9),
+            2: (5, 1),
+            3: (5, 7),
         }
         return depot_positions.get(depot_index, (1, 1))
 
     def _create_depot_letter_pixmap(self, letter: str) -> QtGui.QPixmap | None:
-        """
-        Create a pixmap with a colored square background for depot (R, G, Y, B).
-        
-        Args:
-            letter: The depot letter ('R', 'G', 'Y', or 'B')
-            
-        Returns:
-            QPixmap with colored square background, or None if letter not recognized
-        """
-        # Color mapping for depot backgrounds
         color_map = {
-            'R': QtGui.QColor(255, 0, 0),      # Red
-            'G': QtGui.QColor(0, 255, 0),      # Green  
-            'Y': QtGui.QColor(255, 255, 0),    # Yellow
-            'B': QtGui.QColor(0, 0, 255),      # Blue
+            'R': QtGui.QColor(255, 0, 0),
+            'G': QtGui.QColor(0, 255, 0),
+            'Y': QtGui.QColor(255, 255, 0),
+            'B': QtGui.QColor(0, 0, 255),
         }
-        
+
         color = color_map.get(letter)
         if not color:
             return None
-        
-        # Create pixmap with transparent background
+
         pixmap = QtGui.QPixmap(self._tile_size, self._tile_size)
         pixmap.fill(QtCore.Qt.GlobalColor.transparent)
-        
+
         painter = QtGui.QPainter(pixmap)
         painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
-        
-        # Fill entire tile with depot color (solid square)
         painter.fillRect(0, 0, self._tile_size, self._tile_size, color)
-        
         painter.end()
         return pixmap
 
     @staticmethod
     def _composite_pixmaps(base: QtGui.QPixmap, overlay: QtGui.QPixmap) -> QtGui.QPixmap:
-        """Composite overlay onto base pixmap."""
         result = QtGui.QPixmap(base.size())
         result.fill(QtCore.Qt.GlobalColor.transparent)
-        
+
         painter = QtGui.QPainter(result)
         painter.drawPixmap(0, 0, base)
-        # Center overlay
         x_offset = (base.width() - overlay.width()) // 2
         y_offset = (base.height() - overlay.height()) // 2
         painter.drawPixmap(x_offset, y_offset, overlay)
         painter.end()
-        
+
         return result
 
     def clear_cache(self) -> None:
-        """Clear the asset cache to free memory."""
         self._asset_manager.clear_cache()
 
 
-__all__ = ["GridRenderer"]
+__all__ = ["GridRendererStrategy"]

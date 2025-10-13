@@ -6,13 +6,18 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Any, List, Mapping, Optional
 
-import numpy as np
 from qtpy import QtCore, QtGui, QtWidgets
 
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.core.enums import GameId, RenderMode
-from gym_gui.rendering.grid_renderer import GridRenderer
+from gym_gui.rendering import (
+    RendererContext,
+    RendererRegistry,
+    RendererStrategy,
+    create_default_renderer_registry,
+)
 from gym_gui.replays import EpisodeReplay, EpisodeReplayLoader
+from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
 from gym_gui.ui.widgets.busy_indicator import modal_busy_indicator
 
@@ -30,58 +35,77 @@ class RenderTabs(QtWidgets.QTabWidget):
     ) -> None:
         super().__init__(parent)
 
-        self._grid_tab = _GridTab(parent=self)
-        self._raw_tab = _RawTab(parent=self)
-        self._video_tab = _VideoTab(parent=self)
-        self._replay_tab = _ReplayTab(parent=self, telemetry_service=telemetry_service)
+        locator = get_service_locator()
+        registry = locator.resolve(RendererRegistry)
+        if registry is None:
+            registry = create_default_renderer_registry()
+            locator.register(RendererRegistry, registry)
+        self._registry = registry
 
-        self.addTab(self._grid_tab.widget, "Grid")
-        self.addTab(self._raw_tab.widget, "Raw")
-        self.addTab(self._video_tab.widget, "Video")
-        self.addTab(self._replay_tab, "Replay")
-
-        # Disable grid/video tabs until data arrives
-        self.setTabEnabled(self.indexOf(self._grid_tab.widget), False)
-        self.setTabEnabled(self.indexOf(self._video_tab.widget), False)
+        self._mode_hosts: dict[RenderMode, _RendererHost] = {}
         self._current_game = None
+
+        self._raw_tab = _RawTab(parent=self)
+
+        self._grid_host = self._create_host(RenderMode.GRID, parent=self)
+        if self._grid_host is not None:
+            self._grid_tab_index = self.addTab(self._grid_host.widget, "Grid")
+            self.setTabEnabled(self._grid_tab_index, False)
+        else:
+            self._grid_tab_index = -1
+
+        self._raw_tab_index = self.addTab(self._raw_tab.widget, "Raw")
+        self.setTabEnabled(self._raw_tab_index, True)
+
+        self._video_host = self._create_host(RenderMode.RGB_ARRAY, parent=self)
+        if self._video_host is not None:
+            self._video_tab_index = self.addTab(self._video_host.widget, "Video")
+            self.setTabEnabled(self._video_tab_index, False)
+        else:
+            self._video_tab_index = -1
+
+        self._replay_tab = _ReplayTab(
+            parent=self,
+            telemetry_service=telemetry_service,
+            renderer_registry=registry,
+        )
+        self._replay_tab_index = self.addTab(self._replay_tab, "Replay")
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
     def set_current_game(self, game_id: GameId) -> None:
         self._current_game = game_id
-        self._grid_tab.set_current_game(game_id)
+        for host in self._mode_hosts.values():
+            host.set_current_game(game_id)
         self._replay_tab.set_current_game(game_id)
 
     def display_payload(self, payload: object) -> None:
         if isinstance(payload, Mapping):
-            mode = payload.get("mode")
-            if "game_id" in payload and payload["game_id"]:
-                try:
-                    self._current_game = GameId(payload["game_id"])
-                    self._grid_tab.set_current_game(self._current_game)
-                    self._replay_tab.set_current_game(self._current_game)
-                except Exception:
-                    pass
+            self._update_game_from_payload(payload)
+            self._raw_tab.display_from_payload(payload)
 
-            if mode == RenderMode.GRID.value and "grid" in payload:
-                self._grid_tab.render_grid(payload)
-                self._raw_tab.display_from_payload(payload)
-                self._activate_tab(self._grid_tab.widget)
-            elif mode == RenderMode.RGB_ARRAY.value and "rgb" in payload:
-                self._video_tab.render_frame(payload["rgb"], ansi=payload.get("ansi"))
-                self._raw_tab.display_from_payload(payload)
-                self._activate_tab(self._video_tab.widget)
-            else:
-                text = payload.get("ansi") or payload.get("text") or str(payload)
-                self._raw_tab.display_plain_text(text)
-                self._activate_tab(self._raw_tab.widget, enable_only=True)
-        elif payload is None:
+            mode = _coerce_render_mode(payload.get("mode"))
+            host = self._mode_hosts.get(mode) if mode is not None else None
+            if host is not None and host.supports(payload):
+                host.render(payload)
+                self._activate_tab(host.widget)
+                return
+
+            text = payload.get("ansi") or payload.get("text") or str(payload)
+            self._raw_tab.display_plain_text(text)
+            self._activate_tab(self._raw_tab.widget, enable_only=True)
+            return
+
+        if payload is None:
+            self._reset_hosts()
             self._raw_tab.display_plain_text("No render payload yet.")
             self._activate_tab(self._raw_tab.widget, enable_only=True)
-        else:
-            self._raw_tab.display_plain_text(str(payload))
-            self._activate_tab(self._raw_tab.widget, enable_only=True)
+            return
+
+        self._reset_hosts()
+        self._raw_tab.display_plain_text(str(payload))
+        self._activate_tab(self._raw_tab.widget, enable_only=True)
 
     def refresh_replays(self) -> None:
         self._replay_tab.refresh()
@@ -100,41 +124,37 @@ class RenderTabs(QtWidgets.QTabWidget):
         if not enable_only:
             self.setCurrentIndex(index)
 
+    def _create_host(
+        self,
+        mode: RenderMode,
+        *,
+        parent: QtWidgets.QWidget | None,
+    ) -> _RendererHost | None:
+        if not self._registry.is_registered(mode):
+            return None
+        strategy = self._registry.create(mode, parent)
+        host = _RendererHost(strategy)
+        self._mode_hosts[mode] = host
+        if self._current_game is not None:
+            host.set_current_game(self._current_game)
+        return host
 
-@dataclass(slots=True)
-class _GridTab:
-    widget: QtWidgets.QGraphicsView
-    _renderer: GridRenderer
-    _current_game: GameId | None = None
-
-    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
-        view = QtWidgets.QGraphicsView(parent)
-        view.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
-        view.setBackgroundBrush(QtGui.QBrush(QtGui.QColor(240, 240, 240)))
-        self.widget = view
-        self._renderer = GridRenderer(self.widget)
-        self._current_game = None
-
-    def set_current_game(self, game_id: GameId | None) -> None:
-        self._current_game = game_id
-
-    def render_grid(self, payload: Mapping[str, Any]) -> None:
-        raw_grid = payload.get("grid")
-        if raw_grid is None:
+    def _update_game_from_payload(self, payload: Mapping[str, object]) -> None:
+        raw_game = payload.get("game_id")
+        if raw_game is None:
             return
-        game_id = self._current_game or GameId.FROZEN_LAKE
-        agent_pos = payload.get("agent_position")
-        taxi_state = payload.get("taxi_state")
-        terminated = payload.get("terminated", False)
+        try:
+            game_id = raw_game if isinstance(raw_game, GameId) else GameId(str(raw_game))
+        except ValueError:
+            return
+        self._current_game = game_id
+        for host in self._mode_hosts.values():
+            host.set_current_game(game_id)
+        self._replay_tab.set_current_game(game_id)
 
-        rows: List[List[str]] = []
-        for row in list(raw_grid):
-            if isinstance(row, str):
-                rows.append(list(row))
-            else:
-                rows.append([str(cell) for cell in list(row)])
-
-        self._renderer.render(rows, game_id, agent_pos, taxi_state, terminated, dict(payload))
+    def _reset_hosts(self) -> None:
+        for host in self._mode_hosts.values():
+            host.reset()
 
 
 @dataclass(slots=True)
@@ -156,80 +176,46 @@ class _RawTab:
         self.widget.setPlainText(text)
 
 
-class _VideoTab(QtWidgets.QWidget):
-    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
-        super().__init__(parent)
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
+class _RendererHost:
+    """Wrapper that binds a renderer strategy to the owning widget."""
 
-        container = QtWidgets.QScrollArea(self)
-        container.setWidgetResizable(True)
-        container.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+    def __init__(self, strategy: RendererStrategy) -> None:
+        self._strategy = strategy
+        self.widget = strategy.widget
+        self.mode = strategy.mode
+        self._game_id: GameId | None = None
 
-        label = QtWidgets.QLabel(container)
-        label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        label.setMinimumSize(320, 240)
-        label.setStyleSheet("background-color: #111; color: #eee;")
+    def set_current_game(self, game_id: GameId | None) -> None:
+        self._game_id = game_id
 
-        container.setWidget(label)
-        layout.addWidget(container)
+    def supports(self, payload: Mapping[str, object]) -> bool:
+        return self._strategy.supports(payload)
 
-        self._label = label
-        self._container = container
-        self._current_pixmap: QtGui.QPixmap | None = None
+    def render(self, payload: Mapping[str, object], *, game_id: GameId | None = None) -> None:
+        if game_id is not None:
+            self._game_id = game_id
+        context = RendererContext(game_id=self._game_id)
+        self._strategy.render(payload, context=context)
 
-    @property
-    def widget(self) -> QtWidgets.QWidget:
-        return self
-
-    def render_frame(self, frame: Any, *, ansi: str | None = None) -> None:
-        array = np.asarray(frame)
-        if array.ndim != 3 or array.shape[2] not in (3, 4):
-            self._label.setText("Unsupported RGB frame format")
-            return
-
-        array = np.ascontiguousarray(array)
-        height, width, channels = array.shape
-        if channels == 3:
-            fmt = QtGui.QImage.Format.Format_RGB888
-        else:
-            fmt = QtGui.QImage.Format.Format_RGBA8888
-
-        qimage = QtGui.QImage(array.data, width, height, width * channels, fmt).copy()
-        self._current_pixmap = QtGui.QPixmap.fromImage(qimage)
-        self._scale_pixmap()
-
-        if ansi:
-            # Keep textual representation in sync by showing it as tooltip
-            self._label.setToolTip(_strip_ansi_codes(ansi))
-        else:
-            self._label.setToolTip("")
-
-    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:  # pragma: no cover - GUI only
-        super().resizeEvent(event)
-        self._scale_pixmap()
-
-    def _scale_pixmap(self) -> None:
-        if self._current_pixmap is None:
-            return
-        if self._label.width() <= 0 or self._label.height() <= 0:
-            self._label.setPixmap(self._current_pixmap)
-            return
-        scaled = self._current_pixmap.scaled(
-            self._label.size(),
-            QtCore.Qt.AspectRatioMode.KeepAspectRatio,
-            QtCore.Qt.TransformationMode.SmoothTransformation,
-        )
-        self._label.setPixmap(scaled)
+    def reset(self) -> None:
+        self._strategy.reset()
 
 
 class _ReplayPreview(QtWidgets.QStackedWidget):
     """Mini viewer that mirrors replay frames for quick inspection."""
 
-    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+    def __init__(
+        self,
+        parent: QtWidgets.QWidget | None = None,
+        *,
+        registry: RendererRegistry | None = None,
+    ) -> None:
         super().__init__(parent)
-        self._grid_tab = _GridTab(parent=self)
-        self._video_tab = _VideoTab(parent=self)
+        self._registry = registry or create_default_renderer_registry()
+        self._mode_hosts: dict[RenderMode, _RendererHost] = {}
+        self._mode_indices: dict[RenderMode, int] = {}
+        self._current_game: GameId | None = None
+
         self._text_view = QtWidgets.QPlainTextEdit(self)
         self._text_view.setReadOnly(True)
         self._text_view.setMinimumHeight(120)
@@ -238,18 +224,33 @@ class _ReplayPreview(QtWidgets.QStackedWidget):
         self._placeholder.setWordWrap(True)
 
         self._placeholder_index = self.addWidget(self._placeholder)
-        self._grid_index = self.addWidget(self._grid_tab.widget)
-        self._video_index = self.addWidget(self._video_tab)
+
+        grid_host = self._create_host(RenderMode.GRID)
+        if grid_host is not None:
+            self._grid_index = self.addWidget(grid_host.widget)
+            self._mode_indices[RenderMode.GRID] = self._grid_index
+        else:
+            self._grid_index = -1
+
+        video_host = self._create_host(RenderMode.RGB_ARRAY)
+        if video_host is not None:
+            self._video_index = self.addWidget(video_host.widget)
+            self._mode_indices[RenderMode.RGB_ARRAY] = self._video_index
+        else:
+            self._video_index = -1
+
         self._text_index = self.addWidget(self._text_view)
 
-        self._current_game: GameId | None = None
         self.setCurrentIndex(self._placeholder_index)
 
     def set_current_game(self, game: GameId | None) -> None:
         self._current_game = game
-        self._grid_tab.set_current_game(game)
+        for host in self._mode_hosts.values():
+            host.set_current_game(game)
 
     def clear(self) -> None:
+        for host in self._mode_hosts.values():
+            host.reset()
         self.setCurrentIndex(self._placeholder_index)
         self._text_view.clear()
 
@@ -260,17 +261,16 @@ class _ReplayPreview(QtWidgets.QStackedWidget):
             self.clear()
             return
         if isinstance(payload, Mapping):
-            mode = payload.get("mode")
-            if mode == RenderMode.GRID.value and "grid" in payload:
-                self._grid_tab.render_grid(payload)
-                self.setCurrentIndex(self._grid_index)
-                return
-            if mode == RenderMode.RGB_ARRAY.value and "rgb" in payload:
-                self._video_tab.render_frame(payload["rgb"], ansi=payload.get("ansi"))
-                self.setCurrentIndex(self._video_index)
+            mode = _coerce_render_mode(payload.get("mode"))
+            host = self._mode_hosts.get(mode) if mode is not None else None
+            if host is not None and host.supports(payload):
+                host.render(payload, game_id=game or self._current_game)
+                index = self._mode_indices.get(host.mode, -1)
+                if index != -1:
+                    self.setCurrentIndex(index)
                 return
             ansi = payload.get("ansi")
-            if ansi:
+            if isinstance(ansi, str) and ansi:
                 self._text_view.setPlainText(_strip_ansi_codes(ansi))
                 self.setCurrentIndex(self._text_index)
                 return
@@ -279,6 +279,16 @@ class _ReplayPreview(QtWidgets.QStackedWidget):
         except Exception:
             self._text_view.setPlainText("Unsupported render payload")
         self.setCurrentIndex(self._text_index)
+
+    def _create_host(self, mode: RenderMode) -> _RendererHost | None:
+        if not self._registry.is_registered(mode):
+            return None
+        strategy = self._registry.create(mode, self)
+        host = _RendererHost(strategy)
+        self._mode_hosts[mode] = host
+        if self._current_game is not None:
+            host.set_current_game(self._current_game)
+        return host
 
 
 class _ReplayTab(QtWidgets.QWidget):
@@ -307,12 +317,14 @@ class _ReplayTab(QtWidgets.QWidget):
         parent: QtWidgets.QWidget | None = None,
         *,
         telemetry_service: TelemetryService | None = None,
+        renderer_registry: RendererRegistry | None = None,
     ) -> None:
         super().__init__(parent)
         self._telemetry = telemetry_service
         self._loader = EpisodeReplayLoader(telemetry_service) if telemetry_service else None
         self._current_game = None
         self._sort_descending = True
+        self._renderer_registry = renderer_registry or create_default_renderer_registry()
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
@@ -325,7 +337,7 @@ class _ReplayTab(QtWidgets.QWidget):
         self._episode_summary.setWordWrap(True)
         details_layout.addWidget(self._episode_summary)
 
-        self._preview = _ReplayPreview(self._details_group)
+        self._preview = _ReplayPreview(self._details_group, registry=self._renderer_registry)
         self._preview.setMinimumHeight(220)
         details_layout.addWidget(self._preview)
 
@@ -700,6 +712,17 @@ def _strip_ansi_codes(text: str) -> str:
     action_indicator = re.compile(r"^\s*\([A-Za-z]+\)\s*\n?", re.MULTILINE)
     text = action_indicator.sub("", text)
     return text.strip()
+
+
+def _coerce_render_mode(value: object) -> RenderMode | None:
+    if isinstance(value, RenderMode):
+        return value
+    if isinstance(value, str):
+        try:
+            return RenderMode(value)
+        except ValueError:
+            return None
+    return None
 
 
 __all__ = ["RenderTabs"]

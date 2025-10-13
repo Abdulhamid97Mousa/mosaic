@@ -2,6 +2,7 @@ python-dotenv>=1.0
 qtpy>=2.4
 PyQt6>=6.7
 gymnasium[box2d]>=1.2
+
 python-dotenv==1.1.1
 # sudo apt-get install -y swig
 # sudo apt-get install -y python3.12-dev
@@ -17,3 +18,4 @@ PyQt6-sip==13.10.2
 packaging==25.0
 qtpy==2.4.3
 PyYAML>=6.0
+numpy==2.3.3

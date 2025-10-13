@@ -73,13 +73,17 @@ gym_gui/
       logger.py               # Structured logging configuration
    rendering/                # Rendering helpers (future phases)
    runtime/
-      cache/                  # Writable cache for derived assets
-      data/                   # Episode exports, replays, and snapshots
+      data/                   # Packaged assets shipped with the app (toy-text boards)
          README.md
          toy_text/
             README.md         # Notes about generated toy-text snapshots
-      log_output/             # Runtime log output (gitignored)
-         README.md
+   var/
+      README.md               # Writable runtime artifacts (records, telemetry, cache, tmp)
+      records/                # Episode exports, replays, and snapshots
+      telemetry/              # SQLite telemetry store and analytics tables
+      cache/                  # Derived caches generated on demand
+      tmp/                    # Scratch space for exporters and temp files
+      logs/                   # Structured application logs (gym_gui.log, rotated files)
    services/                 # Cross-cutting services (e.g., orchestrators)
    storage/
       __init__.py
