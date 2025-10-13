@@ -22,12 +22,20 @@ class TelemetrySQLiteStore:
     """Persist telemetry events to a SQLite database."""
 
     _DEFAULT_BATCH_SIZE = 32
+    _DEFAULT_MAX_BUFFER_BYTES = 2 * 1024 * 1024  # 2 MiB
     _QUEUE_TIMEOUT_SECONDS = 0.1
 
-    def __init__(self, db_path: Path, *, batch_size: int | None = None) -> None:
+    def __init__(
+        self,
+        db_path: Path,
+        *,
+        batch_size: int | None = None,
+        max_buffer_bytes: int | None = None,
+    ) -> None:
         self._db_path = db_path.expanduser().resolve()
         _ensure_parent(self._db_path)
         self._batch_size = max(1, batch_size or self._DEFAULT_BATCH_SIZE)
+        self._max_buffer_bytes = max(1, max_buffer_bytes or self._DEFAULT_MAX_BUFFER_BYTES)
         self._logger = logging.getLogger("gym_gui.telemetry.sqlite_store")
         self._deserialization_failures: set[str] = set()
 
@@ -42,6 +50,7 @@ class TelemetrySQLiteStore:
 
         self._queue: "queue.Queue[tuple[str, Any]]" = queue.Queue()
         self._stop_event = threading.Event()
+        self._pending_payload_bytes = 0
         self._worker = threading.Thread(
             target=self._worker_loop,
             name="TelemetrySQLiteStore",
@@ -135,7 +144,7 @@ class TelemetrySQLiteStore:
 
     # ------------------------------------------------------------------
     def _worker_loop(self) -> None:
-        pending_steps: List[StepRecord] = []
+        pending_steps: List[dict[str, object]] = []
         while not self._stop_event.is_set():
             try:
                 cmd, payload = self._queue.get(timeout=self._QUEUE_TIMEOUT_SECONDS)
@@ -148,8 +157,13 @@ class TelemetrySQLiteStore:
             try:
                 if cmd == "step":
                     assert isinstance(payload, StepRecord)
-                    pending_steps.append(payload)
-                    if len(pending_steps) >= self._batch_size:
+                    step_payload, size = self._prepare_step_payload(payload)
+                    pending_steps.append(step_payload)
+                    self._pending_payload_bytes += size
+                    if (
+                        len(pending_steps) >= self._batch_size
+                        or self._pending_payload_bytes >= self._max_buffer_bytes
+                    ):
                         self._flush_steps(pending_steps)
                         pending_steps = []
                 elif cmd == "episode":
@@ -176,6 +190,7 @@ class TelemetrySQLiteStore:
                 elif cmd == "stop":
                     if pending_steps:
                         self._flush_steps(pending_steps)
+                        pending_steps = []
                     break
             finally:
                 self._queue.task_done()
@@ -188,7 +203,9 @@ class TelemetrySQLiteStore:
                 break
             try:
                 if cmd == "step" and isinstance(payload, StepRecord):
-                    pending_steps.append(payload)
+                    step_payload, size = self._prepare_step_payload(payload)
+                    pending_steps.append(step_payload)
+                    self._pending_payload_bytes += size
                 elif cmd == "episode" and isinstance(payload, EpisodeRollup):
                     if pending_steps:
                         self._flush_steps(pending_steps)
@@ -210,10 +227,9 @@ class TelemetrySQLiteStore:
         if pending_steps:
             self._flush_steps(pending_steps)
 
-    def _flush_steps(self, steps: List[StepRecord]) -> None:
+    def _flush_steps(self, steps: List[dict[str, object]]) -> None:
         if not steps:
             return
-        payloads = [self._step_payload(step) for step in steps]
         cursor = self._conn.cursor()
         cursor.execute("BEGIN")
         cursor.executemany(
@@ -224,9 +240,10 @@ class TelemetrySQLiteStore:
             ) VALUES (:episode_id, :step_index, :action, :observation, :reward,
                 :terminated, :truncated, :info, :render_payload, :timestamp)
             """,
-            payloads,
+            steps,
         )
         cursor.execute("COMMIT")
+        self._pending_payload_bytes = 0
 
     def _delete_episode_rows(self, episode_id: str) -> None:
         cursor = self._conn.cursor()
@@ -322,6 +339,22 @@ class TelemetrySQLiteStore:
             "timestamp": record.timestamp.isoformat(),
         }
 
+    def _prepare_step_payload(self, record: StepRecord) -> tuple[dict[str, object], int]:
+        payload = self._step_payload(record)
+        size = self._payload_size(payload)
+        return payload, size
+
+    @staticmethod
+    def _payload_size(payload: dict[str, object]) -> int:
+        size = 0
+        for key in ("observation", "info", "render_payload"):
+            value = payload.get(key)
+            if isinstance(value, (bytes, bytearray, memoryview)):
+                size += len(value)
+            elif isinstance(value, str):
+                size += len(value.encode("utf-8"))
+        return size
+
     def flush(self) -> None:
         self._queue.put(("flush", None))
         self._queue.join()
@@ -336,6 +369,13 @@ class TelemetrySQLiteStore:
             self._worker.join(timeout=2.0)
         finally:
             self._conn.close()
+
+    def __enter__(self) -> "TelemetrySQLiteStore":
+        return self
+
+    def __exit__(self, exc_type, exc, exc_tb) -> bool:
+        self.close()
+        return False
 
     def __del__(self) -> None:  # pragma: no cover - defensive shutdown
         try:

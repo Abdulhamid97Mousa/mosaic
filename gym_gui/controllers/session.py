@@ -163,6 +163,11 @@ class SessionController(QtCore.QObject):
         self.stop_auto_play()
         self._game_started = False
         self._game_paused = False
+        self._stop_idle_tick()
+        if self._awaiting_human:
+            self._awaiting_human = False
+            self.awaiting_human.emit(False, "Game terminated")
+        self._pending_input_label = None
         if self._episode_active and self._last_step is not None:
             self._finalize_episode(self._last_step, aborted=True)
         self.episode_finished.emit(True)

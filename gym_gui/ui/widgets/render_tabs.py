@@ -14,6 +14,7 @@ from gym_gui.core.enums import GameId, RenderMode
 from gym_gui.rendering.grid_renderer import GridRenderer
 from gym_gui.replays import EpisodeReplay, EpisodeReplayLoader
 from gym_gui.services.telemetry import TelemetryService
+from gym_gui.ui.widgets.busy_indicator import modal_busy_indicator
 
 
 class RenderTabs(QtWidgets.QTabWidget):
@@ -606,14 +607,24 @@ class _ReplayTab(QtWidgets.QWidget):
         episode_id = episode_item.data(QtCore.Qt.ItemDataRole.UserRole)
         if not isinstance(episode_id, str):
             episode_id = episode_item.text()
-        self._telemetry.delete_episode(episode_id)
+        with modal_busy_indicator(
+            self,
+            title="Deleting episode",
+            message="Persisted data is being removed…",
+        ):
+            self._telemetry.delete_episode(episode_id)
         self.refresh()
         self._clear_replay_details()
 
     def _clear_all_episodes(self) -> None:
         if self._telemetry is None:
             return
-        self._telemetry.clear_all_episodes()
+        with modal_busy_indicator(
+            self,
+            title="Clearing telemetry",
+            message="Flushing and deleting recorded episodes…",
+        ):
+            self._telemetry.clear_all_episodes()
         self.refresh()
         self._clear_replay_details()
 

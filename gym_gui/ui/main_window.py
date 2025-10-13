@@ -24,6 +24,7 @@ from gym_gui.controllers.session import SessionController
 from gym_gui.ui.logging_bridge import LogRecordPayload, QtLogHandler
 from gym_gui.ui.presenters.main_window_presenter import MainWindowPresenter, MainWindowView
 from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWidget
+from gym_gui.ui.widgets.busy_indicator import modal_busy_indicator
 from gym_gui.ui.widgets.render_tabs import RenderTabs
 from gym_gui.docs.game_info import get_game_info
 from gym_gui.services.actor import ActorService
@@ -334,7 +335,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _on_terminate_game(self) -> None:
         """Handle Terminate Game button."""
-        self._session.terminate_game()
+        with modal_busy_indicator(
+            self,
+            title="Terminating episode",
+            message="Finalizing telemetry and stopping the environment…",
+        ):
+            self._session.terminate_game()
         self._game_started = False
         self._game_paused = False
         self._control_panel.set_game_started(False)

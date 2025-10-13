@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Application entry-point helpers for manual smoke-testing."""
 
+from dataclasses import replace
 import json
 import logging
 import sys
@@ -21,6 +22,7 @@ def _format_settings(settings: Settings) -> str:
         "log_level": settings.log_level,
         "use_gpu": settings.use_gpu,
         "default_control_mode": settings.default_control_mode.value,
+        "default_seed": settings.default_seed,
         "agent_ids": settings.agent_ids,
     }
     return json.dumps(payload, indent=2)
@@ -29,7 +31,7 @@ def _format_settings(settings: Settings) -> str:
 def main() -> int:
     """Print the currently loaded settings and, if Qt is installed, show a stub window."""
 
-    settings = get_settings()
+    settings = replace(get_settings(), default_seed=1)
     log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
     configure_logging(level=log_level, stream=True, log_to_file=True)
     logger = logging.getLogger("gym_gui.app")

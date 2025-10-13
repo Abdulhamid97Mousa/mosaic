@@ -23,6 +23,7 @@ def bootstrap_default_services() -> ServiceLocator:
     telemetry_db = Path(__file__).resolve().parent.parent / "runtime" / "data" / "telemetry" / "telemetry.sqlite"
     telemetry_store = TelemetrySQLiteStore(telemetry_db)
     telemetry.attach_store(telemetry_store)
+    telemetry_store.delete_all_episodes(wait=True)
 
     actors = ActorService()
     actors.register_actor(
