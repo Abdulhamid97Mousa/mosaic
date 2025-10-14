@@ -4,10 +4,7 @@
 [Blog](https://blog.qt.io/)
 [Download Qt](https://www.qt.io/download/)
 
-[![Qt documentation](/style/qt-logo-documentation.png)](/)
-
 * + English
-* [ ]
 * [Archives](/archives)
 * [Snapshots](https://doc-snapshots.qt.io/)
 

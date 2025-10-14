@@ -1,6 +1,4 @@
-[![Logo](_static/logo.png)](index.html)
 
-1.6.1
 
 * [valkka-core](https://github.com/elsampsa/valkka-core)
 * [valkka-examples](https://github.com/elsampsa/valkka-examples)

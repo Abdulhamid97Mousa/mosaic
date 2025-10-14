@@ -12,6 +12,8 @@ python-dotenv==1.1.1
 #   libxcb-render-util0 libxcb-randr0 libxcb-shape0 \
 #   libxcb-xinerama0 libxcb-xkb1
 # sudo apt install sqlite3
+# source ./.venv/bin/activate && python -m grpc_tools.protoc -I gym_gui/services/trainer/proto --python_out=gym_gui/services/trainer/proto --grpc_python_out=gym_gui/services/trainer/proto gym_gui/services/trainer/proto/trainer.proto
+
 PyQt6==6.9.1
 PyQt6-Qt6==6.9.2
 PyQt6-sip==13.10.2
@@ -19,3 +21,7 @@ packaging==25.0
 qtpy==2.4.3
 PyYAML>=6.0
 numpy==2.3.3
+jsonschema==4.23.0
+grpcio==1.67.1
+grpcio-tools==1.67.1
+protobuf==5.27.2

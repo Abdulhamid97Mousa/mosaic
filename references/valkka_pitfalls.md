@@ -1,4 +1,4 @@
-[![Logo](_static/logo.png)](index.html)
+
 
 1.6.1
 

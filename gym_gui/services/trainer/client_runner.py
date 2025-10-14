@@ -1,0 +1,110 @@
+from __future__ import annotations
+
+"""Background thread helper to access :class:`TrainerClient` from Qt controllers."""
+
+import asyncio
+import threading
+from queue import Queue, Empty
+from typing import Any, Iterable, Optional, Sequence
+
+from gym_gui.services.trainer.client import TrainerClient, TrainerClientConfig
+from gym_gui.services.trainer.registry import RunStatus
+
+
+class TrainerClientRunner:
+    """Runs :class:`TrainerClient` coroutines on a dedicated asyncio loop."""
+
+    def __init__(self, client: Optional[TrainerClient] = None, *, name: str = "trainer-client-loop") -> None:
+        self._client = client or TrainerClient(TrainerClientConfig())
+        self._loop = asyncio.new_event_loop()
+        self._thread = threading.Thread(target=self._loop.run_forever, name=name, daemon=True)
+        self._thread.start()
+
+    # ------------------------------------------------------------------
+    def submit_run(self, config_json: str, *, run_id: Optional[str] = None, deadline: Optional[float] = None):
+        return self._submit(self._client.submit_run(config_json, run_id=run_id, deadline=deadline))
+
+    def cancel_run(self, run_id: str, *, deadline: Optional[float] = None):
+        return self._submit(self._client.cancel_run(run_id, deadline=deadline))
+
+    def list_runs(self, statuses: Optional[Sequence[RunStatus]] = None, *, deadline: Optional[float] = None):
+        return self._submit(self._client.list_runs(statuses, deadline=deadline))
+
+    def heartbeat(self, run_id: str, *, deadline: Optional[float] = None):
+        return self._submit(self._client.heartbeat(run_id, deadline=deadline))
+
+    def get_health(self, *, deadline: Optional[float] = None):
+        return self._submit(self._client.get_health(deadline=deadline))
+
+    # ------------------------------------------------------------------
+    def watch_runs(
+        self,
+        statuses: Optional[Iterable[RunStatus]] = None,
+        *,
+        deadline: Optional[float] = None,
+        since_seq: int = 0,
+    ) -> "TrainerWatchSubscription":
+        queue: Queue[Any] = Queue()
+        stop = threading.Event()
+        status_seq = list(statuses) if statuses is not None else None
+
+        async def _consume() -> None:
+            try:
+                async with self._client.watch_runs(status_seq, deadline=deadline, since_seq=since_seq) as stream:
+                    async for record in stream:
+                        if stop.is_set():
+                            break
+                        queue.put(record)
+            except Exception as exc:  # pragma: no cover - propagated to consumer
+                queue.put(exc)
+            finally:
+                queue.put(_SENTINEL)
+
+        future = asyncio.run_coroutine_threadsafe(_consume(), self._loop)
+        return TrainerWatchSubscription(queue, stop, future)
+
+    # ------------------------------------------------------------------
+    def shutdown(self) -> None:
+        try:
+            asyncio.run_coroutine_threadsafe(self._client.close(), self._loop).result(timeout=1)
+        except Exception:  # pragma: no cover - best effort cleanup
+            pass
+        self._loop.call_soon_threadsafe(self._loop.stop)
+        self._thread.join(timeout=2)
+        self._loop.close()
+
+    def _submit(self, coro: Any):
+        return asyncio.run_coroutine_threadsafe(coro, self._loop)
+
+
+class TrainerWatchSubscription:
+    """Thread-safe iterator over run records produced by :meth:`TrainerClient.watch_runs`."""
+
+    def __init__(self, queue: Queue[Any], stop_event: threading.Event, future) -> None:
+        self._queue = queue
+        self._stop = stop_event
+        self._future = future
+
+    def get(self, timeout: Optional[float] = None) -> Any:
+        try:
+            item = self._queue.get(timeout=timeout)
+        except Empty:
+            raise TimeoutError("Timed out waiting for trainer updates") from None
+        if item is _SENTINEL:
+            raise TrainerWatchStopped
+        if isinstance(item, Exception):
+            raise item
+        return item
+
+    def close(self) -> None:
+        self._stop.set()
+        self._future.cancel()
+        self._queue.put(_SENTINEL)
+
+class TrainerWatchStopped(Exception):
+    """Raised when a watch subscription has ended."""
+
+
+_SENTINEL = object()
+
+__all__ = ["TrainerClientRunner", "TrainerWatchSubscription", "TrainerWatchStopped"]
