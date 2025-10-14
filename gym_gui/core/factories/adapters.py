@@ -76,6 +76,7 @@ def create_adapter(
     from gym_gui.core.adapters.toy_text import (
         CliffWalkingAdapter,
         FrozenLakeAdapter,
+        FrozenLakeV2Adapter,
         TaxiAdapter,
     )
     from gym_gui.core.adapters.box2d import (
@@ -88,6 +89,8 @@ def create_adapter(
     if game_config is not None:
         if adapter_cls is FrozenLakeAdapter and isinstance(game_config, FrozenLakeConfig):
             adapter = FrozenLakeAdapter(context, game_config=game_config)
+        elif adapter_cls is FrozenLakeV2Adapter and isinstance(game_config, FrozenLakeConfig):
+            adapter = FrozenLakeV2Adapter(context, game_config=game_config)
         elif adapter_cls is TaxiAdapter and isinstance(game_config, TaxiConfig):
             adapter = TaxiAdapter(context, game_config=game_config)
         elif adapter_cls is CliffWalkingAdapter and isinstance(game_config, CliffWalkingConfig):

@@ -30,6 +30,7 @@ class GameId(StrEnum):
     """Canonical Gymnasium environment identifiers supported by the GUI."""
 
     FROZEN_LAKE = "FrozenLake-v1"
+    FROZEN_LAKE_V2 = "FrozenLake-v2"
     CLIFF_WALKING = "CliffWalking-v1"
     TAXI = "Taxi-v3"
     LUNAR_LANDER = "LunarLander-v3"
@@ -84,6 +85,7 @@ class AdapterCapability(Enum):
 
 ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.FROZEN_LAKE: EnvironmentFamily.TOY_TEXT,
+    GameId.FROZEN_LAKE_V2: EnvironmentFamily.TOY_TEXT,
     GameId.CLIFF_WALKING: EnvironmentFamily.TOY_TEXT,
     GameId.TAXI: EnvironmentFamily.TOY_TEXT,
     GameId.LUNAR_LANDER: EnvironmentFamily.BOX2D,
@@ -94,6 +96,7 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
 
 DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.FROZEN_LAKE: RenderMode.GRID,
+    GameId.FROZEN_LAKE_V2: RenderMode.GRID,
     GameId.CLIFF_WALKING: RenderMode.GRID,
     GameId.TAXI: RenderMode.GRID,
     GameId.LUNAR_LANDER: RenderMode.RGB_ARRAY,
@@ -104,6 +107,14 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
 
 DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
     GameId.FROZEN_LAKE: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+        ControlMode.MULTI_AGENT_COOP,
+        ControlMode.MULTI_AGENT_COMPETITIVE,
+    ),
+    GameId.FROZEN_LAKE_V2: (
         ControlMode.HUMAN_ONLY,
         ControlMode.AGENT_ONLY,
         ControlMode.HYBRID_TURN_BASED,

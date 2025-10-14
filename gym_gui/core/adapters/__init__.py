@@ -9,6 +9,7 @@ from .base import (
 )
 from .toy_text import (
     FrozenLakeAdapter,
+    FrozenLakeV2Adapter,
     CliffWalkingAdapter,
     TaxiAdapter,
     TOY_TEXT_ADAPTERS,
@@ -28,6 +29,7 @@ __all__ = [
     "EnvironmentAdapter",
     "UnsupportedModeError",
     "FrozenLakeAdapter",
+    "FrozenLakeV2Adapter",
     "CliffWalkingAdapter",
     "TaxiAdapter",
     "TOY_TEXT_ADAPTERS",

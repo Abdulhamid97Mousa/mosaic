@@ -13,6 +13,7 @@ from gym_gui.config.game_configs import (
     FrozenLakeConfig,
     LunarLanderConfig,
     TaxiConfig,
+    DEFAULT_FROZEN_LAKE_V2_CONFIG,
 )
 from gym_gui.core.enums import ControlMode, GameId
 from gym_gui.services.actor import ActorDescriptor
@@ -42,6 +43,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
     load_requested = Signal(GameId, ControlMode, int)
     reset_requested = Signal(int)
     slippery_toggled = Signal(bool)
+    frozen_v2_config_changed = Signal(str, object)  # (param_name, value)
     taxi_config_changed = Signal(str, bool)  # (param_name, value)
     cliff_config_changed = Signal(str, bool)  # (param_name, value)
     lunar_config_changed = Signal(str, object)  # (param_name, value)
@@ -66,7 +68,22 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._default_seed = max(1, config.default_seed)
         self._allow_seed_reuse = config.allow_seed_reuse
         self._game_overrides: Dict[GameId, Dict[str, object]] = {
-            GameId.FROZEN_LAKE: {"is_slippery": config.frozen_lake_config.is_slippery},
+            GameId.FROZEN_LAKE: {
+                "is_slippery": config.frozen_lake_config.is_slippery,
+                "success_rate": config.frozen_lake_config.success_rate,
+                "reward_schedule": config.frozen_lake_config.reward_schedule,
+            },
+            GameId.FROZEN_LAKE_V2: {
+                "is_slippery": DEFAULT_FROZEN_LAKE_V2_CONFIG.is_slippery,
+                "success_rate": DEFAULT_FROZEN_LAKE_V2_CONFIG.success_rate,
+                "reward_schedule": DEFAULT_FROZEN_LAKE_V2_CONFIG.reward_schedule,
+                "grid_height": DEFAULT_FROZEN_LAKE_V2_CONFIG.grid_height,
+                "grid_width": DEFAULT_FROZEN_LAKE_V2_CONFIG.grid_width,
+                "start_position": DEFAULT_FROZEN_LAKE_V2_CONFIG.start_position,
+                "goal_position": DEFAULT_FROZEN_LAKE_V2_CONFIG.goal_position,
+                "hole_count": DEFAULT_FROZEN_LAKE_V2_CONFIG.hole_count,
+                "random_holes": DEFAULT_FROZEN_LAKE_V2_CONFIG.random_holes,
+            },
             GameId.TAXI: {
                 "is_raining": config.taxi_config.is_raining,
                 "fickle_passenger": config.taxi_config.fickle_passenger,
@@ -580,6 +597,12 @@ class ControlPanelWidget(QtWidgets.QWidget):
         overrides[param_name] = value
         self.bipedal_config_changed.emit(param_name, value)
 
+    def _on_frozen_v2_config_changed(self, param_name: str, value: object) -> None:
+        """Handle changes to FrozenLake-v2 configuration parameters."""
+        overrides = self._game_overrides.setdefault(GameId.FROZEN_LAKE_V2, {})
+        overrides[param_name] = value
+        self.frozen_v2_config_changed.emit(param_name, value)
+
     # ------------------------------------------------------------------
     # UI state helpers
     # ------------------------------------------------------------------
@@ -694,6 +717,120 @@ class ControlPanelWidget(QtWidgets.QWidget):
             checkbox.stateChanged.connect(self._on_slippery_toggled)
             self._frozen_slippery_checkbox = checkbox
             self._config_layout.addRow("Slippery ice", checkbox)
+        elif self._current_game == GameId.FROZEN_LAKE_V2:
+            # FrozenLake-v2 configuration
+            overrides = self._game_overrides.setdefault(GameId.FROZEN_LAKE_V2, {})
+            from gym_gui.config.game_configs import DEFAULT_FROZEN_LAKE_V2_CONFIG
+            defaults = DEFAULT_FROZEN_LAKE_V2_CONFIG
+            
+            # Slippery checkbox
+            is_slippery = bool(overrides.get("is_slippery", defaults.is_slippery))
+            overrides["is_slippery"] = is_slippery
+            slippery_checkbox = QtWidgets.QCheckBox("Enable slippery ice (stochastic)", self._config_group)
+            slippery_checkbox.setChecked(is_slippery)
+            slippery_checkbox.stateChanged.connect(
+                lambda state: self._on_frozen_v2_config_changed("is_slippery", state == QtCore.Qt.CheckState.Checked.value)
+            )
+            self._config_layout.addRow("Slippery ice", slippery_checkbox)
+            
+            # Grid height
+            grid_height_raw = overrides.get("grid_height", defaults.grid_height)
+            grid_height = int(grid_height_raw) if isinstance(grid_height_raw, (int, float)) else defaults.grid_height
+            overrides["grid_height"] = grid_height
+            height_spin = QtWidgets.QSpinBox(self._config_group)
+            height_spin.setRange(4, 20)
+            height_spin.setValue(grid_height)
+            height_spin.valueChanged.connect(
+                lambda value: self._on_frozen_v2_config_changed("grid_height", int(value))
+            )
+            height_spin.setToolTip("Number of rows in the grid (4-20)")
+            self._config_layout.addRow("Grid Height", height_spin)
+            
+            # Grid width
+            grid_width_raw = overrides.get("grid_width", defaults.grid_width)
+            grid_width = int(grid_width_raw) if isinstance(grid_width_raw, (int, float)) else defaults.grid_width
+            overrides["grid_width"] = grid_width
+            width_spin = QtWidgets.QSpinBox(self._config_group)
+            width_spin.setRange(4, 20)
+            width_spin.setValue(grid_width)
+            width_spin.valueChanged.connect(
+                lambda value: self._on_frozen_v2_config_changed("grid_width", int(value))
+            )
+            width_spin.setToolTip("Number of columns in the grid (4-20)")
+            self._config_layout.addRow("Grid Width", width_spin)
+            
+            # Start position dropdown
+            start_combo = QtWidgets.QComboBox(self._config_group)
+            start_positions = [(r, c) for r in range(grid_height) for c in range(grid_width)]
+            start_pos = overrides.get("start_position", defaults.start_position or (0, 0))
+            overrides["start_position"] = start_pos
+            
+            for pos in start_positions:
+                start_combo.addItem(f"({pos[0]}, {pos[1]})", pos)
+            
+            start_idx = start_combo.findData(start_pos)
+            if start_idx >= 0:
+                start_combo.setCurrentIndex(start_idx)
+            
+            start_combo.currentIndexChanged.connect(
+                lambda idx: self._on_frozen_v2_config_changed("start_position", start_combo.itemData(idx))
+            )
+            start_combo.setToolTip("Starting position for the agent")
+            self._config_layout.addRow("Start Position", start_combo)
+            
+            # Goal position dropdown (excludes start position)
+            goal_combo = QtWidgets.QComboBox(self._config_group)
+            goal_positions = [pos for pos in start_positions if pos != start_pos]
+            
+            # Get goal position from overrides, fallback to defaults, finally to bottom-right
+            goal_pos = overrides.get("goal_position")
+            if goal_pos is None:
+                goal_pos = defaults.goal_position if defaults.goal_position is not None else (grid_height - 1, grid_width - 1)
+            overrides["goal_position"] = goal_pos
+            
+            for pos in goal_positions:
+                goal_combo.addItem(f"({pos[0]}, {pos[1]})", pos)
+            
+            goal_idx = goal_combo.findData(goal_pos)
+            if goal_idx >= 0:
+                goal_combo.setCurrentIndex(goal_idx)
+            else:
+                # If goal position not found (shouldn't happen), select last item (bottom-right)
+                goal_combo.setCurrentIndex(goal_combo.count() - 1)
+            
+            goal_combo.currentIndexChanged.connect(
+                lambda idx: self._on_frozen_v2_config_changed("goal_position", goal_combo.itemData(idx))
+            )
+            goal_combo.setToolTip("Goal position (excludes start position)")
+            self._config_layout.addRow("Goal Position", goal_combo)
+            
+            # Hole count spinner
+            hole_count_raw = overrides.get("hole_count", defaults.hole_count or 19)
+            hole_count = int(hole_count_raw) if isinstance(hole_count_raw, (int, float)) else 19
+            overrides["hole_count"] = hole_count
+            hole_spin = QtWidgets.QSpinBox(self._config_group)
+            max_holes = (grid_height * grid_width) - 2  # Exclude start and goal
+            hole_spin.setRange(0, max_holes)
+            hole_spin.setValue(hole_count)
+            hole_spin.valueChanged.connect(
+                lambda value: self._on_frozen_v2_config_changed("hole_count", int(value))
+            )
+            hole_spin.setToolTip(f"Number of holes in the grid (0-{max_holes})")
+            self._config_layout.addRow("Hole Count", hole_spin)
+            
+            # Random holes checkbox
+            random_holes = bool(overrides.get("random_holes", defaults.random_holes))
+            overrides["random_holes"] = random_holes
+            random_holes_checkbox = QtWidgets.QCheckBox("Random hole placement", self._config_group)
+            random_holes_checkbox.setChecked(random_holes)
+            random_holes_checkbox.stateChanged.connect(
+                lambda state: self._on_frozen_v2_config_changed("random_holes", state == QtCore.Qt.CheckState.Checked.value)
+            )
+            random_holes_checkbox.setToolTip(
+                "If checked, holes are placed randomly. "
+                "If unchecked (default), uses fixed Gymnasium map patterns for 4×4 and 8×8 grids."
+            )
+            self._config_layout.addRow("Random Holes", random_holes_checkbox)
         elif self._current_game == GameId.LUNAR_LANDER:
             overrides = self._game_overrides.setdefault(GameId.LUNAR_LANDER, {})
             defaults = self._config.lunar_lander_config
