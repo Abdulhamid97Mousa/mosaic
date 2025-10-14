@@ -118,6 +118,15 @@ class SessionController(QtCore.QObject):
         self._last_seed = 0
         self._next_seed = max(1, settings.default_seed)
         self._current_seed = self._next_seed
+        self._game_config: (
+            FrozenLakeConfig
+            | TaxiConfig
+            | CliffWalkingConfig
+            | LunarLanderConfig
+            | CarRacingConfig
+            | BipedalWalkerConfig
+            | None
+        ) = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -219,6 +228,7 @@ class SessionController(QtCore.QObject):
         self._adapter = adapter
         self._game_id = game_id
         self._control_mode = control_mode
+        self._game_config = game_config
         self._step_index = 0
         self._turn = "human"
         self._game_started = False  # Game not started until user clicks "Start Game"
@@ -823,17 +833,102 @@ class SessionController(QtCore.QObject):
         if prev_position is not None and new_position is not None:
             delta = (new_position[0] - prev_position[0], new_position[1] - prev_position[1])
 
-        self._logger.debug(
-            "Step %s via input='%s' action=%s reward=%.2f terminated=%s truncated=%s position=%s delta=%s",
-            self._step_index,
-            input_label,
-            action,
-            step.reward,
-            step.terminated,
-            step.truncated,
-            new_position,
-            delta,
-        )
+        # Build configuration context string
+        config_info = self._build_config_context()
+        
+        # Detect slippage for discrete action games (FrozenLake, CliffWalking)
+        slippage_info = self._detect_slippage(action, delta)
+        
+        # Construct log message with configuration and slippage context
+        log_parts = [
+            f"Step {self._step_index}",
+            f"via input='{input_label}'",
+            f"action={action}",
+            f"reward={step.reward:.2f}",
+            f"terminated={step.terminated}",
+            f"truncated={step.truncated}",
+            f"position={new_position}",
+            f"delta={delta}",
+        ]
+        
+        if config_info:
+            log_parts.append(config_info)
+        
+        if slippage_info:
+            log_parts.append(slippage_info)
+        
+        self._logger.debug(" ".join(log_parts))
+
+    def _build_config_context(self) -> str:
+        """Build a configuration context string for logging."""
+        if self._game_config is None or self._game_id is None:
+            return ""
+        
+        config_parts = []
+        
+        if isinstance(self._game_config, FrozenLakeConfig):
+            config_parts.append(f"is_slippery={self._game_config.is_slippery}")
+        elif isinstance(self._game_config, CliffWalkingConfig):
+            config_parts.append(f"is_slippery={self._game_config.is_slippery}")
+        elif isinstance(self._game_config, TaxiConfig):
+            config_parts.append(f"is_raining={self._game_config.is_raining}")
+            config_parts.append(f"fickle_passenger={self._game_config.fickle_passenger}")
+        elif isinstance(self._game_config, LunarLanderConfig):
+            config_parts.append(f"continuous={self._game_config.continuous}")
+            config_parts.append(f"gravity={self._game_config.gravity:.1f}")
+            config_parts.append(f"wind={self._game_config.enable_wind}")
+        elif isinstance(self._game_config, CarRacingConfig):
+            config_parts.append(f"continuous={self._game_config.continuous}")
+            config_parts.append(f"domain_randomize={self._game_config.domain_randomize}")
+        elif isinstance(self._game_config, BipedalWalkerConfig):
+            config_parts.append(f"hardcore={self._game_config.hardcore}")
+        
+        if config_parts:
+            return f"config=[{', '.join(config_parts)}]"
+        return ""
+    
+    def _detect_slippage(self, action: int, delta: tuple[int, int] | None) -> str:
+        """Detect if movement differs from intended action (slippage)."""
+        if delta is None or self._game_id is None:
+            return ""
+        
+        # Only check for discrete action games with directional movement
+        if self._game_id not in {GameId.FROZEN_LAKE, GameId.CLIFF_WALKING}:
+            return ""
+        
+        # Map actions to expected deltas for toy-text games
+        # 0=Left, 1=Down, 2=Right, 3=Up
+        expected_deltas = {
+            0: (0, -1),  # Left
+            1: (1, 0),   # Down
+            2: (0, 1),   # Right
+            3: (-1, 0),  # Up
+        }
+        
+        expected = expected_deltas.get(action)
+        if expected is None:
+            return ""
+        
+        if delta != expected:
+            action_names = {0: "Left", 1: "Down", 2: "Right", 3: "Up"}
+            intended = action_names.get(action, f"action{action}")
+            
+            # Determine observed direction from delta
+            observed_dir = "no_movement"
+            if delta == (0, -1):
+                observed_dir = "Left"
+            elif delta == (1, 0):
+                observed_dir = "Down"
+            elif delta == (0, 1):
+                observed_dir = "Right"
+            elif delta == (-1, 0):
+                observed_dir = "Up"
+            elif delta == (0, 0):
+                observed_dir = "stayed_in_place"
+            
+            return f"slippage_detected[intended={intended}, observed={observed_dir}]"
+        
+        return ""
 
     def _update_status(self, step: AdapterStep, *, prefix: str | None = None) -> None:
         # Avoid emitting routine per-step status messages to the global status bar.

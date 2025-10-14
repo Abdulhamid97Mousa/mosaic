@@ -16,6 +16,7 @@ from gym_gui.config.game_configs import (
     LunarLanderConfig,
     TaxiConfig,
 )
+from gym_gui.config.game_config_builder import GameConfigBuilder
 from gym_gui.config.settings import Settings
 from gym_gui.core.enums import ControlMode, GameId
 from gym_gui.core.factories.adapters import available_games
@@ -224,6 +225,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._control_panel.control_mode_changed.connect(self._on_mode_changed)
         self._control_panel.actor_changed.connect(self._on_actor_changed)
         self._control_panel.slippery_toggled.connect(self._on_slippery_toggled)
+        self._control_panel.frozen_v2_config_changed.connect(self._on_frozen_v2_config_changed)
         self._control_panel.taxi_config_changed.connect(self._on_taxi_config_changed)
         self._control_panel.cliff_config_changed.connect(self._on_cliff_config_changed)
         self._control_panel.lunar_config_changed.connect(self._on_lunar_config_changed)
@@ -286,7 +288,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """Handle load request from control panel."""
         self._episode_finished = False  # Reset episode state on new load
         overrides = self._control_panel.get_overrides(game_id)
-        game_config = self._build_game_config(game_id, overrides)
+        game_config = GameConfigBuilder.build_config(game_id, overrides)
         self._session.load_environment(
             game_id,
             mode,
@@ -363,7 +365,7 @@ class MainWindow(QtWidgets.QMainWindow):
             mode = self._control_panel.current_mode()
             seed = self._control_panel.current_seed()
             overrides = self._control_panel.get_overrides(GameId.FROZEN_LAKE)
-            game_config = self._build_game_config(GameId.FROZEN_LAKE, overrides)
+            game_config = GameConfigBuilder.build_config(GameId.FROZEN_LAKE, overrides)
             self._session.load_environment(
                 GameId.FROZEN_LAKE,
                 mode,
@@ -392,7 +394,7 @@ class MainWindow(QtWidgets.QMainWindow):
             mode = self._control_panel.current_mode()
             seed = self._control_panel.current_seed()
             overrides = self._control_panel.get_overrides(GameId.TAXI)
-            game_config = self._build_game_config(GameId.TAXI, overrides)
+            game_config = GameConfigBuilder.build_config(GameId.TAXI, overrides)
             self._session.load_environment(
                 GameId.TAXI,
                 mode,
@@ -404,6 +406,46 @@ class MainWindow(QtWidgets.QMainWindow):
             self._status_bar.showMessage(
                 f"Taxi {param_label} {status}. Reload to apply.",
                 5000,
+            )
+
+    def _on_frozen_v2_config_changed(self, param_name: str, value: object) -> None:
+        """Handle FrozenLake-v2 configuration changes from control panel."""
+        label_map = {
+            "is_slippery": "slippery ice",
+            "grid_height": "grid height",
+            "grid_width": "grid width",
+            "start_position": "start position",
+            "goal_position": "goal position",
+            "hole_count": "hole count",
+        }
+        current_game = self._control_panel.current_game()
+        descriptor = label_map.get(param_name, param_name)
+        
+        if isinstance(value, bool):
+            value_str = "enabled" if value else "disabled"
+        elif isinstance(value, tuple):
+            value_str = f"({value[0]}, {value[1]})"
+        elif isinstance(value, (int, float)):
+            value_str = str(int(value))
+        else:
+            value_str = str(value)
+        
+        reloading = current_game == GameId.FROZEN_LAKE_V2 and self._session.game_id == GameId.FROZEN_LAKE_V2
+        message = f"FrozenLake-v2 {descriptor} updated to {value_str}."
+        if reloading:
+            message += " Reloading to apply..."
+        self._status_bar.showMessage(message, 5000 if reloading else 4000)
+
+        if reloading:
+            mode = self._control_panel.current_mode()
+            seed = self._control_panel.current_seed()
+            overrides = self._control_panel.get_overrides(GameId.FROZEN_LAKE_V2)
+            game_config = GameConfigBuilder.build_config(GameId.FROZEN_LAKE_V2, overrides)
+            self._session.load_environment(
+                GameId.FROZEN_LAKE_V2,
+                mode,
+                seed=seed,
+                game_config=game_config,
             )
 
     def _on_cliff_config_changed(self, param_name: str, value: bool) -> None:
@@ -421,7 +463,7 @@ class MainWindow(QtWidgets.QMainWindow):
             mode = self._control_panel.current_mode()
             seed = self._control_panel.current_seed()
             overrides = self._control_panel.get_overrides(GameId.CLIFF_WALKING)
-            game_config = self._build_game_config(GameId.CLIFF_WALKING, overrides)
+            game_config = GameConfigBuilder.build_config(GameId.CLIFF_WALKING, overrides)
             self._session.load_environment(
                 GameId.CLIFF_WALKING,
                 mode,
@@ -464,7 +506,7 @@ class MainWindow(QtWidgets.QMainWindow):
             mode = self._control_panel.current_mode()
             seed = self._control_panel.current_seed()
             overrides = self._control_panel.get_overrides(GameId.LUNAR_LANDER)
-            game_config = self._build_game_config(GameId.LUNAR_LANDER, overrides)
+            game_config = GameConfigBuilder.build_config(GameId.LUNAR_LANDER, overrides)
             self._session.load_environment(
                 GameId.LUNAR_LANDER,
                 mode,
@@ -499,7 +541,7 @@ class MainWindow(QtWidgets.QMainWindow):
             mode = self._control_panel.current_mode()
             seed = self._control_panel.current_seed()
             overrides = self._control_panel.get_overrides(GameId.CAR_RACING)
-            game_config = self._build_game_config(GameId.CAR_RACING, overrides)
+            game_config = GameConfigBuilder.build_config(GameId.CAR_RACING, overrides)
             self._session.load_environment(
                 GameId.CAR_RACING,
                 mode,
@@ -534,7 +576,7 @@ class MainWindow(QtWidgets.QMainWindow):
             mode = self._control_panel.current_mode()
             seed = self._control_panel.current_seed()
             overrides = self._control_panel.get_overrides(GameId.BIPEDAL_WALKER)
-            game_config = self._build_game_config(GameId.BIPEDAL_WALKER, overrides)
+            game_config = GameConfigBuilder.build_config(GameId.BIPEDAL_WALKER, overrides)
             self._session.load_environment(
                 GameId.BIPEDAL_WALKER,
                 mode,
@@ -542,98 +584,6 @@ class MainWindow(QtWidgets.QMainWindow):
                 game_config=game_config,
             )
 
-    def _build_game_config(
-        self,
-        game_id: GameId,
-        overrides: dict[str, Any],
-    ) -> (
-        FrozenLakeConfig
-        | TaxiConfig
-        | CliffWalkingConfig
-        | LunarLanderConfig
-        | CarRacingConfig
-        | BipedalWalkerConfig
-        | None
-    ):
-        """Build game configuration from control panel overrides."""
-        if game_id == GameId.FROZEN_LAKE:
-            is_slippery = bool(overrides.get("is_slippery", False))
-            return FrozenLakeConfig(is_slippery=is_slippery)
-        elif game_id == GameId.TAXI:
-            is_raining = bool(overrides.get("is_raining", False))
-            fickle_passenger = bool(overrides.get("fickle_passenger", False))
-            return TaxiConfig(is_raining=is_raining, fickle_passenger=fickle_passenger)
-        elif game_id == GameId.CLIFF_WALKING:
-            is_slippery = bool(overrides.get("is_slippery", False))
-            return CliffWalkingConfig(is_slippery=is_slippery)
-        elif game_id == GameId.LUNAR_LANDER:
-            continuous = bool(overrides.get("continuous", False))
-            gravity = overrides.get("gravity", -10.0)
-            enable_wind = bool(overrides.get("enable_wind", False))
-            wind_power = overrides.get("wind_power", 15.0)
-            turbulence_power = overrides.get("turbulence_power", 1.5)
-            steps_override = overrides.get("max_episode_steps")
-            max_steps: int | None = None
-            try:
-                gravity_value = float(gravity)
-            except (TypeError, ValueError):
-                gravity_value = -10.0
-            try:
-                wind_power_value = float(wind_power)
-            except (TypeError, ValueError):
-                wind_power_value = 15.0
-            try:
-                turbulence_value = float(turbulence_power)
-            except (TypeError, ValueError):
-                turbulence_value = 1.5
-            if isinstance(steps_override, (int, float)) and int(steps_override) > 0:
-                max_steps = int(steps_override)
-            return LunarLanderConfig(
-                continuous=continuous,
-                gravity=gravity_value,
-                enable_wind=enable_wind,
-                wind_power=wind_power_value,
-                turbulence_power=turbulence_value,
-                max_episode_steps=max_steps,
-            )
-        elif game_id == GameId.CAR_RACING:
-            continuous = bool(overrides.get("continuous", False))
-            domain_randomize = bool(overrides.get("domain_randomize", False))
-            lap_percent = overrides.get("lap_complete_percent", 0.95)
-            try:
-                lap_value = float(lap_percent)
-            except (TypeError, ValueError):
-                lap_value = 0.95
-            steps_override = overrides.get("max_episode_steps")
-            seconds_override = overrides.get("max_episode_seconds")
-            max_steps: int | None = None
-            max_seconds: float | None = None
-            if isinstance(steps_override, (int, float)) and int(steps_override) > 0:
-                max_steps = int(steps_override)
-            if isinstance(seconds_override, (int, float)) and float(seconds_override) > 0:
-                max_seconds = float(seconds_override)
-            return CarRacingConfig(
-                continuous=continuous,
-                domain_randomize=domain_randomize,
-                lap_complete_percent=lap_value,
-                max_episode_steps=max_steps,
-                max_episode_seconds=max_seconds,
-            )
-        elif game_id == GameId.BIPEDAL_WALKER:
-            hardcore = bool(overrides.get("hardcore", False))
-            steps_override = overrides.get("max_episode_steps")
-            seconds_override = overrides.get("max_episode_seconds")
-            max_steps: int | None = None
-            max_seconds: float | None = None
-            if isinstance(steps_override, (int, float)) and int(steps_override) > 0:
-                max_steps = int(steps_override)
-            if isinstance(seconds_override, (int, float)) and float(seconds_override) > 0:
-                max_seconds = float(seconds_override)
-            return BipedalWalkerConfig(
-                hardcore=hardcore,
-                max_episode_steps=max_steps,
-                max_episode_seconds=max_seconds,
-            )
         else:
             return None
 

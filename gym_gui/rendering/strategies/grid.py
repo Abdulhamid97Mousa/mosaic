@@ -219,7 +219,7 @@ class _GridRenderer:
             pixmap = self._asset_manager.get_pixmap("taxi_background.png")
             if pixmap is None:
                 return None
-        elif self._current_game == GameId.FROZEN_LAKE:
+        elif self._current_game in (GameId.FROZEN_LAKE, GameId.FROZEN_LAKE_V2):
             base_pixmap = self._asset_manager.get_pixmap(FrozenLakeAssets.ICE)
             if base_pixmap is None:
                 return None
@@ -299,7 +299,7 @@ class _GridRenderer:
                             pixmap = self._composite_pixmaps(pixmap, hotel_scaled)
 
         skip_actor_overlay = (
-            self._current_game == GameId.FROZEN_LAKE
+            self._current_game in (GameId.FROZEN_LAKE, GameId.FROZEN_LAKE_V2)
             and terminated
             and is_actor_cell
             and cell_value.strip().upper() == "H"
@@ -322,7 +322,7 @@ class _GridRenderer:
         return pixmap
 
     def _get_tile_asset(self, cell_value: str, row: int, col: int) -> str:
-        if self._current_game == GameId.FROZEN_LAKE:
+        if self._current_game in (GameId.FROZEN_LAKE, GameId.FROZEN_LAKE_V2):
             return FrozenLakeAssets.get_tile_asset(cell_value)
         if self._current_game == GameId.TAXI:
             return TaxiAssets.get_tile_asset(cell_value, row, col, self._current_grid)
@@ -335,7 +335,7 @@ class _GridRenderer:
         taxi_state: Dict[str, Any] | None = None,
         payload: Dict[str, Any] | None = None,
     ) -> str:
-        if self._current_game == GameId.FROZEN_LAKE:
+        if self._current_game in (GameId.FROZEN_LAKE, GameId.FROZEN_LAKE_V2):
             return self._frozen_lake_actor_asset(payload)
         if self._current_game == GameId.TAXI:
             return self._taxi_actor_asset(taxi_state)

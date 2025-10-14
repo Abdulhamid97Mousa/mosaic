@@ -201,17 +201,17 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
             )
 
         # Register run; returns existing run_id if digest already exists
-        actual_run_id = self._registry.register_run(
+        resolved_run_id = self._registry.register_run(
             config.metadata.run_id, config.to_json(), config.metadata.digest
         )
         
         # If digest already exists, return the existing run
-        if actual_run_id != config.metadata.run_id:
+        if resolved_run_id != config.metadata.run_id:
             _LOGGER.info(
                 "Duplicate run submission detected; returning existing run_id",
-                extra={"requested_run_id": config.metadata.run_id, "existing_run_id": actual_run_id},
+                extra={"requested_run_id": config.metadata.run_id, "existing_run_id": resolved_run_id},
             )
-            return trainer_pb2.SubmitRunResponse(run_id=actual_run_id, digest=config.metadata.digest)
+            return trainer_pb2.SubmitRunResponse(run_id=resolved_run_id, digest=config.metadata.digest)
 
         requested = config.payload["resources"]["gpus"]["requested"]
         mandatory = config.payload["resources"]["gpus"]["mandatory"]

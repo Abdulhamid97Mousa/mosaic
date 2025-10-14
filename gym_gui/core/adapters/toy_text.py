@@ -5,7 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import re
 from collections.abc import Iterable
-from typing import Any, List, Sequence, Tuple, Type, cast
+from typing import Any, List, Sequence, Tuple, Type
 
 import gymnasium as gym
 
@@ -14,6 +14,7 @@ from gym_gui.config.game_configs import (
     TaxiConfig,
     CliffWalkingConfig,
     DEFAULT_FROZEN_LAKE_CONFIG,
+    DEFAULT_FROZEN_LAKE_V2_CONFIG,
     DEFAULT_TAXI_CONFIG,
     DEFAULT_CLIFF_WALKING_CONFIG,
 )
@@ -312,6 +313,147 @@ class FrozenLakeAdapter(ToyTextAdapter):
         return payload
 
 
+class FrozenLakeV2Adapter(ToyTextAdapter):
+    """Adapter for FrozenLake-v2 with configurable grid, start, goal, and hole count."""
+    
+    id = GameId.FROZEN_LAKE_V2.value
+
+    def __init__(
+        self,
+        context: AdapterContext | None = None,
+        *,
+        game_config: FrozenLakeConfig | None = None,
+    ) -> None:
+        """Initialize with optional game-specific configuration."""
+        super().__init__(context)
+        self._game_config = game_config or DEFAULT_FROZEN_LAKE_V2_CONFIG
+        self._last_action: int | None = None
+        self._custom_desc: list[str] | None = None
+
+    def _generate_map_descriptor(self) -> list[str]:
+        """Generate custom map descriptor based on configuration.
+        
+        If random_holes=False and using standard 4×4 or 8×8 grid with default positions,
+        returns the official Gymnasium default map. Otherwise generates a custom map.
+        """
+        import random
+        
+        height = self._game_config.grid_height
+        width = self._game_config.grid_width
+        start_pos = self._game_config.start_position or (0, 0)
+        goal_pos = self._game_config.goal_position or (height - 1, width - 1)
+        hole_count = self._game_config.hole_count
+        random_holes = self._game_config.random_holes
+        
+        # Use official Gymnasium maps if conditions match
+        if not random_holes and start_pos == (0, 0):
+            if height == 4 and width == 4 and goal_pos == (3, 3):
+                # Official 4×4 map from Gymnasium
+                return [
+                    "SFFF",
+                    "FHFH",
+                    "FFFH",
+                    "HFFG"
+                ]
+            elif height == 8 and width == 8 and goal_pos == (7, 7):
+                # Official 8×8 map from Gymnasium
+                return [
+                    "SFFFFFFF",
+                    "FFFFFFFF",
+                    "FFFHFFFF",
+                    "FFFFFHFF",
+                    "FFFHFFFF",
+                    "FHHFFFHF",
+                    "FHFFHFHF",
+                    "FFFHFFFG",
+                ]
+        
+        # Generate random/custom map
+        # Default hole count if not specified
+        if hole_count is None:
+            total_tiles = height * width
+            if height == 4 and width == 4:
+                hole_count = 4  # Gymnasium default 4×4 map
+            elif height == 8 and width == 8:
+                hole_count = 10  # Gymnasium default 8×8 map
+            else:
+                # Scale holes proportionally
+                hole_count = max(1, int(total_tiles * 0.15))  # ~15% holes
+        
+        # Initialize grid with frozen tiles
+        grid = [['F' for _ in range(width)] for _ in range(height)]
+        
+        # Place start and goal
+        grid[start_pos[0]][start_pos[1]] = 'S'
+        grid[goal_pos[0]][goal_pos[1]] = 'G'
+        
+        # Collect available positions for holes (exclude start and goal)
+        available_positions = [
+            (r, c) for r in range(height) for c in range(width)
+            if (r, c) != start_pos and (r, c) != goal_pos
+        ]
+        
+        # Randomly place holes
+        hole_count = min(hole_count, len(available_positions))
+        hole_positions = random.sample(available_positions, hole_count)
+        
+        for r, c in hole_positions:
+            grid[r][c] = 'H'
+        
+        # Convert to list of strings
+        return [''.join(row) for row in grid]
+
+    def load(self) -> None:
+        """Load with custom map descriptor."""
+        self._custom_desc = self._generate_map_descriptor()
+        kwargs = {
+            "is_slippery": self._game_config.is_slippery,
+            "success_rate": self._game_config.success_rate,
+            "reward_schedule": self._game_config.reward_schedule,
+            "desc": self._custom_desc,
+        }
+        env = gym.make("FrozenLake-v1", render_mode=self._gym_render_mode, **kwargs)
+        self.logger.debug("Loaded FrozenLake-v2 env with custom map size=%dx%d", 
+                         self._game_config.grid_height, self._game_config.grid_width)
+        self._set_env(env)
+
+    def gym_kwargs(self) -> dict[str, Any]:
+        """Return Gymnasium environment kwargs (handled in load)."""
+        return {}
+
+    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
+        """Reset state and clear the last action tracker."""
+        self._last_action = None
+        return super().reset(seed=seed, options=options)
+
+    def step(self, action: int):
+        """Record the most recent action for orientation-aware rendering."""
+        self._last_action = int(action)
+        return super().step(action)
+
+    def render(self) -> dict[str, Any]:
+        """Render with FrozenLake-specific terminated state."""
+        payload = super().render()
+        
+        # Add terminated state for cracked_hole visualization
+        payload["terminated"] = self._last_terminated
+        payload["truncated"] = self._last_truncated
+        payload["last_action"] = self._last_action
+        
+        return payload
+
+    @staticmethod
+    def get_available_positions(grid_height: int, grid_width: int, start_position: tuple[int, int], exclude_holes: list[tuple[int, int]] | None = None) -> list[tuple[int, int]]:
+        """Get list of valid positions for goal selection (excludes start and existing holes)."""
+        exclude_holes = exclude_holes or []
+        excluded_set = {start_position} | set(exclude_holes)
+        
+        return [
+            (r, c) for r in range(grid_height) for c in range(grid_width)
+            if (r, c) not in excluded_set
+        ]
+
+
 class CliffWalkingAdapter(ToyTextAdapter):
     """Adapter for CliffWalking environment with game-specific configuration."""
     
@@ -454,6 +596,7 @@ class TaxiAdapter(ToyTextAdapter):
 
 TOY_TEXT_ADAPTERS: dict[GameId, Type[ToyTextAdapter]] = {
     GameId.FROZEN_LAKE: FrozenLakeAdapter,
+    GameId.FROZEN_LAKE_V2: FrozenLakeV2Adapter,
     GameId.CLIFF_WALKING: CliffWalkingAdapter,
     GameId.TAXI: TaxiAdapter,
 }
@@ -461,6 +604,7 @@ TOY_TEXT_ADAPTERS: dict[GameId, Type[ToyTextAdapter]] = {
 __all__ = [
     "ToyTextAdapter",
     "FrozenLakeAdapter",
+    "FrozenLakeV2Adapter",
     "CliffWalkingAdapter",
     "TaxiAdapter",
     "TOY_TEXT_ADAPTERS",

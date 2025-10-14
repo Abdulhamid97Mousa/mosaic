@@ -1,5 +1,5 @@
-  (Right)
-SFFF
+
+[41mS[0mFFF
 FHFH
-FFF[41mH[0m
+FFFH
 HFFG

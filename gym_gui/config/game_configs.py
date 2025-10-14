@@ -19,14 +19,55 @@ def _clamp(value: float, low: float, high: float) -> float:
 class FrozenLakeConfig:
     """Configuration for FrozenLake environment."""
     
-    is_slippery: bool = False
-    """If True, agent moves in intended direction with 33.33% probability,
-    and in perpendicular directions with 33.33% probability each.
+    is_slippery: bool = True
+    """If True, agent moves in intended direction with probability specified by success_rate,
+    else moves in perpendicular directions with equal probability.
     If False, agent always moves in intended direction."""
+    
+    success_rate: float = 1.0 / 3.0
+    """Probability of moving in intended direction when is_slippery=True.
+    For example, with success_rate=1/3:
+    - P(intended direction) = 1/3
+    - P(perpendicular direction 1) = 1/3
+    - P(perpendicular direction 2) = 1/3"""
+    
+    reward_schedule: tuple[float, float, float] = (1.0, 0.0, 0.0)
+    """Reward amounts for reaching tiles: (Goal, Hole, Frozen).
+    Default (1, 0, 0) gives +1 for goal, 0 for hole/frozen."""
+    
+    grid_height: int = 4
+    """Grid height (number of rows). Default is 4 for FrozenLake-v1, 8 for FrozenLake-v2."""
+    
+    grid_width: int = 4
+    """Grid width (number of columns). Default is 4 for FrozenLake-v1, 8 for FrozenLake-v2."""
+    
+    start_position: tuple[int, int] | None = None
+    """Starting position (row, col). If None, defaults to (0, 0)."""
+    
+    goal_position: tuple[int, int] | None = None
+    """Goal position (row, col). If None, defaults to bottom-right corner."""
+    
+    hole_count: int | None = None
+    """Number of holes. If None, uses Gymnasium default (4 for 4×4, 10 for 8×8)."""
+    
+    random_holes: bool = False
+    """If True, holes are placed randomly. If False, uses fixed Gymnasium default map patterns.
+    Only applies to FrozenLake-v2 with standard 4×4 or 8×8 grids."""
     
     def to_gym_kwargs(self) -> Dict[str, Any]:
         """Convert to Gymnasium environment kwargs."""
-        return {"is_slippery": self.is_slippery}
+        kwargs: Dict[str, Any] = {
+            "is_slippery": self.is_slippery,
+            "success_rate": self.success_rate,
+            "reward_schedule": self.reward_schedule,
+        }
+        
+        # For FrozenLake-v2, we'll generate a custom map descriptor
+        if self.grid_height != 4 or self.grid_width != 4 or self.start_position is not None or self.goal_position is not None or self.hole_count is not None:
+            # Custom map generation will be handled by adapter
+            kwargs["map_name"] = None  # Signal to use desc parameter
+        
+        return kwargs
 
 
 @dataclass(frozen=True)
@@ -231,7 +272,27 @@ class BipedalWalkerConfig:
 
 
 # Default configurations for each game
-DEFAULT_FROZEN_LAKE_CONFIG = FrozenLakeConfig(is_slippery=False)
+DEFAULT_FROZEN_LAKE_CONFIG = FrozenLakeConfig(
+    is_slippery=True,
+    success_rate=1.0 / 3.0,
+    reward_schedule=(1.0, 0.0, 0.0),
+    grid_height=4,
+    grid_width=4,
+    start_position=(0, 0),  # "S" tile at top-left
+    goal_position=(3, 3),   # "G" tile at bottom-right for 4×4
+    hole_count=4,  # Gymnasium default 4×4 map
+)
+DEFAULT_FROZEN_LAKE_V2_CONFIG = FrozenLakeConfig(
+    is_slippery=True,
+    success_rate=1.0 / 3.0,
+    reward_schedule=(1.0, 0.0, 0.0),
+    grid_height=8,
+    grid_width=8,
+    start_position=(0, 0),  # "S" tile at top-left
+    goal_position=(7, 7),   # "G" tile at bottom-right for 8×8
+    hole_count=10,  # Gymnasium default 8×8 map has 10 holes
+    random_holes=False,  # Use fixed Gymnasium default map by default
+)
 DEFAULT_TAXI_CONFIG = TaxiConfig(is_raining=False, fickle_passenger=False)
 DEFAULT_CLIFF_WALKING_CONFIG = CliffWalkingConfig(is_slippery=False)
 DEFAULT_LUNAR_LANDER_CONFIG = LunarLanderConfig()
@@ -247,6 +308,7 @@ __all__ = [
     "CarRacingConfig",
     "BipedalWalkerConfig",
     "DEFAULT_FROZEN_LAKE_CONFIG",
+    "DEFAULT_FROZEN_LAKE_V2_CONFIG",
     "DEFAULT_TAXI_CONFIG",
     "DEFAULT_CLIFF_WALKING_CONFIG",
     "DEFAULT_LUNAR_LANDER_CONFIG",

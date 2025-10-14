@@ -19,55 +19,108 @@ Library-neutral training. Use your preferred trainers. CleanRL, for example, sup
 ## 🎯 Vision: the interactive RL laboratory
 
 RL tooling is powerful but fragmented—scripts here, logs there, videos elsewhere. Jumanji turns experiment management into a live, visual workflow: play as a human, train an agent, and replay every decision with synchronized telemetry. It targets Gymnasium-compatible environments and research workflows that need observability and reproducibility, not just final scores.
-## ✨ Core Philosophy: The Human-Agent Loop
+## ✨ Core Philosophy: Human-Led Today, Agent Assist Tomorrow
 
-The true power of Jumanji lies in its unique ability to blend human intuition with algorithmic precision. This is built around two core modes that work in synergy.
+Jumanji already doubles as an exploratory cockpit for humans while laying the groundwork for automated agents. The philosophy is to ship reliable human tooling first, then layer agent orchestration and hybrid hand-offs as the daemon stack matures.
 
 <p align="center">
 	<img src="gym_gui/assets/gui_images/FULL_GUI_LAYOUT.png" alt="Jumanji full GUI layout" width="900" />
 </p>
 
-### 🕵️ Human Mode: Analyze, Play, and Create Baselines
+### 🕵️ Human Mode (Shipping Today)
 
 In Human Mode, you are the agent. This is more than just playing a game; it's a powerful tool for research and analysis:
 
 -   **Intuition Building:** Get a deep, intuitive feel for an environment's dynamics, rewards, and challenges before you write a single line of agent code.
--   **Live Replay & Debugging:** Pause, rewind, and inspect any episode. Every action, observation, and reward is captured and can be replayed frame-by-frame, synchronized with telemetry charts. Found a bug in the environment? You'll see it happen.
--   **Dataset Creation:** Your gameplay automatically generates high-quality demonstration data. These trajectories can be used directly for imitation learning, offline RL, or as a performance benchmark for your AI agents.
+-   **Live Replay & Debugging:** Pause, rewind, and inspect any episode. Every action, observation, and reward is captured and can be replayed frame-by-frame, synchronized with telemetry charts.
+-   **Dataset Creation:** Your gameplay automatically generates high-quality demonstration data. These trajectories become baselines for future agents or offline RL experiments.
 
-### 🤖 Agent Mode: Train, Observe, and Intervene
+### 🤖 Agent Mode (Under Construction)
 
-In Agent Mode, you unleash your algorithms. But unlike traditional script-based training, you are not flying blind:
+The trainer daemon, dispatcher, and registry form the backbone for agent runs, but the GUI bridge is still being wired. Here’s what the near-term roadmap unlocks:
 
--   **Real-Time Observation:** Watch your agent learn (or fail to learn) in real time. See exactly where it gets stuck, discovers a novel strategy, or exploits an unforeseen loophole in the environment.
--   **Algorithm-Agnostic:** Plug in agents from best-in-class libraries like `CleanRL`, `LeanRL`, and `CORL`. Jumanji's `ActorService` provides the orchestration layer to run them all within the same shell.
--   **Seamless Switching:** The most powerful feature. You can pause an agent mid-episode, take control as a human to guide it past a difficult state, and then hand control back to the agent. This interactive loop accelerates debugging and experimentation in ways that are impossible with static scripts.
+-   **Real-Time Observation:** Stream run records from the daemon into the GUI once the TrainerClient bridge lands, mirroring the human telemetry panels.
+-   **Algorithm-Agnostic Launch:** Use CleanRL, LeanRL, CORL, or custom scripts as CLI workers managed by the dispatcher, with GPU reservations enforced by the registry.
+-   **Ops Resilience:** Keep long runs alive even if the Qt shell restarts; the daemon stays in charge.
 
-Jumanji is the only platform that unifies these workflows into a single, cohesive experience.
+### 🧬 Hybrid Handoffs (Roadmap)
+
+Interactive human↔agent switching is a stated goal, not a shipped feature. Achieving it requires:
+
+- Shared action queues between human controllers and agent workers.
+- Deterministic state sync so a hand-off mid-episode keeps observations/actions consistent.
+- GUI affordances for choosing when to intervene versus resume automation.
+
+These pieces will arrive after the TrainerClient bridge and control-panel updates land.
 
 ## 💡 Feature Spotlight
 
-| Category | Why it matters | Jumanji's Unique Value | Traditional Approach (e.g., CleanRL) |
+| Category | Today in Jumanji | Roadmap Lift | Traditional Approach (e.g., CleanRL) |
 | --- | --- | --- | --- |
-| **Interactive Experimentation** | RL is often a "black box." | **Live Human/Agent switching.** Pause the agent, take control, then hand it back. This is a first-of-its-kind capability for deep RL analysis. | Scripted, non-interactive training runs. No way to intervene or observe in real time. |
-| **Visual Debugging & Replay** | Logs and charts don't tell the whole story. | **Synchronized, frame-by-frame replay.** Rewind any episode (human or agent) and see the exact visual state aligned with telemetry data. | Generates video files after the fact. No interactive scrubbing or synchronized data. |
-| **Decoupled, Resilient Training** | GUI crashes shouldn't kill a 12-hour training job. | A **persistent `TrainerDaemon`** manages worker subprocesses. The GUI is just a client that can disconnect and reconnect without affecting the run. | The training script is tied to the parent terminal session. A crash or disconnect kills the run. |
-| **Unified Data Pipeline** | Reproducibility requires consistent data. | Every run, whether human or agent, produces identical, structured artifacts (JSONL, SQLite, frames) through a centralized `TelemetryService`. | Storage is an afterthought. The user is responsible for managing disparate logs, videos, and model files. |
-| **Architectural Clarity** | Contributors need to onboard quickly. | A decoupled client-server model with gRPC, a service locator pattern, and daily design journals make the codebase easy to navigate and extend. | Highly optimized but monolithic scripts that can be difficult to modify or integrate with larger systems. |
+| **Interactive Experimentation** | Human mode with live telemetry, pause, and replay tooling. | Introduce agent-driven control surfaces and curated intervention hooks once TrainerClient wiring lands. | Scripted, non-interactive training runs with no GUI feedback loop. |
+| **Visual Debugging & Replay** | Frame-by-frame playback for human sessions synchronized with JSONL/SQLite telemetry. | Extend replay loader to agent runs and persist RGB frames via the recorder service. | Generate MP4s post-run; no interactive scrubbing or linked telemetry. |
+| **Decoupled Training Pipeline** | Trainer daemon, registry, and dispatcher operate headlessly to protect long jobs. | Expose daemon functionality through the GUI with watch/submit views and run health dashboards. | Training script dies with the terminal session or GUI crash. |
+| **Unified Data Pipeline** | TelemetryService and StorageRecorderService capture every human step for reproducibility. | Add frame archives, pruning policies, and exporter bridges (TensorBoard/W&B). | Users manually juggle logs, checkpoints, and videos. |
+| **Architectural Clarity** | Service locator + design journals document how controllers, adapters, and services plug together. | Publish getting-started diagrams (below) and API docs for trainer/client surfaces. | Monolithic scripts that require spelunking to extend. |
 
 ### Headline Capabilities
 
-- **Decoupled Trainer Daemon**: A persistent `asyncio` and `gRPC`-based service manages the entire training lifecycle, ensuring runs continue even if the GUI is closed or crashes.
-- **Live Human-Agent Switching**: Take control from a running agent or hand off control to an algorithm, all within the same episode.
-- **Synchronized Replay Engine**: Interactively scrub through episode timelines with video and telemetry perfectly aligned.
-- **Pluggable Actor & Renderer Architecture**: Easily extend Jumanji to support new environments and agent types (BDI, LLMs, etc.) through a clean, service-oriented design.
-- **Unified Storage Pipeline**: Every step from every run is captured in a structured, queryable format (JSONL and WAL-backed SQLite).
-- **Real-time Telemetry Analysis**: Live reward charts, termination flags, and actor state roll in as episodes run, giving researchers immediate feedback.
-- **Day-by-day Design Logs**: Architectural intent stays aligned through living memoranda (`1.0_DAY_*`) that document decisions and refactors.
+- **Human Telemetry Cockpit**: Play, pause, rewind, and annotate sessions while the GUI captures every step for reproducibility.
+- **Structured Storage Pipeline**: JSONL logs plus WAL-backed SQLite keep artifacts queryable and durable.
+- **Decoupled Trainer Foundations**: The daemon/dispatcher/registry trio protects long-running jobs from GUI hiccups.
+- **Extensible Service Graph**: Actors, renderers, telemetry, and adapters register through the locator for Cura-style modularity.
+- **Design Journals as Source of Truth**: Day-level logs document constraints, contrarian analyses, and pending work.
 
-## 🧠 Architecture: A Decoupled Client-Server Model
+> **Reality check:** Agent-mode playback and human↔agent hand-offs are in active development. The daemon is live, but GUI controls for automated policies ship once the TrainerClient bridge and control-panel updates land.
 
-Jumanji is built on a robust client-server architecture that separates the interactive GUI from the heavy-lifting of training. This ensures the UI remains responsive and that training jobs are managed reliably as background processes.
+## 🧠 Architecture
+
+
+### Cura-Inspired Service Topology (GUI Process)
+
+Inside the Qt process we mirror Cura’s modular service approach: controllers stay lightweight and delegate to services registered via the locator.
+
+```mermaid
+flowchart TD
+    subgraph QtShell["Qt Shell"]
+        MW["MainWindow & Presenter"]
+        CP["ControlPanelWidget"]
+        RT["RenderTabs"]
+    end
+
+    subgraph ServiceLocator["Service Locator"]
+        TS["TelemetryService"]
+        SR["StorageRecorderService"]
+        AS["ActorService"]
+        RR["RendererRegistry"]
+        Bootstrap["bootstrap_default_services()"]
+    end
+
+    subgraph EnvironmentLayer["Environment Layer"]
+        SC["SessionController"]
+        Factory["Adapter Factory"]
+        Adapter["Environment Adapter"]
+        GymEnv["Gymnasium Env"]
+    end
+
+    MW --> CP
+    MW --> RT
+    CP --> SC
+    SC --> TS
+    SC --> AS
+    SC --> Factory
+    Factory --> Adapter --> GymEnv
+    TS --> SR
+    RR --> RT
+    Bootstrap -.-> TS
+    Bootstrap -.-> SR
+    Bootstrap -.-> AS
+    Bootstrap -.-> RR
+```
+
+### Trainer Orchestrator (Daemon)
+
+Jumanji is built on a robust client-server split: the Qt shell is an operator console, while an out-of-process trainer daemon manages long-running jobs. The diagram below recaps how the daemon components collaborate.
 
 ```mermaid
 graph TD
@@ -93,9 +146,153 @@ graph TD
     style G fill:#f9f,stroke:#333,stroke-width:2px
 ```
 
+
+### Qt Shell Layering
+
+The UI follows a layered MVP pattern with clear seams between presentation, orchestration, and environment control.
+
+```mermaid
+flowchart TD
+    subgraph Presentation["Presentation Layer"]
+        MW2["MainWindow"]
+        Presenter["MainWindowPresenter"]
+        Widgets["Control & Telemetry Widgets"]
+    end
+
+    subgraph Orchestration["Orchestration Layer"]
+        SC2["SessionController"]
+        TrainerBridge["TrainerClient (roadmap)"]
+        HumanInput["HumanInputController"]
+    end
+
+    subgraph EnvironmentAbstraction["Environment Abstraction"]
+        Factory2["Adapter Factory"]
+        Adapter2["Environment Adapter"]
+        Renderers["Renderer Strategies"]
+    end
+
+    subgraph Runtime["Runtime Services"]
+        GymnasiumEnv["Gymnasium Env"]
+        Telemetry["TelemetryService"]
+        Storage["StorageRecorderService"]
+    end
+
+    MW2 --> Presenter --> Widgets
+    Presenter --> SC2
+    Widgets --> SC2
+    SC2 --> HumanInput
+    SC2 --> TrainerBridge
+    SC2 --> Factory2 --> Adapter2 --> GymnasiumEnv
+    Adapter2 --> Renderers --> Widgets
+    SC2 --> Telemetry --> Storage
+```
+
+### Qt Shell High-Level Layout
+
+```mermaid
+flowchart TB
+    subgraph MainWindowLayer["MainWindow (main_window.py)"]
+        direction TB
+
+        subgraph LeftPanel["Left Panel"]
+            CPLayout["ControlPanelWidget"]
+            CPLayout --> EnvPicker["Environment Picker"]
+            CPLayout --> GameConfig["Game Configuration"]
+            CPLayout --> ModeSelect["Control Mode Selector"]
+            CPLayout --> Controls["Control Buttons"]
+            CPLayout --> Status["Status Display"]
+        end
+
+        subgraph CenterPanel["Center Panel"]
+            RenderTabsNode["RenderTabs"]
+            LogConsole["Runtime Log Console"]
+        end
+
+        subgraph RightPanel["Right Panel"]
+            GameInfo["Game Info Browser"]
+        end
+    end
+
+    subgraph ControllerLayer["Controllers Layer"]
+        SessionCtrl["SessionController"]
+        HumanInputCtrl["HumanInputController"]
+        PresenterNode["MainWindowPresenter"]
+    end
+
+    subgraph DomainLayer["Domain Layer"]
+        AdapterNode["Environment Adapter"]
+        GymNode["Gymnasium Environment"]
+    end
+
+    CPLayout -->|signals| PresenterNode
+    PresenterNode -->|coordinates| SessionCtrl
+    SessionCtrl -->|manages| AdapterNode
+    AdapterNode -->|wraps| GymNode
+    HumanInputCtrl -->|keyboard events| SessionCtrl
+    SessionCtrl -->|render payload| RenderTabsNode
+    SessionCtrl -->|log events| LogConsole
+    SessionCtrl -->|status updates| Status
+```
+
+### Component Hierarchy
+
+```mermaid
+classDiagram
+    class MainWindow {
+        -SessionController _session
+        -ControlPanelWidget _control_panel
+        -MainWindowPresenter _presenter
+        -RenderTabs _render_tabs
+        -HumanInputController _human_input
+        +_build_ui()
+        +_connect_signals()
+    }
+
+    class ControlPanelWidget {
+        -QComboBox _game_combo
+        -QSpinBox _seed_spin
+        -QGroupBox _config_group
+        -QRadioButton[] _mode_buttons
+        -QPushButton _play_button
+        +populate_games()
+        +update_modes()
+        +set_status()
+    }
+
+    class RenderTabs {
+        -RendererRegistry _registry
+        -TelemetryService _telemetry
+        +display_payload()
+        +refresh_replays()
+    }
+
+    class SessionController {
+        -EnvironmentAdapter _adapter
+        -ControlMode _control_mode
+        +load_environment()
+        +reset_environment()
+        +step()
+    }
+
+    class MainWindowPresenter {
+        -SessionController _session
+        -HumanInputController _human_input
+        +bind_view(view)
+        +_on_session_initialized()
+    }
+
+    MainWindow *-- ControlPanelWidget
+    MainWindow *-- RenderTabs
+    MainWindow *-- SessionController
+    MainWindow *-- MainWindowPresenter
+    MainWindow *-- HumanInputController
+    MainWindowPresenter --> SessionController
+    SessionController --> EnvironmentAdapter
+```
+
 ### Core Components
 
--   **Qt Shell (GUI Process)**: The user-facing application. It includes the main window, rendering viewports, and telemetry dashboards. It communicates with the backend via a lightweight `TrainerClient`.
+-   **Qt Shell (GUI Process)**: The user-facing application. It includes the main window, rendering viewports, and telemetry dashboards. It communicates with the backend via a lightweight `TrainerClient` (under development).
 -   **Trainer Daemon (Daemon Process)**: A persistent, `asyncio`-based background service that orchestrates all training tasks.
     -   **gRPC Server**: Exposes the `TrainerService` API for submitting runs, watching events, and managing jobs.
     -   **Run Registry**: The source of truth, using SQLite in WAL mode to store metadata for every run without blocking reads.
@@ -181,12 +378,12 @@ Passive actions remain synchronized across human, idle, and agent ticks via the 
 - A benchmarked test suite covering PPO, SAC, TD3, and DQN variants, making it ideal for performance-focused experimentation.
 - Out-of-the-box integrations for EnvPool, multi-GPU torchrun, and JAX accelerators.
 
-**What Jumanji adds on top**
+**What Jumanji is building on top**
 
-- A Qt control room where LeanRL policies can be launched, paused, and compared against human play without leaving the desktop shell.
-- Unified telemetry and storage (JSONL, SQLite, planned frame archives) that transform LeanRL’s fast training outputs into inspectable, replayable artifacts.
+- A Qt control room where LeanRL policies can be launched, paused, and compared against human play without leaving the desktop shell once the TrainerClient bridge lands.
+- Unified telemetry and storage (JSONL, SQLite, planned frame archives) that will transform LeanRL’s fast training outputs into inspectable, replayable artifacts.
 - ActorService orchestration so LeanRL accelerators plug in cleanly alongside human and scripted actors.
-- Pedagogical value: LeanRL explains how to write fast code, while Jumanji shows what the agent is doing in real time.
+- Pedagogical value: LeanRL explains how to write fast code, while Jumanji surfaces what the agent is doing in real time via replay tooling.
 
 ### CORL vs. Jumanji
 
@@ -196,7 +393,7 @@ Passive actions remain synchronized across human, idle, and agent ticks via the 
 - Ready-to-run evaluation tooling for offline, offline-to-online, and fine-tuning benchmarks.
 - Rich documentation that lowers the barrier to applying state-of-the-art offline methods.
 
-**What Jumanji unlocks**
+**What Jumanji aims to unlock**
 
 - Online data collection via the GUI: human or automated actors can generate new trajectories that feed directly into CORL fine-tuning flows.
 - Visual replay and explainability—exactly what CORL leaves to downstream tooling—so stakeholders can observe offline policies before deployment.
@@ -253,7 +450,7 @@ PYTHONPATH=. python examples/run_cartpole.py  # coming soon
 - Structured telemetry table view + export from the Qt shell.
 - Managed environment via `pyproject.toml` + lockfile.
 - Automated formatting/lint gates mirroring CleanRL’s pre-commit stack.
-- Actor plugins for BDI-Q learners and LLM-driven assistants.
+- Actor plugins for BDI-based agents and LLM-based multi-step agents.
 - Storage pruning CLI (`python -m gym_gui.tools.prune`) with dry-run reports.
 - Telemetry exporter bridge (TensorBoard, W&B, MLflow).
 
