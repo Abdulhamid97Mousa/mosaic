@@ -1,0 +1,97 @@
+syntax = "proto3";
+
+package gymgui.trainer;
+
+import "google/protobuf/timestamp.proto";
+
+option cc_enable_arenas = true;
+
+// RPC surface for the trainer daemon.
+service TrainerService {
+  // Registers a new training run and returns the canonical digest.
+  rpc SubmitRun(SubmitRunRequest) returns (SubmitRunResponse);
+
+  // Cancels an in-flight run. No-op if the run already finished.
+  rpc CancelRun(CancelRunRequest) returns (CancelRunResponse);
+
+  // Returns a snapshot of runs filtered by status.
+  rpc ListRuns(ListRunsRequest) returns (ListRunsResponse);
+
+  // Streams updates for active runs. Yields whenever a run changes.
+  rpc WatchRuns(WatchRunsRequest) returns (stream RunRecord);
+
+  // Worker heartbeat hook to keep the run marked as healthy.
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+
+  // Lightweight daemon heartbeat so the GUI can report liveness.
+  rpc GetHealth(HealthCheckRequest) returns (HealthCheckResponse);
+}
+
+message SubmitRunRequest {
+  string run_id = 1;
+  string config_json = 2;
+}
+
+message SubmitRunResponse {
+  string run_id = 1;
+  string digest = 2;
+}
+
+message CancelRunRequest {
+  string run_id = 1;
+}
+
+message CancelRunResponse {}
+
+enum RunStatus {
+  RUN_STATUS_UNSPECIFIED = 0;
+  RUN_STATUS_PENDING = 1;
+  RUN_STATUS_DISPATCHING = 2;
+  RUN_STATUS_RUNNING = 3;
+  RUN_STATUS_COMPLETED = 4;
+  RUN_STATUS_FAILED = 5;
+  RUN_STATUS_CANCELLED = 6;
+}
+
+message RunRecord {
+  string run_id = 1;
+  RunStatus status = 2;
+  string digest = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+  google.protobuf.Timestamp last_heartbeat = 6;
+  optional int32 gpu_slot = 7;
+  optional string failure_reason = 8;
+  repeated int32 gpu_slots = 9;
+  // Monotonic sequence identifier per broadcasted update.
+  uint64 seq_id = 10;
+}
+
+message ListRunsRequest {
+  repeated RunStatus status_filter = 1;
+}
+
+message ListRunsResponse {
+  repeated RunRecord runs = 1;
+}
+
+message WatchRunsRequest {
+  repeated RunStatus status_filter = 1;
+  // Replay any events with seq_id greater than this value before streaming.
+  uint64 since_seq = 2;
+}
+
+message HeartbeatRequest {
+  string run_id = 1;
+}
+
+message HeartbeatResponse {}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  uint64 pid = 1;
+  google.protobuf.Timestamp started_at = 2;
+  string listen_address = 3;
+  bool healthy = 4;
+}
