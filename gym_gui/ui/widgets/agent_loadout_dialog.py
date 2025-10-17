@@ -2,11 +2,12 @@ from __future__ import annotations
 
 """Dialog allowing the user to select an available agent backend."""
 
-from typing import Optional, Tuple
+from typing import Any, Optional, Tuple
 
 from qtpy import QtCore, QtWidgets
 
 from gym_gui.services.actor import ActorDescriptor
+from gym_gui.core.enums import GameId
 
 
 class AgentLoadoutDialog(QtWidgets.QDialog):
@@ -18,15 +19,21 @@ class AgentLoadoutDialog(QtWidgets.QDialog):
         descriptors: Tuple[ActorDescriptor, ...],
         *,
         current_actor: Optional[str] = None,
+        default_game: Optional[GameId] = None,
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Agent Loadout")
         self.setModal(True)
         self._descriptor_by_id = {descriptor.actor_id: descriptor for descriptor in descriptors}
+        self._default_game = default_game
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
-        intro = QtWidgets.QLabel("Select the agent backend you want to activate.", self)
+        intro = QtWidgets.QLabel(
+            "Select the agent backend you want to activate. "
+            "Use the dedicated “Train Agent” button in the control panel to launch headless training runs.",
+            self,
+        )
         intro.setWordWrap(True)
         layout.addWidget(intro)
 
@@ -111,6 +118,11 @@ class AgentLoadoutDialog(QtWidgets.QDialog):
             return None
         data = item.data(QtCore.Qt.ItemDataRole.UserRole)
         return data if isinstance(data, str) else None
+
+    @property
+    def training_config(self) -> Optional[dict[str, Any]]:
+        """Training is now configured exclusively via the dedicated Train Agent button."""
+        return None
 
     def _on_selection_changed(
         self,

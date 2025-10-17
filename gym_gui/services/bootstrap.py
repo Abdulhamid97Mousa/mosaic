@@ -2,18 +2,16 @@ from __future__ import annotations
 
 """Helpers to bootstrap shared services for the application."""
 
+import logging
 import os
 
-from gym_gui.config.paths import VAR_TELEMETRY_DIR, ensure_var_directories
+from gym_gui.config.paths import VAR_TELEMETRY_DIR, ensure_var_directories, LEGACY_VAR_ROOT
 from gym_gui.rendering import RendererRegistry, create_default_renderer_registry
 from gym_gui.services.action_mapping import ContinuousActionMapper, create_default_action_mapper
 from gym_gui.services.actor import ActorService, BDIQAgent, HumanKeyboardActor, LLMMultiStepAgent
 from gym_gui.services.service_locator import ServiceLocator, get_service_locator
-from gym_gui.services.trainer import (
-    TrainerClient,
-    TrainerClientConfig,
-    TrainerClientRunner,
-)
+from gym_gui.services.trainer import TrainerClient, TrainerClientConfig, TrainerClientRunner
+from gym_gui.services.trainer.launcher import TrainerDaemonHandle, ensure_trainer_daemon_running
 from gym_gui.services.trainer.streams import TelemetryAsyncHub
 from gym_gui.services.storage import StorageRecorderService
 from gym_gui.services.telemetry import TelemetryService
@@ -35,6 +33,14 @@ def bootstrap_default_services() -> ServiceLocator:
     telemetry.attach_store(telemetry_store)
     if os.getenv("GYM_GUI_RESET_TELEMETRY") == "1":
         telemetry_store.delete_all_episodes(wait=True)
+
+    legacy_trainer_db = LEGACY_VAR_ROOT / "trainer" / "trainer.sqlite"
+    if legacy_trainer_db.exists():
+        logging.getLogger(__name__).warning(
+            "Detected legacy trainer database at %s – new runs write to %s. Consider migrating or deleting the old file to avoid confusion.",
+            legacy_trainer_db,
+            VAR_TELEMETRY_DIR.parent / "trainer" / "trainer.sqlite",
+        )
 
     actors = ActorService()
     actors.register_actor(
@@ -68,7 +74,12 @@ def bootstrap_default_services() -> ServiceLocator:
     locator.register(TelemetrySQLiteStore, telemetry_store)
     locator.register(ActorService, actors)
     locator.register(ContinuousActionMapper, action_mapper)
-    trainer_client = TrainerClient(TrainerClientConfig())
+
+    client_config = TrainerClientConfig()
+
+    daemon_handle = ensure_trainer_daemon_running(target=client_config.target)
+
+    trainer_client = TrainerClient(client_config)
     trainer_runner = TrainerClientRunner(trainer_client)
     
     # Initialize telemetry hub for live streaming
@@ -83,6 +94,7 @@ def bootstrap_default_services() -> ServiceLocator:
     locator.register(TrainerClientRunner, trainer_runner)
     locator.register(TelemetryAsyncHub, telemetry_hub)
     locator.register(LiveTelemetryController, live_controller)
+    locator.register(TrainerDaemonHandle, daemon_handle)
 
     # Also register under string keys for convenience in legacy code.
     locator.register("storage", storage)
@@ -95,6 +107,7 @@ def bootstrap_default_services() -> ServiceLocator:
     locator.register("trainer_client_runner", trainer_runner)
     locator.register("telemetry_hub", telemetry_hub)
     locator.register("live_telemetry_controller", live_controller)
+    locator.register("trainer_daemon_handle", daemon_handle)
 
     return locator
 

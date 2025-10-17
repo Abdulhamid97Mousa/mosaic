@@ -8,7 +8,7 @@ import logging
 import queue
 import sqlite3
 import threading
-from typing import Any, List, Sequence
+from typing import Any, List, Mapping, Optional, Sequence
 
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.utils import json_serialization
@@ -438,6 +438,44 @@ class TelemetrySQLiteStore:
         with self._connect() as conn:
             rows = conn.execute(query, (episode_id,)).fetchall()
         return tuple(self._row_to_step(row) for row in rows)
+
+    def episodes_for_run(
+        self,
+        run_id: str,
+        *,
+        agent_id: Optional[str] = None,
+        limit: Optional[int] = None,
+        order_desc: bool = False,
+    ) -> Sequence[EpisodeRollup]:
+        """Return all episodes associated with a specific training run."""
+
+        self.flush()
+        clauses: list[str] = []
+        params: list[Any] = []
+        if agent_id:
+            clauses.append("agent_id = ?")
+            params.append(agent_id)
+        query = (
+            "SELECT episode_id, total_reward, steps, terminated, truncated, metadata, timestamp, agent_id "
+            "FROM episodes"
+        )
+        if clauses:
+            query += " WHERE " + " AND ".join(clauses)
+        query += " ORDER BY timestamp {}".format("DESC" if order_desc else "ASC")
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
+
+        with self._connect() as conn:
+            rows = conn.execute(query, tuple(params)).fetchall()
+
+        episodes: list[EpisodeRollup] = []
+        for row in rows:
+            episode = self._row_to_episode(row)
+            metadata = episode.metadata if isinstance(episode.metadata, Mapping) else {}
+            if metadata.get("run_id") == run_id:
+                episodes.append(episode)
+        return tuple(episodes)
 
     def purge_steps(self, keep_recent: int) -> None:
         self.flush()

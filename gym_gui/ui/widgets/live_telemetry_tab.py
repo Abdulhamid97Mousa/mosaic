@@ -61,13 +61,15 @@ class LiveTelemetryTab(QtWidgets.QWidget):
         # Episodes view
         episodes_group = QtWidgets.QGroupBox("Recent Episodes", self)
         episodes_layout = QtWidgets.QVBoxLayout(episodes_group)
-        self._episodes_table = QtWidgets.QTableWidget(0, 5, episodes_group)
+        self._episodes_table = QtWidgets.QTableWidget(0, 7, episodes_group)
         self._episodes_table.setHorizontalHeaderLabels([
             "Episode",
             "Steps",
             "Reward",
             "Terminated",
             "Truncated",
+            "Seed",
+            "Mode",
         ])
         header = self._episodes_table.horizontalHeader()
         if header is not None:
@@ -129,6 +131,16 @@ class LiveTelemetryTab(QtWidgets.QWidget):
         terminated = getattr(payload, "terminated", False)
         truncated = getattr(payload, "truncated", False)
 
+        metadata_json = getattr(payload, "metadata_json", "")
+        metadata: dict[str, Any] = {}
+        if isinstance(metadata_json, str) and metadata_json:
+            try:
+                metadata = json.loads(metadata_json)
+            except json.JSONDecodeError:
+                metadata = {}
+        seed_display = metadata.get("seed", "—")
+        control_mode = metadata.get("control_mode") or metadata.get("mode") or "—"
+
         row = self._episodes_table.rowCount()
         self._episodes_table.insertRow(row)
         self._episodes_table.setItem(row, 0, QtWidgets.QTableWidgetItem(str(episode_index)))
@@ -136,6 +148,15 @@ class LiveTelemetryTab(QtWidgets.QWidget):
         self._episodes_table.setItem(row, 2, QtWidgets.QTableWidgetItem(f"{total_reward:.2f}"))
         self._episodes_table.setItem(row, 3, QtWidgets.QTableWidgetItem("✓" if terminated else "✗"))
         self._episodes_table.setItem(row, 4, QtWidgets.QTableWidgetItem("✓" if truncated else "✗"))
+        self._episodes_table.setItem(row, 5, QtWidgets.QTableWidgetItem(str(seed_display)))
+        self._episodes_table.setItem(row, 6, QtWidgets.QTableWidgetItem(str(control_mode)))
+
+        if metadata:
+            tooltip = json.dumps(metadata, indent=2)
+            for col in range(self._episodes_table.columnCount()):
+                item = self._episodes_table.item(row, col)
+                if item is not None:
+                    item.setToolTip(tooltip)
 
         # Auto-scroll to latest
         self._episodes_table.scrollToBottom()

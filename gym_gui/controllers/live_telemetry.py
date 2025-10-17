@@ -88,7 +88,7 @@ class LiveTelemetryController(QtCore.QObject):
         # Request dynamic tab creation on first step for this (run, agent) pair
         if key not in self._tabs:
             self._tabs[key] = None  # type: ignore[assignment]
-            tab_title = f"Agent_{agent_id}_Tab"
+            tab_title = f"Agent-{agent_id}-Online"
             self.run_tab_requested.emit(run_id, agent_id, tab_title)
             self._logger.debug("Requesting tab creation", extra={"run_id": run_id, "agent_id": agent_id, "title": tab_title})
         

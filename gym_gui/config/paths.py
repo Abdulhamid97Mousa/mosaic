@@ -6,9 +6,11 @@ from pathlib import Path
 
 
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
+_REPO_ROOT = _PACKAGE_ROOT.parent
 
-# Writable runtime artifacts
-VAR_ROOT = _PACKAGE_ROOT / "var"
+# Writable runtime artifacts (shared with worker stack). Prefer repo-level var/.
+VAR_ROOT = (_REPO_ROOT / "var").resolve()
+LEGACY_VAR_ROOT = _PACKAGE_ROOT / "var"
 VAR_RECORDS_DIR = VAR_ROOT / "records"
 VAR_TELEMETRY_DIR = VAR_ROOT / "telemetry"
 VAR_CACHE_DIR = VAR_ROOT / "cache"
@@ -49,4 +51,5 @@ __all__ = [
     "RUNTIME_ROOT",
     "RUNTIME_DATA_DIR",
     "ensure_var_directories",
+    "LEGACY_VAR_ROOT",
 ]

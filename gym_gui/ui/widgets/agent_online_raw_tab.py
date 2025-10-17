@@ -5,7 +5,7 @@ from __future__ import annotations
 import json
 from typing import Any, Dict, Optional
 
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 
 
 class AgentOnlineRawTab(QtWidgets.QWidget):
@@ -47,7 +47,7 @@ class AgentOnlineRawTab(QtWidgets.QWidget):
         self._view.setReadOnly(True)
         self._view.setLineWrapMode(QtWidgets.QPlainTextEdit.LineWrapMode.NoWrap)
         self._view.setMaximumBlockCount(self._max_lines + 10)  # +10 buffer
-        self._view.setFont(QtWidgets.QFont("Monospace", 9))
+        self._view.setFont(QtGui.QFont("Monospace", 9))
         layout.addWidget(self._view, 1)
 
         # Footer

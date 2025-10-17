@@ -149,7 +149,7 @@ class RunRegistry:
     # ------------------------------------------------------------------
     def register_run(self, run_id: str, config_json: str, digest: str) -> Optional[str]:
         """Register a new run or return existing run_id if digest already exists.
-        
+
         Returns:
             The run_id (either the new one or the existing one matching the digest).
         """
@@ -160,6 +160,10 @@ class RunRegistry:
                 "SELECT run_id FROM runs WHERE digest = ?", (digest,)
             ).fetchone()
             if existing:
+                _LOGGER.info(
+                    "Run already registered for digest",
+                    extra={"run_id": existing[0], "digest": digest},
+                )
                 return existing[0]
             
             conn.execute(
@@ -168,6 +172,10 @@ class RunRegistry:
                 VALUES(?, ?, ?, ?, ?, ?, ?)
                 """,
                 (run_id, RunStatus.PENDING.value, config_json, digest, now, now, "[]"),
+            )
+            _LOGGER.info(
+                "Registered new training run",
+                extra={"run_id": run_id, "digest": digest},
             )
             return run_id
 
@@ -183,6 +191,10 @@ class RunRegistry:
                 "UPDATE runs SET status = ?, failure_reason = ?, updated_at = datetime('now') WHERE run_id = ?",
                 (status.value, failure_reason, run_id),
             )
+        _LOGGER.info(
+            "Run status updated",
+            extra={"run_id": run_id, "status": status.value, "reason": failure_reason},
+        )
 
     def record_heartbeat(self, run_id: str) -> None:
         with self._lock, self._connect() as conn:
@@ -190,6 +202,7 @@ class RunRegistry:
                 "UPDATE runs SET last_heartbeat = datetime('now') WHERE run_id = ?",
                 (run_id,),
             )
+        _LOGGER.debug("Heartbeat recorded", extra={"run_id": run_id})
 
     def update_gpu_slots(self, run_id: str, slots: Iterable[int]) -> None:
         slots_list = list(slots)
@@ -206,6 +219,17 @@ class RunRegistry:
             self.update_gpu_slots(run_id, [])
         else:
             self.update_gpu_slots(run_id, [slot])
+
+    def get_run_config_json(self, run_id: str) -> Optional[str]:
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT config_json FROM runs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        config_json = row[0]
+        return str(config_json) if config_json is not None else None
 
     def load_runs(self, statuses: Optional[Iterable[RunStatus]] = None) -> list[RunRecord]:
         query = "SELECT run_id, status, digest, created_at, updated_at, last_heartbeat, gpu_slot, failure_reason, gpu_slots_json FROM runs"

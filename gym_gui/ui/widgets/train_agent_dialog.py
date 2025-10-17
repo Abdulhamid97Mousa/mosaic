@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import json
-import logging
 from datetime import datetime
 from typing import Any, Dict, Optional
 
@@ -26,7 +25,6 @@ class TrainAgentDialog(QtWidgets.QDialog):
         self.setWindowTitle("Train Agent")
         self.resize(500, 400)
 
-        self._logger = logging.getLogger("gym_gui.ui.train_agent_dialog")
         self._selected_config: Optional[dict[str, Any]] = None
 
         self._build_ui()
@@ -34,11 +32,6 @@ class TrainAgentDialog(QtWidgets.QDialog):
             idx = self._game_combo.findText(default_game.value)
             if idx >= 0:
                 self._game_combo.setCurrentIndex(idx)
-
-        self._logger.info(
-            "TrainAgentDialog opened",
-            extra={"default_game": getattr(default_game, "value", None)},
-        )
 
     def _build_ui(self) -> None:
         layout = QtWidgets.QVBoxLayout(self)
@@ -69,23 +62,12 @@ class TrainAgentDialog(QtWidgets.QDialog):
             "A2C (future)",
         ])
         form.addRow("Algorithm:", self._algorithm_combo)
-
-        # Agent identifier input
-        self._agent_id_edit = QtWidgets.QLineEdit(self)
-        self._agent_id_edit.setPlaceholderText("e.g. agent_run_20251017")
-        self._agent_id_edit.setText(self._default_agent_id())
-        form.addRow("Agent ID:", self._agent_id_edit)
-
+        
         # Episodes
         self._episodes_spin = QtWidgets.QSpinBox(self)
         self._episodes_spin.setRange(1, 10000)
-        self._episodes_spin.setValue(1000)
+        self._episodes_spin.setValue(100)
         form.addRow("Episodes:", self._episodes_spin)
-
-        self._max_steps_spin = QtWidgets.QSpinBox(self)
-        self._max_steps_spin.setRange(1, 10000)
-        self._max_steps_spin.setValue(100)
-        form.addRow("Max Steps / Episode:", self._max_steps_spin)
         
         # Seed
         self._seed_spin = QtWidgets.QSpinBox(self)
@@ -167,19 +149,6 @@ class TrainAgentDialog(QtWidgets.QDialog):
                 "Invalid Configuration",
                 f"Please check your inputs:\n{e}",
             )
-        else:
-            if self._selected_config is not None:
-                worker_meta = self._selected_config.get("metadata", {}).get("worker", {})
-                config_meta = worker_meta.get("config", {}) if isinstance(worker_meta, dict) else {}
-                self._logger.info(
-                    "TrainAgentDialog accepted",
-                    extra={
-                        "run_name": self._selected_config.get("run_name"),
-                        "agent_id": worker_meta.get("agent_id"),
-                        "episodes": config_meta.get("max_episodes"),
-                        "max_steps": config_meta.get("max_steps_per_episode"),
-                    },
-                )
 
     def _parse_custom_overrides(self) -> dict[str, Any]:
         if not self._advanced_group.isChecked():
@@ -196,13 +165,10 @@ class TrainAgentDialog(QtWidgets.QDialog):
         algorithm = self._algorithm_combo.currentText()
         env_id = self._game_combo.currentText()
         max_episodes = self._episodes_spin.value()
-        max_steps = self._max_steps_spin.value()
         seed = self._seed_spin.value()
         learning_rate = float(self._lr_edit.text())
         gamma = float(self._gamma_edit.text())
         epsilon_decay = float(self._epsilon_edit.text())
-        agent_id_input = self._agent_id_edit.text().strip()
-        worker_agent_id = agent_id_input or self._default_agent_id()
 
         timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
         run_name = f"{env_id.lower()}-{algorithm.split()[0].lower()}-{timestamp}"
@@ -215,8 +181,8 @@ class TrainAgentDialog(QtWidgets.QDialog):
             "TRAIN_LEARNING_RATE": f"{learning_rate}",
             "TRAIN_DISCOUNT": f"{gamma}",
             "TRAIN_EPSILON_DECAY": f"{epsilon_decay}",
-            "TRAIN_AGENT_ID": worker_agent_id,
         }
+
         metadata: Dict[str, Any] = {
             "ui": {
                 "algorithm": algorithm,
@@ -226,33 +192,12 @@ class TrainAgentDialog(QtWidgets.QDialog):
                     "epsilon_decay": epsilon_decay,
                     "max_episodes": max_episodes,
                     "seed": seed,
-                    "max_steps_per_episode": max_steps,
                 },
-            },
-            "worker": {
-                "module": "spadeBDI_RL_refactored.worker",
-                "use_grpc": True,
-                "grpc_target": "127.0.0.1:50055",
-                "agent_id": worker_agent_id,
-                "config": {
-                    "run_id": run_name,
-                    "env_id": env_id,
-                    "seed": seed,
-                    "max_episodes": max_episodes,
-                    "max_steps_per_episode": max_steps,
-                    "policy_strategy": "train_and_save",
-                    "policy_path": None,
-                    "agent_id": worker_agent_id,
-                    "capture_video": False,
-                    "headless": True,
-                    "extra": {
-                        "algorithm": algorithm,
-                        "learning_rate": learning_rate,
-                        "gamma": gamma,
-                        "epsilon_decay": epsilon_decay,
-                    },
+                "worker": {
+                    "module": "spadeBDI_RL_refactored.worker",
+                    "class": "HeadlessTrainer",
                 },
-            },
+            }
         }
 
         config: dict[str, Any] = {
@@ -261,6 +206,8 @@ class TrainAgentDialog(QtWidgets.QDialog):
             "arguments": [
                 "-m",
                 "spadeBDI_RL_refactored.worker",
+                "--run-name",
+                run_name,
             ],
             "environment": environment,
             "resources": {
@@ -284,9 +231,6 @@ class TrainAgentDialog(QtWidgets.QDialog):
     def get_config(self) -> Optional[dict]:
         """Return the configured training parameters."""
         return self._selected_config
-
-    def _default_agent_id(self) -> str:
-        return f"agent_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}"
 
 
 def _deep_merge_dict(base: dict[str, Any], overrides: dict[str, Any]) -> dict[str, Any]:

@@ -76,11 +76,16 @@ class AgentOnlineGridTab(QtWidgets.QWidget):
         self._placeholder_label = QtWidgets.QLabel("Waiting for grid telemetry…", self._grid_container)
         self._placeholder_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self._grid_layout.addWidget(self._placeholder_label)
+        self._pending = QtWidgets.QLabel("Waiting for live telemetry…", self)
+        self._pending.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        layout.addWidget(self._pending)
         layout.addWidget(self._grid_container, 1)
 
     def on_step(self, step: Dict[str, Any]) -> None:
         """Update stats and render grid from incoming step."""
         # Update counters
+        if self._pending.isVisible():
+            self._pending.hide()
         self._steps += 1
         reward = float(step.get("reward", 0.0))
         self._current_episode_reward += reward

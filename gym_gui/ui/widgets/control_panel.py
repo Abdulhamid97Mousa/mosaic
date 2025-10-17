@@ -57,6 +57,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
     agent_step_requested = Signal()
     actor_changed = Signal(str)
     train_agent_requested = Signal()  # New signal for headless training
+    trained_agent_requested = Signal()  # Load trained policy/evaluation
 
     def __init__(
         self,
@@ -396,19 +397,6 @@ class ControlPanelWidget(QtWidgets.QWidget):
         for column in range(columns):
             mode_layout.setColumnStretch(column, 1)
 
-        self._agent_loadout_button = QtWidgets.QToolButton(mode_group)
-        self._agent_loadout_button.setText("Agent loadout…")
-        self._agent_loadout_button.setToolTip("Configure agent policies and backends")
-        self._agent_loadout_button.setEnabled(False)
-        rows = (len(modes_tuple) + columns - 1) // columns
-        mode_layout.addWidget(
-            self._agent_loadout_button,
-            rows,
-            0,
-            1,
-            columns,
-            QtCore.Qt.AlignmentFlag.AlignLeft,
-        )
         layout.addWidget(mode_group)
 
         # Actor selector
@@ -425,17 +413,43 @@ class ControlPanelWidget(QtWidgets.QWidget):
         # Train Agent button (headless mode)
         train_group = QtWidgets.QGroupBox("Headless Training", self)
         train_layout = QtWidgets.QVBoxLayout(train_group)
+        self._configure_agent_button = QtWidgets.QPushButton("🚀 Configure Agent…", train_group)
+        self._configure_agent_button.setToolTip(
+            "Open the agent loadout to pick or customise the backend used for headless training."
+        )
+        self._configure_agent_button.setEnabled(False)
+        self._configure_agent_button.setStyleSheet(
+            "QPushButton { font-weight: bold; padding: 8px; background-color: #455a64; color: white; }"
+            "QPushButton:hover { background-color: #37474f; }"
+            "QPushButton:pressed { background-color: #263238; }"
+            "QPushButton:disabled { background-color: #9ea7aa; color: #ECEFF1; }"
+        )
+        train_layout.addWidget(self._configure_agent_button)
         self._train_agent_button = QtWidgets.QPushButton("🤖 Train Agent", train_group)
         self._train_agent_button.setToolTip(
             "Submit a headless training run to the trainer daemon.\n"
             "Training will run in the background with live telemetry streaming."
         )
+        self._train_agent_button.setEnabled(False)
         self._train_agent_button.setStyleSheet(
             "QPushButton { font-weight: bold; padding: 8px; background-color: #1976d2; color: white; }"
             "QPushButton:hover { background-color: #1565c0; }"
             "QPushButton:pressed { background-color: #0d47a1; }"
+            "QPushButton:disabled { background-color: #90caf9; color: #E3F2FD; }"
         )
         train_layout.addWidget(self._train_agent_button)
+        self._trained_agent_button = QtWidgets.QPushButton("📦 Load Trained Policy", train_group)
+        self._trained_agent_button.setToolTip(
+            "Select an existing policy or checkpoint to evaluate inside the GUI."
+        )
+        self._trained_agent_button.setEnabled(False)
+        self._trained_agent_button.setStyleSheet(
+            "QPushButton { padding: 8px; font-weight: bold; background-color: #388e3c; color: white; }"
+            "QPushButton:hover { background-color: #2e7d32; }"
+            "QPushButton:pressed { background-color: #1b5e20; }"
+            "QPushButton:disabled { background-color: #a5d6a7; color: #E8F5E9; }"
+        )
+        train_layout.addWidget(self._trained_agent_button)
         layout.addWidget(train_group)
 
         # Control buttons - renamed group
@@ -511,10 +525,11 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._game_combo.currentIndexChanged.connect(self._on_game_changed)
         self._seed_spin.valueChanged.connect(lambda _: self._update_control_states())
         self._wire_mode_buttons()
-        self._agent_loadout_button.clicked.connect(self.agent_loadout_requested.emit)
+        self._configure_agent_button.clicked.connect(self.agent_loadout_requested.emit)
 
         self._load_button.clicked.connect(self._on_load_clicked)
         self._train_agent_button.clicked.connect(self.train_agent_requested.emit)
+        self._trained_agent_button.clicked.connect(self.trained_agent_requested.emit)
         self._start_button.clicked.connect(self._on_start_clicked)
         self._pause_button.clicked.connect(self._on_pause_clicked)
         self._continue_button.clicked.connect(self._on_continue_clicked)
@@ -679,9 +694,11 @@ class ControlPanelWidget(QtWidgets.QWidget):
 
         # Enable actor selector only when an agent can participate
         has_agent_component = self._current_mode != ControlMode.HUMAN_ONLY
+        agent_only_mode = self._current_mode == ControlMode.AGENT_ONLY
         self._actor_combo.setEnabled(has_agent_component and self._actor_combo.count() > 0)
-        self._agent_loadout_button.setEnabled(has_agent_component)
-        self._agent_loadout_button.setVisible(has_agent_component)
+        self._configure_agent_button.setEnabled(agent_only_mode)
+        self._train_agent_button.setEnabled(agent_only_mode)
+        self._trained_agent_button.setEnabled(agent_only_mode)
 
         self._update_actor_description()
 

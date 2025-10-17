@@ -3,13 +3,13 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Any, List, Mapping, Optional
 
 from qtpy import QtCore, QtGui, QtWidgets
 
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
-from gym_gui.core.enums import GameId, RenderMode
+from gym_gui.core.enums import ControlMode, GameId, RenderMode
 from gym_gui.rendering import (
     RendererContext,
     RendererRegistry,
@@ -520,11 +520,19 @@ class _ReplayTab(QtWidgets.QWidget):
     def _fetch_recent_episodes(self) -> List[dict[str, Any]]:
         if self._telemetry is None:
             return []
-        episodes = list(self._telemetry.recent_episodes())
+        episodes = [
+            ep
+            for ep in self._telemetry.recent_episodes()
+            if self._is_human_episode(ep)
+        ]
         return [self._format_episode_row(ep) for ep in episodes]
 
     def _format_episode_row(self, episode: EpisodeRollup) -> dict[str, Any]:
         seed_value, episode_index, game_label = self._parse_episode_metadata(episode.metadata)
+        timestamp = episode.timestamp
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=timezone.utc)
+        display_ts = timestamp.astimezone(timezone.utc)
         return {
             "episode_id": episode.episode_id,
             "episode_index": episode_index,
@@ -533,8 +541,8 @@ class _ReplayTab(QtWidgets.QWidget):
             "steps": str(episode.steps),
             "reward": f"{episode.total_reward:.2f}",
             "terminated": self._termination_label(episode),
-            "timestamp": episode.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            "timestamp_sort": episode.timestamp,
+            "timestamp": display_ts.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "timestamp_sort": display_ts,
         }
 
     def _parse_episode_metadata(
@@ -563,6 +571,19 @@ class _ReplayTab(QtWidgets.QWidget):
             except ValueError:
                 return raw_game
         return "—"
+
+    @staticmethod
+    def _is_human_episode(episode: EpisodeRollup) -> bool:
+        metadata = episode.metadata
+        if not isinstance(metadata, Mapping):
+            return True
+        mode = metadata.get("control_mode") or metadata.get("controlMode")
+        if mode is None:
+            return True
+        if isinstance(mode, ControlMode):
+            return mode is ControlMode.HUMAN_ONLY or mode.value == "human_only"
+        normalized = str(mode).strip().lower()
+        return normalized in {"human", "human_only"}
 
     @staticmethod
     def _termination_label(episode: EpisodeRollup) -> str:

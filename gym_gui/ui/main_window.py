@@ -4,9 +4,16 @@ from __future__ import annotations
 
 import logging
 from datetime import datetime
-from typing import Any, Dict, List
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+import json
+import threading
 
 from qtpy import QtCore, QtGui, QtWidgets
+try:
+    from qtpy.QtGui import QAction
+except ImportError:
+    from qtpy.QtWidgets import QAction  # type: ignore[attr-defined]
 
 from gym_gui.config.game_configs import (
     CliffWalkingConfig,
@@ -32,8 +39,9 @@ from gym_gui.docs.game_info import get_game_info
 from gym_gui.services.actor import ActorService
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
-from gym_gui.services.trainer import TrainerClient
+from gym_gui.services.trainer import TrainerClient, TrainerClientRunner, RunStatus
 from gym_gui.services.trainer.streams import TelemetryAsyncHub
+from gym_gui.services.trainer.client_runner import TrainerWatchStopped
 from gym_gui.ui.widgets.agent_loadout_dialog import AgentLoadoutDialog
 from gym_gui.ui.widgets.agent_train_dialog import TrainAgentDialog
 from gym_gui.ui.widgets.live_telemetry_tab import LiveTelemetryTab
@@ -41,6 +49,7 @@ from gym_gui.ui.widgets.agent_online_grid_tab import AgentOnlineGridTab
 from gym_gui.ui.widgets.agent_online_raw_tab import AgentOnlineRawTab
 from gym_gui.ui.widgets.agent_online_video_tab import AgentOnlineVideoTab
 from gym_gui.ui.widgets.agent_replay_tab import AgentReplayTab
+from gym_gui.ui.widgets.policy_selection_dialog import PolicySelectionDialog
 
 
 class MainWindow(QtWidgets.QMainWindow):
@@ -95,6 +104,10 @@ class MainWindow(QtWidgets.QMainWindow):
         
         # Track dynamic agent tabs by (run_id, agent_id)
         self._agent_tab_index: set[tuple[str, str]] = set()
+        self._run_watch_stop = threading.Event()
+        self._run_watch_thread: Optional[threading.Thread] = None
+        self._run_watch_subscription = None
+        self._selected_policy_path: Optional[Path] = None
         
         # Get live telemetry controller from service locator
         live_controller = locator.resolve(LiveTelemetryController)
@@ -140,6 +153,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self._configure_logging()
         self._build_ui()
+        self._create_view_toolbar()
         self._connect_signals()
         self._populate_environments()
         self._status_bar.showMessage("Select an environment to begin")
@@ -156,7 +170,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._run_poll_timer.setInterval(2000)  # Poll every 2 seconds
         self._run_poll_timer.timeout.connect(self._poll_for_new_runs)
         self._run_poll_timer.start()
-        
+
+        self._start_run_watch()
+
         # Bind presenter to view
         self._wire_presenter()
 
@@ -219,8 +235,10 @@ class MainWindow(QtWidgets.QMainWindow):
         self._game_info.setReadOnly(True)
         self._game_info.setOpenExternalLinks(True)
         info_layout.addWidget(self._game_info, 1)
+        splitter.addWidget(self._info_group)
 
-        self._log_group = QtWidgets.QGroupBox("Runtime Log", self._info_group)
+        # Runtime Log panel (far-right column)
+        self._log_group = QtWidgets.QGroupBox("Runtime Log", self)
         log_layout = QtWidgets.QVBoxLayout(self._log_group)
         filter_row = QtWidgets.QHBoxLayout()
         filter_label = QtWidgets.QLabel("Filter:")
@@ -234,19 +252,49 @@ class MainWindow(QtWidgets.QMainWindow):
         self._log_console.setReadOnly(True)
         self._log_console.setLineWrapMode(QtWidgets.QPlainTextEdit.LineWrapMode.NoWrap)
         log_layout.addWidget(self._log_console, 1)
-        info_layout.addWidget(self._log_group, 1)
-        splitter.addWidget(self._info_group)
+        splitter.addWidget(self._log_group)
 
-        # Configure splitter stretch: control panel (left) small, right_panel (middle) large, info (right) small
-        splitter.setStretchFactor(0, 1)
-        splitter.setStretchFactor(1, 3)
-        splitter.setStretchFactor(2, 1)
+        # Configure splitter stretch: control panel (left) small, right_panel (middle) large, game info (right) small, runtime log (far-right) medium
+        splitter.setStretchFactor(0, 1)  # Control Panel
+        splitter.setStretchFactor(1, 3)  # Render View  
+        splitter.setStretchFactor(2, 1)  # Game Info
+        splitter.setStretchFactor(3, 2)  # Runtime Log
+
+    def _create_view_toolbar(self) -> None:
+        """Create toolbar with quick toggles for key panels."""
+        self._view_toolbar = QtWidgets.QToolBar("View", self)
+        self._view_toolbar.setObjectName("view-toolbar")
+        self._view_toolbar.setMovable(False)
+        self._view_toolbar.setFloatable(False)
+        self._view_toolbar.setIconSize(QtCore.QSize(16, 16))
+        self.addToolBar(QtCore.Qt.ToolBarArea.TopToolBarArea, self._view_toolbar)
+
+        self._view_actions: dict[str, QAction] = {}
+        self._add_view_toggle("Control Panel", self._control_panel)
+        self._add_view_toggle("Render View", self._render_group)
+        self._add_view_toggle("Game Info", self._info_group)
+        self._add_view_toggle("Runtime Log", self._log_group)
+
+    def _add_view_toggle(self, label: str, widget: QtWidgets.QWidget) -> None:
+        """Insert a checkable action to show/hide a widget."""
+        action = QAction(label, self)
+        action.setCheckable(True)
+        action.setChecked(widget.isVisible())
+
+        def handle_toggle(checked: bool, target: QtWidgets.QWidget = widget, name: str = label) -> None:
+            target.setVisible(checked)
+            self._status_bar.showMessage(f"{name} {'shown' if checked else 'hidden'}", 2000)
+
+        action.toggled.connect(handle_toggle)
+        self._view_toolbar.addAction(action)
+        self._view_actions[label] = action
 
     def _connect_signals(self) -> None:
         # Connect control panel signals to session controller
         self._control_panel.load_requested.connect(self._on_load_requested)
         self._control_panel.reset_requested.connect(self._on_reset_requested)
         self._control_panel.train_agent_requested.connect(self._on_train_agent_requested)
+        self._control_panel.trained_agent_requested.connect(self._on_trained_agent_requested)
         self._control_panel.start_game_requested.connect(self._on_start_game)
         self._control_panel.pause_game_requested.connect(self._on_pause_game)
         self._control_panel.continue_game_requested.connect(self._on_continue_game)
@@ -343,6 +391,7 @@ class MainWindow(QtWidgets.QMainWindow):
             self,
             descriptors,
             current_actor=self._control_panel.current_actor(),
+            default_game=self._control_panel.current_game(),
         )
         if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
             return
@@ -351,6 +400,9 @@ class MainWindow(QtWidgets.QMainWindow):
         if not selected:
             return
         self._control_panel.set_active_actor(selected)
+        training_config = dialog.training_config
+        if training_config:
+            self._submit_training_config(training_config)
 
     def _on_load_requested(self, game_id: GameId, mode: ControlMode, seed: int) -> None:
         """Handle load request from control panel."""
@@ -780,18 +832,171 @@ class MainWindow(QtWidgets.QMainWindow):
     def _on_train_agent_requested(self) -> None:
         """Handle Train Agent button - launch headless training dialog."""
         current_game = self._control_panel.current_game()
+        self.logger.info(
+            "Opening TrainAgentDialog",
+            extra={"current_game": getattr(current_game, "value", None)},
+        )
         dialog = TrainAgentDialog(self, default_game=current_game)
-        
+
         if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            self.logger.info("TrainAgentDialog cancelled by user")
             return
-        
+
         config = dialog.get_config()
         if not config:
+            self.logger.warning("TrainAgentDialog returned no config after acceptance")
             return
-        
-        # Submit run to trainer daemon asynchronously
+
+        metadata = config.get("metadata", {}) if isinstance(config.get("metadata"), dict) else {}
+        worker_meta = metadata.get("worker", {}) if isinstance(metadata, dict) else {}
+        config_meta = worker_meta.get("config", {}) if isinstance(worker_meta, dict) else {}
+        self.logger.info(
+            "Submitting training config from dialog",
+            extra={
+                "run_name": config.get("run_name"),
+                "agent_id": worker_meta.get("agent_id"),
+                "episodes": config_meta.get("max_episodes"),
+                "max_steps": config_meta.get("max_steps_per_episode"),
+            },
+        )
+        self._submit_training_config(config)
+
+    def _on_trained_agent_requested(self) -> None:
+        """Handle the 'Load Trained Policy' button."""
+        dialog = PolicySelectionDialog(
+            self,
+            current_game=self._control_panel.current_game(),
+        )
+        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            return
+        policy_path = dialog.selected_path
+        if policy_path is None:
+            return
+        self._selected_policy_path = policy_path
+        self.logger.info("Selected policy for evaluation: %s", policy_path)
+        config = self._build_policy_evaluation_config(policy_path)
+        if config is None:
+            return
+        self._status_bar.showMessage(
+            f"Launching evaluation run for {policy_path.name}",
+            5000,
+        )
+        self._submit_training_config(config)
+
+    def _build_policy_evaluation_config(self, policy_path: Path) -> Optional[dict]:
         try:
-            import json
+            payload = json.loads(policy_path.read_text(encoding="utf-8"))
+        except Exception as exc:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Policy Load Failed",
+                f"Could not read policy file:\n{policy_path}\n\n{exc}",
+            )
+            return None
+
+        metadata = {}
+        if isinstance(payload, dict):
+            metadata = payload.get("metadata", {}) if isinstance(payload.get("metadata"), dict) else {}
+
+        current_game = self._control_panel.current_game()
+        env_id = metadata.get("env_id") or metadata.get("environment")
+        if env_id is None and current_game is not None:
+            env_id = current_game.value
+        if env_id is None:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Missing Environment",
+                "The selected policy does not specify an environment and no game is currently active.",
+            )
+            return None
+
+        agent_id = metadata.get("agent_id") or policy_path.stem
+        seed = int(metadata.get("seed", 0))
+        max_episodes = int(metadata.get("eval_episodes", 5))
+        max_steps = int(metadata.get("max_steps_per_episode", metadata.get("max_steps", 200)))
+        algorithm_label = metadata.get("algorithm", "Loaded Policy")
+
+        run_name = f"eval-{agent_id}-{datetime.utcnow().strftime('%Y%m%d-%H%M%S')}"
+
+        worker_config = {
+            "run_id": run_name,
+            "env_id": env_id,
+            "seed": seed,
+            "max_episodes": max_episodes,
+            "max_steps_per_episode": max_steps,
+            "policy_strategy": "eval",
+            "policy_path": str(policy_path),
+            "agent_id": agent_id,
+            "capture_video": False,
+            "headless": True,
+            "extra": {
+                "policy_path": str(policy_path),
+                "algorithm": algorithm_label,
+            },
+        }
+
+        metadata_payload = {
+            "ui": {
+                "algorithm": algorithm_label,
+                "source_policy": str(policy_path),
+                "eval": {
+                    "max_episodes": max_episodes,
+                    "max_steps_per_episode": max_steps,
+                    "seed": seed,
+                },
+            },
+            "worker": {
+                "module": "spadeBDI_RL_refactored.worker",
+                "use_grpc": True,
+                "grpc_target": "127.0.0.1:50055",
+                "agent_id": agent_id,
+                "config": worker_config,
+            },
+        }
+
+        environment = {
+            "GYM_ENV_ID": env_id,
+            "TRAIN_SEED": str(seed),
+            "EVAL_POLICY_PATH": str(policy_path),
+        }
+
+        config = {
+            "run_name": run_name,
+            "entry_point": "python",
+            "arguments": ["-m", "spadeBDI_RL_refactored.worker"],
+            "environment": environment,
+            "resources": {
+                "cpus": 1,
+                "memory_mb": 1024,
+                "gpus": {"requested": 0, "mandatory": False},
+            },
+            "artifacts": {
+                "output_prefix": f"runs/{run_name}",
+                "persist_logs": True,
+                "keep_checkpoints": False,
+            },
+            "metadata": metadata_payload,
+        }
+        return config
+
+    @staticmethod
+    def _extract_agent_id(config: dict) -> Optional[str]:
+        try:
+            metadata = config.get("metadata", {})
+            worker_meta = metadata.get("worker", {})
+            agent_id = worker_meta.get("agent_id")
+            if not agent_id:
+                worker_cfg = worker_meta.get("config", {})
+                agent_id = worker_cfg.get("agent_id")
+            if agent_id:
+                return str(agent_id)
+        except Exception:  # pragma: no cover - defensive
+            pass
+        return None
+
+    def _submit_training_config(self, config: dict) -> None:
+        """Submit a training configuration to the trainer daemon."""
+        try:
             config_json = json.dumps(config)
             
             # Use TrainerClientRunner (background thread wrapper)
@@ -807,22 +1012,19 @@ class MainWindow(QtWidgets.QMainWindow):
             
             # Submit returns a Future
             future = runner.submit_run(config_json)
-            
+
             # Add callback to handle result
             def on_done(fut):
                 try:
-                    response = fut.result()
-                    run_id = str(response.run_id)
-                    
-                    # Schedule GUI updates on main thread
-                    QtCore.QTimer.singleShot(0, lambda: self._on_training_submitted(run_id, config))
-                    
+                    response = fut.result(timeout=3.0)
                 except Exception as error:
-                    # Schedule error handling on main thread
                     QtCore.QTimer.singleShot(0, lambda: self._on_training_submit_failed(error))
-            
+                    return
+                run_id = str(response.run_id)
+                QtCore.QTimer.singleShot(0, lambda: self._on_training_submitted(run_id, config))
+
             future.add_done_callback(on_done)
-            
+
         except Exception as e:
             self.logger.exception("Failed to prepare training submission")
             QtWidgets.QMessageBox.critical(
@@ -835,11 +1037,27 @@ class MainWindow(QtWidgets.QMainWindow):
         """Handle successful training submission (called on main thread)."""
         self._status_bar.showMessage(f"Training run submitted: {run_id[:12]}...", 5000)
         self.logger.info("Submitted training run", extra={"run_id": run_id, "config": config})
+        self.logger.info(
+            "Waiting for live telemetry to create dynamic agent tabs",
+            extra={
+                "run_id": run_id,
+                "expected_tabs": [
+                    f"Agent-{{agent_id}}-Replay",
+                    f"Agent-{{agent_id}}-Online-Grid",
+                    f"Agent-{{agent_id}}-Online-Raw",
+                    f"Agent-{{agent_id}}Online-Video",
+                ],
+            },
+        )
         
         # Subscribe to telemetry
         self._live_controller.subscribe_to_run(run_id)
         self._render_group.setTitle(f"Live Training - {run_id[:12]}...")
-    
+        agent_id = self._extract_agent_id(config) or f"agent_{run_id[:8]}"
+        key = (run_id, agent_id)
+        if key not in self._agent_tab_index:
+            self._create_agent_tabs_for(run_id, agent_id, {})
+
     def _on_training_submit_failed(self, error: Exception) -> None:
         """Handle training submission failure (called on main thread)."""
         self.logger.exception("Failed to submit training run", exc_info=error)
@@ -868,15 +1086,34 @@ class MainWindow(QtWidgets.QMainWindow):
     def _on_live_step_received(self, step_msg: object) -> None:
         """Called via TelemetryBridge when a step is received; creates agent tabs on first step."""
         run_id = getattr(step_msg, "run_id", None)
-        agent_id = getattr(step_msg, "agent_id", None) or "default"
         payload = getattr(step_msg, "payload", None) or {}
-        
+        agent_id = str(
+            payload.get("agent_id") if isinstance(payload, dict) else None
+            or getattr(step_msg, "agent_id", None)
+            or "default"
+        )
+
         if not run_id:
+            self.logger.debug("Live step received without run_id; ignoring")
             return
-        
+
+        self.logger.info(
+            "Live step received",
+            extra={
+                "run_id": run_id,
+                "agent_id": agent_id,
+                "episode": getattr(payload, "episode_index", getattr(payload, "episode", None)),
+                "step": getattr(payload, "step_index", getattr(payload, "step", None)),
+            },
+        )
+
         # Create tabs on first step for this (run_id, agent_id)
         key = (run_id, agent_id)
         if key not in self._agent_tab_index:
+            self.logger.info(
+                "Creating agent tabs for run",
+                extra={"run_id": run_id, "agent_id": agent_id},
+            )
             self._create_agent_tabs_for(run_id, agent_id, payload)
             self._agent_tab_index.add(key)
         
@@ -918,14 +1155,34 @@ class MainWindow(QtWidgets.QMainWindow):
         # 4) Agent-${agent_id}Online-Video (live RGB frames - exact name as requested)
         video = AgentOnlineVideoTab(run_id, agent_id, parent=self)
         self._render_tabs.add_dynamic_tab(run_id, f"Agent-{agent_id}Online-Video", video)
-        
+
         self.logger.info(
-            "Created 4 dynamic agent tabs",
-            extra={"run_id": run_id, "agent_id": agent_id},
+            "Created dynamic agent tabs",
+            extra={
+                "run_id": run_id,
+                "agent_id": agent_id,
+                "tabs": [
+                    f"Agent-{agent_id}-Replay",
+                    f"Agent-{agent_id}-Online-Grid",
+                    f"Agent-{agent_id}-Online-Raw",
+                    f"Agent-{agent_id}Online-Video",
+                ],
+            },
         )
 
     def _on_run_completed(self, run_id: str) -> None:
         """Clean up dynamic tabs when a run completes."""
+        self.logger.info("Run completed signal received", extra={"run_id": run_id})
+        
+        # Unsubscribe from telemetry before removing tabs
+        if self._live_controller:
+            try:
+                self._live_controller.unsubscribe_from_run(run_id)
+                self.logger.debug("Unsubscribed from telemetry", extra={"run_id": run_id})
+            except Exception as e:
+                self.logger.warning("Failed to unsubscribe from telemetry", exc_info=e, extra={"run_id": run_id})
+        
+        # Remove dynamic tabs
         self._render_tabs.remove_dynamic_tabs_for_run(run_id)
         self._agent_tab_index = {k for k in self._agent_tab_index if k[0] != run_id}
         self.logger.info("Removed dynamic tabs for completed run", extra={"run_id": run_id})
@@ -941,26 +1198,25 @@ class MainWindow(QtWidgets.QMainWindow):
                 self.logger.debug("TrainerClientRunner not available, skipping poll")
                 return
             
-            # List all RUNNING runs
-            self.logger.debug("Polling daemon for RUNNING training runs...")
-            future = runner.list_runs(statuses=[RunStatus.RUNNING], deadline=1.0)
+            # List runs that should have tabs (active or recently completed)
+            self.logger.debug("Polling daemon for active training runs...")
+            future = runner.list_runs(statuses=[RunStatus.PENDING, RunStatus.DISPATCHING, RunStatus.RUNNING, RunStatus.COMPLETED], deadline=3.0)
             
             def on_done(fut):
                 try:
                     response = fut.result(timeout=1.0)
-                    self.logger.debug("Received %d RUNNING runs from daemon", len(response.runs))
-                    for record in response.runs:
-                        run_id = str(record.run_id)
-                        if run_id not in self._known_runs:
-                            self.logger.debug("Discovered new run: %s (status=%s)", run_id, record.status)
-                            self._known_runs.add(run_id)
-                            # Schedule subscription on main thread
-                            QtCore.QTimer.singleShot(0, lambda rid=run_id: self._auto_subscribe_run(rid))
-                        else:
-                            self.logger.debug("Run %s already known, skipping", run_id[:12])
-                except Exception as e:
-                    # Silently ignore polling errors (daemon might be down)
-                    self.logger.debug("Failed to poll for runs", exc_info=e)
+                except Exception as exc:
+                    self.logger.debug("Run poll failed: %s", exc)
+                    return
+                self.logger.debug("Received %d active runs from daemon", len(response.runs))
+                for record in response.runs:
+                    run_id = str(record.run_id)
+                    if run_id not in self._known_runs:
+                        self.logger.debug("Discovered new run: %s (status=%s)", run_id, record.status)
+                        self.logger.debug("Calling auto-subscribe directly for run: %s", run_id)
+                        self._auto_subscribe_run(run_id)
+                    else:
+                        self.logger.debug("Run %s already known, skipping", run_id[:12])
             
             future.add_done_callback(on_done)
             
@@ -969,31 +1225,83 @@ class MainWindow(QtWidgets.QMainWindow):
     
     def _auto_subscribe_run(self, run_id: str) -> None:
         """Auto-subscribe to a newly discovered run (called on main thread)."""
-        self.logger.debug("Auto-subscribing to new run: %s", run_id)
+        self.logger.info("Auto-subscribing to new run", extra={"run_id": run_id})
+        self._known_runs.add(run_id)
         try:
             self._live_controller.subscribe_to_run(run_id)
             self._render_group.setTitle(f"Live Training - {run_id[:12]}...")
             self._status_bar.showMessage(f"Detected new training run: {run_id[:12]}...", 5000)
-            self.logger.debug("Successfully subscribed to run %s", run_id)
+            self.logger.info("Subscribed to run - waiting for telemetry steps to create agent tabs", extra={"run_id": run_id})
         except Exception as e:
             self.logger.exception("Failed to subscribe to run %s", run_id, exc_info=e)
+
+    def _start_run_watch(self) -> None:
+        locator = get_service_locator()
+        runner: Optional[TrainerClientRunner] = locator.resolve(TrainerClientRunner)
+        if runner is None:
+            self.logger.debug("TrainerClientRunner not available; skipping run watch subscription")
+            return
+
+        statuses = [RunStatus.DISPATCHING, RunStatus.RUNNING]
+        subscription = runner.watch_runs(statuses=statuses, since_seq=0)
+        self._run_watch_subscription = subscription
+
+        def _watch_loop() -> None:
+            self.logger.info("Run watch thread started", extra={"statuses": [status.name for status in statuses]})
+            while not self._run_watch_stop.is_set():
+                try:
+                    record = subscription.get(timeout=1.0)
+                except TrainerWatchStopped:
+                    self.logger.info("Run watch subscription closed by daemon")
+                    break
+                except TimeoutError:
+                    continue
+                except Exception as exc:
+                    self.logger.debug("Run watch error", exc_info=exc)
+                    continue
+
+                run_id = getattr(record, "run_id", "")
+                if not run_id:
+                    continue
+                status_value = getattr(record, "status", None)
+                self.logger.info(
+                    "Run watch received update",
+                    extra={"run_id": run_id, "status": status_value},
+                )
+                QtCore.QTimer.singleShot(0, lambda rid=run_id: self._auto_subscribe_run(rid))
+
+            subscription.close()
+            self.logger.info("Run watch thread exiting")
+
+        self._run_watch_thread = threading.Thread(
+            target=_watch_loop,
+            name="trainer-run-watch",
+            daemon=True,
+        )
+        self._run_watch_thread.start()
+
+    def _shutdown_run_watch(self) -> None:
+        self._run_watch_stop.set()
+        if self._run_watch_subscription is not None:
+            try:
+                self._run_watch_subscription.close()
+            except Exception:
+                pass
+            self._run_watch_subscription = None
+        if self._run_watch_thread is not None:
+            self._run_watch_thread.join(timeout=2.0)
+            self._run_watch_thread = None
 
     def _append_log_record(self, payload: LogRecordPayload) -> None:
         self._log_records.append(payload)
         if self._passes_filter(payload):
             self._log_console.appendPlainText(self._format_log(payload))
             scrollbar = self._log_console.verticalScrollBar()
-            if scrollbar is not None:
-                scrollbar.setValue(scrollbar.maximum())
+            assert scrollbar is not None
+            scrollbar.setValue(scrollbar.maximum())
 
     def _on_log_filter_changed(self, _: str) -> None:
-        self._log_console.clear()
-        for record in self._log_records:
-            if self._passes_filter(record):
-                self._log_console.appendPlainText(self._format_log(record))
-        scrollbar = self._log_console.verticalScrollBar()
-        if scrollbar is not None:
-            scrollbar.setValue(scrollbar.maximum())
+        self._refresh_log_console()
 
     # ------------------------------------------------------------------
     # Helpers
@@ -1028,6 +1336,15 @@ class MainWindow(QtWidgets.QMainWindow):
         ts = datetime.fromtimestamp(payload.created).strftime("%H:%M:%S")
         return f"{ts} | {payload.level:<7} | {payload.name} | {payload.message}"
 
+    def _refresh_log_console(self) -> None:
+        self._log_console.clear()
+        for record in self._log_records:
+            if self._passes_filter(record):
+                self._log_console.appendPlainText(self._format_log(record))
+        scrollbar = self._log_console.verticalScrollBar()
+        assert scrollbar is not None
+        scrollbar.setValue(scrollbar.maximum())
+
     @staticmethod
     def _format_bool(value: bool) -> str:
         return "Yes" if value else "No"
@@ -1048,6 +1365,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # Shutdown live telemetry controller
         if hasattr(self, "_live_controller"):
             self._live_controller.shutdown()
+
+        self._shutdown_run_watch()
         
         # Shutdown session
         self._session.shutdown()

@@ -2,15 +2,19 @@ from __future__ import annotations
 
 """Application entry-point helpers for manual smoke-testing."""
 
-from dataclasses import replace
+import asyncio
+import errno
 import json
 import logging
 import sys
+import os
+from dataclasses import replace
 from typing import Any
 
 from gym_gui.config.settings import Settings, get_settings
 from gym_gui.logging_config.logger import configure_logging
 from gym_gui.services.bootstrap import bootstrap_default_services
+from gym_gui.services.trainer.launcher import TrainerDaemonHandle, TrainerDaemonLaunchError
 
 
 def _format_settings(settings: Settings) -> str:
@@ -31,6 +35,8 @@ def _format_settings(settings: Settings) -> str:
 def main() -> int:
     """Print the currently loaded settings and, if Qt is installed, show a stub window."""
 
+    os.environ.setdefault("QT_DEBUG_PLUGINS", "0")
+
     settings = replace(get_settings(), default_seed=1)
     log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
     configure_logging(level=log_level, stream=True, log_to_file=True)
@@ -38,10 +44,8 @@ def main() -> int:
     logger.debug("Settings loaded: qt_api=%s default_env=%s", settings.qt_api, settings.gym_default_env)
     print("[gym_gui] Loaded settings:\n" + _format_settings(settings))
 
-    bootstrap_default_services()
-
     try:
-        from qtpy.QtWidgets import QApplication
+        from qtpy.QtWidgets import QApplication, QMessageBox
         from gym_gui.ui.main_window import MainWindow
     except ImportError as exc:  # pragma: no cover - optional dependency
         print("[gym_gui] Qt bindings not available. Install qtpy and a Qt backend (PyQt5/PyQt6/PySide2/PySide6):", exc)
@@ -52,9 +56,59 @@ def main() -> int:
 
     app = QApplication(sys.argv)
     app.setApplicationName("Gym GUI")
+
+    _install_asyncio_exception_handler()
+
+    try:
+        locator = bootstrap_default_services()
+    except TrainerDaemonLaunchError as exc:
+        QMessageBox.critical(None, "Trainer Daemon Error", str(exc))
+        return 1
+    except Exception as exc:  # pragma: no cover - defensive
+        QMessageBox.critical(None, "Bootstrap Error", str(exc))
+        return 1
+
+    daemon_handle: TrainerDaemonHandle | None = locator.resolve(TrainerDaemonHandle) if locator else None
+
     window = MainWindow(settings)
     window.show()
+
+    if daemon_handle:
+        status_bar = window.statusBar()
+        if status_bar is not None:
+            if daemon_handle.reused:
+                status_bar.showMessage("Connected to existing trainer daemon", 5000)
+            else:
+                status_bar.showMessage("Trainer daemon started automatically", 5000)
+
+        def _stop_daemon() -> None:
+            daemon_handle.stop()
+
+        app.aboutToQuit.connect(_stop_daemon)
+
     return app.exec()
+
+
+def _install_asyncio_exception_handler() -> None:
+    try:
+        loop = asyncio.get_running_loop()
+    except RuntimeError:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+
+    logger = logging.getLogger("gym_gui.app")
+
+    def _handler(loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
+        exc = context.get("exception")
+        if isinstance(exc, BlockingIOError) and getattr(exc, "errno", None) in {errno.EAGAIN, errno.EWOULDBLOCK}:
+            logger.debug(
+                "Ignoring non-fatal BlockingIOError from asyncio poller",
+                extra={"message": context.get("message")},
+            )
+            return
+        loop.default_exception_handler(context)
+
+    loop.set_exception_handler(_handler)
 
 
 if __name__ == "__main__":  # pragma: no cover - CLI convenience

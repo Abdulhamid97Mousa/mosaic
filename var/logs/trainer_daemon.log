@@ -1,10 +1,35 @@
-2025-10-17 18:01:43,672 | INFO    | gym_gui.trainer.daemon | Trainer dependencies
-2025-10-17 18:01:43,674 | INFO    | gym_gui.trainer.daemon | Trainer daemon starting
-2025-10-17 18:01:43,675 | INFO    | gym_gui.trainer.dispatcher | Trainer dispatcher started
-2025-10-17 18:01:43,679 | INFO    | gym_gui.trainer.daemon | Trainer gRPC server listening
-2025-10-17 18:06:43,682 | INFO    | gym_gui.services.trainer.registry | WAL Checkpoint executed: busy=0, log_frames=0, checkpointed=0
-2025-10-17 18:10:00,429 | INFO    | gym_gui.trainer.daemon | Stop signal received; shutting down
-2025-10-17 18:10:00,429 | INFO    | gym_gui.trainer.dispatcher | Trainer dispatcher stopped
-2025-10-17 18:10:00,431 | INFO    | gym_gui.services.trainer.registry | WAL Checkpoint executed: busy=0, log_frames=0, checkpointed=0
-2025-10-17 18:10:00,431 | INFO    | gym_gui.trainer.daemon | Final WAL checkpoint
-2025-10-17 18:10:00,432 | INFO    | gym_gui.trainer.daemon | Trainer daemon shutdown complete
+2025-10-17 21:41:05,828 | INFO    | gym_gui.trainer.daemon | Trainer dependencies
+2025-10-17 21:41:05,873 | INFO    | gym_gui.trainer.daemon | Trainer daemon starting
+2025-10-17 21:41:05,873 | INFO    | gym_gui.trainer.dispatcher | Trainer dispatcher started
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+W0000 00:00:1760708465.873735 2200907 log.cc:112] Log level DEBUG is not suitable for production. Prefer WARNING or ERROR. However if you see this message in a debug environmenmt or test environmenmt it is safe to ignore this message.
+2025-10-17 21:41:05,877 | INFO    | gym_gui.trainer.daemon | Trainer gRPC server listening
+2025-10-17 21:42:13,785 | INFO    | gym_gui.services.trainer.registry | Registered new training run
+2025-10-17 21:42:13,949 | INFO    | gym_gui.services.trainer.registry | Run status updated
+2025-10-17 21:42:13,951 | INFO    | gym_gui.trainer.dispatcher | Prepared worker command from metadata
+2025-10-17 21:42:13,951 | INFO    | gym_gui.trainer.dispatcher | Spawning worker
+I0000 00:00:1760708533.953903 2200907 fork_posix.cc:77] Other threads are currently calling into gRPC, skipping fork() handlers
+2025-10-17 21:42:13,962 | INFO    | gym_gui.services.trainer.registry | Run status updated
+2025-10-17 21:42:14,148 | WARNING | gym_gui.trainer.dispatcher | Worker stderr
+2025-10-17 21:42:14,148 | WARNING | gym_gui.trainer.dispatcher | Worker stderr
+2025-10-17 21:42:39,922 | INFO    | gym_gui.services.trainer.registry | Registered new training run
+2025-10-17 21:42:39,989 | INFO    | gym_gui.services.trainer.registry | Run status updated
+2025-10-17 21:42:39,992 | INFO    | gym_gui.trainer.dispatcher | Prepared worker command from metadata
+2025-10-17 21:42:39,992 | INFO    | gym_gui.trainer.dispatcher | Spawning worker
+I0000 00:00:1760708559.994597 2200907 fork_posix.cc:77] Other threads are currently calling into gRPC, skipping fork() handlers
+2025-10-17 21:42:40,003 | INFO    | gym_gui.services.trainer.registry | Run status updated
+2025-10-17 21:42:40,181 | WARNING | gym_gui.trainer.dispatcher | Worker stderr
+2025-10-17 21:42:40,181 | WARNING | gym_gui.trainer.dispatcher | Worker stderr
+2025-10-17 21:42:50,441 | INFO    | gym_gui.services.trainer.registry | Registered new training run
+2025-10-17 21:42:52,019 | INFO    | gym_gui.services.trainer.registry | Run status updated
+2025-10-17 21:42:52,021 | INFO    | gym_gui.trainer.dispatcher | Prepared worker command from metadata
+2025-10-17 21:42:52,022 | INFO    | gym_gui.trainer.dispatcher | Spawning worker
+I0000 00:00:1760708572.024024 2200907 fork_posix.cc:77] Other threads are currently calling into gRPC, skipping fork() handlers
+2025-10-17 21:42:52,032 | INFO    | gym_gui.services.trainer.registry | Run status updated
+2025-10-17 21:42:52,211 | WARNING | gym_gui.trainer.dispatcher | Worker stderr
+2025-10-17 21:42:52,211 | WARNING | gym_gui.trainer.dispatcher | Worker stderr
+2025-10-17 21:43:20,155 | INFO    | gym_gui.trainer.daemon | Stop signal received; shutting down
+2025-10-17 21:43:20,166 | INFO    | gym_gui.trainer.dispatcher | Trainer dispatcher stopped
+2025-10-17 21:43:20,172 | INFO    | gym_gui.services.trainer.registry | WAL Checkpoint executed: busy=0, log_frames=0, checkpointed=0
+2025-10-17 21:43:20,173 | INFO    | gym_gui.trainer.daemon | Final WAL checkpoint
+2025-10-17 21:43:20,177 | INFO    | gym_gui.trainer.daemon | Trainer daemon shutdown complete

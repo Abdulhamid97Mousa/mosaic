@@ -7,12 +7,15 @@ import asyncio
 from datetime import datetime, timedelta, timezone
 import logging
 import os
+import json
+import contextlib
 from pathlib import Path
 import signal
 import subprocess
 from typing import Any, Callable, Optional
 
 from gym_gui.services.trainer import RunRecord, RunRegistry, RunStatus
+from gym_gui.config.paths import VAR_TRAINER_DIR
 from gym_gui.services.trainer.gpu import GPUAllocator
 
 _LOGGER = logging.getLogger("gym_gui.trainer.dispatcher")
@@ -57,6 +60,7 @@ class TrainerDispatcher:
         self._dispatch_task: Optional[asyncio.Task[None]] = None
         self._monitor_task: Optional[asyncio.Task[None]] = None
         self._heartbeat_task: Optional[asyncio.Task[None]] = None
+        self._worker_config_paths: dict[str, Path] = {}
 
     async def start(self) -> None:
         """Start dispatcher, monitor, and heartbeat checker tasks."""
@@ -162,37 +166,108 @@ class TrainerDispatcher:
         """Build the subprocess command for the trainer worker."""
 
         
-        # Derive agent_id from run_id for telemetry correlation
-        agent_id = f"agent_{run.run_id[:8]}"
-        
-        # gRPC daemon target (hardcoded for now, could be config)
-        grpc_target = "127.0.0.1:50055"
-        
-        # Check for custom worker command from environment or config
-        worker_entry = os.environ.get("GYM_GUI_WORKER_CMD")
-        if not worker_entry:
-            # Default to demo worker for testing
-            worker_cmd = [
-                sys.executable, "-m", "gym_gui.workers.demo_worker",
+        config_payload = self._registry.get_run_config_json(run.run_id)
+        worker_cmd: list[str] | None = None
+        config_path: Optional[Path] = None
+
+        if config_payload:
+            try:
+                config_json = json.loads(config_payload)
+                _LOGGER.debug("Loaded run configuration JSON", extra={"run_id": run.run_id})
+            except json.JSONDecodeError:
+                _LOGGER.warning("Failed to parse run config JSON", extra={"run_id": run.run_id})
+                config_json = None
+        else:
+            config_json = None
+
+        worker_meta = config_json.get("metadata", {}).get("worker", {}) if config_json else {}
+
+        if config_json and worker_meta:
+            module = worker_meta.get("module")
+            script = worker_meta.get("script")
+            args = list(worker_meta.get("arguments", []))
+            grpc_target = worker_meta.get("grpc_target", "127.0.0.1:50055")
+            use_grpc = worker_meta.get("use_grpc", True)
+            worker_config = worker_meta.get("config")
+
+            if worker_config:
+                config_dir = VAR_TRAINER_DIR / "configs"
+                config_dir.mkdir(parents=True, exist_ok=True)
+                config_path = config_dir / f"{run.run_id}.json"
+                worker_payload = dict(worker_config)
+                worker_payload.setdefault("run_id", run.run_id)
+                config_path.write_text(json.dumps(worker_payload, indent=2), encoding="utf-8")
+                self._worker_config_paths[run.run_id] = config_path
+                _LOGGER.debug(
+                    "Persisted worker config",
+                    extra={"run_id": run.run_id, "path": str(config_path)},
+                )
+
+            if module:
+                worker_cmd = [sys.executable, "-m", module]
+            elif script:
+                worker_cmd = [script]
+
+            if worker_cmd is not None:
+                if config_path is not None and "--config" not in args:
+                    args.extend(["--config", str(config_path)])
+                if use_grpc:
+                    if "--grpc" not in args:
+                        args.append("--grpc")
+                    if "--grpc-target" not in args:
+                        args.extend(["--grpc-target", grpc_target])
+                worker_cmd.extend(args)
+                _LOGGER.info(
+                    "Prepared worker command from metadata",
+                    extra={
+                        "run_id": run.run_id,
+                        "cmd": worker_cmd,
+                        "agent_id": worker_meta.get("agent_id"),
+                    },
+                )
+
+        if worker_cmd is None:
+            if run.run_id in self._worker_config_paths:
+                path = self._worker_config_paths.pop(run.run_id)
+                with contextlib.suppress(Exception):
+                    path.unlink()
+            # Fallback legacy behaviour (demo worker)
+            agent_id = f"agent_{run.run_id[:8]}"
+            grpc_target = "127.0.0.1:50055"
+            worker_entry = os.environ.get("GYM_GUI_WORKER_CMD")
+            if not worker_entry:
+                worker_cmd = [
+                    sys.executable, "-m", "gym_gui.workers.demo_worker",
+                    "--run-id", run.run_id,
+                    "--agent-id", agent_id,
+                    "--episodes", "3",
+                    "--steps", "15",
+                    "--delay", "0.03",
+                ]
+            else:
+                worker_cmd = worker_entry.split()
+
+            proxy_cmd = [
+                sys.executable, "-m", "gym_gui.services.trainer.trainer_telemetry_proxy",
+                "--target", grpc_target,
                 "--run-id", run.run_id,
                 "--agent-id", agent_id,
-                "--episodes", "3",
-                "--steps", "15",
-                "--delay", "0.03",
+                "--",
             ]
-        else:
-            # Parse custom worker command (TODO: handle quoted args properly)
-            worker_cmd = worker_entry.split()
-        
-        # Wrap worker with telemetry proxy
+            return proxy_cmd + worker_cmd
+
         proxy_cmd = [
             sys.executable, "-m", "gym_gui.services.trainer.trainer_telemetry_proxy",
-            "--target", grpc_target,
+            "--target", worker_meta.get("grpc_target", "127.0.0.1:50055"),
             "--run-id", run.run_id,
-            "--agent-id", agent_id,
-            "--",  # Separator for proxy args vs worker args
+            "--agent-id", worker_meta.get("agent_id", f"agent_{run.run_id[:8]}"),
+            "--",
         ]
-        
+
+        _LOGGER.debug(
+            "Assembled proxy command",
+            extra={"run_id": run.run_id, "proxy_cmd": proxy_cmd, "worker_cmd": worker_cmd},
+        )
         return proxy_cmd + worker_cmd
 
     def _build_worker_env(self, run: RunRecord) -> dict[str, str]:
@@ -202,12 +277,16 @@ class TrainerDispatcher:
             env["CUDA_VISIBLE_DEVICES"] = ",".join(str(slot) for slot in run.gpu_slots)
         else:
             env["CUDA_VISIBLE_DEVICES"] = ""
+        config_path = self._worker_config_paths.get(run.run_id)
+        if config_path is not None:
+            env["TRAINER_WORKER_CONFIG_PATH"] = str(config_path)
         return env
 
     async def _stream_stdout(self, handle: WorkerHandle) -> None:
         """Stream stdout from worker subprocess."""
         if not handle.process.stdout:
             return
+        _LOGGER.debug("Starting worker stdout stream", extra={"run_id": handle.run_id})
         try:
             async for line in handle.process.stdout:
                 decoded = line.decode("utf-8", errors="replace").rstrip()
@@ -219,6 +298,7 @@ class TrainerDispatcher:
         """Stream stderr from worker subprocess."""
         if not handle.process.stderr:
             return
+        _LOGGER.debug("Starting worker stderr stream", extra={"run_id": handle.run_id})
         try:
             async for line in handle.process.stderr:
                 decoded = line.decode("utf-8", errors="replace").rstrip()
@@ -272,6 +352,10 @@ class TrainerDispatcher:
         self._gpu_allocator.release_many([handle.run_id])
         self._registry.update_gpu_slots(handle.run_id, [])
         await self._broadcast_update(handle.run_id)
+        config_path = self._worker_config_paths.pop(handle.run_id, None)
+        if config_path and config_path.exists():
+            with contextlib.suppress(Exception):
+                config_path.unlink()
 
     async def _terminate_worker(self, handle: WorkerHandle, *, reason: str) -> None:
         """Terminate a worker with SIGTERM → SIGKILL escalation."""

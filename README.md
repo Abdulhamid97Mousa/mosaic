@@ -351,7 +351,7 @@ source .venv/bin/activate
 python -m gym_gui.app
 ```
 
-The first boot creates directories under `gym_gui/var/` for logs, data, and telemetry. Check the status bar for seed and actor selections.
+The first boot creates directories under `var/` (at the repository root) for logs, data, and telemetry. Check the status bar for seed and actor selections.
 
 ### Quick Smoke Test
 
@@ -421,9 +421,9 @@ Passive actions remain synchronized across human, idle, and agent ticks via the 
 
 ## 📦 Data & Storage Layout
 
-- `gym_gui/var/records/` – JSONL step logs per episode and replay snapshots (gitignored).
-- `gym_gui/var/telemetry/telemetry.sqlite` – WAL-backed store for analytics & dashboards.
-- `gym_gui/var/cache/` & `gym_gui/var/tmp/` – Derived caches and scratch space safe to purge.
+- `var/records/` – JSONL step logs per episode and replay snapshots (gitignored).
+- `var/telemetry/telemetry.sqlite` – WAL-backed store for analytics & dashboards.
+- `var/cache/` & `var/tmp/` – Derived caches and scratch space safe to purge.
 
 Retention knobs such as `max_record_bytes`, `max_sessions`, and `prune_on_start` will live in `gym_gui/config/storage_profiles.yaml` to keep large Box2D runs manageable.
 

@@ -3,6 +3,8 @@ from __future__ import annotations
 """Background thread helper to access :class:`TrainerClient` from Qt controllers."""
 
 import asyncio
+import errno
+import logging
 import threading
 from queue import Queue, Empty
 from typing import Any, Iterable, Optional, Sequence
@@ -17,8 +19,10 @@ class TrainerClientRunner:
     def __init__(self, client: Optional[TrainerClient] = None, *, name: str = "trainer-client-loop") -> None:
         self._client = client or TrainerClient(TrainerClientConfig())
         self._loop = asyncio.new_event_loop()
+        self._loop.set_exception_handler(self._loop_exception_handler)
         self._thread = threading.Thread(target=self._loop.run_forever, name=name, daemon=True)
         self._thread.start()
+        self._logger = logging.getLogger("gym_gui.trainer.client_runner")
 
     # ------------------------------------------------------------------
     def submit_run(self, config_json: str, *, run_id: Optional[str] = None, deadline: Optional[float] = None):
@@ -75,6 +79,26 @@ class TrainerClientRunner:
 
     def _submit(self, coro: Any):
         return asyncio.run_coroutine_threadsafe(coro, self._loop)
+
+    def _loop_exception_handler(self, loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
+        exc = context.get("exception")
+        if isinstance(exc, BlockingIOError) and exc.errno in {errno.EAGAIN, errno.EWOULDBLOCK}:
+            self._logger.debug(
+                "Ignoring non-fatal BlockingIOError from gRPC poller",
+                extra={"grpc_message": context.get("message")},  # Rename to avoid conflict
+            )
+            return
+
+        # Sanitize context to avoid LogRecord key conflicts
+        sanitized_context: dict[str, Any] = {}
+        for key, value in context.items():
+            if key in {"message", "exc_info", "stack_info", "args"}:
+                sanitized_context[f"loop_{key}"] = value
+            else:
+                sanitized_context[key] = value
+
+        log_message = sanitized_context.pop("loop_message", "Unhandled exception in trainer client loop")
+        self._logger.error(log_message, extra=sanitized_context)
 
 
 class TrainerWatchSubscription:

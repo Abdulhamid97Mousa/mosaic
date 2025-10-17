@@ -37,10 +37,9 @@ spadeBDI_RL
 graphrag
 openrlbenchmark
 
-var
-
 # Protocol Buffers generated files
 *_pb2.py
 *_pb2.pyi
 *_pb2_grpc.py
 gym_gui/services/trainer/proto/trainer_pb2.pyi
+

@@ -3,9 +3,11 @@ from __future__ import annotations
 """Async client bridge between the Qt GUI and the trainer daemon."""
 
 import asyncio
+import logging
 from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from typing import Any, AsyncIterator, Optional, Sequence, cast
+from weakref import WeakKeyDictionary
 
 import grpc
 
@@ -14,6 +16,14 @@ from gym_gui.services.trainer.proto import trainer_pb2 as trainer_pb2_module
 from gym_gui.services.trainer.proto import trainer_pb2_grpc
 
 trainer_pb2 = cast(Any, trainer_pb2_module)
+
+
+@dataclass
+class _ClientLoopState:
+    """Per-event-loop client state (lock, channel, stub)."""
+    lock: asyncio.Lock
+    channel: Optional[grpc.aio.Channel] = None
+    stub: Optional[trainer_pb2_grpc.TrainerServiceStub] = None
 
 _DEFAULT_DEADLINE = 10.0
 _DEFAULT_CONNECT_TIMEOUT = 5.0
@@ -39,14 +49,23 @@ class TrainerClient:
 
     def __init__(self, config: Optional[TrainerClientConfig] = None) -> None:
         self._config = config or TrainerClientConfig()
-        self._channel: Optional[grpc.aio.Channel] = None
-        self._stub: Optional[trainer_pb2_grpc.TrainerServiceStub] = None
-        self._lock = asyncio.Lock()
+        # Per-event-loop state cache to avoid "Lock bound to different event loop" errors
+        self._loop_state: WeakKeyDictionary[asyncio.AbstractEventLoop, _ClientLoopState] = WeakKeyDictionary()
+        self._logger = logging.getLogger("gym_gui.trainer.client")
+
+    def _get_or_create_state(self) -> _ClientLoopState:
+        """Get or create the state for the current event loop."""
+        loop = asyncio.get_running_loop()
+        if loop not in self._loop_state:
+            self._loop_state[loop] = _ClientLoopState(lock=asyncio.Lock())
+        return self._loop_state[loop]
 
     async def ensure_connected(self) -> trainer_pb2_grpc.TrainerServiceStub:
-        async with self._lock:
-            if self._stub is not None and self._channel is not None:
-                return self._stub
+        state = self._get_or_create_state()
+        async with state.lock:
+            if state.stub is not None and state.channel is not None:
+                return state.stub
+            self._logger.info("Connecting to trainer daemon", extra={"target": self._config.target})
             options = (
                 ("grpc.keepalive_time_ms", int(self._config.keepalive_time * 1000)),
                 ("grpc.keepalive_timeout_ms", int(self._config.keepalive_timeout * 1000)),
@@ -61,6 +80,7 @@ class TrainerClient:
             try:
                 await asyncio.wait_for(channel.channel_ready(), timeout=self._config.connect_timeout)
             except asyncio.TimeoutError as exc:
+                self._logger.error("Trainer daemon connection timeout", extra={"target": self._config.target})
                 await channel.close()
                 raise TrainerClientConnectionError(
                     f"Timed out waiting for trainer daemon at {self._config.target}"
@@ -68,15 +88,37 @@ class TrainerClient:
             except Exception:
                 await channel.close()
                 raise
-            self._channel = channel
-            self._stub = trainer_pb2_grpc.TrainerServiceStub(channel)
-            return self._stub
+            state.channel = channel
+            state.stub = trainer_pb2_grpc.TrainerServiceStub(channel)
+            self._logger.info("Trainer daemon connection established", extra={"target": self._config.target})
+            return state.stub
 
     async def close(self) -> None:
-        if self._channel is not None:
-            await self._channel.close()
-            self._channel = None
-            self._stub = None
+        """Close all per-loop channels."""
+        close_awaitables: list[asyncio.Future[Any]] = []
+        for loop, state in list(self._loop_state.items()):
+            channel = state.channel
+            if channel is None:
+                continue
+
+            async def _close(ch: grpc.aio.Channel) -> None:
+                await ch.close()
+
+            if loop.is_running():
+                future = asyncio.run_coroutine_threadsafe(_close(channel), loop)
+                close_awaitables.append(asyncio.wrap_future(future))
+            else:
+                # Loop not running anymore; create a task in the current loop.
+                task = asyncio.create_task(_close(channel))
+                close_awaitables.append(task)
+
+            state.channel = None
+            state.stub = None
+
+        if close_awaitables:
+            await asyncio.gather(*close_awaitables, return_exceptions=True)
+
+        self._loop_state.clear()
 
     async def submit_run(
         self,
@@ -172,7 +214,10 @@ class TrainerClient:
         try:
             yield call
         finally:
-            await call.aclose()
+            try:
+                call.cancel()
+            except Exception:
+                pass
 
     @asynccontextmanager
     async def stream_run_episodes(
@@ -191,7 +236,10 @@ class TrainerClient:
         try:
             yield call
         finally:
-            await call.aclose()
+            try:
+                call.cancel()
+            except Exception:
+                pass
 
 
 def _status_to_proto(status: RunStatus) -> int:

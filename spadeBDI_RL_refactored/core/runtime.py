@@ -70,12 +70,24 @@ class HeadlessTrainer:
             for episode in range(self.config.max_episodes):
                 summary = self._run_episode(episode)
                 summaries.append(summary)
+                episode_seed = self.config.seed + episode
+                episode_metadata = {
+                    "control_mode": "agent_only",
+                    "run_id": self.config.run_id,
+                    "agent_id": self.config.agent_id,
+                    "env_id": self.config.env_id,
+                    "seed": episode_seed,
+                    "episode_index": episode,
+                    "policy_strategy": self.config.policy_strategy.value,
+                    "success": summary.success,
+                }
                 self.emitter.episode(
                     self.config.run_id,
                     episode,
                     reward=summary.total_reward,
                     steps=summary.steps,
                     success=summary.success,
+                    metadata=episode_metadata,
                 )
 
             if self._should_save:

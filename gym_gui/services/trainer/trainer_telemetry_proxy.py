@@ -14,11 +14,14 @@ import contextlib
 import json
 import os
 import sys
+import logging
 from typing import Any, AsyncIterator, Dict, Optional
 
 import grpc
 
 from gym_gui.services.trainer.proto import trainer_pb2, trainer_pb2_grpc
+
+_LOGGER = logging.getLogger("gym_gui.trainer.telemetry_proxy")
 
 
 class JsonlTailer:
@@ -63,10 +66,12 @@ def _coerce_str(x: Any) -> str:
 
 def _mk_runstep(ev: Dict[str, Any], run_id: str, default_agent: str) -> trainer_pb2.RunStep:
     """Build RunStep proto from JSONL event dict."""
+    episode_val = ev.get("episode_index", ev.get("episode", 0))
+    step_val = ev.get("step_index", ev.get("step", 0))
     msg = trainer_pb2.RunStep(
         run_id=run_id,
-        episode_index=int(ev.get("episode_index", 0)),
-        step_index=int(ev.get("step_index", 0)),
+        episode_index=int(episode_val),
+        step_index=int(step_val),
         action_json=_coerce_str(ev.get("action_json", ev.get("action"))),
         observation_json=_coerce_str(ev.get("observation_json", ev.get("observation"))),
         reward=float(ev.get("reward", 0.0)),
@@ -87,9 +92,10 @@ def _mk_runstep(ev: Dict[str, Any], run_id: str, default_agent: str) -> trainer_
 
 def _mk_runepisode(ev: Dict[str, Any], run_id: str, default_agent: str) -> trainer_pb2.RunEpisode:
     """Build RunEpisode proto from JSONL event dict."""
+    episode_val = ev.get("episode_index", ev.get("episode", 0))
     msg = trainer_pb2.RunEpisode(
         run_id=run_id,
-        episode_index=int(ev.get("episode_index", 0)),
+        episode_index=int(episode_val),
         total_reward=float(ev.get("total_reward", ev.get("reward", 0.0))),
         steps=int(ev.get("steps", 0)),
         terminated=bool(ev.get("terminated", False)),
@@ -143,6 +149,11 @@ async def run_proxy(
     
     Returns worker exit code.
     """
+    _LOGGER.info(
+        "Proxy launching worker",
+        extra={"run_id": run_id, "agent_id": agent_id, "worker_cmd": worker_argv},
+    )
+
     # Start worker subprocess whose stdout is JSONL
     proc = await asyncio.create_subprocess_exec(
         *worker_argv,
@@ -164,6 +175,8 @@ async def run_proxy(
     # Queues feeding client-streaming RPCs
     step_q: asyncio.Queue[Optional[trainer_pb2.RunStep]] = asyncio.Queue(maxsize=max_queue)
     ep_q: asyncio.Queue[Optional[trainer_pb2.RunEpisode]] = asyncio.Queue(maxsize=max_queue)
+    step_count = 0
+    episode_count = 0
 
     # Tasks to publish streams
     steps_task = asyncio.create_task(_publish_steps(stub, step_q), name="publish-steps")
@@ -178,17 +191,46 @@ async def run_proxy(
                 try:
                     step_msg = _mk_runstep(ev, run_id, agent_id)
                     step_q.put_nowait(step_msg)
+                    step_count += 1
+                    if step_count <= 5:
+                        _LOGGER.debug(
+                            "Proxy enqueued step",
+                            extra={
+                                "run_id": run_id,
+                                "agent_id": step_msg.agent_id,
+                                "episode_index": step_msg.episode_index,
+                                "step_index": step_msg.step_index,
+                            },
+                        )
                 except asyncio.QueueFull:
                     # Drop oldest by pulling one, then push new
                     _ = step_q.get_nowait()
                     step_q.put_nowait(step_msg)
+                    _LOGGER.warning(
+                        "Proxy step queue full; dropping oldest",
+                        extra={"run_id": run_id},
+                    )
             elif typ == "episode":
                 try:
                     ep_msg = _mk_runepisode(ev, run_id, agent_id)
                     ep_q.put_nowait(ep_msg)
+                    episode_count += 1
+                    if episode_count <= 3:
+                        _LOGGER.debug(
+                            "Proxy enqueued episode",
+                            extra={
+                                "run_id": run_id,
+                                "agent_id": ep_msg.agent_id,
+                                "episode_index": ep_msg.episode_index,
+                            },
+                        )
                 except asyncio.QueueFull:
                     _ = ep_q.get_nowait()
                     ep_q.put_nowait(ep_msg)
+                    _LOGGER.warning(
+                        "Proxy episode queue full; dropping oldest",
+                        extra={"run_id": run_id},
+                    )
             # else: ignore other event types
 
     async def pump_stderr() -> None:
@@ -206,6 +248,15 @@ async def run_proxy(
 
     # Wait for worker to finish
     rc = await proc.wait()
+    _LOGGER.info(
+        "Worker process exited",
+        extra={
+            "run_id": run_id,
+            "exit_code": rc,
+            "steps_forwarded": step_count,
+            "episodes_forwarded": episode_count,
+        },
+    )
 
     # Stop publishers
     await step_q.put(None)
