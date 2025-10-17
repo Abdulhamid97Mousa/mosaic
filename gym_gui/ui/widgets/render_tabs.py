@@ -69,7 +69,41 @@ class RenderTabs(QtWidgets.QTabWidget):
             telemetry_service=telemetry_service,
             renderer_registry=registry,
         )
-        self._replay_tab_index = self.addTab(self._replay_tab, "Replay")
+        self._replay_tab_index = self.addTab(self._replay_tab, "Human Replay")
+        self.setTabToolTip(self._replay_tab_index, "Review episodes from manual gameplay sessions only")
+
+        # Dynamic agent tabs state
+        self.init_dynamic_tab_state()
+
+    def init_dynamic_tab_state(self) -> None:
+        """Initialize state for dynamically created agent tabs."""
+        # keyed by run_id → dict(name → QWidget)
+        self._agent_tabs: dict[str, dict[str, QtWidgets.QWidget]] = {}
+
+    def add_dynamic_tab(self, run_id: str, name: str, widget: QtWidgets.QWidget) -> None:
+        """Add (or focus) a dynamic tab; stable across re-emits."""
+        if run_id not in self._agent_tabs:
+            self._agent_tabs[run_id] = {}
+        if name in self._agent_tabs[run_id]:
+            # Tab already exists, just focus it
+            idx = self.indexOf(self._agent_tabs[run_id][name])
+            if idx >= 0:
+                self.setCurrentIndex(idx)
+            return
+        # Create new tab
+        self._agent_tabs[run_id][name] = widget
+        idx = self.addTab(widget, name)
+        self.setTabToolTip(idx, f"{name} - Live training telemetry")
+        self.setCurrentIndex(idx)
+
+    def remove_dynamic_tabs_for_run(self, run_id: str) -> None:
+        """Remove all dynamic tabs associated with a run_id."""
+        tabs = self._agent_tabs.pop(run_id, {})
+        for widget in tabs.values():
+            idx = self.indexOf(widget)
+            if idx >= 0:
+                self.removeTab(idx)
+            widget.deleteLater()
 
     # ------------------------------------------------------------------
     # Public API

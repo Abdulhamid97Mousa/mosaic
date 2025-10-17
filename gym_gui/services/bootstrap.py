@@ -14,9 +14,11 @@ from gym_gui.services.trainer import (
     TrainerClientConfig,
     TrainerClientRunner,
 )
+from gym_gui.services.trainer.streams import TelemetryAsyncHub
 from gym_gui.services.storage import StorageRecorderService
 from gym_gui.services.telemetry import TelemetryService
 from gym_gui.telemetry import TelemetrySQLiteStore
+from gym_gui.controllers.live_telemetry import LiveTelemetryController
 
 
 def bootstrap_default_services() -> ServiceLocator:
@@ -39,17 +41,23 @@ def bootstrap_default_services() -> ServiceLocator:
         HumanKeyboardActor(),
         display_name="Human (Keyboard)",
         description="Forward keyboard input captured by the UI.",
+        policy_label="Manual control",
+        backend_label="Qt keyboard input",
         activate=True,
     )
     actors.register_actor(
         BDIQAgent(),
         display_name="BDI-Q Agent",
         description="Belief-Desire-Intention agent with Q-learning hooks.",
+        policy_label="BDI planner + Q-learning",
+        backend_label="In-process Python actor",
     )
     actors.register_actor(
         LLMMultiStepAgent(),
         display_name="LLM Multi-Step Agent",
         description="Delegates decisions to an integrated language model pipeline.",
+        policy_label="LLM planning with tool calls",
+        backend_label="External language model service",
     )
 
     action_mapper: ContinuousActionMapper = create_default_action_mapper()
@@ -62,10 +70,19 @@ def bootstrap_default_services() -> ServiceLocator:
     locator.register(ContinuousActionMapper, action_mapper)
     trainer_client = TrainerClient(TrainerClientConfig())
     trainer_runner = TrainerClientRunner(trainer_client)
+    
+    # Initialize telemetry hub for live streaming
+    telemetry_hub = TelemetryAsyncHub(max_queue=2048, buffer_size=256)
+    # Hub will auto-start on first subscribe_run call
+    
+    # Create live telemetry controller
+    live_controller = LiveTelemetryController(telemetry_hub, trainer_client)
 
     locator.register(RendererRegistry, renderer_registry)
     locator.register(TrainerClient, trainer_client)
     locator.register(TrainerClientRunner, trainer_runner)
+    locator.register(TelemetryAsyncHub, telemetry_hub)
+    locator.register(LiveTelemetryController, live_controller)
 
     # Also register under string keys for convenience in legacy code.
     locator.register("storage", storage)
@@ -76,6 +93,8 @@ def bootstrap_default_services() -> ServiceLocator:
     locator.register("renderer_registry", renderer_registry)
     locator.register("trainer_client", trainer_client)
     locator.register("trainer_client_runner", trainer_runner)
+    locator.register("telemetry_hub", telemetry_hub)
+    locator.register("live_telemetry_controller", live_controller)
 
     return locator
 

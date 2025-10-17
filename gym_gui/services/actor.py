@@ -52,6 +52,8 @@ class ActorDescriptor:
     actor_id: str
     display_name: str
     description: str | None = None
+    policy_label: str | None = None
+    backend_label: str | None = None
 
 
 class ActorService:
@@ -73,12 +75,20 @@ class ActorService:
         *,
         display_name: str | None = None,
         description: str | None = None,
+        policy_label: str | None = None,
+        backend_label: str | None = None,
         activate: bool = False,
     ) -> None:
         actor_id = actor.id
         label = display_name or actor_id.replace("_", " ").title()
         self._actors[actor_id] = actor
-        self._descriptors[actor_id] = ActorDescriptor(actor_id=actor_id, display_name=label, description=description)
+        self._descriptors[actor_id] = ActorDescriptor(
+            actor_id=actor_id,
+            display_name=label,
+            description=description,
+            policy_label=policy_label,
+            backend_label=backend_label,
+        )
         if activate or self._active_actor_id is None:
             self._active_actor_id = actor_id
 

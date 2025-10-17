@@ -7,11 +7,13 @@ from collections import defaultdict, deque
 from datetime import datetime, timezone
 import json
 import logging
-from typing import Any, AsyncIterator, Callable, Deque, Iterable, Optional, cast
+from typing import Any, AsyncIterator, Callable, Deque, Iterable, Mapping, Optional, cast
 
 from google.protobuf.timestamp_pb2 import Timestamp
 import grpc
 
+from gym_gui.core.data_model import EpisodeRollup, StepRecord
+from gym_gui.telemetry import TelemetrySQLiteStore
 from gym_gui.services.trainer import (
     GPUAllocator,
     GPUReservationError,
@@ -174,18 +176,150 @@ class RunEventBroadcaster:
             self._listeners.discard(queue)
 
 
+class RunTelemetryBroadcaster:
+    """Publish/subscribe hub for telemetry streamed from workers."""
+
+    _QUEUE_MAXSIZE = 2048
+    _STEP_HISTORY_LIMIT = 4096
+    _EPISODE_HISTORY_LIMIT = 1024
+
+    def __init__(self) -> None:
+        self._lock = asyncio.Lock()
+        self._step_history: dict[str, Deque[tuple[int, Any]]] = defaultdict(
+            lambda: deque(maxlen=self._STEP_HISTORY_LIMIT)
+        )
+        self._episode_history: dict[str, Deque[tuple[int, Any]]] = defaultdict(
+            lambda: deque(maxlen=self._EPISODE_HISTORY_LIMIT)
+        )
+        self._step_listeners: dict[str, set[asyncio.Queue[Any]]] = defaultdict(set)
+        self._episode_listeners: dict[str, set[asyncio.Queue[Any]]] = defaultdict(set)
+        self._step_seq = 0
+        self._episode_seq = 0
+
+    async def publish_step(self, message: Any) -> tuple[int, int]:
+        if not message.run_id:
+            raise ValueError("run_id is required for telemetry steps")
+        async with self._lock:
+            self._step_seq += 1
+            seq_id = self._step_seq
+            payload = trainer_pb2.RunStep()
+            payload.CopyFrom(message)
+            payload.seq_id = seq_id
+            history = self._step_history[message.run_id]
+            history.append((seq_id, payload))
+            listeners = list(self._step_listeners.get(message.run_id, set()))
+        dropped = self._dispatch(listeners, payload)
+        return seq_id, dropped
+
+    async def publish_episode(self, message: Any) -> tuple[int, int]:
+        if not message.run_id:
+            raise ValueError("run_id is required for telemetry episodes")
+        async with self._lock:
+            self._episode_seq += 1
+            seq_id = self._episode_seq
+            payload = trainer_pb2.RunEpisode()
+            payload.CopyFrom(message)
+            payload.seq_id = seq_id
+            history = self._episode_history[message.run_id]
+            history.append((seq_id, payload))
+            listeners = list(self._episode_listeners.get(message.run_id, set()))
+        dropped = self._dispatch(listeners, payload)
+        return seq_id, dropped
+
+    async def subscribe_steps(
+        self, run_id: str, since_seq: int
+    ) -> tuple[asyncio.Queue[Any], list[Any]]:
+        if not run_id:
+            raise ValueError("run_id is required")
+        queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=self._QUEUE_MAXSIZE)
+        async with self._lock:
+            self._step_listeners[run_id].add(queue)
+            replay: list[Any] = []
+            if since_seq:
+                for seq_id, payload in self._step_history.get(run_id, ()):  # type: ignore[arg-type]
+                    if seq_id > since_seq:
+                        replay_payload = trainer_pb2.RunStep()
+                        replay_payload.CopyFrom(payload)
+                        replay.append(replay_payload)
+        return queue, replay
+
+    async def subscribe_episodes(
+        self, run_id: str, since_seq: int
+    ) -> tuple[asyncio.Queue[Any], list[Any]]:
+        if not run_id:
+            raise ValueError("run_id is required")
+        queue: asyncio.Queue[Any] = asyncio.Queue(maxsize=self._QUEUE_MAXSIZE)
+        async with self._lock:
+            self._episode_listeners[run_id].add(queue)
+            replay: list[Any] = []
+            if since_seq:
+                for seq_id, payload in self._episode_history.get(run_id, ()):  # type: ignore[arg-type]
+                    if seq_id > since_seq:
+                        replay_payload = trainer_pb2.RunEpisode()
+                        replay_payload.CopyFrom(payload)
+                        replay.append(replay_payload)
+        return queue, replay
+
+    async def unsubscribe_steps(self, run_id: str, queue: asyncio.Queue[Any]) -> None:
+        async with self._lock:
+            listeners = self._step_listeners.get(run_id)
+            if listeners is not None:
+                listeners.discard(queue)
+                if not listeners:
+                    self._step_listeners.pop(run_id, None)
+
+    async def unsubscribe_episodes(
+        self, run_id: str, queue: asyncio.Queue[Any]
+    ) -> None:
+        async with self._lock:
+            listeners = self._episode_listeners.get(run_id)
+            if listeners is not None:
+                listeners.discard(queue)
+                if not listeners:
+                    self._episode_listeners.pop(run_id, None)
+
+    @staticmethod
+    def _dispatch(listeners: list[asyncio.Queue[Any]], payload: Any) -> int:
+        if not listeners:
+            return 0
+        dropped = 0
+        for queue in listeners:
+            try:
+                queue.put_nowait(payload)
+            except asyncio.QueueFull:
+                dropped += 1
+                try:
+                    queue.get_nowait()
+                except asyncio.QueueEmpty:
+                    continue
+                try:
+                    queue.put_nowait(payload)
+                except asyncio.QueueFull:
+                    pass
+        if dropped:
+            _LOGGER.warning(
+                "Telemetry consumer lagging; dropped updates",
+                extra={"dropped": dropped, "payload_type": type(payload).__name__},
+            )
+        return dropped
+
+
 class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
     def __init__(
         self,
         registry: RunRegistry,
         gpu_allocator: GPUAllocator,
         broadcaster: Optional[RunEventBroadcaster] = None,
+        telemetry_broadcaster: Optional[RunTelemetryBroadcaster] = None,
         health_provider: Optional[Callable[[], Any]] = None,
+        telemetry_store: Optional[TelemetrySQLiteStore] = None,
     ) -> None:
         self._registry = registry
         self._gpu_allocator = gpu_allocator
         self._broadcaster = broadcaster or RunEventBroadcaster()
+        self._telemetry_broadcaster = telemetry_broadcaster or RunTelemetryBroadcaster()
         self._health_provider = health_provider or (lambda: trainer_pb2.HealthCheckResponse(healthy=False))
+        self._telemetry_store = telemetry_store
 
     # ------------------------------------------------------------------
     async def SubmitRun(self, request: trainer_pb2.SubmitRunRequest, context: grpc.aio.ServicerContext) -> trainer_pb2.SubmitRunResponse:  # type: ignore[override]
@@ -278,9 +412,184 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
         response = self._health_provider()
         return response
 
+    async def StreamRunSteps(self, request: trainer_pb2.StreamStepsRequest, context: grpc.aio.ServicerContext) -> AsyncIterator[trainer_pb2.RunStep]:  # type: ignore[override]
+        if not request.run_id:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "run_id is required")
+
+        queue, replay = await self._telemetry_broadcaster.subscribe_steps(request.run_id, int(request.since_seq))
+        try:
+            for payload in replay:
+                yield payload
+            while True:
+                payload = await queue.get()
+                yield payload
+        except asyncio.CancelledError:
+            _LOGGER.debug("StreamRunSteps cancelled", extra={"run_id": request.run_id})
+            raise
+        finally:
+            await self._telemetry_broadcaster.unsubscribe_steps(request.run_id, queue)
+
+    async def StreamRunEpisodes(self, request: trainer_pb2.StreamEpisodesRequest, context: grpc.aio.ServicerContext) -> AsyncIterator[trainer_pb2.RunEpisode]:  # type: ignore[override]
+        if not request.run_id:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "run_id is required")
+
+        queue, replay = await self._telemetry_broadcaster.subscribe_episodes(request.run_id, int(request.since_seq))
+        try:
+            for payload in replay:
+                yield payload
+            while True:
+                payload = await queue.get()
+                yield payload
+        except asyncio.CancelledError:
+            _LOGGER.debug("StreamRunEpisodes cancelled", extra={"run_id": request.run_id})
+            raise
+        finally:
+            await self._telemetry_broadcaster.unsubscribe_episodes(request.run_id, queue)
+
+    async def PublishRunSteps(self, request_iterator: AsyncIterator[trainer_pb2.RunStep], context: grpc.aio.ServicerContext) -> trainer_pb2.PublishTelemetryResponse:  # type: ignore[override]
+        accepted = 0
+        dropped = 0
+        run_id: Optional[str] = None
+        try:
+            async for message in request_iterator:
+                if not message.run_id:
+                    await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "run_id is required for telemetry ingestion")
+                if run_id is None:
+                    if not self._registry.get_run(message.run_id):
+                        await context.abort(grpc.StatusCode.NOT_FOUND, "run not registered")
+                    run_id = message.run_id
+                elif message.run_id != run_id:
+                    await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "telemetry stream cannot change run_id")
+                try:
+                    _, dropped_now = await self._telemetry_broadcaster.publish_step(message)
+                except ValueError as exc:
+                    await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
+                else:
+                    accepted += 1
+                    dropped += dropped_now
+                    if self._telemetry_store:
+                        record = self._step_from_proto(message)
+                        self._telemetry_store.record_step(record)
+        except asyncio.CancelledError:
+            _LOGGER.debug("PublishRunSteps cancelled", extra={"accepted": accepted})
+            raise
+        return trainer_pb2.PublishTelemetryResponse(accepted=accepted, dropped=dropped)
+
+    async def PublishRunEpisodes(self, request_iterator: AsyncIterator[trainer_pb2.RunEpisode], context: grpc.aio.ServicerContext) -> trainer_pb2.PublishTelemetryResponse:  # type: ignore[override]
+        accepted = 0
+        dropped = 0
+        run_id: Optional[str] = None
+        try:
+            async for message in request_iterator:
+                if not message.run_id:
+                    await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "run_id is required for telemetry ingestion")
+                if run_id is None:
+                    if not self._registry.get_run(message.run_id):
+                        await context.abort(grpc.StatusCode.NOT_FOUND, "run not registered")
+                    run_id = message.run_id
+                elif message.run_id != run_id:
+                    await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "telemetry stream cannot change run_id")
+                try:
+                    _, dropped_now = await self._telemetry_broadcaster.publish_episode(message)
+                except ValueError as exc:
+                    await context.abort(grpc.StatusCode.INVALID_ARGUMENT, str(exc))
+                else:
+                    accepted += 1
+                    dropped += dropped_now
+                    if self._telemetry_store:
+                        rollup = self._episode_from_proto(message)
+                        self._telemetry_store.record_episode(rollup, wait=False)
+        except asyncio.CancelledError:
+            _LOGGER.debug("PublishRunEpisodes cancelled", extra={"accepted": accepted})
+            raise
+        return trainer_pb2.PublishTelemetryResponse(accepted=accepted, dropped=dropped)
+
     # ------------------------------------------------------------------
     async def _broadcast(self, run_id: str) -> None:
         record = self._registry.get_run(run_id)
         if not record:
             return
         await self._broadcaster.publish(_record_to_proto(record))
+
+    # ------------------------------------------------------------------
+    def _step_from_proto(self, message: Any) -> StepRecord:
+        episode_suffix = int(message.episode_index)
+        episode_id = f"{message.run_id}-ep{episode_suffix:04d}" if message.run_id else f"ep{episode_suffix:04d}"
+        timestamp = self._timestamp_from_proto(message)
+        action_value = self._decode_action(message.action_json)
+        observation = self._decode_json_field(message.observation_json, default=None)
+        render_hint = self._decode_json_field(message.render_hint_json, default=None)
+
+        info_payload: dict[str, Any] = {}
+        if message.policy_label:
+            info_payload["policy_label"] = message.policy_label
+        if message.backend:
+            info_payload["backend"] = message.backend
+
+        return StepRecord(
+            episode_id=episode_id,
+            step_index=int(message.step_index),
+            action=action_value,
+            observation=observation,
+            reward=message.reward,
+            terminated=message.terminated,
+            truncated=message.truncated,
+            info=info_payload,
+            timestamp=timestamp,
+            render_payload=None,
+            agent_id=message.agent_id or None,
+            render_hint=render_hint if isinstance(render_hint, Mapping) else None,
+            frame_ref=message.frame_ref or None,
+            payload_version=int(message.payload_version) if message.payload_version else 0,
+        )
+
+    def _episode_from_proto(self, message: Any) -> EpisodeRollup:
+        episode_suffix = int(message.episode_index)
+        episode_id = f"{message.run_id}-ep{episode_suffix:04d}" if message.run_id else f"ep{episode_suffix:04d}"
+        metadata = self._decode_json_field(message.metadata_json, default={})
+        if not isinstance(metadata, Mapping):
+            metadata = {}
+        return EpisodeRollup(
+            episode_id=episode_id,
+            total_reward=message.total_reward,
+            steps=int(message.steps),
+            terminated=message.terminated,
+            truncated=message.truncated,
+            metadata=dict(metadata),
+            timestamp=self._timestamp_from_proto(message),
+            agent_id=message.agent_id or None,
+        )
+
+    @staticmethod
+    def _decode_json_field(value: str, *, default: Any) -> Any:
+        if not value:
+            return default
+        try:
+            return json.loads(value)
+        except json.JSONDecodeError:
+            _LOGGER.warning("Failed to decode telemetry JSON field", extra={"value_preview": value[:64]})
+            return default
+
+    @staticmethod
+    def _timestamp_from_proto(message: Any) -> datetime:
+        if hasattr(message, "timestamp") and hasattr(message, "HasField") and message.HasField("timestamp"):
+            dt = message.timestamp.ToDatetime()
+            if dt.tzinfo is None:
+                dt = dt.replace(tzinfo=timezone.utc)
+            else:
+                dt = dt.astimezone(timezone.utc)
+            return dt
+        return datetime.now(timezone.utc)
+
+    def _decode_action(self, value: str) -> int | None:
+        parsed = self._decode_json_field(value, default=None)
+        if isinstance(parsed, bool):
+            return 1 if parsed else 0
+        if isinstance(parsed, (int, float)):
+            return int(parsed)
+        if isinstance(parsed, str):
+            try:
+                return int(parsed)
+            except ValueError:
+                return None
+        return None

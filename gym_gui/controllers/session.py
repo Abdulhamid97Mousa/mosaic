@@ -6,7 +6,7 @@ from dataclasses import dataclass, replace
 import hashlib
 import logging
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
 
 import gymnasium.spaces as spaces
 import numpy as np
@@ -577,6 +577,12 @@ class SessionController(QtCore.QObject):
         if input_source is not None:
             info_payload.setdefault("input_source", input_source)
         # Ensure telemetry StepRecord mirrors the augmented snapshot information.
+        agent_id = step.agent_id or getattr(step.state, "active_agent", None)
+        if agent_id is None and self._actor_service is not None:
+            agent_id = self._actor_service.get_active_actor_id()
+        render_hint = self._coalesce_render_hint(step)
+        frame_ref = step.frame_ref or self._extract_frame_reference(step)
+        payload_version = step.payload_version if step.payload_version is not None else 0
         record = StepRecord(
             episode_id=self._episode_id,
             step_index=self._step_index,
@@ -588,6 +594,10 @@ class SessionController(QtCore.QObject):
             info=info_payload,
             timestamp=timestamp or datetime.utcnow(),
             render_payload=step.render_payload,
+            agent_id=agent_id,
+            render_hint=render_hint,
+            frame_ref=frame_ref,
+            payload_version=payload_version,
         )
         if self._telemetry is not None:
             self._telemetry.record_step(record)
@@ -731,6 +741,34 @@ class SessionController(QtCore.QObject):
             info=info_payload,
         )
 
+    def _coalesce_render_hint(self, step: AdapterStep) -> dict[str, Any] | None:
+        if step.render_hint:
+            return dict(step.render_hint)
+        state = step.state
+        hint: dict[str, Any] = {}
+        if state.active_agent:
+            hint["active_agent"] = state.active_agent
+        if state.metrics:
+            hint["metrics"] = dict(state.metrics)
+        if state.environment:
+            hint["environment"] = dict(state.environment)
+        if state.inventory:
+            hint["inventory"] = dict(state.inventory)
+        return hint or None
+
+    def _extract_frame_reference(self, step: AdapterStep) -> str | None:
+        state_raw = getattr(step.state, "raw", None)
+        if isinstance(state_raw, Mapping):
+            ref = state_raw.get("frame_ref")
+            if isinstance(ref, str):
+                return ref
+        payload = step.render_payload
+        if isinstance(payload, Mapping):
+            ref = payload.get("frame_ref")
+            if isinstance(ref, str):
+                return ref
+        return None
+
     def _finalize_episode(
         self,
         step: AdapterStep,
@@ -760,6 +798,7 @@ class SessionController(QtCore.QObject):
                 truncated=step.truncated if not aborted else True,
                 metadata=dict(self._episode_metadata),
                 timestamp=timestamp or datetime.utcnow(),
+                agent_id=getattr(step.state, "active_agent", None),
             )
             self._telemetry.complete_episode(rollup)
         self._episode_active = False

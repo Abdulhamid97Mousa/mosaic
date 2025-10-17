@@ -75,7 +75,11 @@ class TelemetrySQLiteStore:
                 truncated INTEGER NOT NULL,
                 info BLOB,
                 render_payload BLOB,
-                timestamp TEXT NOT NULL
+                timestamp TEXT NOT NULL,
+                agent_id TEXT,
+                render_hint BLOB,
+                frame_ref TEXT,
+                payload_version INTEGER NOT NULL DEFAULT 0
             )
             """
         )
@@ -88,7 +92,8 @@ class TelemetrySQLiteStore:
                 terminated INTEGER NOT NULL,
                 truncated INTEGER NOT NULL,
                 metadata BLOB,
-                timestamp TEXT NOT NULL
+                timestamp TEXT NOT NULL,
+                agent_id TEXT
             )
             """
         )
@@ -110,9 +115,24 @@ class TelemetrySQLiteStore:
     def _ensure_columns(self) -> None:
         cursor = self._conn.execute("PRAGMA table_info(steps)")
         column_names = {row[1] for row in cursor.fetchall()}
-        if "render_payload" not in column_names:
-            self._conn.execute("ALTER TABLE steps ADD COLUMN render_payload BLOB")
-            self._conn.commit()
+        migrations = [
+            ("render_payload", "ALTER TABLE steps ADD COLUMN render_payload BLOB"),
+            ("agent_id", "ALTER TABLE steps ADD COLUMN agent_id TEXT"),
+            ("render_hint", "ALTER TABLE steps ADD COLUMN render_hint BLOB"),
+            ("frame_ref", "ALTER TABLE steps ADD COLUMN frame_ref TEXT"),
+            (
+                "payload_version",
+                "ALTER TABLE steps ADD COLUMN payload_version INTEGER NOT NULL DEFAULT 0",
+            ),
+        ]
+        for name, ddl in migrations:
+            if name not in column_names:
+                self._conn.execute(ddl)
+        cursor = self._conn.execute("PRAGMA table_info(episodes)")
+        episode_columns = {row[1] for row in cursor.fetchall()}
+        if "agent_id" not in episode_columns:
+            self._conn.execute("ALTER TABLE episodes ADD COLUMN agent_id TEXT")
+        self._conn.commit()
 
     # ------------------------------------------------------------------
     def record_step(self, record: StepRecord) -> None:
@@ -236,9 +256,11 @@ class TelemetrySQLiteStore:
             """
             INSERT INTO steps (
                 episode_id, step_index, action, observation, reward,
-                terminated, truncated, info, render_payload, timestamp
+                terminated, truncated, info, render_payload, timestamp,
+                agent_id, render_hint, frame_ref, payload_version
             ) VALUES (:episode_id, :step_index, :action, :observation, :reward,
-                :terminated, :truncated, :info, :render_payload, :timestamp)
+                :terminated, :truncated, :info, :render_payload, :timestamp,
+                :agent_id, :render_hint, :frame_ref, :payload_version)
             """,
             steps,
         )
@@ -305,21 +327,23 @@ class TelemetrySQLiteStore:
             "truncated": int(rollup.truncated),
             "metadata": self._serialize_field(rollup.metadata, context="episode metadata"),
             "timestamp": rollup.timestamp.isoformat(),
+            "agent_id": rollup.agent_id,
         }
         cursor = self._conn.cursor()
         cursor.execute("BEGIN")
         cursor.execute(
             """
             INSERT INTO episodes (
-                episode_id, total_reward, steps, terminated, truncated, metadata, timestamp
-            ) VALUES (:episode_id, :total_reward, :steps, :terminated, :truncated, :metadata, :timestamp)
+                episode_id, total_reward, steps, terminated, truncated, metadata, timestamp, agent_id
+            ) VALUES (:episode_id, :total_reward, :steps, :terminated, :truncated, :metadata, :timestamp, :agent_id)
             ON CONFLICT(episode_id) DO UPDATE SET
                 total_reward=excluded.total_reward,
                 steps=excluded.steps,
                 terminated=excluded.terminated,
                 truncated=excluded.truncated,
                 metadata=excluded.metadata,
-                timestamp=excluded.timestamp
+                timestamp=excluded.timestamp,
+                agent_id=excluded.agent_id
             """,
             payload,
         )
@@ -337,6 +361,10 @@ class TelemetrySQLiteStore:
             "info": self._serialize_field(record.info, context="info"),
             "render_payload": self._serialize_field(record.render_payload, context="render payload"),
             "timestamp": record.timestamp.isoformat(),
+            "agent_id": record.agent_id,
+            "render_hint": self._serialize_field(record.render_hint, context="render hint"),
+            "frame_ref": record.frame_ref,
+            "payload_version": int(record.payload_version),
         }
 
     def _prepare_step_payload(self, record: StepRecord) -> tuple[dict[str, object], int]:
@@ -347,7 +375,7 @@ class TelemetrySQLiteStore:
     @staticmethod
     def _payload_size(payload: dict[str, object]) -> int:
         size = 0
-        for key in ("observation", "info", "render_payload"):
+        for key in ("observation", "info", "render_payload", "render_hint"):
             value = payload.get(key)
             if isinstance(value, (bytes, bytearray, memoryview)):
                 size += len(value)
@@ -388,21 +416,23 @@ class TelemetrySQLiteStore:
     def recent_steps(self, limit: int = 100) -> Sequence[StepRecord]:
         query = (
             "SELECT episode_id, step_index, action, observation, reward, terminated, truncated, info, "
-            "render_payload, timestamp FROM steps ORDER BY rowid DESC LIMIT ?"
+            "render_payload, timestamp, agent_id, render_hint, frame_ref, payload_version "
+            "FROM steps ORDER BY rowid DESC LIMIT ?"
         )
         with self._connect() as conn:
             rows = conn.execute(query, (limit,)).fetchall()
         return tuple(self._row_to_step(row) for row in rows)
 
     def recent_episodes(self, limit: int = 20) -> Sequence[EpisodeRollup]:
-        query = "SELECT episode_id, total_reward, steps, terminated, truncated, metadata, timestamp FROM episodes ORDER BY timestamp DESC LIMIT ?"
+        query = "SELECT episode_id, total_reward, steps, terminated, truncated, metadata, timestamp, agent_id FROM episodes ORDER BY timestamp DESC LIMIT ?"
         with self._connect() as conn:
             rows = conn.execute(query, (limit,)).fetchall()
         return tuple(self._row_to_episode(row) for row in rows)
 
     def episode_steps(self, episode_id: str) -> Sequence[StepRecord]:
         query = (
-            "SELECT episode_id, step_index, action, observation, reward, terminated, truncated, info, render_payload, timestamp "
+            "SELECT episode_id, step_index, action, observation, reward, terminated, truncated, info, render_payload, "
+            "timestamp, agent_id, render_hint, frame_ref, payload_version "
             "FROM steps WHERE episode_id = ? ORDER BY step_index ASC"
         )
         with self._connect() as conn:
@@ -427,12 +457,14 @@ class TelemetrySQLiteStore:
     def _row_to_step(self, row: Sequence) -> StepRecord:
         observation = self._deserialize_field(row[3], context="observation", default=None)
         info = self._deserialize_field(row[7], context="info", default={})
-        render_payload = None
-        if len(row) > 8:
-            render_payload = self._deserialize_field(
-                row[8], context="render payload", default=None
-            )
+        render_payload = self._deserialize_field(row[8], context="render payload", default=None)
         timestamp_value = row[9] if len(row) > 9 else None
+        agent_id = row[10] if len(row) > 10 else None
+        render_hint = None
+        if len(row) > 11:
+            render_hint = self._deserialize_field(row[11], context="render hint", default=None)
+        frame_ref = row[12] if len(row) > 12 else None
+        payload_version = int(row[13]) if len(row) > 13 and row[13] is not None else 0
         return StepRecord(
             episode_id=row[0],
             step_index=row[1],
@@ -444,6 +476,10 @@ class TelemetrySQLiteStore:
             info=info,
             timestamp=datetime.fromisoformat(timestamp_value) if timestamp_value else datetime.utcnow(),
             render_payload=render_payload,
+            agent_id=agent_id,
+            render_hint=render_hint,
+            frame_ref=frame_ref,
+            payload_version=payload_version,
         )
 
     def _row_to_episode(self, row: Sequence) -> EpisodeRollup:
@@ -456,6 +492,7 @@ class TelemetrySQLiteStore:
             truncated=bool(row[4]),
             metadata=metadata,
             timestamp=datetime.fromisoformat(row[6]) if row[6] else datetime.utcnow(),
+            agent_id=row[7] if len(row) > 7 else None,
         )
 
 

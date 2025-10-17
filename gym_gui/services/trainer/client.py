@@ -155,6 +155,44 @@ class TrainerClient:
             timeout=deadline or self._config.deadline,
         )
 
+    @asynccontextmanager
+    async def stream_run_steps(
+        self,
+        run_id: str,
+        *,
+        since_seq: int = 0,
+        deadline: Optional[float] = None,
+    ) -> AsyncIterator[AsyncIterator[Any]]:
+        """Stream telemetry steps for a specific run."""
+        stub = await self.ensure_connected()
+        call = stub.StreamRunSteps(
+            trainer_pb2.StreamStepsRequest(run_id=run_id, since_seq=since_seq),
+            timeout=deadline,
+        )
+        try:
+            yield call
+        finally:
+            await call.aclose()
+
+    @asynccontextmanager
+    async def stream_run_episodes(
+        self,
+        run_id: str,
+        *,
+        since_seq: int = 0,
+        deadline: Optional[float] = None,
+    ) -> AsyncIterator[AsyncIterator[Any]]:
+        """Stream telemetry episodes for a specific run."""
+        stub = await self.ensure_connected()
+        call = stub.StreamRunEpisodes(
+            trainer_pb2.StreamEpisodesRequest(run_id=run_id, since_seq=since_seq),
+            timeout=deadline,
+        )
+        try:
+            yield call
+        finally:
+            await call.aclose()
+
 
 def _status_to_proto(status: RunStatus) -> int:
     mapping = {

@@ -22,19 +22,30 @@ import grpc
 from google.protobuf import __version__ as protobuf_version
 from packaging.version import Version
 
-from gym_gui.config.paths import VAR_TRAINER_DIR, VAR_TRAINER_DB, ensure_var_directories
+from gym_gui.config.paths import (
+    VAR_TELEMETRY_DIR,
+    VAR_TRAINER_DIR,
+    VAR_TRAINER_DB,
+    ensure_var_directories,
+)
 from gym_gui.logging_config.logger import configure_logging
 from gym_gui.services.trainer import GPUAllocator, RunRegistry, RunStatus, TrainerDispatcher
+from gym_gui.services.trainer.service import _record_to_proto
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from gym_gui.services.trainer.proto import trainer_pb2, trainer_pb2_grpc
 from gym_gui.services.trainer.registry import WALCheckpointStats
+from gym_gui.telemetry import TelemetrySQLiteStore
 
 if TYPE_CHECKING:
     HealthCheckResponseType = Any  # pragma: no cover - typing alias
 else:  # pragma: no cover - alias only used for runtime
     HealthCheckResponseType = getattr(trainer_pb2, "HealthCheckResponse")
-from gym_gui.services.trainer.service import RunEventBroadcaster, TrainerService
+from gym_gui.services.trainer.service import (
+    RunEventBroadcaster,
+    RunTelemetryBroadcaster,
+    TrainerService,
+)
 
 _LOGGER = logging.getLogger("gym_gui.trainer.daemon")
 
@@ -162,22 +173,28 @@ class TrainerDaemon:
         self._grpc_server: Optional[grpc.aio.Server] = None
         self._listen = listen
         self._broadcaster = RunEventBroadcaster()
+        self._telemetry_broadcaster = RunTelemetryBroadcaster()
         self._dispatcher: Optional[TrainerDispatcher] = None
         self._pid_file = pid_file
         self._started_at: Optional[datetime] = None
         self._healthy = False
         self._fallback_full_streak = 0
+        # gRPC server options - keepalive settings disabled to avoid immediate GOAWAY on idle connections
         self._grpc_options = (
             ("grpc.max_send_message_length", max_message_bytes),
             ("grpc.max_receive_message_length", max_message_bytes),
-            ("grpc.keepalive_time_ms", 30_000),
-            ("grpc.keepalive_timeout_ms", 10_000),
-            ("grpc.http2.max_pings_without_data", 0),
-            ("grpc.keepalive_permit_without_calls", 1),
-            ("grpc.http2.min_time_between_pings_ms", 10_000),
-            ("grpc.max_connection_idle_ms", 0),
-            # TODO: tighten these limits once production telemetry envelopes are known.
+            # TODO: Re-enable keepalive once we understand why it causes GOAWAY on first connection
+            # ("grpc.keepalive_time_ms", 30_000),
+            # ("grpc.keepalive_timeout_ms", 10_000),
+            # ("grpc.http2.max_pings_without_data", 0),
+            # ("grpc.keepalive_permit_without_calls", 1),
+            # ("grpc.http2.min_time_between_pings_ms", 10_000),
+            # ("grpc.max_connection_idle_ms", 0),
         )
+        ensure_var_directories()
+        telemetry_db = VAR_TELEMETRY_DIR / "telemetry.sqlite"
+        self._telemetry_store: Optional[TelemetrySQLiteStore]
+        self._telemetry_store = TelemetrySQLiteStore(telemetry_db)
 
     async def run(self) -> None:
         _LOGGER.info("Trainer daemon starting")
@@ -201,7 +218,7 @@ class TrainerDaemon:
         async def broadcast_callback(run_id: str) -> None:
             record = self._registry.get_run(run_id)
             if record:
-                from gym_gui.services.trainer.service import _record_to_proto
+                
                 await self._broadcaster.publish(_record_to_proto(record))
         
         self._dispatcher = TrainerDispatcher(
@@ -215,7 +232,9 @@ class TrainerDaemon:
             self._registry,
             self._gpu_allocator,
             broadcaster=self._broadcaster,
+            telemetry_broadcaster=self._telemetry_broadcaster,
             health_provider=self._build_health_response,
+            telemetry_store=self._telemetry_store,
         )
         self._grpc_server = grpc.aio.server(options=self._grpc_options)
         trainer_pb2_grpc.add_TrainerServiceServicer_to_server(service, self._grpc_server)
@@ -253,6 +272,12 @@ class TrainerDaemon:
         _LOGGER.info("Final WAL checkpoint", extra=self._wal_stats_extra(wal_stats, "TRUNCATE"))
         if self._pid_file:
             self._pid_file.remove()
+        store = getattr(self, "_telemetry_store", None)
+        if store is not None:
+            try:
+                store.close()
+            finally:
+                self._telemetry_store = None
         _LOGGER.info("Trainer daemon shutdown complete")
 
     async def _maintenance_loop(self) -> None:

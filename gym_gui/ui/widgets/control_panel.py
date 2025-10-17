@@ -42,6 +42,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
     game_changed = Signal(GameId)
     load_requested = Signal(GameId, ControlMode, int)
     reset_requested = Signal(int)
+    agent_loadout_requested = Signal()
     slippery_toggled = Signal(bool)
     frozen_v2_config_changed = Signal(str, object)  # (param_name, value)
     taxi_config_changed = Signal(str, bool)  # (param_name, value)
@@ -55,6 +56,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
     terminate_game_requested = Signal()
     agent_step_requested = Signal()
     actor_changed = Signal(str)
+    train_agent_requested = Signal()  # New signal for headless training
 
     def __init__(
         self,
@@ -67,6 +69,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._available_modes = config.available_modes
         self._default_seed = max(1, config.default_seed)
         self._allow_seed_reuse = config.allow_seed_reuse
+        self._settings_store = QtCore.QSettings("GymGUI", "ControlPanelWidget")
         self._game_overrides: Dict[GameId, Dict[str, object]] = {
             GameId.FROZEN_LAKE: {
                 "is_slippery": config.frozen_lake_config.is_slippery,
@@ -112,7 +115,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         }
 
         self._current_game: Optional[GameId] = None
-        self._current_mode: ControlMode = config.default_mode
+        self._current_mode: ControlMode = self._load_mode_preference(config.default_mode)
         self._awaiting_human: bool = False
         self._auto_running: bool = False
         self._game_started: bool = False
@@ -161,7 +164,9 @@ class ControlPanelWidget(QtWidgets.QWidget):
         }
 
         self._build_ui()
+        self._apply_current_mode_selection()
         self._connect_signals()
+        self._update_control_states()
         self._populate_actor_combo()
 
     # ------------------------------------------------------------------
@@ -216,6 +221,11 @@ class ControlPanelWidget(QtWidgets.QWidget):
 
         if self._current_mode not in supported:
             self._current_mode = supported[0]
+            self._persist_mode_preference(self._current_mode)
+            self._mode_buttons[self._current_mode].setChecked(True)
+            self._emit_mode_changed(self._current_mode)
+            return
+
         self._mode_buttons[self._current_mode].setChecked(True)
         self._update_control_states()
 
@@ -385,6 +395,20 @@ class ControlPanelWidget(QtWidgets.QWidget):
             self._mode_buttons[mode] = button
         for column in range(columns):
             mode_layout.setColumnStretch(column, 1)
+
+        self._agent_loadout_button = QtWidgets.QToolButton(mode_group)
+        self._agent_loadout_button.setText("Agent loadout…")
+        self._agent_loadout_button.setToolTip("Configure agent policies and backends")
+        self._agent_loadout_button.setEnabled(False)
+        rows = (len(modes_tuple) + columns - 1) // columns
+        mode_layout.addWidget(
+            self._agent_loadout_button,
+            rows,
+            0,
+            1,
+            columns,
+            QtCore.Qt.AlignmentFlag.AlignLeft,
+        )
         layout.addWidget(mode_group)
 
         # Actor selector
@@ -397,6 +421,22 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._actor_description.setWordWrap(True)
         actor_layout.addWidget(self._actor_description)
         layout.addWidget(actor_group)
+
+        # Train Agent button (headless mode)
+        train_group = QtWidgets.QGroupBox("Headless Training", self)
+        train_layout = QtWidgets.QVBoxLayout(train_group)
+        self._train_agent_button = QtWidgets.QPushButton("🤖 Train Agent", train_group)
+        self._train_agent_button.setToolTip(
+            "Submit a headless training run to the trainer daemon.\n"
+            "Training will run in the background with live telemetry streaming."
+        )
+        self._train_agent_button.setStyleSheet(
+            "QPushButton { font-weight: bold; padding: 8px; background-color: #1976d2; color: white; }"
+            "QPushButton:hover { background-color: #1565c0; }"
+            "QPushButton:pressed { background-color: #0d47a1; }"
+        )
+        train_layout.addWidget(self._train_agent_button)
+        layout.addWidget(train_group)
 
         # Control buttons - renamed group
         controls_group = QtWidgets.QGroupBox("Game Control Flow", self)
@@ -471,8 +511,10 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._game_combo.currentIndexChanged.connect(self._on_game_changed)
         self._seed_spin.valueChanged.connect(lambda _: self._update_control_states())
         self._wire_mode_buttons()
+        self._agent_loadout_button.clicked.connect(self.agent_loadout_requested.emit)
 
         self._load_button.clicked.connect(self._on_load_clicked)
+        self._train_agent_button.clicked.connect(self.train_agent_requested.emit)
         self._start_button.clicked.connect(self._on_start_clicked)
         self._pause_button.clicked.connect(self._on_pause_clicked)
         self._continue_button.clicked.connect(self._on_continue_clicked)
@@ -496,6 +538,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
     def _emit_mode_changed(self, mode: ControlMode) -> None:
         if self._current_mode != mode:
             self._current_mode = mode
+            self._persist_mode_preference(mode)
         self.control_mode_changed.emit(mode)
         self._update_control_states()
 
@@ -637,8 +680,38 @@ class ControlPanelWidget(QtWidgets.QWidget):
         # Enable actor selector only when an agent can participate
         has_agent_component = self._current_mode != ControlMode.HUMAN_ONLY
         self._actor_combo.setEnabled(has_agent_component and self._actor_combo.count() > 0)
+        self._agent_loadout_button.setEnabled(has_agent_component)
+        self._agent_loadout_button.setVisible(has_agent_component)
 
         self._update_actor_description()
+
+    def _apply_current_mode_selection(self) -> None:
+        button = self._mode_buttons.get(self._current_mode)
+        if button is None:
+            return
+        button.blockSignals(True)
+        button.setChecked(True)
+        button.blockSignals(False)
+
+    def _persist_mode_preference(self, mode: ControlMode) -> None:
+        self._settings_store.setValue("control_mode", mode.name)
+
+    def _load_mode_preference(self, fallback: ControlMode) -> ControlMode:
+        stored = self._settings_store.value("control_mode")
+        if stored is None:
+            return fallback
+        if isinstance(stored, ControlMode):
+            return stored
+        if isinstance(stored, str):
+            key = stored.strip()
+            try:
+                return ControlMode[key]
+            except KeyError:
+                try:
+                    return ControlMode(key)
+                except ValueError:
+                    return fallback
+        return fallback
 
     def _populate_actor_combo(self) -> None:
         self._actor_combo.blockSignals(True)

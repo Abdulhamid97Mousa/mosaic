@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Async dispatcher that orchestrates trainer worker lifecycle."""
 
+import sys
 import asyncio
 from datetime import datetime, timedelta, timezone
 import logging
@@ -159,9 +160,40 @@ class TrainerDispatcher:
 
     def _build_worker_command(self, run: RunRecord) -> list[str]:
         """Build the subprocess command for the trainer worker."""
-        # TODO: Parse run config_json to extract entry_point and arguments
-        # For now, return a placeholder
-        return ["python", "-c", "import time; time.sleep(5); print('Training complete')"]
+
+        
+        # Derive agent_id from run_id for telemetry correlation
+        agent_id = f"agent_{run.run_id[:8]}"
+        
+        # gRPC daemon target (hardcoded for now, could be config)
+        grpc_target = "127.0.0.1:50055"
+        
+        # Check for custom worker command from environment or config
+        worker_entry = os.environ.get("GYM_GUI_WORKER_CMD")
+        if not worker_entry:
+            # Default to demo worker for testing
+            worker_cmd = [
+                sys.executable, "-m", "gym_gui.workers.demo_worker",
+                "--run-id", run.run_id,
+                "--agent-id", agent_id,
+                "--episodes", "3",
+                "--steps", "15",
+                "--delay", "0.03",
+            ]
+        else:
+            # Parse custom worker command (TODO: handle quoted args properly)
+            worker_cmd = worker_entry.split()
+        
+        # Wrap worker with telemetry proxy
+        proxy_cmd = [
+            sys.executable, "-m", "gym_gui.services.trainer.trainer_telemetry_proxy",
+            "--target", grpc_target,
+            "--run-id", run.run_id,
+            "--agent-id", agent_id,
+            "--",  # Separator for proxy args vs worker args
+        ]
+        
+        return proxy_cmd + worker_cmd
 
     def _build_worker_env(self, run: RunRecord) -> dict[str, str]:
         """Build environment variables for the worker subprocess."""

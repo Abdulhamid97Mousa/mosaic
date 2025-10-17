@@ -25,3 +25,16 @@ jsonschema==4.23.0
 grpcio==1.67.1
 grpcio-tools==1.67.1
 protobuf==5.27.2
+
+############################
+spade==4.0.1
+spade-bdi==0.3.2
+gymnasium>=0.26.0
+agentspeak==0.2.2
+pygame>=2.1.0
+cython==3.1.3
+slixmpp==1.8.5
+cffi==2.0.0
+bcrypt==4.3.0
+cryptography==43.0.1
+##############################
