@@ -87,6 +87,10 @@ class AdapterStep(Generic[ObservationT]):
     truncated: bool
     info: Mapping[str, Any]
     render_payload: Any | None = None
+    render_hint: Mapping[str, Any] | None = None
+    agent_id: str | None = None
+    frame_ref: str | None = None
+    payload_version: int = 1
     state: StepState = field(default_factory=StepState)
 
 
@@ -194,20 +198,58 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT]):
         truncated: bool,
         info: Mapping[str, Any],
     ) -> AdapterStep[ObservationT]:
+        state = self.build_step_state(observation, info)
+        render_payload = self.render()
+        render_hint = self.build_render_hint(observation, info, state)
+        frame_ref = self.build_frame_reference(render_payload, state)
         return AdapterStep(
             observation=observation,
             reward=reward,
             terminated=terminated,
             truncated=truncated,
             info=info,
-            render_payload=self.render(),
-            state=self.build_step_state(observation, info),
+            render_payload=render_payload,
+            render_hint=render_hint,
+            agent_id=state.active_agent,
+            frame_ref=frame_ref,
+            payload_version=self.telemetry_payload_version(),
+            state=state,
         )
 
     def build_step_state(self, observation: ObservationT, info: Mapping[str, Any]) -> StepState:
         """Construct the canonical :class:`StepState` for the current step."""
 
         return StepState()
+
+    def build_render_hint(
+        self,
+        observation: ObservationT,
+        info: Mapping[str, Any],
+        state: StepState,
+    ) -> Mapping[str, Any] | None:
+        """Return lightweight render metadata for downstream consumers."""
+
+        hint: dict[str, Any] = {}
+        if state.active_agent:
+            hint["active_agent"] = state.active_agent
+        if state.metrics:
+            hint["metrics"] = dict(state.metrics)
+        if state.environment:
+            hint["environment"] = dict(state.environment)
+        if state.inventory:
+            hint["inventory"] = dict(state.inventory)
+        return hint or None
+
+    def build_frame_reference(self, render_payload: Any | None, state: StepState) -> str | None:
+        """Optional hook to derive an external frame reference for media pipelines."""
+
+        del render_payload, state
+        return None
+
+    def telemetry_payload_version(self) -> int:
+        """Version marker for downstream telemetry consumers."""
+
+        return 1
 
     # ------------------------------------------------------------------
     # Optional utilities

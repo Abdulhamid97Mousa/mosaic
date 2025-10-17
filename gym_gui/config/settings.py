@@ -11,6 +11,8 @@ import yaml  # type: ignore[import-not-found]
 
 from dotenv import load_dotenv
 
+from gym_gui.cache.memory import memoize
+
 from gym_gui.core.enums import ControlMode
 
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
@@ -89,7 +91,7 @@ def _resolve_video_dir(raw_path: str | None) -> Path | None:
 _DEFAULT_SETTINGS = Settings()
 
 
-@lru_cache(maxsize=1)
+@memoize(maxsize=1)
 def get_settings() -> Settings:
     """Load settings from environment variables and cache the result."""
 
@@ -143,7 +145,7 @@ def reload_settings() -> Settings:
 __all__ = ["Settings", "get_settings", "reload_settings"]
 
 
-@lru_cache(maxsize=1)
+@memoize(maxsize=1)
 def get_storage_profile_config() -> dict[str, dict[str, object]]:
     """Load raw storage profile settings from YAML configuration."""
 

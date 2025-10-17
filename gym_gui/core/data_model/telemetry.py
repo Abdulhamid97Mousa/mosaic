@@ -25,6 +25,10 @@ class StepRecord:
     info: Mapping[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=_utc_now)
     render_payload: Any | None = None
+    agent_id: str | None = None
+    render_hint: Mapping[str, Any] | None = None
+    frame_ref: str | None = None
+    payload_version: int = 0
 
 
 @dataclass(slots=True)
@@ -38,6 +42,7 @@ class EpisodeRollup:
     truncated: bool
     metadata: Mapping[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=_utc_now)
+    agent_id: str | None = None
 
 
 __all__ = ["StepRecord", "EpisodeRollup"]

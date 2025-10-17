@@ -283,7 +283,7 @@ DEFAULT_FROZEN_LAKE_CONFIG = FrozenLakeConfig(
     hole_count=4,  # Gymnasium default 4×4 map
 )
 DEFAULT_FROZEN_LAKE_V2_CONFIG = FrozenLakeConfig(
-    is_slippery=True,
+    is_slippery=False,  # Deterministic movement by default for v2
     success_rate=1.0 / 3.0,
     reward_schedule=(1.0, 0.0, 0.0),
     grid_height=8,
