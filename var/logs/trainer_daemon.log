@@ -1,0 +1,10 @@
+2025-10-17 18:01:43,672 | INFO    | gym_gui.trainer.daemon | Trainer dependencies
+2025-10-17 18:01:43,674 | INFO    | gym_gui.trainer.daemon | Trainer daemon starting
+2025-10-17 18:01:43,675 | INFO    | gym_gui.trainer.dispatcher | Trainer dispatcher started
+2025-10-17 18:01:43,679 | INFO    | gym_gui.trainer.daemon | Trainer gRPC server listening
+2025-10-17 18:06:43,682 | INFO    | gym_gui.services.trainer.registry | WAL Checkpoint executed: busy=0, log_frames=0, checkpointed=0
+2025-10-17 18:10:00,429 | INFO    | gym_gui.trainer.daemon | Stop signal received; shutting down
+2025-10-17 18:10:00,429 | INFO    | gym_gui.trainer.dispatcher | Trainer dispatcher stopped
+2025-10-17 18:10:00,431 | INFO    | gym_gui.services.trainer.registry | WAL Checkpoint executed: busy=0, log_frames=0, checkpointed=0
+2025-10-17 18:10:00,431 | INFO    | gym_gui.trainer.daemon | Final WAL checkpoint
+2025-10-17 18:10:00,432 | INFO    | gym_gui.trainer.daemon | Trainer daemon shutdown complete
