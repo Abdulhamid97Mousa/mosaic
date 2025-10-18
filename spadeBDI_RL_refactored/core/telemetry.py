@@ -35,11 +35,14 @@ class TelemetryEmitter:
         self.emit("run_completed", run_id=run_id, status=status, **fields)
 
     def step(self, run_id: str, episode: int, step_index: int, **fields: Any) -> None:
+        # Add both 'ts' and 'timestamp' for compatibility
+        ts = _utc_timestamp()
         self.emit(
             "step",
             run_id=run_id,
             episode=int(episode),
             step=int(step_index),
+            timestamp=ts,  # Add timestamp field explicitly
             **fields,
         )
 

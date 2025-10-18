@@ -32,6 +32,8 @@ gym_gui/var/tmp/*
 !gym_gui/var/tmp/README.md
 gym_gui/var/logs/*
 !gym_gui/var/logs/README.md
+gym_gui/var/config/*
+!gym_gui/var/config/README.md
 
 spadeBDI_RL
 graphrag

@@ -65,6 +65,10 @@ class FrozenLakeAdapter:
         col = state % self._ncol
         return (int(row), int(col))
 
+    def pos_to_state(self, x: int, y: int) -> int:
+        """Convert (x, y) position to flat state index."""
+        return int(y * self._ncol + x)
+
     def goal_pos(self) -> Tuple[int, int]:
         """Find the goal position by scanning the map."""
         desc = self._env.unwrapped.desc  # type: ignore[attr-defined]
@@ -72,6 +76,26 @@ class FrozenLakeAdapter:
         if len(goal_positions[0]) > 0:
             return (int(goal_positions[0][0]), int(goal_positions[1][0]))
         return (self._nrow - 1, self._ncol - 1)  # Default to bottom-right
+
+    def set_goal(self, gx: int, gy: int) -> None:
+        """Set a new goal position (if supported by environment)."""
+        # FrozenLake-v1 doesn't support dynamic goal changes
+        # This is a placeholder for future extensibility
+        pass
+
+    def is_hole(self, x: int, y: int) -> bool:
+        """Check if position (x, y) is a hole."""
+        desc = self._env.unwrapped.desc  # type: ignore[attr-defined]
+        if 0 <= x < self._ncol and 0 <= y < self._nrow:
+            return desc[y, x] == b'H'
+        return False
+
+    def is_goal(self, x: int, y: int) -> bool:
+        """Check if position (x, y) is the goal."""
+        desc = self._env.unwrapped.desc  # type: ignore[attr-defined]
+        if 0 <= x < self._ncol and 0 <= y < self._nrow:
+            return desc[y, x] == b'G'
+        return False
 
     def action_meanings(self) -> list[str]:
         return list(self._action_meanings)
@@ -196,6 +220,10 @@ class FrozenLakeV2Adapter:
         col = state % self._ncol
         return (int(row), int(col))
 
+    def pos_to_state(self, x: int, y: int) -> int:
+        """Convert (x, y) position to flat state index."""
+        return int(y * self._ncol + x)
+
     def goal_pos(self) -> Tuple[int, int]:
         """Find the goal position by scanning the map."""
         desc = self._env.unwrapped.desc  # type: ignore[attr-defined]
@@ -203,6 +231,26 @@ class FrozenLakeV2Adapter:
         if len(goal_positions[0]) > 0:
             return (int(goal_positions[0][0]), int(goal_positions[1][0]))
         return (self._nrow - 1, self._ncol - 1)  # Default to bottom-right
+
+    def set_goal(self, gx: int, gy: int) -> None:
+        """Set a new goal position (if supported by environment)."""
+        # FrozenLake-v2 doesn't support dynamic goal changes
+        # This is a placeholder for future extensibility
+        pass
+
+    def is_hole(self, x: int, y: int) -> bool:
+        """Check if position (x, y) is a hole."""
+        desc = self._env.unwrapped.desc  # type: ignore[attr-defined]
+        if 0 <= x < self._ncol and 0 <= y < self._nrow:
+            return desc[y, x] == b'H'
+        return False
+
+    def is_goal(self, x: int, y: int) -> bool:
+        """Check if position (x, y) is the goal."""
+        desc = self._env.unwrapped.desc  # type: ignore[attr-defined]
+        if 0 <= x < self._ncol and 0 <= y < self._nrow:
+            return desc[y, x] == b'G'
+        return False
 
     def action_meanings(self) -> list[str]:
         return list(self._action_meanings)
@@ -216,16 +264,16 @@ class FrozenLakeV2Adapter:
     def _obs_dict(self, state: int, info: Dict[str, Any] | None = None) -> Dict[str, Any]:
         row, col = self.state_to_pos(state)
         goal_row, goal_col = self.goal_pos()
-        
+
         result = {
             "state": int(state),
             "position": {"row": int(row), "col": int(col)},
             "goal": {"row": int(goal_row), "col": int(goal_col)},
         }
-        
+
         if info:
             result.update(info)
-        
+
         return result
 
 

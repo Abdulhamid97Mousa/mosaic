@@ -11,6 +11,7 @@ from typing import Any, Dict, Optional
 from .adapters import create_adapter
 from .core import RunConfig, TelemetryEmitter
 from .core.runtime import HeadlessTrainer
+from .core.bdi_trainer import BDITrainer
 
 
 def _read_config_from_path(path: Path) -> Dict[str, Any]:
@@ -51,15 +52,30 @@ def main(argv: Optional[list[str]] = None) -> int:
         default="127.0.0.1:50055",
         help="Daemon gRPC address (default: 127.0.0.1:50055).",
     )
+    parser.add_argument(
+        "--bdi",
+        action="store_true",
+        help="Use BDI-RL mode (requires SPADE-BDI and ejabberd).",
+    )
+    parser.add_argument(
+        "--bdi-jid",
+        default="agent@localhost",
+        help="XMPP JID for BDI agent (default: agent@localhost).",
+    )
+    parser.add_argument(
+        "--bdi-password",
+        default="secret",
+        help="XMPP password for BDI agent (default: secret).",
+    )
     parsed = parser.parse_args(argv)
 
     run_config = _load_config(parsed)
-    
+
     # Override config with CLI flags
     if parsed.grpc:
         run_config.extra["use_grpc_telemetry"] = True
         run_config.extra["grpc_target"] = parsed.grpc_target
-    
+
     emitter = TelemetryEmitter()
 
     adapter_kwargs = run_config.extra.get("adapter_kwargs", {})
@@ -70,7 +86,17 @@ def main(argv: Optional[list[str]] = None) -> int:
         emitter.run_completed(run_config.run_id, status="skipped", reason="dry-run")
         return 0
 
-    trainer = HeadlessTrainer(adapter, run_config, emitter)
+    # Choose trainer based on BDI flag
+    if parsed.bdi:
+        trainer = BDITrainer(
+            adapter,
+            run_config,
+            emitter,
+            jid=parsed.bdi_jid,
+            password=parsed.bdi_password,
+        )
+    else:
+        trainer = HeadlessTrainer(adapter, run_config, emitter)
 
     try:
         return trainer.run()

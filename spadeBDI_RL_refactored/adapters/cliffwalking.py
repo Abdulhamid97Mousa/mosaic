@@ -1,4 +1,4 @@
-"""Adapter wrapping Gymnasium's CliffWalking-v0 for unified runtime use."""
+"""Adapter wrapping Gymnasium's CliffWalking-v1 for unified runtime use."""
 
 from __future__ import annotations
 
@@ -12,7 +12,7 @@ import numpy as np
 
 @dataclass(slots=True)
 class CliffWalkingAdapter:
-    """Provide consistent semantics over Gymnasium's CliffWalking-v0 environment."""
+    """Provide consistent semantics over Gymnasium's CliffWalking-v1 environment."""
 
     _env: gym.Env = field(init=False, repr=False)
     _action_meanings: list[str] = field(init=False, repr=False)
@@ -21,7 +21,7 @@ class CliffWalkingAdapter:
 
     def __post_init__(self) -> None:
         self._env = gym.make(
-            "CliffWalking-v0",
+            "CliffWalking-v1",
             render_mode=None,
         )
         self._action_meanings = ["UP", "RIGHT", "DOWN", "LEFT"]

@@ -57,7 +57,8 @@ def main() -> int:
     app = QApplication(sys.argv)
     app.setApplicationName("Gym GUI")
 
-    _install_asyncio_exception_handler()
+    # Setup Qt-compatible asyncio event loop using qasync
+    _setup_qasync_event_loop(app)
 
     try:
         locator = bootstrap_default_services()
@@ -89,7 +90,46 @@ def main() -> int:
     return app.exec()
 
 
+def _setup_qasync_event_loop(app: Any) -> None:
+    """Setup Qt-compatible asyncio event loop using qasync.
+
+    This allows asyncio and Qt to share the same event loop, preventing
+    conflicts between the two event loop systems.
+    """
+    try:
+        from qasync import QEventLoop
+    except ImportError:
+        logger = logging.getLogger("gym_gui.app")
+        logger.warning(
+            "qasync not installed - falling back to separate event loops. "
+            "Install qasync for better asyncio/Qt integration."
+        )
+        _install_asyncio_exception_handler()
+        return
+
+    logger = logging.getLogger("gym_gui.app")
+
+    # Create Qt-compatible event loop
+    loop = QEventLoop(app)
+    asyncio.set_event_loop(loop)
+
+    # Install exception handler
+    def _handler(loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
+        exc = context.get("exception")
+        if isinstance(exc, BlockingIOError) and getattr(exc, "errno", None) in {errno.EAGAIN, errno.EWOULDBLOCK}:
+            logger.debug(
+                "Ignoring non-fatal BlockingIOError from gRPC poller",
+                extra={"message": context.get("message")},
+            )
+            return
+        loop.default_exception_handler(context)
+
+    loop.set_exception_handler(_handler)
+    logger.info("Qt-compatible asyncio event loop initialized with qasync")
+
+
 def _install_asyncio_exception_handler() -> None:
+    """Fallback: Install exception handler for separate asyncio loop."""
     try:
         loop = asyncio.get_running_loop()
     except RuntimeError:

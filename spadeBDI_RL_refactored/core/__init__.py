@@ -4,6 +4,7 @@ from typing import TYPE_CHECKING
 
 from .config import PolicyStrategy, RunConfig
 from .runtime import HeadlessTrainer
+from .bdi_trainer import BDITrainer
 from .telemetry import TelemetryEmitter
 
 if TYPE_CHECKING:
@@ -29,6 +30,7 @@ __all__ = [
     "RunConfig",
     "PolicyStrategy",
     "HeadlessTrainer",
+    "BDITrainer",
     "TelemetryEmitter",
 ]
 

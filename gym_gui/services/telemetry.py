@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Telemetry collection and routing service."""
 
+import logging
 from collections import deque
 from typing import Deque, Iterable, Optional, TYPE_CHECKING
 
@@ -10,13 +11,16 @@ from gym_gui.storage.session import EpisodeRecord
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
     from gym_gui.services.storage import StorageRecorderService
+    from gym_gui.services.validation_service import ValidationService
     from gym_gui.telemetry import TelemetrySQLiteStore
+
+logger = logging.getLogger(__name__)
 
 
 class TelemetryService:
     """Aggregates telemetry events and forwards them to storage."""
 
-    def __init__(self, *, history_limit: int = 512) -> None:
+    def __init__(self, *, history_limit: int = 512, validation_service: Optional["ValidationService"] = None) -> None:
         self._history_limit = max(1, history_limit)
         self._step_history: Deque[StepRecord] = deque(maxlen=self._history_limit)
         self._episode_history: Deque[EpisodeRollup] = deque(
@@ -24,6 +28,7 @@ class TelemetryService:
         )
         self._storage: "StorageRecorderService | None" = None
         self._store: "TelemetrySQLiteStore | None" = None
+        self._validation_service: "ValidationService | None" = validation_service
 
     def attach_storage(self, storage: "StorageRecorderService") -> None:
         self._storage = storage
@@ -31,8 +36,47 @@ class TelemetryService:
     def attach_store(self, store: "TelemetrySQLiteStore") -> None:
         self._store = store
 
+    def attach_validation_service(self, validation_service: "ValidationService") -> None:
+        """Attach a validation service for data validation."""
+        self._validation_service = validation_service
+
     # ------------------------------------------------------------------
     def record_step(self, record: StepRecord) -> None:
+        # Log incoming step with all 10 fields
+        logger.error(f"[TELEMETRY] Incoming StepRecord: "
+                    f"episode_id={record.episode_id} "
+                    f"step_index={record.step_index} "
+                    f"agent_id={record.agent_id} "
+                    f"reward={record.reward} "
+                    f"action={record.action} "
+                    f"terminated={record.terminated} "
+                    f"truncated={record.truncated}")
+        
+        # Log field types to spot mismatches
+        logger.error(f"[TELEMETRY TYPES] episode_id={type(record.episode_id).__name__} "
+                    f"step_index={type(record.step_index).__name__} "
+                    f"reward={type(record.reward).__name__} "
+                    f"action={type(record.action).__name__} "
+                    f"terminated={type(record.terminated).__name__} "
+                    f"truncated={type(record.truncated).__name__}")
+        
+        # Validate step data if validation service is attached
+        if self._validation_service:
+            try:
+                episode_num = int(record.episode_id.split("_")[-1]) if "_" in record.episode_id else 0
+            except (ValueError, IndexError):
+                episode_num = 0
+            is_valid = self._validation_service.validate_step_data(
+                episode=episode_num,
+                step=record.step_index,
+                action=record.action or 0,
+                reward=record.reward,
+                state=0,  # Not available in StepRecord
+                next_state=0,  # Not available in StepRecord
+            )
+            if not is_valid:
+                logger.warning(f"Step record validation failed: {record}")
+
         self._step_history.append(record)
         if self._storage:
             storage_record = EpisodeRecord(
@@ -46,6 +90,8 @@ class TelemetryService:
             )
             self._storage.record_step(storage_record)
         if self._store:
+            logger.error(f"[TELEMETRY PERSIST] Persisting to SQLite store: "
+                        f"episode_id={record.episode_id} step_index={record.step_index}")
             self._store.record_step(record)
 
     def complete_episode(self, rollup: EpisodeRollup) -> None:
