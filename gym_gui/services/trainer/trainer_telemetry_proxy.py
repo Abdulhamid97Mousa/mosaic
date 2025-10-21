@@ -184,6 +184,7 @@ async def run_proxy(
 
     async def read_worker() -> None:
         """Tail worker stdout and enqueue parsed events."""
+        nonlocal step_count, episode_count
         tail = JsonlTailer(proc)
         async for ev in tail:
             typ = str(ev.get("type", "")).lower()
