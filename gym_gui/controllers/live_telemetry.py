@@ -1,11 +1,24 @@
-"""Controller for managing live telemetry streaming from trainer runs."""
+"""Controller for managing live telemetry streaming from trainer runs.
+
+This controller subscribes to RunBus for independent event delivery:
+- Subscribes to STEP_APPENDED and EPISODE_FINALIZED topics
+- Uses UI queue size (64 events) for responsive rendering
+- Processes events in background thread
+- Emits Qt signals for main thread rendering
+"""
 
 from __future__ import annotations
 
+import asyncio
 import logging
+import queue
+import threading
 from typing import TYPE_CHECKING, Optional, Dict
 
 from qtpy import QtCore
+
+from gym_gui.telemetry.run_bus import get_bus
+from gym_gui.telemetry.events import Topic, TelemetryEvent
 
 if TYPE_CHECKING:
     from gym_gui.services.trainer import TrainerClient
@@ -19,8 +32,6 @@ class LiveTelemetryController(QtCore.QObject):
     # Signals
     run_tab_requested = QtCore.Signal(str, str, str)  # type: ignore[attr-defined] # (run_id, agent_id, tab_title)
     telemetry_stats_updated = QtCore.Signal(str, dict)  # type: ignore[attr-defined] # (run_id, stats)
-    step_received = QtCore.Signal(object)  # type: ignore[attr-defined] # (step_data)
-    episode_received = QtCore.Signal(object)  # type: ignore[attr-defined] # (episode_data)
     run_completed = QtCore.Signal(str)  # type: ignore[attr-defined] # (run_id)
 
     def __init__(
@@ -36,11 +47,57 @@ class LiveTelemetryController(QtCore.QObject):
         self._active_runs: set[str] = set()
         self._tabs: Dict[tuple[str, str], "LiveTelemetryTab"] = {}  # (run_id, agent_id) -> tab
 
-        # Wire bridge signals
-        self._hub.bridge.step_received.connect(self._on_step_received)
-        self._hub.bridge.episode_received.connect(self._on_episode_received)
+        # Buffer for steps that arrive before tab is registered (race condition mitigation)
+        self._step_buffer: Dict[tuple[str, str], list] = {}  # (run_id, agent_id) -> [steps]
+        self._episode_buffer: Dict[tuple[str, str], list] = {}  # (run_id, agent_id) -> [episodes]
+
+        # Store rendering throttle value per run (from TELEMETRY_SAMPLING_INTERVAL env var)
+        self._render_throttle_per_run: Dict[str, int] = {}  # run_id -> throttle_interval
+
+        # Store buffer sizes per run (from training config)
+        self._step_buffer_size_per_run: Dict[str, int] = {}  # run_id -> step_buffer_size
+        self._episode_buffer_size_per_run: Dict[str, int] = {}  # run_id -> episode_buffer_size
+        # RunBus subscription for independent event delivery
+        self._bus = get_bus()
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+        self._thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self._step_queue: Optional[queue.Queue] = None
+        self._episode_queue: Optional[queue.Queue] = None
+
+        # Still wire bridge signals for overflow and run_completed (not in RunBus yet)
         self._hub.bridge.queue_overflow.connect(self._on_queue_overflow)
         self._hub.bridge.run_completed.connect(self._on_run_completed_from_bridge)
+
+        self._logger.info("LiveTelemetryController initialized with RunBus subscription")
+
+    def start(self) -> None:
+        """Start the background thread for RunBus subscription."""
+        if self._thread is not None:
+            self._logger.warning("Controller already started")
+            return
+
+        self._stop_event.clear()
+        self._thread = threading.Thread(
+            target=self._run,
+            name="live-telemetry-runbus",
+            daemon=True,
+        )
+        self._thread.start()
+        self._logger.info("LiveTelemetryController background thread started")
+
+    def stop(self) -> None:
+        """Stop the background thread."""
+        if self._thread is None:
+            return
+
+        self._stop_event.set()
+        self._thread.join(timeout=5.0)
+        if self._thread.is_alive():
+            self._logger.warning("Controller thread did not stop cleanly")
+        else:
+            self._logger.info("LiveTelemetryController background thread stopped")
+        self._thread = None
 
     def subscribe_to_run(self, run_id: str) -> None:
         """Start streaming telemetry for a run."""
@@ -71,96 +128,101 @@ class LiveTelemetryController(QtCore.QObject):
         self._tabs.clear()
         self._hub.stop()
 
+    def set_render_throttle_for_run(self, run_id: str, throttle_interval: int) -> None:
+        """Set the rendering throttle interval for a run.
+
+        Args:
+            run_id: The training run ID
+            throttle_interval: Render every Nth step (1=every step, 2=every 2nd step, etc.)
+        """
+        self._render_throttle_per_run[run_id] = max(1, throttle_interval)
+        self._logger.debug(
+            "Set render throttle for run",
+            extra={"run_id": run_id, "throttle_interval": throttle_interval},
+        )
+
+    def set_buffer_sizes_for_run(self, run_id: str, step_buffer_size: int = 100, episode_buffer_size: int = 100) -> None:
+        """Set the buffer sizes for a run.
+
+        Args:
+            run_id: The training run ID
+            step_buffer_size: Number of steps to keep in UI display buffer (default: 100)
+            episode_buffer_size: Number of episodes to keep in UI display buffer (default: 100)
+        """
+        self._step_buffer_size_per_run[run_id] = max(10, step_buffer_size)
+        self._episode_buffer_size_per_run[run_id] = max(10, episode_buffer_size)
+        self._logger.debug(
+            "Set buffer sizes for run",
+            extra={
+                "run_id": run_id,
+                "step_buffer_size": step_buffer_size,
+                "episode_buffer_size": episode_buffer_size,
+            },
+        )
+
+    def get_buffer_sizes_for_run(self, run_id: str) -> tuple[int, int]:
+        """Get the buffer sizes for a run.
+
+        Args:
+            run_id: The training run ID
+
+        Returns:
+            Tuple of (step_buffer_size, episode_buffer_size)
+        """
+        step_size = self._step_buffer_size_per_run.get(run_id, 100)
+        episode_size = self._episode_buffer_size_per_run.get(run_id, 100)
+        return step_size, episode_size
+
     def register_tab(self, run_id: str, agent_id: str, tab: "LiveTelemetryTab") -> None:
         """Register a newly created tab widget for routing telemetry."""
         key = (run_id, agent_id)
         self._tabs[key] = tab
-        self._logger.debug("Registered tab", extra={"run_id": run_id, "agent_id": agent_id})
 
-    # Signal handlers
-    def _on_step_received(self, step: object) -> None:
-        from gym_gui.services.trainer.streams import TelemetryStep
-
-        if not isinstance(step, TelemetryStep):
-            self._logger.debug(f"Received non-TelemetryStep object: {type(step)}")
-            return
-
-        run_id = step.run_id
-        payload = getattr(step, "payload", None)
-        # Extract agent_id from dict payloads (preferred) or attribute fallback
-        agent_id = (
-            (payload.get("agent_id") if isinstance(payload, dict) else getattr(payload, "agent_id", None))
-            or "default"
-        )
-
-        # Extra debug snapshot for troubleshooting
-        payload_type = type(payload).__name__
-        if isinstance(payload, dict):
-            payload_keys = list(payload.keys())[:12]
-            episode_idx = payload.get("episode_index", payload.get("episode"))
-            step_idx = payload.get("step_index", payload.get("step"))
-        else:
-            payload_keys = []
-            episode_idx = getattr(payload, "episode_index", getattr(payload, "episode", None))
-            step_idx = getattr(payload, "step_index", getattr(payload, "step", None))
-
-        self._logger.debug(
-            "_on_step_received: telemetry step",
-            extra={
-                "run_id": run_id,
-                "agent_id": agent_id,
-                "payload_type": payload_type,
-                "payload_keys": payload_keys,
-                "episode_index": episode_idx,
-                "step_index": step_idx,
-            },
-        )
-
-        key = (run_id, agent_id)
-
-        # Request dynamic tab creation on first step for this (run, agent) pair
-        if key not in self._tabs:
-            self._tabs[key] = None  # type: ignore[assignment]
-            tab_title = f"Agent-{agent_id}-Online"
-            self.run_tab_requested.emit(run_id, agent_id, tab_title)
+        # Apply rendering throttle if set for this run
+        if run_id in self._render_throttle_per_run:
+            throttle = self._render_throttle_per_run[run_id]
+            tab.set_render_throttle_interval(throttle)
             self._logger.debug(
-                "Requesting tab creation",
-                extra={"run_id": run_id, "agent_id": agent_id, "title": tab_title},
+                "Applied render throttle to tab",
+                extra={"run_id": run_id, "agent_id": agent_id, "throttle": throttle},
             )
 
-        # Emit step signal for main window to handle
-        self.step_received.emit(step)
-        self._logger.debug("Emitted step_received signal", extra={"run_id": run_id, "agent_id": agent_id})
+        self._logger.info(
+            "Tab registered and ready for telemetry",
+            extra={"run_id": run_id, "agent_id": agent_id, "tab_type": type(tab).__name__},
+        )
 
-        # Route step to registered tab if available
-        tab = self._tabs.get(key)
-        if tab is not None:
-            tab.add_step(payload)
+        # Flush any buffered steps that arrived before tab was registered
+        if key in self._step_buffer:
+            buffered_steps = self._step_buffer.pop(key)
+            self._logger.info(
+                "Flushing buffered steps to newly registered tab",
+                extra={"run_id": run_id, "agent_id": agent_id, "buffered_count": len(buffered_steps)},
+            )
+            for payload in buffered_steps:
+                tab.add_step(payload)
 
-    def _on_episode_received(self, episode: object) -> None:
-        from gym_gui.services.trainer.streams import TelemetryEpisode
+        # Flush any buffered episodes that arrived before tab was registered
+        if key in self._episode_buffer:
+            buffered_episodes = self._episode_buffer.pop(key)
+            self._logger.info(
+                "Flushing buffered episodes to newly registered tab",
+                extra={"run_id": run_id, "agent_id": agent_id, "buffered_count": len(buffered_episodes)},
+            )
+            for payload in buffered_episodes:
+                tab.add_episode(payload)
 
-        if not isinstance(episode, TelemetryEpisode):
-            return
+    @QtCore.Slot(str, str, str)  # type: ignore[misc]
+    def _emit_tab_requested(self, run_id: str, agent_id: str, tab_title: str) -> None:
+        """Helper method to emit run_tab_requested signal from main thread.
 
-        run_id = episode.run_id
-        # Extract agent_id from payload if available
-        # payload is a dict, not an object
-        agent_id = None
-        if isinstance(episode.payload, dict):
-            agent_id = episode.payload.get("agent_id")
-        else:
-            agent_id = getattr(episode.payload, "agent_id", None)
-        agent_id = agent_id or "unknown"
-        key = (run_id, agent_id)
+        This is called via QMetaObject.invokeMethod from the background thread,
+        ensuring the signal is emitted on the main thread.
+        """
+        self.run_tab_requested.emit(run_id, agent_id, tab_title)
 
-        # Emit episode signal for main window to handle
-        self.episode_received.emit(episode)
-
-        # Route episode to registered tab
-        tab = self._tabs.get(key)
-        if tab is not None:
-            tab.add_episode(episode.payload)
+    # Note: Old signal handlers (_on_step_received, _on_episode_received) removed
+    # Events now come from RunBus subscription in background thread (_process_step_queue, _process_episode_queue)
 
     def _on_queue_overflow(self, run_id: str, stream_type: str, dropped: int) -> None:
         stats = {
@@ -184,6 +246,174 @@ class LiveTelemetryController(QtCore.QObject):
         """Handle run completion signal from bridge."""
         self._logger.info("Run completed signal received from bridge", extra={"run_id": run_id})
         self.run_completed.emit(run_id)
+
+    def _run(self) -> None:
+        """Main loop for background thread."""
+        try:
+            # Create new event loop for this thread
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+
+            # Subscribe to RunBus with UI queue size (64)
+            self._step_queue = self._bus.subscribe_with_size(
+                Topic.STEP_APPENDED, "live-ui", 64
+            )
+            self._episode_queue = self._bus.subscribe_with_size(
+                Topic.EPISODE_FINALIZED, "live-ui", 64
+            )
+
+            self._logger.info(
+                "Subscribed to RunBus topics",
+                extra={"queue_size": 64},
+            )
+
+            # Run async loop
+            self._loop.run_until_complete(self._process_events())
+        except Exception as e:
+            self._logger.exception("Fatal error in controller", extra={"error": str(e)})
+        finally:
+            if self._loop is not None:
+                self._loop.close()
+            self._logger.info("Controller loop exited")
+
+    async def _process_events(self) -> None:
+        """Process events from RunBus queues."""
+        while not self._stop_event.is_set():
+            try:
+                # Process step events (non-blocking)
+                if self._step_queue is not None:
+                    await self._process_step_queue()
+
+                # Process episode events (non-blocking)
+                if self._episode_queue is not None:
+                    await self._process_episode_queue()
+
+                # Small sleep to avoid busy-waiting
+                await asyncio.sleep(0.01)
+            except Exception as e:
+                self._logger.exception("Error processing events", extra={"error": str(e)})
+
+    async def _process_step_queue(self) -> None:
+        """Process all available step events from RunBus."""
+        assert self._step_queue is not None
+
+        while True:
+            try:
+                evt = self._step_queue.get_nowait()
+                if not isinstance(evt, TelemetryEvent):
+                    continue
+
+                self._logger.debug(
+                    "Step event received from RunBus",
+                    extra={
+                        "run_id": evt.run_id,
+                        "agent_id": evt.agent_id,
+                        "seq_id": evt.seq_id,
+                    },
+                )
+
+                # Route to tab or buffer
+                agent_id = evt.agent_id or "default"
+                key = (evt.run_id, agent_id)
+
+                # Route to tab if registered
+                tab = self._tabs.get(key)
+                if tab is not None:
+                    try:
+                        tab.add_step(evt.payload)
+                    except Exception as e:
+                        self._logger.warning(
+                            "Error adding step to tab (tab may be destroyed)",
+                            extra={"run_id": evt.run_id, "agent_id": agent_id, "error": str(e)},
+                        )
+                        # Remove the tab from tracking if it's destroyed
+                        self._tabs.pop(key, None)
+                else:
+                    # Emit signal to request tab creation on first step
+                    if key not in self._step_buffer:
+                        self._logger.info(
+                            "First step received; requesting tab creation",
+                            extra={"run_id": evt.run_id, "agent_id": agent_id},
+                        )
+                        tab_title = f"Live – {agent_id}"
+                        # CRITICAL FIX: Use QMetaObject.invokeMethod to emit signal from main thread
+                        # This is thread-safe and works across event loops
+                        try:
+                            QtCore.QMetaObject.invokeMethod(
+                                self,
+                                "_emit_tab_requested",
+                                QtCore.Qt.ConnectionType.QueuedConnection,
+                                QtCore.Q_ARG(str, evt.run_id),
+                                QtCore.Q_ARG(str, agent_id),
+                                QtCore.Q_ARG(str, tab_title),
+                            )
+                            self._logger.debug(
+                                "Scheduled signal emission via QMetaObject.invokeMethod",
+                                extra={"run_id": evt.run_id, "agent_id": agent_id},
+                            )
+                        except Exception as e:
+                            self._logger.error(
+                                "Failed to schedule signal emission",
+                                extra={"error": str(e), "run_id": evt.run_id, "agent_id": agent_id},
+                            )
+
+                    # Buffer until tab is registered
+                    if key not in self._step_buffer:
+                        self._step_buffer[key] = []
+                    self._step_buffer[key].append(evt.payload)
+
+            except Exception as e:
+                # Catch queue.Empty (from thread-safe queue.Queue)
+                if type(e).__name__ == 'Empty':
+                    break
+                raise
+
+    async def _process_episode_queue(self) -> None:
+        """Process all available episode events from RunBus."""
+        assert self._episode_queue is not None
+
+        while True:
+            try:
+                evt = self._episode_queue.get_nowait()
+                if not isinstance(evt, TelemetryEvent):
+                    continue
+
+                self._logger.debug(
+                    "Episode event received from RunBus",
+                    extra={
+                        "run_id": evt.run_id,
+                        "agent_id": evt.agent_id,
+                        "seq_id": evt.seq_id,
+                    },
+                )
+
+                # Route to tab or buffer
+                agent_id = evt.agent_id or "default"
+                key = (evt.run_id, agent_id)
+
+                # Route to tab if registered
+                tab = self._tabs.get(key)
+                if tab is not None:
+                    try:
+                        tab.add_episode(evt.payload)
+                    except Exception as e:
+                        self._logger.warning(
+                            "Error adding episode to tab (tab may be destroyed)",
+                            extra={"run_id": evt.run_id, "agent_id": agent_id, "error": str(e)},
+                        )
+                        # Remove the tab from tracking if it's destroyed
+                        self._tabs.pop(key, None)
+                else:
+                    # Buffer until tab is registered
+                    if key not in self._episode_buffer:
+                        self._episode_buffer[key] = []
+                    self._episode_buffer[key].append(evt.payload)
+
+            except Exception as e:
+                # Catch queue.Empty (from thread-safe queue.Queue)
+                if type(e).__name__ == 'Empty':
+                    break
+                raise
 
 
 __all__ = ["LiveTelemetryController"]

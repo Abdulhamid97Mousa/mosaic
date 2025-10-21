@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Telemetry collection and routing service."""
 
+import asyncio
 import logging
 from collections import deque
 from typing import Deque, Iterable, Optional, TYPE_CHECKING
@@ -92,7 +93,29 @@ class TelemetryService:
         if self._store:
             logger.error(f"[TELEMETRY PERSIST] Persisting to SQLite store: "
                         f"episode_id={record.episode_id} step_index={record.step_index}")
-            self._store.record_step(record)
+            # Schedule async write without blocking drain loop
+            try:
+                # Check if there's a RUNNING event loop
+                # asyncio.get_running_loop() raises RuntimeError if no loop is running
+                asyncio.get_running_loop()
+                # If we get here, there's a running loop - use async write
+                asyncio.create_task(self._async_record_step(record))
+                logger.debug(f"[TELEMETRY] Scheduled async write for episode_id={record.episode_id}")
+            except RuntimeError:
+                # No running event loop - use sync write immediately
+                logger.debug(f"[TELEMETRY] No running event loop, using sync write for episode_id={record.episode_id}")
+                self._store.record_step(record)
+
+    async def _async_record_step(self, record: StepRecord) -> None:
+        """Record step asynchronously to avoid blocking drain loop."""
+        if not self._store:
+            return
+        try:
+            # Run blocking DB write in thread pool
+            loop = asyncio.get_event_loop()
+            await loop.run_in_executor(None, self._store.record_step, record)
+        except Exception as e:
+            logger.error(f"Failed to record step asynchronously: {e}", exc_info=e)
 
     def complete_episode(self, rollup: EpisodeRollup) -> None:
         self._episode_history.append(rollup)

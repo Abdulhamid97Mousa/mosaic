@@ -5,11 +5,18 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
+# Load environment variables from .env file
+if [ -f .env ]; then
+  set -a
+  source .env
+  set +a
+fi
+
 if [ -f .venv/bin/activate ]; then
   source .venv/bin/activate
 fi
 
-mkdir -p var/logs
+mkdir -p var/logs var/trainer
 
 cleanup() {
   if [ "${REUSED_DAEMON:-0}" -eq 0 ] && ps -p "${DAEMON_PID:-0}" >/dev/null 2>&1; then
@@ -21,12 +28,30 @@ trap cleanup EXIT
 
 PYTHON_BIN="${PYTHON_BIN:-$(command -v python)}"
 
-EXISTING_DAEMON="$(pgrep -f 'gym_gui.services.trainer_daemon' || true)"
-if [ -n "$EXISTING_DAEMON" ]; then
-  echo "Trainer daemon already running (PID: $EXISTING_DAEMON). Reusing."
-  DAEMON_PID=$EXISTING_DAEMON
-  REUSED_DAEMON=1
-else
+# Clean up any stale or zombie daemon processes before checking
+STALE_PIDS="$(pgrep -f 'gym_gui.services.trainer_daemon' || true)"
+if [ -n "$STALE_PIDS" ]; then
+  for pid in $STALE_PIDS; do
+    # Check if process is zombie (defunct) or not responding
+    if ps -p "$pid" -o stat= 2>/dev/null | grep -q 'Z'; then
+      echo "Cleaning up zombie daemon process (PID: $pid)..."
+      kill -9 "$pid" 2>/dev/null || true
+    elif ! timeout 1 bash -c "kill -0 $pid 2>/dev/null"; then
+      echo "Cleaning up stale daemon process (PID: $pid)..."
+      kill -9 "$pid" 2>/dev/null || true
+    else
+      echo "Trainer daemon already running (PID: $pid). Reusing."
+      DAEMON_PID=$pid
+      REUSED_DAEMON=1
+    fi
+  done
+fi
+
+# Remove stale PID file if it exists
+rm -f var/trainer/trainer.pid 2>/dev/null || true
+
+# Start daemon if not already reusing an existing one
+if [ "${REUSED_DAEMON:-0}" -eq 0 ]; then
   echo "Starting trainer daemon..."
   QT_DEBUG_PLUGINS=0 \
   "$PYTHON_BIN" -m gym_gui.services.trainer_daemon > var/logs/trainer_daemon.log 2>&1 &
