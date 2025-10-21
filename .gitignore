@@ -48,6 +48,7 @@ gym_gui/services/trainer/proto/trainer_pb2.pyi
 .codex
 .github
 .idea
-.venv.pytest_cache
+.venv
+.pytest_cache
 
 
