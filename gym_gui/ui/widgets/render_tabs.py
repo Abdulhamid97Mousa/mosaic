@@ -94,16 +94,124 @@ class RenderTabs(QtWidgets.QTabWidget):
         self._agent_tabs[run_id][name] = widget
         idx = self.addTab(widget, name)
         self.setTabToolTip(idx, f"{name} - Live training telemetry")
+        
+        # Add close button to the tab
+        self._add_close_button_to_tab(idx, run_id, name)
+        
         self.setCurrentIndex(idx)
+    
+    def _add_close_button_to_tab(self, tab_index: int, run_id: str, tab_name: str) -> None:
+        """Add a close button to a dynamic tab."""
+        close_button = QtWidgets.QPushButton(self)
+        close_button.setText("✕")
+        close_button.setMaximumWidth(30)
+        close_button.setMaximumHeight(20)
+        close_button.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        close_button.setToolTip("Close this tab")
+        close_button.setStyleSheet("""
+            QPushButton {
+                border: none;
+                background-color: transparent;
+                padding: 0px;
+            }
+            QPushButton:hover {
+                background-color: #dd4444;
+                color: white;
+                border-radius: 2px;
+            }
+        """)
+        # Create a lambda to capture the parameters
+        close_button.clicked.connect(
+            lambda: self._close_dynamic_tab(run_id, tab_name, tab_index)
+        )
+        tab_bar = self.tabBar()
+        if tab_bar is not None:
+            tab_bar.setTabButton(tab_index, QtWidgets.QTabBar.ButtonPosition.RightSide, close_button)
+    
+    def _close_dynamic_tab(self, run_id: str, tab_name: str, tab_index: int) -> None:
+        """Close a dynamic tab and cleanup resources."""
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            logger.debug(f"_close_dynamic_tab: START (run_id={run_id}, tab_name={tab_name}, tab_index={tab_index})")
+
+            # Get the widget before removing the tab
+            widget = self.widget(tab_index)
+            logger.debug(f"_close_dynamic_tab: Got widget: {widget}")
+
+            # Remove from tracking
+            if run_id in self._agent_tabs and tab_name in self._agent_tabs[run_id]:
+                del self._agent_tabs[run_id][tab_name]
+                logger.debug(f"_close_dynamic_tab: Removed from tracking")
+
+                # If this was the last tab for this run, clean up the run entry
+                if not self._agent_tabs[run_id]:
+                    del self._agent_tabs[run_id]
+                    logger.debug(f"_close_dynamic_tab: Removed run entry")
+
+            # Remove the tab from the widget
+            logger.debug(f"_close_dynamic_tab: Removing tab at index {tab_index}")
+            self.removeTab(tab_index)
+
+            # Cleanup the widget
+            if widget is not None:
+                logger.debug(f"_close_dynamic_tab: Cleaning up widget")
+                # Call cleanup on LiveTelemetryTab to prevent segfaults from pending QTimer callbacks
+                if hasattr(widget, 'cleanup'):
+                    try:
+                        logger.debug(f"_close_dynamic_tab: Calling widget.cleanup()")
+                        widget.cleanup()
+                        logger.debug(f"_close_dynamic_tab: widget.cleanup() completed")
+                    except Exception as e:
+                        logger.exception(f"_close_dynamic_tab: Error cleaning up tab: {e}")
+                logger.debug(f"_close_dynamic_tab: Calling widget.deleteLater()")
+                widget.deleteLater()
+
+            logger.debug(f"_close_dynamic_tab: COMPLETE")
+        except Exception as e:
+            logger.exception(f"_close_dynamic_tab: FATAL ERROR - {e}")
 
     def remove_dynamic_tabs_for_run(self, run_id: str) -> None:
         """Remove all dynamic tabs associated with a run_id."""
-        tabs = self._agent_tabs.pop(run_id, {})
-        for widget in tabs.values():
-            idx = self.indexOf(widget)
-            if idx >= 0:
-                self.removeTab(idx)
-            widget.deleteLater()
+        import logging
+        logger = logging.getLogger(__name__)
+
+        try:
+            logger.info(f"remove_dynamic_tabs_for_run: START (run_id={run_id})")
+
+            tabs = self._agent_tabs.pop(run_id, {})
+            logger.debug(f"remove_dynamic_tabs_for_run: Found {len(tabs)} tabs to remove")
+
+            for i, widget in enumerate(tabs.values()):
+                try:
+                    logger.debug(f"remove_dynamic_tabs_for_run: Processing tab {i+1}/{len(tabs)}: {widget}")
+
+                    # Call cleanup on LiveTelemetryTab to prevent segfaults from pending QTimer callbacks
+                    if hasattr(widget, 'cleanup'):
+                        try:
+                            logger.debug(f"remove_dynamic_tabs_for_run: Calling widget.cleanup()")
+                            widget.cleanup()
+                            logger.debug(f"remove_dynamic_tabs_for_run: widget.cleanup() completed")
+                        except Exception as e:
+                            logger.exception(f"remove_dynamic_tabs_for_run: Error cleaning up tab: {e}")
+
+                    idx = self.indexOf(widget)
+                    logger.debug(f"remove_dynamic_tabs_for_run: Widget index: {idx}")
+
+                    if idx >= 0:
+                        logger.debug(f"remove_dynamic_tabs_for_run: Removing tab at index {idx}")
+                        self.removeTab(idx)
+
+                    logger.debug(f"remove_dynamic_tabs_for_run: Calling widget.deleteLater()")
+                    widget.deleteLater()
+                    logger.debug(f"remove_dynamic_tabs_for_run: Tab {i+1} cleanup complete")
+                except Exception as e:
+                    logger.exception(f"remove_dynamic_tabs_for_run: Error processing tab {i+1}: {e}")
+
+            logger.info(f"remove_dynamic_tabs_for_run: COMPLETE")
+        except Exception as e:
+            logger.exception(f"remove_dynamic_tabs_for_run: FATAL ERROR - {e}")
 
     # ------------------------------------------------------------------
     # Public API

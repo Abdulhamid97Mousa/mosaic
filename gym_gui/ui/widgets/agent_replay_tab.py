@@ -70,9 +70,18 @@ class AgentReplayTab(QtWidgets.QWidget):
 
         # Episode table
         self._episode_table = QtWidgets.QTableWidget(self)
-        self._episode_table.setColumnCount(5)
+        self._episode_table.setColumnCount(8)
         self._episode_table.setHorizontalHeaderLabels(
-            ["Episode", "Reward", "Steps", "Result", "Timestamp (UTC)"]
+            [
+                "Episode",
+                "Reward",
+                "Steps",
+                "Result",
+                "Seed",
+                "Control Mode",
+                "Game",
+                "Timestamp (UTC)",
+            ]
         )
         self._episode_table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
         self._episode_table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
@@ -160,15 +169,25 @@ class AgentReplayTab(QtWidgets.QWidget):
             timestamp = episode.timestamp if isinstance(episode.timestamp, datetime) else None
             timestamp_display = timestamp.isoformat(timespec="seconds") if timestamp else "—"
 
+            metadata = episode.metadata if isinstance(episode.metadata, dict) else {}
+            seed_display = metadata.get("seed", "—")
+            control_mode = metadata.get("control_mode") or metadata.get("mode") or "—"
+            game_label = metadata.get("game_id") or "—"
+
             cells = [
                 QtWidgets.QTableWidgetItem(str(episode_index)),
                 reward_item,
                 steps_item,
                 QtWidgets.QTableWidgetItem(self._episode_result_label(episode)),
+                QtWidgets.QTableWidgetItem(str(seed_display)),
+                QtWidgets.QTableWidgetItem(str(control_mode)),
+                QtWidgets.QTableWidgetItem(str(game_label)),
                 QtWidgets.QTableWidgetItem(timestamp_display),
             ]
             for column, item in enumerate(cells):
                 item.setData(QtCore.Qt.ItemDataRole.UserRole, episode.episode_id)
+                if metadata:
+                    item.setToolTip(json.dumps(metadata, indent=2))
                 self._episode_table.setItem(row, column, item)
 
         self._toggle_placeholder(False)
@@ -202,6 +221,12 @@ class AgentReplayTab(QtWidgets.QWidget):
         seed = metadata.get("seed")
         if seed is not None:
             header += f" • Seed {seed}"
+        control_mode = metadata.get("control_mode") or metadata.get("mode")
+        if control_mode:
+            header += f" • Mode {control_mode}"
+        game = metadata.get("game_id")
+        if game:
+            header += f" • Game {game}"
         self._step_summary.setText(header)
 
         if not steps:

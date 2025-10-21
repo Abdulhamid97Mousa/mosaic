@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from dataclasses import dataclass
 from typing import Dict, Iterable, Optional
 
@@ -70,7 +71,6 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._available_modes = config.available_modes
         self._default_seed = max(1, config.default_seed)
         self._allow_seed_reuse = config.allow_seed_reuse
-        self._settings_store = QtCore.QSettings("GymGUI", "ControlPanelWidget")
         self._game_overrides: Dict[GameId, Dict[str, object]] = {
             GameId.FROZEN_LAKE: {
                 "is_slippery": config.frozen_lake_config.is_slippery,
@@ -711,24 +711,22 @@ class ControlPanelWidget(QtWidgets.QWidget):
         button.blockSignals(False)
 
     def _persist_mode_preference(self, mode: ControlMode) -> None:
-        self._settings_store.setValue("control_mode", mode.name)
+        """Persist control mode preference to environment variable."""
+        os.environ["GYM_CONTROL_MODE"] = mode.name.lower()
 
     def _load_mode_preference(self, fallback: ControlMode) -> ControlMode:
-        stored = self._settings_store.value("control_mode")
+        """Load control mode preference from environment variable."""
+        stored = os.environ.get("GYM_CONTROL_MODE")
         if stored is None:
             return fallback
-        if isinstance(stored, ControlMode):
-            return stored
-        if isinstance(stored, str):
-            key = stored.strip()
+        stored = stored.strip().upper()
+        try:
+            return ControlMode[stored]
+        except KeyError:
             try:
-                return ControlMode[key]
-            except KeyError:
-                try:
-                    return ControlMode(key)
-                except ValueError:
-                    return fallback
-        return fallback
+                return ControlMode(stored.lower())
+            except ValueError:
+                return fallback
 
     def _populate_actor_combo(self) -> None:
         self._actor_combo.blockSignals(True)
@@ -1186,3 +1184,6 @@ class ControlPanelWidget(QtWidgets.QWidget):
             placeholder = QtWidgets.QLabel("No overrides available for this game.")
             placeholder.setWordWrap(True)
             self._config_layout.addRow(placeholder)
+
+
+

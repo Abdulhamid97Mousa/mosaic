@@ -7,8 +7,10 @@ from typing import Any, Dict, Optional
 
 from qtpy import QtCore, QtGui, QtWidgets
 
+from gym_gui.ui.widgets.base_telemetry_tab import BaseTelemetryTab
 
-class AgentOnlineRawTab(QtWidgets.QWidget):
+
+class AgentOnlineRawTab(BaseTelemetryTab):
     """Displays scrolling raw JSON step data for debugging agent runs."""
 
     def __init__(
@@ -19,26 +21,18 @@ class AgentOnlineRawTab(QtWidgets.QWidget):
         max_lines: int = 100,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
-        super().__init__(parent)
-        self.run_id = run_id
-        self.agent_id = agent_id
         self._max_lines = max_lines
         self._step_count = 0
 
-        self._build_ui()
+        super().__init__(run_id, agent_id, parent=parent)
 
     def _build_ui(self) -> None:
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        # Header
-        header = QtWidgets.QHBoxLayout()
-        self._run_label = QtWidgets.QLabel(f"<b>Run:</b> {self.run_id[:12]}...")
-        self._agent_label = QtWidgets.QLabel(f"<b>Agent:</b> {self.agent_id}")
+        # Use inherited header builder and extend it
+        header = self._build_header()
         self._step_count_label = QtWidgets.QLabel("<b>Steps:</b> 0")
-        header.addWidget(self._run_label)
-        header.addWidget(self._agent_label)
-        header.addStretch()
         header.addWidget(self._step_count_label)
         layout.addLayout(header)
 

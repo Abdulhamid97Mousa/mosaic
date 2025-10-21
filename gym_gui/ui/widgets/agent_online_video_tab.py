@@ -7,8 +7,10 @@ from typing import Any, Dict, Optional
 
 from qtpy import QtCore, QtGui, QtWidgets
 
+from gym_gui.ui.widgets.base_telemetry_tab import BaseTelemetryTab
 
-class AgentOnlineVideoTab(QtWidgets.QWidget):
+
+class AgentOnlineVideoTab(BaseTelemetryTab):
     """Displays live RGB frames if telemetry includes frame data."""
 
     def __init__(
@@ -18,26 +20,23 @@ class AgentOnlineVideoTab(QtWidgets.QWidget):
         *,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
-        super().__init__(parent)
-        self.run_id = run_id
-        self.agent_id = agent_id
         self._frame_count = 0
+        self._seed: Optional[int] = None
+        self._control_mode: Optional[str] = None
 
-        self._build_ui()
+        super().__init__(run_id, agent_id, parent=parent)
 
     def _build_ui(self) -> None:
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        # Header
-        header = QtWidgets.QHBoxLayout()
-        self._run_label = QtWidgets.QLabel(f"<b>Run:</b> {self.run_id[:12]}...")
-        self._agent_label = QtWidgets.QLabel(f"<b>Agent:</b> {self.agent_id}")
+        # Use inherited header builder and extend it
+        header = self._build_header()
         self._frame_count_label = QtWidgets.QLabel("<b>Frames:</b> 0")
-        header.addWidget(self._run_label)
-        header.addWidget(self._agent_label)
-        header.addStretch()
+        self._metadata_label = QtWidgets.QLabel("Seed: — • Mode: —")
+        self._metadata_label.setStyleSheet("color: gray;")
         header.addWidget(self._frame_count_label)
+        header.addWidget(self._metadata_label)
         layout.addLayout(header)
 
         # Frame display
@@ -55,7 +54,7 @@ class AgentOnlineVideoTab(QtWidgets.QWidget):
         self._info_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         layout.addWidget(self._info_label)
 
-    def on_step(self, step: Dict[str, Any]) -> None:
+    def on_step(self, step: Dict[str, Any], *, metadata: Optional[Dict[str, Any]] = None) -> None:
         """Update frame display from step payload."""
         # Try multiple possible field names for RGB data
         b64_data = step.get("rgb_b64") or step.get("frame_b64") or step.get("render_b64")
@@ -85,6 +84,9 @@ class AgentOnlineVideoTab(QtWidgets.QWidget):
         except Exception as e:
             self._info_label.setText(f"Frame decode error: {e}")
 
+        if metadata:
+            self.update_metadata(metadata)
+
     def _load_frame_from_file(self, frame_ref: str) -> None:
         """Load frame from file path reference."""
         try:
@@ -102,6 +104,20 @@ class AgentOnlineVideoTab(QtWidgets.QWidget):
                 self._label.setStyleSheet("background-color: black;")
         except Exception as e:
             self._info_label.setText(f"Frame load error: {e}")
+
+    def update_metadata(self, metadata: Dict[str, Any]) -> None:
+        seed = metadata.get("seed")
+        if seed is not None:
+            try:
+                self._seed = int(seed)
+            except (TypeError, ValueError):
+                self._seed = None
+        control_mode = metadata.get("control_mode") or metadata.get("mode")
+        if control_mode:
+            self._control_mode = str(control_mode)
+        seed_text = f"{self._seed}" if self._seed is not None else "—"
+        mode_text = self._control_mode or "—"
+        self._metadata_label.setText(f"Seed: {seed_text} • Mode: {mode_text}")
 
 
 __all__ = ["AgentOnlineVideoTab"]

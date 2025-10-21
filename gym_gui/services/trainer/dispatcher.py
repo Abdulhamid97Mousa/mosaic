@@ -17,8 +17,24 @@ from typing import Any, Callable, Optional
 from gym_gui.services.trainer import RunRecord, RunRegistry, RunStatus
 from gym_gui.config.paths import VAR_TRAINER_DIR
 from gym_gui.services.trainer.gpu import GPUAllocator
+from gym_gui.core.agent_config import get_agent_config
 
 _LOGGER = logging.getLogger("gym_gui.trainer.dispatcher")
+
+# Import signals for lifecycle events (lazy initialization)
+_signals = None
+
+def _get_signals():
+    """Get or initialize TrainerSignals lazily."""
+    global _signals
+    if _signals is None:
+        try:
+            from gym_gui.services.trainer.signals import get_trainer_signals
+            _signals = get_trainer_signals()
+        except Exception as e:
+            _LOGGER.warning(f"Failed to initialize TrainerSignals: {e}")
+            _signals = None
+    return _signals
 
 
 class WorkerHandle:
@@ -106,6 +122,7 @@ class TrainerDispatcher:
                     )
                     break
                 except asyncio.TimeoutError:
+                    _LOGGER.debug("Dispatch loop tick")
                     await self._dispatch_pending_runs()
         except asyncio.CancelledError:
             _LOGGER.debug("Dispatch loop cancelled")
@@ -114,9 +131,12 @@ class TrainerDispatcher:
     async def _dispatch_pending_runs(self) -> None:
         """Dispatch all PENDING runs."""
         pending = self._registry.load_runs([RunStatus.PENDING])
+        _LOGGER.info("Pending runs polled", extra={"count": len(pending)})
         for run in pending:
             if run.run_id in self._workers:
+                _LOGGER.debug("Run already has worker", extra={"run_id": run.run_id})
                 continue
+            _LOGGER.info("Dispatching run", extra={"run_id": run.run_id})
             try:
                 await self._dispatch_run(run)
             except Exception as exc:  # pragma: no cover - defensive
@@ -157,6 +177,17 @@ class TrainerDispatcher:
 
         self._registry.update_status(run.run_id, RunStatus.RUNNING)
         await self._broadcast_update(run.run_id)
+
+        # Emit training_started signal
+        signals = _get_signals()
+        if signals:
+            try:
+                config_json = json.loads(self._registry.get_run_config_json(run.run_id) or "{}")
+                metadata = config_json.get("metadata", {})
+                signals.emit_training_started(run.run_id, metadata)
+                _LOGGER.debug("Emitted training_started signal", extra={"run_id": run.run_id})
+            except Exception as e:
+                _LOGGER.warning(f"Failed to emit training_started signal: {e}", extra={"run_id": run.run_id})
 
         # Start log streaming tasks
         asyncio.create_task(self._stream_stdout(handle), name=f"stdout-{run.run_id}")
@@ -216,6 +247,63 @@ class TrainerDispatcher:
                         args.append("--grpc")
                     if "--grpc-target" not in args:
                         args.extend(["--grpc-target", grpc_target])
+                
+                # Add BDI flags if BDI mode is enabled
+                agent_type = worker_meta.get("agent_type", "Headless")
+                if worker_meta.get("bdi_enabled"):
+                    if "--bdi" not in args:
+                        args.append("--bdi")
+                    bdi_config = worker_meta.get("bdi_config", {})
+                    bdi_jid = bdi_config.get("jid", "agent@localhost")
+                    bdi_password = bdi_config.get("password", "secret")
+                    
+                    if "--bdi-jid" not in args:
+                        args.extend(["--bdi-jid", bdi_jid])
+                    if "--bdi-password" not in args:
+                        args.extend(["--bdi-password", bdi_password])
+                    
+                    if "asl_file" in bdi_config:
+                        asl_file = bdi_config.get("asl_file")
+                        if asl_file and "--asl-file" not in args:
+                            args.extend(["--asl-file", asl_file])
+                    
+                    # Log BDI configuration details
+                    agent_config = get_agent_config("BDI")
+                    schema = agent_config.get_telemetry_schema()
+                    required_fields = agent_config.get_required_fields()
+                    optional_fields = agent_config.get_optional_fields()
+                    
+                    _LOGGER.info(
+                        "BDI Agent worker command prepared",
+                        extra={
+                            "run_id": run.run_id,
+                            "agent_type": agent_type,
+                            "bdi_jid": bdi_jid,
+                            "bdi_password": "[***]",
+                            "bdi_asl_file": bdi_config.get("asl_file", "(not provided)"),
+                            "bdi_config_keys": list(bdi_config.keys()),
+                            "telemetry_schema_categories": list(schema.keys()),
+                            "required_telemetry_fields": sorted(required_fields),
+                            "optional_telemetry_fields": sorted(optional_fields),
+                        },
+                    )
+                else:
+                    # Log Headless agent configuration
+                    agent_config = get_agent_config(agent_type)
+                    schema = agent_config.get_telemetry_schema()
+                    required_fields = agent_config.get_required_fields()
+                    
+                    _LOGGER.info(
+                        "Headless Agent worker command prepared",
+                        extra={
+                            "run_id": run.run_id,
+                            "agent_type": agent_type,
+                            "algorithm": worker_meta.get("algorithm", "unknown"),
+                            "telemetry_schema_categories": list(schema.keys()),
+                            "required_telemetry_fields": sorted(required_fields),
+                        },
+                    )
+                
                 worker_cmd.extend(args)
                 _LOGGER.info(
                     "Prepared worker command from metadata",
@@ -315,6 +403,7 @@ class TrainerDispatcher:
                     await asyncio.wait_for(self._stop_event.wait(), timeout=1.0)
                     break
                 except asyncio.TimeoutError:
+                    _LOGGER.debug("Monitor loop tick", extra={"active_workers": len(self._workers)})
                     await self._check_workers()
         except asyncio.CancelledError:
             _LOGGER.debug("Monitor loop cancelled")
@@ -351,6 +440,17 @@ class TrainerDispatcher:
         self._registry.update_status(handle.run_id, status, failure_reason=reason)
         self._gpu_allocator.release_many([handle.run_id])
         self._registry.update_gpu_slots(handle.run_id, [])
+
+        # Emit training_finished signal
+        signals = _get_signals()
+        if signals:
+            try:
+                outcome = "succeeded" if status == RunStatus.COMPLETED else "failed" if status == RunStatus.FAILED else "canceled"
+                signals.emit_training_finished(handle.run_id, outcome, reason)
+                _LOGGER.debug("Emitted training_finished signal", extra={"run_id": handle.run_id, "outcome": outcome})
+            except Exception as e:
+                _LOGGER.warning(f"Failed to emit training_finished signal: {e}", extra={"run_id": handle.run_id})
+
         await self._broadcast_update(handle.run_id)
         config_path = self._worker_config_paths.pop(handle.run_id, None)
         if config_path and config_path.exists():
@@ -394,6 +494,7 @@ class TrainerDispatcher:
                     await asyncio.wait_for(self._stop_event.wait(), timeout=30.0)
                     break
                 except asyncio.TimeoutError:
+                    _LOGGER.debug("Heartbeat loop tick")
                     await self._check_heartbeats()
         except asyncio.CancelledError:
             _LOGGER.debug("Heartbeat loop cancelled")

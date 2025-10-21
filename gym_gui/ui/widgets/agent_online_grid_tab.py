@@ -8,9 +8,10 @@ from qtpy import QtCore, QtWidgets
 
 from gym_gui.core.enums import GameId, RenderMode
 from gym_gui.rendering import RendererContext, RendererRegistry, RendererStrategy
+from gym_gui.ui.widgets.base_telemetry_tab import BaseTelemetryTab
 
 
-class AgentOnlineGridTab(QtWidgets.QWidget):
+class AgentOnlineGridTab(BaseTelemetryTab):
     """Displays live grid rendering + episode stats for a specific agent run."""
 
     def __init__(
@@ -21,9 +22,6 @@ class AgentOnlineGridTab(QtWidgets.QWidget):
         renderer_registry: Optional[RendererRegistry] = None,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
-        super().__init__(parent)
-        self.run_id = run_id
-        self.agent_id = agent_id
         self._episodes = 0
         self._steps = 0
         self._total_reward = 0.0
@@ -31,25 +29,20 @@ class AgentOnlineGridTab(QtWidgets.QWidget):
         self._game_id: Optional[GameId] = None
         self._renderer_strategy: Optional[RendererStrategy] = None
         self._renderer_registry = renderer_registry
+        self._seed: Optional[int] = None
+        self._control_mode: Optional[str] = None
 
-        self._build_ui()
+        super().__init__(run_id, agent_id, parent=parent)
 
     def _build_ui(self) -> None:
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        # Header with run/agent info
-        header = QtWidgets.QHBoxLayout()
-        self._run_label = QtWidgets.QLabel(f"<b>Run:</b> {self.run_id[:12]}...")
-        self._agent_label = QtWidgets.QLabel(f"<b>Agent:</b> {self.agent_id}")
-        header.addWidget(self._run_label)
-        header.addWidget(self._agent_label)
-        header.addStretch()
-        layout.addLayout(header)
+        # Use inherited header builder
+        layout.addLayout(self._build_header())
 
-        # Stats panel
-        stats_group = QtWidgets.QGroupBox("Training Statistics", self)
-        stats_layout = QtWidgets.QGridLayout(stats_group)
+        # Use inherited stats group builder
+        stats_group, stats_layout = self._build_stats_group()
         
         stats_layout.addWidget(QtWidgets.QLabel("<b>Episodes:</b>"), 0, 0)
         self._episodes_label = QtWidgets.QLabel("0")
@@ -66,6 +59,14 @@ class AgentOnlineGridTab(QtWidgets.QWidget):
         stats_layout.addWidget(QtWidgets.QLabel("<b>Total Reward:</b>"), 1, 2)
         self._total_reward_label = QtWidgets.QLabel("0.00")
         stats_layout.addWidget(self._total_reward_label, 1, 3)
+
+        stats_layout.addWidget(QtWidgets.QLabel("<b>Seed:</b>"), 2, 0)
+        self._seed_label = QtWidgets.QLabel("—")
+        stats_layout.addWidget(self._seed_label, 2, 1)
+
+        stats_layout.addWidget(QtWidgets.QLabel("<b>Mode:</b>"), 2, 2)
+        self._mode_label = QtWidgets.QLabel("—")
+        stats_layout.addWidget(self._mode_label, 2, 3)
         
         layout.addWidget(stats_group)
 
@@ -81,7 +82,7 @@ class AgentOnlineGridTab(QtWidgets.QWidget):
         layout.addWidget(self._pending)
         layout.addWidget(self._grid_container, 1)
 
-    def on_step(self, step: Dict[str, Any]) -> None:
+    def on_step(self, step: Dict[str, Any], *, metadata: Optional[Dict[str, Any]] = None) -> None:
         """Update stats and render grid from incoming step."""
         # Update counters
         if self._pending.isVisible():
@@ -107,8 +108,34 @@ class AgentOnlineGridTab(QtWidgets.QWidget):
         self._episode_reward_label.setText(f"{self._current_episode_reward:.2f}")
         self._total_reward_label.setText(f"{self._total_reward:.2f}")
 
+        if metadata:
+            self.update_metadata(metadata)
+
         # Render grid if available
         self._render_grid(step)
+
+    def update_metadata(self, metadata: Dict[str, Any]) -> None:
+        seed = metadata.get("seed")
+        if seed is not None:
+            try:
+                self._seed = int(seed)
+                self._seed_label.setText(str(self._seed))
+            except (TypeError, ValueError):
+                self._seed_label.setText(str(seed))
+        control_mode = metadata.get("control_mode") or metadata.get("mode")
+        if control_mode:
+            self._control_mode = str(control_mode)
+            self._mode_label.setText(self._control_mode)
+        game_id = metadata.get("game_id")
+        if game_id:
+            try:
+                self._game_id = GameId(str(game_id))
+            except ValueError:
+                self._game_id = None
+            if self._game_id is not None:
+                self._run_label.setText(f"<b>Run:</b> {self.run_id[:12]}… • Game: {self._game_id.value}")
+            else:
+                self._run_label.setText(f"<b>Run:</b> {self.run_id[:12]}…")
 
     def _render_grid(self, payload: Dict[str, Any]) -> None:
         """Render grid visualization using renderer registry."""

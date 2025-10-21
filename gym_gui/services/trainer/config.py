@@ -160,6 +160,13 @@ def validate_train_run_config(raw: Mapping[str, Any]) -> TrainRunConfig:
     )
     run_id = hashlib.sha1(run_id_seed, usedforsecurity=False).hexdigest()
 
+    # CRITICAL FIX: Update worker config with the correct hash-based run_id
+    # The UI builds config with run_name, but we need to use the hash-based run_id
+    # so that telemetry from the worker matches the database run_id
+    if "metadata" in canonical and "worker" in canonical["metadata"]:
+        if "config" in canonical["metadata"]["worker"]:
+            canonical["metadata"]["worker"]["config"]["run_id"] = run_id
+
     metadata = TrainerRunMetadata(run_id=run_id, digest=digest, submitted_at=submitted)
     return TrainRunConfig(payload=canonical, metadata=metadata)
 

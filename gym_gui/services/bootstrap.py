@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 import os
 
-from gym_gui.config.paths import VAR_TELEMETRY_DIR, ensure_var_directories, LEGACY_VAR_ROOT
+from gym_gui.config.paths import VAR_TELEMETRY_DIR, ensure_var_directories, VAR_ROOT
 from gym_gui.rendering import RendererRegistry, create_default_renderer_registry
 from gym_gui.services.action_mapping import ContinuousActionMapper, create_default_action_mapper
 from gym_gui.services.actor import ActorService, BDIQAgent, HumanKeyboardActor, LLMMultiStepAgent
@@ -16,6 +16,9 @@ from gym_gui.services.trainer.streams import TelemetryAsyncHub
 from gym_gui.services.storage import StorageRecorderService
 from gym_gui.services.telemetry import TelemetryService
 from gym_gui.telemetry import TelemetrySQLiteStore
+from gym_gui.telemetry.db_sink import TelemetryDBSink
+from gym_gui.telemetry.run_bus import get_bus
+from gym_gui.telemetry.health import HealthMonitor
 from gym_gui.controllers.live_telemetry import LiveTelemetryController
 
 
@@ -34,7 +37,7 @@ def bootstrap_default_services() -> ServiceLocator:
     if os.getenv("GYM_GUI_RESET_TELEMETRY") == "1":
         telemetry_store.delete_all_episodes(wait=True)
 
-    legacy_trainer_db = LEGACY_VAR_ROOT / "trainer" / "trainer.sqlite"
+    legacy_trainer_db = VAR_ROOT / "trainer" / "trainer.sqlite"
     if legacy_trainer_db.exists():
         logging.getLogger(__name__).warning(
             "Detected legacy trainer database at %s – new runs write to %s. Consider migrating or deleting the old file to avoid confusion.",
@@ -83,17 +86,40 @@ def bootstrap_default_services() -> ServiceLocator:
     trainer_runner = TrainerClientRunner(trainer_client)
     
     # Initialize telemetry hub for live streaming
-    telemetry_hub = TelemetryAsyncHub(max_queue=2048, buffer_size=256)
+    # Increased buffer_size from 256 to 512 to handle high-frequency training (episode 658+)
+    # max_queue=2048 handles gRPC stream buffering, buffer_size=512 handles UI processing lag
+    telemetry_hub = TelemetryAsyncHub(max_queue=2048, buffer_size=512)
     # Hub will auto-start on first subscribe_run call
-    
-    # Create live telemetry controller
+
+    # Create live telemetry controller and start RunBus subscription
+    # UI queue size: 64 events (responsive rendering)
     live_controller = LiveTelemetryController(telemetry_hub, trainer_client)
+    live_controller.start()
+
+    # Initialize and start database sink for durable persistence
+    # Writer queue is larger (512) to handle backlog, UI queue is smaller (64)
+    bus = get_bus()
+    db_sink = TelemetryDBSink(
+        telemetry_store,
+        bus,
+        batch_size=64,
+        checkpoint_interval=1000,
+        writer_queue_size=512,
+    )
+    db_sink.start()
+
+    # Initialize and start health monitor for observability
+    # Emits RUN_HEARTBEAT events every 5 seconds
+    health_monitor = HealthMonitor(bus, heartbeat_interval=5.0)
+    health_monitor.start()
 
     locator.register(RendererRegistry, renderer_registry)
     locator.register(TrainerClient, trainer_client)
     locator.register(TrainerClientRunner, trainer_runner)
     locator.register(TelemetryAsyncHub, telemetry_hub)
     locator.register(LiveTelemetryController, live_controller)
+    locator.register(TelemetryDBSink, db_sink)
+    locator.register(HealthMonitor, health_monitor)
     locator.register(TrainerDaemonHandle, daemon_handle)
 
     # Also register under string keys for convenience in legacy code.

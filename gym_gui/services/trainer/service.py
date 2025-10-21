@@ -7,6 +7,7 @@ from collections import defaultdict, deque
 from datetime import datetime, timezone
 import json
 import logging
+import sqlite3
 from typing import Any, AsyncIterator, Callable, Deque, Iterable, Mapping, Optional, cast
 
 from google.protobuf.timestamp_pb2 import Timestamp
@@ -14,6 +15,8 @@ import grpc
 
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.telemetry import TelemetrySQLiteStore
+from gym_gui.telemetry.events import Topic, TelemetryEvent
+from gym_gui.telemetry.run_bus import get_bus
 from gym_gui.services.trainer import (
     GPUAllocator,
     GPUReservationError,
@@ -27,7 +30,6 @@ from gym_gui.services.trainer.proto import trainer_pb2 as trainer_pb2_module, tr
 trainer_pb2 = cast(Any, trainer_pb2_module)
 
 _LOGGER = logging.getLogger("gym_gui.trainer.service")
-
 
 def _timestamp(dt: Optional[datetime]) -> Optional[Timestamp]:
     if dt is None:
@@ -235,12 +237,13 @@ class RunTelemetryBroadcaster:
         async with self._lock:
             self._step_listeners[run_id].add(queue)
             replay: list[Any] = []
-            if since_seq:
-                for seq_id, payload in self._step_history.get(run_id, ()):  # type: ignore[arg-type]
-                    if seq_id > since_seq:
-                        replay_payload = trainer_pb2.RunStep()
-                        replay_payload.CopyFrom(payload)
-                        replay.append(replay_payload)
+            # Always replay historical data, not just when since_seq > 0
+            # This ensures GUI receives all steps even if it subscribes after training starts
+            for seq_id, payload in self._step_history.get(run_id, ()):  # type: ignore[arg-type]
+                if since_seq == 0 or seq_id > since_seq:
+                    replay_payload = trainer_pb2.RunStep()
+                    replay_payload.CopyFrom(payload)
+                    replay.append(replay_payload)
         return queue, replay
 
     async def subscribe_episodes(
@@ -252,12 +255,13 @@ class RunTelemetryBroadcaster:
         async with self._lock:
             self._episode_listeners[run_id].add(queue)
             replay: list[Any] = []
-            if since_seq:
-                for seq_id, payload in self._episode_history.get(run_id, ()):  # type: ignore[arg-type]
-                    if seq_id > since_seq:
-                        replay_payload = trainer_pb2.RunEpisode()
-                        replay_payload.CopyFrom(payload)
-                        replay.append(replay_payload)
+            # Always replay historical data, not just when since_seq > 0
+            # This ensures GUI receives all episodes even if it subscribes after training starts
+            for seq_id, payload in self._episode_history.get(run_id, ()):  # type: ignore[arg-type]
+                if since_seq == 0 or seq_id > since_seq:
+                    replay_payload = trainer_pb2.RunEpisode()
+                    replay_payload.CopyFrom(payload)
+                    replay.append(replay_payload)
         return queue, replay
 
     async def unsubscribe_steps(self, run_id: str, queue: asyncio.Queue[Any]) -> None:
@@ -320,9 +324,32 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
         self._telemetry_broadcaster = telemetry_broadcaster or RunTelemetryBroadcaster()
         self._health_provider = health_provider or (lambda: trainer_pb2.HealthCheckResponse(healthy=False))
         self._telemetry_store = telemetry_store
+        _LOGGER.debug("TrainerService initialized")
+
+    def _save_run_config(self, run_id: str, config_json: str) -> None:
+        """Save training config to disk for audit trail and reproducibility."""
+        try:
+            from gym_gui.config.paths import VAR_TRAINER_DIR, ensure_var_directories
+
+            ensure_var_directories()
+            config_dir = VAR_TRAINER_DIR / "configs"
+            config_dir.mkdir(parents=True, exist_ok=True)
+
+            config_file = config_dir / f"config-{run_id}.json"
+            config_file.write_text(config_json, encoding="utf-8")
+            _LOGGER.info(
+                "Saved training config to disk",
+                extra={"run_id": run_id, "config_file": str(config_file)},
+            )
+        except Exception as e:
+            _LOGGER.warning(
+                "Failed to save training config to disk",
+                extra={"run_id": run_id, "error": str(e)},
+            )
 
     # ------------------------------------------------------------------
     async def SubmitRun(self, request: trainer_pb2.SubmitRunRequest, context: grpc.aio.ServicerContext) -> trainer_pb2.SubmitRunResponse:  # type: ignore[override]
+        _LOGGER.info("SubmitRun received", extra={"request_run_id": request.run_id, "payload_bytes": len(request.config_json or '')})
         try:
             config = validate_train_run_config(json.loads(request.config_json))
         except Exception as exc:  # pragma: no cover - validation errors
@@ -333,6 +360,9 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
                 grpc.StatusCode.INVALID_ARGUMENT,
                 "run_id mismatch with configuration digest",
             )
+
+        # Save config to disk for audit trail
+        self._save_run_config(config.metadata.run_id, config.to_json())
 
         # Register run; returns existing run_id if digest already exists
         resolved_run_id = self._registry.register_run(
@@ -357,6 +387,7 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
             await context.abort(grpc.StatusCode.RESOURCE_EXHAUSTED, str(exc))
 
         await self._broadcast(config.metadata.run_id)
+        _LOGGER.info("SubmitRun accepted", extra={"run_id": config.metadata.run_id})
         return trainer_pb2.SubmitRunResponse(run_id=config.metadata.run_id, digest=config.metadata.digest)
 
     async def CancelRun(self, request: trainer_pb2.CancelRunRequest, context: grpc.aio.ServicerContext) -> trainer_pb2.CancelRunResponse:  # type: ignore[override]
@@ -373,19 +404,28 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
         return trainer_pb2.CancelRunResponse()
 
     async def ListRuns(self, request: trainer_pb2.ListRunsRequest, context: grpc.aio.ServicerContext) -> trainer_pb2.ListRunsResponse:  # type: ignore[override]
-        statuses = _proto_to_statuses(request.status_filter)
-        runs = self._registry.load_runs(statuses if statuses else None)
-        return trainer_pb2.ListRunsResponse(runs=[_record_to_proto(run, seq_id=0) for run in runs])
+        try:
+            statuses = _proto_to_statuses(request.status_filter)
+            runs = self._registry.load_runs(statuses if statuses else None)
+            return trainer_pb2.ListRunsResponse(runs=[_record_to_proto(run, seq_id=0) for run in runs])
+        except sqlite3.OperationalError as e:
+            _LOGGER.error(f"Database error in ListRuns: {e}")
+            # Return empty response instead of crashing - caller can retry
+            return trainer_pb2.ListRunsResponse(runs=[])
 
     async def WatchRuns(self, request: trainer_pb2.WatchRunsRequest, context: grpc.aio.ServicerContext) -> AsyncIterator[trainer_pb2.RunRecord]:  # type: ignore[override]
         queue, replay = await self._broadcaster.subscribe(request.since_seq)
         status_filter_proto = set(request.status_filter)
         try:
             if request.since_seq == 0:
-                for run in self._registry.load_runs(_proto_to_statuses(request.status_filter) or None):
-                    snapshot = _record_to_proto(run, seq_id=0)
-                    if not status_filter_proto or snapshot.status in status_filter_proto:
-                        yield snapshot
+                try:
+                    for run in self._registry.load_runs(_proto_to_statuses(request.status_filter) or None):
+                        snapshot = _record_to_proto(run, seq_id=0)
+                        if not status_filter_proto or snapshot.status in status_filter_proto:
+                            yield snapshot
+                except sqlite3.OperationalError as e:
+                    _LOGGER.error(f"Database error in WatchRuns initial load: {e}")
+                    # Continue to watch for updates even if initial load fails
             if replay:
                 for message in replay:
                     if not status_filter_proto or message.status in status_filter_proto:
@@ -413,15 +453,81 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
         return response
 
     async def StreamRunSteps(self, request: trainer_pb2.StreamStepsRequest, context: grpc.aio.ServicerContext) -> AsyncIterator[trainer_pb2.RunStep]:  # type: ignore[override]
+        _LOGGER.debug("StreamRunSteps subscribe", extra={"run_id": request.run_id, "since_seq": int(request.since_seq)})
         if not request.run_id:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "run_id is required")
+
+        # Load historical steps from telemetry database first
+        seq_counter = 0
+        if self._telemetry_store:
+            try:
+                # Query all recent steps and filter by run_id (encoded in episode_id as {run_id}-ep{N})
+                all_steps = self._telemetry_store.recent_steps(limit=4096)
+                for step in all_steps:
+                    # Extract run_id from episode_id (format: {run_id}-ep{N})
+                    parts = step.episode_id.split('-ep')
+                    if len(parts) == 2 and parts[0] == request.run_id:
+                        seq_counter += 1
+                        # Extract episode index from episode_id
+                        try:
+                            episode_index = int(parts[1]) if parts[1].isdigit() else 0
+                        except (ValueError, IndexError):
+                            episode_index = 0
+                        
+                        # Convert StepRecord to RunStep proto
+                        action_json = ''
+                        if step.action is not None:
+                            try:
+                                action_json = json.dumps(step.action)
+                            except (TypeError, ValueError):
+                                action_json = str(step.action)
+                        
+                        observation_json = ''
+                        if step.observation is not None:
+                            try:
+                                observation_json = json.dumps(step.observation)
+                            except (TypeError, ValueError):
+                                observation_json = str(step.observation)
+                        
+                        render_hint_json = ''
+                        if step.render_hint:
+                            try:
+                                render_hint_json = json.dumps(step.render_hint)
+                            except (TypeError, ValueError):
+                                render_hint_json = str(step.render_hint)
+                        
+                        payload = trainer_pb2.RunStep(
+                            run_id=request.run_id,
+                            episode_index=episode_index,
+                            step_index=step.step_index,
+                            action_json=action_json,
+                            observation_json=observation_json,
+                            reward=float(step.reward),
+                            terminated=step.terminated,
+                            truncated=step.truncated,
+                            policy_label=str(step.info.get('policy_label', '') if step.info else ''),
+                            backend=str(step.info.get('backend', '') if step.info else ''),
+                            seq_id=seq_counter,
+                            agent_id=step.agent_id or '',
+                            render_hint_json=render_hint_json,
+                            frame_ref=step.frame_ref or '',
+                            payload_version=step.payload_version,
+                        )
+                        if step.timestamp:
+                            payload.timestamp.FromDatetime(step.timestamp)
+                        _LOGGER.debug("StreamRunSteps replay yield from DB", extra={"run_id": request.run_id, "ep": episode_index, "step": step.step_index, "seq": seq_counter})
+                        yield payload
+            except Exception as exc:
+                _LOGGER.warning("StreamRunSteps: failed to load from telemetry store", extra={"run_id": request.run_id, "error": str(exc)}, exc_info=True)
 
         queue, replay = await self._telemetry_broadcaster.subscribe_steps(request.run_id, int(request.since_seq))
         try:
             for payload in replay:
+                _LOGGER.debug("StreamRunSteps replay yield", extra={"run_id": request.run_id, "seq": getattr(payload, 'seq_id', None)})
                 yield payload
             while True:
                 payload = await queue.get()
+                _LOGGER.debug("StreamRunSteps yield", extra={"run_id": request.run_id, "ep": getattr(payload, 'episode_index', None), "step": getattr(payload, 'step_index', None), "seq": getattr(payload, 'seq_id', None), "agent_id": getattr(payload, 'agent_id', None)})
                 yield payload
         except asyncio.CancelledError:
             _LOGGER.debug("StreamRunSteps cancelled", extra={"run_id": request.run_id})
@@ -430,15 +536,45 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
             await self._telemetry_broadcaster.unsubscribe_steps(request.run_id, queue)
 
     async def StreamRunEpisodes(self, request: trainer_pb2.StreamEpisodesRequest, context: grpc.aio.ServicerContext) -> AsyncIterator[trainer_pb2.RunEpisode]:  # type: ignore[override]
+        _LOGGER.debug("StreamRunEpisodes subscribe", extra={"run_id": request.run_id, "since_seq": int(request.since_seq)})
         if not request.run_id:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "run_id is required")
+
+        # Load historical episodes from telemetry database first
+        seq_counter = 0
+        if self._telemetry_store:
+            try:
+                episodes = self._telemetry_store.episodes_for_run(request.run_id)
+                for episode in episodes:
+                    seq_counter += 1
+                    # Convert EpisodeRollup to RunEpisode proto
+                    episode_index = int(episode.episode_id.split('_')[-1]) if '_' in episode.episode_id else 0
+                    payload = trainer_pb2.RunEpisode(
+                        run_id=request.run_id,
+                        episode_index=episode_index,
+                        total_reward=episode.total_reward,
+                        steps=episode.steps,
+                        terminated=episode.terminated,
+                        truncated=episode.truncated,
+                        metadata_json=json.dumps(episode.metadata) if episode.metadata else '{}',
+                        seq_id=seq_counter,
+                        agent_id=episode.agent_id or '',
+                    )
+                    if episode.timestamp:
+                        payload.timestamp.FromDatetime(episode.timestamp)
+                    _LOGGER.debug("StreamRunEpisodes replay yield from DB", extra={"run_id": request.run_id, "ep": episode.episode_id, "seq": seq_counter})
+                    yield payload
+            except Exception as exc:
+                _LOGGER.warning("StreamRunEpisodes: failed to load from telemetry store", extra={"run_id": request.run_id, "error": str(exc)})
 
         queue, replay = await self._telemetry_broadcaster.subscribe_episodes(request.run_id, int(request.since_seq))
         try:
             for payload in replay:
+                _LOGGER.debug("StreamRunEpisodes replay yield", extra={"run_id": request.run_id, "seq": getattr(payload, 'seq_id', None)})
                 yield payload
             while True:
                 payload = await queue.get()
+                _LOGGER.debug("StreamRunEpisodes yield", extra={"run_id": request.run_id, "ep": getattr(payload, 'episode_index', None), "seq": getattr(payload, 'seq_id', None), "agent_id": getattr(payload, 'agent_id', None)})
                 yield payload
         except asyncio.CancelledError:
             _LOGGER.debug("StreamRunEpisodes cancelled", extra={"run_id": request.run_id})
@@ -447,6 +583,7 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
             await self._telemetry_broadcaster.unsubscribe_episodes(request.run_id, queue)
 
     async def PublishRunSteps(self, request_iterator: AsyncIterator[trainer_pb2.RunStep], context: grpc.aio.ServicerContext) -> trainer_pb2.PublishTelemetryResponse:  # type: ignore[override]
+        _LOGGER.debug("PublishRunSteps open")
         accepted = 0
         dropped = 0
         run_id: Optional[str] = None
@@ -467,15 +604,54 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
                 else:
                     accepted += 1
                     dropped += dropped_now
+                    if accepted <= 5:
+                        _LOGGER.debug("PublishRunSteps accepted", extra={"run_id": run_id, "ep": int(getattr(message, 'episode_index', 0)), "step": int(getattr(message, 'step_index', 0)), "agent_id": getattr(message, 'agent_id', '')})
                     if self._telemetry_store:
                         record = self._step_from_proto(message)
                         self._telemetry_store.record_step(record)
+
+                    # Publish to RunBus for db_sink and other subscribers
+                    if run_id:
+                        try:
+                            bus = get_bus()
+                            agent_id = getattr(message, 'agent_id', 'default')
+                            payload_dict = {
+                                'run_id': run_id,
+                                'agent_id': agent_id,
+                                'episode_index': int(getattr(message, 'episode_index', 0)),
+                                'step_index': int(getattr(message, 'step_index', 0)),
+                                'reward': float(getattr(message, 'reward', 0.0)),
+                                'terminated': bool(getattr(message, 'terminated', False)),
+                                'truncated': bool(getattr(message, 'truncated', False)),
+                                'timestamp': getattr(message, 'timestamp', ''),
+                                'action': int(getattr(message, 'action', -1)) if hasattr(message, 'action') else None,
+                            }
+                            evt = TelemetryEvent(
+                                topic=Topic.STEP_APPENDED,
+                                run_id=run_id,
+                                agent_id=agent_id,
+                                seq_id=int(getattr(message, 'seq_id', -1)),
+                                ts_iso=getattr(message, 'timestamp', ''),
+                                payload=payload_dict,
+                            )
+                            bus.publish(evt)
+                            _LOGGER.debug(
+                                "Published STEP_APPENDED to RunBus from daemon",
+                                extra={"run_id": run_id, "agent_id": agent_id, "seq_id": getattr(message, 'seq_id', -1)},
+                            )
+                        except Exception as e:
+                            _LOGGER.warning(
+                                "Failed to publish STEP_APPENDED to RunBus",
+                                extra={"run_id": run_id, "error": str(e)},
+                            )
         except asyncio.CancelledError:
             _LOGGER.debug("PublishRunSteps cancelled", extra={"accepted": accepted})
             raise
+        _LOGGER.info("PublishRunSteps close", extra={"run_id": run_id, "accepted": accepted, "dropped": dropped})
         return trainer_pb2.PublishTelemetryResponse(accepted=accepted, dropped=dropped)
 
     async def PublishRunEpisodes(self, request_iterator: AsyncIterator[trainer_pb2.RunEpisode], context: grpc.aio.ServicerContext) -> trainer_pb2.PublishTelemetryResponse:  # type: ignore[override]
+        _LOGGER.debug("PublishRunEpisodes open")
         accepted = 0
         dropped = 0
         run_id: Optional[str] = None
@@ -496,12 +672,49 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
                 else:
                     accepted += 1
                     dropped += dropped_now
+                    if accepted <= 3:
+                        _LOGGER.debug("PublishRunEpisodes accepted", extra={"run_id": run_id, "ep": int(getattr(message, 'episode_index', 0)), "agent_id": getattr(message, 'agent_id', '')})
                     if self._telemetry_store:
                         rollup = self._episode_from_proto(message)
                         self._telemetry_store.record_episode(rollup, wait=False)
+
+                    # Publish to RunBus for db_sink and other subscribers
+                    if run_id:
+                        try:
+                            bus = get_bus()
+                            agent_id = getattr(message, 'agent_id', 'default')
+                            payload_dict = {
+                                'run_id': run_id,
+                                'agent_id': agent_id,
+                                'episode_index': int(getattr(message, 'episode_index', 0)),
+                                'total_reward': float(getattr(message, 'total_reward', 0.0)),
+                                'steps': int(getattr(message, 'steps', 0)),
+                                'terminated': bool(getattr(message, 'terminated', False)),
+                                'truncated': bool(getattr(message, 'truncated', False)),
+                                'timestamp': getattr(message, 'timestamp', ''),
+                            }
+                            evt = TelemetryEvent(
+                                topic=Topic.EPISODE_FINALIZED,
+                                run_id=run_id,
+                                agent_id=agent_id,
+                                seq_id=int(getattr(message, 'seq_id', -1)),
+                                ts_iso=getattr(message, 'timestamp', ''),
+                                payload=payload_dict,
+                            )
+                            bus.publish(evt)
+                            _LOGGER.debug(
+                                "Published EPISODE_FINALIZED to RunBus from daemon",
+                                extra={"run_id": run_id, "agent_id": agent_id, "seq_id": getattr(message, 'seq_id', -1)},
+                            )
+                        except Exception as e:
+                            _LOGGER.warning(
+                                "Failed to publish EPISODE_FINALIZED to RunBus",
+                                extra={"run_id": run_id, "error": str(e)},
+                            )
         except asyncio.CancelledError:
             _LOGGER.debug("PublishRunEpisodes cancelled", extra={"accepted": accepted})
             raise
+        _LOGGER.info("PublishRunEpisodes close", extra={"run_id": run_id, "accepted": accepted, "dropped": dropped})
         return trainer_pb2.PublishTelemetryResponse(accepted=accepted, dropped=dropped)
 
     # ------------------------------------------------------------------
@@ -558,6 +771,7 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
             metadata=dict(metadata),
             timestamp=self._timestamp_from_proto(message),
             agent_id=message.agent_id or None,
+            run_id=message.run_id or None,
         )
 
     @staticmethod

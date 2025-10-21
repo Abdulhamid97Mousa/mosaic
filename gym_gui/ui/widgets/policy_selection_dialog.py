@@ -63,7 +63,7 @@ class PolicySelectionDialog(QtWidgets.QDialog):
         for path in sorted(self._policy_root.rglob("*.json")):
             rel = path.relative_to(self._policy_root)
             parts = rel.parts
-            env_id = parts[0] if parts else "unknown"
+            game_id = parts[0] if parts else "unknown"
             agent_id = path.stem
             try:
                 payload = json.loads(path.read_text())
@@ -71,7 +71,7 @@ class PolicySelectionDialog(QtWidgets.QDialog):
                 payload = {}
             timestamp = datetime.fromtimestamp(path.stat().st_mtime)
             info = PolicyInfo(
-                environment=env_id,
+                environment=game_id,
                 agent_id=payload.get("agent_id") or agent_id,
                 path=path,
                 updated=timestamp,
