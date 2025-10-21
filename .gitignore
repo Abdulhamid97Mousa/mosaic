@@ -35,9 +35,6 @@ gym_gui/var/logs/*
 gym_gui/var/config/*
 !gym_gui/var/config/README.md
 
-spadeBDI_RL
-graphrag
-openrlbenchmark
 
 # Protocol Buffers generated files
 *_pb2.py
@@ -52,4 +49,5 @@ gym_gui/services/trainer/proto/trainer_pb2.pyi
 .github
 .idea
 .venv.pytest_cache
+
 
