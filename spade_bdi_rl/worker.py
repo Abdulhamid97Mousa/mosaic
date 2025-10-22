@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 from typing import Any, Dict, Optional
@@ -20,8 +21,15 @@ def _read_config_from_path(path: Path) -> Dict[str, Any]:
 
 
 def _load_config(args: argparse.Namespace) -> RunConfig:
-    if args.config_path:
-        config_payload = _read_config_from_path(Path(args.config_path).expanduser().resolve())
+    # Priority: CLI arg > environment variable > stdin
+    config_path = args.config_path
+
+    # If no CLI arg, check environment variable
+    if not config_path:
+        config_path = os.environ.get("TRAINER_WORKER_CONFIG_PATH")
+
+    if config_path:
+        config_payload = _read_config_from_path(Path(config_path).expanduser().resolve())
     else:
         try:
             config_payload = json.load(sys.stdin)

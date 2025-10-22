@@ -2,19 +2,22 @@ from __future__ import annotations
 
 """Application entry-point helpers for manual smoke-testing."""
 
+# CRITICAL: Set Qt API BEFORE any other imports that might use Qt
+import os
+os.environ.setdefault("QT_API", "pyqt6")
+
 import asyncio
 import errno
 import json
 import logging
 import sys
-import os
 from dataclasses import replace
 from typing import Any
 
 from gym_gui.config.settings import Settings, get_settings
 from gym_gui.logging_config.logger import configure_logging
-from gym_gui.services.bootstrap import bootstrap_default_services
-from gym_gui.services.trainer.launcher import TrainerDaemonHandle, TrainerDaemonLaunchError
+# NOTE: bootstrap_default_services and TrainerDaemonHandle are imported inside main()
+# to ensure Qt API is set before any Qt imports happen
 
 
 def _format_settings(settings: Settings) -> str:
@@ -59,6 +62,10 @@ def main() -> int:
 
     # Setup Qt-compatible asyncio event loop using qasync
     _setup_qasync_event_loop(app)
+
+    # Import bootstrap AFTER Qt is initialized
+    from gym_gui.services.bootstrap import bootstrap_default_services
+    from gym_gui.services.trainer.launcher import TrainerDaemonHandle, TrainerDaemonLaunchError
 
     try:
         locator = bootstrap_default_services()

@@ -1,3 +1,4 @@
+# /home/hamid/Desktop/Projects/GUI_BDI_RL/gym_gui/services/trainer/service.py
 from __future__ import annotations
 
 """gRPC service implementation for the trainer daemon."""
@@ -457,9 +458,9 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
         if not request.run_id:
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "run_id is required")
 
-        # Load historical steps from telemetry database first
+        # Load historical steps from telemetry database first (only on initial subscribe)
         seq_counter = 0
-        if self._telemetry_store:
+        if self._telemetry_store and int(request.since_seq) == 0:
             try:
                 # Query all recent steps and filter by run_id (encoded in episode_id as {run_id}-ep{N})
                 all_steps = self._telemetry_store.recent_steps(limit=4096)
@@ -520,7 +521,10 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
             except Exception as exc:
                 _LOGGER.warning("StreamRunSteps: failed to load from telemetry store", extra={"run_id": request.run_id, "error": str(exc)}, exc_info=True)
 
-        queue, replay = await self._telemetry_broadcaster.subscribe_steps(request.run_id, int(request.since_seq))
+        # NEW: Pass seq_counter to broadcaster to prevent double-delivery
+        # If DB replay emitted steps (seq_counter > 0), broadcaster will skip its replay
+        # If DB was empty (seq_counter == 0), broadcaster will replay from in-memory history
+        queue, replay = await self._telemetry_broadcaster.subscribe_steps(request.run_id, seq_counter)
         try:
             for payload in replay:
                 _LOGGER.debug("StreamRunSteps replay yield", extra={"run_id": request.run_id, "seq": getattr(payload, 'seq_id', None)})
@@ -548,7 +552,14 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
                 for episode in episodes:
                     seq_counter += 1
                     # Convert EpisodeRollup to RunEpisode proto
-                    episode_index = int(episode.episode_id.split('_')[-1]) if '_' in episode.episode_id else 0
+                    # Parse episode_index from episode_id (format: "run_id-ep0002")
+                    eid = episode.episode_id or ""
+                    episode_index = 0
+                    if "-ep" in eid:
+                        try:
+                            episode_index = int(eid.split("-ep", 1)[1])
+                        except ValueError:
+                            pass  # Keep episode_index = 0 if parsing fails
                     payload = trainer_pb2.RunEpisode(
                         run_id=request.run_id,
                         episode_index=episode_index,
@@ -567,7 +578,10 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
             except Exception as exc:
                 _LOGGER.warning("StreamRunEpisodes: failed to load from telemetry store", extra={"run_id": request.run_id, "error": str(exc)})
 
-        queue, replay = await self._telemetry_broadcaster.subscribe_episodes(request.run_id, int(request.since_seq))
+        # NEW: Pass seq_counter to broadcaster to prevent double-delivery
+        # If DB replay emitted episodes (seq_counter > 0), broadcaster will skip its replay
+        # If DB was empty (seq_counter == 0), broadcaster will replay from in-memory history
+        queue, replay = await self._telemetry_broadcaster.subscribe_episodes(request.run_id, seq_counter)
         try:
             for payload in replay:
                 _LOGGER.debug("StreamRunEpisodes replay yield", extra={"run_id": request.run_id, "seq": getattr(payload, 'seq_id', None)})
@@ -676,7 +690,8 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
                         _LOGGER.debug("PublishRunEpisodes accepted", extra={"run_id": run_id, "ep": int(getattr(message, 'episode_index', 0)), "agent_id": getattr(message, 'agent_id', '')})
                     if self._telemetry_store:
                         rollup = self._episode_from_proto(message)
-                        self._telemetry_store.record_episode(rollup, wait=False)
+                        # Persist episode to SQLite (durable path)
+                        self._telemetry_store.record_episode(rollup, wait=True)
 
                     # Publish to RunBus for db_sink and other subscribers
                     if run_id:

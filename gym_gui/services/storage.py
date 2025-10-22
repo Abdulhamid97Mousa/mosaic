@@ -138,6 +138,11 @@ class StorageRecorderService:
         recorder = self._ensure_recorder()
         recorder.finalize_episode()
 
+    def write_episode_from_steps(self, episode_id: str, steps: list) -> None:
+        """Write episode JSONL file from a list of steps (used when buffer is empty)."""
+        recorder = self._ensure_recorder()
+        recorder.write_episode_from_steps(episode_id, steps)
+
     def reset_session(self) -> None:
         if self._recorder:
             self._recorder.close()

@@ -14,7 +14,7 @@ if TYPE_CHECKING:
 from ..algorithms import create_agent, create_runtime
 from ..policies import PolicyStorage
 from .config import PolicyStrategy, RunConfig
-from .telemetry import TelemetryEmitter
+from .worker_telemetry import TelemetryEmitter
 
 logger = logging.getLogger(__name__)
 

@@ -97,7 +97,11 @@ class SessionRecorder:
 
     # ------------------------------------------------------------------
     def finalize_episode(self) -> None:
-        if self._current_episode_id is None or not self._steps:
+        if self._current_episode_id is None:
+            return
+
+        # If buffer is empty, don't write anything (will be written from database)
+        if not self._steps:
             return
 
         episode_dir = self._base_dir / self._current_episode_id
@@ -111,6 +115,25 @@ class SessionRecorder:
         self._prune_old_episodes()
         self._steps.clear()
         self._current_episode_id = None
+
+    def write_episode_from_steps(self, episode_id: str, steps: list[EpisodeRecord]) -> None:
+        """Write episode JSONL file from a list of steps (used when buffer is empty).
+
+        This method is called when the in-memory buffer is empty but we have steps
+        from the database that need to be written to the JSONL file.
+        """
+        if not steps:
+            return
+
+        episode_dir = self._base_dir / episode_id
+        episode_dir.mkdir(parents=True, exist_ok=True)
+        payload = [self._serialize_step(step) for step in steps]
+        output_file = episode_dir / "episode.jsonl"
+        with output_file.open("w", encoding="utf-8") as handle:
+            for entry in payload:
+                handle.write(json.dumps(entry) + "\n")
+
+        self._prune_old_episodes()
 
     # ------------------------------------------------------------------
     def close(self) -> None:

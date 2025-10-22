@@ -1,3 +1,4 @@
+# /home/hamid/Desktop/Projects/GUI_BDI_RL/gym_gui/ui/widgets/live_telemetry_tab.py
 """Live telemetry tab widget for displaying streamed run data."""
 
 from __future__ import annotations
@@ -9,9 +10,16 @@ from typing import Any, Deque, Optional
 
 from qtpy import QtCore, QtWidgets
 
+from PyQt6.QtCore import pyqtSlot  # type: ignore[attr-defined]
+
+_QUEUED_CONNECTION = QtCore.Qt.ConnectionType.QueuedConnection  # type: ignore[attr-defined]
+
+
 from gym_gui.ui.widgets.base_telemetry_tab import BaseTelemetryTab
 from gym_gui.rendering import RendererRegistry, create_default_renderer_registry, RendererContext
 from gym_gui.core.enums import GameId, RenderMode
+from gym_gui.telemetry.rendering_speed_regulator import RenderingSpeedRegulator
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,9 +36,14 @@ class LiveTelemetryTab(BaseTelemetryTab):
         buffer_size: int = 100,
         episode_buffer_size: int = 100,
         render_throttle_interval: int = 1,
+        render_delay_ms: int = 100,
         renderer_registry: Optional[RendererRegistry] = None,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
+        # Store render delay for later use in _build_ui()
+        self._render_delay_ms = render_delay_ms
+        self._render_regulator: Optional[RenderingSpeedRegulator] = None
+
         self._step_buffer: Deque[Any] = deque(maxlen=buffer_size)
         self._episode_buffer: Deque[Any] = deque(maxlen=episode_buffer_size)
         self._dropped_steps = 0
@@ -43,6 +56,9 @@ class LiveTelemetryTab(BaseTelemetryTab):
         self._last_render_payload: Optional[dict[str, Any]] = None
         self._is_destroyed = False  # Track if widget is being destroyed
         self._pending_render_timer_id: Optional[int] = None  # Track pending QTimer for cleanup
+
+        # CRITICAL: Call super().__init__() which calls _build_ui()
+        # _build_ui() will create the regulator after self is a valid Qt object
         super().__init__(run_id, agent_id, parent=parent)
 
     def _build_ui(self) -> None:
@@ -58,6 +74,7 @@ class LiveTelemetryTab(BaseTelemetryTab):
         # 1) LIVE RENDERING PANEL (at top)
         render_group = QtWidgets.QGroupBox("Live Rendering", self)
         render_group.setMinimumHeight(300)  # Ensure rendering area has minimum height
+        _LOGGER.debug("_build_ui: Render group minimum height set to 300px")
         render_layout = QtWidgets.QVBoxLayout(render_group)
         self._render_container = QtWidgets.QWidget(render_group)
         # Set size policy to expand and fill available space
@@ -65,18 +82,27 @@ class LiveTelemetryTab(BaseTelemetryTab):
             QtWidgets.QSizePolicy.Policy.Expanding,
             QtWidgets.QSizePolicy.Policy.Expanding
         )
+        _LOGGER.debug("_build_ui: Render container size policy set to Expanding/Expanding")
         self._render_layout = QtWidgets.QVBoxLayout(self._render_container)
         self._render_layout.setContentsMargins(0, 0, 0, 0)
+        self._render_layout.setSpacing(0)
+        _LOGGER.debug("_build_ui: Render layout margins and spacing set to 0")
         self._render_placeholder = QtWidgets.QLabel("Waiting for render data...")
         self._render_placeholder.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self._render_placeholder.setStyleSheet("color: #999; font-style: italic;")
         self._render_layout.addWidget(self._render_placeholder)
         render_layout.addWidget(self._render_container)
+        render_layout.setContentsMargins(0, 0, 0, 0)
+        render_layout.setSpacing(0)
+        _LOGGER.debug("_build_ui: Render layout (group) margins and spacing set to 0")
         layout.addWidget(render_group, 3)  # Stretch factor 3 (increased from 1)
+        _LOGGER.debug("_build_ui: Render group added to main layout with stretch factor 3")
 
         # 2) TELEMETRY SECTIONS (vertical splitter for episodes and steps)
         splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical, self)
+        _LOGGER.debug("_build_ui: Vertical splitter created for episodes and steps")
         layout.addWidget(splitter, 1)  # Stretch factor 1 (decreased from 2)
+        _LOGGER.debug("_build_ui: Splitter added to main layout with stretch factor 1")
 
         # 2a) Telemetry Recent Episodes (above steps)
         episodes_group = QtWidgets.QGroupBox("Telemetry Recent Episodes", self)
@@ -145,20 +171,42 @@ class LiveTelemetryTab(BaseTelemetryTab):
 
         splitter.setStretchFactor(0, 1)  # Episodes (reduced from 1)
         splitter.setStretchFactor(1, 1)  # Steps (reduced from 2)
+        _LOGGER.debug("_build_ui: Splitter stretch factors set - Episodes: 1, Steps: 1")
 
         # Footer with overflow stats
         self._overflow_label = QtWidgets.QLabel("")
         self._overflow_label.setStyleSheet("color: #d32f2f;")
         layout.addWidget(self._overflow_label)
 
+        # Create and start rendering speed regulator for decoupled visual rendering
+        # IMPORTANT: This must be AFTER super().__init__() so self is a valid Qt object
+        self._render_regulator = RenderingSpeedRegulator(
+            render_delay_ms=self._render_delay_ms,
+            max_queue_size=32,
+            parent=self
+        )
+        self._render_regulator.payload_ready.connect(self._try_render_visual)
+        self._render_regulator.start()
+        _LOGGER.debug(f"_build_ui: RenderingSpeedRegulator created and started with delay={self._render_delay_ms}ms")
+
     def set_render_throttle_interval(self, interval: int) -> None:
         """Set the render throttle interval (render every Nth step).
-        
+
         Args:
             interval: Render every Nth step (1=every step, 2=every 2nd step, etc.)
         """
         self._render_throttle_interval = max(1, interval)
         _LOGGER.debug(f"Render throttle interval set to {self._render_throttle_interval}")
+
+    def set_render_delay(self, delay_ms: int) -> None:
+        """Set the rendering delay (time between visual renders).
+
+        Args:
+            delay_ms: Delay in milliseconds (e.g., 100ms = 10 FPS, 50ms = 20 FPS)
+        """
+        if self._render_regulator is not None:
+            self._render_regulator.set_render_delay(delay_ms)
+            _LOGGER.info(f"Render delay set to {delay_ms}ms")
 
     def add_step(self, payload: Any) -> None:
         """Add a step to the buffer and update display lazily."""
@@ -173,23 +221,25 @@ class LiveTelemetryTab(BaseTelemetryTab):
             self._step_buffer.append(payload)
             self._update_stats()
 
-            # Schedule table update on main Qt thread (safe from any thread)
-            # Use singleShot to defer to main event loop
-            QtCore.QTimer.singleShot(0, lambda: self._render_latest_step(payload))
+            # Schedule step rendering on the GUI thread using QMetaObject.invokeMethod.
+            # This works from any thread (including background threads without Qt event loops).
+            self._schedule_step_render(payload)
+            _LOGGER.debug("add_step: Table update scheduled (no throttle)")
 
-            # Throttle visual rendering to avoid blocking event loop
-            # Only render every N steps to keep UI responsive during high-frequency telemetry
-            self._render_throttle_counter += 1
-            _LOGGER.debug(f"add_step: Throttle counter={self._render_throttle_counter}, interval={self._render_throttle_interval}")
-            if self._render_throttle_counter >= self._render_throttle_interval:
-                self._render_throttle_counter = 0
-                # Store payload for deferred rendering (avoid lambda capture issues)
-                self._last_render_payload = payload
-                # Schedule rendering on main Qt thread (CRITICAL: prevents QBasicTimer threading errors)
-                _LOGGER.debug(f"add_step: Throttle check passed, scheduling _try_render_visual on main thread")
-                QtCore.QTimer.singleShot(0, lambda p=payload: self._try_render_visual(p))
-            else:
-                _LOGGER.debug(f"add_step: Throttle check failed, skipping render (counter={self._render_throttle_counter} < interval={self._render_throttle_interval})")
+            # Submit payload to rendering speed regulator for decoupled visual rendering
+            # Visual rendering happens at configurable rate (e.g., 10 FPS) independent of table updates
+            if self._render_regulator is not None:
+                if isinstance(payload, dict):
+                    self._render_regulator.submit_payload(payload)
+                    _LOGGER.debug(f"add_step: Payload submitted to regulator (queue_size={self._render_regulator.get_queue_size()})")
+                else:
+                    # Convert object to dict if needed
+                    try:
+                        payload_dict = dict(payload) if hasattr(payload, '__dict__') else {"payload": payload}
+                        self._render_regulator.submit_payload(payload_dict)
+                        _LOGGER.debug(f"add_step: Object payload converted and submitted to regulator")
+                    except Exception as e:
+                        _LOGGER.warning(f"add_step: Failed to submit payload to regulator: {e}")
 
             _LOGGER.debug("add_step: COMPLETE")
         except Exception as e:
@@ -396,9 +446,16 @@ class LiveTelemetryTab(BaseTelemetryTab):
                         self._render_layout.removeWidget(self._render_placeholder)
                         self._render_placeholder.deleteLater()
                     if self._renderer_strategy and hasattr(self._renderer_strategy, 'widget'):
-                        _LOGGER.debug("_try_render_visual: Adding renderer widget to layout")
-                        self._render_layout.addWidget(self._renderer_strategy.widget)
-                        _LOGGER.debug(f"_try_render_visual: Renderer widget added, widget={self._renderer_strategy.widget}")
+                        widget = self._renderer_strategy.widget
+                        _LOGGER.debug(f"_try_render_visual: Adding renderer widget to layout (widget={widget})")
+                        # Ensure renderer widget expands to fill container
+                        widget.setSizePolicy(
+                            QtWidgets.QSizePolicy.Policy.Expanding,
+                            QtWidgets.QSizePolicy.Policy.Expanding
+                        )
+                        _LOGGER.debug("_try_render_visual: Renderer widget size policy set to Expanding/Expanding")
+                        self._render_layout.addWidget(widget)
+                        _LOGGER.info(f"_try_render_visual: Renderer widget successfully added to layout")
                 except Exception as e:
                     _LOGGER.exception(f"_try_render_visual: Failed to initialize renderer: {e}")
                     return
@@ -482,13 +539,76 @@ class LiveTelemetryTab(BaseTelemetryTab):
             self._episode_buffer.append(payload)
             self._update_stats()
 
-            # Schedule episode row rendering on main Qt thread (safe from any thread)
-            # Use lambda to defer the call to the main event loop
-            _LOGGER.debug(f"add_episode: Scheduling _render_episode_row on main thread")
-            QtCore.QTimer.singleShot(0, lambda p=payload: self._render_episode_row(p))
+            # Schedule episode rendering on the GUI thread using QMetaObject.invokeMethod.
+            # This works from any thread (including background threads without Qt event loops).
+            self._schedule_episode_render(payload)
             _LOGGER.debug("add_episode: COMPLETE")
         except Exception as e:
             _LOGGER.exception(f"add_episode: ERROR - {e}")
+    
+    
+    def _schedule_step_render(self, payload: Any) -> None:
+        """Schedule step rendering on the GUI thread using QMetaObject.invokeMethod.
+
+        This method works from any thread (including background threads without event loops).
+        It stores the payload and invokes the actual render method on the GUI thread.
+        """
+        try:
+            # Store payload in a temporary slot so we can pass it to the render method
+            self._pending_step_payload = payload
+            # Use QMetaObject.invokeMethod to schedule on GUI thread
+            # QtCore.Qt.ConnectionType.QueuedConnection ensures it runs on the GUI thread's event loop
+            QtCore.QMetaObject.invokeMethod(
+                self,
+                "_render_latest_step_from_pending",
+                _QUEUED_CONNECTION,
+            )
+        except Exception as e:
+            _LOGGER.exception(f"_schedule_step_render: ERROR - {e}")
+
+
+    def _schedule_episode_render(self, payload: Any) -> None:
+        """Schedule episode rendering on the GUI thread using QMetaObject.invokeMethod.
+
+        This method works from any thread (including background threads without event loops).
+        It stores the payload and invokes the actual render method on the GUI thread.
+        """
+        try:
+            # Store payload in a temporary slot so we can pass it to the render method
+            self._pending_episode_payload = payload
+            # Use QMetaObject.invokeMethod to schedule on GUI thread
+            # QtCore.Qt.ConnectionType.QueuedConnection ensures it runs on the GUI thread's event loop
+            QtCore.QMetaObject.invokeMethod(
+                self,
+                "_render_episode_row_from_pending",
+                _QUEUED_CONNECTION,
+            )
+        except Exception as e:
+            _LOGGER.exception(f"_schedule_episode_render: ERROR - {e}")
+            
+    @pyqtSlot()
+    def _render_latest_step_from_pending(self) -> None:
+        """Wrapper to render the pending step payload. Called via QMetaObject.invokeMethod."""
+        try:
+            if hasattr(self, '_pending_step_payload'):
+                payload = self._pending_step_payload
+                delattr(self, '_pending_step_payload')
+                self._render_latest_step(payload)
+        except Exception as e:
+            _LOGGER.exception(f"_render_latest_step_from_pending: ERROR - {e}")
+            
+    @pyqtSlot()
+    def _render_episode_row_from_pending(self) -> None:
+        """Wrapper to render the pending episode payload. Called via QMetaObject.invokeMethod."""
+        try:
+            if hasattr(self, '_pending_episode_payload'):
+                payload = self._pending_episode_payload
+                delattr(self, '_pending_episode_payload')
+                self._render_episode_row(payload)
+        except Exception as e:
+            _LOGGER.exception(f"_render_episode_row_from_pending: ERROR - {e}")
+
+
 
     def _render_episode_row(self, payload: Any) -> None:
         """Add a row to the episodes table."""
@@ -498,142 +618,154 @@ class LiveTelemetryTab(BaseTelemetryTab):
             if self._is_destroyed:
                 _LOGGER.debug("_render_episode_row: Widget is destroyed, skipping")
                 return
-        except Exception as e:
-            _LOGGER.exception(f"_render_episode_row: ERROR checking destroyed state - {e}")
-            return
 
-        # Helper function to handle both dict and object payloads
-        def _get_field(obj: Any, *field_names: str, default: Any = None) -> Any:
-            for field in field_names:
-                if isinstance(obj, dict):
-                    val = obj.get(field)
-                    if val is not None:
-                        return val
+            # Helper function to handle both dict and object payloads
+            def _get_field(obj: Any, *field_names: str, default: Any = None) -> Any:
+                for field in field_names:
+                    if isinstance(obj, dict):
+                        val = obj.get(field)
+                        if val is not None:
+                            return val
+                    else:
+                        val = getattr(obj, field, None)
+                        if val is not None:
+                            return val
+                return default
+
+            # Try both camelCase (from protobuf) and snake_case field names
+            episode_index_raw = _get_field(payload, "episodeIndex", "episode_index", "episode", default=0)
+            steps_raw = _get_field(payload, "steps", default=0)
+            total_reward = _get_field(payload, "totalReward", "total_reward", "reward", default=0.0)
+            terminated = _get_field(payload, "terminated", default=False)
+            truncated = _get_field(payload, "truncated", default=False)
+
+            # Convert to proper types (handles both string and int values from protobuf)
+            try:
+                episode_index = int(episode_index_raw) if episode_index_raw is not None else 0
+            except (TypeError, ValueError):
+                episode_index = 0
+
+            try:
+                steps = int(steps_raw) if steps_raw is not None else 0
+            except (TypeError, ValueError):
+                steps = 0
+
+            # Extract timestamp
+            timestamp = _get_field(payload, "timestamp", "ts")
+            if timestamp:
+                if hasattr(timestamp, 'seconds'):
+                    # Protobuf Timestamp
+                    from datetime import datetime, timezone as tz
+                    dt = datetime.fromtimestamp(timestamp.seconds + timestamp.nanos / 1e9, tz=tz.utc)
+                    ts_display = dt.strftime("%Y-%m-%d %H:%M:%S")
+                elif isinstance(timestamp, str):
+                    ts_display = timestamp[:19].replace('T', ' ')
                 else:
-                    val = getattr(obj, field, None)
-                    if val is not None:
-                        return val
-            return default
-
-        # Try both camelCase (from protobuf) and snake_case field names
-        episode_index_raw = _get_field(payload, "episodeIndex", "episode_index", "episode", default=0)
-        steps_raw = _get_field(payload, "steps", default=0)
-        total_reward = _get_field(payload, "totalReward", "total_reward", "reward", default=0.0)
-        terminated = _get_field(payload, "terminated", default=False)
-        truncated = _get_field(payload, "truncated", default=False)
-
-        # Convert to proper types (handles both string and int values from protobuf)
-        try:
-            episode_index = int(episode_index_raw) if episode_index_raw is not None else 0
-        except (TypeError, ValueError):
-            episode_index = 0
-
-        try:
-            steps = int(steps_raw) if steps_raw is not None else 0
-        except (TypeError, ValueError):
-            steps = 0
-
-        # Extract timestamp
-        timestamp = _get_field(payload, "timestamp", "ts")
-        if timestamp:
-            if hasattr(timestamp, 'seconds'):
-                # Protobuf Timestamp
-                from datetime import datetime, timezone as tz
-                dt = datetime.fromtimestamp(timestamp.seconds + timestamp.nanos / 1e9, tz=tz.utc)
-                ts_display = dt.strftime("%Y-%m-%d %H:%M:%S")
-            elif isinstance(timestamp, str):
-                ts_display = timestamp[:19].replace('T', ' ')
+                    ts_display = str(timestamp)[:19]
             else:
-                ts_display = str(timestamp)[:19]
-        else:
-            ts_display = "—"
+                ts_display = "—"
 
-        metadata_json = _get_field(payload, "metadataJson", "metadata_json", default="")
-        metadata: dict[str, Any] = {}
-        if isinstance(metadata_json, str) and metadata_json:
+            metadata_json = _get_field(payload, "metadataJson", "metadata_json", default="")
+            metadata: dict[str, Any] = {}
+            if isinstance(metadata_json, str) and metadata_json:
+                try:
+                    metadata = json.loads(metadata_json)
+                except json.JSONDecodeError:
+                    metadata = {}
+            elif isinstance(metadata_json, dict):
+                metadata = metadata_json
+
+            seed = metadata.get("seed", "—")
+            episode_seed = metadata.get("episode_seed", "—")
+            control_mode = metadata.get("mode") or metadata.get("control_mode") or "—"
+            game_id = metadata.get("game_id", "—")
+
+            # CRITICAL FIX: Update current_game from episode metadata
+            # This ensures the renderer uses the correct game_id for rendering
+            if game_id != "—":
+                try:
+                    new_game_id = game_id if isinstance(game_id, GameId) else GameId(str(game_id))
+                    if self._current_game != new_game_id:
+                        self._current_game = new_game_id
+                        _LOGGER.debug(f"_render_episode_row: Updated current_game to {self._current_game} from episode metadata")
+                except (ValueError, KeyError):
+                    _LOGGER.warning(f"_render_episode_row: Invalid game_id in metadata: {game_id}")
+
+            # CRITICAL FIX: Display episode should equal seed + episode_index
+            # episode_index is 0-based (0, 1, 2, 3...)
+            # display_episode = seed + episode_index
             try:
-                metadata = json.loads(metadata_json)
-            except json.JSONDecodeError:
-                metadata = {}
-        elif isinstance(metadata_json, dict):
-            metadata = metadata_json
+                seed_int = int(seed) if seed != "—" else 0
+                episode_idx_int = int(episode_index)
+                display_episode = seed_int + episode_idx_int
+                _LOGGER.debug(f"_render_episode_row: seed={seed} ({seed_int}), episode_index={episode_index} ({episode_idx_int}), display_episode={display_episode}")
+            except (TypeError, ValueError) as e:
+                _LOGGER.warning(f"_render_episode_row: Failed to calculate display_episode: {e}")
+                display_episode = int(episode_index) if episode_index else 0
 
-        seed = metadata.get("seed", "—")
-        episode_seed = metadata.get("episode_seed", "—")
-        control_mode = metadata.get("mode") or metadata.get("control_mode") or "—"
-        game_id = metadata.get("game_id", "—")
-
-        # CRITICAL FIX: Update current_game from episode metadata
-        # This ensures the renderer uses the correct game_id for rendering
-        if game_id != "—":
-            try:
-                new_game_id = game_id if isinstance(game_id, GameId) else GameId(str(game_id))
-                if self._current_game != new_game_id:
-                    self._current_game = new_game_id
-                    _LOGGER.debug(f"_render_episode_row: Updated current_game to {self._current_game} from episode metadata")
-            except (ValueError, KeyError):
-                _LOGGER.warning(f"_render_episode_row: Invalid game_id in metadata: {game_id}")
-
-        # CRITICAL FIX: Display episode should equal seed + episode_index
-        # episode_index is 0-based (0, 1, 2, 3...)
-        # display_episode = seed + episode_index
-        try:
-            seed_int = int(seed) if seed != "—" else 0
-            episode_idx_int = int(episode_index)
-            display_episode = seed_int + episode_idx_int
-            _LOGGER.debug(f"_render_episode_row: seed={seed} ({seed_int}), episode_index={episode_index} ({episode_idx_int}), display_episode={display_episode}")
-        except (TypeError, ValueError) as e:
-            _LOGGER.warning(f"_render_episode_row: Failed to calculate display_episode: {e}")
-            display_episode = int(episode_index) if episode_index else 0
-
-        # Compute outcome display from episode state
-        if terminated:
-            if total_reward > 0:
-                outcome_display = "Success"
-            elif total_reward < 0:
-                outcome_display = "Failed"
+            # Compute outcome display from episode state
+            if terminated:
+                if total_reward > 0:
+                    outcome_display = "Success"
+                elif total_reward < 0:
+                    outcome_display = "Failed"
+                else:
+                    outcome_display = "Completed"
+            elif truncated:
+                outcome_display = "Timeout"
             else:
-                outcome_display = "Completed"
-        elif truncated:
-            outcome_display = "Timeout"
-        else:
-            outcome_display = "Running"
+                outcome_display = "Running"
 
-        row = self._episodes_table.rowCount()
-        self._episodes_table.insertRow(row)
-        # Column 0: Timestamp
-        self._episodes_table.setItem(row, 0, QtWidgets.QTableWidgetItem(ts_display))
-        # Column 1: Episode (display value = seed + episode_index)
-        self._episodes_table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(display_episode)))
-        self._episodes_table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(steps)))
-        self._episodes_table.setItem(row, 3, QtWidgets.QTableWidgetItem(f"{float(total_reward):.2f}"))
-        self._episodes_table.setItem(row, 4, QtWidgets.QTableWidgetItem(str(terminated)))
-        self._episodes_table.setItem(row, 5, QtWidgets.QTableWidgetItem(str(truncated)))
-        self._episodes_table.setItem(row, 6, QtWidgets.QTableWidgetItem(str(seed)))
-        self._episodes_table.setItem(row, 7, QtWidgets.QTableWidgetItem(str(episode_seed)))
-        self._episodes_table.setItem(row, 8, QtWidgets.QTableWidgetItem(str(control_mode)))
-        self._episodes_table.setItem(row, 9, QtWidgets.QTableWidgetItem(str(game_id)))
-        self._episodes_table.setItem(row, 10, QtWidgets.QTableWidgetItem(str(outcome_display)))
+            row = self._episodes_table.rowCount()
+            self._episodes_table.insertRow(row)
+            # Column 0: Timestamp
+            self._episodes_table.setItem(row, 0, QtWidgets.QTableWidgetItem(ts_display))
+            # Column 1: Episode (display value = seed + episode_index)
+            self._episodes_table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(display_episode)))
+            self._episodes_table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(steps)))
+            self._episodes_table.setItem(row, 3, QtWidgets.QTableWidgetItem(f"{float(total_reward):.2f}"))
+            self._episodes_table.setItem(row, 4, QtWidgets.QTableWidgetItem(str(terminated)))
+            self._episodes_table.setItem(row, 5, QtWidgets.QTableWidgetItem(str(truncated)))
+            self._episodes_table.setItem(row, 6, QtWidgets.QTableWidgetItem(str(seed)))
+            self._episodes_table.setItem(row, 7, QtWidgets.QTableWidgetItem(str(episode_seed)))
+            self._episodes_table.setItem(row, 8, QtWidgets.QTableWidgetItem(str(control_mode)))
+            self._episodes_table.setItem(row, 9, QtWidgets.QTableWidgetItem(str(game_id)))
+            self._episodes_table.setItem(row, 10, QtWidgets.QTableWidgetItem(str(outcome_display)))
 
-        if metadata:
-            tooltip = json.dumps(metadata, indent=2)
-            for col in range(self._episodes_table.columnCount()):
-                item = self._episodes_table.item(row, col)
-                if item is not None:
-                    item.setToolTip(tooltip)
+            if metadata:
+                tooltip = json.dumps(metadata, indent=2)
+                for col in range(self._episodes_table.columnCount()):
+                    item = self._episodes_table.item(row, col)
+                    if item is not None:
+                        item.setToolTip(tooltip)
 
-        # Auto-scroll to latest
-        self._episodes_table.scrollToBottom()
+            # Auto-scroll to latest
+            self._episodes_table.scrollToBottom()
 
-        # Enable Copy button when data is available
-        if self._episodes_table.rowCount() > 0:
-            self._episodes_copy_button.setEnabled(True)
+            # Enable Copy button when data is available
+            if self._episodes_table.rowCount() > 0:
+                self._episodes_copy_button.setEnabled(True)
 
-        # Limit rows to prevent memory bloat (keep last 100 episodes, same as steps)
-        if self._episodes_table.rowCount() > 100:
-            self._episodes_table.removeRow(0)
+            # Limit rows to prevent memory bloat (keep last 100 episodes, same as steps)
+            if self._episodes_table.rowCount() > 100:
+                self._episodes_table.removeRow(0)
 
-        _LOGGER.info(f"_render_episode_row: COMPLETE (row_count={self._episodes_table.rowCount()})")
+            _LOGGER.info(f"_render_episode_row: COMPLETE (row_count={self._episodes_table.rowCount()})")
+        except Exception as e:
+            # NEW: Never let UI rendering die silently - log raw payload preview
+            try:
+                preview = (json.dumps(payload)[:400] + "…") if isinstance(payload, dict) else str(payload)[:400] + "…"
+            except Exception:
+                preview = "<uninspectable>"
+            _LOGGER.exception(
+                "EPISODE ROW RENDER FAILED",
+                extra={
+                    "agent": self.agent_id,
+                    "run": self.run_id,
+                    "payload_preview": preview,
+                    "error": str(e)
+                }
+            )
 
     def mark_overflow(self, stream_type: str, dropped: int) -> None:
         """Record dropped events and update overflow indicator."""
@@ -752,6 +884,16 @@ class LiveTelemetryTab(BaseTelemetryTab):
             self._episode_buffer.clear()
             _LOGGER.debug(f"cleanup: Cleared episode buffer (was {episode_count} items)")
 
+            # Stop rendering speed regulator
+            if hasattr(self, '_render_regulator') and self._render_regulator is not None:
+                _LOGGER.debug("cleanup: Stopping RenderingSpeedRegulator")
+                try:
+                    self._render_regulator.stop()
+                    self._render_regulator.clear_queue()
+                    _LOGGER.debug("cleanup: RenderingSpeedRegulator stopped and queue cleared")
+                except Exception as e:
+                    _LOGGER.exception(f"cleanup: Error stopping regulator: {e}")
+
             # Clear renderer strategy
             if self._renderer_strategy is not None:
                 _LOGGER.debug(f"cleanup: Cleaning up renderer strategy: {self._renderer_strategy}")
@@ -822,9 +964,23 @@ class LiveTelemetryTab(BaseTelemetryTab):
             except (TypeError, ValueError):
                 return None
 
-            # Create minimal grid representation (8x8 default)
-            grid_size = 8
-            grid = [['F' for _ in range(grid_size)] for _ in range(grid_size)]
+            # Extract grid size from observation (respect actual environment dimensions)
+            # Default to 4x4 for FrozenLake-v1, but respect what the observation reports
+            grid_size_info = obs_data.get("grid_size")
+            if isinstance(grid_size_info, dict):
+                # grid_size is {"height": h, "width": w}
+                grid_height = int(grid_size_info.get("height", 4))
+                grid_width = int(grid_size_info.get("width", 4))
+            elif isinstance(grid_size_info, int):
+                # grid_size is a single number (square grid)
+                grid_height = grid_width = int(grid_size_info)
+            else:
+                # Default to 4x4 for FrozenLake-v1
+                grid_height = grid_width = 4
+
+            # Create grid representation with correct dimensions
+            grid = [['F' for _ in range(grid_width)] for _ in range(grid_height)]
+            grid_size = max(grid_height, grid_width)  # Use max for bounds checking
 
             # Mark holes from observation data
             holes = obs_data.get("holes", [])
@@ -839,19 +995,20 @@ class LiveTelemetryTab(BaseTelemetryTab):
                         except (TypeError, ValueError):
                             pass
 
-            # Mark goal (bottom-right)
+            # Mark goal (bottom-right by default)
             goal = obs_data.get("goal", {})
             if isinstance(goal, dict):
                 try:
-                    goal_row = int(goal.get("row", grid_size - 1))
-                    goal_col = int(goal.get("col", grid_size - 1))
-                    if 0 <= goal_row < grid_size and 0 <= goal_col < grid_size:
+                    goal_row = int(goal.get("row", grid_height - 1))
+                    goal_col = int(goal.get("col", grid_width - 1))
+                    if 0 <= goal_row < grid_height and 0 <= goal_col < grid_width:
                         grid[goal_row][goal_col] = 'G'
                 except (TypeError, ValueError):
                     pass
 
             # Mark start (top-left)
-            grid[0][0] = 'S'
+            if grid_height > 0 and grid_width > 0:
+                grid[0][0] = 'S'
 
             # Create render payload
             render_payload = {
