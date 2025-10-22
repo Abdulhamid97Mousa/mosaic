@@ -56,6 +56,11 @@ class LiveTelemetryTab(BaseTelemetryTab):
         self._last_render_payload: Optional[dict[str, Any]] = None
         self._is_destroyed = False  # Track if widget is being destroyed
         self._pending_render_timer_id: Optional[int] = None  # Track pending QTimer for cleanup
+        
+        # COUNTER TRACKING: Independent metrics display (not based on buffer size)
+        self._current_episode_index: int = 0  # Actual episode being trained
+        self._current_step_in_episode: int = 0  # Step within current episode
+        self._previous_episode_index: int = -1  # Detect episode boundaries
 
         # CRITICAL: Call super().__init__() which calls _build_ui()
         # _build_ui() will create the regulator after self is a valid Qt object
@@ -218,6 +223,28 @@ class LiveTelemetryTab(BaseTelemetryTab):
                 _LOGGER.debug("add_step: Widget is destroyed, skipping")
                 return
 
+            # CRITICAL: Extract episode_index and step_index to track current episode/step
+            # This is separate from buffer size tracking
+            episode_index_raw = payload.get("episode_index", 0) if isinstance(payload, dict) else getattr(payload, "episode_index", 0)
+            step_index_raw = payload.get("step_index", 0) if isinstance(payload, dict) else getattr(payload, "step_index", 0)
+            
+            try:
+                episode_idx = int(episode_index_raw) if episode_index_raw is not None else 0
+                step_idx = int(step_index_raw) if step_index_raw is not None else 0
+            except (TypeError, ValueError):
+                episode_idx = 0
+                step_idx = 0
+            
+            # Detect episode boundary: when episode_index changes from previous
+            if episode_idx != self._previous_episode_index:
+                self._current_step_in_episode = 0  # Reset step counter at episode boundary
+                self._previous_episode_index = episode_idx
+                _LOGGER.info(f"add_step: Episode boundary detected (episode {episode_idx}), resetting step counter")
+            
+            # Update current metrics
+            self._current_episode_index = episode_idx
+            self._current_step_in_episode = step_idx
+
             self._step_buffer.append(payload)
             self._update_stats()
 
@@ -324,7 +351,13 @@ class LiveTelemetryTab(BaseTelemetryTab):
         except (TypeError, ValueError):
             step_index = 0
 
-        reward = _get_field(payload, "reward", default=0.0)
+        reward_raw = _get_field(payload, "reward", default=0.0)
+        # Ensure reward is a float for formatting
+        try:
+            reward = float(reward_raw) if reward_raw is not None else 0.0
+        except (TypeError, ValueError):
+            reward = 0.0
+        
         terminated = _get_field(payload, "terminated", default=False)
         truncated = _get_field(payload, "truncated", default=False)
 
@@ -498,15 +531,18 @@ class LiveTelemetryTab(BaseTelemetryTab):
                     _LOGGER.debug("_try_render_visual: Failed to convert render_payload to dict")
                     return
 
-            # Extract game_id from payload (cache it)
-            if self._current_game is None:
-                game_id_raw = render_payload.get("game_id")
-                if game_id_raw:
-                    try:
-                        self._current_game = game_id_raw if isinstance(game_id_raw, GameId) else GameId(str(game_id_raw))
-                        _LOGGER.debug(f"_try_render_visual: Set current_game to {self._current_game}")
-                    except (ValueError, KeyError):
-                        pass
+            # Extract game_id from payload (update on every render to handle game switching)
+            game_id_raw = render_payload.get("game_id")
+            if game_id_raw:
+                try:
+                    new_game = game_id_raw if isinstance(game_id_raw, GameId) else GameId(str(game_id_raw))
+                    if new_game != self._current_game:
+                        _LOGGER.debug(f"_try_render_visual: Switching game from {self._current_game} to {new_game}")
+                        self._current_game = new_game
+                    # Always set current_game even if unchanged, to ensure renderer uses correct assets
+                    self._current_game = new_game
+                except (ValueError, KeyError):
+                    pass
 
             # Render if supported
             if self._renderer_strategy and self._renderer_strategy.supports(render_payload):
@@ -635,7 +671,7 @@ class LiveTelemetryTab(BaseTelemetryTab):
             # Try both camelCase (from protobuf) and snake_case field names
             episode_index_raw = _get_field(payload, "episodeIndex", "episode_index", "episode", default=0)
             steps_raw = _get_field(payload, "steps", default=0)
-            total_reward = _get_field(payload, "totalReward", "total_reward", "reward", default=0.0)
+            total_reward_raw = _get_field(payload, "totalReward", "total_reward", "reward", default=0.0)
             terminated = _get_field(payload, "terminated", default=False)
             truncated = _get_field(payload, "truncated", default=False)
 
@@ -649,6 +685,12 @@ class LiveTelemetryTab(BaseTelemetryTab):
                 steps = int(steps_raw) if steps_raw is not None else 0
             except (TypeError, ValueError):
                 steps = 0
+
+            # Ensure total_reward is a float for formatting and comparisons
+            try:
+                total_reward = float(total_reward_raw) if total_reward_raw is not None else 0.0
+            except (TypeError, ValueError):
+                total_reward = 0.0
 
             # Extract timestamp
             timestamp = _get_field(payload, "timestamp", "ts")
@@ -723,7 +765,7 @@ class LiveTelemetryTab(BaseTelemetryTab):
             # Column 1: Episode (display value = seed + episode_index)
             self._episodes_table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(display_episode)))
             self._episodes_table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(steps)))
-            self._episodes_table.setItem(row, 3, QtWidgets.QTableWidgetItem(f"{float(total_reward):.2f}"))
+            self._episodes_table.setItem(row, 3, QtWidgets.QTableWidgetItem(f"{total_reward:.2f}"))
             self._episodes_table.setItem(row, 4, QtWidgets.QTableWidgetItem(str(terminated)))
             self._episodes_table.setItem(row, 5, QtWidgets.QTableWidgetItem(str(truncated)))
             self._episodes_table.setItem(row, 6, QtWidgets.QTableWidgetItem(str(seed)))
@@ -776,9 +818,17 @@ class LiveTelemetryTab(BaseTelemetryTab):
         self._update_overflow_label()
 
     def _update_stats(self) -> None:
-        """Refresh step/episode counters."""
+        """Refresh step/episode counters.
+        
+        CRITICAL FIX: Display current episode/step indices, NOT buffer sizes.
+        This ensures counter resets at episode boundaries and shows actual training progress.
+        """
+        # OLD (BROKEN): f"Steps: {len(self._step_buffer)} | Episodes: {len(self._episode_buffer)}"
+        # Problem: Buffer maxes at 100, so counter gets stuck showing "100" for multiple episodes
+        
+        # NEW (FIXED): Show actual current episode and step indices
         self._stats_label.setText(
-            f"Steps: {len(self._step_buffer)} | Episodes: {len(self._episode_buffer)}"
+            f"Episode: {self._current_episode_index} Step: {self._current_step_in_episode}"
         )
 
     def _update_overflow_label(self) -> None:

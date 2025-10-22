@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, Optional, Protocol
+from typing import Any, Dict, Iterable, Optional, Protocol
 
 
 class Actor(Protocol):
@@ -181,21 +181,68 @@ class HumanKeyboardActor:
 
 @dataclass(slots=True)
 class BDIQAgent:
-    """Skeleton for a BDI + Q-learning driven agent implementation."""
+    """BDI + Q-learning driven agent implementation with epsilon-greedy action selection."""
 
     id: str = "bdi_q_agent"
+    q_table: Optional[Any] = None  # Reference to RL agent's Q-table (numpy array)
+    epsilon: float = 0.1  # Exploration rate
+    training: bool = True  # Whether in training mode (affects exploration)
 
     def select_action(self, step: StepSnapshot) -> Optional[int]:
-        # Placeholder: real implementation will consult Q-table / policy.
-        return None
+        """Select action using epsilon-greedy policy from Q-table.
+        
+        If training: randomly explore with probability epsilon, else exploit best action.
+        If not training: always select greedy best action (no exploration).
+        
+        Args:
+            step: Current step snapshot with observation
+            
+        Returns:
+            Integer action index (0 to num_actions-1) or None if Q-table unavailable
+        """
+        if self.q_table is None or step.observation is None:
+            return None  # Abstain if Q-table not initialized
+        
+        try:
+            import numpy as np
+            state_val = step.observation
+            if not isinstance(state_val, int):
+                state_val = int(state_val)  # type: ignore[arg-type]
+            state = state_val
+            
+            # Check if state is valid
+            if state < 0 or state >= len(self.q_table):
+                return None
+            
+            q_values = self.q_table[state]
+            num_actions = len(q_values)
+            
+            if self.training and np.random.random() < self.epsilon:
+                # Exploration: random action
+                return int(np.random.randint(0, num_actions))
+            else:
+                # Exploitation: greedy action (highest Q-value)
+                return int(np.argmax(q_values))
+        except (TypeError, IndexError, ValueError):
+            return None
 
     def on_step(self, step: StepSnapshot) -> None:
-        # Placeholder hook for Q-value updates.
-        return
+        """Receive feedback after an action has been applied.
+        
+        Q-table updates are handled by the trainer/RL agent, not here.
+        This hook can be used for logging or observation filtering.
+        """
+        pass
 
     def on_episode_end(self, summary: EpisodeSummary) -> None:
-        # Placeholder for logging or checkpointing.
-        return
+        """Episode lifecycle hook for learning rate decay or checkpointing.
+        
+        Args:
+            summary: Aggregated episode statistics
+        """
+        # Decay exploration rate over episodes
+        if self.training and self.epsilon > 0.01:
+            self.epsilon = max(0.01, self.epsilon * 0.99)
 
 
 @dataclass(slots=True)

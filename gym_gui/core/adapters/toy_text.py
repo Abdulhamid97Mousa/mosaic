@@ -127,6 +127,58 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
         self._last_terminated: bool = False
         self._last_truncated: bool = False
 
+    def _get_grid_width(self) -> int:
+        """Get grid width from environment.
+        
+        Returns the number of columns in the grid. Override in subclasses
+        if special handling is needed (e.g., CliffWalking always 12).
+        
+        Returns:
+            Grid width (ncol). Defaults to 8 if unable to determine.
+        """
+        env = self._require_env()
+        unwrapped = getattr(env, "unwrapped", env)
+        
+        # Try ncol attribute first (FrozenLake)
+        if hasattr(unwrapped, "ncol"):
+            return int(getattr(unwrapped, "ncol"))
+        
+        # Try desc attribute (map descriptor)
+        if hasattr(unwrapped, "desc"):
+            desc = getattr(unwrapped, "desc")
+            if desc and len(desc) > 0:
+                return len(desc[0])
+        
+        # Fallback for 8×8 FrozenLake
+        return 8
+
+    def state_to_pos(self, state: int) -> tuple[int, int]:
+        """Convert state (single integer) to grid position (row, col).
+        
+        Args:
+            state: Integer state from environment (0 to ncol*nrow - 1)
+            
+        Returns:
+            Tuple of (row, col) grid indices (0-indexed)
+        """
+        width = self._get_grid_width()
+        row = int(state) // width
+        col = int(state) % width
+        return (row, col)
+
+    def pos_to_state(self, x: int, y: int) -> int:
+        """Convert grid position (col, row) to state (single integer).
+        
+        Args:
+            x: Column index (0-indexed)
+            y: Row index (0-indexed)
+            
+        Returns:
+            Integer state representation
+        """
+        width = self._get_grid_width()
+        return y * width + x
+
     def load(self) -> None:
         kwargs = self.gym_kwargs()
         env = gym.make(self.id, render_mode=self._gym_render_mode, **kwargs)
@@ -361,6 +413,53 @@ class FrozenLakeAdapter(ToyTextAdapter):
         payload["last_action"] = self._last_action
         
         return payload
+
+    def set_goal(self, x: int, y: int) -> None:
+        """Store goal position for BDI planning.
+        
+        For dynamic goal scenarios in BDI. Stores the goal but may not
+        reconfigure the environment (depends on environment implementation).
+        
+        Args:
+            x: Goal column (0-indexed)
+            y: Goal row (0-indexed)
+        """
+        self._goal_position = (x, y)
+        self.logger.debug(f"FrozenLake goal set to ({x}, {y})")
+
+    def reset_q_table(self) -> None:
+        """Reset Q-table for goal-switching scenarios.
+        
+        Called by BDI when switching goals to clear learned policy.
+        The actual Q-table is managed by the RL agent/trainer, not the adapter.
+        This is a hook for coordination.
+        """
+        self.logger.debug("FrozenLake Q-table reset requested (managed by RL agent)")
+
+    def get_grid_size(self) -> tuple[int, int]:
+        """Get (height, width) of the FrozenLake grid.
+        
+        Required for BDI pathfinding and goal validation.
+        
+        Returns:
+            Tuple of (height, width) dimensions
+        """
+        env = self._require_env()
+        unwrapped = getattr(env, "unwrapped", env)
+        height, width = None, None
+        
+        if hasattr(unwrapped, "nrow"):
+            height = int(getattr(unwrapped, "nrow"))
+        if hasattr(unwrapped, "ncol"):
+            width = int(getattr(unwrapped, "ncol"))
+        
+        if hasattr(unwrapped, "desc"):
+            desc = getattr(unwrapped, "desc")
+            if desc:
+                height = height or len(desc)
+                width = width or (len(desc[0]) if len(desc) > 0 else 0)
+        
+        return (height or 8, width or 8)
 
 
 class FrozenLakeV2Adapter(ToyTextAdapter):

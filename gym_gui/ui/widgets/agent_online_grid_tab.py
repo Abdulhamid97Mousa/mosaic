@@ -36,6 +36,11 @@ class AgentOnlineGridTab(BaseTelemetryTab):
         self._renderer_registry = renderer_registry or create_default_renderer_registry()
         self._seed: Optional[int] = None
         self._control_mode: Optional[str] = None
+        
+        # CRITICAL FIX: Track current episode/step indices (not cumulative)
+        self._current_episode_index: int = 0  # Current episode being trained
+        self._current_step_in_episode: int = 0  # Step within current episode
+        self._previous_episode_index: int = -1  # Detect episode boundaries
 
         super().__init__(run_id, agent_id, parent=parent)
 
@@ -94,15 +99,36 @@ class AgentOnlineGridTab(BaseTelemetryTab):
         has_render = "render_payload_json" in step if isinstance(step, dict) else False
         _LOGGER.debug(f"[on_step] step keys: {step_keys}, has_render_payload_json={has_render}")
 
+        # CRITICAL FIX: Track current episode/step indices and reset step counter on boundaries
+        episode_index = step.get("episode_index")
+        step_index = step.get("step_index", 0)
+        
+        if episode_index is not None:
+            try:
+                episode_idx = int(episode_index)
+                step_idx = int(step_index) if step_index is not None else 0
+            except (TypeError, ValueError):
+                episode_idx = 0
+                step_idx = 0
+            
+            # Detect episode boundary: when episode_index changes
+            if episode_idx != self._previous_episode_index:
+                self._current_step_in_episode = 0  # Reset step counter at boundary
+                self._previous_episode_index = episode_idx
+                _LOGGER.info(f"[on_step] Episode boundary (episode {episode_idx}), resetting step counter")
+            
+            # Update current metrics
+            self._current_episode_index = episode_idx
+            self._current_step_in_episode = step_idx
+
         # Update counters
         if self._pending.isVisible():
             self._pending.hide()
-        self._steps += 1
+        self._steps += 1  # Keep cumulative for total steps tracking
         reward = float(step.get("reward", 0.0))
         self._current_episode_reward += reward
         self._total_reward += reward
         
-        episode_index = step.get("episode_index")
         if episode_index is not None:
             self._episodes = max(self._episodes, int(episode_index) + 1)
         
@@ -112,9 +138,9 @@ class AgentOnlineGridTab(BaseTelemetryTab):
         if terminated or truncated:
             self._current_episode_reward = 0.0
         
-        # Update labels
+        # Update labels (use per-episode step counter for display, not cumulative)
         self._episodes_label.setText(str(self._episodes))
-        self._steps_label.setText(str(self._steps))
+        self._steps_label.setText(str(self._current_step_in_episode))  # FIXED: Show per-episode step count
         self._episode_reward_label.setText(f"{self._current_episode_reward:.2f}")
         self._total_reward_label.setText(f"{self._total_reward:.2f}")
 
