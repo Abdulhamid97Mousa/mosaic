@@ -90,4 +90,4 @@ PY
 done
 
 echo "Launching Gym GUI..."
-QT_DEBUG_PLUGINS=0 "$PYTHON_BIN" -m gym_gui.app
+QT_API=pyqt6 QT_DEBUG_PLUGINS=0 "$PYTHON_BIN" -m gym_gui.app
