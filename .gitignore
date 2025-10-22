@@ -53,6 +53,15 @@ gym_gui/services/trainer/proto/trainer_pb2.pyi
 
 spadeBDI_RL
 
-
+var/records/*
+var/telemetry/*
+var/cache/*
+var/tmp/*
+var/logs/*
+var/config/*
+var/policies/*
+var/trainer.sqlite
+var/trainer.pid
+var/trainer.lock
 
 
