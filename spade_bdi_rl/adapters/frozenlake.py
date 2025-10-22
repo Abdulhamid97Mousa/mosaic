@@ -125,6 +125,31 @@ class FrozenLakeAdapter:
             self._env.close()
 
     # Internal helpers ---------------------------------------------------
+    def _generate_ansi(self, state: int) -> str:
+        """Generate ANSI output for the current state (like Gymnasium does).
+
+        This is the FAST path for rendering - the UI can display ANSI directly
+        without needing to composite images.
+        """
+        row, col = self.state_to_pos(state)
+        desc = self._env.unwrapped.desc  # type: ignore[attr-defined]
+
+        lines = []
+        for r in range(self._nrow):
+            line = ""
+            for c in range(self._ncol):
+                # desc is a numpy array of bytes, convert to string
+                cell_byte = desc[r, c]
+                cell_char = cell_byte.decode('utf-8') if isinstance(cell_byte, bytes) else chr(cell_byte)
+                # Mark agent position with red background (ANSI code 41)
+                if r == row and c == col:
+                    line += f"\x1b[41m{cell_char}\x1b[0m"
+                else:
+                    line += cell_char
+            lines.append(line)
+
+        return "\n".join(lines) + "\n"
+
     def _obs_dict(self, state: int, info: Dict[str, Any] | None = None) -> Dict[str, Any]:
         row, col = self.state_to_pos(state)
         goal_row, goal_col = self.goal_pos()
@@ -136,6 +161,7 @@ class FrozenLakeAdapter:
             "goal": {"row": int(goal_row), "col": int(goal_col)},
             "grid_size": self._nrow,  # FrozenLake-v1 is always square (4x4)
             "holes": holes,  # Include hole positions for rendering
+            "ansi": self._generate_ansi(state),  # FAST rendering path
         }
 
         if info:
@@ -312,6 +338,31 @@ class FrozenLakeV2Adapter:
             self._env.close()
 
     # Internal helpers ---------------------------------------------------
+    def _generate_ansi(self, state: int) -> str:
+        """Generate ANSI output for the current state (like Gymnasium does).
+
+        This is the FAST path for rendering - the UI can display ANSI directly
+        without needing to composite images.
+        """
+        row, col = self.state_to_pos(state)
+        desc = self._env.unwrapped.desc  # type: ignore[attr-defined]
+
+        lines = []
+        for r in range(self._nrow):
+            line = ""
+            for c in range(self._ncol):
+                # desc is a numpy array of bytes, convert to string
+                cell_byte = desc[r, c]
+                cell_char = cell_byte.decode('utf-8') if isinstance(cell_byte, bytes) else chr(cell_byte)
+                # Mark agent position with red background (ANSI code 41)
+                if r == row and c == col:
+                    line += f"\x1b[41m{cell_char}\x1b[0m"
+                else:
+                    line += cell_char
+            lines.append(line)
+
+        return "\n".join(lines) + "\n"
+
     def _obs_dict(self, state: int, info: Dict[str, Any] | None = None) -> Dict[str, Any]:
         row, col = self.state_to_pos(state)
         goal_row, goal_col = self.goal_pos()
@@ -323,6 +374,7 @@ class FrozenLakeV2Adapter:
             "goal": {"row": int(goal_row), "col": int(goal_col)},
             "grid_size": {"height": self._nrow, "width": self._ncol},  # FrozenLake-v2 can be rectangular
             "holes": holes,  # Include hole positions for rendering
+            "ansi": self._generate_ansi(state),  # FAST rendering path
         }
 
         if info:

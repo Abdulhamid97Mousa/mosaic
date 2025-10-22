@@ -29,6 +29,7 @@ class StepRecord:
     render_hint: Mapping[str, Any] | None = None
     frame_ref: str | None = None
     payload_version: int = 0
+    run_id: str | None = None  # NEW: Training run identifier for correlation
 
 
 @dataclass(slots=True)
@@ -43,6 +44,8 @@ class EpisodeRollup:
     metadata: Mapping[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=_utc_now)
     agent_id: str | None = None
+    run_id: str | None = None  # NEW: Training run identifier for correlation
+    game_id: str | None = None  # NEW: Game environment identifier
 
 
 __all__ = ["StepRecord", "EpisodeRollup"]

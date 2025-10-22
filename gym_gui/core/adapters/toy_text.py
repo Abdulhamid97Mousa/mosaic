@@ -5,6 +5,7 @@ from __future__ import annotations
 from pathlib import Path
 import re
 from collections.abc import Iterable
+from datetime import datetime
 from typing import Any, List, Sequence, Tuple, Type
 
 import gymnasium as gym
@@ -18,7 +19,7 @@ from gym_gui.config.game_configs import (
     DEFAULT_TAXI_CONFIG,
     DEFAULT_CLIFF_WALKING_CONFIG,
 )
-from gym_gui.core.adapters.base import AdapterContext, EnvironmentAdapter
+from gym_gui.core.adapters.base import AdapterContext, EnvironmentAdapter, StepState
 from gym_gui.core.enums import ControlMode, GameId, RenderMode
 
 _TOY_TEXT_DATA_DIR = Path(__file__).resolve().parents[2] / "runtime" / "data" / "toy_text"
@@ -173,7 +174,36 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
             "agent_position": agent_pos,
             "game_id": self.id,
         }
-        
+
+        # Add FrozenLake-specific info (holes and goal positions)
+        if self.id in (GameId.FROZEN_LAKE.value, GameId.FROZEN_LAKE_V2.value):
+            unwrapped = getattr(env, "unwrapped", env)
+            desc = getattr(unwrapped, "desc", None)
+            if desc is not None:
+                # Extract holes and goal positions from the environment descriptor
+                holes = []
+                goal = None
+                try:
+                    for r, row in enumerate(desc):
+                        for c, cell in enumerate(row):
+                            if isinstance(cell, bytes):
+                                cell_char = cell.decode('utf-8')
+                            else:
+                                cell_char = str(cell)
+                            if cell_char == 'H':
+                                holes.append({"row": int(r), "col": int(c)})
+                            elif cell_char == 'G':
+                                goal = {"row": int(r), "col": int(c)}
+                except Exception:
+                    pass
+
+                if holes:
+                    payload["holes"] = holes
+                if goal:
+                    payload["goal"] = goal
+                # Add grid dimensions
+                payload["grid_size"] = {"height": len(desc), "width": len(desc[0]) if len(desc) > 0 else 0}
+
         # Add Taxi-specific state info
         if self.id == GameId.TAXI.value:
             unwrapped = getattr(env, "unwrapped", env)
@@ -194,6 +224,26 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
                     }
         
         return payload
+
+    def build_frame_reference(self, render_payload: Any | None, state: StepState) -> str | None:
+        """Generate timestamped frame reference for media storage.
+
+        Args:
+            render_payload: The render payload (unused for toy-text)
+            state: The step state (unused for toy-text)
+
+        Returns:
+            Timestamped frame reference string or None if payload is invalid
+        """
+        if render_payload is None:
+            return None
+
+        # Generate timestamp: YYYY-MM-DD_HH-MM-SS_NNN
+        now = datetime.now()
+        timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
+        microseconds = now.microsecond // 1000  # Convert to milliseconds
+
+        return f"frames/{timestamp}_{microseconds:03d}.png"
 
     def gym_kwargs(self) -> dict[str, Any]:
         return {}
@@ -412,8 +462,8 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
             "reward_schedule": self._game_config.reward_schedule,
             "desc": self._custom_desc,
         }
-        env = gym.make("FrozenLake-v1", render_mode=self._gym_render_mode, **kwargs)
-        self.logger.debug("Loaded FrozenLake-v2 env with custom map size=%dx%d", 
+        env = gym.make("FrozenLake-v2", render_mode=self._gym_render_mode, **kwargs)
+        self.logger.debug("Loaded FrozenLake-v2 env with custom map size=%dx%d",
                          self._game_config.grid_height, self._game_config.grid_width)
         self._set_env(env)
 

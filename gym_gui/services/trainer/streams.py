@@ -547,7 +547,12 @@ class TelemetryAsyncHub:
                         bus.publish(evt)
                         _LOGGER.debug(
                             "Published STEP_APPENDED to RunBus",
-                            extra={"run_id": run_id, "agent_id": agent_id, "seq_id": step.seq_id},
+                            extra={
+                                "run_id": run_id,
+                                "agent_id": agent_id,
+                                "seq_id": step.seq_id,
+                                "event_type": "STEP_APPENDED",
+                            },
                         )
                     except Exception as e:
                         _LOGGER.warning(
@@ -581,7 +586,12 @@ class TelemetryAsyncHub:
                         bus.publish(evt)
                         _LOGGER.debug(
                             "Published EPISODE_FINALIZED to RunBus",
-                            extra={"run_id": run_id, "agent_id": agent_id, "seq_id": episode.seq_id},
+                            extra={
+                                "run_id": run_id,
+                                "agent_id": agent_id,
+                                "seq_id": episode.seq_id,
+                                "event_type": "EPISODE_FINALIZED",
+                            },
                         )
                     except Exception as e:
                         _LOGGER.warning(

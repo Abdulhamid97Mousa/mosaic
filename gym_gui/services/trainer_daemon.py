@@ -36,6 +36,8 @@ from google.protobuf.timestamp_pb2 import Timestamp
 from gym_gui.services.trainer.proto import trainer_pb2, trainer_pb2_grpc
 from gym_gui.services.trainer.registry import WALCheckpointStats
 from gym_gui.telemetry import TelemetrySQLiteStore
+from gym_gui.telemetry.db_sink import TelemetryDBSink
+from gym_gui.telemetry.run_bus import get_bus
 
 if TYPE_CHECKING:
     HealthCheckResponseType = Any  # pragma: no cover - typing alias
@@ -193,7 +195,6 @@ class TrainerDaemon:
         )
         ensure_var_directories()
         telemetry_db = VAR_TELEMETRY_DIR / "telemetry.sqlite"
-        self._telemetry_store: Optional[TelemetrySQLiteStore]
         self._telemetry_store = TelemetrySQLiteStore(telemetry_db)
 
     async def run(self) -> None:
@@ -227,7 +228,21 @@ class TrainerDaemon:
             broadcaster=broadcast_callback,
         )
         await self._dispatcher.start()
-        
+
+        # Initialize and start database sink for durable persistence
+        # This ensures telemetry events are persisted to SQLite
+        bus = get_bus()
+        assert self._telemetry_store is not None, "Telemetry store must be initialized"
+        db_sink = TelemetryDBSink(
+            self._telemetry_store,
+            bus,
+            batch_size=64,
+            checkpoint_interval=1000,
+            writer_queue_size=512,
+        )
+        db_sink.start()
+        _LOGGER.info("Telemetry database sink started in daemon")
+
         service = TrainerService(
             self._registry,
             self._gpu_allocator,

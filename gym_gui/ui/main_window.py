@@ -43,25 +43,36 @@ from gym_gui.services.trainer import TrainerClient, TrainerClientRunner, RunStat
 from gym_gui.services.trainer.streams import TelemetryAsyncHub
 from gym_gui.services.trainer.client_runner import TrainerWatchStopped
 from gym_gui.ui.widgets.agent_loadout_dialog import AgentLoadoutDialog
-from gym_gui.ui.widgets.agent_train_dialog import TrainAgentDialog
+from gym_gui.ui.widgets.agent_train_form import TrainAgentDialog
 from gym_gui.ui.widgets.live_telemetry_tab import LiveTelemetryTab
 from gym_gui.ui.widgets.agent_online_tab import AgentOnlineTab
 from gym_gui.ui.widgets.agent_online_grid_tab import AgentOnlineGridTab
 from gym_gui.ui.widgets.agent_online_raw_tab import AgentOnlineRawTab
 from gym_gui.ui.widgets.agent_online_video_tab import AgentOnlineVideoTab
 from gym_gui.ui.widgets.agent_replay_tab import AgentReplayTab
-from gym_gui.ui.widgets.policy_selection_dialog import PolicySelectionDialog
+from gym_gui.ui.widgets.policy_selection_form import PolicySelectionDialog
 from gym_gui.services.trainer.signals import get_trainer_signals
 
 
 class MainWindow(QtWidgets.QMainWindow):
     """Primary window that orchestrates the Gym session."""
 
+    # Component-level filters (module prefixes)
     LOG_FILTER_OPTIONS: Dict[str, str | None] = {
         "All": None,
-        "Controllers": "gym_gui.controllers",
-        "Adapters": "gym_gui.core.adapters",
-        "Agents": "gym_gui.agents",
+        "UI": "gym_gui.ui",
+        "Controller": "gym_gui.controllers",
+        "Adapter": "gym_gui.core.adapters",
+        "Worker": "spade_bdi_rl.worker",
+    }
+
+    # Severity-level filters
+    LOG_SEVERITY_OPTIONS: Dict[str, str | None] = {
+        "All": None,
+        "DEBUG": "DEBUG",
+        "INFO": "INFO",
+        "WARNING": "WARNING",
+        "ERROR": "ERROR",
     }
 
     CONTROL_MODE_LABELS: Dict[ControlMode, str] = {
@@ -244,11 +255,21 @@ class MainWindow(QtWidgets.QMainWindow):
         self._log_group = QtWidgets.QGroupBox("Runtime Log", self)
         log_layout = QtWidgets.QVBoxLayout(self._log_group)
         filter_row = QtWidgets.QHBoxLayout()
-        filter_label = QtWidgets.QLabel("Filter:")
+
+        # Component filter
+        component_label = QtWidgets.QLabel("Component:")
         self._log_filter = QtWidgets.QComboBox()
         self._log_filter.addItems(self.LOG_FILTER_OPTIONS.keys())
-        filter_row.addWidget(filter_label)
+        filter_row.addWidget(component_label)
         filter_row.addWidget(self._log_filter, 1)
+
+        # Severity filter
+        severity_label = QtWidgets.QLabel("Severity:")
+        self._log_severity_filter = QtWidgets.QComboBox()
+        self._log_severity_filter.addItems(self.LOG_SEVERITY_OPTIONS.keys())
+        filter_row.addWidget(severity_label)
+        filter_row.addWidget(self._log_severity_filter, 1)
+
         log_layout.addLayout(filter_row)
 
         self._log_console = QtWidgets.QPlainTextEdit()
@@ -316,8 +337,9 @@ class MainWindow(QtWidgets.QMainWindow):
         self._control_panel.bipedal_config_changed.connect(self._on_bipedal_config_changed)
         self._session.seed_applied.connect(self._on_seed_applied)
         
-        # Connect log filter
+        # Connect log filters (component and severity)
         self._log_filter.currentTextChanged.connect(self._on_log_filter_changed)
+        self._log_severity_filter.currentTextChanged.connect(self._on_log_filter_changed)
 
         self._session.session_initialized.connect(self._on_session_initialized)
         self._session.step_processed.connect(self._on_step_processed)
@@ -384,31 +406,27 @@ class MainWindow(QtWidgets.QMainWindow):
         self._status_bar.showMessage(f"Active actor set to {label}", 4000)
 
     def _on_agent_loadout_requested(self) -> None:
-        descriptors = self._actor_service.describe_actors()
-        if not descriptors:
-            QtWidgets.QMessageBox.information(
-                self,
-                "Agent Loadout",
-                "No agent backends are currently available.",
-            )
-            return
-
-        dialog = AgentLoadoutDialog(
+        """Handle agent training request from control panel."""
+        self.logger.info("_on_agent_loadout_requested: START")
+        # Open the training configuration dialog
+        dialog = TrainAgentDialog(
             self,
-            descriptors,
-            current_actor=self._control_panel.current_actor(),
             default_game=self._control_panel.current_game(),
         )
+        self.logger.debug("_on_agent_loadout_requested: Dialog created, calling exec()")
         if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            self.logger.debug("TrainAgentDialog was rejected")
             return
 
-        selected = dialog.selected_actor_id
-        if not selected:
-            return
-        self._control_panel.set_active_actor(selected)
-        training_config = dialog.training_config
+        # Get the training configuration from the dialog
+        self.logger.debug("_on_agent_loadout_requested: Dialog accepted, getting config")
+        training_config = dialog.get_config()
+        self.logger.debug(f"TrainAgentDialog.get_config() returned: {training_config is not None}")
         if training_config:
+            self.logger.info("Submitting training config from dialog")
             self._submit_training_config(training_config)
+        else:
+            self.logger.warning("TrainAgentDialog returned None config")
 
     def _on_load_requested(self, game_id: GameId, mode: ControlMode, seed: int) -> None:
         """Handle load request from control panel."""
@@ -837,12 +855,14 @@ class MainWindow(QtWidgets.QMainWindow):
     
     def _on_train_agent_requested(self) -> None:
         """Handle Train Agent button - launch headless training dialog."""
+        self.logger.info("_on_train_agent_requested: START")
         current_game = self._control_panel.current_game()
         self.logger.info(
             "Opening TrainAgentDialog",
             extra={"current_game": getattr(current_game, "value", None)},
         )
         dialog = TrainAgentDialog(self, default_game=current_game)
+        self.logger.debug("_on_train_agent_requested: Dialog created")
 
         if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
             self.logger.info("TrainAgentDialog cancelled by user")
@@ -1001,33 +1021,42 @@ class MainWindow(QtWidgets.QMainWindow):
     def _submit_training_config(self, config: dict) -> None:
         """Submit a training configuration to the trainer daemon."""
         try:
+            self.logger.debug("_submit_training_config: START")
             config_json = json.dumps(config)
-            
+            self.logger.debug(f"_submit_training_config: Config JSON length={len(config_json)}")
+
             # Use TrainerClientRunner (background thread wrapper)
             from gym_gui.services.service_locator import get_service_locator
             from gym_gui.services.trainer import TrainerClientRunner
-            
+
             locator = get_service_locator()
             runner = locator.resolve(TrainerClientRunner)
             if runner is None:
                 raise RuntimeError("TrainerClientRunner not registered")
-            
+
+            self.logger.debug("_submit_training_config: TrainerClientRunner resolved")
             self._status_bar.showMessage("Submitting training run...", 3000)
-            
+
             # Submit returns a Future
             future = runner.submit_run(config_json)
+            self.logger.debug("_submit_training_config: submit_run() called, future created")
 
             # Add callback to handle result
             def on_done(fut):
+                self.logger.debug("_submit_training_config: on_done callback called")
                 try:
                     response = fut.result(timeout=3.0)
+                    self.logger.debug(f"_submit_training_config: Got response with run_id={response.run_id}")
                 except Exception as error:
+                    self.logger.exception("_submit_training_config: on_done got exception")
                     QtCore.QTimer.singleShot(0, lambda: self._on_training_submit_failed(error))
                     return
                 run_id = str(response.run_id)
+                self.logger.info(f"_submit_training_config: Scheduling _on_training_submitted with run_id={run_id}")
                 QtCore.QTimer.singleShot(0, lambda: self._on_training_submitted(run_id, config))
 
             future.add_done_callback(on_done)
+            self.logger.debug("_submit_training_config: Callback added to future")
 
         except Exception as e:
             self.logger.exception("Failed to prepare training submission")
@@ -1060,6 +1089,19 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception as e:
             self.logger.warning(f"Failed to set buffer sizes: {e}")
 
+        # Extract game_id from environment and store in controller
+        try:
+            environment = config.get("environment", {})
+            game_id = environment.get("GYM_ENV_ID", "")
+            if game_id:
+                self._live_controller.set_game_id_for_run(run_id, game_id)
+                self.logger.debug(
+                    "Set game_id for run",
+                    extra={"run_id": run_id, "game_id": game_id},
+                )
+        except Exception as e:
+            self.logger.warning(f"Failed to set game_id: {e}")
+
         self.logger.info(
             "Waiting for live telemetry to create dynamic agent tabs",
             extra={
@@ -1091,12 +1133,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 )
 
         # Subscribe to telemetry
+        # NOTE: Do NOT call _create_agent_tabs_for() here!
+        # The LiveTelemetryController will create the LiveTelemetryTab dynamically
+        # when the first telemetry event arrives. This ensures proper naming and
+        # routing of telemetry data to the correct tab.
         self._live_controller.subscribe_to_run(run_id)
         self._render_group.setTitle(f"Live Training - {run_id[:12]}...")
-        agent_id = self._extract_agent_id(config) or f"agent_{run_id[:8]}"
-        key = (run_id, agent_id)
-        if key not in self._agent_tab_index:
-            self._create_agent_tabs_for(run_id, agent_id, {})
 
     def _on_training_submit_failed(self, error: Exception) -> None:
         """Handle training submission failure (called on main thread)."""
@@ -1112,6 +1154,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _on_live_telemetry_tab_requested(self, run_id: str, agent_id: str, tab_title: str) -> None:
         """Create and register a new live telemetry tab dynamically."""
         from gym_gui.rendering import RendererRegistry
+        from gym_gui.core.enums import GameId
 
         locator = get_service_locator()
         renderer_registry = locator.resolve(RendererRegistry)
@@ -1119,11 +1162,28 @@ class MainWindow(QtWidgets.QMainWindow):
         # Get buffer sizes from controller (set during training submission)
         step_buffer_size, episode_buffer_size = self._live_controller.get_buffer_sizes_for_run(run_id)
 
+        # Get game_id from controller (set during training submission)
+        game_id_str = self._live_controller.get_game_id_for_run(run_id)
+        game_id = None
+        if game_id_str:
+            try:
+                game_id = GameId(game_id_str)
+            except (ValueError, KeyError):
+                self.logger.warning(
+                    "Invalid game_id for run",
+                    extra={"run_id": run_id, "game_id": game_id_str},
+                )
+
+        # Get render throttle interval from controller (set during training submission)
+        render_throttle_interval = self._live_controller.get_render_throttle_for_run(run_id)
+
         tab = LiveTelemetryTab(
             run_id,
             agent_id,
+            game_id=game_id,
             buffer_size=step_buffer_size,
             episode_buffer_size=episode_buffer_size,
+            render_throttle_interval=render_throttle_interval,
             renderer_registry=renderer_registry,
             parent=self._render_tabs,
         )
@@ -1134,7 +1194,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         self.logger.info(
             "Created live telemetry tab",
-            extra={"run_id": run_id, "agent_id": agent_id, "title": tab_title},
+            extra={"run_id": run_id, "agent_id": agent_id, "title": tab_title, "game_id": game_id_str},
         )
 
     # NOTE: Removed _on_live_step_received and _on_live_episode_received
@@ -1153,13 +1213,25 @@ class MainWindow(QtWidgets.QMainWindow):
         - Replay tab shows episode browser
         """
         from gym_gui.rendering import RendererRegistry
+        from gym_gui.core.enums import GameId
 
         locator = get_service_locator()
         renderer_registry = locator.resolve(RendererRegistry)
 
         # Determine environment family from metadata
-        game_id = first_payload.get("game_id", "").lower()
-        is_toytext = any(name in game_id for name in ["frozenlake", "cliffwalking", "taxi", "gridworld"])
+        game_id_str = first_payload.get("game_id", "").lower()
+        is_toytext = any(name in game_id_str for name in ["frozenlake", "cliffwalking", "taxi", "gridworld"])
+
+        # Convert game_id string to GameId enum for passing to tabs
+        game_id_enum = None
+        if game_id_str:
+            try:
+                game_id_enum = GameId(game_id_str)
+            except (ValueError, KeyError):
+                self.logger.warning(
+                    "Invalid game_id in first_payload",
+                    extra={"run_id": run_id, "agent_id": agent_id, "game_id": game_id_str},
+                )
 
         # 0) Agent-${agent_id}-Online (primary real-time view)
         online = AgentOnlineTab(run_id, agent_id, parent=self)
@@ -1170,7 +1242,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self._render_tabs.add_dynamic_tab(run_id, f"Agent-{agent_id}-Replay", replay)
 
         # 2) Agent-${agent_id}-Live – Grid (live grid rendering - always created for ToyText)
-        grid = AgentOnlineGridTab(run_id, agent_id, renderer_registry=renderer_registry, parent=self)
+        # CRITICAL FIX: Pass game_id to ensure correct FrozenLake version is used
+        grid = AgentOnlineGridTab(
+            run_id,
+            agent_id,
+            game_id=game_id_enum,
+            renderer_registry=renderer_registry,
+            parent=self,
+        )
         self._render_tabs.add_dynamic_tab(run_id, f"Agent-{agent_id}-Live – Grid", grid)
 
         # 3) Agent-${agent_id}-Debug (live step stream - debug only, hidden by default)
@@ -1202,7 +1281,7 @@ class MainWindow(QtWidgets.QMainWindow):
             extra={
                 "run_id": run_id,
                 "agent_id": agent_id,
-                "game_id": game_id,
+                "game_id": game_id_str,
                 "is_toytext": is_toytext,
                 "tabs": tabs_created,
             },
@@ -1215,30 +1294,61 @@ class MainWindow(QtWidgets.QMainWindow):
                 grid.update_metadata(metadata)
 
     def _on_training_finished(self, run_id: str, outcome: str, failure_reason: str) -> None:
-        """Handle training_finished signal - refresh replay tabs for all agents in this run."""
+        """Handle training_finished signal - create/refresh replay tabs for all agents in this run."""
         self.logger.info(
             "Training finished signal received",
             extra={"run_id": run_id, "outcome": outcome, "failure_reason": failure_reason},
         )
 
-        # Refresh replay tabs for all agents in this run
+        # Get all agents that participated in this run
         agent_tabs = self._render_tabs._agent_tabs.get(run_id, {})
-        for tab_name, tab_widget in agent_tabs.items():
-            if "Replay" in tab_name:
+
+        # Extract unique agent IDs from tab names (e.g., "Agent-1-Online" -> agent_id="1")
+        agent_ids_with_tabs = set()
+        for tab_name in agent_tabs.keys():
+            # Tab names follow pattern: "Agent-{agent_id}-*"
+            if tab_name.startswith("Agent-"):
+                parts = tab_name.split("-")
+                if len(parts) >= 2:
+                    agent_id = parts[1]
+                    agent_ids_with_tabs.add(agent_id)
+
+        # Create or refresh replay tabs for each agent
+        for agent_id in agent_ids_with_tabs:
+            replay_tab_name = f"Agent-{agent_id}-Replay"
+
+            # Check if replay tab already exists
+            if replay_tab_name in agent_tabs:
+                # Refresh existing replay tab
                 try:
-                    # AgentReplayTab has refresh() method
+                    tab_widget = agent_tabs[replay_tab_name]
                     refresh = getattr(tab_widget, "refresh", None)
                     if callable(refresh):
                         refresh()
                         self.logger.debug(
                             "Refreshed replay tab",
-                            extra={"run_id": run_id, "tab_name": tab_name},
+                            extra={"run_id": run_id, "tab_name": replay_tab_name},
                         )
                 except Exception as e:
                     self.logger.warning(
                         "Failed to refresh replay tab",
                         exc_info=e,
-                        extra={"run_id": run_id, "tab_name": tab_name},
+                        extra={"run_id": run_id, "tab_name": replay_tab_name},
+                    )
+            else:
+                # Create new replay tab for this agent
+                try:
+                    replay = AgentReplayTab(run_id, agent_id, parent=self)
+                    self._render_tabs.add_dynamic_tab(run_id, replay_tab_name, replay)
+                    self.logger.info(
+                        "Created replay tab for agent",
+                        extra={"run_id": run_id, "agent_id": agent_id, "tab_name": replay_tab_name},
+                    )
+                except Exception as e:
+                    self.logger.warning(
+                        "Failed to create replay tab",
+                        exc_info=e,
+                        extra={"run_id": run_id, "agent_id": agent_id},
                     )
 
     def _on_run_completed(self, run_id: str) -> None:
@@ -1386,11 +1496,19 @@ class MainWindow(QtWidgets.QMainWindow):
     # Helpers
     # ------------------------------------------------------------------
     def _passes_filter(self, payload: LogRecordPayload) -> bool:
-        selected = self._log_filter.currentText()
-        prefix = self.LOG_FILTER_OPTIONS.get(selected)
-        if not prefix:
-            return True
-        return payload.name.startswith(prefix)
+        # Check component filter
+        selected_component = self._log_filter.currentText()
+        prefix = self.LOG_FILTER_OPTIONS.get(selected_component)
+        if prefix and not payload.name.startswith(prefix):
+            return False
+
+        # Check severity filter
+        selected_severity = self._log_severity_filter.currentText()
+        severity = self.LOG_SEVERITY_OPTIONS.get(selected_severity)
+        if severity and payload.level != severity:
+            return False
+
+        return True
 
     def _update_input_state(self) -> None:
         """Synchronize keyboard input enablement with session state."""

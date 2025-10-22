@@ -115,6 +115,7 @@ class TelemetrySQLiteStore:
         WALConfiguration.configure_wal(self._conn)
 
         self._ensure_columns()
+        self._ensure_indexes()
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(
@@ -135,6 +136,8 @@ class TelemetrySQLiteStore:
                 "ALTER TABLE steps ADD COLUMN payload_version INTEGER NOT NULL DEFAULT 0",
             ),
             ("run_id", "ALTER TABLE steps ADD COLUMN run_id TEXT"),
+            ("game_id", "ALTER TABLE steps ADD COLUMN game_id TEXT"),
+            ("episode_seed", "ALTER TABLE steps ADD COLUMN episode_seed INTEGER"),
         ]
         for name, ddl in migrations:
             if name not in column_names:
@@ -145,6 +148,34 @@ class TelemetrySQLiteStore:
             self._conn.execute("ALTER TABLE episodes ADD COLUMN agent_id TEXT")
         if "run_id" not in episode_columns:
             self._conn.execute("ALTER TABLE episodes ADD COLUMN run_id TEXT")
+        if "game_id" not in episode_columns:
+            self._conn.execute("ALTER TABLE episodes ADD COLUMN game_id TEXT")
+        self._conn.commit()
+
+    def _ensure_indexes(self) -> None:
+        """Create indexes for efficient querying of game_id and other fields."""
+        cursor = self._conn.cursor()
+
+        # Get existing indexes
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='index'")
+        existing_indexes = {row[0] for row in cursor.fetchall()}
+
+        # Define indexes to create
+        indexes = [
+            ("idx_steps_game_id", "CREATE INDEX IF NOT EXISTS idx_steps_game_id ON steps(game_id)"),
+            ("idx_steps_run_id_agent_id", "CREATE INDEX IF NOT EXISTS idx_steps_run_id_agent_id ON steps(run_id, agent_id)"),
+            ("idx_episodes_game_id", "CREATE INDEX IF NOT EXISTS idx_episodes_game_id ON episodes(game_id)"),
+            ("idx_episodes_run_id", "CREATE INDEX IF NOT EXISTS idx_episodes_run_id ON episodes(run_id)"),
+        ]
+
+        for index_name, ddl in indexes:
+            if index_name not in existing_indexes:
+                try:
+                    cursor.execute(ddl)
+                    self._logger.debug(f"Created index: {index_name}")
+                except sqlite3.OperationalError as e:
+                    self._logger.debug(f"Index {index_name} already exists or error: {e}")
+
         self._conn.commit()
 
     # ------------------------------------------------------------------
@@ -286,10 +317,10 @@ class TelemetrySQLiteStore:
             INSERT INTO steps (
                 episode_id, step_index, action, observation, reward,
                 terminated, truncated, info, render_payload, timestamp,
-                agent_id, render_hint, frame_ref, payload_version, run_id
+                agent_id, render_hint, frame_ref, payload_version, run_id, game_id
             ) VALUES (:episode_id, :step_index, :action, :observation, :reward,
                 :terminated, :truncated, :info, :render_payload, :timestamp,
-                :agent_id, :render_hint, :frame_ref, :payload_version, :run_id)
+                :agent_id, :render_hint, :frame_ref, :payload_version, :run_id, :game_id)
             """,
             steps,
         )
@@ -359,14 +390,15 @@ class TelemetrySQLiteStore:
             "timestamp": rollup.timestamp.isoformat(),
             "agent_id": rollup.agent_id,
             "run_id": rollup.run_id,
+            "game_id": rollup.game_id,
         }
         cursor = self._conn.cursor()
         cursor.execute("BEGIN")
         cursor.execute(
             """
             INSERT INTO episodes (
-                episode_id, total_reward, steps, terminated, truncated, metadata, timestamp, agent_id, run_id
-            ) VALUES (:episode_id, :total_reward, :steps, :terminated, :truncated, :metadata, :timestamp, :agent_id, :run_id)
+                episode_id, total_reward, steps, terminated, truncated, metadata, timestamp, agent_id, run_id, game_id
+            ) VALUES (:episode_id, :total_reward, :steps, :terminated, :truncated, :metadata, :timestamp, :agent_id, :run_id, :game_id)
             ON CONFLICT(episode_id) DO UPDATE SET
                 total_reward=excluded.total_reward,
                 steps=excluded.steps,
@@ -375,13 +407,19 @@ class TelemetrySQLiteStore:
                 metadata=excluded.metadata,
                 timestamp=excluded.timestamp,
                 agent_id=excluded.agent_id,
-                run_id=excluded.run_id
+                run_id=excluded.run_id,
+                game_id=excluded.game_id
             """,
             payload,
         )
         cursor.execute("COMMIT")
 
     def _step_payload(self, record: StepRecord) -> dict[str, object]:
+        # Extract game_id from render_payload if available
+        game_id = None
+        if isinstance(record.render_payload, dict):
+            game_id = record.render_payload.get("game_id")
+
         return {
             "episode_id": record.episode_id,
             "step_index": record.step_index,
@@ -398,6 +436,7 @@ class TelemetrySQLiteStore:
             "frame_ref": record.frame_ref,
             "payload_version": int(record.payload_version),
             "run_id": record.run_id,
+            "game_id": game_id,
         }
 
     def _prepare_step_payload(self, record: StepRecord) -> tuple[dict[str, object], int]:

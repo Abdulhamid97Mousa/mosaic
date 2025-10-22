@@ -66,8 +66,37 @@ def _coerce_str(x: Any) -> str:
 
 def _mk_runstep(ev: Dict[str, Any], run_id: str, default_agent: str) -> trainer_pb2.RunStep:
     """Build RunStep proto from JSONL event dict."""
-    episode_val = ev.get("episode_index", ev.get("episode", 0))
+    # CRITICAL: Extract episode_index from metadata dict
+    # The trainer emits: episode (display value = seed + episode_index)
+    # The metadata dict contains: episode_index (0-based counter)
+    # We MUST use episode_index from metadata for proper synchronization
+    episode_index_val = None
+
+    # Extract metadata and get episode_index from it
+    metadata_json = ev.get("metadata_json", ev.get("metadata", "{}"))
+    if isinstance(metadata_json, str):
+        try:
+            metadata = json.loads(metadata_json)
+            episode_index_val = metadata.get("episode_index")
+        except (json.JSONDecodeError, TypeError):
+            pass
+    elif isinstance(metadata_json, dict):
+        episode_index_val = metadata_json.get("episode_index")
+
+    # Fallback to episode field if episode_index not found in metadata
+    if episode_index_val is None:
+        episode_index_val = ev.get("episode", 0)
+
+    episode_val = episode_index_val
     step_val = ev.get("step_index", ev.get("step", 0))
+
+    # DEBUG: Log render_payload presence
+    render_payload = ev.get("render_payload")
+    if render_payload:
+        _LOGGER.debug(f"[PROXY] render_payload found: {type(render_payload)}, keys: {list(render_payload.keys()) if isinstance(render_payload, dict) else 'not_dict'}")
+    else:
+        _LOGGER.debug(f"[PROXY] render_payload NOT found in event. Available keys: {list(ev.keys())}")
+
     msg = trainer_pb2.RunStep(
         run_id=run_id,
         episode_index=int(episode_val),
@@ -81,8 +110,10 @@ def _mk_runstep(ev: Dict[str, Any], run_id: str, default_agent: str) -> trainer_
         backend=str(ev.get("backend", "")),
         agent_id=str(ev.get("agent_id") or default_agent),
         render_hint_json=_coerce_str(ev.get("render_hint_json", ev.get("render"))),
+        render_payload_json=_coerce_str(ev.get("render_payload")),
         frame_ref=str(ev.get("frame_ref", "")),
         payload_version=int(ev.get("payload_version", 0)),
+        episode_seed=int(ev.get("episode_seed", 0)),  # NEW: Unique seed per episode for environment variation
     )
     ts_ns = ev.get("ts_unix_ns")
     if isinstance(ts_ns, (int, float, str)) and str(ts_ns).replace('.', '').replace('-', '').isdigit():
@@ -92,10 +123,30 @@ def _mk_runstep(ev: Dict[str, Any], run_id: str, default_agent: str) -> trainer_
 
 def _mk_runepisode(ev: Dict[str, Any], run_id: str, default_agent: str) -> trainer_pb2.RunEpisode:
     """Build RunEpisode proto from JSONL event dict."""
-    episode_val = ev.get("episode_index", ev.get("episode", 0))
+    # CRITICAL: Extract episode_index from metadata dict
+    # The trainer emits: episode (display value = seed + episode_index)
+    # The metadata dict contains: episode_index (0-based counter)
+    # We MUST use episode_index from metadata for proper synchronization
+    episode_index_val = None
+
+    # Extract metadata and get episode_index from it
+    metadata_json = ev.get("metadata_json", ev.get("metadata", "{}"))
+    if isinstance(metadata_json, str):
+        try:
+            metadata = json.loads(metadata_json)
+            episode_index_val = metadata.get("episode_index")
+        except (json.JSONDecodeError, TypeError):
+            pass
+    elif isinstance(metadata_json, dict):
+        episode_index_val = metadata_json.get("episode_index")
+
+    # Fallback to episode field if episode_index not found in metadata
+    if episode_index_val is None:
+        episode_index_val = ev.get("episode", 0)
+
     msg = trainer_pb2.RunEpisode(
         run_id=run_id,
-        episode_index=int(episode_val),
+        episode_index=int(episode_index_val),
         total_reward=float(ev.get("total_reward", ev.get("reward", 0.0))),
         steps=int(ev.get("steps", 0)),
         terminated=bool(ev.get("terminated", False)),

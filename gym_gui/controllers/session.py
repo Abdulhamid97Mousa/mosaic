@@ -27,6 +27,7 @@ from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.core.enums import ControlMode, GameId, EnvironmentFamily, ENVIRONMENT_FAMILY_BY_GAME
 from gym_gui.core.factories.adapters import create_adapter, get_adapter_cls
 from gym_gui.services.actor import ActorService, EpisodeSummary, StepSnapshot
+from gym_gui.services.frame_storage import FrameStorageService
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
 from gym_gui.utils.seeding import SessionSeedManager
@@ -103,6 +104,7 @@ class SessionController(QtCore.QObject):
         locator = get_service_locator()
         self._telemetry = locator.resolve(TelemetryService)
         self._actor_service = locator.resolve(ActorService)
+        self._frame_storage = locator.resolve(FrameStorageService)
         if self._actor_service is not None:
             self._seed_manager.register_consumer("actor_service", self._actor_service.seed)
         self._seed_manager.register_consumer("session_timers", self._seed_timers)
@@ -583,6 +585,18 @@ class SessionController(QtCore.QObject):
         render_hint = self._coalesce_render_hint(step)
         frame_ref = step.frame_ref or self._extract_frame_reference(step)
         payload_version = step.payload_version if step.payload_version is not None else 0
+
+        # Save frame to disk if frame_ref is available
+        if frame_ref and self._frame_storage is not None and step.render_payload is not None:
+            try:
+                self._frame_storage.save_frame(
+                    step.render_payload,
+                    frame_ref,
+                    run_id=None,  # No run_id in human input mode
+                )
+            except Exception as e:
+                self._logger.debug(f"Failed to save frame {frame_ref}: {e}")
+
         record = StepRecord(
             episode_id=self._episode_id,
             step_index=self._step_index,
@@ -757,6 +771,7 @@ class SessionController(QtCore.QObject):
         return hint or None
 
     def _extract_frame_reference(self, step: AdapterStep) -> str | None:
+        # First check if frame_ref is already in state or payload
         state_raw = getattr(step.state, "raw", None)
         if isinstance(state_raw, Mapping):
             ref = state_raw.get("frame_ref")
@@ -767,6 +782,14 @@ class SessionController(QtCore.QObject):
             ref = payload.get("frame_ref")
             if isinstance(ref, str):
                 return ref
+
+        # If not found, ask the adapter to generate one
+        if self._adapter is not None:
+            try:
+                return self._adapter.build_frame_reference(step.render_payload, step.state)
+            except Exception as e:
+                self._logger.debug(f"Failed to build frame reference: {e}")
+
         return None
 
     def _finalize_episode(
@@ -799,6 +822,7 @@ class SessionController(QtCore.QObject):
                 metadata=dict(self._episode_metadata),
                 timestamp=timestamp or datetime.utcnow(),
                 agent_id=getattr(step.state, "active_agent", None),
+                game_id=self._game_id.value if self._game_id else None,
             )
             self._telemetry.complete_episode(rollup)
         self._episode_active = False

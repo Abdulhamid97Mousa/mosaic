@@ -36,6 +36,14 @@ class RgbRendererStrategy(RendererStrategy):
     def reset(self) -> None:
         self._view.reset()
 
+    def cleanup(self) -> None:
+        """Clean up resources before widget destruction."""
+        try:
+            self._view.reset()
+        except Exception:
+            # Silently ignore errors during cleanup
+            pass
+
 
 class _RgbView(QtWidgets.QWidget):
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:

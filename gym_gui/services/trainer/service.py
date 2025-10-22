@@ -692,6 +692,7 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
                                 'terminated': bool(getattr(message, 'terminated', False)),
                                 'truncated': bool(getattr(message, 'truncated', False)),
                                 'timestamp': getattr(message, 'timestamp', ''),
+                                'metadata_json': getattr(message, 'metadata_json', ''),
                             }
                             evt = TelemetryEvent(
                                 topic=Topic.EPISODE_FINALIZED,
@@ -732,6 +733,7 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
         action_value = self._decode_action(message.action_json)
         observation = self._decode_json_field(message.observation_json, default=None)
         render_hint = self._decode_json_field(message.render_hint_json, default=None)
+        render_payload = self._decode_json_field(message.render_payload_json, default=None)
 
         info_payload: dict[str, Any] = {}
         if message.policy_label:
@@ -749,7 +751,7 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
             truncated=message.truncated,
             info=info_payload,
             timestamp=timestamp,
-            render_payload=None,
+            render_payload=render_payload,
             agent_id=message.agent_id or None,
             render_hint=render_hint if isinstance(render_hint, Mapping) else None,
             frame_ref=message.frame_ref or None,
@@ -762,6 +764,8 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
         metadata = self._decode_json_field(message.metadata_json, default={})
         if not isinstance(metadata, Mapping):
             metadata = {}
+        # Extract game_id from metadata if available
+        game_id = metadata.get("game_id") if isinstance(metadata, dict) else None
         return EpisodeRollup(
             episode_id=episode_id,
             total_reward=message.total_reward,
@@ -772,6 +776,7 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
             timestamp=self._timestamp_from_proto(message),
             agent_id=message.agent_id or None,
             run_id=message.run_id or None,
+            game_id=game_id,
         )
 
     @staticmethod

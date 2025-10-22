@@ -63,6 +63,11 @@ class AgentReplayTab(QtWidgets.QWidget):
         self._summary_label.setWordWrap(True)
         actions_layout.addWidget(self._summary_label, 1)
 
+        self._copy_button = QtWidgets.QPushButton("Copy to Clipboard")
+        self._copy_button.clicked.connect(self._copy_table_to_clipboard)
+        self._copy_button.setEnabled(False)
+        actions_layout.addWidget(self._copy_button, 0, QtCore.Qt.AlignmentFlag.AlignRight)
+
         self._refresh_button = QtWidgets.QPushButton("Refresh")
         self._refresh_button.clicked.connect(self.refresh)
         actions_layout.addWidget(self._refresh_button, 0, QtCore.Qt.AlignmentFlag.AlignRight)
@@ -193,6 +198,12 @@ class AgentReplayTab(QtWidgets.QWidget):
         self._toggle_placeholder(False)
         self._episode_table.selectRow(0)
 
+        # Enable Copy button when data is available
+        if self._episode_table.rowCount() > 0:
+            self._copy_button.setEnabled(True)
+        else:
+            self._copy_button.setEnabled(False)
+
     def _on_episode_selected(self) -> None:
         row = self._episode_table.currentRow()
         if row < 0 or row >= len(self._episodes):
@@ -251,6 +262,33 @@ class AgentReplayTab(QtWidgets.QWidget):
                 lines.append(f"  info={info_preview}")
 
         self._step_view.setPlainText("\n".join(lines))
+
+    def _copy_table_to_clipboard(self) -> None:
+        """Copy episodes table contents to clipboard in TSV format."""
+        if self._episode_table.rowCount() == 0:
+            return
+
+        clipboard = QtWidgets.QApplication.clipboard()
+        if clipboard is None:
+            return
+
+        # Extract headers
+        headers: list[str] = []
+        for column_index in range(self._episode_table.columnCount()):
+            header_item = self._episode_table.horizontalHeaderItem(column_index)
+            headers.append(header_item.text() if header_item is not None else "")
+
+        # Extract rows
+        rows: list[str] = ["\t".join(headers)]
+        for row_index in range(self._episode_table.rowCount()):
+            row_values: list[str] = []
+            for column_index in range(self._episode_table.columnCount()):
+                item = self._episode_table.item(row_index, column_index)
+                row_values.append(item.text() if item is not None else "")
+            rows.append("\t".join(row_values))
+
+        # Copy to clipboard
+        clipboard.setText("\n".join(rows))
 
     # ------------------------------------------------------------------
     # Helpers

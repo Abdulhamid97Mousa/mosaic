@@ -19,6 +19,7 @@ from qtpy import QtCore
 
 from gym_gui.telemetry.run_bus import get_bus
 from gym_gui.telemetry.events import Topic, TelemetryEvent
+from gym_gui.telemetry.credit_manager import get_credit_manager
 
 if TYPE_CHECKING:
     from gym_gui.services.trainer import TrainerClient
@@ -57,6 +58,10 @@ class LiveTelemetryController(QtCore.QObject):
         # Store buffer sizes per run (from training config)
         self._step_buffer_size_per_run: Dict[str, int] = {}  # run_id -> step_buffer_size
         self._episode_buffer_size_per_run: Dict[str, int] = {}  # run_id -> episode_buffer_size
+
+        # Store game_id per run (for passing to tabs)
+        self._game_id_per_run: Dict[str, str] = {}  # run_id -> game_id
+
         # RunBus subscription for independent event delivery
         self._bus = get_bus()
         self._loop: Optional[asyncio.AbstractEventLoop] = None
@@ -100,12 +105,32 @@ class LiveTelemetryController(QtCore.QObject):
         self._thread = None
 
     def subscribe_to_run(self, run_id: str) -> None:
-        """Start streaming telemetry for a run."""
+        """Start streaming telemetry for a run.
+
+        Pre-initialize credits to prevent chicken-and-egg deadlock.
+        Credits are initialized BEFORE first event arrives, ensuring the
+        credit system is ready when the first step/episode is received.
+        """
         if run_id in self._active_runs:
             self._logger.debug("Already subscribed to run", extra={"run_id": run_id})
             return
-        self._logger.debug("Subscribing controller to run: %s", run_id)
+
+        self._logger.debug(
+            "Subscribing controller to run",
+            extra={"run_id": run_id},
+        )
         self._active_runs.add(run_id)
+
+        # Pre-initialize credits for default agent
+        # This ensures credits exist BEFORE first event arrives
+        # We use "default" as a placeholder; actual agent_id will be extracted from first event
+        credit_mgr = get_credit_manager()
+        credit_mgr.initialize_stream(run_id, "default")
+        self._logger.debug(
+            "Pre-initialized credits for default agent",
+            extra={"run_id": run_id, "agent_id": "default"},
+        )
+
         self._hub.subscribe_run(run_id, self._client)
         self._logger.debug("Successfully subscribed to run: %s (hub notified)", run_id)
 
@@ -173,10 +198,58 @@ class LiveTelemetryController(QtCore.QObject):
         episode_size = self._episode_buffer_size_per_run.get(run_id, 100)
         return step_size, episode_size
 
+    def set_game_id_for_run(self, run_id: str, game_id: str) -> None:
+        """Store the game_id for a run (for passing to dynamic tabs).
+
+        Args:
+            run_id: The training run ID
+            game_id: The game environment ID (e.g., "FrozenLake-v1")
+        """
+        self._game_id_per_run[run_id] = game_id
+        self._logger.debug(
+            "Set game_id for run",
+            extra={"run_id": run_id, "game_id": game_id},
+        )
+
+    def get_game_id_for_run(self, run_id: str) -> str | None:
+        """Get the game_id for a run.
+
+        Args:
+            run_id: The training run ID
+
+        Returns:
+            The game_id string, or None if not set
+        """
+        return self._game_id_per_run.get(run_id)
+
+    def get_render_throttle_for_run(self, run_id: str) -> int:
+        """Get the rendering throttle interval for a run.
+
+        Args:
+            run_id: The training run ID
+
+        Returns:
+            The throttle interval (render every Nth step), defaults to 1 if not set
+        """
+        return self._render_throttle_per_run.get(run_id, 1)
+
     def register_tab(self, run_id: str, agent_id: str, tab: "LiveTelemetryTab") -> None:
-        """Register a newly created tab widget for routing telemetry."""
+        """Register a newly created tab widget for routing telemetry.
+
+        When tab is registered, we grant initial credits to ensure the
+        credit system is ready for incoming events.
+        """
         key = (run_id, agent_id)
         self._tabs[key] = tab
+
+        # Grant initial credits when tab is registered
+        # This ensures credits are available for events routed to this tab
+        credit_mgr = get_credit_manager()
+        credit_mgr.grant_credits(run_id, agent_id, 200)
+        self._logger.debug(
+            "Granted initial credits to tab",
+            extra={"run_id": run_id, "agent_id": agent_id, "amount": 200},
+        )
 
         # Apply rendering throttle if set for this run
         if run_id in self._render_throttle_per_run:
@@ -187,7 +260,7 @@ class LiveTelemetryController(QtCore.QObject):
                 extra={"run_id": run_id, "agent_id": agent_id, "throttle": throttle},
             )
 
-        self._logger.info(
+        self._logger.debug(
             "Tab registered and ready for telemetry",
             extra={"run_id": run_id, "agent_id": agent_id, "tab_type": type(tab).__name__},
         )
@@ -316,8 +389,28 @@ class LiveTelemetryController(QtCore.QObject):
                 agent_id = evt.agent_id or "default"
                 key = (evt.run_id, agent_id)
 
+                # Initialize credits for actual agent_id on first event
+                # This ensures credits are allocated for the specific agent
+                credit_mgr = get_credit_manager()
+                was_initialized = credit_mgr.initialize_stream(evt.run_id, agent_id)
+                if was_initialized:
+                    self._logger.debug(
+                        "Initialized credits for actual agent_id",
+                        extra={"run_id": evt.run_id, "agent_id": agent_id},
+                    )
+
                 # Route to tab if registered
                 tab = self._tabs.get(key)
+                self._logger.debug(
+                    "Looking for tab",
+                    extra={
+                        "run_id": evt.run_id,
+                        "agent_id": agent_id,
+                        "key": key,
+                        "tabs_available": list(self._tabs.keys()),
+                        "tab_found": tab is not None,
+                    },
+                )
                 if tab is not None:
                     try:
                         tab.add_step(evt.payload)
@@ -331,11 +424,15 @@ class LiveTelemetryController(QtCore.QObject):
                 else:
                     # Emit signal to request tab creation on first step
                     if key not in self._step_buffer:
-                        self._logger.info(
+                        self._logger.debug(
                             "First step received; requesting tab creation",
                             extra={"run_id": evt.run_id, "agent_id": agent_id},
                         )
-                        tab_title = f"Live – {agent_id}"
+                        # Format tab title: use agent_id if it's not numeric, otherwise use "Agent-{id}"
+                        if agent_id and not agent_id.isdigit():
+                            tab_title = f"Live – {agent_id}"
+                        else:
+                            tab_title = f"Live – Agent-{agent_id}" if agent_id else "Live – Agent"
                         # CRITICAL FIX: Use QMetaObject.invokeMethod to emit signal from main thread
                         # This is thread-safe and works across event loops
                         try:
@@ -360,6 +457,15 @@ class LiveTelemetryController(QtCore.QObject):
                     # Buffer until tab is registered
                     if key not in self._step_buffer:
                         self._step_buffer[key] = []
+
+                    # DEBUG: Log payload keys
+                    payload_keys = list(evt.payload.keys()) if isinstance(evt.payload, dict) else "not_dict"
+                    has_render = "render_payload_json" in evt.payload if isinstance(evt.payload, dict) else False
+                    self._logger.debug(
+                        f"[BUFFER] Buffering step: keys={payload_keys}, has_render_payload_json={has_render}",
+                        extra={"run_id": evt.run_id, "agent_id": agent_id}
+                    )
+
                     self._step_buffer[key].append(evt.payload)
 
             except Exception as e:

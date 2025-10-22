@@ -10,11 +10,22 @@ from qtpy import QtWidgets
 class InfoLogContainer(QtWidgets.QWidget):
     """Container for game info and runtime log panels."""
 
+    # Component-level filters (module prefixes)
     LOG_FILTER_OPTIONS: Dict[str, str | None] = {
         "All": None,
-        "Controllers": "gym_gui.controllers",
-        "Adapters": "gym_gui.core.adapters",
-        "Agents": "gym_gui.agents",
+        "UI": "gym_gui.ui",
+        "Controller": "gym_gui.controllers",
+        "Adapter": "gym_gui.core.adapters",
+        "Worker": "spade_bdi_rl.worker",
+    }
+
+    # Severity-level filters
+    LOG_SEVERITY_OPTIONS: Dict[str, str | None] = {
+        "All": None,
+        "DEBUG": "DEBUG",
+        "INFO": "INFO",
+        "WARNING": "WARNING",
+        "ERROR": "ERROR",
     }
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
@@ -36,13 +47,23 @@ class InfoLogContainer(QtWidgets.QWidget):
         self._log_group = QtWidgets.QGroupBox("Runtime Log", self)
         log_layout = QtWidgets.QVBoxLayout(self._log_group)
 
-        # Log filter row
+        # Log filter row (component and severity filters)
         filter_row = QtWidgets.QHBoxLayout()
-        filter_label = QtWidgets.QLabel("Filter:")
+
+        # Component filter
+        component_label = QtWidgets.QLabel("Component:")
         self._log_filter = QtWidgets.QComboBox()
         self._log_filter.addItems(self.LOG_FILTER_OPTIONS.keys())
-        filter_row.addWidget(filter_label)
+        filter_row.addWidget(component_label)
         filter_row.addWidget(self._log_filter, 1)
+
+        # Severity filter
+        severity_label = QtWidgets.QLabel("Severity:")
+        self._log_severity_filter = QtWidgets.QComboBox()
+        self._log_severity_filter.addItems(self.LOG_SEVERITY_OPTIONS.keys())
+        filter_row.addWidget(severity_label)
+        filter_row.addWidget(self._log_severity_filter, 1)
+
         log_layout.addLayout(filter_row)
 
         # Log console
@@ -94,9 +115,18 @@ class InfoLogContainer(QtWidgets.QWidget):
         self._log_console.clear()
 
     def get_log_filter_value(self) -> Optional[str]:
-        """Get the current log filter value."""
+        """Get the current log component filter value."""
         current_text = self._log_filter.currentText()
         return self.LOG_FILTER_OPTIONS.get(current_text)
+
+    def get_log_severity_filter(self) -> QtWidgets.QComboBox:
+        """Get the log severity filter combo box."""
+        return self._log_severity_filter
+
+    def get_log_severity_filter_value(self) -> Optional[str]:
+        """Get the current log severity filter value."""
+        current_text = self._log_severity_filter.currentText()
+        return self.LOG_SEVERITY_OPTIONS.get(current_text)
 
     def get_log_text(self) -> str:
         """Get all log text."""

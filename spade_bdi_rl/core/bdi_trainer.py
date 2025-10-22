@@ -84,14 +84,32 @@ class BDITrainer(HeadlessTrainer):
 
             # Run episodes with BDI integration
             summaries: list[EpisodeMetrics] = []
-            for episode in range(self.config.max_episodes):
-                summary = self._run_bdi_episode(episode, self.config.seed)
+            for episode_index in range(self.config.max_episodes):
+                # CRITICAL: Separation of concerns for reproducibility and environment variation
+                #
+                # seed (config.seed): Base seed for reproducible experiment (e.g., seed=1)
+                #   - Constant throughout the run
+                #   - Used for reproducibility across runs
+                #   - Does NOT change per episode
+                #
+                # episode_number: Display value for user (seed + episode_index)
+                #   - For seed=1: episodes 1, 2, 3, 4, ...
+                #   - For seed=39: episodes 39, 40, 41, 42, ...
+                #
+                # episode_seed: Unique seed for environment variation per episode
+                #   - Derived from episode_index (0, 1, 2, 3, ...)
+                #   - Each episode gets different environment state
+                #   - Allows agent to learn from diverse experiences
+                #
+                episode_number = self.config.seed + episode_index
+                episode_seed = episode_index  # Unique seed per episode (0, 1, 2, 3, ...)
+                summary = self._run_bdi_episode(episode_index, episode_number, episode_seed)
                 summaries.append(summary)
 
-                episode_metadata = self._build_episode_metadata(episode, summary, self.config.seed)
+                episode_metadata = self._build_episode_metadata(episode_index, summary, episode_seed)
                 self.emitter.episode(
                     self.config.run_id,
-                    episode,
+                    episode_number,  # Pass episode_number (display value = seed + episode_index)
                     reward=summary.total_reward,
                     steps=summary.steps,
                     success=summary.success,
@@ -176,14 +194,15 @@ class BDITrainer(HeadlessTrainer):
                 self.bdi_agent = None
                 self._event_loop = None
 
-    def _run_bdi_episode(self, episode: int, seed: int) -> EpisodeMetrics:
+    def _run_bdi_episode(self, episode_index: int, episode_number: int, episode_seed: int) -> EpisodeMetrics:
         """Run single episode with BDI reasoning integration.
 
         This extends the base episode runner with BDI agent execution.
 
         Args:
-            episode: Episode number
-            seed: Seed for environment reset
+            episode_index: 0-based loop counter (0, 1, 2, 3, ...)
+            episode_number: Display value for telemetry (seed + episode_index)
+            episode_seed: Unique seed for environment variation (derived from episode_index)
 
         Returns:
             Episode metrics (reward, steps, success)
@@ -194,7 +213,7 @@ class BDITrainer(HeadlessTrainer):
 
         if self.bdi_agent is None:
             LOGGER.warning("BDI agent not initialized; falling back to RL-only mode")
-            return self._run_episode(episode, seed)
+            return self._run_episode(episode_index, episode_number, episode_seed)
 
         # TODO: When BDI agent is fully integrated, this should:
         # 1. Consult BDI agent beliefs/desires/intentions before each step
@@ -205,10 +224,10 @@ class BDITrainer(HeadlessTrainer):
         # For now, use base RL implementation to ensure telemetry works
         LOGGER.debug(
             "Running BDI episode (RL mode with telemetry)",
-            extra={"episode": episode, "note": "BDI reasoning pending full SPADE integration"},
+            extra={"episode_number": episode_number, "note": "BDI reasoning pending full SPADE integration"},
         )
 
-        return self._run_episode(episode, seed)
+        return self._run_episode(episode_index, episode_number, episode_seed)
 
     def _build_config_payload(self) -> Dict[str, Any]:
         """Build configuration payload with BDI-specific fields."""
@@ -229,15 +248,22 @@ class BDITrainer(HeadlessTrainer):
             "extra": self.config.extra,
         }
 
-    def _build_episode_metadata(self, episode: int, summary: EpisodeMetrics, seed: int) -> Dict[str, Any]:
+    def _build_episode_metadata(self, episode_index: int, summary: EpisodeMetrics, episode_seed: int) -> Dict[str, Any]:
         """Build episode metadata with BDI-specific fields."""
+        # episode_index = 0-based loop counter (0, 1, 2, 3, ...)
+        # episode_seed = unique seed per episode (0, 1, 2, 3, ...) for environment variation
+        # seed = base seed (self.config.seed) for reproducibility
+        # episode (display) = seed + episode_index
+        episode = self.config.seed + episode_index
         return {
             "control_mode": "bdi_agent",
             "run_id": self.config.run_id,
             "agent_id": self.config.agent_id,
             "game_id": self.config.game_id,
-            "seed": seed,
-            "episode": episode,
+            "seed": self.config.seed,  # Base seed for reproducibility
+            "episode_index": episode_index,  # 0-based counter
+            "episode": episode,  # Display value (seed + episode_index)
+            "episode_seed": episode_seed,  # Unique seed per episode for environment variation
             "policy_strategy": self.config.policy_strategy.value,
             "success": summary.success,
             "bdi_enabled": True,

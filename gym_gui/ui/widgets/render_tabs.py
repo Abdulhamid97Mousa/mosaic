@@ -161,7 +161,8 @@ class RenderTabs(QtWidgets.QTabWidget):
                 if hasattr(widget, 'cleanup'):
                     try:
                         logger.debug(f"_close_dynamic_tab: Calling widget.cleanup()")
-                        widget.cleanup()
+                        # Type: ignore because cleanup is a custom method on LiveTelemetryTab
+                        widget.cleanup()  # type: ignore[attr-defined]
                         logger.debug(f"_close_dynamic_tab: widget.cleanup() completed")
                     except Exception as e:
                         logger.exception(f"_close_dynamic_tab: Error cleaning up tab: {e}")
@@ -191,7 +192,8 @@ class RenderTabs(QtWidgets.QTabWidget):
                     if hasattr(widget, 'cleanup'):
                         try:
                             logger.debug(f"remove_dynamic_tabs_for_run: Calling widget.cleanup()")
-                            widget.cleanup()
+                            # Type: ignore because cleanup is a custom method on LiveTelemetryTab
+                            widget.cleanup()  # type: ignore[attr-defined]
                             logger.debug(f"remove_dynamic_tabs_for_run: widget.cleanup() completed")
                         except Exception as e:
                             logger.exception(f"remove_dynamic_tabs_for_run: Error cleaning up tab: {e}")

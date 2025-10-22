@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Mapping
 
 import gymnasium as gym
@@ -30,6 +31,26 @@ class Box2DAdapter(EnvironmentAdapter[np.ndarray, Any]):
             "rgb": frame,
             "game_id": self.id,
         }
+
+    def build_frame_reference(self, render_payload: Any | None, state: StepState) -> str | None:
+        """Generate timestamped frame reference for media storage.
+
+        Args:
+            render_payload: The render payload (unused for Box2D)
+            state: The step state (unused for Box2D)
+
+        Returns:
+            Timestamped frame reference string or None if payload is invalid
+        """
+        if render_payload is None:
+            return None
+
+        # Generate timestamp: YYYY-MM-DD_HH-MM-SS_NNN
+        now = datetime.now()
+        timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
+        microseconds = now.microsecond // 1000  # Convert to milliseconds
+
+        return f"frames/{timestamp}_{microseconds:03d}.png"
 
     def build_step_state(self, observation: np.ndarray, info: Mapping[str, Any]) -> StepState:
         return StepState(

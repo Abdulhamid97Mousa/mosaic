@@ -135,6 +135,8 @@ message RunStep {
   string render_hint_json = 14;
   string frame_ref = 15;
   uint32 payload_version = 16;
+  string render_payload_json = 17;  // Grid/RGB rendering data
+  uint64 episode_seed = 18;  // NEW: Unique seed per episode for environment variation
 }
 
 message RunEpisode {

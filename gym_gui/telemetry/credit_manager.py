@@ -48,40 +48,68 @@ class CreditManager:
         key = (run_id, agent_id)
         return self._credits.get(key, 0)
 
-    def initialize_stream(self, run_id: str, agent_id: str) -> None:
+    def initialize_stream(self, run_id: str, agent_id: str) -> bool:
         """Initialize credits for a new stream.
-        
+
         Args:
             run_id: Training run ID
             agent_id: Agent ID
+
+        Returns:
+            True if stream was newly initialized, False if already initialized
         """
         key = (run_id, agent_id)
         if key not in self._credits:
             self._credits[key] = self._initial_credits
             self._total_dropped[key] = 0
-            _LOGGER.debug(
-                f"Initialized credits for stream",
-                extra={"run_id": run_id, "agent_id": agent_id, "credits": self._initial_credits},
+            _LOGGER.info(
+                "Initialized credits for stream (PRE-TAB CREDIT GRANT)",
+                extra={
+                    "run_id": run_id,
+                    "agent_id": agent_id,
+                    "initial_credits": self._initial_credits,
+                    "timestamp": "pre-tab",
+                },
             )
+            return True
+        return False
 
     def consume_credit(self, run_id: str, agent_id: str) -> bool:
         """Attempt to consume one credit.
-        
+
         Args:
             run_id: Training run ID
             agent_id: Agent ID
-            
+
         Returns:
             True if credit was available and consumed, False if no credits
         """
         key = (run_id, agent_id)
         self.initialize_stream(run_id, agent_id)
-        
+
         if self._credits[key] > 0:
             self._credits[key] -= 1
+            remaining = self._credits[key]
+            _LOGGER.debug(
+                "Consumed credit from stream",
+                extra={
+                    "run_id": run_id,
+                    "agent_id": agent_id,
+                    "remaining_credits": remaining,
+                },
+            )
             return True
         else:
             self._total_dropped[key] = self._total_dropped.get(key, 0) + 1
+            dropped_count = self._total_dropped[key]
+            _LOGGER.warning(
+                "No credits available; event dropped",
+                extra={
+                    "run_id": run_id,
+                    "agent_id": agent_id,
+                    "total_dropped": dropped_count,
+                },
+            )
             return False
 
     def grant_credits(self, run_id: str, agent_id: str, amount: int) -> None:

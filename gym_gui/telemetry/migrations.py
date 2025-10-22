@@ -91,6 +91,11 @@ class MigrationRunner:
             "telemetry_create_index_episodes_run_agent_timestamp",
             "CREATE INDEX IF NOT EXISTS idx_episodes_run_agent_ts ON episodes(run_id, agent_id, timestamp)",
         ),
+        # Phase 5: Episode seed tracking for environment variation
+        Migration(
+            "telemetry_add_episode_seed_to_steps",
+            "ALTER TABLE steps ADD COLUMN episode_seed INTEGER",
+        ),
         # Phase 4: Duplicate prevention trigger
         Migration(
             "telemetry_trigger_steps_unique",

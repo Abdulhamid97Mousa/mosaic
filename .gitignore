@@ -51,4 +51,8 @@ gym_gui/services/trainer/proto/trainer_pb2.pyi
 .venv
 .pytest_cache
 
+spadeBDI_RL
+
+
+
 

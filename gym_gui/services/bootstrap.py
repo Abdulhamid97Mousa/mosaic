@@ -9,6 +9,7 @@ from gym_gui.config.paths import VAR_TELEMETRY_DIR, ensure_var_directories, VAR_
 from gym_gui.rendering import RendererRegistry, create_default_renderer_registry
 from gym_gui.services.action_mapping import ContinuousActionMapper, create_default_action_mapper
 from gym_gui.services.actor import ActorService, BDIQAgent, HumanKeyboardActor, LLMMultiStepAgent
+from gym_gui.services.frame_storage import FrameStorageService
 from gym_gui.services.service_locator import ServiceLocator, get_service_locator
 from gym_gui.services.trainer import TrainerClient, TrainerClientConfig, TrainerClientRunner
 from gym_gui.services.trainer.launcher import TrainerDaemonHandle, ensure_trainer_daemon_running
@@ -71,12 +72,14 @@ def bootstrap_default_services() -> ServiceLocator:
 
     action_mapper: ContinuousActionMapper = create_default_action_mapper()
     renderer_registry: RendererRegistry = create_default_renderer_registry()
+    frame_storage: FrameStorageService = FrameStorageService()
 
     locator.register(StorageRecorderService, storage)
     locator.register(TelemetryService, telemetry)
     locator.register(TelemetrySQLiteStore, telemetry_store)
     locator.register(ActorService, actors)
     locator.register(ContinuousActionMapper, action_mapper)
+    locator.register(FrameStorageService, frame_storage)
 
     client_config = TrainerClientConfig()
 

@@ -171,13 +171,15 @@ class TestBDITrainerConfiguration:
         from ..core.runtime import EpisodeMetrics
 
         metrics = EpisodeMetrics(episode=0, total_reward=1.0, steps=5, success=True)
-        metadata = trainer._build_episode_metadata(0, metrics, seed=1)
+        # episode_index=0, episode_seed=42 (config.seed + episode_index)
+        metadata = trainer._build_episode_metadata(0, metrics, episode_seed=42)
 
         assert metadata["control_mode"] == "bdi_agent"
         assert metadata["bdi_enabled"] is True
         assert metadata["bdi_jid"] == "config@localhost"
         assert metadata["success"] is True
-        assert metadata["seed"] == 1
+        assert metadata["seed"] == 42
+        assert metadata["episode_index"] == 0
 
     def test_policy_metadata_includes_bdi_fields(self, trainer: BDITrainer):
         """Test that policy save metadata includes BDI-specific fields."""
