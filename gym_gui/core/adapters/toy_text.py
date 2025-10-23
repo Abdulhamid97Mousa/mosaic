@@ -475,6 +475,22 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
     ) -> None:
         """Initialize with optional game-specific configuration."""
         super().__init__(context)
+        
+        # Convert dictionary to FrozenLakeConfig if needed
+        if isinstance(game_config, dict):
+            # Build FrozenLakeConfig from dictionary
+            game_config = FrozenLakeConfig(
+                is_slippery=game_config.get('is_slippery', DEFAULT_FROZEN_LAKE_V2_CONFIG.is_slippery),
+                success_rate=game_config.get('success_rate', DEFAULT_FROZEN_LAKE_V2_CONFIG.success_rate),
+                reward_schedule=game_config.get('reward_schedule', DEFAULT_FROZEN_LAKE_V2_CONFIG.reward_schedule),
+                grid_height=game_config.get('grid_height', DEFAULT_FROZEN_LAKE_V2_CONFIG.grid_height),
+                grid_width=game_config.get('grid_width', DEFAULT_FROZEN_LAKE_V2_CONFIG.grid_width),
+                start_position=tuple(game_config.get('start_position', DEFAULT_FROZEN_LAKE_V2_CONFIG.start_position)) if game_config.get('start_position') else None,
+                goal_position=tuple(game_config.get('goal_position', DEFAULT_FROZEN_LAKE_V2_CONFIG.goal_position)) if game_config.get('goal_position') else None,
+                hole_count=game_config.get('hole_count', DEFAULT_FROZEN_LAKE_V2_CONFIG.hole_count),
+                random_holes=game_config.get('random_holes', DEFAULT_FROZEN_LAKE_V2_CONFIG.random_holes),
+            )
+        
         self._game_config = game_config or DEFAULT_FROZEN_LAKE_V2_CONFIG
         self._last_action: int | None = None
         self._custom_desc: list[str] | None = None
@@ -542,9 +558,22 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
             if (r, c) != start_pos and (r, c) != goal_pos
         ]
         
-        # Randomly place holes
         hole_count = min(hole_count, len(available_positions))
-        hole_positions = random.sample(available_positions, hole_count)
+        
+        if random_holes:
+            # Randomly place holes
+            hole_positions = random.sample(available_positions, hole_count)
+        else:
+            # Use ANSI grid rendering positions (visually top-left to bottom-right)
+            # This ensures deterministic placement that matches the visual layout
+            hole_positions = available_positions[:hole_count]
+        
+        # DEBUG: Log hole placement details
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.debug(f"[FrozenLakeV2 Map Gen] random_holes={random_holes}, hole_count={hole_count}, "
+                    f"available_positions[:5]={available_positions[:5]}, "
+                    f"hole_positions={hole_positions}")
         
         for r, c in hole_positions:
             grid[r][c] = 'H'
@@ -561,8 +590,10 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
             "reward_schedule": self._game_config.reward_schedule,
             "desc": self._custom_desc,
         }
-        env = gym.make("FrozenLake-v2", render_mode=self._gym_render_mode, **kwargs)
-        self.logger.debug("Loaded FrozenLake-v2 env with custom map size=%dx%d",
+        # Use FrozenLake8x8-v1 (the 8x8 variant available in Gymnasium)
+        # This adapter is designed for larger customizable grids, hence the v2 naming in our code
+        env = gym.make("FrozenLake8x8-v1", render_mode=self._gym_render_mode, **kwargs)
+        self.logger.debug("Loaded FrozenLake8x8-v1 env with custom map size=%dx%d",
                          self._game_config.grid_height, self._game_config.grid_width)
         self._set_env(env)
 

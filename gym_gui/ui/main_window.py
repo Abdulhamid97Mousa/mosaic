@@ -42,7 +42,6 @@ from gym_gui.services.telemetry import TelemetryService
 from gym_gui.services.trainer import TrainerClient, TrainerClientRunner, RunStatus
 from gym_gui.services.trainer.streams import TelemetryAsyncHub
 from gym_gui.services.trainer.client_runner import TrainerWatchStopped
-from gym_gui.ui.widgets.agent_loadout_dialog import AgentLoadoutDialog
 from gym_gui.ui.widgets.agent_train_form import TrainAgentDialog
 from gym_gui.ui.widgets.live_telemetry_tab import LiveTelemetryTab
 from gym_gui.ui.widgets.agent_online_tab import AgentOnlineTab
@@ -1302,6 +1301,11 @@ class MainWindow(QtWidgets.QMainWindow):
 
         # Get all agents that participated in this run
         agent_tabs = self._render_tabs._agent_tabs.get(run_id, {})
+        
+        self.logger.debug(
+            "_on_training_finished: agent_tabs for run",
+            extra={"run_id": run_id, "tab_count": len(agent_tabs), "tab_names": list(agent_tabs.keys())},
+        )
 
         # Extract unique agent IDs from tab names (e.g., "Agent-1-Online" -> agent_id="1")
         agent_ids_with_tabs = set()
@@ -1312,10 +1316,22 @@ class MainWindow(QtWidgets.QMainWindow):
                 if len(parts) >= 2:
                     agent_id = parts[1]
                     agent_ids_with_tabs.add(agent_id)
+        
+        self.logger.debug(
+            "_on_training_finished: extracted agent IDs",
+            extra={"run_id": run_id, "agent_ids": list(agent_ids_with_tabs)},
+        )
 
-        # Create or refresh replay tabs for each agent
+        # Create or refresh replay tabs for each agent, and switch to the first one created
+        first_replay_tab_index: int | None = None
+        
         for agent_id in agent_ids_with_tabs:
             replay_tab_name = f"Agent-{agent_id}-Replay"
+            
+            self.logger.debug(
+                "_on_training_finished: processing agent",
+                extra={"run_id": run_id, "agent_id": agent_id, "replay_tab_name": replay_tab_name},
+            )
 
             # Check if replay tab already exists
             if replay_tab_name in agent_tabs:
@@ -1324,10 +1340,21 @@ class MainWindow(QtWidgets.QMainWindow):
                     tab_widget = agent_tabs[replay_tab_name]
                     refresh = getattr(tab_widget, "refresh", None)
                     if callable(refresh):
+                        self.logger.debug(
+                            "_on_training_finished: calling refresh on existing replay tab",
+                            extra={"run_id": run_id, "agent_id": agent_id},
+                        )
                         refresh()
                         self.logger.debug(
                             "Refreshed replay tab",
                             extra={"run_id": run_id, "tab_name": replay_tab_name},
+                        )
+                    # Record the tab index for switching later
+                    if first_replay_tab_index is None:
+                        first_replay_tab_index = self._render_tabs.indexOf(tab_widget)
+                        self.logger.debug(
+                            "_on_training_finished: recorded existing replay tab index",
+                            extra={"run_id": run_id, "agent_id": agent_id, "tab_index": first_replay_tab_index},
                         )
                 except Exception as e:
                     self.logger.warning(
@@ -1337,6 +1364,10 @@ class MainWindow(QtWidgets.QMainWindow):
                     )
             else:
                 # Create new replay tab for this agent
+                self.logger.debug(
+                    "_on_training_finished: replay tab does not exist, creating new",
+                    extra={"run_id": run_id, "agent_id": agent_id, "replay_tab_name": replay_tab_name},
+                )
                 try:
                     replay = AgentReplayTab(run_id, agent_id, parent=self)
                     self._render_tabs.add_dynamic_tab(run_id, replay_tab_name, replay)
@@ -1344,12 +1375,37 @@ class MainWindow(QtWidgets.QMainWindow):
                         "Created replay tab for agent",
                         extra={"run_id": run_id, "agent_id": agent_id, "tab_name": replay_tab_name},
                     )
+                    # Record the tab index for switching later (add_dynamic_tab already switches, but we track it)
+                    if first_replay_tab_index is None:
+                        first_replay_tab_index = self._render_tabs.indexOf(replay)
+                        self.logger.debug(
+                            "_on_training_finished: recorded new replay tab index",
+                            extra={"run_id": run_id, "agent_id": agent_id, "tab_index": first_replay_tab_index},
+                        )
                 except Exception as e:
                     self.logger.warning(
                         "Failed to create replay tab",
                         exc_info=e,
                         extra={"run_id": run_id, "agent_id": agent_id},
                     )
+        
+        self.logger.debug(
+            "_on_training_finished: about to switch to replay tab",
+            extra={"run_id": run_id, "first_replay_tab_index": first_replay_tab_index},
+        )
+        
+        # Switch to the first replay tab created/refreshed so user can see results
+        if first_replay_tab_index is not None and first_replay_tab_index >= 0:
+            self._render_tabs.setCurrentIndex(first_replay_tab_index)
+            self.logger.info(
+                "Switched to replay tab after training completion",
+                extra={"run_id": run_id, "tab_index": first_replay_tab_index},
+            )
+        else:
+            self.logger.warning(
+                "_on_training_finished: could not find valid replay tab to switch to",
+                extra={"run_id": run_id, "first_replay_tab_index": first_replay_tab_index},
+            )
 
     def _on_run_completed(self, run_id: str) -> None:
         """Handle run completion - keep Live-Agent tabs open, add Replay tabs."""

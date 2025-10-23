@@ -8,7 +8,9 @@ from typing import Any, Dict, Tuple
 
 import gymnasium as gym
 import numpy as np
+import logging
 
+LOGGER = logging.getLogger(__name__)
 
 @dataclass(slots=True)
 class FrozenLakeAdapter:

@@ -263,11 +263,27 @@ class HeadlessTrainer:
             if 0 <= h_row < nrow and 0 <= h_col < ncol:
                 grid[h_row][h_col] = 'H'
 
+        # Mark cliffs (CliffWalking) - bottom row excluding start and goal
+        is_cliff_walking = self.config.game_id in ("CliffWalking-v0", "CliffWalking-v1")
+        if is_cliff_walking:
+            start_pos = obs.get("start", {})
+            start_col = start_pos.get("col", 0)
+            # Mark cliff positions: bottom row (nrow-1), excluding start (col=0) and goal (col=ncol-1)
+            for col in range(1, ncol - 1):
+                grid[nrow - 1][col] = 'C'
+
+        # Mark start position (for CliffWalking display)
+        if is_cliff_walking:
+            start_pos = obs.get("start", {})
+            start_row = start_pos.get("row", nrow - 1)
+            start_col = start_pos.get("col", 0)
+            grid[start_row][start_col] = 'S'
+
         # Mark goal
         if 0 <= goal_row < nrow and 0 <= goal_col < ncol:
             grid[goal_row][goal_col] = 'G'
 
-        # Mark agent position
+        # Mark agent position (after cliffs and goal, so agent takes precedence)
         if 0 <= agent_row < nrow and 0 <= agent_col < ncol:
             grid[agent_row][agent_col] = 'A'
 

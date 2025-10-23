@@ -86,7 +86,15 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     emitter = TelemetryEmitter()
 
+    # Extract game_config from run_config.extra (set by GUI's Agent Train Form)
+    # and pass it to the adapter factory
+    game_config = run_config.extra.pop("game_config", None)
     adapter_kwargs = run_config.extra.get("adapter_kwargs", {})
+    
+    # Include game_config in kwargs if provided
+    if game_config is not None:
+        adapter_kwargs["game_config"] = game_config
+    
     adapter = create_adapter(run_config.game_id, **adapter_kwargs)
 
     if parsed.dry_run:

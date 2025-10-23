@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import logging
 from datetime import datetime
 from typing import Dict, List, Optional, Sequence
 
@@ -10,13 +11,14 @@ from qtpy import QtCore, QtWidgets
 
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.services.service_locator import get_service_locator
+from gym_gui.services.trainer import RunRegistry
 from gym_gui.telemetry import TelemetrySQLiteStore
 
 
 class AgentReplayTab(QtWidgets.QWidget):
     """Display telemetry captured for a specific training run and agent."""
 
-    _MAX_EPISODES = 500
+    _DEFAULT_MAX_EPISODES = 500  # Fallback if config unavailable
 
     def __init__(
         self,
@@ -29,11 +31,19 @@ class AgentReplayTab(QtWidgets.QWidget):
         super().__init__(parent)
         self.run_id = run_id
         self.agent_id = agent_id
+        self._logger = logging.getLogger("gym_gui.ui.agent_replay_tab")
 
         locator = get_service_locator()
         self._store: Optional[TelemetrySQLiteStore] = (
             telemetry_store or locator.resolve(TelemetrySQLiteStore)
         )
+        
+        # Resolve RunRegistry to retrieve actual max_episodes from run config
+        try:
+            self._registry: Optional[RunRegistry] = locator.resolve(RunRegistry)
+        except Exception:
+            self._registry = None
+            self._logger.debug("RunRegistry not available, will use default max_episodes limit")
 
         self._episodes: List[EpisodeRollup] = []
         self._steps_cache: Dict[str, Sequence[StepRecord]] = {}
@@ -119,23 +129,83 @@ class AgentReplayTab(QtWidgets.QWidget):
     # ------------------------------------------------------------------
     # Data loading & rendering
     # ------------------------------------------------------------------
+    def _get_max_episodes_from_config(self) -> int:
+        """Retrieve max_episodes from the run's configuration.
+        
+        Returns:
+            The max_episodes value from the run config, or DEFAULT if unavailable.
+        """
+        if self._registry is None:
+            self._logger.debug("Registry unavailable, using default max_episodes limit")
+            return self._DEFAULT_MAX_EPISODES
+        
+        try:
+            config_json = self._registry.get_run_config_json(self.run_id)
+            if config_json is None:
+                self._logger.warning(f"No config found for run {self.run_id}, using default max_episodes limit")
+                return self._DEFAULT_MAX_EPISODES
+            
+            config = json.loads(config_json)
+            # Extract max_episodes from nested worker config
+            # Path: metadata.worker.config.max_episodes
+            max_episodes = (
+                config.get("metadata", {})
+                .get("worker", {})
+                .get("config", {})
+                .get("max_episodes", self._DEFAULT_MAX_EPISODES)
+            )
+            if isinstance(max_episodes, int) and max_episodes > 0:
+                self._logger.debug(f"Using max_episodes={max_episodes} from run config for {self.run_id}")
+                return max_episodes
+        except Exception as e:
+            self._logger.warning(f"Failed to extract max_episodes from config: {e}, using default")
+        
+        return self._DEFAULT_MAX_EPISODES
+
     def refresh(self) -> None:
         """Reload telemetry from persistent storage."""
+        self._logger.debug(
+            "AgentReplayTab.refresh() called",
+            extra={"run_id": self.run_id, "agent_id": self.agent_id},
+        )
 
         if self._store is None:
+            self._logger.warning(
+                "Telemetry store is unavailable in refresh",
+                extra={"run_id": self.run_id, "agent_id": self.agent_id},
+            )
             self._summary_label.setText("Telemetry store is unavailable.")
             self._episode_table.setRowCount(0)
             self._step_view.clear()
             self._toggle_placeholder(True)
             return
 
+        # Get the actual max_episodes limit from the run configuration
+        max_episodes_limit = self._get_max_episodes_from_config()
+        self._logger.debug(
+            "AgentReplayTab querying episodes",
+            extra={
+                "run_id": self.run_id,
+                "agent_id": self.agent_id,
+                "max_episodes_limit": max_episodes_limit,
+            },
+        )
+        
         episodes = self._store.episodes_for_run(
             self.run_id,
             agent_id=self.agent_id,
-            limit=self._MAX_EPISODES,
+            limit=max_episodes_limit,
             order_desc=False,
         )
         self._episodes = list(episodes)
+        self._logger.debug(
+            "AgentReplayTab loaded episodes from store",
+            extra={
+                "run_id": self.run_id,
+                "agent_id": self.agent_id,
+                "episode_count": len(self._episodes),
+            },
+        )
         self._steps_cache.clear()
         self._populate_episode_table()
 

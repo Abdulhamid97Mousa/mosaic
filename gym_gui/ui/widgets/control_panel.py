@@ -893,8 +893,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
             self._config_layout.addRow("Goal Position", goal_combo)
             
             # Hole count spinner
-            hole_count_raw = overrides.get("hole_count", defaults.hole_count or 19)
-            hole_count = int(hole_count_raw) if isinstance(hole_count_raw, (int, float)) else 19
+            hole_count_raw = overrides.get("hole_count", defaults.hole_count or 10)
+            hole_count = int(hole_count_raw) if isinstance(hole_count_raw, (int, float)) else 10
             overrides["hole_count"] = hole_count
             hole_spin = QtWidgets.QSpinBox(self._config_group)
             max_holes = (grid_height * grid_width) - 2  # Exclude start and goal
