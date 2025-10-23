@@ -91,7 +91,7 @@ def bootstrap_default_services() -> ServiceLocator:
     # Initialize telemetry hub for live streaming
     # Increased buffer_size from 256 to 512 to handle high-frequency training (episode 658+)
     # max_queue=2048 handles gRPC stream buffering, buffer_size=512 handles UI processing lag
-    telemetry_hub = TelemetryAsyncHub(max_queue=2048, buffer_size=512)
+    telemetry_hub = TelemetryAsyncHub(max_queue=4096, buffer_size=2048)
     # Hub will auto-start on first subscribe_run call
 
     # Create live telemetry controller and start RunBus subscription
@@ -105,9 +105,9 @@ def bootstrap_default_services() -> ServiceLocator:
     db_sink = TelemetryDBSink(
         telemetry_store,
         bus,
-        batch_size=64,
-        checkpoint_interval=1000,
-        writer_queue_size=512,
+        batch_size=128,
+        checkpoint_interval=1024,
+        writer_queue_size=4096,
     )
     db_sink.start()
 
