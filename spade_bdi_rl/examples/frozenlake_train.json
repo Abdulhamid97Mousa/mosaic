@@ -1,9 +1,0 @@
-{
-  "run_id": "demo-train",
-  "env_id": "FrozenLake-v1",
-  "seed": 123,
-  "max_episodes": 3,
-  "max_steps_per_episode": 100,
-  "policy_strategy": "train",
-  "agent_id": "bdi_rl_demo"
-}

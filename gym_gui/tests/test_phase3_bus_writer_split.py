@@ -9,6 +9,7 @@ Tests for:
 
 import asyncio
 import pytest
+import queue
 from datetime import datetime, timezone
 
 from gym_gui.telemetry.events import Topic, TelemetryEvent
@@ -50,9 +51,11 @@ class TestRunBusPubSub:
     """Test RunBus pub/sub functionality."""
 
     def test_subscribe_returns_queue(self, bus):
-        """Test that subscribe returns an asyncio.Queue."""
+        """Test that subscribe returns a thread-safe queue.Queue."""
         q = bus.subscribe(Topic.STEP_APPENDED, "subscriber-1")
-        assert isinstance(q, asyncio.Queue)
+        # RunBus uses thread-safe queue.Queue to support both async (UI) and thread-based (db_sink) consumers
+        assert isinstance(q, queue.Queue)
+        assert not isinstance(q, asyncio.Queue)  # Explicitly NOT asyncio.Queue
 
     def test_publish_to_single_subscriber(self, bus, test_event):
         """Test publishing to a single subscriber."""

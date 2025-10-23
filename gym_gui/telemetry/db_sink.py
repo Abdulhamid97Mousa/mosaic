@@ -15,7 +15,7 @@ import threading
 from datetime import datetime
 from typing import Optional
 
-from gym_gui.core.data_model.telemetry import StepRecord, EpisodeRollup
+from gym_gui.core.data_model.telemetry_core import StepRecord, EpisodeRollup
 from gym_gui.telemetry.sqlite_store import TelemetrySQLiteStore
 from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.telemetry.run_bus import RunBus

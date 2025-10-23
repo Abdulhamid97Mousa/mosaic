@@ -36,9 +36,11 @@ class TestBDIRLAgentInstantiation:
         agent = BDIRLAgent(jid="test@localhost", password="secret", adapter=adapter)
         
         assert agent.adapter is adapter
-        # FrozenLakeAdapter uses grid_size, not map_size
+        # FrozenLakeAdapter has map_size and _env attributes after __post_init__
         if isinstance(agent.adapter, FrozenLakeAdapter):
-            assert hasattr(agent.adapter, "grid_size") or hasattr(agent.adapter, "env")
+            assert hasattr(agent.adapter, "map_size")
+            assert hasattr(agent.adapter, "_env")
+            assert agent.adapter.map_size == "4x4"
 
     def test_agent_initial_state(self):
         """Test agent has proper initial state."""

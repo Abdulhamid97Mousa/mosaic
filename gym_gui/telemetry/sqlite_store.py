@@ -295,17 +295,17 @@ class TelemetrySQLiteStore:
         if not steps:
             return
         
-        # Log what we're about to insert
+        # Log what we're about to insert (DEBUG for individual steps to avoid spam)
         for i, step in enumerate(steps):
-            self._logger.error(f"[DB_FLUSH] Step {i+1}/{len(steps)} insert: "
+            self._logger.debug(f"[DB_FLUSH] Step {i+1}/{len(steps)} insert: "
                               f"episode_id={step.get('episode_id')} "
                               f"step_index={step.get('step_index')} "
                               f"reward={step.get('reward')} "
                               f"terminated={step.get('terminated')} "
                               f"truncated={step.get('truncated')} "
                               f"agent_id={step.get('agent_id')}")
-            # Log types
-            self._logger.error(f"[DB_FLUSH TYPES] "
+            # Log types (DEBUG level)
+            self._logger.debug(f"[DB_FLUSH TYPES] "
                               f"reward={type(step.get('reward')).__name__} "
                               f"terminated={type(step.get('terminated')).__name__} "
                               f"truncated={type(step.get('truncated')).__name__}")
@@ -325,7 +325,8 @@ class TelemetrySQLiteStore:
             steps,
         )
         cursor.execute("COMMIT")
-        self._logger.error(f"[DB_FLUSH] Successfully committed {len(steps)} steps to database")
+        # Use INFO for batch commit (less noise than per-step ERROR logs)
+        self._logger.info(f"[DB_FLUSH] Successfully committed {len(steps)} steps to database")
         self._pending_payload_bytes = 0
 
     def _delete_episode_rows(self, episode_id: str) -> None:

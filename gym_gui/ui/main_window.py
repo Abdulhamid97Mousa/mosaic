@@ -29,7 +29,7 @@ from gym_gui.core.enums import ControlMode, GameId
 from gym_gui.core.factories.adapters import available_games
 from gym_gui.controllers.human_input import HumanInputController
 from gym_gui.controllers.session import SessionController
-from gym_gui.controllers.live_telemetry import LiveTelemetryController
+from gym_gui.controllers.live_telemetry_controllers import LiveTelemetryController
 from gym_gui.ui.logging_bridge import LogRecordPayload, QtLogHandler
 from gym_gui.ui.presenters.main_window_presenter import MainWindowPresenter, MainWindowView
 from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWidget
@@ -42,14 +42,15 @@ from gym_gui.services.telemetry import TelemetryService
 from gym_gui.services.trainer import TrainerClient, TrainerClientRunner, RunStatus
 from gym_gui.services.trainer.streams import TelemetryAsyncHub
 from gym_gui.services.trainer.client_runner import TrainerWatchStopped
-from gym_gui.ui.widgets.agent_train_form import TrainAgentDialog
 from gym_gui.ui.widgets.live_telemetry_tab import LiveTelemetryTab
-from gym_gui.ui.widgets.agent_online_tab import AgentOnlineTab
-from gym_gui.ui.widgets.agent_online_grid_tab import AgentOnlineGridTab
-from gym_gui.ui.widgets.agent_online_raw_tab import AgentOnlineRawTab
-from gym_gui.ui.widgets.agent_online_video_tab import AgentOnlineVideoTab
-from gym_gui.ui.widgets.agent_replay_tab import AgentReplayTab
+from gym_gui.ui.presenters.workers import (
+    get_worker_presenter_registry,
+)
+from gym_gui.ui.widgets.spade_bdi_rl_worker_tabs import (
+    AgentReplayTab,
+)
 from gym_gui.ui.widgets.policy_selection_form import PolicySelectionDialog
+from gym_gui.ui.widgets.agent_train_dialog import AgentTrainDialog
 from gym_gui.services.trainer.signals import get_trainer_signals
 
 
@@ -316,6 +317,8 @@ class MainWindow(QtWidgets.QMainWindow):
         # Connect control panel signals to session controller
         self._control_panel.load_requested.connect(self._on_load_requested)
         self._control_panel.reset_requested.connect(self._on_reset_requested)
+
+        self._control_panel.agent_loadout_requested.connect(self._on_agent_loadout_requested)
         self._control_panel.train_agent_requested.connect(self._on_train_agent_requested)
         self._control_panel.trained_agent_requested.connect(self._on_trained_agent_requested)
         self._control_panel.start_game_requested.connect(self._on_start_game)
@@ -326,7 +329,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self._control_panel.game_changed.connect(self._on_game_changed)
         self._control_panel.control_mode_changed.connect(self._on_mode_changed)
         self._control_panel.actor_changed.connect(self._on_actor_changed)
-        self._control_panel.agent_loadout_requested.connect(self._on_agent_loadout_requested)
         self._control_panel.slippery_toggled.connect(self._on_slippery_toggled)
         self._control_panel.frozen_v2_config_changed.connect(self._on_frozen_v2_config_changed)
         self._control_panel.taxi_config_changed.connect(self._on_taxi_config_changed)
@@ -403,29 +405,6 @@ class MainWindow(QtWidgets.QMainWindow):
         descriptor = self._actor_service.get_actor_descriptor(actor_id)
         label = descriptor.display_name if descriptor is not None else actor_id
         self._status_bar.showMessage(f"Active actor set to {label}", 4000)
-
-    def _on_agent_loadout_requested(self) -> None:
-        """Handle agent training request from control panel."""
-        self.logger.info("_on_agent_loadout_requested: START")
-        # Open the training configuration dialog
-        dialog = TrainAgentDialog(
-            self,
-            default_game=self._control_panel.current_game(),
-        )
-        self.logger.debug("_on_agent_loadout_requested: Dialog created, calling exec()")
-        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
-            self.logger.debug("TrainAgentDialog was rejected")
-            return
-
-        # Get the training configuration from the dialog
-        self.logger.debug("_on_agent_loadout_requested: Dialog accepted, getting config")
-        training_config = dialog.get_config()
-        self.logger.debug(f"TrainAgentDialog.get_config() returned: {training_config is not None}")
-        if training_config:
-            self.logger.info("Submitting training config from dialog")
-            self._submit_training_config(training_config)
-        else:
-            self.logger.warning("TrainAgentDialog returned None config")
 
     def _on_load_requested(self, game_id: GameId, mode: ControlMode, seed: int) -> None:
         """Handle load request from control panel."""
@@ -852,39 +831,6 @@ class MainWindow(QtWidgets.QMainWindow):
         self._control_panel.set_auto_running(running)
         self._update_input_state()
     
-    def _on_train_agent_requested(self) -> None:
-        """Handle Train Agent button - launch headless training dialog."""
-        self.logger.info("_on_train_agent_requested: START")
-        current_game = self._control_panel.current_game()
-        self.logger.info(
-            "Opening TrainAgentDialog",
-            extra={"current_game": getattr(current_game, "value", None)},
-        )
-        dialog = TrainAgentDialog(self, default_game=current_game)
-        self.logger.debug("_on_train_agent_requested: Dialog created")
-
-        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
-            self.logger.info("TrainAgentDialog cancelled by user")
-            return
-
-        config = dialog.get_config()
-        if not config:
-            self.logger.warning("TrainAgentDialog returned no config after acceptance")
-            return
-
-        metadata = config.get("metadata", {}) if isinstance(config.get("metadata"), dict) else {}
-        worker_meta = metadata.get("worker", {}) if isinstance(metadata, dict) else {}
-        config_meta = worker_meta.get("config", {}) if isinstance(worker_meta, dict) else {}
-        self.logger.info(
-            "Submitting training config from dialog",
-            extra={
-                "run_name": config.get("run_name"),
-                "agent_id": worker_meta.get("agent_id"),
-                "episodes": config_meta.get("max_episodes"),
-                "max_steps": config_meta.get("max_steps_per_episode"),
-            },
-        )
-        self._submit_training_config(config)
 
     def _on_trained_agent_requested(self) -> None:
         """Handle the 'Load Trained Policy' button."""
@@ -908,114 +854,69 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         self._submit_training_config(config)
 
+    def _on_agent_loadout_requested(self) -> None:
+        """Handle the 'Configure Agent' button - opens the agent training configuration dialog."""
+        dialog = AgentTrainDialog(
+            parent=self,
+            default_game=self._control_panel.current_game(),
+        )
+        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            return
+        
+        config = dialog.get_config()
+        if config is None:
+            return
+        
+        self.logger.info("Agent training configuration submitted from dialog")
+        self._status_bar.showMessage("Launching training run...", 5000)
+        self._submit_training_config(config)
+
+    def _on_train_agent_requested(self) -> None:
+        """Handle the 'Train Agent' button - opens the agent training configuration dialog."""
+        # The "Train Agent" button also opens the dialog, similar to "Configure Agent"
+        # This is the primary entry point for the training workflow
+        self._on_agent_loadout_requested()
+
     def _build_policy_evaluation_config(self, policy_path: Path) -> Optional[dict]:
+        """Build training config using the worker presenter registry.
+        
+        Delegates configuration composition to the appropriate worker presenter,
+        which handles worker-specific logic for config building, metadata composition, etc.
+        """
         try:
-            payload = json.loads(policy_path.read_text(encoding="utf-8"))
-        except Exception as exc:
+            registry = get_worker_presenter_registry()
+            worker_id = "spade_bdi_rl"
+            presenter = registry.get(worker_id)
+            
+            if presenter is None:
+                raise ValueError(f"Worker presenter '{worker_id}' not found in registry")
+            
+            config = presenter.build_train_request(
+                policy_path=policy_path,
+                current_game=self._control_panel.current_game(),
+            )
+            return config
+        except FileNotFoundError:
             QtWidgets.QMessageBox.warning(
+                self,
+                "Policy Not Found",
+                f"Could not read policy file:\n{policy_path}",
+            )
+            return None
+        except ValueError as e:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Invalid Configuration",
+                f"Configuration error:\n{e}",
+            )
+            return None
+        except Exception as e:
+            QtWidgets.QMessageBox.critical(
                 self,
                 "Policy Load Failed",
-                f"Could not read policy file:\n{policy_path}\n\n{exc}",
+                f"Could not prepare training request:\n{e}",
             )
             return None
-
-        metadata = {}
-        if isinstance(payload, dict):
-            metadata = payload.get("metadata", {}) if isinstance(payload.get("metadata"), dict) else {}
-
-        current_game = self._control_panel.current_game()
-        game_id = metadata.get("game_id") or current_game.value if current_game is not None else None
-        if game_id is None:
-            QtWidgets.QMessageBox.warning(
-                self,
-                "Missing Environment",
-                "The selected policy does not specify an environment and no game is currently active.",
-            )
-            return None
-
-        agent_id = metadata.get("agent_id") or policy_path.stem
-        seed = int(metadata.get("seed", 0))
-        max_episodes = int(metadata.get("eval_episodes", 5))
-        max_steps = int(metadata.get("max_steps_per_episode", metadata.get("max_steps", 200)))
-        algorithm_label = metadata.get("algorithm", "Loaded Policy")
-
-        run_name = f"eval-{agent_id}-{datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S')}"
-
-        worker_config = {
-            "run_id": run_name,
-            "game_id": game_id,
-            "seed": seed,
-            "max_episodes": max_episodes,
-            "max_steps_per_episode": max_steps,
-            "policy_strategy": "eval",
-            "policy_path": str(policy_path),
-            "agent_id": agent_id,
-            "capture_video": False,
-            "headless": True,
-            "extra": {
-                "policy_path": str(policy_path),
-                "algorithm": algorithm_label,
-            },
-        }
-
-        metadata_payload = {
-            "ui": {
-                "algorithm": algorithm_label,
-                "source_policy": str(policy_path),
-                "eval": {
-                    "max_episodes": max_episodes,
-                    "max_steps_per_episode": max_steps,
-                    "seed": seed,
-                },
-            },
-            "worker": {
-                "module": "spade_bdi_rl.worker",
-                "use_grpc": True,
-                "grpc_target": "127.0.0.1:50055",
-                "agent_id": agent_id,
-                "config": worker_config,
-            },
-        }
-
-        environment = {
-            "GYM_ENV_ID": game_id,
-            "TRAIN_SEED": str(seed),
-            "EVAL_POLICY_PATH": str(policy_path),
-        }
-
-        config = {
-            "run_name": run_name,
-            "entry_point": "python",
-            "arguments": ["-m", "spade_bdi_rl.worker"],
-            "environment": environment,
-            "resources": {
-                "cpus": 2,
-                "memory_mb": 2048,
-                "gpus": {"requested": 0, "mandatory": False},
-            },
-            "artifacts": {
-                "output_prefix": f"runs/{run_name}",
-                "persist_logs": True,
-                "keep_checkpoints": False,
-            },
-            "metadata": metadata_payload,
-        }
-        return config
-
-    @staticmethod
-    def _extract_agent_id(config: dict) -> Optional[str]:
-        try:
-            metadata = config.get("metadata", {})
-            worker_meta = metadata.get("worker", {})
-            agent_id = worker_meta.get("agent_id")
-            if not agent_id:
-                worker_cfg = worker_meta.get("config", {})
-                agent_id = worker_cfg.get("agent_id")
-            if agent_id:
-                return str(agent_id)
-        except Exception:  # pragma: no cover - defensive
-            pass
-        return None
 
     def _submit_training_config(self, config: dict) -> None:
         """Submit a training configuration to the trainer daemon."""
@@ -1201,7 +1102,7 @@ class MainWindow(QtWidgets.QMainWindow):
     # Main window only handles tab creation via run_tab_requested signal.
 
     def _create_agent_tabs_for(self, run_id: str, agent_id: str, first_payload: dict) -> None:
-        """Create dynamic agent tabs with environment-specific ergonomics.
+        """Create dynamic agent tabs using the worker presenter registry.
 
         For ToyText environments (FrozenLake, CliffWalking, Taxi):
         - Online tab shows grid rendering (primary view)
@@ -1210,87 +1111,79 @@ class MainWindow(QtWidgets.QMainWindow):
         For visual environments (Atari, etc.):
         - Online tab shows video rendering
         - Replay tab shows episode browser
+        
+        Delegates tab creation to the appropriate worker presenter based on
+        the worker type, which handles environment detection and conditional
+        tab instantiation.
         """
-        from gym_gui.rendering import RendererRegistry
-        from gym_gui.core.enums import GameId
-
-        locator = get_service_locator()
-        renderer_registry = locator.resolve(RendererRegistry)
-
-        # Determine environment family from metadata
-        game_id_str = first_payload.get("game_id", "").lower()
-        is_toytext = any(name in game_id_str for name in ["frozenlake", "cliffwalking", "taxi", "gridworld"])
-
-        # Convert game_id string to GameId enum for passing to tabs
-        game_id_enum = None
-        if game_id_str:
-            try:
-                game_id_enum = GameId(game_id_str)
-            except (ValueError, KeyError):
-                self.logger.warning(
-                    "Invalid game_id in first_payload",
-                    extra={"run_id": run_id, "agent_id": agent_id, "game_id": game_id_str},
+        try:
+            # Get the presenter registry and resolve the worker presenter
+            registry = get_worker_presenter_registry()
+            worker_id = "spade_bdi_rl"  # TODO: Extract from config/payload if supporting multiple workers
+            presenter = registry.get(worker_id)
+            
+            if presenter is None:
+                self.logger.error(
+                    "Worker presenter not found in registry",
+                    extra={"run_id": run_id, "agent_id": agent_id, "worker_id": worker_id},
                 )
-
-        # 0) Agent-${agent_id}-Online (primary real-time view)
-        online = AgentOnlineTab(run_id, agent_id, parent=self)
-        self._render_tabs.add_dynamic_tab(run_id, f"Agent-{agent_id}-Online", online)
-
-        # 1) Agent-${agent_id}-Replay (historical per-run)
-        replay = AgentReplayTab(run_id, agent_id, parent=self)
-        self._render_tabs.add_dynamic_tab(run_id, f"Agent-{agent_id}-Replay", replay)
-
-        # 2) Agent-${agent_id}-Live – Grid (live grid rendering - always created for ToyText)
-        # CRITICAL FIX: Pass game_id to ensure correct FrozenLake version is used
-        grid = AgentOnlineGridTab(
-            run_id,
-            agent_id,
-            game_id=game_id_enum,
-            renderer_registry=renderer_registry,
-            parent=self,
-        )
-        self._render_tabs.add_dynamic_tab(run_id, f"Agent-{agent_id}-Live – Grid", grid)
-
-        # 3) Agent-${agent_id}-Debug (live step stream - debug only, hidden by default)
-        raw = AgentOnlineRawTab(run_id, agent_id, parent=self)
-        self._render_tabs.add_dynamic_tab(run_id, f"Agent-{agent_id}-Debug", raw)
-
-        # 4) Agent-${agent_id}-Live – Video (live RGB frames - only for visual envs)
-        # Only create video tab if environment advertises RGB rendering capability
-        if not is_toytext:
-            video = AgentOnlineVideoTab(run_id, agent_id, parent=self)
-            self._render_tabs.add_dynamic_tab(run_id, f"Agent-{agent_id}-Live – Video", video)
-            tabs_created = [
-                f"Agent-{agent_id}-Online",
-                f"Agent-{agent_id}-Replay",
-                f"Agent-{agent_id}-Live – Grid",
-                f"Agent-{agent_id}-Debug",
-                f"Agent-{agent_id}-Live – Video",
-            ]
-        else:
-            tabs_created = [
+                return
+            
+            tabs = presenter.create_tabs(run_id, agent_id, first_payload, parent=self)
+            
+            # Tab names and registration order must match presenter output
+            tab_names = [
                 f"Agent-{agent_id}-Online",
                 f"Agent-{agent_id}-Replay",
                 f"Agent-{agent_id}-Live – Grid",
                 f"Agent-{agent_id}-Debug",
             ]
-
-        self.logger.info(
-            "Created dynamic agent tabs",
-            extra={
-                "run_id": run_id,
-                "agent_id": agent_id,
-                "game_id": game_id_str,
-                "is_toytext": is_toytext,
-                "tabs": tabs_created,
-            },
-        )
-
-        metadata = self._run_metadata.get((run_id, agent_id))
-        if metadata:
-            # Update grid metadata
-            if hasattr(grid, "update_metadata"):
-                grid.update_metadata(metadata)
+            
+            # Determine if video tab was created (check if environment is visual)
+            game_id_str = first_payload.get("game_id", "").lower()
+            is_toytext = any(name in game_id_str for name in ["frozenlake", "cliffwalking", "taxi", "gridworld"])
+            
+            if not is_toytext:
+                tab_names.append(f"Agent-{agent_id}-Live – Video")
+            
+            # Register tabs with the render container
+            if len(tabs) != len(tab_names):
+                self.logger.warning(
+                    "Tab count mismatch",
+                    extra={
+                        "run_id": run_id,
+                        "agent_id": agent_id,
+                        "expected": len(tab_names),
+                        "actual": len(tabs),
+                    },
+                )
+            
+            for tab_name, tab_widget in zip(tab_names, tabs):
+                self._render_tabs.add_dynamic_tab(run_id, tab_name, tab_widget)
+            
+            # Update metadata if available
+            metadata = self._run_metadata.get((run_id, agent_id))
+            if metadata:
+                grid_tab = tabs[2] if len(tabs) > 2 else None
+                if grid_tab and hasattr(grid_tab, "update_metadata"):
+                    grid_tab.update_metadata(metadata)
+            
+            self.logger.info(
+                "Created dynamic agent tabs via presenter registry",
+                extra={
+                    "run_id": run_id,
+                    "agent_id": agent_id,
+                    "worker_id": worker_id,
+                    "game_id": game_id_str,
+                    "is_toytext": is_toytext,
+                    "tabs": tab_names,
+                },
+            )
+        except Exception as e:
+            self.logger.exception(
+                "Failed to create agent tabs",
+                extra={"run_id": run_id, "agent_id": agent_id, "error": str(e)},
+            )
 
     def _on_training_finished(self, run_id: str, outcome: str, failure_reason: str) -> None:
         """Handle training_finished signal - create/refresh replay tabs for all agents in this run."""

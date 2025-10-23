@@ -15,7 +15,7 @@ from gym_gui.core.enums import GameId
 from gym_gui.services.trainer import validate_train_run_config
 
 
-class TrainAgentDialog(QtWidgets.QDialog):
+class AgentTrainDialog(QtWidgets.QDialog):
     """Dialog to configure and submit a training run."""
 
     def __init__(
@@ -25,9 +25,10 @@ class TrainAgentDialog(QtWidgets.QDialog):
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Agent Train Form")
-        # Set larger initial size to accommodate all content without overlapping
+        # Set larger initial size to accommodate two-column layout
         # Dialog will resize dynamically when game configuration changes
-        self.resize(600, 900)
+        self.resize(1000, 800)
+        self.setMinimumWidth(800)
 
         self._logger = logging.getLogger("gym_gui.ui.train_agent_dialog")
         self._selected_config: Optional[dict[str, Any]] = None
@@ -44,12 +45,28 @@ class TrainAgentDialog(QtWidgets.QDialog):
         )
 
     def _build_ui(self) -> None:
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.setSpacing(12)
+        main_layout = QtWidgets.QVBoxLayout(self)
+        main_layout.setSpacing(12)
 
-        # Form layout for configuration
-        form = QtWidgets.QFormLayout()
-        form.setSpacing(8)
+        # Create scrollable content area for two-column form
+        scroll = QtWidgets.QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setStyleSheet("QScrollArea { border: none; }")
+        
+        scroll_widget = QtWidgets.QWidget()
+        scroll_layout = QtWidgets.QVBoxLayout(scroll_widget)
+        
+        # Two-column container
+        two_col_container = QtWidgets.QWidget()
+        two_col_layout = QtWidgets.QHBoxLayout(two_col_container)
+        two_col_layout.setSpacing(20)
+        two_col_layout.setContentsMargins(0, 0, 0, 0)
+
+        # ============ LEFT COLUMN ============
+        left_layout = QtWidgets.QFormLayout()
+        left_layout.setSpacing(8)
+        left_widget = QtWidgets.QWidget()
+        left_widget.setLayout(left_layout)
 
         # Game selection
         self._game_combo = QtWidgets.QComboBox(self)
@@ -61,7 +78,7 @@ class TrainAgentDialog(QtWidgets.QDialog):
             "LunarLander-v3",
             "CartPole-v1",
         ])
-        form.addRow("Environment:", self._game_combo)
+        left_layout.addRow("Environment:", self._game_combo)
         self._game_combo.currentTextChanged.connect(self._on_game_selection_changed)
         
         # Algorithm selection
@@ -72,126 +89,188 @@ class TrainAgentDialog(QtWidgets.QDialog):
             "PPO (future)",
             "A2C (future)",
         ])
-        form.addRow("Algorithm:", self._algorithm_combo)
+        left_layout.addRow("Algorithm:", self._algorithm_combo)
 
         # Agent identifier input
         self._agent_id_edit = QtWidgets.QLineEdit(self)
         self._agent_id_edit.setPlaceholderText("e.g. agent_run_20251017")
         self._agent_id_edit.setText(self._default_agent_id())
-        form.addRow("Agent ID:", self._agent_id_edit)
+        left_layout.addRow("Agent ID:", self._agent_id_edit)
 
         # Episodes
         self._episodes_spin = QtWidgets.QSpinBox(self)
         self._episodes_spin.setRange(1, 10000)
         self._episodes_spin.setValue(1000)
-        form.addRow("Episodes:", self._episodes_spin)
+        left_layout.addRow("Episodes:", self._episodes_spin)
 
         self._max_steps_spin = QtWidgets.QSpinBox(self)
         self._max_steps_spin.setRange(1, 10000)
         self._max_steps_spin.setValue(100)
-        form.addRow("Max Steps / Episode:", self._max_steps_spin)
+        left_layout.addRow("Max Steps / Episode:", self._max_steps_spin)
         
         # Seed
         self._seed_spin = QtWidgets.QSpinBox(self)
         self._seed_spin.setRange(0, 999999)
         self._seed_spin.setValue(42)
-        form.addRow("Random Seed:", self._seed_spin)
+        left_layout.addRow("Random Seed:", self._seed_spin)
         
         # Learning rate
         self._lr_edit = QtWidgets.QLineEdit("0.1")
-        form.addRow("Learning Rate:", self._lr_edit)
+        left_layout.addRow("Learning Rate:", self._lr_edit)
         
         # Gamma (discount)
         self._gamma_edit = QtWidgets.QLineEdit("0.99")
-        form.addRow("Discount (γ):", self._gamma_edit)
+        left_layout.addRow("Discount (γ):", self._gamma_edit)
         
         # Epsilon decay
         self._epsilon_edit = QtWidgets.QLineEdit("0.995")
-        form.addRow("Epsilon Decay:", self._epsilon_edit)
+        left_layout.addRow("Epsilon Decay:", self._epsilon_edit)
 
-        # UI Rendering Throttle (controls how often the visual display updates)
-        # Note: This controls UI rendering frequency, NOT database writes.
-        # All telemetry events are always written to the database for complete training records.
-        # The database uses efficient batching (batch_size=64) and WAL mode for performance.
-        telemetry_layout = QtWidgets.QHBoxLayout()
-        self._telemetry_sampling_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        self._telemetry_sampling_slider.setRange(1, 10)
-        self._telemetry_sampling_slider.setValue(2)  # Default: render every 2nd step (50% UI update rate)
-        self._telemetry_sampling_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
-        self._telemetry_sampling_slider.setTickInterval(1)
-        self._telemetry_sampling_slider.valueChanged.connect(self._on_telemetry_sampling_changed)
-        telemetry_layout.addWidget(self._telemetry_sampling_slider)
+        # ============ RIGHT COLUMN ============
+        right_layout = QtWidgets.QFormLayout()
+        right_layout.setSpacing(8)
+        right_widget = QtWidgets.QWidget()
+        right_widget.setLayout(right_layout)
 
-        self._telemetry_sampling_label = QtWidgets.QLabel("50%")
-        self._telemetry_sampling_label.setMinimumWidth(40)
-        telemetry_layout.addWidget(self._telemetry_sampling_label)
+        # SLIDER 1: Training Telemetry Throttle (controls data collection speed)
+        telemetry_throttle_layout = QtWidgets.QHBoxLayout()
+        self._training_telemetry_throttle_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        self._training_telemetry_throttle_slider.setRange(1, 10)
+        self._training_telemetry_throttle_slider.setValue(1)
+        self._training_telemetry_throttle_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
+        self._training_telemetry_throttle_slider.setTickInterval(1)
+        self._training_telemetry_throttle_slider.valueChanged.connect(self._on_training_telemetry_throttle_changed)
+        telemetry_throttle_layout.addWidget(self._training_telemetry_throttle_slider)
 
-        form.addRow("UI Rendering Throttle:", telemetry_layout)
+        self._training_telemetry_throttle_label = QtWidgets.QLabel("100%")
+        self._training_telemetry_throttle_label.setMinimumWidth(40)
+        telemetry_throttle_layout.addWidget(self._training_telemetry_throttle_label)
 
-        # Training Speed Control (delays between steps for real-time observation)
-        # This introduces actual delays in the training loop, allowing users to observe
-        # the agent's actions in real-time through the Live Rendering panel
-        speed_layout = QtWidgets.QHBoxLayout()
-        self._training_speed_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        self._training_speed_slider.setRange(0, 100)  # 0 = no delay, 100 = 1 second delay per step
-        self._training_speed_slider.setValue(0)  # Default: no delay (fast training)
-        self._training_speed_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
-        self._training_speed_slider.setTickInterval(10)
-        self._training_speed_slider.valueChanged.connect(self._on_training_speed_changed)
-        speed_layout.addWidget(self._training_speed_slider)
+        right_layout.addRow("Telemetry Throttle:", telemetry_throttle_layout)
 
-        self._training_speed_label = QtWidgets.QLabel("0ms")
-        self._training_speed_label.setMinimumWidth(50)
-        speed_layout.addWidget(self._training_speed_label)
+        # Warning label for training telemetry throttle
+        self._training_telemetry_warning_label = QtWidgets.QLabel(
+            "⚠ Values > 1 will skip telemetry collection."
+        )
+        self._training_telemetry_warning_label.setStyleSheet("color: #ff9800; font-size: 9px; font-style: italic;")
+        self._training_telemetry_warning_label.setVisible(False)
+        right_layout.addRow("", self._training_telemetry_warning_label)
 
-        form.addRow("Training Speed (Delay):", speed_layout)
+        # SLIDER 2: UI Live Rendering Throttle
+        ui_rendering_layout = QtWidgets.QHBoxLayout()
+        self._ui_rendering_throttle_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        self._ui_rendering_throttle_slider.setRange(1, 10)
+        self._ui_rendering_throttle_slider.setValue(1)
+        self._ui_rendering_throttle_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
+        self._ui_rendering_throttle_slider.setTickInterval(1)
+        self._ui_rendering_throttle_slider.valueChanged.connect(self._on_ui_rendering_throttle_changed)
+        ui_rendering_layout.addWidget(self._ui_rendering_throttle_slider)
 
-        # Telemetry Buffer Size (in-memory ring buffer for UI display)
-        # Note: All steps are persisted to SQLite database; this only controls UI display buffer
+        self._ui_rendering_throttle_label = QtWidgets.QLabel("100%")
+        self._ui_rendering_throttle_label.setMinimumWidth(40)
+        ui_rendering_layout.addWidget(self._ui_rendering_throttle_label)
+
+        right_layout.addRow("UI Rendering Throttle:", ui_rendering_layout)
+
+        # Warning label for UI rendering throttle
+        self._ui_rendering_warning_label = QtWidgets.QLabel(
+            "⚠ Values > 1 will skip frames."
+        )
+        self._ui_rendering_warning_label.setStyleSheet("color: #ff9800; font-size: 9px; font-style: italic;")
+        self._ui_rendering_warning_label.setVisible(False)
+        right_layout.addRow("", self._ui_rendering_warning_label)
+
+        # SLIDER 2b: Render Delay
+        render_delay_layout = QtWidgets.QHBoxLayout()
+        self._render_delay_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        self._render_delay_slider.setRange(10, 500)
+        self._render_delay_slider.setValue(100)
+        self._render_delay_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
+        self._render_delay_slider.setTickInterval(50)
+        self._render_delay_slider.valueChanged.connect(self._on_render_delay_changed)
+        render_delay_layout.addWidget(self._render_delay_slider)
+
+        self._render_delay_label = QtWidgets.QLabel("100ms (10 FPS)")
+        self._render_delay_label.setMinimumWidth(100)
+        render_delay_layout.addWidget(self._render_delay_label)
+
+        right_layout.addRow("Render Delay:", render_delay_layout)
+
+        # Info label for render delay
+        self._render_delay_info_label = QtWidgets.QLabel(
+            "ℹ Controls visual grid update speed."
+        )
+        self._render_delay_info_label.setStyleSheet("color: #1976d2; font-size: 9px; font-style: italic;")
+        right_layout.addRow("", self._render_delay_info_label)
+
+        # SLIDER 3: UI Training Speed
+        ui_speed_layout = QtWidgets.QHBoxLayout()
+        self._ui_training_speed_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
+        self._ui_training_speed_slider.setRange(0, 100)
+        self._ui_training_speed_slider.setValue(100)
+        self._ui_training_speed_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
+        self._ui_training_speed_slider.setTickInterval(10)
+        self._ui_training_speed_slider.valueChanged.connect(self._on_ui_training_speed_changed)
+        ui_speed_layout.addWidget(self._ui_training_speed_slider)
+
+        self._ui_training_speed_label = QtWidgets.QLabel("1000ms")
+        self._ui_training_speed_label.setMinimumWidth(50)
+        ui_speed_layout.addWidget(self._ui_training_speed_label)
+
+        right_layout.addRow("Step Delay (ms):", ui_speed_layout)
+
+        # Warning label for UI training speed
+        self._ui_training_speed_warning_label = QtWidgets.QLabel(
+            "⚠ 0ms will make training too fast."
+        )
+        self._ui_training_speed_warning_label.setStyleSheet("color: #ff9800; font-size: 9px; font-style: italic;")
+        self._ui_training_speed_warning_label.setVisible(False)
+        right_layout.addRow("", self._ui_training_speed_warning_label)
+
+        # Telemetry Buffer Size
         buffer_layout = QtWidgets.QHBoxLayout()
         self._telemetry_buffer_spin = QtWidgets.QSpinBox(self)
         self._telemetry_buffer_spin.setRange(256, 10000)
         self._telemetry_buffer_spin.setValue(512)
         self._telemetry_buffer_spin.setSingleStep(256)
-        self._telemetry_buffer_spin.setToolTip(
-            "Ring buffer size for in-memory telemetry. All steps are persisted to SQLite database; "
-            "UI only displays the last N steps in memory. Increase for longer training sessions."
-        )
         buffer_layout.addWidget(self._telemetry_buffer_spin)
 
         self._telemetry_buffer_label = QtWidgets.QLabel("steps")
         buffer_layout.addWidget(self._telemetry_buffer_label)
         buffer_layout.addStretch()
 
-        form.addRow("Telemetry Buffer Size:", buffer_layout)
+        right_layout.addRow("Telemetry Buffer:", buffer_layout)
 
-        # Episode Buffer Size (in-memory ring buffer for UI display)
-        # Note: All episodes are persisted to SQLite database; this only controls UI display buffer
+        # Episode Buffer Size
         episode_buffer_layout = QtWidgets.QHBoxLayout()
         self._episode_buffer_spin = QtWidgets.QSpinBox(self)
         self._episode_buffer_spin.setRange(10, 1000)
         self._episode_buffer_spin.setValue(100)
         self._episode_buffer_spin.setSingleStep(10)
-        self._episode_buffer_spin.setToolTip(
-            "Ring buffer size for in-memory episodes. All episodes are persisted to SQLite database; "
-            "UI only displays the last N episodes in memory. Increase for longer training sessions."
-        )
         episode_buffer_layout.addWidget(self._episode_buffer_spin)
 
         self._episode_buffer_label = QtWidgets.QLabel("episodes")
         episode_buffer_layout.addWidget(self._episode_buffer_label)
         episode_buffer_layout.addStretch()
 
-        form.addRow("Episode Buffer Size:", episode_buffer_layout)
+        right_layout.addRow("Episode Buffer:", episode_buffer_layout)
 
-        layout.addLayout(form)
+        # Add left and right columns to the two-column container
+        two_col_layout.addWidget(left_widget, 1)
+        two_col_layout.addWidget(right_widget, 1)
+        
+        scroll_layout.addWidget(two_col_container)
+        scroll_layout.addStretch()
+        
+        scroll.setWidget(scroll_widget)
+        main_layout.addWidget(scroll)
 
-        # Game-specific configuration (dynamic) - add to main layout for proper display
+        # Game-specific configuration (dynamic)
         self._game_config_group = QtWidgets.QGroupBox("Game Configuration", self)
         self._game_config_layout = QtWidgets.QFormLayout(self._game_config_group)
         self._game_config_widgets: Dict[str, QtWidgets.QWidget] = {}
         self._build_game_config_widgets()
-        layout.addWidget(self._game_config_group)
+        main_layout.addWidget(self._game_config_group)
 
         # BDI Agent Settings (collapsible)
         self._bdi_group = QtWidgets.QGroupBox("BDI Agent Settings (SPADE)", self)
@@ -222,7 +301,7 @@ class TrainAgentDialog(QtWidgets.QDialog):
         
         bdi_layout.addRow("ASL File (optional):", asl_layout)
         
-        layout.addWidget(self._bdi_group)
+        main_layout.addWidget(self._bdi_group)
         
         # Advanced options (collapsible)
         self._advanced_group = QtWidgets.QGroupBox("Advanced Options", self)
@@ -245,7 +324,7 @@ class TrainAgentDialog(QtWidgets.QDialog):
             '}'
         )
         advanced_layout.addWidget(self._custom_config)
-        layout.addWidget(self._advanced_group)
+        main_layout.addWidget(self._advanced_group)
         
         # Info label
         info_label = QtWidgets.QLabel(
@@ -253,7 +332,7 @@ class TrainAgentDialog(QtWidgets.QDialog):
             'Watch progress in the "Live Telemetry" tab.</i>'
         )
         info_label.setWordWrap(True)
-        layout.addWidget(info_label)
+        main_layout.addWidget(info_label)
         
         # Buttons
         button_box = QtWidgets.QDialogButtonBox(
@@ -263,7 +342,7 @@ class TrainAgentDialog(QtWidgets.QDialog):
         )
         button_box.accepted.connect(self._on_accept)
         button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box)
+        main_layout.addWidget(button_box)
 
     def _on_browse_asl_file(self) -> None:
         """Handle ASL file browser button click."""
@@ -411,31 +490,72 @@ class TrainAgentDialog(QtWidgets.QDialog):
         self._game_config_group.updateGeometry()
         self.updateGeometry()
 
-    def _on_telemetry_sampling_changed(self, value: int) -> None:
-        """Handle UI rendering throttle slider change.
+    def _on_training_telemetry_throttle_changed(self, value: int) -> None:
+        """Handle training telemetry throttle slider change.
 
-        This controls how often the visual display updates during training.
-        All telemetry events are always written to the database (no data loss).
+        This controls how fast telemetry data is collected and written to database.
+        Affects: Telemetry Recent Episodes and Telemetry Recent Steps table population speed.
 
-        Slider value (1-10) to UI update percentage:
-        - value=1 means 100% (update every step)
-        - value=2 means 50% (update every 2nd step)
-        - value=10 means 10% (update every 10th step)
+        Slider value (1-10) to collection percentage:
+        - value=1 means 100% (collect every step) - RECOMMENDED
+        - value=2 means 50% (collect every 2nd step)
+        - value=10 means 10% (collect every 10th step)
         """
         percentage = int(100 / value)
-        self._telemetry_sampling_label.setText(f"{percentage}%")
+        self._training_telemetry_throttle_label.setText(f"{percentage}%")
 
-    def _on_training_speed_changed(self, value: int) -> None:
-        """Handle training speed slider change.
+        # Show warning if value > 1 (skipping telemetry collection)
+        self._training_telemetry_warning_label.setVisible(value > 1)
 
-        This controls the delay between training steps for real-time observation.
+    def _on_ui_rendering_throttle_changed(self, value: int) -> None:
+        """Handle UI rendering throttle slider change.
+
+        This controls how often the visual grid display updates on screen.
+        Affects: Live Rendering grid visualization only (NOT database writes or table updates).
+
+        Slider value (1-10) to rendering percentage:
+        - value=1 means 100% (render every step) - RECOMMENDED
+        - value=2 means 50% (render every 2nd step)
+        - value=10 means 10% (render every 10th step)
+        """
+        percentage = int(100 / value)
+        self._ui_rendering_throttle_label.setText(f"{percentage}%")
+
+        # Show warning if value > 1 (skipping frames)
+        self._ui_rendering_warning_label.setVisible(value > 1)
+
+    def _on_render_delay_changed(self, value: int) -> None:
+        """Handle render delay slider change.
+
+        This controls the delay between visual grid renders (independent of table update speed).
+        Affects: Live Rendering grid visualization smoothness (NOT database writes or table updates).
+
+        Slider value (10-500) to delay in milliseconds and FPS:
+        - value=10 means 10ms (100 FPS, very fast, high CPU)
+        - value=50 means 50ms (20 FPS, smooth)
+        - value=100 means 100ms (10 FPS, default, smooth)
+        - value=200 means 200ms (5 FPS, slower)
+        - value=500 means 500ms (2 FPS, very slow, low CPU)
+        """
+        fps = 1000 // value  # Calculate FPS from delay
+        self._render_delay_label.setText(f"{value}ms ({fps} FPS)")
+
+    def _on_ui_training_speed_changed(self, value: int) -> None:
+        """Handle UI training speed slider change.
+
+        This controls the artificial delay between training steps for human observation.
+        Affects: Overall training duration and visual observation speed.
+
         Slider value (0-100) to delay in milliseconds:
-        - value=0 means 0ms (no delay, fast training)
+        - value=0 means 0ms (no delay, too fast to observe)
         - value=50 means 500ms (0.5 second delay per step)
-        - value=100 means 1000ms (1 second delay per step)
+        - value=100 means 1000ms (1 second delay per step) - RECOMMENDED
         """
         delay_ms = value * 10  # Convert slider value to milliseconds
-        self._training_speed_label.setText(f"{delay_ms}ms")
+        self._ui_training_speed_label.setText(f"{delay_ms}ms")
+
+        # Show warning if value = 0 (no delay, too fast)
+        self._ui_training_speed_warning_label.setVisible(value == 0)
 
     def _on_accept(self) -> None:
         """Validate and build config before accepting."""
@@ -566,16 +686,26 @@ class TrainAgentDialog(QtWidgets.QDialog):
         timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
         run_name = f"{game_id.lower()}-{algorithm.split()[0].lower()}-{timestamp}"
 
-        # Get UI rendering throttle from slider
-        # This controls how often the visual display updates (not database writes)
-        # All telemetry events are always written to the database for complete training records
-        ui_rendering_throttle = self._telemetry_sampling_slider.value()
+        # Get training telemetry throttle from slider
+        # This controls how fast telemetry data is collected and written to database
+        # Affects: Telemetry Recent Episodes and Telemetry Recent Steps table population speed
+        training_telemetry_throttle = self._training_telemetry_throttle_slider.value()
 
-        # Get training speed (step delay) from slider
-        # This controls the delay between training steps for real-time observation
+        # Get UI rendering throttle from slider
+        # This controls how often the visual grid display updates on screen
+        # Affects: Live Rendering grid visualization only (NOT database writes or table updates)
+        ui_rendering_throttle = self._ui_rendering_throttle_slider.value()
+
+        # Get render delay from slider
+        # This controls the delay between visual grid renders (independent of table update speed)
+        # Affects: Live Rendering grid visualization smoothness (NOT database writes or table updates)
+        render_delay_ms = self._render_delay_slider.value()
+
+        # Get UI training speed (step delay) from slider
+        # This controls the artificial delay between training steps for human observation
         # Slider value (0-100) maps to delay in seconds (0.0 to 1.0)
-        training_speed_value = self._training_speed_slider.value()
-        step_delay = training_speed_value / 100.0  # Convert to seconds (0.0 to 1.0)
+        ui_training_speed_value = self._ui_training_speed_slider.value()
+        step_delay = ui_training_speed_value / 100.0  # Convert to seconds (0.0 to 1.0)
 
         # Get telemetry buffer size from spin box
         # This controls the in-memory ring buffer size for UI display
@@ -594,8 +724,9 @@ class TrainAgentDialog(QtWidgets.QDialog):
             "TRAIN_DISCOUNT": f"{gamma}",
             "TRAIN_EPSILON_DECAY": f"{epsilon_decay}",
             "TRAIN_AGENT_ID": worker_agent_id,
-            # Note: TELEMETRY_SAMPLING_INTERVAL is kept for backward compatibility
-            # but it now controls UI rendering frequency, not database writes
+            # Training telemetry throttle: controls data collection speed
+            "TRAINING_TELEMETRY_THROTTLE": str(training_telemetry_throttle),
+            # UI rendering throttle: controls visual grid update speed (backward compatible name)
             "TELEMETRY_SAMPLING_INTERVAL": str(ui_rendering_throttle),
         }
         
@@ -611,7 +742,10 @@ class TrainAgentDialog(QtWidgets.QDialog):
             "ui": {
                 "algorithm": algorithm,
                 "agent_type": agent_type,
+                "training_telemetry_throttle": training_telemetry_throttle,
                 "ui_rendering_throttle": ui_rendering_throttle,
+                "render_delay_ms": render_delay_ms,
+                "ui_training_speed_ms": ui_training_speed_value * 10,
                 "telemetry_buffer_size": telemetry_buffer_size,
                 "episode_buffer_size": episode_buffer_size,
                 "hyperparameters": {
@@ -717,4 +851,4 @@ def _deep_merge_dict(base: dict[str, Any], overrides: dict[str, Any]) -> dict[st
     return result
 
 
-__all__ = ["TrainAgentDialog"]
+__all__ = ["AgentTrainDialog"]

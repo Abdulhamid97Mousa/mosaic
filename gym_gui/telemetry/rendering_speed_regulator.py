@@ -12,6 +12,8 @@ from typing import Any, Optional
 from collections import deque
 from qtpy import QtCore, QtWidgets
 
+from gym_gui.telemetry.constants import RENDER_QUEUE_SIZE, RENDER_BOOTSTRAP_TIMEOUT_MS
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -47,8 +49,10 @@ class RenderingSpeedRegulator(QtCore.QObject):
         self._render_delay_ms = max(1, render_delay_ms)  # Minimum 1ms
         self._max_queue_size = max(1, max_queue_size)
         self._payload_queue: deque[dict[str, Any]] = deque(maxlen=max_queue_size)
+        self._early_payloads: deque[dict[str, Any]] = deque(maxlen=max_queue_size)  # Buffer before start()
         self._timer: Optional[QtCore.QTimer] = None
         self._is_running = False
+        self._bootstrap_timer: Optional[QtCore.QTimer] = None
         
         _LOGGER.debug(
             "RenderingSpeedRegulator initialized",
@@ -69,10 +73,21 @@ class RenderingSpeedRegulator(QtCore.QObject):
         self._timer.timeout.connect(self._emit_next_payload)
         self._timer.start(self._render_delay_ms)
         
-        _LOGGER.info(
-            "RenderingSpeedRegulator started",
-            extra={"render_delay_ms": self._render_delay_ms},
-        )
+        # Drain early payloads that arrived before start()
+        early_count = len(self._early_payloads)
+        if early_count > 0:
+            while self._early_payloads:
+                early_payload = self._early_payloads.popleft()
+                self._payload_queue.append(early_payload)
+            _LOGGER.info(
+                "RenderingSpeedRegulator started and drained early payloads",
+                extra={"render_delay_ms": self._render_delay_ms, "early_payloads": early_count},
+            )
+        else:
+            _LOGGER.info(
+                "RenderingSpeedRegulator started",
+                extra={"render_delay_ms": self._render_delay_ms},
+            )
 
     def stop(self) -> None:
         """Stop the rendering timer."""
@@ -86,6 +101,11 @@ class RenderingSpeedRegulator(QtCore.QObject):
             self._timer.deleteLater()
             self._timer = None
         
+        if self._bootstrap_timer is not None:
+            self._bootstrap_timer.stop()
+            self._bootstrap_timer.deleteLater()
+            self._bootstrap_timer = None
+        
         _LOGGER.info("RenderingSpeedRegulator stopped")
 
     def submit_payload(self, payload: dict[str, Any]) -> None:
@@ -93,12 +113,28 @@ class RenderingSpeedRegulator(QtCore.QObject):
         
         Payloads are queued and emitted at the configured rate.
         If queue is full, oldest payload is dropped.
+        Early payloads (before start() called) are buffered separately
+        and drained when start() is called.
         
         Args:
             payload: The render payload to queue
         """
         if not self._is_running:
-            _LOGGER.debug("RenderingSpeedRegulator not running, ignoring payload")
+            # Buffer early payloads before start() is called
+            was_full = len(self._early_payloads) >= self._max_queue_size
+            self._early_payloads.append(payload)
+            
+            if not was_full:
+                _LOGGER.debug(
+                    "RenderingSpeedRegulator buffering early payload (before start)",
+                    extra={"early_buffer_size": len(self._early_payloads)},
+                )
+            
+            # Auto-start if we've been buffering for too long
+            if not self._bootstrap_timer and len(self._early_payloads) > 0:
+                self._bootstrap_timer = QtCore.QTimer(self)
+                self._bootstrap_timer.singleShot(RENDER_BOOTSTRAP_TIMEOUT_MS, self._auto_start)
+            
             return
         
         # Queue is automatically limited by deque(maxlen=...)
@@ -158,6 +194,18 @@ class RenderingSpeedRegulator(QtCore.QObject):
             extra={"queue_size": len(self._payload_queue)},
         )
         self.payload_ready.emit(payload)
+
+    def _auto_start(self) -> None:
+        """Auto-start the regulator if early payloads exist and not yet started."""
+        if not self._is_running and len(self._early_payloads) > 0:
+            _LOGGER.info(
+                "RenderingSpeedRegulator auto-starting due to early payloads timeout",
+                extra={"early_payloads_buffered": len(self._early_payloads)},
+            )
+            self.start()
+        if self._bootstrap_timer is not None:
+            self._bootstrap_timer.deleteLater()
+            self._bootstrap_timer = None
 
     def __del__(self) -> None:
         """Cleanup on deletion."""

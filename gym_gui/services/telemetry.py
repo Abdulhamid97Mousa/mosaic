@@ -14,7 +14,7 @@ from gym_gui.storage.session import EpisodeRecord
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
     from gym_gui.services.storage import StorageRecorderService
-    from gym_gui.services.validation_service import ValidationService
+    from gym_gui.services.validation import ValidationService
     from gym_gui.telemetry import TelemetrySQLiteStore
 
 logger = logging.getLogger(__name__)
@@ -45,8 +45,8 @@ class TelemetryService:
 
     # ------------------------------------------------------------------
     def record_step(self, record: StepRecord) -> None:
-        # Log incoming step with all 10 fields
-        logger.error(f"[TELEMETRY] Incoming StepRecord: "
+        # Log incoming step with all 10 fields (DEBUG level - per-step is noisy)
+        logger.debug(f"[TELEMETRY] Incoming StepRecord: "
                     f"episode_id={record.episode_id} "
                     f"step_index={record.step_index} "
                     f"agent_id={record.agent_id} "
@@ -55,8 +55,8 @@ class TelemetryService:
                     f"terminated={record.terminated} "
                     f"truncated={record.truncated}")
         
-        # Log field types to spot mismatches
-        logger.error(f"[TELEMETRY TYPES] episode_id={type(record.episode_id).__name__} "
+        # Log field types to spot mismatches (DEBUG level)
+        logger.debug(f"[TELEMETRY TYPES] episode_id={type(record.episode_id).__name__} "
                     f"step_index={type(record.step_index).__name__} "
                     f"reward={type(record.reward).__name__} "
                     f"action={type(record.action).__name__} "
@@ -93,7 +93,7 @@ class TelemetryService:
             )
             self._storage.record_step(storage_record)
         if self._store:
-            logger.error(f"[TELEMETRY PERSIST] Persisting to SQLite store: "
+            logger.debug(f"[TELEMETRY PERSIST] Persisting to SQLite store: "
                         f"episode_id={record.episode_id} step_index={record.step_index}")
             # Schedule async write without blocking drain loop
             try:

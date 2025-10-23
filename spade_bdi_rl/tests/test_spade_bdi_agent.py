@@ -23,6 +23,8 @@ from ..core import create_and_start_agent
 from ..core import docker_compose_path
 from ..core import resolve_asl
 from ..core import create_agent, resolve_asl
+from ..core.agent import create_and_start_agent
+
 
 @pytest.fixture(scope="module")
 def check_ejabberd():
@@ -111,13 +113,21 @@ def test_agent_lifecycle(check_ejabberd):
 
 def test_xmpp_connectivity(check_ejabberd):
     """Test XMPP connection to ejabberd server."""
-    from spadeBDI_RL.src import spade_bdi_rl_agent as legacy_agent
+    # Test basic XMPP connectivity using the refactored BDI agent
     
     async def check_connection():
-        result = await legacy_agent.test_xmpp_connection("agent@localhost", "secret")
-        if not result:
-            pytest.skip("XMPP connection test failed - ejabberd may need initialization")
-        print("✓ XMPP connection verified")
+        try:
+            handle = await create_and_start_agent(
+                jid="xmpp_test@localhost",
+                password="secret",
+                ensure_account=True,
+                verify_connection=True,
+                start_timeout=10.0,
+            )
+            await handle.stop()
+            print("✓ XMPP connection verified")
+        except Exception as e:
+            pytest.skip(f"XMPP connection test failed - {e}")
     
     asyncio.run(check_connection())
 

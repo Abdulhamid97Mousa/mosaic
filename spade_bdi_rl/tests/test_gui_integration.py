@@ -22,7 +22,7 @@ import pytest
 from ..adapters import create_adapter
 from ..core.config import RunConfig, PolicyStrategy
 from ..core.runtime import HeadlessTrainer
-from ..core.worker_telemetry import TelemetryEmitter
+from ..core.telemetry_worker import TelemetryEmitter
 
 logger = logging.getLogger(__name__)
 

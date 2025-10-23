@@ -1,3 +1,5 @@
+# gym_gui/services/actor.py
+
 from __future__ import annotations
 
 """Actor abstractions and registry for human and autonomous agents."""

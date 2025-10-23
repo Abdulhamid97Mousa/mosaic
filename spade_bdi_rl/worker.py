@@ -75,6 +75,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         default="secret",
         help="XMPP password for BDI agent (default: secret).",
     )
+    parser.add_argument(
+        "--asl-file",
+        default=None,
+        help="Path to custom AgentSpeak (.asl) file for BDI agent.",
+    )
     parsed = parser.parse_args(argv)
 
     run_config = _load_config(parsed)
@@ -110,6 +115,7 @@ def main(argv: Optional[list[str]] = None) -> int:
             emitter,
             jid=parsed.bdi_jid,
             password=parsed.bdi_password,
+            asl_file=parsed.asl_file,
         )
     else:
         trainer = HeadlessTrainer(adapter, run_config, emitter)

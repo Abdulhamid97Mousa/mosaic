@@ -529,6 +529,8 @@ def create_agent(
 
     try:
         agent = BDIRLAgent(jid, password, adapter=adapter, asl_file=asl_file)
+        # Note: Custom BDI actions are registered globally in bdi_actions.py via GLOBAL_ACTIONS
+        # and are available to the agent through the ASL interpreter
         LOGGER.info(
             "Created BDI agent",
             extra={"jid": jid, "env": adapter.__class__.__name__},

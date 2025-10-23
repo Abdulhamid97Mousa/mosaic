@@ -12,6 +12,7 @@ from qtpy import QtCore
 
 from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.telemetry.run_bus import get_bus
+from gym_gui.telemetry.credit_manager import get_credit_manager
 
 _LOGGER = logging.getLogger("gym_gui.trainer.streams")
 
@@ -193,6 +194,7 @@ class TelemetryAsyncHub:
         self._stopping = False
         self._started = False
         self._completed: set[str] = set()  # Guard against multiple run_completed signals
+        self._credit_mgr = get_credit_manager()  # Shared credit manager for UI backpressure
         _LOGGER.debug(
             "TelemetryAsyncHub initialized",
             extra={"max_queue": max_queue, "buffer_size": buffer_size},
@@ -534,10 +536,12 @@ class TelemetryAsyncHub:
                     _LOGGER.debug("Emitting bridge.step_received", extra={"run_id": run_id, "seq": step.seq_id})
                     self.bridge.emit_step(step)
 
-                    # Publish to RunBus for db_sink and other subscribers
+                    # Publish to RunBus for db_sink and other subscribers (always publish for durability)
                     try:
                         bus = get_bus()
                         agent_id = payload_dict.get("agent_id", "default")
+                        self._credit_mgr.initialize_stream(run_id, agent_id)
+
                         evt = TelemetryEvent(
                             topic=Topic.STEP_APPENDED,
                             run_id=run_id,
@@ -573,10 +577,12 @@ class TelemetryAsyncHub:
                     _LOGGER.debug("Emitting bridge.episode_received", extra={"run_id": run_id, "seq": episode.seq_id})
                     self.bridge.emit_episode(episode)
 
-                    # Publish to RunBus for db_sink and other subscribers
+                    # Publish to RunBus for db_sink and other subscribers (always published)
                     try:
                         bus = get_bus()
                         agent_id = payload_dict.get("agent_id", "default")
+                        self._credit_mgr.initialize_stream(run_id, agent_id)
+
                         evt = TelemetryEvent(
                             topic=Topic.EPISODE_FINALIZED,
                             run_id=run_id,

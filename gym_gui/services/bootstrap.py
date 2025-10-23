@@ -20,7 +20,7 @@ from gym_gui.telemetry import TelemetrySQLiteStore
 from gym_gui.telemetry.db_sink import TelemetryDBSink
 from gym_gui.telemetry.run_bus import get_bus
 from gym_gui.telemetry.health import HealthMonitor
-from gym_gui.controllers.live_telemetry import LiveTelemetryController
+from gym_gui.controllers.live_telemetry_controllers import LiveTelemetryController
 
 
 def bootstrap_default_services() -> ServiceLocator:

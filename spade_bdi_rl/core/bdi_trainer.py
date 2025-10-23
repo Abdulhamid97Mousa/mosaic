@@ -15,7 +15,7 @@ if TYPE_CHECKING:
 
 from .config import RunConfig
 from .runtime import HeadlessTrainer, EpisodeMetrics
-from .worker_telemetry import TelemetryEmitter
+from .telemetry_worker import TelemetryEmitter
 
 LOGGER = logging.getLogger(__name__)
 

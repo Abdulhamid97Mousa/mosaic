@@ -22,7 +22,7 @@ import pytest
 from ..adapters import create_adapter
 from ..core.config import RunConfig, PolicyStrategy
 from ..core.runtime import HeadlessTrainer
-from ..core.worker_telemetry import TelemetryEmitter
+from ..core.telemetry_worker import TelemetryEmitter
 
 logger = logging.getLogger(__name__)
 
@@ -145,10 +145,11 @@ class TestMultiEpisodeTelemetry:
         assert len(step_events) > 0, "Should have step events"
         assert len(episode_events) > 0, "Should have episode events"
 
-        # Group steps by episode
+        # Group steps by episode_index (0-based)
         steps_by_episode: Dict[int, List[Dict[str, Any]]] = {}
         for step_event in step_events:
-            episode_idx = step_event.get("episode")
+            # Use episode_index (0-based) instead of episode (display value)
+            episode_idx = step_event.get("episode_index", step_event.get("episode"))
             if episode_idx not in steps_by_episode:
                 steps_by_episode[episode_idx] = []
             steps_by_episode[episode_idx].append(step_event)
@@ -156,13 +157,13 @@ class TestMultiEpisodeTelemetry:
         # Validate each episode has steps
         for episode_idx in range(run_config.max_episodes):
             assert episode_idx in steps_by_episode, (
-                f"Episode {episode_idx} has no steps"
+                f"Episode {episode_idx} has no steps. Available keys: {list(steps_by_episode.keys())}"
             )
             steps = steps_by_episode[episode_idx]
             assert len(steps) > 0, f"Episode {episode_idx} should have steps"
 
             # Validate step indices are sequential
-            step_indices = [s.get("step") for s in steps]
+            step_indices = [s.get("step_index") for s in steps]
             assert step_indices == list(range(len(steps))), (
                 f"Episode {episode_idx} steps not sequential: {step_indices}"
             )

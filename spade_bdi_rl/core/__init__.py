@@ -5,7 +5,7 @@ from typing import TYPE_CHECKING
 from .config import PolicyStrategy, RunConfig
 from .runtime import HeadlessTrainer
 from .bdi_trainer import BDITrainer
-from .worker_telemetry import TelemetryEmitter
+from .telemetry_worker import TelemetryEmitter
 
 if TYPE_CHECKING:
     from .agent import (

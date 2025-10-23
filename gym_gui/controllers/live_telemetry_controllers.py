@@ -13,6 +13,7 @@ import asyncio
 import logging
 import queue
 import threading
+from collections import deque
 from typing import TYPE_CHECKING, Optional, Dict
 
 from qtpy import QtCore
@@ -20,6 +21,7 @@ from qtpy import QtCore
 from gym_gui.telemetry.run_bus import get_bus
 from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.telemetry.credit_manager import get_credit_manager
+from gym_gui.telemetry.constants import STEP_BUFFER_SIZE, EPISODE_BUFFER_SIZE
 
 if TYPE_CHECKING:
     from gym_gui.services.trainer import TrainerClient
@@ -49,8 +51,9 @@ class LiveTelemetryController(QtCore.QObject):
         self._tabs: Dict[tuple[str, str], "LiveTelemetryTab"] = {}  # (run_id, agent_id) -> tab
 
         # Buffer for steps that arrive before tab is registered (race condition mitigation)
-        self._step_buffer: Dict[tuple[str, str], list] = {}  # (run_id, agent_id) -> [steps]
-        self._episode_buffer: Dict[tuple[str, str], list] = {}  # (run_id, agent_id) -> [episodes]
+        # Use bounded deques to prevent memory leaks if tabs never open
+        self._step_buffer: Dict[tuple[str, str], deque] = {}  # (run_id, agent_id) -> deque of steps
+        self._episode_buffer: Dict[tuple[str, str], deque] = {}  # (run_id, agent_id) -> deque of episodes
 
         # Store rendering throttle value per run (from TELEMETRY_SAMPLING_INTERVAL env var)
         self._render_throttle_per_run: Dict[str, int] = {}  # run_id -> throttle_interval
@@ -456,7 +459,7 @@ class LiveTelemetryController(QtCore.QObject):
 
                     # Buffer until tab is registered
                     if key not in self._step_buffer:
-                        self._step_buffer[key] = []
+                        self._step_buffer[key] = deque(maxlen=STEP_BUFFER_SIZE)
 
                     # DEBUG: Log payload keys
                     payload_keys = list(evt.payload.keys()) if isinstance(evt.payload, dict) else "not_dict"
@@ -510,9 +513,9 @@ class LiveTelemetryController(QtCore.QObject):
                         # Remove the tab from tracking if it's destroyed
                         self._tabs.pop(key, None)
                 else:
-                    # Buffer until tab is registered
+                    # Buffer until tab is registered (bounded deque to prevent memory leaks)
                     if key not in self._episode_buffer:
-                        self._episode_buffer[key] = []
+                        self._episode_buffer[key] = deque(maxlen=EPISODE_BUFFER_SIZE)
                     self._episode_buffer[key].append(evt.payload)
 
             except Exception as e:
