@@ -12,12 +12,23 @@ import json
 import logging
 import sys
 from dataclasses import replace
+from functools import partial
 from typing import Any
 
 from gym_gui.config.settings import Settings, get_settings
 from gym_gui.logging_config.logger import configure_logging
+from gym_gui.logging_config.helpers import log_constant
+from gym_gui.logging_config.log_constants import (
+    LOG_RUNTIME_APP_DEBUG,
+    LOG_RUNTIME_APP_INFO,
+    LOG_RUNTIME_APP_WARNING,
+)
 # NOTE: bootstrap_default_services and TrainerDaemonHandle are imported inside main()
 # to ensure Qt API is set before any Qt imports happen
+
+
+LOGGER = logging.getLogger("gym_gui.app")
+_log = partial(log_constant, LOGGER)
 
 
 def _format_settings(settings: Settings) -> str:
@@ -42,9 +53,12 @@ def main() -> int:
 
     settings = replace(get_settings(), default_seed=1)
     log_level = getattr(logging, settings.log_level.upper(), logging.INFO)
-    configure_logging(level=log_level, stream=True, log_to_file=True)
-    logger = logging.getLogger("gym_gui.app")
-    logger.debug("Settings loaded: qt_api=%s default_env=%s", settings.qt_api, settings.gym_default_env)
+    configure_logging(level=log_level, stream=False, log_to_file=True)
+    _log(
+        LOG_RUNTIME_APP_DEBUG,
+        message="settings_loaded",
+        extra={"qt_api": settings.qt_api, "default_env": settings.gym_default_env},
+    )
     print("[gym_gui] Loaded settings:\n" + _format_settings(settings))
 
     try:
@@ -106,15 +120,12 @@ def _setup_qasync_event_loop(app: Any) -> None:
     try:
         from qasync import QEventLoop
     except ImportError:
-        logger = logging.getLogger("gym_gui.app")
-        logger.warning(
-            "qasync not installed - falling back to separate event loops. "
-            "Install qasync for better asyncio/Qt integration."
+        _log(
+            LOG_RUNTIME_APP_WARNING,
+            message="qasync_missing_fallback",
         )
         _install_asyncio_exception_handler()
         return
-
-    logger = logging.getLogger("gym_gui.app")
 
     # Create Qt-compatible event loop
     loop = QEventLoop(app)
@@ -124,15 +135,19 @@ def _setup_qasync_event_loop(app: Any) -> None:
     def _handler(loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
         exc = context.get("exception")
         if isinstance(exc, BlockingIOError) and getattr(exc, "errno", None) in {errno.EAGAIN, errno.EWOULDBLOCK}:
-            logger.debug(
-                "Ignoring non-fatal BlockingIOError from gRPC poller",
-                extra={"message": context.get("message")},
+            _log(
+                LOG_RUNTIME_APP_DEBUG,
+                message="grpc_blocking_io_ignored",
+                extra={"source": "qasync", "errno": getattr(exc, "errno", None)},
             )
             return
         loop.default_exception_handler(context)
 
     loop.set_exception_handler(_handler)
-    logger.info("Qt-compatible asyncio event loop initialized with qasync")
+    _log(
+        LOG_RUNTIME_APP_INFO,
+        message="qasync_event_loop_initialized",
+    )
 
 
 def _install_asyncio_exception_handler() -> None:
@@ -143,14 +158,13 @@ def _install_asyncio_exception_handler() -> None:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
 
-    logger = logging.getLogger("gym_gui.app")
-
     def _handler(loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
         exc = context.get("exception")
         if isinstance(exc, BlockingIOError) and getattr(exc, "errno", None) in {errno.EAGAIN, errno.EWOULDBLOCK}:
-            logger.debug(
-                "Ignoring non-fatal BlockingIOError from asyncio poller",
-                extra={"message": context.get("message")},
+            _log(
+                LOG_RUNTIME_APP_DEBUG,
+                message="grpc_blocking_io_ignored",
+                extra={"source": "asyncio", "errno": getattr(exc, "errno", None)},
             )
             return
         loop.default_exception_handler(context)

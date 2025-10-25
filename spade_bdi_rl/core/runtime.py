@@ -15,8 +15,12 @@ from ..algorithms import create_agent, create_runtime
 from ..policies import PolicyStorage
 from .config import PolicyStrategy, RunConfig
 from .telemetry_worker import TelemetryEmitter
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_WORKER_RUNTIME_EVENT,
+)
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -27,7 +31,7 @@ class EpisodeMetrics:
     success: bool
 
 
-class HeadlessTrainer:
+class HeadlessTrainer(LogConstantMixin):
     """Drive the learning/evaluation loop and emit JSONL telemetry."""
 
     def __init__(
@@ -36,6 +40,7 @@ class HeadlessTrainer:
         config: RunConfig,
         emitter: TelemetryEmitter,
     ) -> None:
+        self._logger = _LOGGER
         self.adapter = adapter
         self.config = config
         self.emitter = emitter
@@ -66,7 +71,19 @@ class HeadlessTrainer:
         if config.policy_strategy is PolicyStrategy.EVAL:
             self.agent.epsilon = 0.0
         
-        logger.info(f"HEADLESS_TRAINER_INIT | type={self.__class__.__name__} | adapter={adapter.__class__.__name__} | env={config.game_id} | policy_strategy={config.policy_strategy.value} | max_episodes={config.max_episodes} | seed={config.seed} | policy_path={policy_path}")
+        self.log_constant(
+            LOG_WORKER_RUNTIME_EVENT,
+            message="HEADLESS_TRAINER_INIT",
+            extra={
+                "trainer": self.__class__.__name__,
+                "adapter": adapter.__class__.__name__,
+                "game_id": config.game_id,
+                "policy_strategy": config.policy_strategy.value,
+                "max_episodes": config.max_episodes,
+                "seed": config.seed,
+                "policy_path": str(policy_path),
+            },
+        )
 
     # ------------------------------------------------------------------
     def run(self) -> int:

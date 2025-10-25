@@ -7,19 +7,32 @@ from pathlib import Path
 import logging
 import queue
 import sqlite3
+import sys
 import threading
 from typing import Any, List, Mapping, Optional, Sequence
 
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.utils import json_serialization
 from gym_gui.telemetry.migrations import MigrationRunner, WALConfiguration
+from gym_gui.logging_config.helpers import LogConstantMixin, log_constant
+from gym_gui.logging_config.log_constants import (
+    LOG_SERVICE_SQLITE_DEBUG,
+    LOG_SERVICE_SQLITE_INFO,
+    LOG_SERVICE_SQLITE_WARNING,
+    LOG_SERVICE_SQLITE_DESERIALIZATION_FAILED,
+    LOG_SERVICE_SQLITE_WORKER_STARTED,
+    LOG_SERVICE_SQLITE_WORKER_STOPPED,
+    LOG_SERVICE_SQLITE_WRITE_ERROR,
+)
+
+_LOGGER = logging.getLogger("gym_gui.telemetry.sqlite_store")
 
 
 def _ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
-class TelemetrySQLiteStore:
+class TelemetrySQLiteStore(LogConstantMixin):
     """Persist telemetry events to a SQLite database."""
 
     _DEFAULT_BATCH_SIZE = 32
@@ -37,7 +50,7 @@ class TelemetrySQLiteStore:
         _ensure_parent(self._db_path)
         self._batch_size = max(1, batch_size or self._DEFAULT_BATCH_SIZE)
         self._max_buffer_bytes = max(1, max_buffer_bytes or self._DEFAULT_MAX_BUFFER_BYTES)
-        self._logger = logging.getLogger("gym_gui.telemetry.sqlite_store")
+        self._logger = _LOGGER
         self._deserialization_failures: set[str] = set()
 
         self._conn = sqlite3.connect(
@@ -60,6 +73,7 @@ class TelemetrySQLiteStore:
 
         self._initialize()
         self._worker.start()
+        self.log_constant(LOG_SERVICE_SQLITE_WORKER_STARTED)
 
     # ------------------------------------------------------------------
     def _initialize(self) -> None:
@@ -172,9 +186,17 @@ class TelemetrySQLiteStore:
             if index_name not in existing_indexes:
                 try:
                     cursor.execute(ddl)
-                    self._logger.debug(f"Created index: {index_name}")
+                    self.log_constant(
+                        LOG_SERVICE_SQLITE_INFO,
+                        message="index_created",
+                        extra={"index": index_name},
+                    )
                 except sqlite3.OperationalError as e:
-                    self._logger.debug(f"Index {index_name} already exists or error: {e}")
+                    self.log_constant(
+                        LOG_SERVICE_SQLITE_WARNING,
+                        message="index_create_failed",
+                        extra={"index": index_name, "error": str(e)},
+                    )
 
         self._conn.commit()
 
@@ -296,19 +318,31 @@ class TelemetrySQLiteStore:
             return
         
         # Log what we're about to insert (DEBUG for individual steps to avoid spam)
-        for i, step in enumerate(steps):
-            self._logger.debug(f"[DB_FLUSH] Step {i+1}/{len(steps)} insert: "
-                              f"episode_id={step.get('episode_id')} "
-                              f"step_index={step.get('step_index')} "
-                              f"reward={step.get('reward')} "
-                              f"terminated={step.get('terminated')} "
-                              f"truncated={step.get('truncated')} "
-                              f"agent_id={step.get('agent_id')}")
-            # Log types (DEBUG level)
-            self._logger.debug(f"[DB_FLUSH TYPES] "
-                              f"reward={type(step.get('reward')).__name__} "
-                              f"terminated={type(step.get('terminated')).__name__} "
-                              f"truncated={type(step.get('truncated')).__name__}")
+        batch_size = len(steps)
+        for index, step in enumerate(steps, start=1):
+            self.log_constant(
+                LOG_SERVICE_SQLITE_DEBUG,
+                message="batch_step_prepared",
+                extra={
+                    "batch_position": index,
+                    "batch_size": batch_size,
+                    "episode_id": step.get("episode_id"),
+                    "step_index": step.get("step_index"),
+                    "reward": step.get("reward"),
+                    "terminated": step.get("terminated"),
+                    "truncated": step.get("truncated"),
+                    "agent_id": step.get("agent_id"),
+                },
+            )
+            self.log_constant(
+                LOG_SERVICE_SQLITE_DEBUG,
+                message="batch_step_types",
+                extra={
+                    "reward_type": type(step.get("reward")).__name__,
+                    "terminated_type": type(step.get("terminated")).__name__,
+                    "truncated_type": type(step.get("truncated")).__name__,
+                },
+            )
         
         cursor = self._conn.cursor()
         cursor.execute("BEGIN")
@@ -326,7 +360,11 @@ class TelemetrySQLiteStore:
         )
         cursor.execute("COMMIT")
         # Use INFO for batch commit (less noise than per-step ERROR logs)
-        self._logger.info(f"[DB_FLUSH] Successfully committed {len(steps)} steps to database")
+        self.log_constant(
+            LOG_SERVICE_SQLITE_INFO,
+            message="batch_commit_success",
+            extra={"step_count": batch_size},
+        )
         self._pending_payload_bytes = 0
 
     def _delete_episode_rows(self, episode_id: str) -> None:
@@ -349,7 +387,11 @@ class TelemetrySQLiteStore:
         try:
             return json_serialization.dumps(value)
         except json_serialization.SerializationError:
-            self._logger.warning("Failed to serialize %s; dropping value", context, exc_info=True)
+            self.log_constant(
+                LOG_SERVICE_SQLITE_DESERIALIZATION_FAILED,
+                extra={"context": context, "phase": "serialize"},
+                exc_info=sys.exc_info()[1],
+            )
             return None
 
     def _deserialize_field(self, payload: Any, *, context: str, default: Any) -> Any:
@@ -360,13 +402,16 @@ class TelemetrySQLiteStore:
         except json_serialization.SerializationError:
             if context not in self._deserialization_failures:
                 self._deserialization_failures.add(context)
-                self._logger.warning(
-                    "Failed to deserialize %s; using default fallback", context, exc_info=True
+                self.log_constant(
+                    LOG_SERVICE_SQLITE_DESERIALIZATION_FAILED,
+                    extra={"context": context, "phase": "deserialize"},
+                    exc_info=sys.exc_info()[1],
                 )
             else:
-                self._logger.debug(
-                    "Repeated deserialization failure for %s; default applied", context,
-                    exc_info=False,
+                self.log_constant(
+                    LOG_SERVICE_SQLITE_DEBUG,
+                    message="repeated_deserialization_failure",
+                    extra={"context": context},
                 )
             return self._clone_default(default)
 
@@ -469,9 +514,17 @@ class TelemetrySQLiteStore:
         """
         try:
             self._conn.execute(f"PRAGMA wal_checkpoint({mode})")
-            self._logger.debug(f"WAL checkpoint completed with mode={mode}")
+            self.log_constant(
+                LOG_SERVICE_SQLITE_DEBUG,
+                message="wal_checkpoint_completed",
+                extra={"mode": mode},
+            )
         except Exception as e:
-            self._logger.warning(f"WAL checkpoint failed: {e}")
+            self.log_constant(
+                LOG_SERVICE_SQLITE_WRITE_ERROR,
+                extra={"context": "wal_checkpoint", "mode": mode},
+                exc_info=e,
+            )
 
     def close(self) -> None:
         if self._stop_event.is_set():
@@ -483,6 +536,7 @@ class TelemetrySQLiteStore:
             self._worker.join(timeout=2.0)
         finally:
             self._conn.close()
+        self.log_constant(LOG_SERVICE_SQLITE_WORKER_STOPPED)
 
     def __enter__(self) -> "TelemetrySQLiteStore":
         return self
@@ -494,9 +548,14 @@ class TelemetrySQLiteStore:
     def __del__(self) -> None:  # pragma: no cover - defensive shutdown
         try:
             self.close()
-        except Exception:  # pragma: no cover - best-effort logging during GC
-            logger = getattr(self, "_logger", logging.getLogger("gym_gui.telemetry.sqlite_store"))
-            logger.warning("TelemetrySQLiteStore close during __del__ failed", exc_info=True)
+        except Exception as exc:  # pragma: no cover - best-effort logging during GC
+            logger = getattr(self, "_logger", _LOGGER)
+            log_constant(
+                logger,
+                LOG_SERVICE_SQLITE_WARNING,
+                message="close_failed_during_gc",
+                exc_info=exc,
+            )
 
     # ------------------------------------------------------------------
     def recent_steps(self, limit: int = 100) -> Sequence[StepRecord]:

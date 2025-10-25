@@ -9,13 +9,20 @@ from typing import Any, Dict, Optional
 from qtpy import QtCore, QtWidgets
 
 from gym_gui.core.enums import GameId, RenderMode
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_UI_WORKER_TABS_TRACE,
+    LOG_UI_WORKER_TABS_INFO,
+    LOG_UI_WORKER_TABS_WARNING,
+    LOG_UI_WORKER_TABS_ERROR,
+)
 from gym_gui.rendering import RendererContext, RendererRegistry, RendererStrategy, create_default_renderer_registry
 from gym_gui.ui.widgets.base_telemetry_tab import BaseTelemetryTab
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class AgentOnlineGridTab(BaseTelemetryTab):
+class AgentOnlineGridTab(BaseTelemetryTab, LogConstantMixin):
     """Displays live grid rendering + episode stats for a specific agent run."""
 
     def __init__(
@@ -42,6 +49,7 @@ class AgentOnlineGridTab(BaseTelemetryTab):
         self._current_step_in_episode: int = 0  # Step within current episode
         self._previous_episode_index: int = -1  # Detect episode boundaries
 
+        self._logger = _LOGGER
         super().__init__(run_id, agent_id, parent=parent)
 
     def _build_ui(self) -> None:
@@ -97,7 +105,7 @@ class AgentOnlineGridTab(BaseTelemetryTab):
         # DEBUG: Log step keys
         step_keys = list(step.keys()) if isinstance(step, dict) else "not_dict"
         has_render = "render_payload_json" in step if isinstance(step, dict) else False
-        _LOGGER.debug(f"[on_step] step keys: {step_keys}, has_render_payload_json={has_render}")
+        self.log_constant(LOG_UI_WORKER_TABS_TRACE, message=f"[on_step] step keys: {step_keys}, has_render_payload_json={has_render}")
 
         # CRITICAL FIX: Track current episode/step indices and reset step counter on boundaries
         episode_index = step.get("episode_index")
@@ -115,7 +123,7 @@ class AgentOnlineGridTab(BaseTelemetryTab):
             if episode_idx != self._previous_episode_index:
                 self._current_step_in_episode = 0  # Reset step counter at boundary
                 self._previous_episode_index = episode_idx
-                _LOGGER.info(f"[on_step] Episode boundary (episode {episode_idx}), resetting step counter")
+                self.log_constant(LOG_UI_WORKER_TABS_INFO, message=f"[on_step] Episode boundary (episode {episode_idx}), resetting step counter")
             
             # Update current metrics
             self._current_episode_index = episode_idx
@@ -176,11 +184,11 @@ class AgentOnlineGridTab(BaseTelemetryTab):
     def _render_grid(self, payload: Dict[str, Any]) -> None:
         """Render grid visualization using renderer registry."""
         if self._renderer_registry is None:
-            _LOGGER.debug(f"[_render_grid] renderer_registry is None, returning")
+            self.log_constant(LOG_UI_WORKER_TABS_TRACE, message=f"[_render_grid] renderer_registry is None, returning")
             return
 
         # DEBUG: Log what keys are in the payload
-        _LOGGER.debug(f"[_render_grid] payload keys: {list(payload.keys())}")
+        self.log_constant(LOG_UI_WORKER_TABS_TRACE, message=f"[_render_grid] payload keys: {list(payload.keys())}")
 
         # CRITICAL: Extract render_payload from step payload
         # Try render_payload_json first (from protobuf), then render_payload (from dict)
@@ -189,61 +197,61 @@ class AgentOnlineGridTab(BaseTelemetryTab):
         # If render_payload_json exists (from protobuf), parse it
         if render_payload is None:
             render_payload_json = payload.get("render_payload_json")
-            _LOGGER.debug(f"[_render_grid] render_payload_json present: {render_payload_json is not None}")
+            self.log_constant(LOG_UI_WORKER_TABS_TRACE, message=f"[_render_grid] render_payload_json present: {render_payload_json is not None}")
             if render_payload_json:
                 try:
                     if isinstance(render_payload_json, str):
                         render_payload = json.loads(render_payload_json)
                     else:
                         render_payload = render_payload_json
-                    _LOGGER.debug(f"[_render_grid] Parsed render_payload_json, keys: {list(render_payload.keys()) if isinstance(render_payload, dict) else 'not_dict'}")
+                    self.log_constant(LOG_UI_WORKER_TABS_TRACE, message=f"[_render_grid] Parsed render_payload_json, keys: {list(render_payload.keys()) if isinstance(render_payload, dict) else 'not_dict'}")
                 except (json.JSONDecodeError, TypeError) as e:
-                    _LOGGER.debug(f"[_render_grid] Failed to parse render_payload_json: {e}")
+                    self.log_constant(LOG_UI_WORKER_TABS_TRACE, message=f"[_render_grid] Failed to parse render_payload_json: {e}")
                     render_payload = None
 
         if render_payload is None:
-            _LOGGER.debug(f"[_render_grid] render_payload is None, returning")
+            self.log_constant(LOG_UI_WORKER_TABS_TRACE, message=f"[_render_grid] render_payload is None, returning")
             return
 
         # Check if render_payload has grid mode
         mode = render_payload.get("mode")
-        _LOGGER.debug(f"[_render_grid] mode: {mode}")
+        self.log_constant(LOG_UI_WORKER_TABS_TRACE, message=f"[_render_grid] mode: {mode}")
         # Accept both "ansi" string and GRID render mode
         if mode not in ("ansi", "grid", RenderMode.GRID):
-            _LOGGER.debug(f"[_render_grid] mode not supported: {mode}")
+            self.log_constant(LOG_UI_WORKER_TABS_TRACE, message=f"[_render_grid] mode not supported: {mode}")
             return
 
         # Initialize renderer on first grid payload
         if self._renderer_strategy is None:
-            _LOGGER.debug(f"[_render_grid] Initializing renderer strategy")
+            self.log_constant(LOG_UI_WORKER_TABS_TRACE, message=f"[_render_grid] Initializing renderer strategy")
             if not self._renderer_registry.is_registered(RenderMode.GRID):
-                _LOGGER.debug(f"[_render_grid] GRID renderer not registered")
+                self.log_constant(LOG_UI_WORKER_TABS_TRACE, message=f"[_render_grid] GRID renderer not registered")
                 return
             self._renderer_strategy = self._renderer_registry.create(RenderMode.GRID, self._grid_container)
-            _LOGGER.debug(f"[_render_grid] Renderer strategy created: {self._renderer_strategy}")
+            self.log_constant(LOG_UI_WORKER_TABS_TRACE, message=f"[_render_grid] Renderer strategy created: {self._renderer_strategy}")
             self._grid_layout.removeWidget(self._placeholder_label)
             self._placeholder_label.deleteLater()
             self._grid_layout.addWidget(self._renderer_strategy.widget)
-            _LOGGER.debug(f"[_render_grid] Renderer widget added to layout")
+            self.log_constant(LOG_UI_WORKER_TABS_TRACE, message=f"[_render_grid] Renderer widget added to layout")
 
         # Extract game_id from render_payload
         raw_game = render_payload.get("game_id")
         if raw_game and self._game_id is None:
             try:
                 self._game_id = raw_game if isinstance(raw_game, GameId) else GameId(str(raw_game))
-                _LOGGER.debug(f"[_render_grid] Set game_id to: {self._game_id}")
+                self.log_constant(LOG_UI_WORKER_TABS_TRACE, message=f"[_render_grid] Set game_id to: {self._game_id}")
             except ValueError:
-                _LOGGER.debug(f"[_render_grid] Failed to parse game_id: {raw_game}")
+                self.log_constant(LOG_UI_WORKER_TABS_TRACE, message=f"[_render_grid] Failed to parse game_id: {raw_game}")
                 pass
 
         # Render using the render_payload (not the step payload)
         if self._renderer_strategy and self._renderer_strategy.supports(render_payload):
-            _LOGGER.debug(f"[_render_grid] Calling renderer.render()")
+            self.log_constant(LOG_UI_WORKER_TABS_TRACE, message=f"[_render_grid] Calling renderer.render()")
             context = RendererContext(game_id=self._game_id)
             self._renderer_strategy.render(render_payload, context=context)
-            _LOGGER.debug(f"[_render_grid] Render complete")
+            self.log_constant(LOG_UI_WORKER_TABS_TRACE, message=f"[_render_grid] Render complete")
         else:
-            _LOGGER.debug(f"[_render_grid] Renderer doesn't support payload or is None")
+            self.log_constant(LOG_UI_WORKER_TABS_TRACE, message=f"[_render_grid] Renderer doesn't support payload or is None")
 
 
 __all__ = ["AgentOnlineGridTab"]

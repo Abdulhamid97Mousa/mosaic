@@ -14,6 +14,12 @@ import grpc
 from .registry import RunStatus
 from gym_gui.services.trainer.proto import trainer_pb2 as trainer_pb2_module
 from gym_gui.services.trainer.proto import trainer_pb2_grpc
+from gym_gui.logging_config.helpers import LogConstantMixin, log_constant
+from gym_gui.logging_config.log_constants import (
+    LOG_TRAINER_CLIENT_CONNECTING,
+    LOG_TRAINER_CLIENT_CONNECTED,
+    LOG_TRAINER_CLIENT_CONNECTION_TIMEOUT,
+)
 
 trainer_pb2 = cast(Any, trainer_pb2_module)
 
@@ -44,7 +50,7 @@ class TrainerClientConnectionError(RuntimeError):
     """Raised when the client cannot establish a gRPC channel."""
 
 
-class TrainerClient:
+class TrainerClient(LogConstantMixin):
     """High-level async API used by controllers to reach the daemon."""
 
     def __init__(self, config: Optional[TrainerClientConfig] = None) -> None:
@@ -65,7 +71,7 @@ class TrainerClient:
         async with state.lock:
             if state.stub is not None and state.channel is not None:
                 return state.stub
-            self._logger.info("Connecting to trainer daemon", extra={"target": self._config.target})
+            log_constant(self._logger, LOG_TRAINER_CLIENT_CONNECTING, message="Connecting to trainer daemon", extra={"target": self._config.target})
             options = (
                 ("grpc.keepalive_time_ms", int(self._config.keepalive_time * 1000)),
                 ("grpc.keepalive_timeout_ms", int(self._config.keepalive_timeout * 1000)),
@@ -80,7 +86,7 @@ class TrainerClient:
             try:
                 await asyncio.wait_for(channel.channel_ready(), timeout=self._config.connect_timeout)
             except asyncio.TimeoutError as exc:
-                self._logger.error("Trainer daemon connection timeout", extra={"target": self._config.target})
+                log_constant(self._logger, LOG_TRAINER_CLIENT_CONNECTION_TIMEOUT, message="Trainer daemon connection timeout", extra={"target": self._config.target})
                 await channel.close()
                 raise TrainerClientConnectionError(
                     f"Timed out waiting for trainer daemon at {self._config.target}"
@@ -90,7 +96,7 @@ class TrainerClient:
                 raise
             state.channel = channel
             state.stub = trainer_pb2_grpc.TrainerServiceStub(channel)
-            self._logger.info("Trainer daemon connection established", extra={"target": self._config.target})
+            log_constant(self._logger, LOG_TRAINER_CLIENT_CONNECTED, message="Trainer daemon connection established", extra={"target": self._config.target})
             return state.stub
 
     async def close(self) -> None:

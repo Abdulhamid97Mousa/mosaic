@@ -475,7 +475,7 @@ Add Pydantic models for step/episode payloads.
 control_mode_changed = Signal(ControlMode)  # snake_case
 game_changed = Signal(GameId)               # snake_case
 load_requested = Signal(...)                # snake_case
-agent_loadout_requested = Signal()          # snake_case
+agent_form_requested = Signal()          # snake_case
 slippery_toggled = Signal(bool)             # snake_case
 frozen_v2_config_changed = Signal(...)      # snake_case
 train_agent_requested = Signal()            # snake_case
@@ -489,7 +489,7 @@ control_mode_changed = Signal(ControlMode)
 game_changed = Signal(GameId)
 load_environment_requested = Signal(GameId, ControlMode, int)
 reset_environment_requested = Signal(int)
-agent_loadout_requested = Signal()
+agent_form_requested = Signal()
 # ... all use _requested or _changed consistently
 ```
 
@@ -773,7 +773,6 @@ class LiveTelemetryTab(BaseTelemetryTab):
         self._pending_steps.clear()
         self._batch_timer.stop()
 ```
-
 
 
 

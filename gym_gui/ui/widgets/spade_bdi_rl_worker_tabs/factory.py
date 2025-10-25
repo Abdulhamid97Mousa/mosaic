@@ -18,6 +18,13 @@ import logging
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.core.enums import GameId
 from gym_gui.rendering import RendererRegistry
+from gym_gui.logging_config.helpers import log_constant
+from gym_gui.logging_config.log_constants import (
+    LOG_UI_WORKER_TABS_TRACE,
+    LOG_UI_WORKER_TABS_INFO,
+    LOG_UI_WORKER_TABS_WARNING,
+    LOG_UI_WORKER_TABS_ERROR,
+)
 
 from .agent_online_tab import AgentOnlineTab
 from .agent_online_grid_tab import AgentOnlineGridTab
@@ -66,7 +73,7 @@ class TabFactory:
             try:
                 game_id_enum = GameId(game_id_str)
             except (ValueError, KeyError):
-                logger.warning(
+                log_constant(logger, LOG_UI_WORKER_TABS_WARNING, message=
                     "Invalid game_id in first_payload",
                     extra={"run_id": run_id, "agent_id": agent_id, "game_id": game_id_str},
                 )
@@ -90,7 +97,7 @@ class TabFactory:
             video = AgentOnlineVideoTab(run_id, agent_id, parent=parent)
             tabs.append(video)
 
-        logger.debug(
+        log_constant(logger, LOG_UI_WORKER_TABS_TRACE, message=
             "Created tabs for agent",
             extra={
                 "run_id": run_id,

@@ -18,7 +18,7 @@ from typing import Dict, Optional, Tuple
 
 from .events import TelemetryEvent, Topic
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 SubscriberId = str
 
@@ -58,7 +58,7 @@ class RunBus:
         # Per-run sequence tracking for gap detection
         self._last_seq: Dict[Tuple[str, str], int] = {}  # (run_id, agent_id) -> last_seq_id
 
-        logger.info(f"RunBus initialized with default max_queue={max_queue}")
+        _LOGGER.info(f"RunBus initialized with default max_queue={max_queue}")
     
     def subscribe(self, topic: Topic, subscriber_id: SubscriberId) -> queue.Queue:
         """Subscribe to a topic with default queue size.
@@ -89,7 +89,7 @@ class RunBus:
         key = (topic, subscriber_id)
         self._queues[key] = q
         self._queue_sizes[key] = max_queue
-        logger.debug(
+        _LOGGER.debug(
             f"Subscriber {subscriber_id} subscribed to {topic.name}",
             extra={"max_queue": max_queue},
         )
@@ -103,7 +103,7 @@ class RunBus:
             subscriber_id: Subscriber identifier
         """
         self._queues.pop((topic, subscriber_id), None)
-        logger.debug(f"Subscriber {subscriber_id} unsubscribed from {topic.name}")
+        _LOGGER.debug(f"Subscriber {subscriber_id} unsubscribed from {topic.name}")
     
     def publish(self, evt: TelemetryEvent) -> None:
         """Publish an event to all subscribers (non-blocking).
@@ -122,7 +122,7 @@ class RunBus:
             last_seq = self._last_seq[run_agent_key]
             gap = evt.seq_id - last_seq - 1
             if gap > 0:
-                logger.warning(
+                _LOGGER.warning(
                     f"Sequence gap detected in RunBus",
                     extra={
                         "run_id": evt.run_id,
@@ -175,7 +175,7 @@ class RunBus:
     def reset_overflow_stats(self) -> None:
         """Reset all overflow counters."""
         self._overflow.clear()
-        logger.debug("Overflow stats reset")
+        _LOGGER.debug("Overflow stats reset")
     
     def queue_sizes(self) -> Dict[str, int]:
         """Get current queue sizes for all subscribers.

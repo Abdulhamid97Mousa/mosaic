@@ -17,6 +17,7 @@ import json
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
+from functools import partial
 from typing import Any, Callable, Dict, List, Optional, Tuple, Union, TYPE_CHECKING
 
 import numpy as np
@@ -27,11 +28,19 @@ from spade_bdi.bdi import BDIAgent
 from .bdi_actions import GLOBAL_ACTIONS, register_actions
 from ..adapters import FrozenLakeAdapter, FrozenLakeV2Adapter, CliffWalkingAdapter, TaxiAdapter
 from ..algorithms import QLearningAgent, QLearningRuntime
+from gym_gui.logging_config.log_constants import (
+    LOG_WORKER_BDI_EVENT,
+    LOG_WORKER_BDI_WARNING,
+    LOG_WORKER_BDI_ERROR,
+    LOG_WORKER_BDI_DEBUG,
+)
+from gym_gui.logging_config.helpers import log_constant
 
 # Type alias for all adapter types
 AdapterType = Union[FrozenLakeAdapter, FrozenLakeV2Adapter, CliffWalkingAdapter, TaxiAdapter]
 
 LOGGER = logging.getLogger(__name__)
+_log = partial(log_constant, LOGGER)
 
 DEFAULT_JID = "agent@localhost"
 DEFAULT_PASSWORD = "secret"
@@ -123,14 +132,11 @@ class BDIRLAgent(BDIAgent):
         # Event streaming
         self.event_sink: Optional[Callable[[dict], None]] = None
 
-        LOGGER.info(
-            "BDI-RL Agent initialized",
-            extra={
-                "jid": jid,
-                "env": self.adapter.__class__.__name__,
-                "asl_file": str(asl_file) if asl_file else "default",
-            },
-        )
+        _log(LOG_WORKER_BDI_EVENT, message="BDI-RL Agent initialized", extra={
+            "jid": jid,
+            "env": self.adapter.__class__.__name__,
+            "asl_file": str(asl_file) if asl_file else "default",
+        })
 
     @staticmethod
     def _get_default_asl() -> str:
@@ -148,8 +154,8 @@ class BDIRLAgent(BDIAgent):
         try:
             self._load_policy_beliefs()
         except Exception as exc:
-            LOGGER.warning("Could not load policy beliefs: %s", exc)
-        LOGGER.info("BDI-RL Agent setup complete", extra={"jid": self.jid})
+            _log(LOG_WORKER_BDI_WARNING, message="Could not load policy beliefs", extra={"error": str(exc)}, exc_info=exc)
+        _log(LOG_WORKER_BDI_EVENT, message="BDI-RL Agent setup complete", extra={"jid": self.jid})
 
     # ========================================================================
     # Public Interface for UI/Visualizers
@@ -165,7 +171,7 @@ class BDIRLAgent(BDIAgent):
             if self.event_sink:
                 self.event_sink(payload)
         except Exception as exc:
-            LOGGER.debug("Event emission failed: %s", exc)
+            _log(LOG_WORKER_BDI_DEBUG, message="Event emission failed", extra={"error": str(exc)}, exc_info=exc)
 
     def get_q_snapshot(self) -> np.ndarray:
         """Return copy of current Q-table."""
@@ -203,14 +209,15 @@ class BDIRLAgent(BDIAgent):
                         del self.cached_policies[k]
                 self._save_cached_policies()
             except Exception as exc:
-                LOGGER.debug("Could not clear cache: %s", exc)
+                _log(LOG_WORKER_BDI_DEBUG, message="Could not clear cache", extra={"error": str(exc)}, exc_info=exc)
 
         # Reset Q-table and exploration for new goal
         if reset_q:
             self.rl_agent.q_table[:] = 0.0
             self.rl_agent.epsilon = self.reset_epsilon
-            LOGGER.info(
-                "Reset Q-table for new goal",
+            _log(
+                LOG_WORKER_BDI_EVENT,
+                message="Reset Q-table for new goal",
                 extra={"goal": (gx, gy), "epsilon": self.reset_epsilon},
             )
 
@@ -228,13 +235,14 @@ class BDIRLAgent(BDIAgent):
             try:
                 with open(self.policy_store_path, "r") as f:
                     data = json.load(f)
-                LOGGER.info(
-                    "Loaded cached policies",
+                _log(
+                    LOG_WORKER_BDI_EVENT,
+                    message="Loaded cached policies",
                     extra={"count": len(data), "path": str(self.policy_store_path)},
                 )
                 return data
             except Exception as exc:
-                LOGGER.warning("Error loading policies: %s", exc)
+                _log(LOG_WORKER_BDI_WARNING, message="Error loading policies", extra={"error": str(exc)}, exc_info=exc)
         return {}
 
     def _save_cached_policies(self) -> None:
@@ -243,12 +251,13 @@ class BDIRLAgent(BDIAgent):
             self.policy_store_path.parent.mkdir(parents=True, exist_ok=True)
             with open(self.policy_store_path, "w") as f:
                 json.dump(self.cached_policies, f, indent=2)
-            LOGGER.info(
-                "Saved cached policies",
+            _log(
+                LOG_WORKER_BDI_EVENT,
+                message="Saved cached policies",
                 extra={"count": len(self.cached_policies)},
             )
         except Exception as exc:
-            LOGGER.warning("Error saving policies: %s", exc)
+            _log(LOG_WORKER_BDI_WARNING, message="Error saving policies", extra={"error": str(exc)}, exc_info=exc)
 
     def _load_policy_beliefs(self) -> None:
         """Load cached policies into BDI beliefs.
@@ -256,8 +265,9 @@ class BDIRLAgent(BDIAgent):
         Note: BDI belief loading is deferred until runtime when beliefs
         can be properly added through the BDI reasoning system.
         """
-        LOGGER.debug(
-            "Policy beliefs will be loaded at runtime",
+        _log(
+            LOG_WORKER_BDI_DEBUG,
+            message="Policy beliefs will be loaded at runtime",
             extra={"cached_policies": len(self.cached_policies)},
         )
 
@@ -274,7 +284,7 @@ class BDIRLAgent(BDIAgent):
         # Direct episode execution via RL runtime
         # BDI belief triggering will be handled through ASL plans
         if not hasattr(self, "bdi") or self.bdi is None:
-            LOGGER.warning("BDI not initialized; call await agent.setup() first")
+            _log(LOG_WORKER_BDI_WARNING, message="BDI not initialized; call await agent.setup() first")
             return {
                 "episode": self.episode_count,
                 "steps": self.episode_steps,
@@ -321,8 +331,9 @@ class BDIRLAgent(BDIAgent):
             if done:
                 success = reward > 0
                 self.success_history.append(success)
-                LOGGER.info(
-                    "Episode completed",
+                _log(
+                    LOG_WORKER_BDI_EVENT,
+                    message="Episode completed",
                     extra={
                         "episode": self.episode_count,
                         "steps": self.episode_steps,
@@ -338,7 +349,7 @@ class BDIRLAgent(BDIAgent):
 
         if not done:
             self.success_history.append(False)
-            LOGGER.warning("Episode exceeded max steps")
+            _log(LOG_WORKER_BDI_WARNING, message="Episode exceeded max steps")
 
         return {
             "episode": self.episode_count,
@@ -402,8 +413,9 @@ class BDIRLAgent(BDIAgent):
             "timestamp": str(Path.cwd()),
         }
         self._save_cached_policies()
-        LOGGER.info(
-            "Cached policy",
+        _log(
+            LOG_WORKER_BDI_EVENT,
+            message="Cached policy",
             extra={
                 "goal": (goal_x, goal_y),
                 "confidence": confidence,
@@ -458,7 +470,7 @@ class AgentHandle:
             raise ValueError("Agent not initialized")
 
         if self.started:
-            LOGGER.warning("Agent already started")
+            _log(LOG_WORKER_BDI_WARNING, message="Agent already started")
             return
 
         try:
@@ -468,12 +480,22 @@ class AgentHandle:
             )
             await self.agent.setup()
             self.started = True
-            LOGGER.info("BDI agent started successfully", extra={"jid": self.jid})
+            _log(LOG_WORKER_BDI_EVENT, message="BDI agent started successfully", extra={"jid": self.jid})
         except asyncio.TimeoutError as exc:
-            LOGGER.error("BDI agent start timed out after %.1fs", timeout)
+            _log(
+                LOG_WORKER_BDI_ERROR,
+                message="BDI agent start timed out",
+                extra={"timeout": timeout},
+                exc_info=exc,
+            )
             raise
         except Exception as exc:
-            LOGGER.error("BDI agent start failed: %s", exc)
+            _log(
+                LOG_WORKER_BDI_ERROR,
+                message="BDI agent start failed",
+                extra={"error": str(exc)},
+                exc_info=exc,
+            )
             # Attempt cleanup
             try:
                 await asyncio.wait_for(self.agent.stop(), timeout=5.0)
@@ -491,16 +513,26 @@ class AgentHandle:
             raise ValueError("Agent not initialized")
 
         if not self.started:
-            LOGGER.debug("Agent not started, skipping stop")
+            _log(LOG_WORKER_BDI_DEBUG, message="Agent not started, skipping stop")
             return
 
         try:
             await asyncio.wait_for(self.agent.stop(), timeout=5.0)
-            LOGGER.info("BDI agent stopped successfully", extra={"jid": self.jid})
-        except asyncio.TimeoutError:
-            LOGGER.warning("BDI agent stop timed out")
+            _log(LOG_WORKER_BDI_EVENT, message="BDI agent stopped successfully", extra={"jid": self.jid})
+        except asyncio.TimeoutError as exc:
+            _log(
+                LOG_WORKER_BDI_WARNING,
+                message="BDI agent stop timed out",
+                extra={"jid": self.jid},
+                exc_info=exc,
+            )
         except Exception as exc:
-            LOGGER.warning("BDI agent stop raised exception: %s", exc)
+            _log(
+                LOG_WORKER_BDI_WARNING,
+                message="BDI agent stop raised exception",
+                extra={"error": str(exc)},
+                exc_info=exc,
+            )
         finally:
             self.started = False
 
@@ -531,13 +563,14 @@ def create_agent(
         agent = BDIRLAgent(jid, password, adapter=adapter, asl_file=asl_file)
         # Note: Custom BDI actions are registered globally in bdi_actions.py via GLOBAL_ACTIONS
         # and are available to the agent through the ASL interpreter
-        LOGGER.info(
-            "Created BDI agent",
+        _log(
+            LOG_WORKER_BDI_EVENT,
+            message="Created BDI agent",
             extra={"jid": jid, "env": adapter.__class__.__name__},
         )
         return AgentHandle(agent=agent, jid=jid, password=password)
     except Exception as exc:
-        LOGGER.exception("Failed to create BDI agent: %s", exc)
+        _log(LOG_WORKER_BDI_ERROR, message="Failed to create BDI agent", extra={"error": str(exc)}, exc_info=exc)
         return AgentHandle(agent=None, jid=jid, password=password)
 
 
@@ -568,10 +601,10 @@ async def create_and_start_agent(
     
     try:
         await handle.start(auto_register=True, timeout=timeout)
-        LOGGER.info("BDI agent created and started", extra={"jid": jid})
+        _log(LOG_WORKER_BDI_EVENT, message="BDI agent created and started", extra={"jid": jid})
         return handle
     except Exception as exc:
-        LOGGER.exception("Failed to start BDI agent: %s", exc)
+        _log(LOG_WORKER_BDI_ERROR, message="Failed to start BDI agent", extra={"error": str(exc)}, exc_info=exc)
         raise
 
 

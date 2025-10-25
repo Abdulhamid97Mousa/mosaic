@@ -12,7 +12,12 @@ from gym_gui.config.settings import get_settings
 from gym_gui.core.adapters.base import AdapterContext, AdapterStep
 from gym_gui.core.factories import available_games, create_adapter
 from gym_gui.core.enums import ControlMode, GameId
+from gym_gui.logging_config.helpers import log_constant
 from gym_gui.logging_config.logger import configure_logging
+from gym_gui.logging_config.log_constants import LOG_SESSION_STEP_ERROR
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 def _game_choices() -> Iterable[str]:
@@ -42,7 +47,6 @@ def main(argv: list[str] | None = None) -> int:
 
     log_level = getattr(logging, args.log_level.upper(), logging.DEBUG)
     configure_logging(level=log_level, stream=True, log_to_file=True)
-    logger = logging.getLogger("gym_gui.controllers.cli")
 
     settings = get_settings()
     context = AdapterContext(
@@ -63,7 +67,7 @@ def main(argv: list[str] | None = None) -> int:
         while step_index < args.max_steps:
             command, action = _prompt_action(adapter.action_space)
             if command == "quit":
-                logger.info("Exiting orchestrator at user request")
+                _LOGGER.info("Exiting orchestrator at user request")
                 break
             if command == "reset":
                 step_index = 0
@@ -73,10 +77,19 @@ def main(argv: list[str] | None = None) -> int:
 
             assert action is not None
             step_index += 1
-            step = adapter.step(action)
+            try:
+                step = adapter.step(action)
+            except Exception as exc:
+                log_constant(
+                    _LOGGER,
+                    LOG_SESSION_STEP_ERROR,
+                    exc_info=exc,
+                    extra={"game_id": game_id.value, "action": action},
+                )
+                raise
             _print_step(step, step_index)
             if step.terminated or step.truncated:
-                logger.info("Episode finished at step=%s", step_index)
+                _LOGGER.info("Episode finished at step=%s", step_index)
                 break
     finally:
         adapter.close()

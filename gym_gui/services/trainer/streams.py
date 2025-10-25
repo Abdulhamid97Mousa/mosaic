@@ -6,13 +6,29 @@ from collections import deque
 from dataclasses import dataclass
 import logging
 import threading
-from typing import Any, Deque, Dict, Optional
+from typing import Any, Deque, Dict, Optional, TYPE_CHECKING
 
 from qtpy import QtCore
 
 from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.telemetry.run_bus import get_bus
 from gym_gui.telemetry.credit_manager import get_credit_manager
+from gym_gui.logging_config.log_constants import (
+    LOG_SERVICE_TELEMETRY_BRIDGE_STEP_QUEUED,
+    LOG_SERVICE_TELEMETRY_BRIDGE_EPISODE_QUEUED,
+    LOG_SERVICE_TELEMETRY_BRIDGE_STEP_DELIVERED,
+    LOG_SERVICE_TELEMETRY_BRIDGE_EPISODE_DELIVERED,
+    LOG_SERVICE_TELEMETRY_BRIDGE_OVERFLOW,
+    LOG_SERVICE_TELEMETRY_BRIDGE_RUN_COMPLETED,
+    LOG_SERVICE_TELEMETRY_HUB_STARTED,
+    LOG_SERVICE_TELEMETRY_HUB_SUBSCRIBED,
+    LOG_SERVICE_TELEMETRY_HUB_TRACE,
+    LOG_SERVICE_TELEMETRY_HUB_ERROR,
+)
+from gym_gui.logging_config.helpers import log_constant
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from gym_gui.telemetry.run_bus import RunBus
 
 _LOGGER = logging.getLogger("gym_gui.trainer.streams")
 
@@ -108,7 +124,7 @@ class TelemetryBridge(QtCore.QObject):
         normalized_message = TelemetryStep(message.run_id, normalized_payload, message.seq_id)
 
         # Post custom event for thread-safe delivery to main thread
-        _LOGGER.debug("TelemetryBridge.queue step", extra={"run_id": message.run_id, "seq": message.seq_id})
+        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_BRIDGE_STEP_QUEUED, extra={"run_id": message.run_id, "seq": message.seq_id})
         QtCore.QCoreApplication.postEvent(self, _TelemetryEvent("step", normalized_message))
 
     def emit_episode(self, message: TelemetryEpisode) -> None:
@@ -117,18 +133,18 @@ class TelemetryBridge(QtCore.QObject):
         normalized_message = TelemetryEpisode(message.run_id, normalized_payload, message.seq_id)
 
         # Post custom event for thread-safe delivery to main thread
-        _LOGGER.debug("TelemetryBridge.queue episode", extra={"run_id": message.run_id, "seq": message.seq_id})
+        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_BRIDGE_EPISODE_QUEUED, extra={"run_id": message.run_id, "seq": message.seq_id})
         QtCore.QCoreApplication.postEvent(self, _TelemetryEvent("episode", normalized_message))
 
     def emit_overflow(self, run_id: str, stream_type: str, dropped: int) -> None:
         # Post custom event for thread-safe delivery to main thread
-        _LOGGER.warning("TelemetryBridge.queue overflow", extra={"run_id": run_id, "stream_type": stream_type, "dropped": dropped})
+        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_BRIDGE_OVERFLOW, extra={"run_id": run_id, "stream_type": stream_type, "dropped": dropped})
         QtCore.QCoreApplication.postEvent(self, _TelemetryEvent("overflow", (run_id, stream_type, dropped)))
 
     def emit_run_completed(self, run_id: str) -> None:
         """Signal that a training run has completed."""
         # Post custom event for thread-safe delivery to main thread
-        _LOGGER.info("TelemetryBridge.queue run_completed", extra={"run_id": run_id})
+        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_BRIDGE_RUN_COMPLETED, extra={"run_id": run_id})
         QtCore.QCoreApplication.postEvent(self, _TelemetryEvent("completed", run_id))
 
     def event(self, e: QtCore.QEvent) -> bool:
@@ -136,18 +152,18 @@ class TelemetryBridge(QtCore.QObject):
         if isinstance(e, _TelemetryEvent):
             if e.event_name == "step":
                 payload = getattr(e, "data", None)
-                _LOGGER.debug("TelemetryBridge.deliver step", extra={"run_id": getattr(payload, "run_id", None), "seq": getattr(payload, "seq_id", None)})
+                log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_BRIDGE_STEP_DELIVERED, extra={"run_id": getattr(payload, "run_id", None), "seq": getattr(payload, "seq_id", None)})
                 self.step_received.emit(e.data)
             elif e.event_name == "episode":
                 payload = getattr(e, "data", None)
-                _LOGGER.debug("TelemetryBridge.deliver episode", extra={"run_id": getattr(payload, "run_id", None), "seq": getattr(payload, "seq_id", None)})
+                log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_BRIDGE_EPISODE_DELIVERED, extra={"run_id": getattr(payload, "run_id", None), "seq": getattr(payload, "seq_id", None)})
                 self.episode_received.emit(e.data)
             elif e.event_name == "overflow":
                 run_id, stream_type, dropped = e.data  # type: ignore[misc]
-                _LOGGER.warning("TelemetryBridge.deliver overflow", extra={"run_id": run_id, "stream_type": stream_type, "dropped": dropped})
+                log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_BRIDGE_OVERFLOW, extra={"run_id": run_id, "stream_type": stream_type, "dropped": dropped})
                 self.queue_overflow.emit(run_id, stream_type, dropped)
             elif e.event_name == "completed":
-                _LOGGER.info("TelemetryBridge.deliver run_completed", extra={"run_id": e.data})
+                log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_BRIDGE_RUN_COMPLETED, extra={"run_id": e.data})
                 self.run_completed.emit(e.data)  # type: ignore[arg-type]
             return True
         return super().event(e)
@@ -195,35 +211,30 @@ class TelemetryAsyncHub:
         self._started = False
         self._completed: set[str] = set()  # Guard against multiple run_completed signals
         self._credit_mgr = get_credit_manager()  # Shared credit manager for UI backpressure
-        _LOGGER.debug(
-            "TelemetryAsyncHub initialized",
-            extra={"max_queue": max_queue, "buffer_size": buffer_size},
-        )
+        self._starved_streams: set[tuple[str, str, str]] = set()
+        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"max_queue": max_queue, "buffer_size": buffer_size})
 
     def start(self) -> None:
         if self._started:
             return
         self._stopping = False
-        _LOGGER.info("Telemetry hub starting")
+        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_STARTED)
 
         # Initialize loop on first start (deferred from __init__)
         if self._loop is None:
             try:
                 self._loop = asyncio.get_running_loop()
                 self._owns_loop = False
-                _LOGGER.info("Using existing event loop (Qt-compatible)")
+                log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE)
             except RuntimeError:
                 self._loop = asyncio.new_event_loop()
                 self._owns_loop = True
-                _LOGGER.info("Created new event loop (fallback)")
+                log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE)
 
             self._loop.set_exception_handler(self._loop_exception_handler)
             self._queue = asyncio.Queue(maxsize=self._max_queue)
 
-        _LOGGER.debug(
-            "Telemetry hub loop context",
-            extra={"owns_loop": self._owns_loop, "loop": str(self._loop)},
-        )
+        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"owns_loop": self._owns_loop, "loop": str(self._loop)})
 
         # If we own the loop, run it in a thread
         if self._owns_loop:
@@ -239,16 +250,16 @@ class TelemetryAsyncHub:
             self._start_drain_loop()
 
         self._started = True
-        _LOGGER.info("Telemetry hub started successfully")
+        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_STARTED)
 
     def _start_drain_loop(self) -> None:
         if self._task is None and self._loop is not None:
-            _LOGGER.debug("Starting telemetry drain task")
+            log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE)
             self._task = self._loop.create_task(self._drain_loop())
 
     def _call_soon_threadsafe(self, callback, *args) -> None:
         if self._loop is None:
-            _LOGGER.warning("Event loop not initialized")
+            log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_ERROR)
             return
         if self._owns_loop and self._thread is not None:
             self._loop.call_soon_threadsafe(lambda: callback(*args))
@@ -262,10 +273,7 @@ class TelemetryAsyncHub:
     def _loop_exception_handler(self, _loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
         exc = context.get("exception")
         if isinstance(exc, BlockingIOError) and getattr(exc, "errno", None) in {errno.EAGAIN, errno.EWOULDBLOCK}:
-            _LOGGER.debug(
-                "Ignoring non-fatal BlockingIOError from gRPC poller",
-                extra={"grpc_message": context.get("message")},  # Rename to avoid conflict
-            )
+            log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"grpc_message": context.get("message")})
             return
 
         # Sanitize context to avoid LogRecord key conflicts
@@ -277,10 +285,7 @@ class TelemetryAsyncHub:
             else:
                 sanitized_context[key] = value
 
-        _LOGGER.error(
-            "Unhandled exception in telemetry hub loop",
-            extra=sanitized_context,
-        )
+        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_ERROR, extra=sanitized_context)
 
     def subscribe_run(self, run_id: str, client: Any) -> None:
         """Subscribe to both step and episode streams for a run."""
@@ -288,10 +293,10 @@ class TelemetryAsyncHub:
             self.start()
 
         if self._loop is None:
-            _LOGGER.error("Event loop not initialized after start()")
+            log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_ERROR, extra={"run_id": run_id})
             return
 
-        _LOGGER.info("Subscribing to telemetry for run", extra={"run_id": run_id})
+        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_SUBSCRIBED, extra={"run_id": run_id})
 
         # Schedule subscription in the event loop
         if self._owns_loop:
@@ -300,10 +305,7 @@ class TelemetryAsyncHub:
             # Already in the Qt event loop, schedule as a task
             asyncio.create_task(self._subscribe_run_async_wrapper(run_id, client))
 
-        _LOGGER.debug(
-            "Scheduling telemetry subscriptions",
-            extra={"run_id": run_id, "owns_loop": self._owns_loop},
-        )
+        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id, "owns_loop": self._owns_loop})
 
     async def _subscribe_run_async_wrapper(self, run_id: str, client: Any) -> None:
         """Wrapper to call _subscribe_run_async from async context."""
@@ -311,12 +313,12 @@ class TelemetryAsyncHub:
 
     def _subscribe_run_async(self, run_id: str, client: Any) -> None:
         if run_id in self._subscriptions:
-            _LOGGER.debug("Already subscribed to run", extra={"run_id": run_id})
+            log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id})
             return
         if self._loop is None:
-            _LOGGER.error("Event loop not initialized")
+            log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_ERROR, extra={"run_id": run_id})
             return
-        _LOGGER.info("Creating telemetry stream tasks for run: %s", run_id)
+        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_SUBSCRIBED, extra={"run_id": run_id})
         tasks = {}
         tasks["step"] = self._loop.create_task(
             self._stream_steps(run_id, client),
@@ -327,15 +329,12 @@ class TelemetryAsyncHub:
             name=f"stream-episodes-{run_id}",
         )
         self._subscriptions[run_id] = tasks
-        _LOGGER.info("Subscribed to telemetry streams (tasks created): %s", run_id)
-        _LOGGER.debug(
-            "Creating stream tasks",
-            extra={"run_id": run_id},
-        )
+        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_SUBSCRIBED, extra={"run_id": run_id})
+        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id})
 
     async def _stream_steps(self, run_id: str, client: Any) -> None:
         if self._queue is None:
-            _LOGGER.error("Queue not initialized in _stream_steps")
+            log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_ERROR, extra={"run_id": run_id})
             return
 
         last_seq = 0
@@ -343,12 +342,12 @@ class TelemetryAsyncHub:
         max_reconnect_attempts = 10
         reconnect_delay = 1.0  # Start with 1 second delay
 
-        _LOGGER.debug("Starting step stream for run: %s", run_id)
+        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id})
         try:
             while not self._stopping:
                 try:
                     async with client.stream_run_steps(run_id, since_seq=last_seq) as stream:
-                        _LOGGER.debug("Step stream opened for run: %s, waiting for data...", run_id)
+                        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id})
                         reconnect_attempts = 0  # Reset on successful connection
                         reconnect_delay = 1.0
 
@@ -356,57 +355,50 @@ class TelemetryAsyncHub:
                             if self._stopping:
                                 break
                             seq_id = getattr(payload, "seq_id", -1)
-                            _LOGGER.debug("Received step: run=%s seq=%d ep=%d step=%d",
-                                          run_id, seq_id,
-                                          getattr(payload, "episode_index", -1),
-                                          getattr(payload, "step_index", -1))
+                            log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={
+                                "run_id": run_id, "seq": seq_id,
+                                "episode_index": getattr(payload, "episode_index", -1),
+                                "step_index": getattr(payload, "step_index", -1)
+                            })
                             if last_seq > 0:
                                 gap = seq_id - last_seq - 1
                                 if gap > 0:
-                                    _LOGGER.warning(
-                                        "Detected sequence gap in steps",
-                                        extra={"run_id": run_id, "gap": gap, "last_seq": last_seq, "seq_id": seq_id},
-                                    )
+                                    log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id, "gap": gap, "last_seq": last_seq, "seq_id": seq_id})
                             last_seq = seq_id
                             try:
                                 self._queue.put_nowait((run_id, "step", payload))
-                                _LOGGER.debug(
-                                    "Enqueued step payload",
-                                    extra={
-                                        "run_id": run_id,
-                                        "seq_id": seq_id,
-                                        "qsize": self._queue.qsize() if hasattr(self._queue, "qsize") else None,
-                                    },
-                                )
+                                log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={
+                                    "run_id": run_id,
+                                    "seq_id": seq_id,
+                                    "qsize": self._queue.qsize() if hasattr(self._queue, "qsize") else None,
+                                })
                             except asyncio.QueueFull:
                                 self.bridge.emit_overflow(run_id, "step", 1)
 
                         # Stream closed normally, attempt reconnection
                         if not self._stopping:
-                            _LOGGER.info("Step stream closed, will reconnect", extra={"run_id": run_id, "last_seq": last_seq})
+                            log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id, "last_seq": last_seq})
                             await asyncio.sleep(0.5)  # Brief delay before reconnect
                             continue
                         else:
                             break
 
                 except asyncio.CancelledError:
-                    _LOGGER.debug("Step stream cancelled", extra={"run_id": run_id})
+                    log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id})
                     break
                 except Exception as exc:
                     reconnect_attempts += 1
                     if reconnect_attempts >= max_reconnect_attempts:
-                        _LOGGER.error("Step stream failed after max reconnect attempts",
-                                    extra={"run_id": run_id, "attempts": reconnect_attempts, "error": str(exc)})
+                        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_ERROR, extra={"run_id": run_id, "attempts": reconnect_attempts, "error": str(exc)})
                         break
-                    _LOGGER.warning("Step stream error, will reconnect",
-                                  extra={"run_id": run_id, "attempt": reconnect_attempts, "error": str(exc)})
+                    log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id, "attempt": reconnect_attempts, "error": str(exc)})
                     await asyncio.sleep(reconnect_delay)
                     reconnect_delay = min(reconnect_delay * 1.5, 30.0)  # Exponential backoff, max 30s
 
         except asyncio.CancelledError:
-            _LOGGER.debug("Step stream cancelled", extra={"run_id": run_id})
+            log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id})
         finally:
-            _LOGGER.info("Step stream closed", extra={"run_id": run_id})
+            log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id})
             # NOTE: Do NOT emit run_completed here. Stream closure does not mean training is complete.
             # The stream may close due to:
             # - Episode boundary (normal, training continues)
@@ -417,7 +409,7 @@ class TelemetryAsyncHub:
 
     async def _stream_episodes(self, run_id: str, client: Any) -> None:
         if self._queue is None:
-            _LOGGER.error("Queue not initialized in _stream_episodes")
+            log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_ERROR, extra={"run_id": run_id})
             return
 
         last_seq = 0
@@ -439,65 +431,84 @@ class TelemetryAsyncHub:
                             if last_seq > 0:
                                 gap = seq_id - last_seq - 1
                                 if gap > 0:
-                                    _LOGGER.warning(
-                                        "Detected sequence gap in episodes",
-                                        extra={"run_id": run_id, "gap": gap, "last_seq": last_seq, "seq_id": seq_id},
-                                    )
+                                    log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id, "gap": gap, "last_seq": last_seq, "seq_id": seq_id})
                             last_seq = seq_id
                             try:
                                 self._queue.put_nowait((run_id, "episode", payload))
-                                _LOGGER.debug(
-                                    "Enqueued episode payload",
-                                    extra={
-                                        "run_id": run_id,
-                                        "seq_id": seq_id,
-                                        "qsize": self._queue.qsize() if hasattr(self._queue, "qsize") else None,
-                                    },
-                                )
+                                log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={
+                                    "run_id": run_id,
+                                    "seq_id": seq_id,
+                                    "qsize": self._queue.qsize() if hasattr(self._queue, "qsize") else None,
+                                })
                             except asyncio.QueueFull:
                                 self.bridge.emit_overflow(run_id, "episode", 1)
 
                         # Stream closed normally, attempt reconnection
                         if not self._stopping:
-                            _LOGGER.info("Episode stream closed, will reconnect", extra={"run_id": run_id, "last_seq": last_seq})
+                            log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id, "last_seq": last_seq})
                             await asyncio.sleep(0.5)  # Brief delay before reconnect
                             continue
                         else:
                             break
 
                 except asyncio.CancelledError:
-                    _LOGGER.debug("Episode stream cancelled", extra={"run_id": run_id})
+                    log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id})
                     break
                 except Exception as exc:
                     reconnect_attempts += 1
                     if reconnect_attempts >= max_reconnect_attempts:
-                        _LOGGER.error("Episode stream failed after max reconnect attempts",
-                                    extra={"run_id": run_id, "attempts": reconnect_attempts, "error": str(exc)})
+                        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_ERROR, extra={"run_id": run_id, "attempts": reconnect_attempts, "error": str(exc)})
                         break
-                    _LOGGER.warning("Episode stream error, will reconnect",
-                                  extra={"run_id": run_id, "attempt": reconnect_attempts, "error": str(exc)})
+                    log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id, "attempt": reconnect_attempts, "error": str(exc)})
                     await asyncio.sleep(reconnect_delay)
                     reconnect_delay = min(reconnect_delay * 1.5, 30.0)  # Exponential backoff, max 30s
 
         except asyncio.CancelledError:
-            _LOGGER.debug("Episode stream cancelled", extra={"run_id": run_id})
+            log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id})
         finally:
-            _LOGGER.info("Episode stream closed", extra={"run_id": run_id})
+            log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id})
 
     def unsubscribe_run(self, run_id: str) -> None:
         """Cancel subscriptions and clear buffers for a run."""
         self._call_soon_threadsafe(self._unsubscribe_run_async, run_id)
 
     def _unsubscribe_run_async(self, run_id: str) -> None:
-        _LOGGER.info("Unsubscribing from telemetry for run", extra={"run_id": run_id})
+        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_SUBSCRIBED, extra={"run_id": run_id})
         tasks = self._subscriptions.pop(run_id, None)
         if tasks:
             for name, task in tasks.items():
-                _LOGGER.debug("Cancelling stream task", extra={"run_id": run_id, "task": name})
+                log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id, "task": name})
                 task.cancel()
         self._buffers.pop(run_id, None)
-        _LOGGER.debug("Unsubscribed and cleaned up buffers for run: %s", run_id)
-        _LOGGER.info("Unsubscribed from telemetry streams", extra={"run_id": run_id})
+        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_TRACE, extra={"run_id": run_id})
+        log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_SUBSCRIBED, extra={"run_id": run_id})
+
+    def _publish_control_event(
+        self,
+        bus: "RunBus",
+        *,
+        run_id: str,
+        agent_id: str,
+        seq_id: int,
+        timestamp: str,
+        stream_type: str,
+        state: str,
+    ) -> None:
+        """Publish a control-plane event for credit state changes."""
+
+        control_evt = TelemetryEvent(
+            topic=Topic.CONTROL,
+            run_id=run_id,
+            agent_id=agent_id,
+            seq_id=seq_id,
+            ts_iso=timestamp,
+            payload={
+                "state": state,
+                "stream_type": stream_type,
+                "agent_id": agent_id,
+            },
+        )
+        bus.publish(control_evt)
 
     async def _drain_loop(self) -> None:
         if self._queue is None:
@@ -533,21 +544,65 @@ class TelemetryAsyncHub:
                     _LOGGER.warning("Step buffer overflow", extra={"run_id": run_id, "overflow": overflow})
                     self.bridge.emit_overflow(run_id, stream_type, overflow)
                 else:
-                    _LOGGER.debug("Emitting bridge.step_received", extra={"run_id": run_id, "seq": step.seq_id})
-                    self.bridge.emit_step(step)
+                    agent_id = payload_dict.get("agent_id", "default")
+                    timestamp = payload_dict.get("timestamp", "")
+                    stream_key = (run_id, agent_id, stream_type)
 
-                    # Publish to RunBus for db_sink and other subscribers (always publish for durability)
                     try:
                         bus = get_bus()
-                        agent_id = payload_dict.get("agent_id", "default")
                         self._credit_mgr.initialize_stream(run_id, agent_id)
+                        credits_available = self._credit_mgr.consume_credit(run_id, agent_id)
+
+                        if credits_available:
+                            if stream_key in self._starved_streams:
+                                self._starved_streams.discard(stream_key)
+                                self._publish_control_event(
+                                    bus,
+                                    run_id=run_id,
+                                    agent_id=agent_id,
+                                    seq_id=step.seq_id,
+                                    timestamp=timestamp,
+                                    stream_type=stream_type,
+                                    state="RESUMED",
+                                )
+                                _LOGGER.info(
+                                    "Credits replenished; CONTROL RESUMED emitted",
+                                    extra={"run_id": run_id, "agent_id": agent_id, "stream_type": stream_type},
+                                )
+
+                            _LOGGER.debug(
+                                "Emitting bridge.step_received",
+                                extra={"run_id": run_id, "seq": step.seq_id},
+                            )
+                            self.bridge.emit_step(step)
+                        else:
+                            if stream_key not in self._starved_streams:
+                                self._starved_streams.add(stream_key)
+                                self._publish_control_event(
+                                    bus,
+                                    run_id=run_id,
+                                    agent_id=agent_id,
+                                    seq_id=step.seq_id,
+                                    timestamp=timestamp,
+                                    stream_type=stream_type,
+                                    state="STARVED",
+                                )
+                                _LOGGER.warning(
+                                    "Credits exhausted; CONTROL STARVED emitted",
+                                    extra={"run_id": run_id, "agent_id": agent_id, "stream_type": stream_type},
+                                )
+
+                            _LOGGER.debug(
+                                "Skipping bridge emit due to credit starvation",
+                                extra={"run_id": run_id, "agent_id": agent_id},
+                            )
 
                         evt = TelemetryEvent(
                             topic=Topic.STEP_APPENDED,
                             run_id=run_id,
                             agent_id=agent_id,
                             seq_id=step.seq_id,
-                            ts_iso=payload_dict.get("timestamp", ""),
+                            ts_iso=timestamp,
                             payload=payload_dict,
                         )
                         bus.publish(evt)
@@ -574,21 +629,65 @@ class TelemetryAsyncHub:
                     _LOGGER.warning("Episode buffer overflow", extra={"run_id": run_id, "overflow": overflow})
                     self.bridge.emit_overflow(run_id, stream_type, overflow)
                 else:
-                    _LOGGER.debug("Emitting bridge.episode_received", extra={"run_id": run_id, "seq": episode.seq_id})
-                    self.bridge.emit_episode(episode)
+                    agent_id = payload_dict.get("agent_id", "default")
+                    timestamp = payload_dict.get("timestamp", "")
+                    stream_key = (run_id, agent_id, stream_type)
 
-                    # Publish to RunBus for db_sink and other subscribers (always published)
                     try:
                         bus = get_bus()
-                        agent_id = payload_dict.get("agent_id", "default")
                         self._credit_mgr.initialize_stream(run_id, agent_id)
+                        credits_available = self._credit_mgr.consume_credit(run_id, agent_id)
+
+                        if credits_available:
+                            if stream_key in self._starved_streams:
+                                self._starved_streams.discard(stream_key)
+                                self._publish_control_event(
+                                    bus,
+                                    run_id=run_id,
+                                    agent_id=agent_id,
+                                    seq_id=episode.seq_id,
+                                    timestamp=timestamp,
+                                    stream_type=stream_type,
+                                    state="RESUMED",
+                                )
+                                _LOGGER.info(
+                                    "Credits replenished; CONTROL RESUMED emitted",
+                                    extra={"run_id": run_id, "agent_id": agent_id, "stream_type": stream_type},
+                                )
+
+                            _LOGGER.debug(
+                                "Emitting bridge.episode_received",
+                                extra={"run_id": run_id, "seq": episode.seq_id},
+                            )
+                            self.bridge.emit_episode(episode)
+                        else:
+                            if stream_key not in self._starved_streams:
+                                self._starved_streams.add(stream_key)
+                                self._publish_control_event(
+                                    bus,
+                                    run_id=run_id,
+                                    agent_id=agent_id,
+                                    seq_id=episode.seq_id,
+                                    timestamp=timestamp,
+                                    stream_type=stream_type,
+                                    state="STARVED",
+                                )
+                                _LOGGER.warning(
+                                    "Credits exhausted; CONTROL STARVED emitted",
+                                    extra={"run_id": run_id, "agent_id": agent_id, "stream_type": stream_type},
+                                )
+
+                            _LOGGER.debug(
+                                "Skipping bridge episode emit due to credit starvation",
+                                extra={"run_id": run_id, "agent_id": agent_id},
+                            )
 
                         evt = TelemetryEvent(
                             topic=Topic.EPISODE_FINALIZED,
                             run_id=run_id,
                             agent_id=agent_id,
                             seq_id=episode.seq_id,
-                            ts_iso=payload_dict.get("timestamp", ""),
+                            ts_iso=timestamp,
                             payload=payload_dict,
                         )
                         bus.publish(evt)
@@ -606,6 +705,9 @@ class TelemetryAsyncHub:
                             "Failed to publish EPISODE_FINALIZED to RunBus",
                             extra={"run_id": run_id, "error": str(e)},
                         )
+
+            if self._queue is not None:
+                self._queue.task_done()
 
     def stop(self) -> None:
         if not self._started or self._loop is None:

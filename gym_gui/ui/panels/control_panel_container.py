@@ -159,9 +159,9 @@ class ControlPanelContainer(QtWidgets.QWidget):
         return self._control_panel.actor_changed
 
     @property
-    def agent_loadout_requested(self):
-        """Signal: agent loadout requested."""
-        return self._control_panel.agent_loadout_requested
+    def agent_form_requested(self):
+        """Signal: agent form requested."""
+        return self._control_panel.agent_form_requested
 
     @property
     def slippery_toggled(self):
@@ -200,4 +200,3 @@ class ControlPanelContainer(QtWidgets.QWidget):
 
 
 __all__ = ["ControlPanelContainer"]
-

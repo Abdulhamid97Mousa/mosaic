@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
+import logging
 from typing import Any, List, Mapping, Optional
 
 from qtpy import QtCore, QtGui, QtWidgets
@@ -20,9 +21,19 @@ from gym_gui.replays import EpisodeReplay, EpisodeReplayLoader
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
 from gym_gui.ui.widgets.busy_indicator import modal_busy_indicator
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_UI_RENDER_TABS_TRACE,
+    LOG_UI_RENDER_TABS_INFO,
+    LOG_UI_RENDER_TABS_WARNING,
+    LOG_UI_RENDER_TABS_ERROR,
+)
 
 
-class RenderTabs(QtWidgets.QTabWidget):
+_LOGGER = logging.getLogger(__name__)
+
+
+class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
     """Tab widget combining grid, raw text, video, and replay views."""
 
     _current_game: GameId | None
@@ -34,6 +45,7 @@ class RenderTabs(QtWidgets.QTabWidget):
         telemetry_service: TelemetryService | None = None,
     ) -> None:
         super().__init__(parent)
+        self._logger = _LOGGER
 
         locator = get_service_locator()
         registry = locator.resolve(RendererRegistry)
@@ -130,90 +142,84 @@ class RenderTabs(QtWidgets.QTabWidget):
     
     def _close_dynamic_tab(self, run_id: str, tab_name: str, tab_index: int) -> None:
         """Close a dynamic tab and cleanup resources."""
-        import logging
-        logger = logging.getLogger(__name__)
-
         try:
-            logger.debug(f"_close_dynamic_tab: START (run_id={run_id}, tab_name={tab_name}, tab_index={tab_index})")
+            self.log_constant(LOG_UI_RENDER_TABS_TRACE, message=f"_close_dynamic_tab: START (run_id={run_id}, tab_name={tab_name}, tab_index={tab_index})")
 
             # Get the widget before removing the tab
             widget = self.widget(tab_index)
-            logger.debug(f"_close_dynamic_tab: Got widget: {widget}")
+            self.log_constant(LOG_UI_RENDER_TABS_TRACE, message=f"_close_dynamic_tab: Got widget: {widget}")
 
             # Remove from tracking
             if run_id in self._agent_tabs and tab_name in self._agent_tabs[run_id]:
                 del self._agent_tabs[run_id][tab_name]
-                logger.debug(f"_close_dynamic_tab: Removed from tracking")
+                self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="_close_dynamic_tab: Removed from tracking")
 
                 # If this was the last tab for this run, clean up the run entry
                 if not self._agent_tabs[run_id]:
                     del self._agent_tabs[run_id]
-                    logger.debug(f"_close_dynamic_tab: Removed run entry")
+                    self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="_close_dynamic_tab: Removed run entry")
 
             # Remove the tab from the widget
-            logger.debug(f"_close_dynamic_tab: Removing tab at index {tab_index}")
+            self.log_constant(LOG_UI_RENDER_TABS_TRACE, message=f"_close_dynamic_tab: Removing tab at index {tab_index}")
             self.removeTab(tab_index)
 
             # Cleanup the widget
             if widget is not None:
-                logger.debug(f"_close_dynamic_tab: Cleaning up widget")
+                self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="_close_dynamic_tab: Cleaning up widget")
                 # Call cleanup on LiveTelemetryTab to prevent segfaults from pending QTimer callbacks
                 if hasattr(widget, 'cleanup'):
                     try:
-                        logger.debug(f"_close_dynamic_tab: Calling widget.cleanup()")
+                        self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="_close_dynamic_tab: Calling widget.cleanup()")
                         # Type: ignore because cleanup is a custom method on LiveTelemetryTab
                         widget.cleanup()  # type: ignore[attr-defined]
-                        logger.debug(f"_close_dynamic_tab: widget.cleanup() completed")
+                        self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="_close_dynamic_tab: widget.cleanup() completed")
                     except Exception as e:
-                        logger.exception(f"_close_dynamic_tab: Error cleaning up tab: {e}")
-                logger.debug(f"_close_dynamic_tab: Calling widget.deleteLater()")
+                        self.log_constant(LOG_UI_RENDER_TABS_ERROR, message=f"_close_dynamic_tab: Error cleaning up tab: {e}", exc_info=e)
+                self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="_close_dynamic_tab: Calling widget.deleteLater()")
                 widget.deleteLater()
 
-            logger.debug(f"_close_dynamic_tab: COMPLETE")
+            self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="_close_dynamic_tab: COMPLETE")
         except Exception as e:
-            logger.exception(f"_close_dynamic_tab: FATAL ERROR - {e}")
+            self.log_constant(LOG_UI_RENDER_TABS_ERROR, message=f"_close_dynamic_tab: FATAL ERROR - {e}", exc_info=e)
 
     def remove_dynamic_tabs_for_run(self, run_id: str) -> None:
         """Remove all dynamic tabs associated with a run_id."""
-        import logging
-        logger = logging.getLogger(__name__)
-
         try:
-            logger.info(f"remove_dynamic_tabs_for_run: START (run_id={run_id})")
+            self.log_constant(LOG_UI_RENDER_TABS_INFO, message=f"remove_dynamic_tabs_for_run: START (run_id={run_id})")
 
             tabs = self._agent_tabs.pop(run_id, {})
-            logger.debug(f"remove_dynamic_tabs_for_run: Found {len(tabs)} tabs to remove")
+            self.log_constant(LOG_UI_RENDER_TABS_TRACE, message=f"remove_dynamic_tabs_for_run: Found {len(tabs)} tabs to remove")
 
             for i, widget in enumerate(tabs.values()):
                 try:
-                    logger.debug(f"remove_dynamic_tabs_for_run: Processing tab {i+1}/{len(tabs)}: {widget}")
+                    self.log_constant(LOG_UI_RENDER_TABS_TRACE, message=f"remove_dynamic_tabs_for_run: Processing tab {i+1}/{len(tabs)}: {widget}")
 
                     # Call cleanup on LiveTelemetryTab to prevent segfaults from pending QTimer callbacks
                     if hasattr(widget, 'cleanup'):
                         try:
-                            logger.debug(f"remove_dynamic_tabs_for_run: Calling widget.cleanup()")
+                            self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="remove_dynamic_tabs_for_run: Calling widget.cleanup()")
                             # Type: ignore because cleanup is a custom method on LiveTelemetryTab
                             widget.cleanup()  # type: ignore[attr-defined]
-                            logger.debug(f"remove_dynamic_tabs_for_run: widget.cleanup() completed")
+                            self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="remove_dynamic_tabs_for_run: widget.cleanup() completed")
                         except Exception as e:
-                            logger.exception(f"remove_dynamic_tabs_for_run: Error cleaning up tab: {e}")
+                            self.log_constant(LOG_UI_RENDER_TABS_ERROR, message=f"remove_dynamic_tabs_for_run: Error cleaning up tab: {e}", exc_info=e)
 
                     idx = self.indexOf(widget)
-                    logger.debug(f"remove_dynamic_tabs_for_run: Widget index: {idx}")
+                    self.log_constant(LOG_UI_RENDER_TABS_TRACE, message=f"remove_dynamic_tabs_for_run: Widget index: {idx}")
 
                     if idx >= 0:
-                        logger.debug(f"remove_dynamic_tabs_for_run: Removing tab at index {idx}")
+                        self.log_constant(LOG_UI_RENDER_TABS_TRACE, message=f"remove_dynamic_tabs_for_run: Removing tab at index {idx}")
                         self.removeTab(idx)
 
-                    logger.debug(f"remove_dynamic_tabs_for_run: Calling widget.deleteLater()")
+                    self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="remove_dynamic_tabs_for_run: Calling widget.deleteLater()")
                     widget.deleteLater()
-                    logger.debug(f"remove_dynamic_tabs_for_run: Tab {i+1} cleanup complete")
+                    self.log_constant(LOG_UI_RENDER_TABS_TRACE, message=f"remove_dynamic_tabs_for_run: Tab {i+1} cleanup complete")
                 except Exception as e:
-                    logger.exception(f"remove_dynamic_tabs_for_run: Error processing tab {i+1}: {e}")
+                    self.log_constant(LOG_UI_RENDER_TABS_ERROR, message=f"remove_dynamic_tabs_for_run: Error processing tab {i+1}: {e}", exc_info=e)
 
-            logger.info(f"remove_dynamic_tabs_for_run: COMPLETE")
+            self.log_constant(LOG_UI_RENDER_TABS_INFO, message="remove_dynamic_tabs_for_run: COMPLETE")
         except Exception as e:
-            logger.exception(f"remove_dynamic_tabs_for_run: FATAL ERROR - {e}")
+            self.log_constant(LOG_UI_RENDER_TABS_ERROR, message=f"remove_dynamic_tabs_for_run: FATAL ERROR - {e}", exc_info=e)
 
     # ------------------------------------------------------------------
     # Public API
@@ -355,6 +361,7 @@ class _ReplayPreview(QtWidgets.QStackedWidget):
         registry: RendererRegistry | None = None,
     ) -> None:
         super().__init__(parent)
+        self._logger = _LOGGER
         self._registry = registry or create_default_renderer_registry()
         self._mode_hosts: dict[RenderMode, _RendererHost] = {}
         self._mode_indices: dict[RenderMode, int] = {}
@@ -464,6 +471,7 @@ class _ReplayTab(QtWidgets.QWidget):
         renderer_registry: RendererRegistry | None = None,
     ) -> None:
         super().__init__(parent)
+        self._logger = _LOGGER
         self._telemetry = telemetry_service
         self._loader = EpisodeReplayLoader(telemetry_service) if telemetry_service else None
         self._current_game = None

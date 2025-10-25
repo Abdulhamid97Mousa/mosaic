@@ -19,11 +19,22 @@ from gym_gui.core.data_model.telemetry_core import StepRecord, EpisodeRollup
 from gym_gui.telemetry.sqlite_store import TelemetrySQLiteStore
 from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.telemetry.run_bus import RunBus
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_SERVICE_DB_SINK_INITIALIZED,
+    LOG_SERVICE_DB_SINK_STARTED,
+    LOG_SERVICE_DB_SINK_ALREADY_RUNNING,
+    LOG_SERVICE_DB_SINK_STOPPED,
+    LOG_SERVICE_DB_SINK_STOP_TIMEOUT,
+    LOG_SERVICE_DB_SINK_FATAL,
+    LOG_SERVICE_DB_SINK_LOOP_EXITED,
+)
+
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class TelemetryDBSink:
+class TelemetryDBSink(LogConstantMixin):
     """Background writer that persists telemetry events to SQLite.
     
     This class subscribes to the RunBus and batches events for efficient
@@ -53,6 +64,7 @@ class TelemetryDBSink:
         The database uses efficient batching (batch_size=64) and WAL mode.
         UI rendering throttling is handled separately in LiveTelemetryTab.
         """
+        self._logger = _LOGGER
         self._store = store
         self._bus = bus
         self._batch_size = batch_size
@@ -65,8 +77,8 @@ class TelemetryDBSink:
         self._episode_batch: list[EpisodeRollup] = []
         self._write_count = 0
 
-        _LOGGER.info(
-            "TelemetryDBSink initialized",
+        self.log_constant(
+            LOG_SERVICE_DB_SINK_INITIALIZED,
             extra={
                 "batch_size": batch_size,
                 "checkpoint_interval": checkpoint_interval,
@@ -77,7 +89,7 @@ class TelemetryDBSink:
     def start(self) -> None:
         """Start the background writer thread."""
         if self._thread is not None:
-            _LOGGER.warning("DB sink already started")
+            self.log_constant(LOG_SERVICE_DB_SINK_ALREADY_RUNNING)
             return
         
         self._stop_event.clear()
@@ -87,19 +99,19 @@ class TelemetryDBSink:
             daemon=True,
         )
         self._thread.start()
-        _LOGGER.info("TelemetryDBSink started")
+        self.log_constant(LOG_SERVICE_DB_SINK_STARTED)
 
     def stop(self) -> None:
         """Stop the background writer thread."""
         if self._thread is None:
             return
-        
+
         self._stop_event.set()
         self._thread.join(timeout=5.0)
         if self._thread.is_alive():
-            _LOGGER.warning("DB sink thread did not stop cleanly")
+            self.log_constant(LOG_SERVICE_DB_SINK_STOP_TIMEOUT)
         else:
-            _LOGGER.info("TelemetryDBSink stopped")
+            self.log_constant(LOG_SERVICE_DB_SINK_STOPPED)
         self._thread = None
 
     def _run(self) -> None:
@@ -122,23 +134,31 @@ class TelemetryDBSink:
                 try:
                     # Process step events (non-blocking)
                     self._process_step_queue(step_queue)
-                    
+
                     # Process episode events (non-blocking)
                     self._process_episode_queue(episode_queue)
-                    
+
                     # Flush batches if needed
                     self._flush_batches()
-                    
+
                     # Small sleep to avoid busy-waiting
                     self._stop_event.wait(timeout=0.1)
                 except Exception as e:
-                    _LOGGER.exception("Error in DB sink loop", extra={"error": str(e)})
+                    self.log_constant(
+                        LOG_SERVICE_DB_SINK_FATAL,
+                        exc_info=e,
+                        extra={"error": str(e), "context": "loop"},
+                    )
         except Exception as e:
-            _LOGGER.exception("Fatal error in DB sink", extra={"error": str(e)})
+            self.log_constant(
+                LOG_SERVICE_DB_SINK_FATAL,
+                exc_info=e,
+                extra={"error": str(e)},
+            )
         finally:
             # Flush any remaining events
             self._flush_batches(force=True)
-            _LOGGER.info("DB sink loop exited")
+            self.log_constant(LOG_SERVICE_DB_SINK_LOOP_EXITED)
 
     def _process_step_queue(self, q: queue.Queue) -> None:
         """Process all available step events from the queue."""
@@ -328,4 +348,3 @@ class TelemetryDBSink:
 
 
 __all__ = ["TelemetryDBSink"]
-

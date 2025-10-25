@@ -31,8 +31,8 @@ def _policy_root() -> Path:
     return (VAR_TRAINER_DIR / "policies").resolve()
 
 
-class PolicySelectionDialog(QtWidgets.QDialog):
-    """Dialog to select an existing trained policy/checkpoint."""
+class SpadeBdiPolicySelectionForm(QtWidgets.QDialog):
+    """SPADE-BDI dialog to select an existing trained policy/checkpoint."""
 
     def __init__(
         self,
@@ -200,4 +200,4 @@ class PolicySelectionDialog(QtWidgets.QDialog):
         QtGui.QDesktopServices.openUrl(QtCore.QUrl.fromLocalFile(str(self._policy_root)))
 
 
-__all__ = ["PolicySelectionDialog"]
+__all__ = ["SpadeBdiPolicySelectionForm"]

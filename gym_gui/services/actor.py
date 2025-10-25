@@ -8,6 +8,9 @@ import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Optional, Protocol
 
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import LOG_SERVICE_ACTOR_SEED_ERROR
+
 
 class Actor(Protocol):
     """Protocol every actor implementation must follow."""
@@ -58,7 +61,7 @@ class ActorDescriptor:
     backend_label: str | None = None
 
 
-class ActorService:
+class ActorService(LogConstantMixin):
     """Registry that coordinates active actors for the current session."""
 
     def __init__(self) -> None:
@@ -155,8 +158,13 @@ class ActorService:
                 continue
             try:
                 callback(seed)
-            except Exception:  # pragma: no cover - defensive guard
-                self._logger.exception("Actor '%s' failed during seeding", actor_id)
+            except Exception as exc:  # pragma: no cover - defensive guard
+                self.log_constant(
+                    LOG_SERVICE_ACTOR_SEED_ERROR,
+                    message="actor_seed_failed",
+                    extra={"actor_id": actor_id},
+                    exc_info=exc,
+                )
 
     @property
     def last_seed(self) -> Optional[int]:

@@ -18,6 +18,31 @@ from typing import TYPE_CHECKING, Optional, Dict
 
 from qtpy import QtCore
 
+from gym_gui.logging_config.log_constants import (
+    LOG_BUFFER_DROP,
+    LOG_CREDIT_RESUMED,
+    LOG_CREDIT_STARVED,
+    LOG_LIVE_CONTROLLER_ALREADY_RUNNING,
+    LOG_LIVE_CONTROLLER_INITIALIZED,
+    LOG_LIVE_CONTROLLER_RUN_ALREADY_SUBSCRIBED,
+    LOG_LIVE_CONTROLLER_RUN_SUBSCRIBED,
+    LOG_LIVE_CONTROLLER_RUN_UNSUBSCRIBED,
+    LOG_LIVE_CONTROLLER_THREAD_STARTED,
+    LOG_LIVE_CONTROLLER_THREAD_STOPPED,
+    LOG_LIVE_CONTROLLER_THREAD_STOP_TIMEOUT,
+    LOG_TELEMETRY_CONTROLLER_THREAD_ERROR,
+    LOG_TELEMETRY_SUBSCRIBE_ERROR,
+    LOG_LIVE_CONTROLLER_LOOP_EXITED,
+    LOG_LIVE_CONTROLLER_BUFFER_STEPS_FLUSHED,
+    LOG_LIVE_CONTROLLER_BUFFER_EPISODES_FLUSHED,
+    LOG_LIVE_CONTROLLER_QUEUE_OVERFLOW,
+    LOG_LIVE_CONTROLLER_RUN_COMPLETED,
+    LOG_LIVE_CONTROLLER_RUNBUS_SUBSCRIBED,
+    LOG_LIVE_CONTROLLER_TAB_ADD_FAILED,
+    LOG_LIVE_CONTROLLER_SIGNAL_EMIT_FAILED,
+)
+from gym_gui.logging_config.helpers import LogConstantMixin
+
 from gym_gui.telemetry.run_bus import get_bus
 from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.telemetry.credit_manager import get_credit_manager
@@ -29,7 +54,10 @@ if TYPE_CHECKING:
     from gym_gui.ui.widgets.live_telemetry_tab import LiveTelemetryTab
 
 
-class LiveTelemetryController(QtCore.QObject):
+_LOGGER = logging.getLogger(__name__)
+
+
+class LiveTelemetryController(QtCore.QObject, LogConstantMixin):
     """Coordinates telemetry hub lifecycle and manages dynamic per-agent tab creation."""
 
     # Signals
@@ -44,9 +72,9 @@ class LiveTelemetryController(QtCore.QObject):
         parent: Optional[QtCore.QObject] = None,
     ) -> None:
         super().__init__(parent)
+        self._logger = _LOGGER
         self._hub = hub
         self._client = client
-        self._logger = logging.getLogger("gym_gui.controllers.live_telemetry")
         self._active_runs: set[str] = set()
         self._tabs: Dict[tuple[str, str], "LiveTelemetryTab"] = {}  # (run_id, agent_id) -> tab
 
@@ -57,6 +85,10 @@ class LiveTelemetryController(QtCore.QObject):
 
         # Store rendering throttle value per run (from TELEMETRY_SAMPLING_INTERVAL env var)
         self._render_throttle_per_run: Dict[str, int] = {}  # run_id -> throttle_interval
+
+        # Store render delay and enable flag per run (from train form metadata)
+        self._render_delay_per_run: Dict[str, int] = {}  # run_id -> render delay (ms)
+        self._render_enabled_per_run: Dict[str, bool] = {}  # run_id -> live render enabled flag
 
         # Store buffer sizes per run (from training config)
         self._step_buffer_size_per_run: Dict[str, int] = {}  # run_id -> step_buffer_size
@@ -72,17 +104,21 @@ class LiveTelemetryController(QtCore.QObject):
         self._stop_event = threading.Event()
         self._step_queue: Optional[queue.Queue] = None
         self._episode_queue: Optional[queue.Queue] = None
+        self._control_queue: Optional[queue.Queue] = None
 
         # Still wire bridge signals for overflow and run_completed (not in RunBus yet)
         self._hub.bridge.queue_overflow.connect(self._on_queue_overflow)
         self._hub.bridge.run_completed.connect(self._on_run_completed_from_bridge)
 
-        self._logger.info("LiveTelemetryController initialized with RunBus subscription")
+        self.log_constant(
+            LOG_LIVE_CONTROLLER_INITIALIZED,
+            extra={"bridge": type(self._hub.bridge).__name__},
+        )
 
     def start(self) -> None:
         """Start the background thread for RunBus subscription."""
         if self._thread is not None:
-            self._logger.warning("Controller already started")
+            self.log_constant(LOG_LIVE_CONTROLLER_ALREADY_RUNNING)
             return
 
         self._stop_event.clear()
@@ -92,7 +128,7 @@ class LiveTelemetryController(QtCore.QObject):
             daemon=True,
         )
         self._thread.start()
-        self._logger.info("LiveTelemetryController background thread started")
+        self.log_constant(LOG_LIVE_CONTROLLER_THREAD_STARTED)
 
     def stop(self) -> None:
         """Stop the background thread."""
@@ -102,9 +138,9 @@ class LiveTelemetryController(QtCore.QObject):
         self._stop_event.set()
         self._thread.join(timeout=5.0)
         if self._thread.is_alive():
-            self._logger.warning("Controller thread did not stop cleanly")
+            self.log_constant(LOG_LIVE_CONTROLLER_THREAD_STOP_TIMEOUT)
         else:
-            self._logger.info("LiveTelemetryController background thread stopped")
+            self.log_constant(LOG_LIVE_CONTROLLER_THREAD_STOPPED)
         self._thread = None
 
     def subscribe_to_run(self, run_id: str) -> None:
@@ -115,12 +151,15 @@ class LiveTelemetryController(QtCore.QObject):
         credit system is ready when the first step/episode is received.
         """
         if run_id in self._active_runs:
-            self._logger.debug("Already subscribed to run", extra={"run_id": run_id})
+            self.log_constant(
+                LOG_LIVE_CONTROLLER_RUN_ALREADY_SUBSCRIBED,
+                extra={"run_id": run_id},
+            )
             return
 
-        self._logger.debug(
-            "Subscribing controller to run",
-            extra={"run_id": run_id},
+        self.log_constant(
+            LOG_LIVE_CONTROLLER_RUN_SUBSCRIBED,
+            extra={"run_id": run_id, "stage": "request"},
         )
         self._active_runs.add(run_id)
 
@@ -129,13 +168,16 @@ class LiveTelemetryController(QtCore.QObject):
         # We use "default" as a placeholder; actual agent_id will be extracted from first event
         credit_mgr = get_credit_manager()
         credit_mgr.initialize_stream(run_id, "default")
-        self._logger.debug(
+        _LOGGER.debug(
             "Pre-initialized credits for default agent",
             extra={"run_id": run_id, "agent_id": "default"},
         )
 
         self._hub.subscribe_run(run_id, self._client)
-        self._logger.debug("Successfully subscribed to run: %s (hub notified)", run_id)
+        self.log_constant(
+            LOG_LIVE_CONTROLLER_RUN_SUBSCRIBED,
+            extra={"run_id": run_id, "stage": "bound"},
+        )
 
     def unsubscribe_from_run(self, run_id: str) -> None:
         """Stop streaming telemetry for a run."""
@@ -147,7 +189,16 @@ class LiveTelemetryController(QtCore.QObject):
         for key in keys_to_remove:
             del self._tabs[key]
         self._hub.unsubscribe_run(run_id)
-        self._logger.debug("Unsubscribed controller from run", extra={"run_id": run_id})
+        self._render_throttle_per_run.pop(run_id, None)
+        self._render_delay_per_run.pop(run_id, None)
+        self._render_enabled_per_run.pop(run_id, None)
+        self._step_buffer_size_per_run.pop(run_id, None)
+        self._episode_buffer_size_per_run.pop(run_id, None)
+        self._game_id_per_run.pop(run_id, None)
+        self.log_constant(
+            LOG_LIVE_CONTROLLER_RUN_UNSUBSCRIBED,
+            extra={"run_id": run_id},
+        )
 
     def shutdown(self) -> None:
         """Clean up all subscriptions and stop the hub."""
@@ -164,7 +215,7 @@ class LiveTelemetryController(QtCore.QObject):
             throttle_interval: Render every Nth step (1=every step, 2=every 2nd step, etc.)
         """
         self._render_throttle_per_run[run_id] = max(1, throttle_interval)
-        self._logger.debug(
+        _LOGGER.debug(
             "Set render throttle for run",
             extra={"run_id": run_id, "throttle_interval": throttle_interval},
         )
@@ -179,7 +230,7 @@ class LiveTelemetryController(QtCore.QObject):
         """
         self._step_buffer_size_per_run[run_id] = max(10, step_buffer_size)
         self._episode_buffer_size_per_run[run_id] = max(10, episode_buffer_size)
-        self._logger.debug(
+        _LOGGER.debug(
             "Set buffer sizes for run",
             extra={
                 "run_id": run_id,
@@ -201,6 +252,18 @@ class LiveTelemetryController(QtCore.QObject):
         episode_size = self._episode_buffer_size_per_run.get(run_id, 100)
         return step_size, episode_size
 
+    def set_render_delay_for_run(self, run_id: str, delay_ms: int) -> None:
+        self._render_delay_per_run[run_id] = max(0, delay_ms)
+
+    def get_render_delay_for_run(self, run_id: str) -> int:
+        return self._render_delay_per_run.get(run_id, 100)
+
+    def set_live_render_enabled_for_run(self, run_id: str, enabled: bool) -> None:
+        self._render_enabled_per_run[run_id] = enabled
+
+    def is_live_render_enabled(self, run_id: str) -> bool:
+        return self._render_enabled_per_run.get(run_id, True)
+
     def set_game_id_for_run(self, run_id: str, game_id: str) -> None:
         """Store the game_id for a run (for passing to dynamic tabs).
 
@@ -209,7 +272,7 @@ class LiveTelemetryController(QtCore.QObject):
             game_id: The game environment ID (e.g., "FrozenLake-v1")
         """
         self._game_id_per_run[run_id] = game_id
-        self._logger.debug(
+        _LOGGER.debug(
             "Set game_id for run",
             extra={"run_id": run_id, "game_id": game_id},
         )
@@ -249,7 +312,7 @@ class LiveTelemetryController(QtCore.QObject):
         # This ensures credits are available for events routed to this tab
         credit_mgr = get_credit_manager()
         credit_mgr.grant_credits(run_id, agent_id, 200)
-        self._logger.debug(
+        _LOGGER.debug(
             "Granted initial credits to tab",
             extra={"run_id": run_id, "agent_id": agent_id, "amount": 200},
         )
@@ -258,12 +321,12 @@ class LiveTelemetryController(QtCore.QObject):
         if run_id in self._render_throttle_per_run:
             throttle = self._render_throttle_per_run[run_id]
             tab.set_render_throttle_interval(throttle)
-            self._logger.debug(
+            _LOGGER.debug(
                 "Applied render throttle to tab",
                 extra={"run_id": run_id, "agent_id": agent_id, "throttle": throttle},
             )
 
-        self._logger.debug(
+        _LOGGER.debug(
             "Tab registered and ready for telemetry",
             extra={"run_id": run_id, "agent_id": agent_id, "tab_type": type(tab).__name__},
         )
@@ -271,22 +334,32 @@ class LiveTelemetryController(QtCore.QObject):
         # Flush any buffered steps that arrived before tab was registered
         if key in self._step_buffer:
             buffered_steps = self._step_buffer.pop(key)
-            self._logger.info(
-                "Flushing buffered steps to newly registered tab",
-                extra={"run_id": run_id, "agent_id": agent_id, "buffered_count": len(buffered_steps)},
+            self.log_constant(
+                LOG_LIVE_CONTROLLER_BUFFER_STEPS_FLUSHED,
+                extra={
+                    "run_id": run_id,
+                    "agent_id": agent_id,
+                    "buffered_count": len(buffered_steps),
+                },
             )
             for payload in buffered_steps:
                 tab.add_step(payload)
+                credit_mgr.grant_credits(run_id, agent_id, 1)
 
         # Flush any buffered episodes that arrived before tab was registered
         if key in self._episode_buffer:
             buffered_episodes = self._episode_buffer.pop(key)
-            self._logger.info(
-                "Flushing buffered episodes to newly registered tab",
-                extra={"run_id": run_id, "agent_id": agent_id, "buffered_count": len(buffered_episodes)},
+            self.log_constant(
+                LOG_LIVE_CONTROLLER_BUFFER_EPISODES_FLUSHED,
+                extra={
+                    "run_id": run_id,
+                    "agent_id": agent_id,
+                    "buffered_count": len(buffered_episodes),
+                },
             )
             for payload in buffered_episodes:
                 tab.add_episode(payload)
+                credit_mgr.grant_credits(run_id, agent_id, 1)
 
     @QtCore.Slot(str, str, str)  # type: ignore[misc]
     def _emit_tab_requested(self, run_id: str, agent_id: str, tab_title: str) -> None:
@@ -313,14 +386,17 @@ class LiveTelemetryController(QtCore.QObject):
                 if hasattr(tab, 'mark_overflow'):
                     tab.mark_overflow(stream_type, dropped)
 
-        self._logger.warning(
-            "Telemetry queue overflow",
+        self.log_constant(
+            LOG_LIVE_CONTROLLER_QUEUE_OVERFLOW,
             extra={"run_id": run_id, "stream_type": stream_type, "dropped": dropped},
         )
 
     def _on_run_completed_from_bridge(self, run_id: str) -> None:
         """Handle run completion signal from bridge."""
-        self._logger.info("Run completed signal received from bridge", extra={"run_id": run_id})
+        self.log_constant(
+            LOG_LIVE_CONTROLLER_RUN_COMPLETED,
+            extra={"run_id": run_id},
+        )
         self.run_completed.emit(run_id)
 
     def _run(self) -> None:
@@ -337,20 +413,27 @@ class LiveTelemetryController(QtCore.QObject):
             self._episode_queue = self._bus.subscribe_with_size(
                 Topic.EPISODE_FINALIZED, "live-ui", 64
             )
+            self._control_queue = self._bus.subscribe_with_size(
+                Topic.CONTROL, "live-ui-control", 32
+            )
 
-            self._logger.info(
-                "Subscribed to RunBus topics",
-                extra={"queue_size": 64},
+            self.log_constant(
+                LOG_LIVE_CONTROLLER_RUNBUS_SUBSCRIBED,
+                extra={"step_queue_size": 64, "episode_queue_size": 64, "control_queue_size": 32},
             )
 
             # Run async loop
             self._loop.run_until_complete(self._process_events())
         except Exception as e:
-            self._logger.exception("Fatal error in controller", extra={"error": str(e)})
+            self.log_constant(
+                LOG_TELEMETRY_CONTROLLER_THREAD_ERROR,
+                extra={"error": str(e)},
+                exc_info=e,
+            )
         finally:
             if self._loop is not None:
                 self._loop.close()
-            self._logger.info("Controller loop exited")
+            self.log_constant(LOG_LIVE_CONTROLLER_LOOP_EXITED)
 
     async def _process_events(self) -> None:
         """Process events from RunBus queues."""
@@ -364,14 +447,23 @@ class LiveTelemetryController(QtCore.QObject):
                 if self._episode_queue is not None:
                     await self._process_episode_queue()
 
+                if self._control_queue is not None:
+                    await self._process_control_queue()
+
                 # Small sleep to avoid busy-waiting
                 await asyncio.sleep(0.01)
             except Exception as e:
-                self._logger.exception("Error processing events", extra={"error": str(e)})
+                self.log_constant(
+                    LOG_TELEMETRY_CONTROLLER_THREAD_ERROR,
+                    extra={"error": str(e), "stage": "process_events"},
+                    exc_info=e,
+                )
 
     async def _process_step_queue(self) -> None:
         """Process all available step events from RunBus."""
         assert self._step_queue is not None
+
+        credit_mgr = get_credit_manager()
 
         while True:
             try:
@@ -379,7 +471,7 @@ class LiveTelemetryController(QtCore.QObject):
                 if not isinstance(evt, TelemetryEvent):
                     continue
 
-                self._logger.debug(
+                _LOGGER.debug(
                     "Step event received from RunBus",
                     extra={
                         "run_id": evt.run_id,
@@ -397,14 +489,14 @@ class LiveTelemetryController(QtCore.QObject):
                 credit_mgr = get_credit_manager()
                 was_initialized = credit_mgr.initialize_stream(evt.run_id, agent_id)
                 if was_initialized:
-                    self._logger.debug(
+                    _LOGGER.debug(
                         "Initialized credits for actual agent_id",
                         extra={"run_id": evt.run_id, "agent_id": agent_id},
                     )
 
                 # Route to tab if registered
                 tab = self._tabs.get(key)
-                self._logger.debug(
+                _LOGGER.debug(
                     "Looking for tab",
                     extra={
                         "run_id": evt.run_id,
@@ -417,17 +509,24 @@ class LiveTelemetryController(QtCore.QObject):
                 if tab is not None:
                     try:
                         tab.add_step(evt.payload)
+                        credit_mgr.grant_credits(evt.run_id, agent_id, 1)
                     except Exception as e:
-                        self._logger.warning(
-                            "Error adding step to tab (tab may be destroyed)",
-                            extra={"run_id": evt.run_id, "agent_id": agent_id, "error": str(e)},
+                        self.log_constant(
+                            LOG_LIVE_CONTROLLER_TAB_ADD_FAILED,
+                            extra={
+                                "run_id": evt.run_id,
+                                "agent_id": agent_id,
+                                "error": str(e),
+                                "payload_keys": list(evt.payload.keys()) if isinstance(evt.payload, dict) else "-",
+                            },
+                            exc_info=e,
                         )
                         # Remove the tab from tracking if it's destroyed
                         self._tabs.pop(key, None)
                 else:
                     # Emit signal to request tab creation on first step
                     if key not in self._step_buffer:
-                        self._logger.debug(
+                        _LOGGER.debug(
                             "First step received; requesting tab creation",
                             extra={"run_id": evt.run_id, "agent_id": agent_id},
                         )
@@ -447,29 +546,52 @@ class LiveTelemetryController(QtCore.QObject):
                                 QtCore.Q_ARG(str, agent_id),
                                 QtCore.Q_ARG(str, tab_title),
                             )
-                            self._logger.debug(
+                            _LOGGER.debug(
                                 "Scheduled signal emission via QMetaObject.invokeMethod",
                                 extra={"run_id": evt.run_id, "agent_id": agent_id},
                             )
                         except Exception as e:
-                            self._logger.error(
-                                "Failed to schedule signal emission",
-                                extra={"error": str(e), "run_id": evt.run_id, "agent_id": agent_id},
+                            self.log_constant(
+                                LOG_LIVE_CONTROLLER_SIGNAL_EMIT_FAILED,
+                                extra={
+                                    "run_id": evt.run_id,
+                                    "agent_id": agent_id,
+                                },
+                                exc_info=e,
                             )
 
                     # Buffer until tab is registered
                     if key not in self._step_buffer:
                         self._step_buffer[key] = deque(maxlen=STEP_BUFFER_SIZE)
 
-                    # DEBUG: Log payload keys
                     payload_keys = list(evt.payload.keys()) if isinstance(evt.payload, dict) else "not_dict"
-                    has_render = "render_payload_json" in evt.payload if isinstance(evt.payload, dict) else False
-                    self._logger.debug(
-                        f"[BUFFER] Buffering step: keys={payload_keys}, has_render_payload_json={has_render}",
-                        extra={"run_id": evt.run_id, "agent_id": agent_id}
+                    has_render = (
+                        isinstance(evt.payload, dict)
+                        and "render_payload_json" in evt.payload
                     )
-
                     self._step_buffer[key].append(evt.payload)
+                    level = (
+                        LOG_BUFFER_DROP.level
+                        if isinstance(LOG_BUFFER_DROP.level, int)
+                        else getattr(logging, LOG_BUFFER_DROP.level)
+                    )
+                    _LOGGER.log(
+                        level,
+                        "%s %s",
+                        LOG_BUFFER_DROP.code,
+                        LOG_BUFFER_DROP.message,
+                        extra={
+                            "run_id": evt.run_id,
+                            "agent_id": agent_id,
+                            "log_code": LOG_BUFFER_DROP.code,
+                            "buffer_size": len(self._step_buffer[key]),
+                            "payload_keys": payload_keys,
+                            "has_render_payload_json": has_render,
+                            "component": LOG_BUFFER_DROP.component,
+                            "subcomponent": LOG_BUFFER_DROP.subcomponent,
+                            "tags": ",".join(LOG_BUFFER_DROP.tags),
+                        },
+                    )
 
             except Exception as e:
                 # Catch queue.Empty (from thread-safe queue.Queue)
@@ -481,13 +603,15 @@ class LiveTelemetryController(QtCore.QObject):
         """Process all available episode events from RunBus."""
         assert self._episode_queue is not None
 
+        credit_mgr = get_credit_manager()
+
         while True:
             try:
                 evt = self._episode_queue.get_nowait()
                 if not isinstance(evt, TelemetryEvent):
                     continue
 
-                self._logger.debug(
+                _LOGGER.debug(
                     "Episode event received from RunBus",
                     extra={
                         "run_id": evt.run_id,
@@ -505,10 +629,18 @@ class LiveTelemetryController(QtCore.QObject):
                 if tab is not None:
                     try:
                         tab.add_episode(evt.payload)
+                        credit_mgr.grant_credits(evt.run_id, agent_id, 1)
                     except Exception as e:
-                        self._logger.warning(
-                            "Error adding episode to tab (tab may be destroyed)",
-                            extra={"run_id": evt.run_id, "agent_id": agent_id, "error": str(e)},
+                        self.log_constant(
+                            LOG_LIVE_CONTROLLER_TAB_ADD_FAILED,
+                            extra={
+                                "run_id": evt.run_id,
+                                "agent_id": agent_id,
+                                "error": str(e),
+                                "payload_keys": list(evt.payload.keys()) if isinstance(evt.payload, dict) else "-",
+                                "entry_type": "episode",
+                            },
+                            exc_info=e,
                         )
                         # Remove the tab from tracking if it's destroyed
                         self._tabs.pop(key, None)
@@ -518,11 +650,73 @@ class LiveTelemetryController(QtCore.QObject):
                         self._episode_buffer[key] = deque(maxlen=EPISODE_BUFFER_SIZE)
                     self._episode_buffer[key].append(evt.payload)
 
-            except Exception as e:
-                # Catch queue.Empty (from thread-safe queue.Queue)
-                if type(e).__name__ == 'Empty':
-                    break
-                raise
+            except queue.Empty:
+                break
+
+    async def _process_control_queue(self) -> None:
+        """Process control-plane events (credit starvation/resume)."""
+        assert self._control_queue is not None
+
+        while True:
+            try:
+                evt = self._control_queue.get_nowait()
+            except queue.Empty:
+                break
+
+            if not isinstance(evt, TelemetryEvent):
+                continue
+
+            agent_id = evt.agent_id or "default"
+            state = evt.payload.get("state") if isinstance(evt.payload, dict) else None
+            stream_type = evt.payload.get("stream_type") if isinstance(evt.payload, dict) else "unknown"
+
+            if state == "STARVED":
+                level = (
+                    LOG_CREDIT_STARVED.level
+                    if isinstance(LOG_CREDIT_STARVED.level, int)
+                    else getattr(logging, LOG_CREDIT_STARVED.level)
+                )
+                _LOGGER.log(
+                    level,
+                    "%s %s",
+                    LOG_CREDIT_STARVED.code,
+                    LOG_CREDIT_STARVED.message,
+                    extra={
+                        "run_id": evt.run_id,
+                        "agent_id": agent_id,
+                        "stream_type": stream_type,
+                        "log_code": LOG_CREDIT_STARVED.code,
+                        "component": LOG_CREDIT_STARVED.component,
+                        "subcomponent": LOG_CREDIT_STARVED.subcomponent,
+                        "tags": ",".join(LOG_CREDIT_STARVED.tags),
+                    },
+                )
+            elif state == "RESUMED":
+                level = (
+                    LOG_CREDIT_RESUMED.level
+                    if isinstance(LOG_CREDIT_RESUMED.level, int)
+                    else getattr(logging, LOG_CREDIT_RESUMED.level)
+                )
+                _LOGGER.log(
+                    level,
+                    "%s %s",
+                    LOG_CREDIT_RESUMED.code,
+                    LOG_CREDIT_RESUMED.message,
+                    extra={
+                        "run_id": evt.run_id,
+                        "agent_id": agent_id,
+                        "stream_type": stream_type,
+                        "log_code": LOG_CREDIT_RESUMED.code,
+                        "component": LOG_CREDIT_RESUMED.component,
+                        "subcomponent": LOG_CREDIT_RESUMED.subcomponent,
+                        "tags": ",".join(LOG_CREDIT_RESUMED.tags),
+                    },
+                )
+            else:
+                _LOGGER.debug(
+                    "Received CONTROL event",
+                    extra={"run_id": evt.run_id, "agent_id": agent_id, "payload": evt.payload},
+                )
 
 
 __all__ = ["LiveTelemetryController"]

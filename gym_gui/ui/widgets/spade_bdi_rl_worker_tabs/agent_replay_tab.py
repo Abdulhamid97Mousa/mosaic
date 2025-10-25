@@ -5,17 +5,27 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime
-from typing import Dict, List, Optional, Sequence
+from typing import Any, Dict, List, Optional, Sequence
 
 from qtpy import QtCore, QtWidgets
 
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_UI_WORKER_TABS_TRACE,
+    LOG_UI_WORKER_TABS_INFO,
+    LOG_UI_WORKER_TABS_WARNING,
+    LOG_UI_WORKER_TABS_ERROR,
+)
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.trainer import RunRegistry
 from gym_gui.telemetry import TelemetrySQLiteStore
 
 
-class AgentReplayTab(QtWidgets.QWidget):
+_LOGGER = logging.getLogger("gym_gui.ui.agent_replay_tab")
+
+
+class AgentReplayTab(QtWidgets.QWidget, LogConstantMixin):
     """Display telemetry captured for a specific training run and agent."""
 
     _DEFAULT_MAX_EPISODES = 500  # Fallback if config unavailable
@@ -29,9 +39,9 @@ class AgentReplayTab(QtWidgets.QWidget):
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         super().__init__(parent)
+        self._logger = _LOGGER
         self.run_id = run_id
         self.agent_id = agent_id
-        self._logger = logging.getLogger("gym_gui.ui.agent_replay_tab")
 
         locator = get_service_locator()
         self._store: Optional[TelemetrySQLiteStore] = (
@@ -43,7 +53,10 @@ class AgentReplayTab(QtWidgets.QWidget):
             self._registry: Optional[RunRegistry] = locator.resolve(RunRegistry)
         except Exception:
             self._registry = None
-            self._logger.debug("RunRegistry not available, will use default max_episodes limit")
+            self.log_constant(
+                LOG_UI_WORKER_TABS_TRACE,
+                message="RunRegistry not available, will use default max_episodes limit",
+            )
 
         self._episodes: List[EpisodeRollup] = []
         self._steps_cache: Dict[str, Sequence[StepRecord]] = {}
@@ -136,13 +149,19 @@ class AgentReplayTab(QtWidgets.QWidget):
             The max_episodes value from the run config, or DEFAULT if unavailable.
         """
         if self._registry is None:
-            self._logger.debug("Registry unavailable, using default max_episodes limit")
+            self.log_constant(
+                LOG_UI_WORKER_TABS_TRACE,
+                message="Registry unavailable, using default max_episodes limit",
+            )
             return self._DEFAULT_MAX_EPISODES
         
         try:
             config_json = self._registry.get_run_config_json(self.run_id)
             if config_json is None:
-                self._logger.warning(f"No config found for run {self.run_id}, using default max_episodes limit")
+                self.log_constant(
+                    LOG_UI_WORKER_TABS_WARNING,
+                    message=f"No config found for run {self.run_id}, using default max_episodes limit",
+                )
                 return self._DEFAULT_MAX_EPISODES
             
             config = json.loads(config_json)
@@ -155,23 +174,32 @@ class AgentReplayTab(QtWidgets.QWidget):
                 .get("max_episodes", self._DEFAULT_MAX_EPISODES)
             )
             if isinstance(max_episodes, int) and max_episodes > 0:
-                self._logger.debug(f"Using max_episodes={max_episodes} from run config for {self.run_id}")
+                self.log_constant(
+                    LOG_UI_WORKER_TABS_TRACE,
+                    message=f"Using max_episodes={max_episodes} from run config for {self.run_id}",
+                )
                 return max_episodes
         except Exception as e:
-            self._logger.warning(f"Failed to extract max_episodes from config: {e}, using default")
+            self.log_constant(
+                LOG_UI_WORKER_TABS_WARNING,
+                message=f"Failed to extract max_episodes from config: {e}, using default",
+                exc_info=e,
+            )
         
         return self._DEFAULT_MAX_EPISODES
 
     def refresh(self) -> None:
         """Reload telemetry from persistent storage."""
-        self._logger.debug(
-            "AgentReplayTab.refresh() called",
+        self.log_constant(
+            LOG_UI_WORKER_TABS_TRACE,
+            message="AgentReplayTab.refresh() called",
             extra={"run_id": self.run_id, "agent_id": self.agent_id},
         )
 
         if self._store is None:
-            self._logger.warning(
-                "Telemetry store is unavailable in refresh",
+            self.log_constant(
+                LOG_UI_WORKER_TABS_WARNING,
+                message="Telemetry store is unavailable in refresh",
                 extra={"run_id": self.run_id, "agent_id": self.agent_id},
             )
             self._summary_label.setText("Telemetry store is unavailable.")
@@ -182,8 +210,9 @@ class AgentReplayTab(QtWidgets.QWidget):
 
         # Get the actual max_episodes limit from the run configuration
         max_episodes_limit = self._get_max_episodes_from_config()
-        self._logger.debug(
-            "AgentReplayTab querying episodes",
+        self.log_constant(
+            LOG_UI_WORKER_TABS_TRACE,
+            message="AgentReplayTab querying episodes",
             extra={
                 "run_id": self.run_id,
                 "agent_id": self.agent_id,
@@ -198,8 +227,9 @@ class AgentReplayTab(QtWidgets.QWidget):
             order_desc=False,
         )
         self._episodes = list(episodes)
-        self._logger.debug(
-            "AgentReplayTab loaded episodes from store",
+        self.log_constant(
+            LOG_UI_WORKER_TABS_TRACE,
+            message="AgentReplayTab loaded episodes from store",
             extra={
                 "run_id": self.run_id,
                 "agent_id": self.agent_id,

@@ -1,4 +1,4 @@
-"""Dialog for configuring and submitting headless training runs."""
+"""SPADE-BDI training form (Qt dialog wrapper)."""
 
 from __future__ import annotations
 
@@ -13,10 +13,20 @@ from qtpy import QtCore, QtWidgets
 
 from gym_gui.core.enums import GameId
 from gym_gui.services.trainer import validate_train_run_config
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_UI_TRAIN_FORM_TRACE,
+    LOG_UI_TRAIN_FORM_INFO,
+    LOG_UI_TRAIN_FORM_WARNING,
+    LOG_UI_TRAIN_FORM_ERROR,
+)
 
 
-class AgentTrainDialog(QtWidgets.QDialog):
-    """Dialog to configure and submit a training run."""
+_LOGGER = logging.getLogger("gym_gui.ui.spade_bdi_train_form")
+
+
+class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
+    """SPADE-BDI specific dialog to configure and submit a training run."""
 
     def __init__(
         self,
@@ -24,13 +34,13 @@ class AgentTrainDialog(QtWidgets.QDialog):
         default_game: Optional[GameId] = None,
     ) -> None:
         super().__init__(parent)
+        self._logger = _LOGGER
         self.setWindowTitle("Agent Train Form")
         # Set larger initial size to accommodate two-column layout
         # Dialog will resize dynamically when game configuration changes
         self.resize(1000, 800)
         self.setMinimumWidth(800)
 
-        self._logger = logging.getLogger("gym_gui.ui.train_agent_dialog")
         self._selected_config: Optional[dict[str, Any]] = None
 
         self._build_ui()
@@ -39,8 +49,9 @@ class AgentTrainDialog(QtWidgets.QDialog):
             if idx >= 0:
                 self._game_combo.setCurrentIndex(idx)
 
-        self._logger.info(
-            "TrainAgentDialog opened",
+        self.log_constant(
+            LOG_UI_TRAIN_FORM_INFO,
+            message="SpadeBdiTrainForm opened",
             extra={"default_game": getattr(default_game, "value", None)},
         )
 
@@ -131,6 +142,16 @@ class AgentTrainDialog(QtWidgets.QDialog):
         right_layout.setSpacing(8)
         right_widget = QtWidgets.QWidget()
         right_widget.setLayout(right_layout)
+
+        # Toggle: disable live rendering (telemetry only)
+        self._disable_live_render_checkbox = QtWidgets.QCheckBox(
+            "Disable live rendering (telemetry only)"
+        )
+        self._disable_live_render_checkbox.setToolTip(
+            "When enabled, live grid/video views are not created; only telemetry tables update."
+        )
+        self._disable_live_render_checkbox.toggled.connect(self._on_live_render_toggle_changed)
+        right_layout.addRow("Live Rendering:", self._disable_live_render_checkbox)
 
         # SLIDER 1: Training Telemetry Throttle (controls data collection speed)
         telemetry_throttle_layout = QtWidgets.QHBoxLayout()
@@ -325,7 +346,10 @@ class AgentTrainDialog(QtWidgets.QDialog):
         )
         advanced_layout.addWidget(self._custom_config)
         main_layout.addWidget(self._advanced_group)
-        
+
+        # Initialize control states based on live rendering toggle
+        self._update_render_control_states()
+
         # Info label
         info_label = QtWidgets.QLabel(
             '<i>Training will run in the background. '
@@ -507,6 +531,39 @@ class AgentTrainDialog(QtWidgets.QDialog):
         # Show warning if value > 1 (skipping telemetry collection)
         self._training_telemetry_warning_label.setVisible(value > 1)
 
+    def _on_live_render_toggle_changed(self, checked: bool) -> None:
+        """Handle live rendering enable/disable toggle."""
+        self._update_render_control_states()
+
+    def _update_render_control_states(self) -> None:
+        """Enable/disable render-related controls based on toggle."""
+        enabled = not getattr(self, "_disable_live_render_checkbox", None) or not self._disable_live_render_checkbox.isChecked()
+        for widget in (
+            getattr(self, "_ui_rendering_throttle_slider", None),
+            getattr(self, "_render_delay_slider", None),
+        ):
+            if widget is not None:
+                widget.setEnabled(enabled)
+        for widget in (
+            getattr(self, "_ui_rendering_throttle_label", None),
+            getattr(self, "_render_delay_label", None),
+            getattr(self, "_ui_rendering_warning_label", None),
+            getattr(self, "_render_delay_info_label", None),
+        ):
+            if widget is not None:
+                widget.setEnabled(enabled)
+
+        if enabled:
+            if hasattr(self, "_ui_rendering_throttle_slider"):
+                self._on_ui_rendering_throttle_changed(self._ui_rendering_throttle_slider.value())
+            if hasattr(self, "_render_delay_slider"):
+                self._on_render_delay_changed(self._render_delay_slider.value())
+        else:
+            if hasattr(self, "_ui_rendering_throttle_label"):
+                self._ui_rendering_throttle_label.setText("Disabled")
+            if hasattr(self, "_render_delay_label"):
+                self._render_delay_label.setText("Disabled")
+
     def _on_ui_rendering_throttle_changed(self, value: int) -> None:
         """Handle UI rendering throttle slider change.
 
@@ -580,8 +637,9 @@ class AgentTrainDialog(QtWidgets.QDialog):
             if self._selected_config is not None:
                 worker_meta = self._selected_config.get("metadata", {}).get("worker", {})
                 config_meta = worker_meta.get("config", {}) if isinstance(worker_meta, dict) else {}
-                self._logger.info(
-                    "TrainAgentDialog accepted",
+                self.log_constant(
+                    LOG_UI_TRAIN_FORM_INFO,
+                    message="TrainAgentDialog accepted",
                     extra={
                         "run_name": self._selected_config.get("run_name"),
                         "agent_id": worker_meta.get("agent_id"),
@@ -631,8 +689,9 @@ class AgentTrainDialog(QtWidgets.QDialog):
             if bdi_asl_file:
                 bdi_config["asl_file"] = bdi_asl_file
             
-            self._logger.info(
-                "BDI Agent configuration collected",
+            self.log_constant(
+                LOG_UI_TRAIN_FORM_INFO,
+                message="BDI Agent configuration collected",
                 extra={
                     "agent_type": agent_type,
                     "bdi_jid": bdi_jid,
@@ -642,8 +701,9 @@ class AgentTrainDialog(QtWidgets.QDialog):
                 },
             )
         else:
-            self._logger.info(
-                "Headless Agent configuration (BDI disabled)",
+            self.log_constant(
+                LOG_UI_TRAIN_FORM_INFO,
+                message="Headless Agent configuration (BDI disabled)",
                 extra={
                     "agent_type": agent_type,
                     "algorithm": algorithm,
@@ -693,13 +753,12 @@ class AgentTrainDialog(QtWidgets.QDialog):
 
         # Get UI rendering throttle from slider
         # This controls how often the visual grid display updates on screen
-        # Affects: Live Rendering grid visualization only (NOT database writes or table updates)
         ui_rendering_throttle = self._ui_rendering_throttle_slider.value()
 
         # Get render delay from slider
-        # This controls the delay between visual grid renders (independent of table update speed)
-        # Affects: Live Rendering grid visualization smoothness (NOT database writes or table updates)
         render_delay_ms = self._render_delay_slider.value()
+
+        live_rendering_enabled = not self._disable_live_render_checkbox.isChecked()
 
         # Get UI training speed (step delay) from slider
         # This controls the artificial delay between training steps for human observation
@@ -715,6 +774,8 @@ class AgentTrainDialog(QtWidgets.QDialog):
         # This controls the in-memory ring buffer size for episodes in UI display
         episode_buffer_size = self._episode_buffer_spin.value()
 
+        env_render_delay_ms = render_delay_ms if live_rendering_enabled else 0
+
         environment = {
             "GYM_ENV_ID": game_id,
             "TRAIN_SEED": str(seed),
@@ -728,6 +789,8 @@ class AgentTrainDialog(QtWidgets.QDialog):
             "TRAINING_TELEMETRY_THROTTLE": str(training_telemetry_throttle),
             # UI rendering throttle: controls visual grid update speed (backward compatible name)
             "TELEMETRY_SAMPLING_INTERVAL": str(ui_rendering_throttle),
+            "UI_LIVE_RENDERING_ENABLED": "1" if live_rendering_enabled else "0",
+            "UI_RENDER_DELAY_MS": str(env_render_delay_ms),
         }
         
         # Add BDI-specific environment variables if enabled
@@ -745,6 +808,7 @@ class AgentTrainDialog(QtWidgets.QDialog):
                 "training_telemetry_throttle": training_telemetry_throttle,
                 "ui_rendering_throttle": ui_rendering_throttle,
                 "render_delay_ms": render_delay_ms,
+                "live_rendering_enabled": live_rendering_enabled,
                 "ui_training_speed_ms": ui_training_speed_value * 10,
                 "telemetry_buffer_size": telemetry_buffer_size,
                 "episode_buffer_size": episode_buffer_size,
@@ -851,4 +915,4 @@ def _deep_merge_dict(base: dict[str, Any], overrides: dict[str, Any]) -> dict[st
     return result
 
 
-__all__ = ["AgentTrainDialog"]
+__all__ = ["SpadeBdiTrainForm"]

@@ -52,6 +52,8 @@ gym_gui/services/trainer/proto/trainer_pb2.pyi
 .pytest_cache
 
 spadeBDI_RL
+cleanrl
+ray
 
 var/records/*
 var/telemetry/*

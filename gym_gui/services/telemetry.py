@@ -11,19 +11,25 @@ from typing import Deque, Iterable, Optional, TYPE_CHECKING
 
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.storage.session import EpisodeRecord
+from gym_gui.logging_config.log_constants import (
+    LOG_SERVICE_TELEMETRY_ASYNC_ERROR,
+    LOG_SERVICE_TELEMETRY_STEP_REJECTED,
+)
+from gym_gui.logging_config.helpers import LogConstantMixin
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
     from gym_gui.services.storage import StorageRecorderService
     from gym_gui.services.validation import ValidationService
     from gym_gui.telemetry import TelemetrySQLiteStore
 
-logger = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
-class TelemetryService:
+class TelemetryService(LogConstantMixin):
     """Aggregates telemetry events and forwards them to storage."""
 
     def __init__(self, *, history_limit: int = 512, validation_service: Optional["ValidationService"] = None) -> None:
+        self._logger = _LOGGER
         self._history_limit = max(1, history_limit)
         self._step_history: Deque[StepRecord] = deque(maxlen=self._history_limit)
         self._episode_history: Deque[EpisodeRollup] = deque(
@@ -46,7 +52,7 @@ class TelemetryService:
     # ------------------------------------------------------------------
     def record_step(self, record: StepRecord) -> None:
         # Log incoming step with all 10 fields (DEBUG level - per-step is noisy)
-        logger.debug(f"[TELEMETRY] Incoming StepRecord: "
+        _LOGGER.debug(f"[TELEMETRY] Incoming StepRecord: "
                     f"episode_id={record.episode_id} "
                     f"step_index={record.step_index} "
                     f"agent_id={record.agent_id} "
@@ -56,7 +62,7 @@ class TelemetryService:
                     f"truncated={record.truncated}")
         
         # Log field types to spot mismatches (DEBUG level)
-        logger.debug(f"[TELEMETRY TYPES] episode_id={type(record.episode_id).__name__} "
+        _LOGGER.debug(f"[TELEMETRY TYPES] episode_id={type(record.episode_id).__name__} "
                     f"step_index={type(record.step_index).__name__} "
                     f"reward={type(record.reward).__name__} "
                     f"action={type(record.action).__name__} "
@@ -78,7 +84,13 @@ class TelemetryService:
                 next_state=0,  # Not available in StepRecord
             )
             if not is_valid:
-                logger.warning(f"Step record validation failed: {record}")
+                self.log_constant(
+                    LOG_SERVICE_TELEMETRY_STEP_REJECTED,
+                    extra={
+                        "episode_id": record.episode_id,
+                        "step_index": record.step_index,
+                    },
+                )
 
         self._step_history.append(record)
         if self._storage:
@@ -93,7 +105,7 @@ class TelemetryService:
             )
             self._storage.record_step(storage_record)
         if self._store:
-            logger.debug(f"[TELEMETRY PERSIST] Persisting to SQLite store: "
+            _LOGGER.debug(f"[TELEMETRY PERSIST] Persisting to SQLite store: "
                         f"episode_id={record.episode_id} step_index={record.step_index}")
             # Schedule async write without blocking drain loop
             try:
@@ -102,10 +114,10 @@ class TelemetryService:
                 asyncio.get_running_loop()
                 # If we get here, there's a running loop - use async write
                 asyncio.create_task(self._async_record_step(record))
-                logger.debug(f"[TELEMETRY] Scheduled async write for episode_id={record.episode_id}")
+                _LOGGER.debug(f"[TELEMETRY] Scheduled async write for episode_id={record.episode_id}")
             except RuntimeError:
                 # No running event loop - use sync write immediately
-                logger.debug(f"[TELEMETRY] No running event loop, using sync write for episode_id={record.episode_id}")
+                _LOGGER.debug(f"[TELEMETRY] No running event loop, using sync write for episode_id={record.episode_id}")
                 self._store.record_step(record)
 
     async def _async_record_step(self, record: StepRecord) -> None:
@@ -117,7 +129,14 @@ class TelemetryService:
             loop = asyncio.get_event_loop()
             await loop.run_in_executor(None, self._store.record_step, record)
         except Exception as e:
-            logger.error(f"Failed to record step asynchronously: {e}", exc_info=e)
+            self.log_constant(
+                LOG_SERVICE_TELEMETRY_ASYNC_ERROR,
+                exc_info=e,
+                extra={
+                    "episode_id": record.episode_id,
+                    "step_index": record.step_index,
+                },
+            )
 
     def complete_episode(self, rollup: EpisodeRollup) -> None:
         self._episode_history.append(rollup)

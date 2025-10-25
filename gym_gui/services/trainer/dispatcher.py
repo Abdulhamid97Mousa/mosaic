@@ -12,12 +12,15 @@ import contextlib
 from pathlib import Path
 import signal
 import subprocess
+import re
 from typing import Any, Callable, Optional
 
 from gym_gui.services.trainer import RunRecord, RunRegistry, RunStatus
 from gym_gui.config.paths import VAR_TRAINER_DIR
 from gym_gui.services.trainer.gpu import GPUAllocator
 from gym_gui.core.agent_config import get_agent_config
+from gym_gui.logging_config.helpers import log_constant
+from gym_gui.logging_config.log_constants import get_constant_by_code
 
 _LOGGER = logging.getLogger("gym_gui.trainer.dispatcher")
 
@@ -35,6 +38,64 @@ def _get_signals():
             _LOGGER.warning(f"Failed to initialize TrainerSignals: {e}")
             _signals = None
     return _signals
+
+
+# Pattern to recognize LOG_CODE from worker output: "LOG_XXX | message | extra={...}"
+_LOG_CODE_PATTERN = re.compile(
+    r'^(?P<code>LOG\d+)\s+\|\s+(?P<message>.+?)\s+\|\s+extra=(?P<extra>.*)$'
+)
+
+
+def _parse_structured_log_line(line: str) -> tuple[str | None, dict[str, Any] | None]:
+    """Parse a structured log line from worker output.
+    
+    Expected format: "LOG_CODE | message | extra={...}"
+    
+    Returns:
+        Tuple of (log_code, extra_dict) if parseable, else (None, None).
+    """
+    match = _LOG_CODE_PATTERN.match(line.strip())
+    if not match:
+        return None, None
+    
+    code = match.group('code')
+    message = match.group('message')
+    extra_str = match.group('extra')
+    
+    try:
+        extra = json.loads(extra_str)
+    except json.JSONDecodeError:
+        return None, None
+    
+    return code, extra
+
+
+def _re_emit_worker_log(run_id: str, code: str, extra: dict[str, Any]) -> None:
+    """Re-emit a worker log as a structured log constant.
+    
+    Looks up the LOG_CODE, extracts component/subcomponent, and calls log_constant.
+    Falls back gracefully if the code is not recognized.
+    """
+    constant = get_constant_by_code(code)
+    if not constant:
+        _LOGGER.debug(
+            f"Unknown LOG_CODE from worker: {code}",
+            extra={"run_id": run_id, "code": code, "worker_extra": extra}
+        )
+        return
+    
+    # Ensure component and subcomponent are present in extra dict
+    worker_extra = dict(extra)
+    worker_extra.setdefault('component', constant.component)
+    worker_extra.setdefault('subcomponent', constant.subcomponent)
+    
+    try:
+        log_constant(_LOGGER, constant, extra=worker_extra)
+    except Exception as e:
+        _LOGGER.debug(
+            f"Failed to re-emit worker log: {e}",
+            extra={"run_id": run_id, "code": code, "error": str(e)}
+        )
 
 
 class WorkerHandle:
@@ -371,14 +432,28 @@ class TrainerDispatcher:
         return env
 
     async def _stream_stdout(self, handle: WorkerHandle) -> None:
-        """Stream stdout from worker subprocess."""
+        """Stream stdout from worker subprocess.
+        
+        Attempts to parse structured LOG_CODE lines and re-emit as log constants.
+        Falls back to plain DEBUG logging for unstructured output.
+        """
         if not handle.process.stdout:
             return
         _LOGGER.debug("Starting worker stdout stream", extra={"run_id": handle.run_id})
         try:
             async for line in handle.process.stdout:
                 decoded = line.decode("utf-8", errors="replace").rstrip()
-                _LOGGER.debug("Worker stdout", extra={"run_id": handle.run_id, "line": decoded})
+                
+                # Try to parse as structured log
+                code, extra = _parse_structured_log_line(decoded)
+                if code is not None and extra is not None:
+                    _re_emit_worker_log(handle.run_id, code, extra)
+                else:
+                    # Fallback: log as plain DEBUG message
+                    _LOGGER.debug(
+                        "Worker stdout",
+                        extra={"run_id": handle.run_id, "line": decoded}
+                    )
         except asyncio.CancelledError:
             pass
 

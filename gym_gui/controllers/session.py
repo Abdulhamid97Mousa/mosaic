@@ -26,12 +26,23 @@ from gym_gui.core.adapters.base import AdapterContext, AdapterStep, EnvironmentA
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.core.enums import ControlMode, GameId, EnvironmentFamily, ENVIRONMENT_FAMILY_BY_GAME
 from gym_gui.core.factories.adapters import create_adapter, get_adapter_cls
+from gym_gui.logging_config.log_constants import (
+    LOG_SESSION_ADAPTER_LOAD_ERROR,
+    LOG_SESSION_STEP_ERROR,
+    LOG_SESSION_EPISODE_ERROR,
+    LOG_SESSION_TIMER_PRECISION_WARNING,
+    
+)
+from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.services.actor import ActorService, EpisodeSummary, StepSnapshot
 from gym_gui.services.frame_storage import FrameStorageService
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
 from gym_gui.utils.seeding import SessionSeedManager
 from gym_gui.utils.timekeeping import SessionTimers
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -46,7 +57,7 @@ class SessionState:
     truncated: bool
 
 
-class SessionController(QtCore.QObject):
+class SessionController(QtCore.QObject, LogConstantMixin):
     """Manage adapter lifecycle and emit Qt-friendly signals for the UI."""
 
     session_initialized = QtCore.Signal(str, str, object)  # type: ignore[attr-defined]
@@ -61,8 +72,8 @@ class SessionController(QtCore.QObject):
 
     def __init__(self, settings: Settings, parent: Optional[QtCore.QObject] = None) -> None:
         super().__init__(parent)
+        self._logger = _LOGGER
         self._settings = settings
-        self._logger = logging.getLogger("gym_gui.controllers.session")
         self._adapter: EnvironmentAdapter | None = None
         self._game_id: GameId | None = None
         self._control_mode: ControlMode = settings.default_control_mode
@@ -75,10 +86,11 @@ class SessionController(QtCore.QObject):
         if hasattr(self._auto_timer, "setTimerType"):
             try:
                 self._auto_timer.setTimerType(QtCore.Qt.TimerType.PreciseTimer)  # type: ignore[attr-defined]
-            except Exception:
-                self._logger.warning(
-                    "Unable to apply precise timer type to auto timer; continuing with default",
-                    exc_info=True,
+            except Exception as exc:
+                self.log_constant(
+                    LOG_SESSION_TIMER_PRECISION_WARNING,
+                    exc_info=exc,
+                    extra={"timer": "auto"},
                 )
         self._auto_timer.timeout.connect(self._auto_step)
         self._idle_timer = QtCore.QTimer(self)
@@ -86,10 +98,11 @@ class SessionController(QtCore.QObject):
         if hasattr(self._idle_timer, "setTimerType"):
             try:
                 self._idle_timer.setTimerType(QtCore.Qt.TimerType.PreciseTimer)  # type: ignore[attr-defined]
-            except Exception:
-                self._logger.warning(
-                    "Unable to apply precise timer type to idle timer; continuing with default",
-                    exc_info=True,
+            except Exception as exc:
+                self.log_constant(
+                    LOG_SESSION_TIMER_PRECISION_WARNING,
+                    exc_info=exc,
+                    extra={"timer": "idle"},
                 )
         self._idle_timer.timeout.connect(self._idle_step)
         self._user_idle_interval: int | None = None
@@ -223,7 +236,14 @@ class SessionController(QtCore.QObject):
             adapter.load()
             initial_step = adapter.reset(seed=seed_to_use)
         except Exception as exc:  # pragma: no cover - UI surfaces error
-            self._logger.exception("Failed to load environment", exc_info=exc)
+            self.log_constant(
+                LOG_SESSION_ADAPTER_LOAD_ERROR,
+                exc_info=exc,
+                extra={
+                    "game_id": game_id.value,
+                    "control_mode": control_mode.value,
+                },
+            )
             self.error_occurred.emit(str(exc))
             return
 
@@ -258,7 +278,15 @@ class SessionController(QtCore.QObject):
         try:
             step = self._adapter.reset(seed=seed_to_use)
         except Exception as exc:  # pragma: no cover - UI surfaces error
-            self._logger.exception("Failed to reset environment", exc_info=exc)
+            self.log_constant(
+                LOG_SESSION_ADAPTER_LOAD_ERROR,
+                exc_info=exc,
+                extra={
+                    "game_id": self._game_id.value if self._game_id else "unknown",
+                    "control_mode": self._control_mode.value if self._game_id else "unknown",
+                    "context": "reset",
+                },
+            )
             self.error_occurred.emit(str(exc))
             return
         self._step_index = 0
@@ -301,7 +329,7 @@ class SessionController(QtCore.QObject):
         self._awaiting_human = False
         self.awaiting_human.emit(False, "")
         self._pending_input_label = key_label or "human"
-        self._logger.debug(
+        _LOGGER.debug(
             "Human action received label='%s' action=%s", self._pending_input_label, action
         )
         self._apply_action(action)
@@ -438,7 +466,14 @@ class SessionController(QtCore.QObject):
             try:
                 selected = self._actor_service.select_action(snapshot)
             except Exception as exc:  # pragma: no cover - defensive
-                self._logger.exception("Actor service failed to select action", exc_info=exc)
+                self.log_constant(
+                    LOG_SESSION_STEP_ERROR,
+                    exc_info=exc,
+                    extra={
+                        "stage": "actor_select",
+                        "game_id": self._game_id.value if self._game_id else "unknown",
+                    },
+                )
             else:
                 if selected is not None:
                     return selected
@@ -449,7 +484,14 @@ class SessionController(QtCore.QObject):
                 action = space.sample()
                 return int(action) if isinstance(action, (bool, int)) else action
         except Exception as exc:  # pragma: no cover - defensive
-            self._logger.exception("Failed to sample action", exc_info=exc)
+            self.log_constant(
+                LOG_SESSION_STEP_ERROR,
+                exc_info=exc,
+                extra={
+                    "stage": "sample_action",
+                    "game_id": self._game_id.value if self._game_id else "unknown",
+                },
+            )
             self.error_occurred.emit(str(exc))
         return None
 
@@ -459,7 +501,15 @@ class SessionController(QtCore.QObject):
         try:
             step = self._adapter.step(action)
         except Exception as exc:  # pragma: no cover - surfaced in UI
-            self._logger.exception("Step failed", exc_info=exc)
+            self.log_constant(
+                LOG_SESSION_STEP_ERROR,
+                exc_info=exc,
+                extra={
+                    "stage": "adapter_step",
+                    "action": action,
+                    "game_id": self._game_id.value if self._game_id else "unknown",
+                },
+            )
             self.error_occurred.emit(str(exc))
             self.stop_auto_play()
             self._pending_input_label = None
@@ -573,8 +623,15 @@ class SessionController(QtCore.QObject):
         if self._actor_service is not None and action is not None:
             try:
                 self._actor_service.notify_step(snapshot)
-            except Exception:  # pragma: no cover - defensive safeguard
-                self._logger.exception("Actor service failed during notify_step")
+            except Exception as exc:  # pragma: no cover - defensive safeguard
+                self.log_constant(
+                    LOG_SESSION_STEP_ERROR,
+                    exc_info=exc,
+                    extra={
+                        "stage": "actor_notify_step",
+                        "game_id": self._game_id.value if self._game_id else "unknown",
+                    },
+                )
         info_payload = dict(snapshot.info)
         if input_source is not None:
             info_payload.setdefault("input_source", input_source)
@@ -595,7 +652,7 @@ class SessionController(QtCore.QObject):
                     run_id=None,  # No run_id in human input mode
                 )
             except Exception as e:
-                self._logger.debug(f"Failed to save frame {frame_ref}: {e}")
+                _LOGGER.debug(f"Failed to save frame {frame_ref}: {e}")
 
         record = StepRecord(
             episode_id=self._episode_id,
@@ -624,7 +681,7 @@ class SessionController(QtCore.QObject):
         if not self._awaiting_human:
             return
         if self._passive_action is None:
-            self._logger.debug("Idle timer active but passive action unavailable")
+            _LOGGER.debug("Idle timer active but passive action unavailable")
             self._stop_idle_tick()
             return
         self._awaiting_human = False
@@ -788,7 +845,7 @@ class SessionController(QtCore.QObject):
             try:
                 return self._adapter.build_frame_reference(step.render_payload, step.state)
             except Exception as e:
-                self._logger.debug(f"Failed to build frame reference: {e}")
+                _LOGGER.debug(f"Failed to build frame reference: {e}")
 
         return None
 
@@ -810,8 +867,17 @@ class SessionController(QtCore.QObject):
         if self._actor_service is not None:
             try:
                 self._actor_service.notify_episode_end(summary)
-            except Exception:  # pragma: no cover - defensive safeguard
-                self._logger.exception("Actor service failed during notify_episode_end")
+            except Exception as exc:  # pragma: no cover - defensive safeguard
+                self.log_constant(
+                    LOG_SESSION_EPISODE_ERROR,
+                    exc_info=exc,
+                    extra={
+                        "stage": "actor_notify_episode_end",
+                        "game_id": summary.metadata.get("game_id")
+                        or (self._game_id.value if self._game_id else "unknown"),
+                        "episode_id": self._episode_id,
+                    },
+                )
         if self._telemetry is not None:
             rollup = EpisodeRollup(
                 episode_id=self._episode_id,
@@ -920,7 +986,7 @@ class SessionController(QtCore.QObject):
         if slippage_info:
             log_parts.append(slippage_info)
         
-        self._logger.debug(" ".join(log_parts))
+        _LOGGER.debug(" ".join(log_parts))
 
     def _build_config_context(self) -> str:
         """Build a configuration context string for logging."""

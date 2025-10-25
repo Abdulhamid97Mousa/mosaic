@@ -5,11 +5,16 @@ from __future__ import annotations
 import logging
 import random
 from dataclasses import dataclass, field
+from functools import partial
 from typing import Any, Protocol
 
 import numpy as np
 
+from gym_gui.logging_config.helpers import log_constant
+from gym_gui.logging_config.log_constants import LOG_WORKER_BDI_EVENT
+
 LOGGER = logging.getLogger(__name__)
+_log = partial(log_constant, LOGGER)
 
 
 class Environment(Protocol):
@@ -97,7 +102,7 @@ class QLearningRuntime:
 
             if (episode + 1) % 100 == 0:
                 avg_reward = np.mean(episode_rewards[-100:])
-                LOGGER.info("Episode %d: avg_reward=%.2f epsilon=%.3f", episode + 1, avg_reward, self.agent.epsilon)
+                _log(LOG_WORKER_BDI_EVENT, message=f"Episode {episode + 1}: training progress", extra={"avg_reward": float(avg_reward), "epsilon": self.agent.epsilon})
 
         return {
             "episode_rewards": episode_rewards,

@@ -273,7 +273,7 @@ class TabFactory:
 ```
 control_panel.train_agent_requested
   → _on_train_agent_requested()
-  → _on_agent_loadout_requested()
+  → _on_agent_form_requested()
   → Dialog → config from presenter
   → _submit_training_config(config)
 
@@ -600,4 +600,3 @@ assert isinstance(presenter, WorkerPresenter)  # Runtime check
 The WorkerPresenter architecture is **complete and fully tested**. The abstraction cleanly separates worker-specific orchestration logic (config building, tab creation, metadata extraction) from the MainWindow's core responsibilities (hosting Qt widgets, routing signals). The registry pattern enables pluggable workers without modifying MainWindow code.
 
 All 27 tests pass, covering registry operations, presenter functionality, tab creation, and MainWindow integration.
-

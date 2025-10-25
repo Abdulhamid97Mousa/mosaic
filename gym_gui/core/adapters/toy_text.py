@@ -21,12 +21,21 @@ from gym_gui.config.game_configs import (
 )
 from gym_gui.core.adapters.base import AdapterContext, EnvironmentAdapter, StepState
 from gym_gui.core.enums import ControlMode, GameId, RenderMode
+from gym_gui.logging_config.log_constants import (
+    LOG_ADAPTER_ENV_CREATED,
+    LOG_ADAPTER_STEP_SUMMARY,
+    LOG_ADAPTER_INIT_ERROR,
+    LOG_ADAPTER_STEP_ERROR,
+    LOG_ADAPTER_RENDER_ERROR,
+    LOG_ADAPTER_STATE_INVALID,
+)
 
 _TOY_TEXT_DATA_DIR = Path(__file__).resolve().parents[2] / "runtime" / "data" / "toy_text"
 _TOY_TEXT_DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 _ANSI_ESCAPE_RE = re.compile(r"\x1b\[(?P<codes>[0-9;]*)m")
 _AGENT_TOKEN_HINTS = {"x"}
+
 
 
 def _ensure_sequence(value: Any) -> Sequence[Any]:
@@ -182,7 +191,15 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
     def load(self) -> None:
         kwargs = self.gym_kwargs()
         env = gym.make(self.id, render_mode=self._gym_render_mode, **kwargs)
-        self.logger.debug("Loaded toy-text env '%s' with kwargs=%s", self.id, kwargs)
+        self.log_constant(
+            LOG_ADAPTER_ENV_CREATED,
+            message="toy_text_env_loaded",
+            extra={
+                "env_id": self.id,
+                "render_mode": self._gym_render_mode,
+                "kwargs": ",".join(sorted(kwargs.keys())) if kwargs else "-",
+            },
+        )
         self._set_env(env)
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
@@ -425,7 +442,11 @@ class FrozenLakeAdapter(ToyTextAdapter):
             y: Goal row (0-indexed)
         """
         self._goal_position = (x, y)
-        self.logger.debug(f"FrozenLake goal set to ({x}, {y})")
+        self.log_constant(
+            LOG_ADAPTER_STEP_SUMMARY,
+            message="frozenlake_goal_set",
+            extra={"env_id": self.id, "goal_x": x, "goal_y": y},
+        )
 
     def reset_q_table(self) -> None:
         """Reset Q-table for goal-switching scenarios.
@@ -434,7 +455,11 @@ class FrozenLakeAdapter(ToyTextAdapter):
         The actual Q-table is managed by the RL agent/trainer, not the adapter.
         This is a hook for coordination.
         """
-        self.logger.debug("FrozenLake Q-table reset requested (managed by RL agent)")
+        self.log_constant(
+            LOG_ADAPTER_STEP_SUMMARY,
+            message="frozenlake_qtable_reset_requested",
+            extra={"env_id": self.id},
+        )
 
     def get_grid_size(self) -> tuple[int, int]:
         """Get (height, width) of the FrozenLake grid.
@@ -568,12 +593,17 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
             # This ensures deterministic placement that matches the visual layout
             hole_positions = available_positions[:hole_count]
         
-        # DEBUG: Log hole placement details
-        import logging
-        logger = logging.getLogger(__name__)
-        logger.debug(f"[FrozenLakeV2 Map Gen] random_holes={random_holes}, hole_count={hole_count}, "
-                    f"available_positions[:5]={available_positions[:5]}, "
-                    f"hole_positions={hole_positions}")
+        # DEBUG: Log hole placement details using structured logging
+        self.log_constant(
+            LOG_ADAPTER_ENV_CREATED,
+            message="frozenlake_map_generation",
+            extra={
+                "random_holes": random_holes,
+                "hole_count": hole_count,
+                "sample_positions": repr(available_positions[:5]),
+                "hole_positions": repr(hole_positions),
+            },
+        )
         
         for r, c in hole_positions:
             grid[r][c] = 'H'
@@ -593,8 +623,15 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
         # Use FrozenLake8x8-v1 (the 8x8 variant available in Gymnasium)
         # This adapter is designed for larger customizable grids, hence the v2 naming in our code
         env = gym.make("FrozenLake8x8-v1", render_mode=self._gym_render_mode, **kwargs)
-        self.logger.debug("Loaded FrozenLake8x8-v1 env with custom map size=%dx%d",
-                         self._game_config.grid_height, self._game_config.grid_width)
+        self.log_constant(
+            LOG_ADAPTER_ENV_CREATED,
+            message="frozenlake_custom_map_loaded",
+            extra={
+                "env_id": "FrozenLake8x8-v1",
+                "grid_height": self._game_config.grid_height,
+                "grid_width": self._game_config.grid_width,
+            },
+        )
         self._set_env(env)
 
     def gym_kwargs(self) -> dict[str, Any]:

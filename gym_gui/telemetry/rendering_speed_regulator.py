@@ -12,6 +12,10 @@ from typing import Any, Optional
 from collections import deque
 from qtpy import QtCore, QtWidgets
 
+from gym_gui.logging_config.log_constants import (
+    LOG_RENDER_DROPPED_FRAME,
+    LOG_RENDER_REGULATOR_NOT_STARTED,
+)
 from gym_gui.telemetry.constants import RENDER_QUEUE_SIZE, RENDER_BOOTSTRAP_TIMEOUT_MS
 
 _LOGGER = logging.getLogger(__name__)
@@ -125,9 +129,23 @@ class RenderingSpeedRegulator(QtCore.QObject):
             self._early_payloads.append(payload)
             
             if not was_full:
-                _LOGGER.debug(
-                    "RenderingSpeedRegulator buffering early payload (before start)",
-                    extra={"early_buffer_size": len(self._early_payloads)},
+                level = (
+                    LOG_RENDER_REGULATOR_NOT_STARTED.level
+                    if isinstance(LOG_RENDER_REGULATOR_NOT_STARTED.level, int)
+                    else getattr(logging, LOG_RENDER_REGULATOR_NOT_STARTED.level)
+                )
+                _LOGGER.log(
+                    level,
+                    "%s %s",
+                    LOG_RENDER_REGULATOR_NOT_STARTED.code,
+                    LOG_RENDER_REGULATOR_NOT_STARTED.message,
+                    extra={
+                        "early_buffer_size": len(self._early_payloads),
+                        "log_code": LOG_RENDER_REGULATOR_NOT_STARTED.code,
+                        "component": LOG_RENDER_REGULATOR_NOT_STARTED.component,
+                        "subcomponent": LOG_RENDER_REGULATOR_NOT_STARTED.subcomponent,
+                        "tags": ",".join(LOG_RENDER_REGULATOR_NOT_STARTED.tags),
+                    },
                 )
             
             # Auto-start if we've been buffering for too long
@@ -143,9 +161,23 @@ class RenderingSpeedRegulator(QtCore.QObject):
         self._payload_queue.append(payload)
         
         if was_full:
-            _LOGGER.debug(
-                "RenderingSpeedRegulator queue full, dropped oldest payload",
-                extra={"queue_size": len(self._payload_queue)},
+            level = (
+                LOG_RENDER_DROPPED_FRAME.level
+                if isinstance(LOG_RENDER_DROPPED_FRAME.level, int)
+                else getattr(logging, LOG_RENDER_DROPPED_FRAME.level)
+            )
+            _LOGGER.log(
+                level,
+                "%s %s",
+                LOG_RENDER_DROPPED_FRAME.code,
+                LOG_RENDER_DROPPED_FRAME.message,
+                extra={
+                    "queue_size": len(self._payload_queue),
+                    "log_code": LOG_RENDER_DROPPED_FRAME.code,
+                    "component": LOG_RENDER_DROPPED_FRAME.component,
+                    "subcomponent": LOG_RENDER_DROPPED_FRAME.subcomponent,
+                    "tags": ",".join(LOG_RENDER_DROPPED_FRAME.tags),
+                },
             )
         else:
             _LOGGER.debug(
@@ -210,4 +242,3 @@ class RenderingSpeedRegulator(QtCore.QObject):
     def __del__(self) -> None:
         """Cleanup on deletion."""
         self.stop()
-

@@ -13,6 +13,7 @@ from __future__ import annotations
 import asyncio
 import logging
 import sys
+from functools import partial
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Union
@@ -30,8 +31,16 @@ if TYPE_CHECKING:
 
 from ..assets import asl_path
 from .bdi_agent import BDIRLAgent
+from gym_gui.logging_config.helpers import log_constant
+from gym_gui.logging_config.log_constants import (
+    LOG_WORKER_BDI_EVENT,
+    LOG_WORKER_BDI_WARNING,
+    LOG_WORKER_BDI_ERROR,
+    LOG_WORKER_BDI_DEBUG,
+)
 
 LOGGER = logging.getLogger(__name__)
+_log = partial(log_constant, LOGGER)
 
 DEFAULT_JID = "agent@localhost"
 DEFAULT_PASSWORD = "secret"
@@ -108,19 +117,34 @@ class AgentHandle:
             )
         
         if self.started:
-            LOGGER.warning("Agent already started, skipping duplicate start")
+            _log(
+                LOG_WORKER_BDI_WARNING,
+                message="Agent already started, skipping duplicate start",
+                extra={"jid": self.jid},
+            )
             return
         
         try:
             await asyncio.wait_for(self.agent.start(auto_register=auto_register), timeout=timeout)
             await self.agent.setup()
             self.started = True
-            LOGGER.info("BDI agent '%s' started successfully", self.jid)
+            _log(
+                LOG_WORKER_BDI_EVENT,
+                message="BDI agent started successfully",
+                extra={"jid": self.jid},
+            )
         except asyncio.TimeoutError:
-            LOGGER.error("BDI agent start timed out after %.1fs", timeout)
+            _log(
+                LOG_WORKER_BDI_ERROR,
+                message=f"BDI agent start timed out after {timeout:.1f}s",
+            )
             raise
         except Exception as exc:
-            LOGGER.error("BDI agent start failed: %s", exc)
+            _log(
+                LOG_WORKER_BDI_ERROR,
+                message=f"BDI agent start failed: {exc}",
+                exc_info=exc,
+            )
             # Attempt cleanup
             try:
                 await asyncio.wait_for(self.agent.stop(), timeout=5.0)
@@ -140,16 +164,28 @@ class AgentHandle:
             )
         
         if not self.started:
-            LOGGER.debug("Agent not started, skipping stop")
+            _log(
+                LOG_WORKER_BDI_DEBUG,
+                message="Agent not started, skipping stop",
+                extra={"jid": self.jid},
+            )
             return
         
         try:
             await asyncio.wait_for(self.agent.stop(), timeout=5.0)
-            LOGGER.info("BDI agent '%s' stopped successfully", self.jid)
+            _log(
+                LOG_WORKER_BDI_EVENT,
+                message="BDI agent stopped successfully",
+                extra={"jid": self.jid},
+            )
         except asyncio.TimeoutError:
-            LOGGER.warning("BDI agent stop timed out")
+            _log(LOG_WORKER_BDI_WARNING, message="BDI agent stop timed out", extra={"jid": self.jid})
         except Exception as exc:
-            LOGGER.warning("BDI agent stop raised exception: %s", exc)
+            _log(
+                LOG_WORKER_BDI_WARNING,
+                message=f"BDI agent stop raised exception: {exc}",
+                exc_info=exc,
+            )
         finally:
             self.started = False
 
@@ -183,10 +219,16 @@ def create_agent(
     # Resolve ASL file if specified
     if asl_file is None:
         asl_file_path = str(asl_path())
-        LOGGER.debug("Using default ASL file: %s", asl_file_path)
+        _log(
+            LOG_WORKER_BDI_DEBUG,
+            message=f"Using default ASL file: {asl_file_path}",
+        )
     else:
         asl_file_path = str(resolve_asl(asl_file))
-        LOGGER.debug("Using custom ASL file: %s", asl_file_path)
+        _log(
+            LOG_WORKER_BDI_DEBUG,
+            message=f"Using custom ASL file: {asl_file_path}",
+        )
     
     # Get BDI agent class
     BDIAgentClass = _get_bdi_agent_class()
@@ -199,8 +241,9 @@ def create_agent(
             adapter=adapter,
             asl_file=asl_file_path,
         )
-        LOGGER.info(
-            "Created BDI agent instance successfully",
+        _log(
+            LOG_WORKER_BDI_EVENT,
+            message="Created BDI agent instance successfully",
             extra={
                 "jid": jid,
                 "asl_file": asl_file_path,
@@ -209,13 +252,15 @@ def create_agent(
         )
         return AgentHandle(agent=agent, jid=jid, password=password)
     except Exception as exc:
-        LOGGER.exception(
-            "Failed to instantiate BDI agent",
+        _log(
+            LOG_WORKER_BDI_ERROR,
+            message="Failed to instantiate BDI agent",
             extra={
                 "jid": jid,
                 "asl_file": asl_file_path,
                 "error": str(exc),
             },
+            exc_info=exc,
         )
         # Return handle with agent=None - start/stop will raise clear error
         return AgentHandle(agent=None, jid=jid, password=password)
@@ -256,14 +301,16 @@ async def create_and_start_agent(
     # Attempt to start
     try:
         await handle.start(auto_register=ensure_account, timeout=start_timeout)
-        LOGGER.info(
-            "BDI agent created and started successfully",
+        _log(
+            LOG_WORKER_BDI_EVENT,
+            message="BDI agent created and started successfully",
             extra={"jid": jid},
         )
         return handle
     except LegacyImportError:
-        LOGGER.error(
-            "Cannot start BDI agent - agent is not initialized",
+        _log(
+            LOG_WORKER_BDI_ERROR,
+            message="Cannot start BDI agent - agent is not initialized",
             extra={
                 "jid": jid,
                 "recommendation": "Check agent instantiation",
@@ -271,9 +318,11 @@ async def create_and_start_agent(
         )
         raise
     except Exception as exc:
-        LOGGER.exception(
-            "BDI agent startup failed",
+        _log(
+            LOG_WORKER_BDI_ERROR,
+            message="BDI agent startup failed",
             extra={"jid": jid, "error": str(exc)},
+            exc_info=exc,
         )
         raise
 

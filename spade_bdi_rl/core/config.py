@@ -2,14 +2,23 @@
 
 from __future__ import annotations
 
-import logging
 import os
 from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, Optional
 
-logger = logging.getLogger(__name__)
+import logging
+from functools import partial
+
+from gym_gui.logging_config.helpers import log_constant
+from gym_gui.logging_config.log_constants import (
+    LOG_WORKER_CONFIG_EVENT,
+    LOG_WORKER_CONFIG_WARNING,
+)
+
+_LOGGER = logging.getLogger(__name__)
+_log = partial(log_constant, _LOGGER)
 
 
 class PolicyStrategy(str, Enum):
@@ -86,11 +95,33 @@ class RunConfig:
     def __post_init__(self) -> None:
         """Log configuration details after initialization."""
         # CRITICAL: Enforce that seed is never 0
+        original_seed = self.seed
         if self.seed < 1:
             object.__setattr__(self, "seed", 1)
-            logger.warning(f"Seed was {self.seed}, forcing to 1 (seed must never be 0)")
+            _log(
+                LOG_WORKER_CONFIG_WARNING,
+                message="Seed coerced to 1 (must never be 0)",
+                extra={"original_seed": original_seed},
+            )
 
-        logger.info(f"RUN_CONFIG_LOADED | run_id={self.run_id} | game_id={self.game_id} | seed={self.seed} | max_episodes={self.max_episodes} | max_steps_per_episode={self.max_steps_per_episode} | policy_strategy={self.policy_strategy.value} | agent_id={self.agent_id} | capture_video={self.capture_video} | headless={self.headless} | step_delay={self.step_delay}s | policy_path={self.policy_path} | extra_keys={list(self.extra.keys())}")
+        _log(
+            LOG_WORKER_CONFIG_EVENT,
+            message="RUN_CONFIG_LOADED",
+            extra={
+                "run_id": self.run_id,
+                "game_id": self.game_id,
+                "seed": self.seed,
+                "max_episodes": self.max_episodes,
+                "max_steps_per_episode": self.max_steps_per_episode,
+                "policy_strategy": self.policy_strategy.value,
+                "agent_id": self.agent_id,
+                "capture_video": self.capture_video,
+                "headless": self.headless,
+                "step_delay_s": self.step_delay,
+                "policy_path": str(self.policy_path) if self.policy_path else None,
+                "extra_keys": list(self.extra.keys()),
+            },
+        )
 
     def ensure_policy_path(self) -> Path:
         """Ensure a canonical policy path exists, creating parent dirs as needed."""

@@ -43,7 +43,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
     game_changed = Signal(GameId)
     load_requested = Signal(GameId, ControlMode, int)
     reset_requested = Signal(int)
-    agent_loadout_requested = Signal()
+    agent_form_requested = Signal()
     slippery_toggled = Signal(bool)
     frozen_v2_config_changed = Signal(str, object)  # (param_name, value)
     taxi_config_changed = Signal(str, bool)  # (param_name, value)
@@ -419,7 +419,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         train_layout = QtWidgets.QVBoxLayout(train_group)
         self._configure_agent_button = QtWidgets.QPushButton("🚀 Configure Agent…", train_group)
         self._configure_agent_button.setToolTip(
-            "Open the agent loadout to pick or customise the backend used for headless training."
+            "Open the agent training form to configure the backend used for headless training."
         )
         self._configure_agent_button.setEnabled(False)
         self._configure_agent_button.setStyleSheet(
@@ -529,7 +529,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._game_combo.currentIndexChanged.connect(self._on_game_changed)
         self._seed_spin.valueChanged.connect(lambda _: self._update_control_states())
         self._wire_mode_combo()
-        self._configure_agent_button.clicked.connect(self.agent_loadout_requested.emit)
+        self._configure_agent_button.clicked.connect(self.agent_form_requested.emit)
 
         self._load_button.clicked.connect(self._on_load_clicked)
         self._train_agent_button.clicked.connect(self.train_agent_requested.emit)
@@ -1193,6 +1193,4 @@ class ControlPanelWidget(QtWidgets.QWidget):
             placeholder = QtWidgets.QLabel("No overrides available for this game.")
             placeholder.setWordWrap(True)
             self._config_layout.addRow(placeholder)
-
-
 

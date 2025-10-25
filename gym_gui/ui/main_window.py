@@ -5,7 +5,7 @@ from __future__ import annotations
 import logging
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
 import json
 import threading
 
@@ -30,6 +30,19 @@ from gym_gui.core.factories.adapters import available_games
 from gym_gui.controllers.human_input import HumanInputController
 from gym_gui.controllers.session import SessionController
 from gym_gui.controllers.live_telemetry_controllers import LiveTelemetryController
+from gym_gui.logging_config.log_constants import (
+    LOG_UI_MAINWINDOW_TRACE,
+    LOG_UI_MAINWINDOW_INFO,
+    LOG_UI_MAINWINDOW_WARNING,
+    LOG_UI_MAINWINDOW_ERROR,
+    LOG_TELEMETRY_SUBSCRIBE_ERROR,
+    LOG_LIVE_CONTROLLER_RUN_COMPLETED,
+    LOG_UI_WORKER_TABS_WARNING,
+    LOG_UI_WORKER_TABS_ERROR,
+    LOG_UI_WORKER_TABS_INFO,
+)
+from gym_gui.logging_config.logger import list_known_components
+from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.ui.logging_bridge import LogRecordPayload, QtLogHandler
 from gym_gui.ui.presenters.main_window_presenter import MainWindowPresenter, MainWindowView
 from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWidget
@@ -49,22 +62,18 @@ from gym_gui.ui.presenters.workers import (
 from gym_gui.ui.widgets.spade_bdi_rl_worker_tabs import (
     AgentReplayTab,
 )
-from gym_gui.ui.widgets.policy_selection_form import PolicySelectionDialog
-from gym_gui.ui.widgets.agent_train_dialog import AgentTrainDialog
+from gym_gui.ui.forms import get_worker_form_factory
+
+if TYPE_CHECKING:  # pragma: no cover - typing only
+    from gym_gui.ui.widgets.spade_bdi_train_form import SpadeBdiTrainForm
+    from gym_gui.ui.widgets.spade_bdi_policy_selection_form import SpadeBdiPolicySelectionForm
 from gym_gui.services.trainer.signals import get_trainer_signals
 
+_LOGGER = logging.getLogger(__name__)
 
-class MainWindow(QtWidgets.QMainWindow):
+
+class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
     """Primary window that orchestrates the Gym session."""
-
-    # Component-level filters (module prefixes)
-    LOG_FILTER_OPTIONS: Dict[str, str | None] = {
-        "All": None,
-        "UI": "gym_gui.ui",
-        "Controller": "gym_gui.controllers",
-        "Adapter": "gym_gui.core.adapters",
-        "Worker": "spade_bdi_rl.worker",
-    }
 
     # Severity-level filters
     LOG_SEVERITY_OPTIONS: Dict[str, str | None] = {
@@ -92,11 +101,13 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def __init__(self, settings: Settings, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
-        self.logger = logging.getLogger(__name__)
+        self._logger = _LOGGER
         self._settings = settings
         self._session = SessionController(settings, self)
         self._log_handler = QtLogHandler(parent=self)
         self._log_records: List[LogRecordPayload] = []
+        self._component_filter_options: List[str] = ["All", *list_known_components()]
+        self._component_filter_set = set(self._component_filter_options)
         self._auto_running = False
         self._episode_finished = False  # Track episode termination state
         self._game_started = False
@@ -209,7 +220,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def _configure_logging(self) -> None:
         root_logger = logging.getLogger()
         self._log_handler.setLevel(logging.NOTSET)
-        formatter = logging.Formatter("%(asctime)s | %(levelname)-7s | %(name)s | %(message)s")
+        # Qt handler emits raw log messages; timestamps and metadata are added when rendering.
+        formatter = logging.Formatter("%(message)s")
         self._log_handler.setFormatter(formatter)
         root_logger.addHandler(self._log_handler)
 
@@ -259,7 +271,7 @@ class MainWindow(QtWidgets.QMainWindow):
         # Component filter
         component_label = QtWidgets.QLabel("Component:")
         self._log_filter = QtWidgets.QComboBox()
-        self._log_filter.addItems(self.LOG_FILTER_OPTIONS.keys())
+        self._log_filter.addItems(self._component_filter_options)
         filter_row.addWidget(component_label)
         filter_row.addWidget(self._log_filter, 1)
 
@@ -318,7 +330,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._control_panel.load_requested.connect(self._on_load_requested)
         self._control_panel.reset_requested.connect(self._on_reset_requested)
 
-        self._control_panel.agent_loadout_requested.connect(self._on_agent_loadout_requested)
+        self._control_panel.agent_form_requested.connect(self._on_agent_form_requested)
         self._control_panel.train_agent_requested.connect(self._on_train_agent_requested)
         self._control_panel.trained_agent_requested.connect(self._on_trained_agent_requested)
         self._control_panel.start_game_requested.connect(self._on_start_game)
@@ -362,9 +374,17 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             trainer_signals = get_trainer_signals()
             trainer_signals.training_finished.connect(self._on_training_finished)
-            self.logger.debug("Connected to trainer lifecycle signals")
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_TRACE,
+                message="Connected to trainer lifecycle signals",
+            )
         except Exception as e:
-            self.logger.warning(f"Failed to connect trainer signals: {e}")
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_WARNING,
+                message=f"Failed to connect trainer signals: {e}",
+                extra={"exception": type(e).__name__},
+                exc_info=e,
+            )
 
         # Ensure status reflects persisted mode on startup
         self._on_mode_changed(self._control_panel.current_mode())
@@ -398,7 +418,11 @@ class MainWindow(QtWidgets.QMainWindow):
         try:
             self._actor_service.set_active_actor(actor_id)
         except KeyError:
-            self.logger.error("Attempted to activate unknown actor '%s'", actor_id)
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_ERROR,
+                message=f"Attempted to activate unknown actor '{actor_id}'",
+                extra={"actor_id": actor_id},
+            )
             self._status_bar.showMessage(f"Unknown actor '{actor_id}'", 5000)
             return
 
@@ -716,7 +740,11 @@ class MainWindow(QtWidgets.QMainWindow):
         except Exception:
             mode_label = mode
         self._status_bar.showMessage(f"Loaded {game_id} in {mode_label} mode - Click 'Start Game' to begin")
-        self.logger.info("Loaded %s (%s)", game_id, mode_label)
+        self.log_constant( 
+            LOG_UI_MAINWINDOW_INFO,
+            message=f"Loaded {game_id} ({mode_label})",
+            extra={"game_id": getattr(game_id, "value", str(game_id)), "mode": mode_label},
+        )
         self._auto_running = False
         self._game_started = False
         self._game_paused = False
@@ -834,17 +862,35 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _on_trained_agent_requested(self) -> None:
         """Handle the 'Load Trained Policy' button."""
-        dialog = PolicySelectionDialog(
-            self,
-            current_game=self._control_panel.current_game(),
-        )
+        factory = get_worker_form_factory()
+        worker_id = "spade_bdi_rl"
+        try:
+            dialog = cast(
+                "SpadeBdiPolicySelectionForm",
+                factory.create_policy_form(
+                    worker_id,
+                    parent=self,
+                    current_game=self._control_panel.current_game(),
+                ),
+            )
+        except KeyError:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Policy form unavailable",
+                f"No policy selection form registered for worker '{worker_id}'.",
+            )
+            return
         if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
             return
         policy_path = dialog.selected_path
         if policy_path is None:
             return
         self._selected_policy_path = policy_path
-        self.logger.info("Selected policy for evaluation: %s", policy_path)
+        self.log_constant( 
+            LOG_UI_MAINWINDOW_INFO,
+            message=f"Selected policy for evaluation: {policy_path}",
+            extra={"policy_path": str(policy_path)},
+        )
         config = self._build_policy_evaluation_config(policy_path)
         if config is None:
             return
@@ -854,20 +900,37 @@ class MainWindow(QtWidgets.QMainWindow):
         )
         self._submit_training_config(config)
 
-    def _on_agent_loadout_requested(self) -> None:
-        """Handle the 'Configure Agent' button - opens the agent training configuration dialog."""
-        dialog = AgentTrainDialog(
-            parent=self,
-            default_game=self._control_panel.current_game(),
-        )
+    def _on_agent_form_requested(self) -> None:
+        """Open the SPADE-BDI agent training form."""
+        factory = get_worker_form_factory()
+        worker_id = "spade_bdi_rl"
+        try:
+            dialog = cast(
+                "SpadeBdiTrainForm",
+                factory.create_train_form(
+                    worker_id,
+                    parent=self,
+                    default_game=self._control_panel.current_game(),
+                ),
+            )
+        except KeyError:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Train form unavailable",
+                f"No train form registered for worker '{worker_id}'.",
+            )
+            return
         if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
             return
-        
+
         config = dialog.get_config()
         if config is None:
             return
         
-        self.logger.info("Agent training configuration submitted from dialog")
+        self.log_constant( 
+            LOG_UI_MAINWINDOW_INFO,
+            message="Agent training configuration submitted from dialog",
+        )
         self._status_bar.showMessage("Launching training run...", 5000)
         self._submit_training_config(config)
 
@@ -875,7 +938,7 @@ class MainWindow(QtWidgets.QMainWindow):
         """Handle the 'Train Agent' button - opens the agent training configuration dialog."""
         # The "Train Agent" button also opens the dialog, similar to "Configure Agent"
         # This is the primary entry point for the training workflow
-        self._on_agent_loadout_requested()
+        self._on_agent_form_requested()
 
     def _build_policy_evaluation_config(self, policy_path: Path) -> Optional[dict]:
         """Build training config using the worker presenter registry.
@@ -921,9 +984,16 @@ class MainWindow(QtWidgets.QMainWindow):
     def _submit_training_config(self, config: dict) -> None:
         """Submit a training configuration to the trainer daemon."""
         try:
-            self.logger.debug("_submit_training_config: START")
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_TRACE,
+                message="_submit_training_config: START",
+            )
             config_json = json.dumps(config)
-            self.logger.debug(f"_submit_training_config: Config JSON length={len(config_json)}")
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_TRACE,
+                message=f"_submit_training_config: Config JSON length={len(config_json)}",
+                extra={"config_length": len(config_json)},
+            )
 
             # Use TrainerClientRunner (background thread wrapper)
             from gym_gui.services.service_locator import get_service_locator
@@ -934,32 +1004,62 @@ class MainWindow(QtWidgets.QMainWindow):
             if runner is None:
                 raise RuntimeError("TrainerClientRunner not registered")
 
-            self.logger.debug("_submit_training_config: TrainerClientRunner resolved")
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_TRACE,
+                message="_submit_training_config: TrainerClientRunner resolved",
+            )
             self._status_bar.showMessage("Submitting training run...", 3000)
 
             # Submit returns a Future
             future = runner.submit_run(config_json)
-            self.logger.debug("_submit_training_config: submit_run() called, future created")
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_TRACE,
+                message="_submit_training_config: submit_run() called, future created",
+            )
 
             # Add callback to handle result
             def on_done(fut):
-                self.logger.debug("_submit_training_config: on_done callback called")
+                self.log_constant( 
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message="_submit_training_config: on_done callback called",
+                )
                 try:
                     response = fut.result(timeout=3.0)
-                    self.logger.debug(f"_submit_training_config: Got response with run_id={response.run_id}")
+                    self.log_constant( 
+                        LOG_UI_MAINWINDOW_TRACE,
+                        message=f"_submit_training_config: Got response with run_id={response.run_id}",
+                        extra={"run_id": str(response.run_id)},
+                    )
                 except Exception as error:
-                    self.logger.exception("_submit_training_config: on_done got exception")
+                    self.log_constant( 
+                        LOG_UI_MAINWINDOW_ERROR,
+                        message="_submit_training_config: on_done got exception",
+                        extra={"exception": type(error).__name__},
+                        exc_info=error,
+                    )
                     QtCore.QTimer.singleShot(0, lambda: self._on_training_submit_failed(error))
                     return
                 run_id = str(response.run_id)
-                self.logger.info(f"_submit_training_config: Scheduling _on_training_submitted with run_id={run_id}")
+                self.log_constant( 
+                    LOG_UI_MAINWINDOW_INFO,
+                    message=f"_submit_training_config: Scheduling _on_training_submitted with run_id={run_id}",
+                    extra={"run_id": run_id},
+                )
                 QtCore.QTimer.singleShot(0, lambda: self._on_training_submitted(run_id, config))
 
             future.add_done_callback(on_done)
-            self.logger.debug("_submit_training_config: Callback added to future")
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_TRACE,
+                message="_submit_training_config: Callback added to future",
+            )
 
         except Exception as e:
-            self.logger.exception("Failed to prepare training submission")
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_ERROR,
+                message="Failed to prepare training submission",
+                extra={"exception": type(e).__name__},
+                exc_info=e,
+            )
             QtWidgets.QMessageBox.critical(
                 self,
                 "Training Preparation Failed",
@@ -969,17 +1069,25 @@ class MainWindow(QtWidgets.QMainWindow):
     def _on_training_submitted(self, run_id: str, config: dict) -> None:
         """Handle successful training submission (called on main thread)."""
         self._status_bar.showMessage(f"Training run submitted: {run_id[:12]}...", 5000)
-        self.logger.info("Submitted training run", extra={"run_id": run_id, "config": config})
+        self.log_constant( 
+            LOG_UI_MAINWINDOW_INFO,
+            message="Submitted training run",
+            extra={"run_id": run_id, "config": config},
+        )
+
+        metadata = config.get("metadata", {})
+        environment = config.get("environment", {})
+        environment_dict = environment if isinstance(environment, dict) else {}
 
         # Extract buffer sizes from config and set them in the controller
         try:
-            metadata = config.get("metadata", {})
             ui_config = metadata.get("ui", {})
             step_buffer_size = ui_config.get("telemetry_buffer_size", 100)
             episode_buffer_size = ui_config.get("episode_buffer_size", 100)
             self._live_controller.set_buffer_sizes_for_run(run_id, step_buffer_size, episode_buffer_size)
-            self.logger.debug(
-                "Set buffer sizes for run",
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_TRACE,
+                message="Set buffer sizes for run",
                 extra={
                     "run_id": run_id,
                     "step_buffer_size": step_buffer_size,
@@ -987,50 +1095,78 @@ class MainWindow(QtWidgets.QMainWindow):
                 },
             )
         except Exception as e:
-            self.logger.warning(f"Failed to set buffer sizes: {e}")
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_WARNING,
+                message=f"Failed to set buffer sizes: {e}",
+                extra={"exception": type(e).__name__},
+                exc_info=e,
+            )
 
         # Extract game_id from environment and store in controller
         try:
-            environment = config.get("environment", {})
-            game_id = environment.get("GYM_ENV_ID", "")
+            game_id = environment_dict.get("GYM_ENV_ID", "")
             if game_id:
                 self._live_controller.set_game_id_for_run(run_id, game_id)
-                self.logger.debug(
-                    "Set game_id for run",
+                self.log_constant( 
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message="Set game_id for run",
                     extra={"run_id": run_id, "game_id": game_id},
                 )
         except Exception as e:
-            self.logger.warning(f"Failed to set game_id: {e}")
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_WARNING,
+                message=f"Failed to set game_id: {e}",
+                extra={"exception": type(e).__name__},
+                exc_info=e,
+            )
 
-        self.logger.info(
-            "Waiting for live telemetry to create dynamic agent tabs",
+        self.log_constant( 
+            LOG_UI_MAINWINDOW_INFO,
+            message="Waiting for live telemetry to create dynamic agent tabs",
             extra={
                 "run_id": run_id,
                 "expected_tabs": [
-                    f"Agent-{{agent_id}}-Replay",
-                    f"Agent-{{agent_id}}-Online-Grid",
-                    f"Agent-{{agent_id}}-Online-Raw",
-                    f"Agent-{{agent_id}}-Online-Video",
+                    "Agent-{agent_id}-Replay",
+                    "Agent-{agent_id}-Online-Grid",
+                    "Agent-{agent_id}-Online-Raw",
+                    "Agent-{agent_id}-Online-Video",
                 ],
             },
         )
 
         # Extract UI rendering throttle from environment variables and set it on the controller
-        environment = config.get("environment", {})
-        if isinstance(environment, dict):
+        if environment_dict:
             try:
-                throttle_str = environment.get("TELEMETRY_SAMPLING_INTERVAL", "2")
+                throttle_str = environment_dict.get("TELEMETRY_SAMPLING_INTERVAL", "2")
                 throttle_interval = int(throttle_str)
                 self._live_controller.set_render_throttle_for_run(run_id, throttle_interval)
-                self.logger.debug(
-                    "Set render throttle for run",
+                self.log_constant( 
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message="Set render throttle for run",
                     extra={"run_id": run_id, "throttle": throttle_interval},
                 )
             except (ValueError, TypeError):
-                self.logger.warning(
-                    "Failed to parse TELEMETRY_SAMPLING_INTERVAL",
-                    extra={"run_id": run_id, "value": environment.get("TELEMETRY_SAMPLING_INTERVAL")},
+                self.log_constant( 
+                    LOG_UI_MAINWINDOW_WARNING,
+                    message="Failed to parse TELEMETRY_SAMPLING_INTERVAL",
+                    extra={
+                        "run_id": run_id,
+                        "value": environment_dict.get("TELEMETRY_SAMPLING_INTERVAL"),
+                    },
                 )
+
+        # Apply render delay and enable flag from metadata (defaulting to enabled)
+        ui_config = metadata.get("ui", {}) if isinstance(metadata, dict) else {}
+        render_delay_ms = int(environment_dict.get("UI_RENDER_DELAY_MS", ui_config.get("render_delay_ms", 100)))
+        live_rendering_enabled = ui_config.get("live_rendering_enabled", True)
+        self._live_controller.set_render_delay_for_run(run_id, int(render_delay_ms))
+        self._live_controller.set_live_render_enabled_for_run(run_id, bool(live_rendering_enabled))
+
+        # Persist metadata keyed by (run_id, agent_id)
+        worker_meta = metadata.get("worker", {}) if isinstance(metadata, dict) else {}
+        worker_config = worker_meta.get("config", {}) if isinstance(worker_meta, dict) else {}
+        agent_id_key = worker_meta.get("agent_id") or worker_config.get("agent_id") or "default"
+        self._run_metadata[(run_id, agent_id_key)] = metadata
 
         # Subscribe to telemetry
         # NOTE: Do NOT call _create_agent_tabs_for() here!
@@ -1042,7 +1178,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
     def _on_training_submit_failed(self, error: Exception) -> None:
         """Handle training submission failure (called on main thread)."""
-        self.logger.exception("Failed to submit training run", exc_info=error)
+        self.log_constant( 
+            LOG_UI_MAINWINDOW_ERROR,
+            message="Failed to submit training run",
+            extra={"exception": type(error).__name__},
+            exc_info=error,
+        )
         QtWidgets.QMessageBox.critical(
             self,
             "Training Submission Failed",
@@ -1069,13 +1210,16 @@ class MainWindow(QtWidgets.QMainWindow):
             try:
                 game_id = GameId(game_id_str)
             except (ValueError, KeyError):
-                self.logger.warning(
-                    "Invalid game_id for run",
+                self.log_constant( 
+                    LOG_UI_MAINWINDOW_WARNING,
+                    message="Invalid game_id for run",
                     extra={"run_id": run_id, "game_id": game_id_str},
                 )
 
         # Get render throttle interval from controller (set during training submission)
         render_throttle_interval = self._live_controller.get_render_throttle_for_run(run_id)
+        render_delay_ms = self._live_controller.get_render_delay_for_run(run_id)
+        live_render_enabled = self._live_controller.is_live_render_enabled(run_id)
 
         tab = LiveTelemetryTab(
             run_id,
@@ -1084,6 +1228,8 @@ class MainWindow(QtWidgets.QMainWindow):
             buffer_size=step_buffer_size,
             episode_buffer_size=episode_buffer_size,
             render_throttle_interval=render_throttle_interval,
+            render_delay_ms=render_delay_ms,
+            live_render_enabled=live_render_enabled,
             renderer_registry=renderer_registry,
             parent=self._render_tabs,
         )
@@ -1092,8 +1238,9 @@ class MainWindow(QtWidgets.QMainWindow):
         # Add to render tabs widget using add_dynamic_tab to include close button
         self._render_tabs.add_dynamic_tab(run_id, tab_title, tab)
 
-        self.logger.info(
-            "Created live telemetry tab",
+        self.log_constant( 
+            LOG_UI_MAINWINDOW_INFO,
+            message="Created live telemetry tab",
             extra={"run_id": run_id, "agent_id": agent_id, "title": tab_title, "game_id": game_id_str},
         )
 
@@ -1123,8 +1270,9 @@ class MainWindow(QtWidgets.QMainWindow):
             presenter = registry.get(worker_id)
             
             if presenter is None:
-                self.logger.error(
-                    "Worker presenter not found in registry",
+                self.log_constant( 
+                    LOG_UI_WORKER_TABS_ERROR,
+                    message="Worker presenter not found in registry",
                     extra={"run_id": run_id, "agent_id": agent_id, "worker_id": worker_id},
                 )
                 return
@@ -1148,8 +1296,9 @@ class MainWindow(QtWidgets.QMainWindow):
             
             # Register tabs with the render container
             if len(tabs) != len(tab_names):
-                self.logger.warning(
-                    "Tab count mismatch",
+                self.log_constant( 
+                    LOG_UI_WORKER_TABS_WARNING,
+                    message="Tab count mismatch",
                     extra={
                         "run_id": run_id,
                         "agent_id": agent_id,
@@ -1168,8 +1317,9 @@ class MainWindow(QtWidgets.QMainWindow):
                 if grid_tab and hasattr(grid_tab, "update_metadata"):
                     grid_tab.update_metadata(metadata)
             
-            self.logger.info(
-                "Created dynamic agent tabs via presenter registry",
+            self.log_constant( 
+                LOG_UI_WORKER_TABS_INFO,
+                message="Created dynamic agent tabs via presenter registry",
                 extra={
                     "run_id": run_id,
                     "agent_id": agent_id,
@@ -1180,23 +1330,27 @@ class MainWindow(QtWidgets.QMainWindow):
                 },
             )
         except Exception as e:
-            self.logger.exception(
-                "Failed to create agent tabs",
+            self.log_constant( 
+                LOG_UI_WORKER_TABS_ERROR,
+                message="Failed to create agent tabs",
                 extra={"run_id": run_id, "agent_id": agent_id, "error": str(e)},
+                exc_info=e,
             )
 
     def _on_training_finished(self, run_id: str, outcome: str, failure_reason: str) -> None:
         """Handle training_finished signal - create/refresh replay tabs for all agents in this run."""
-        self.logger.info(
-            "Training finished signal received",
+        self.log_constant( 
+            LOG_UI_MAINWINDOW_INFO,
+            message="Training finished signal received",
             extra={"run_id": run_id, "outcome": outcome, "failure_reason": failure_reason},
         )
 
         # Get all agents that participated in this run
         agent_tabs = self._render_tabs._agent_tabs.get(run_id, {})
         
-        self.logger.debug(
-            "_on_training_finished: agent_tabs for run",
+        self.log_constant( 
+            LOG_UI_MAINWINDOW_TRACE,
+            message="_on_training_finished: agent_tabs for run",
             extra={"run_id": run_id, "tab_count": len(agent_tabs), "tab_names": list(agent_tabs.keys())},
         )
 
@@ -1210,8 +1364,9 @@ class MainWindow(QtWidgets.QMainWindow):
                     agent_id = parts[1]
                     agent_ids_with_tabs.add(agent_id)
         
-        self.logger.debug(
-            "_on_training_finished: extracted agent IDs",
+        self.log_constant( 
+            LOG_UI_MAINWINDOW_TRACE,
+            message="_on_training_finished: extracted agent IDs",
             extra={"run_id": run_id, "agent_ids": list(agent_ids_with_tabs)},
         )
 
@@ -1221,8 +1376,9 @@ class MainWindow(QtWidgets.QMainWindow):
         for agent_id in agent_ids_with_tabs:
             replay_tab_name = f"Agent-{agent_id}-Replay"
             
-            self.logger.debug(
-                "_on_training_finished: processing agent",
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_TRACE,
+                message="_on_training_finished: processing agent",
                 extra={"run_id": run_id, "agent_id": agent_id, "replay_tab_name": replay_tab_name},
             )
 
@@ -1233,89 +1389,117 @@ class MainWindow(QtWidgets.QMainWindow):
                     tab_widget = agent_tabs[replay_tab_name]
                     refresh = getattr(tab_widget, "refresh", None)
                     if callable(refresh):
-                        self.logger.debug(
-                            "_on_training_finished: calling refresh on existing replay tab",
+                        self.log_constant( 
+                            LOG_UI_MAINWINDOW_TRACE,
+                            message="_on_training_finished: calling refresh on existing replay tab",
                             extra={"run_id": run_id, "agent_id": agent_id},
                         )
                         refresh()
-                        self.logger.debug(
-                            "Refreshed replay tab",
+                        self.log_constant( 
+                            LOG_UI_MAINWINDOW_TRACE,
+                            message="Refreshed replay tab",
                             extra={"run_id": run_id, "tab_name": replay_tab_name},
                         )
                     # Record the tab index for switching later
                     if first_replay_tab_index is None:
                         first_replay_tab_index = self._render_tabs.indexOf(tab_widget)
-                        self.logger.debug(
-                            "_on_training_finished: recorded existing replay tab index",
+                        self.log_constant( 
+                            LOG_UI_MAINWINDOW_TRACE,
+                            message="_on_training_finished: recorded existing replay tab index",
                             extra={"run_id": run_id, "agent_id": agent_id, "tab_index": first_replay_tab_index},
                         )
                 except Exception as e:
-                    self.logger.warning(
-                        "Failed to refresh replay tab",
+                    self.log_constant( 
+                        LOG_UI_MAINWINDOW_WARNING,
+                        message="Failed to refresh replay tab",
                         exc_info=e,
                         extra={"run_id": run_id, "tab_name": replay_tab_name},
                     )
             else:
                 # Create new replay tab for this agent
-                self.logger.debug(
-                    "_on_training_finished: replay tab does not exist, creating new",
+                self.log_constant( 
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message="_on_training_finished: replay tab does not exist, creating new",
                     extra={"run_id": run_id, "agent_id": agent_id, "replay_tab_name": replay_tab_name},
                 )
                 try:
                     replay = AgentReplayTab(run_id, agent_id, parent=self)
                     self._render_tabs.add_dynamic_tab(run_id, replay_tab_name, replay)
-                    self.logger.info(
-                        "Created replay tab for agent",
+                    self.log_constant( 
+                        LOG_UI_MAINWINDOW_INFO,
+                        message="Created replay tab for agent",
                         extra={"run_id": run_id, "agent_id": agent_id, "tab_name": replay_tab_name},
                     )
                     # Record the tab index for switching later (add_dynamic_tab already switches, but we track it)
                     if first_replay_tab_index is None:
                         first_replay_tab_index = self._render_tabs.indexOf(replay)
-                        self.logger.debug(
-                            "_on_training_finished: recorded new replay tab index",
+                        self.log_constant( 
+                            LOG_UI_MAINWINDOW_TRACE,
+                            message="_on_training_finished: recorded new replay tab index",
                             extra={"run_id": run_id, "agent_id": agent_id, "tab_index": first_replay_tab_index},
                         )
                 except Exception as e:
-                    self.logger.warning(
-                        "Failed to create replay tab",
+                    self.log_constant( 
+                        LOG_UI_MAINWINDOW_WARNING,
+                        message="Failed to create replay tab",
                         exc_info=e,
                         extra={"run_id": run_id, "agent_id": agent_id},
                     )
         
-        self.logger.debug(
-            "_on_training_finished: about to switch to replay tab",
+        self.log_constant( 
+            LOG_UI_MAINWINDOW_TRACE,
+            message="_on_training_finished: about to switch to replay tab",
             extra={"run_id": run_id, "first_replay_tab_index": first_replay_tab_index},
         )
         
         # Switch to the first replay tab created/refreshed so user can see results
         if first_replay_tab_index is not None and first_replay_tab_index >= 0:
             self._render_tabs.setCurrentIndex(first_replay_tab_index)
-            self.logger.info(
-                "Switched to replay tab after training completion",
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_INFO,
+                message="Switched to replay tab after training completion",
                 extra={"run_id": run_id, "tab_index": first_replay_tab_index},
             )
         else:
-            self.logger.warning(
-                "_on_training_finished: could not find valid replay tab to switch to",
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_WARNING,
+                message="_on_training_finished: could not find valid replay tab to switch to",
                 extra={"run_id": run_id, "first_replay_tab_index": first_replay_tab_index},
             )
 
     def _on_run_completed(self, run_id: str) -> None:
         """Handle run completion - keep Live-Agent tabs open, add Replay tabs."""
-        self.logger.info("Run completed signal received", extra={"run_id": run_id})
+        self.log_constant( 
+            LOG_LIVE_CONTROLLER_RUN_COMPLETED,
+            message="Run completed signal received",
+            extra={"run_id": run_id},
+        )
 
         # Unsubscribe from telemetry (stops new events from arriving)
         if self._live_controller:
             try:
                 self._live_controller.unsubscribe_from_run(run_id)
-                self.logger.debug("Unsubscribed from telemetry", extra={"run_id": run_id})
+                self.log_constant( 
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message="Unsubscribed from telemetry",
+                    extra={"run_id": run_id},
+                )
             except Exception as e:
-                self.logger.warning("Failed to unsubscribe from telemetry", exc_info=e, extra={"run_id": run_id})
+                self.log_constant( 
+                    LOG_UI_MAINWINDOW_WARNING,
+                    message="Failed to unsubscribe from telemetry",
+                    exc_info=e,
+                    extra={"run_id": run_id},
+                )
 
         # NOTE: Do NOT remove Live-Agent tabs - keep them open so user can review the training
         # The Live-Agent tab will remain visible with the final state
         # Replay tabs will be created by _on_training_finished() signal
-        self.logger.info("Run completed - Live-Agent tabs remain open for review", extra={"run_id": run_id})
+        self.log_constant( 
+            LOG_LIVE_CONTROLLER_RUN_COMPLETED,
+            message="Run completed - Live-Agent tabs remain open for review",
+            extra={"run_id": run_id},
+        )
 
     def _poll_for_new_runs(self) -> None:
         """Poll daemon for new training runs and auto-subscribe to their telemetry."""
@@ -1325,20 +1509,32 @@ class MainWindow(QtWidgets.QMainWindow):
             locator = get_service_locator()
             runner = locator.resolve(TrainerClientRunner)
             if runner is None:
-                self.logger.debug("TrainerClientRunner not available, skipping poll")
+                self.log_constant( 
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message="TrainerClientRunner not available, skipping poll",
+                )
                 return
             
             # List runs that should have tabs (active or recently completed)
-            self.logger.debug("Polling daemon for active training runs...")
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_TRACE,
+                message="Polling daemon for active training runs...",
+            )
             future = runner.list_runs(statuses=[RunStatus.PENDING, RunStatus.DISPATCHING, RunStatus.RUNNING, RunStatus.COMPLETED], deadline=3.0)
             
             def on_done(fut):
                 try:
                     response = fut.result(timeout=1.0)
                 except Exception as exc:
-                    self.logger.debug("Run poll failed: %s", exc)
+                    self.log_constant( 
+                        LOG_UI_MAINWINDOW_TRACE,
+                        message=f"Run poll failed: {exc}",
+                    )
                     return
-                self.logger.debug("Received %d active runs from daemon", len(response.runs))
+                self.log_constant( 
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message=f"Received {len(response.runs)} active runs from daemon",
+                )
                 for record in response.runs:
                     run_id = str(record.run_id)
                     if run_id not in self._known_runs:
@@ -1348,34 +1544,62 @@ class MainWindow(QtWidgets.QMainWindow):
                         if isinstance(status_value, int):
                             from gym_gui.services.trainer import RunStatus
                             status_name = RunStatus.from_proto(status_value).value
-                        self.logger.debug("Discovered new run: %s (status=%s, proto=%s)", run_id, status_name, status_value)
-                        self.logger.debug("Calling auto-subscribe directly for run: %s", run_id)
+                        self.log_constant( 
+                            LOG_UI_MAINWINDOW_TRACE,
+                            message=f"Discovered new run: {run_id} (status={status_name}, proto={status_value})",
+                        )
+                        self.log_constant( 
+                            LOG_UI_MAINWINDOW_TRACE,
+                            message=f"Calling auto-subscribe directly for run: {run_id}",
+                        )
                         self._auto_subscribe_run(run_id)
                     else:
-                        self.logger.debug("Run %s already known, skipping", run_id[:12])
+                        self.log_constant( 
+                            LOG_UI_MAINWINDOW_TRACE,
+                            message=f"Run {run_id[:12]} already known, skipping",
+                        )
             
             future.add_done_callback(on_done)
             
         except Exception as e:
-            self.logger.debug("Failed to initiate run poll", exc_info=e)
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_TRACE,
+                message="Failed to initiate run poll",
+                exc_info=e,
+            )
     
     def _auto_subscribe_run(self, run_id: str) -> None:
         """Auto-subscribe to a newly discovered run (called on main thread)."""
-        self.logger.info("Auto-subscribing to new run", extra={"run_id": run_id})
+        self.log_constant( 
+            LOG_UI_MAINWINDOW_INFO,
+            message="Auto-subscribing to new run",
+            extra={"run_id": run_id},
+        )
         self._known_runs.add(run_id)
         try:
             self._live_controller.subscribe_to_run(run_id)
             self._render_group.setTitle(f"Live Training - {run_id[:12]}...")
             self._status_bar.showMessage(f"Detected new training run: {run_id[:12]}...", 5000)
-            self.logger.info("Subscribed to run - waiting for telemetry steps to create agent tabs", extra={"run_id": run_id})
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_INFO,
+                message="Subscribed to run - waiting for telemetry steps to create agent tabs",
+                extra={"run_id": run_id},
+            )
         except Exception as e:
-            self.logger.exception("Failed to subscribe to run %s", run_id, exc_info=e)
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_ERROR,
+                message=f"Failed to subscribe to run {run_id}",
+                exc_info=e,
+            )
 
     def _start_run_watch(self) -> None:
         locator = get_service_locator()
         runner: Optional[TrainerClientRunner] = locator.resolve(TrainerClientRunner)
         if runner is None:
-            self.logger.debug("TrainerClientRunner not available; skipping run watch subscription")
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_TRACE,
+                message="TrainerClientRunner not available; skipping run watch subscription",
+            )
             return
 
         statuses = [RunStatus.DISPATCHING, RunStatus.RUNNING]
@@ -1383,17 +1607,26 @@ class MainWindow(QtWidgets.QMainWindow):
         self._run_watch_subscription = subscription
 
         def _watch_loop() -> None:
-            self.logger.info("Run watch thread started (statuses=%s)", ",".join([status.name for status in statuses]))
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_INFO,
+                message=f"Run watch thread started (statuses={','.join([status.name for status in statuses])})",
+            )
             while not self._run_watch_stop.is_set():
                 try:
                     record = subscription.get(timeout=1.0)
                 except TrainerWatchStopped:
-                    self.logger.info("Run watch subscription closed by daemon")
+                    self.log_constant( 
+                        LOG_UI_MAINWINDOW_INFO,
+                        message="Run watch subscription closed by daemon",
+                    )
                     break
                 except TimeoutError:
                     continue
                 except Exception as exc:
-                    self.logger.debug("Run watch error: %s", exc)
+                    self.log_constant( 
+                        LOG_UI_MAINWINDOW_TRACE,
+                        message=f"Run watch error: {exc}",
+                    )
                     continue
 
                 run_id = getattr(record, "run_id", "")
@@ -1403,13 +1636,17 @@ class MainWindow(QtWidgets.QMainWindow):
                 if isinstance(status_value, int):
                     from gym_gui.services.trainer import RunStatus
                     status_name = RunStatus.from_proto(status_value).value
-                self.logger.info(
-                    "Run watch update: run_id=%s status=%s (proto=%s)", run_id, status_name, status_value
+                self.log_constant( 
+                    LOG_UI_MAINWINDOW_INFO,
+                    message=f"Run watch update: run_id={run_id} status={status_name} (proto={status_value})",
                 )
                 QtCore.QTimer.singleShot(0, lambda rid=run_id: self._auto_subscribe_run(rid))
 
             subscription.close()
-            self.logger.info("Run watch thread exiting")
+            self.log_constant( 
+                LOG_UI_MAINWINDOW_INFO,
+                message="Run watch thread exiting",
+            )
 
         self._run_watch_thread = threading.Thread(
             target=_watch_loop,
@@ -1431,6 +1668,9 @@ class MainWindow(QtWidgets.QMainWindow):
             self._run_watch_thread = None
 
     def _append_log_record(self, payload: LogRecordPayload) -> None:
+        if payload.component and payload.component not in self._component_filter_set:
+            self._component_filter_set.add(payload.component)
+            self._log_filter.addItem(payload.component)
         self._log_records.append(payload)
         if self._passes_filter(payload):
             self._log_console.appendPlainText(self._format_log(payload))
@@ -1447,8 +1687,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def _passes_filter(self, payload: LogRecordPayload) -> bool:
         # Check component filter
         selected_component = self._log_filter.currentText()
-        prefix = self.LOG_FILTER_OPTIONS.get(selected_component)
-        if prefix and not payload.name.startswith(prefix):
+        if selected_component != "All" and payload.component != selected_component:
             return False
 
         # Check severity filter
@@ -1480,7 +1719,8 @@ class MainWindow(QtWidgets.QMainWindow):
     @staticmethod
     def _format_log(payload: LogRecordPayload) -> str:
         ts = datetime.fromtimestamp(payload.created).strftime("%H:%M:%S")
-        return f"{ts} | {payload.level:<7} | {payload.name} | {payload.message}"
+        component = payload.component or "Unknown"
+        return f"{ts} | {payload.level:<7} | {component:<12} | {payload.name} | {payload.message}"
 
     def _refresh_log_console(self) -> None:
         self._log_console.clear()

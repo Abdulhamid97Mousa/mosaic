@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import logging
 from typing import Any, Dict, Optional, TYPE_CHECKING
 
 from pydantic import ValidationError
@@ -12,14 +11,18 @@ from gym_gui.core.validation import (
     TrainingConfig,
     TelemetryEventBase,
 )
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_SERVICE_VALIDATION_DEBUG,
+    LOG_SERVICE_VALIDATION_WARNING,
+    LOG_SERVICE_VALIDATION_ERROR,
+)
 
 if TYPE_CHECKING:  # pragma: no cover
     pass
 
-logger = logging.getLogger(__name__)
 
-
-class ValidationService:
+class ValidationService(LogConstantMixin):
     """Service for validating telemetry data and configuration."""
 
     def __init__(self, strict_mode: bool = False) -> None:
@@ -29,9 +32,12 @@ class ValidationService:
             strict_mode: If True, raise exceptions on validation errors.
                         If False, log warnings and continue.
         """
+        import logging
+
         self.strict_mode = strict_mode
         self._validation_errors: list[str] = []
         self._validation_warnings: list[str] = []
+        self._logger = logging.getLogger("gym_gui.services.validation")
 
     def validate_telemetry_event(self, event_data: Dict[str, Any]) -> Optional[TelemetryEventBase]:
         """Validate a telemetry event.
@@ -44,12 +50,20 @@ class ValidationService:
         """
         try:
             event = validate_telemetry_event(event_data)
-            logger.debug(f"✓ Validated {event.type} event")
+            self.log_constant(
+                LOG_SERVICE_VALIDATION_DEBUG,
+                message="telemetry_event_valid",
+                extra={"event_type": event.type},
+            )
             return event
         except ValidationError as e:
             error_msg = f"Telemetry validation error: {e}"
             self._validation_errors.append(error_msg)
-            logger.error(error_msg)
+            self.log_constant(
+                LOG_SERVICE_VALIDATION_ERROR,
+                message=error_msg,
+                extra={"phase": "telemetry_event"},
+            )
             
             if self.strict_mode:
                 raise
@@ -57,7 +71,12 @@ class ValidationService:
         except Exception as e:
             error_msg = f"Unexpected validation error: {e}"
             self._validation_errors.append(error_msg)
-            logger.error(error_msg)
+            self.log_constant(
+                LOG_SERVICE_VALIDATION_ERROR,
+                message=error_msg,
+                extra={"phase": "telemetry_event", "error_type": type(e).__name__},
+                exc_info=e,
+            )
             
             if self.strict_mode:
                 raise
@@ -74,12 +93,20 @@ class ValidationService:
         """
         try:
             config = TrainingConfig(**config_data)
-            logger.debug(f"✓ Validated training config for run {config.run_id}")
+            self.log_constant(
+                LOG_SERVICE_VALIDATION_DEBUG,
+                message="training_config_valid",
+                extra={"run_id": config.run_id},
+            )
             return config
         except ValidationError as e:
             error_msg = f"Config validation error: {e}"
             self._validation_errors.append(error_msg)
-            logger.error(error_msg)
+            self.log_constant(
+                LOG_SERVICE_VALIDATION_ERROR,
+                message=error_msg,
+                extra={"phase": "training_config"},
+            )
             
             if self.strict_mode:
                 raise
@@ -87,7 +114,12 @@ class ValidationService:
         except Exception as e:
             error_msg = f"Unexpected config validation error: {e}"
             self._validation_errors.append(error_msg)
-            logger.error(error_msg)
+            self.log_constant(
+                LOG_SERVICE_VALIDATION_ERROR,
+                message=error_msg,
+                extra={"phase": "training_config", "error_type": type(e).__name__},
+                exc_info=e,
+            )
             
             if self.strict_mode:
                 raise
@@ -127,12 +159,27 @@ class ValidationService:
             if next_state < 0:
                 raise ValueError("next_state must be non-negative")
             
-            logger.debug(f"✓ Validated step data: ep={episode}, step={step}")
+            self.log_constant(
+                LOG_SERVICE_VALIDATION_DEBUG,
+                message="step_data_valid",
+                extra={
+                    "episode": episode,
+                    "step": step,
+                    "action": action,
+                    "reward": reward,
+                    "state": state,
+                    "next_state": next_state,
+                },
+            )
             return True
         except ValueError as e:
             warning_msg = f"Step data validation warning: {e}"
             self._validation_warnings.append(warning_msg)
-            logger.warning(warning_msg)
+            self.log_constant(
+                LOG_SERVICE_VALIDATION_WARNING,
+                message=warning_msg,
+                extra={"phase": "step_validation"},
+            )
             return False
 
     def get_validation_errors(self) -> list[str]:
@@ -168,4 +215,3 @@ class ValidationService:
 
 
 __all__ = ["ValidationService"]
-

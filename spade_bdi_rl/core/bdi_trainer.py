@@ -7,7 +7,6 @@ BDI reasoning capabilities using SPADE agents and AgentSpeak plans.
 from __future__ import annotations
 
 import asyncio
-import logging
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 if TYPE_CHECKING:
@@ -16,8 +15,16 @@ if TYPE_CHECKING:
 from .config import RunConfig
 from .runtime import HeadlessTrainer, EpisodeMetrics
 from .telemetry_worker import TelemetryEmitter
+from gym_gui.logging_config.log_constants import (
+    LOG_WORKER_BDI_EVENT,
+    LOG_WORKER_BDI_WARNING,
+    LOG_WORKER_BDI_ERROR,
+    LOG_WORKER_BDI_DEBUG,
+)
+from gym_gui.logging_config.helpers import log_constant
+import logging
 
-LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger(__name__)
 
 
 class BDITrainer(HeadlessTrainer):
@@ -55,8 +62,9 @@ class BDITrainer(HeadlessTrainer):
         self.bdi_agent: Optional[Any] = None
         self._event_loop: Optional[asyncio.AbstractEventLoop] = None
 
-        LOGGER.info(
-            "BDITrainer initialized",
+        self.log_constant(
+            LOG_WORKER_BDI_EVENT,
+            message="BDITrainer initialized",
             extra={
                 "jid": jid,
                 "game_id": config.game_id,
@@ -126,7 +134,11 @@ class BDITrainer(HeadlessTrainer):
             return 0
 
         except Exception as exc:
-            LOGGER.exception("BDI training failed", exc_info=exc)
+            self.log_constant(
+                LOG_WORKER_BDI_ERROR,
+                message="BDI training failed",
+                exc_info=exc,
+            )
             self.emitter.run_completed(
                 self.config.run_id,
                 status="failed",
@@ -162,8 +174,9 @@ class BDITrainer(HeadlessTrainer):
             asyncio.set_event_loop(self._event_loop)
             self._event_loop.run_until_complete(agent_handle.start(auto_register=True))
             
-            LOGGER.info(
-                "BDI agent started successfully",
+            self.log_constant(
+                LOG_WORKER_BDI_EVENT,
+                message="BDI agent started successfully",
                 extra={
                     "jid": self.jid,
                     "game_id": self.config.game_id,
@@ -171,25 +184,43 @@ class BDITrainer(HeadlessTrainer):
                 },
             )
         except Exception as exc:
-            LOGGER.warning("BDI agent unavailable, falling back to RL-only mode: %s", exc)
+            self.log_constant(
+                LOG_WORKER_BDI_WARNING,
+                message="BDI agent unavailable, falling back to RL-only mode",
+                extra={"exception": str(exc)},
+                exc_info=exc,
+            )
             self.bdi_agent = None
 
     def _on_agent_event(self, event: Dict[str, Any]) -> None:
         """Handle events emitted by the BDI agent."""
         # This callback bridges BDI agent events to telemetry
         # Can be extended for custom telemetry integration
-        LOGGER.debug("BDI agent event", extra=event)
+        self.log_constant(
+            LOG_WORKER_BDI_DEBUG,
+            message="BDI agent event",
+            extra=dict(event),
+        )
 
     def _stop_bdi_agent(self) -> None:
         """Stop and cleanup the SPADE-BDI agent."""
         if self.bdi_agent is not None:
-            LOGGER.info("Stopping BDI agent", extra={"jid": self.jid})
+            self.log_constant(
+                LOG_WORKER_BDI_EVENT,
+                message="Stopping BDI agent",
+                extra={"jid": self.jid},
+            )
             try:
                 if self._event_loop is not None and not self._event_loop.is_closed():
                     self._event_loop.run_until_complete(self.bdi_agent.stop())
                     self._event_loop.close()
             except Exception as exc:
-                LOGGER.warning("Error stopping BDI agent: %s", exc)
+                self.log_constant(
+                    LOG_WORKER_BDI_WARNING,
+                    message="Error stopping BDI agent",
+                    extra={"exception": str(exc)},
+                    exc_info=exc,
+                )
             finally:
                 self.bdi_agent = None
                 self._event_loop = None
@@ -212,7 +243,7 @@ class BDITrainer(HeadlessTrainer):
         # once the SPADE agent interface is fully integrated
 
         if self.bdi_agent is None:
-            LOGGER.warning("BDI agent not initialized; falling back to RL-only mode")
+            log_constant(_LOGGER, LOG_WORKER_BDI_WARNING, message="BDI agent not initialized; falling back to RL-only mode")
             return self._run_episode(episode_index, episode_number, episode_seed)
 
         # TODO: When BDI agent is fully integrated, this should:
@@ -222,10 +253,7 @@ class BDITrainer(HeadlessTrainer):
         # 4. Update BDI beliefs after environment transitions
 
         # For now, use base RL implementation to ensure telemetry works
-        LOGGER.debug(
-            "Running BDI episode (RL mode with telemetry)",
-            extra={"episode_number": episode_number, "note": "BDI reasoning pending full SPADE integration"},
-        )
+        log_constant(_LOGGER, LOG_WORKER_BDI_DEBUG, message="Running BDI episode (RL mode with telemetry)", extra={"episode_number": episode_number, "note": "BDI reasoning pending full SPADE integration"})
 
         return self._run_episode(episode_index, episode_number, episode_seed)
 

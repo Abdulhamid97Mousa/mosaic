@@ -15,6 +15,13 @@ from PyQt6.QtCore import pyqtSlot  # type: ignore[attr-defined]
 _QUEUED_CONNECTION = QtCore.Qt.ConnectionType.QueuedConnection  # type: ignore[attr-defined]
 
 
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_UI_LIVE_TAB_TRACE,
+    LOG_UI_LIVE_TAB_INFO,
+    LOG_UI_LIVE_TAB_WARNING,
+    LOG_UI_LIVE_TAB_ERROR,
+)
 from gym_gui.ui.widgets.base_telemetry_tab import BaseTelemetryTab
 from gym_gui.rendering import RendererRegistry, create_default_renderer_registry, RendererContext
 from gym_gui.core.enums import GameId, RenderMode
@@ -24,7 +31,7 @@ from gym_gui.telemetry.rendering_speed_regulator import RenderingSpeedRegulator
 _LOGGER = logging.getLogger(__name__)
 
 
-class LiveTelemetryTab(BaseTelemetryTab):
+class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
     """Displays live telemetry stream for a specific (run_id, agent_id) pair with live rendering."""
 
     def __init__(
@@ -37,12 +44,15 @@ class LiveTelemetryTab(BaseTelemetryTab):
         episode_buffer_size: int = 100,
         render_throttle_interval: int = 1,
         render_delay_ms: int = 100,
+        live_render_enabled: bool = True,
         renderer_registry: Optional[RendererRegistry] = None,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         # Store render delay for later use in _build_ui()
+        self._logger = _LOGGER
         self._render_delay_ms = render_delay_ms
         self._render_regulator: Optional[RenderingSpeedRegulator] = None
+        self._live_render_enabled = live_render_enabled
 
         self._step_buffer: Deque[Any] = deque(maxlen=buffer_size)
         self._episode_buffer: Deque[Any] = deque(maxlen=episode_buffer_size)
@@ -77,37 +87,45 @@ class LiveTelemetryTab(BaseTelemetryTab):
         layout.addLayout(header)
 
         # 1) LIVE RENDERING PANEL (at top)
-        render_group = QtWidgets.QGroupBox("Live Rendering", self)
-        render_group.setMinimumHeight(300)  # Ensure rendering area has minimum height
-        _LOGGER.debug("_build_ui: Render group minimum height set to 300px")
-        render_layout = QtWidgets.QVBoxLayout(render_group)
-        self._render_container = QtWidgets.QWidget(render_group)
-        # Set size policy to expand and fill available space
-        self._render_container.setSizePolicy(
-            QtWidgets.QSizePolicy.Policy.Expanding,
-            QtWidgets.QSizePolicy.Policy.Expanding
-        )
-        _LOGGER.debug("_build_ui: Render container size policy set to Expanding/Expanding")
-        self._render_layout = QtWidgets.QVBoxLayout(self._render_container)
-        self._render_layout.setContentsMargins(0, 0, 0, 0)
-        self._render_layout.setSpacing(0)
-        _LOGGER.debug("_build_ui: Render layout margins and spacing set to 0")
-        self._render_placeholder = QtWidgets.QLabel("Waiting for render data...")
-        self._render_placeholder.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        self._render_placeholder.setStyleSheet("color: #999; font-style: italic;")
-        self._render_layout.addWidget(self._render_placeholder)
-        render_layout.addWidget(self._render_container)
-        render_layout.setContentsMargins(0, 0, 0, 0)
-        render_layout.setSpacing(0)
-        _LOGGER.debug("_build_ui: Render layout (group) margins and spacing set to 0")
-        layout.addWidget(render_group, 3)  # Stretch factor 3 (increased from 1)
-        _LOGGER.debug("_build_ui: Render group added to main layout with stretch factor 3")
+        if self._live_render_enabled:
+            render_group = QtWidgets.QGroupBox("Live Rendering", self)
+            render_group.setMinimumHeight(300)
+            render_layout = QtWidgets.QVBoxLayout(render_group)
+            self._render_container = QtWidgets.QWidget(render_group)
+            self._render_container.setSizePolicy(
+                QtWidgets.QSizePolicy.Policy.Expanding,
+                QtWidgets.QSizePolicy.Policy.Expanding
+            )
+            self._render_layout = QtWidgets.QVBoxLayout(self._render_container)
+            self._render_layout.setContentsMargins(0, 0, 0, 0)
+            self._render_layout.setSpacing(0)
+            self._render_placeholder = QtWidgets.QLabel("Waiting for render data...")
+            self._render_placeholder.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+            self._render_placeholder.setStyleSheet("color: #999; font-style: italic;")
+            self._render_layout.addWidget(self._render_placeholder)
+            render_layout.addWidget(self._render_container)
+            render_layout.setContentsMargins(0, 0, 0, 0)
+            render_layout.setSpacing(0)
+            layout.addWidget(render_group, 3)
+        else:
+            disabled_group = QtWidgets.QGroupBox("Live Rendering", self)
+            disabled_layout = QtWidgets.QVBoxLayout(disabled_group)
+            notice = QtWidgets.QLabel(
+                "Live rendering disabled for this run. Telemetry tables below remain active."
+            )
+            notice.setStyleSheet("color: #607D8B; font-style: italic;")
+            notice.setWordWrap(True)
+            disabled_layout.addWidget(notice)
+            layout.addWidget(disabled_group)
+            self._render_container = None
+            self._render_layout = None
+            self._render_placeholder = None
 
         # 2) TELEMETRY SECTIONS (vertical splitter for episodes and steps)
         splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical, self)
-        _LOGGER.debug("_build_ui: Vertical splitter created for episodes and steps")
+        self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_build_ui: Vertical splitter created for episodes and steps")
         layout.addWidget(splitter, 1)  # Stretch factor 1 (decreased from 2)
-        _LOGGER.debug("_build_ui: Splitter added to main layout with stretch factor 1")
+        self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_build_ui: Splitter added to main layout with stretch factor 1")
 
         # 2a) Telemetry Recent Episodes (above steps)
         episodes_group = QtWidgets.QGroupBox("Telemetry Recent Episodes", self)
@@ -176,23 +194,23 @@ class LiveTelemetryTab(BaseTelemetryTab):
 
         splitter.setStretchFactor(0, 1)  # Episodes (reduced from 1)
         splitter.setStretchFactor(1, 1)  # Steps (reduced from 2)
-        _LOGGER.debug("_build_ui: Splitter stretch factors set - Episodes: 1, Steps: 1")
+        self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_build_ui: Splitter stretch factors set - Episodes: 1, Steps: 1")
 
         # Footer with overflow stats
         self._overflow_label = QtWidgets.QLabel("")
         self._overflow_label.setStyleSheet("color: #d32f2f;")
         layout.addWidget(self._overflow_label)
 
-        # Create and start rendering speed regulator for decoupled visual rendering
-        # IMPORTANT: This must be AFTER super().__init__() so self is a valid Qt object
-        self._render_regulator = RenderingSpeedRegulator(
-            render_delay_ms=self._render_delay_ms,
-            max_queue_size=32,
-            parent=self
-        )
-        self._render_regulator.payload_ready.connect(self._try_render_visual)
-        self._render_regulator.start()
-        _LOGGER.debug(f"_build_ui: RenderingSpeedRegulator created and started with delay={self._render_delay_ms}ms")
+        if self._live_render_enabled:
+            self._render_regulator = RenderingSpeedRegulator(
+                render_delay_ms=self._render_delay_ms,
+                max_queue_size=32,
+                parent=self
+            )
+            self._render_regulator.payload_ready.connect(self._try_render_visual)
+            self._render_regulator.start()
+        else:
+            self._render_regulator = None
 
     def set_render_throttle_interval(self, interval: int) -> None:
         """Set the render throttle interval (render every Nth step).
@@ -201,7 +219,7 @@ class LiveTelemetryTab(BaseTelemetryTab):
             interval: Render every Nth step (1=every step, 2=every 2nd step, etc.)
         """
         self._render_throttle_interval = max(1, interval)
-        _LOGGER.debug(f"Render throttle interval set to {self._render_throttle_interval}")
+        self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"Render throttle interval set to {self._render_throttle_interval}")
 
     def set_render_delay(self, delay_ms: int) -> None:
         """Set the rendering delay (time between visual renders).
@@ -211,16 +229,16 @@ class LiveTelemetryTab(BaseTelemetryTab):
         """
         if self._render_regulator is not None:
             self._render_regulator.set_render_delay(delay_ms)
-            _LOGGER.info(f"Render delay set to {delay_ms}ms")
+            self.log_constant(LOG_UI_LIVE_TAB_INFO, message=f"Render delay set to {delay_ms}ms")
 
     def add_step(self, payload: Any) -> None:
         """Add a step to the buffer and update display lazily."""
         try:
             step_index = payload.get("step_index", "?") if isinstance(payload, dict) else getattr(payload, "step_index", "?")
-            _LOGGER.info(f"add_step: START (step={step_index}, is_destroyed={self._is_destroyed})")
+            self.log_constant(LOG_UI_LIVE_TAB_INFO, message=f"add_step: START (step={step_index}, is_destroyed={self._is_destroyed})")
 
             if self._is_destroyed:
-                _LOGGER.debug("add_step: Widget is destroyed, skipping")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="add_step: Widget is destroyed, skipping")
                 return
 
             # CRITICAL: Extract episode_index and step_index to track current episode/step
@@ -239,7 +257,7 @@ class LiveTelemetryTab(BaseTelemetryTab):
             if episode_idx != self._previous_episode_index:
                 self._current_step_in_episode = 0  # Reset step counter at episode boundary
                 self._previous_episode_index = episode_idx
-                _LOGGER.info(f"add_step: Episode boundary detected (episode {episode_idx}), resetting step counter")
+                self.log_constant(LOG_UI_LIVE_TAB_INFO, message=f"add_step: Episode boundary detected (episode {episode_idx}), resetting step counter")
             
             # Update current metrics
             self._current_episode_index = episode_idx
@@ -251,26 +269,30 @@ class LiveTelemetryTab(BaseTelemetryTab):
             # Schedule step rendering on the GUI thread using QMetaObject.invokeMethod.
             # This works from any thread (including background threads without Qt event loops).
             self._schedule_step_render(payload)
-            _LOGGER.debug("add_step: Table update scheduled (no throttle)")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="add_step: Table update scheduled (no throttle)")
 
             # Submit payload to rendering speed regulator for decoupled visual rendering
             # Visual rendering happens at configurable rate (e.g., 10 FPS) independent of table updates
             if self._render_regulator is not None:
                 if isinstance(payload, dict):
                     self._render_regulator.submit_payload(payload)
-                    _LOGGER.debug(f"add_step: Payload submitted to regulator (queue_size={self._render_regulator.get_queue_size()})")
+                    self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"add_step: Payload submitted to regulator (queue_size={self._render_regulator.get_queue_size()})")
                 else:
                     # Convert object to dict if needed
                     try:
                         payload_dict = dict(payload) if hasattr(payload, '__dict__') else {"payload": payload}
                         self._render_regulator.submit_payload(payload_dict)
-                        _LOGGER.debug(f"add_step: Object payload converted and submitted to regulator")
+                        self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"add_step: Object payload converted and submitted to regulator")
                     except Exception as e:
-                        _LOGGER.warning(f"add_step: Failed to submit payload to regulator: {e}")
+                        self.log_constant(
+                            LOG_UI_LIVE_TAB_WARNING,
+                            message=f"add_step: Failed to submit payload to regulator: {e}",
+                            exc_info=e,
+                        )
 
-            _LOGGER.debug("add_step: COMPLETE")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="add_step: COMPLETE")
         except Exception as e:
-            _LOGGER.exception(f"add_step: ERROR - {e}")
+            self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=f"add_step: ERROR - {e}", exc_info=e)
 
     def _safe_process_deferred_render(self) -> None:
         """Safe wrapper for deferred rendering that checks if widget is destroyed.
@@ -278,40 +300,40 @@ class LiveTelemetryTab(BaseTelemetryTab):
         This prevents segfaults when QTimer callbacks try to access a deleted widget.
         """
         try:
-            _LOGGER.debug(f"_safe_process_deferred_render: START")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_safe_process_deferred_render: START")
             # Check if widget is being destroyed BEFORE accessing any attributes
             if not hasattr(self, '_is_destroyed') or self._is_destroyed:
-                _LOGGER.debug(f"_safe_process_deferred_render: Widget is destroyed, skipping")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_safe_process_deferred_render: Widget is destroyed, skipping")
                 return
 
             # Now safe to call the actual render method
-            _LOGGER.debug(f"_safe_process_deferred_render: Calling _process_deferred_render")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_safe_process_deferred_render: Calling _process_deferred_render")
             self._process_deferred_render()
-            _LOGGER.debug(f"_safe_process_deferred_render: COMPLETE")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_safe_process_deferred_render: COMPLETE")
         except Exception as e:
             # Log errors during deferred render
-            _LOGGER.exception(f"_safe_process_deferred_render: ERROR - {e}")
+            self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=f"_safe_process_deferred_render: ERROR - {e}", exc_info=e)
 
     def _process_deferred_render(self) -> None:
         """Process deferred rendering without lambda capture issues."""
         try:
-            _LOGGER.debug(f"_process_deferred_render: START (is_destroyed={self._is_destroyed}, has_payload={self._last_render_payload is not None})")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_process_deferred_render: START (is_destroyed={self._is_destroyed}, has_payload={self._last_render_payload is not None})")
 
             # Safety check: if widget is being destroyed, skip rendering
             if self._is_destroyed:
-                _LOGGER.debug("_process_deferred_render: Widget is destroyed, skipping")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_process_deferred_render: Widget is destroyed, skipping")
                 self._last_render_payload = None
                 return
 
             if self._last_render_payload is None:
-                _LOGGER.debug("_process_deferred_render: No payload, skipping")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_process_deferred_render: No payload, skipping")
                 return
 
-            _LOGGER.debug("_process_deferred_render: Calling _try_render_visual")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_process_deferred_render: Calling _try_render_visual")
             self._try_render_visual(self._last_render_payload)
-            _LOGGER.debug("_process_deferred_render: COMPLETE")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_process_deferred_render: COMPLETE")
         except Exception as e:
-            _LOGGER.exception(f"_process_deferred_render: ERROR - {e}")
+            self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=f"_process_deferred_render: ERROR - {e}", exc_info=e)
         finally:
             self._last_render_payload = None
 
@@ -459,38 +481,51 @@ class LiveTelemetryTab(BaseTelemetryTab):
     def _try_render_visual(self, payload: Any) -> None:
         """Try to render visual representation from payload (throttled)."""
         try:
-            _LOGGER.debug(f"_try_render_visual: START (is_destroyed={self._is_destroyed}, renderer_strategy={self._renderer_strategy is not None})")
+            if not self._live_render_enabled:
+                return
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_try_render_visual: START (is_destroyed={self._is_destroyed}, renderer_strategy={self._renderer_strategy is not None})")
 
             # Skip if renderer not initialized yet
             if self._renderer_strategy is None:
-                _LOGGER.debug("_try_render_visual: Renderer not initialized, attempting to create")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_try_render_visual: Renderer not initialized, attempting to create")
                 # Try to initialize on first call
                 if not self._renderer_registry.is_registered(RenderMode.GRID):
-                    _LOGGER.warning("_try_render_visual: GRID renderer not registered in registry")
+                    self.log_constant(LOG_UI_LIVE_TAB_WARNING, message="_try_render_visual: GRID renderer not registered in registry")
                     return
                 try:
-                    _LOGGER.debug("_try_render_visual: Creating GRID renderer...")
+                    self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_try_render_visual: Creating GRID renderer...")
                     self._renderer_strategy = self._renderer_registry.create(RenderMode.GRID, self._render_container)
-                    _LOGGER.debug(f"_try_render_visual: Renderer created: {self._renderer_strategy}")
+                    self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_try_render_visual: Renderer created: {self._renderer_strategy}")
 
                     # Safely remove placeholder and add renderer widget
-                    if self._render_placeholder and self._render_placeholder.parent():
-                        _LOGGER.debug("_try_render_visual: Removing placeholder widget")
+                    if (
+                        self._render_placeholder is not None
+                        and self._render_placeholder.parent()
+                        and self._render_layout is not None
+                    ):
+                        self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_try_render_visual: Removing placeholder widget")
                         self._render_layout.removeWidget(self._render_placeholder)
                         self._render_placeholder.deleteLater()
-                    if self._renderer_strategy and hasattr(self._renderer_strategy, 'widget'):
+                    if (
+                        self._renderer_strategy
+                        and hasattr(self._renderer_strategy, 'widget')
+                        and self._render_layout is not None
+                    ):
                         widget = self._renderer_strategy.widget
-                        _LOGGER.debug(f"_try_render_visual: Adding renderer widget to layout (widget={widget})")
+                        self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_try_render_visual: Adding renderer widget to layout (widget={widget})")
                         # Ensure renderer widget expands to fill container
                         widget.setSizePolicy(
                             QtWidgets.QSizePolicy.Policy.Expanding,
                             QtWidgets.QSizePolicy.Policy.Expanding
                         )
-                        _LOGGER.debug("_try_render_visual: Renderer widget size policy set to Expanding/Expanding")
+                        self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_try_render_visual: Renderer widget size policy set to Expanding/Expanding")
                         self._render_layout.addWidget(widget)
-                        _LOGGER.info(f"_try_render_visual: Renderer widget successfully added to layout")
+                        self.log_constant(LOG_UI_LIVE_TAB_INFO, message=f"_try_render_visual: Renderer widget successfully added to layout")
                 except Exception as e:
-                    _LOGGER.exception(f"_try_render_visual: Failed to initialize renderer: {e}")
+                    self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=
+                        f"_try_render_visual: Failed to initialize renderer: {e}",
+                        exc_info=e,
+                    )
                     return
 
             # Extract render_payload if available
@@ -507,17 +542,17 @@ class LiveTelemetryTab(BaseTelemetryTab):
                             else:
                                 render_payload = render_payload_json
                         except (json.JSONDecodeError, TypeError) as e:
-                            _LOGGER.debug(f"_try_render_visual: Failed to parse render_payload_json: {e}")
+                            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_try_render_visual: Failed to parse render_payload_json: {e}")
             else:
                 render_payload = getattr(payload, "render_payload", None)
 
             # If no render_payload, try to generate one from observation (lightweight)
             if render_payload is None:
-                _LOGGER.debug("_try_render_visual: No render_payload, generating from observation")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_try_render_visual: No render_payload, generating from observation")
                 render_payload = self._generate_render_payload_from_observation(payload)
 
             if render_payload is None:
-                _LOGGER.debug("_try_render_visual: No render_payload after generation, returning")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_try_render_visual: No render_payload after generation, returning")
                 return
 
             # Convert to dict if needed
@@ -528,7 +563,7 @@ class LiveTelemetryTab(BaseTelemetryTab):
                     else:
                         render_payload = dict(render_payload)
                 except (json.JSONDecodeError, TypeError):
-                    _LOGGER.debug("_try_render_visual: Failed to convert render_payload to dict")
+                    self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_try_render_visual: Failed to convert render_payload to dict")
                     return
 
             # Extract game_id from payload (update on every render to handle game switching)
@@ -537,7 +572,7 @@ class LiveTelemetryTab(BaseTelemetryTab):
                 try:
                     new_game = game_id_raw if isinstance(game_id_raw, GameId) else GameId(str(game_id_raw))
                     if new_game != self._current_game:
-                        _LOGGER.debug(f"_try_render_visual: Switching game from {self._current_game} to {new_game}")
+                        self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_try_render_visual: Switching game from {self._current_game} to {new_game}")
                         self._current_game = new_game
                     # Always set current_game even if unchanged, to ensure renderer uses correct assets
                     self._current_game = new_game
@@ -547,29 +582,29 @@ class LiveTelemetryTab(BaseTelemetryTab):
             # Render if supported
             if self._renderer_strategy and self._renderer_strategy.supports(render_payload):
                 game_id_str = str(self._current_game) if self._current_game else "None"
-                _LOGGER.debug(f"_try_render_visual: Renderer supports payload (game_id={game_id_str})")
-                _LOGGER.debug(f"_try_render_visual: Calling renderer.render() with grid={render_payload.get('grid')}")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_try_render_visual: Renderer supports payload (game_id={game_id_str})")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_try_render_visual: Calling renderer.render() with grid={render_payload.get('grid')}")
                 context = RendererContext(game_id=self._current_game)
                 self._renderer_strategy.render(render_payload, context=context)
-                _LOGGER.info(f"_try_render_visual: Grid rendered successfully (grid size={len(render_payload.get('grid', []))}x{len(render_payload.get('grid', [[]])[0]) if render_payload.get('grid') else 0})")
+                self.log_constant(LOG_UI_LIVE_TAB_INFO, message=f"_try_render_visual: Grid rendered successfully (grid size={len(render_payload.get('grid', []))}x{len(render_payload.get('grid', [[]])[0]) if render_payload.get('grid') else 0})")
             else:
-                _LOGGER.warning(f"_try_render_visual: Renderer does not support payload or is None")
-                _LOGGER.debug(f"  - _renderer_strategy: {self._renderer_strategy}")
-                _LOGGER.debug(f"  - supports(): {self._renderer_strategy.supports(render_payload) if self._renderer_strategy else 'N/A'}")
-                _LOGGER.debug(f"  - payload keys: {list(render_payload.keys())}")
+                self.log_constant(LOG_UI_LIVE_TAB_WARNING, message=f"_try_render_visual: Renderer does not support payload or is None")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"  - _renderer_strategy: {self._renderer_strategy}")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"  - supports(): {self._renderer_strategy.supports(render_payload) if self._renderer_strategy else 'N/A'}")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"  - payload keys: {list(render_payload.keys())}")
                 game_id_str = str(self._current_game) if self._current_game else "None"
-                _LOGGER.debug(f"  - game_id: {game_id_str}")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"  - game_id: {game_id_str}")
         except Exception as e:
-            _LOGGER.exception(f"_try_render_visual: ERROR - {e}")
+            self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=f"_try_render_visual: ERROR - {e}", exc_info=e)
 
     def add_episode(self, payload: Any) -> None:
         """Add an episode to the buffer and update table."""
         try:
             episode_index = payload.get("episode_index", "?") if isinstance(payload, dict) else getattr(payload, "episode_index", "?")
-            _LOGGER.info(f"add_episode: START (episode={episode_index}, is_destroyed={self._is_destroyed})")
+            self.log_constant(LOG_UI_LIVE_TAB_INFO, message=f"add_episode: START (episode={episode_index}, is_destroyed={self._is_destroyed})")
 
             if self._is_destroyed:
-                _LOGGER.debug("add_episode: Widget is destroyed, skipping")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="add_episode: Widget is destroyed, skipping")
                 return
 
             self._episode_buffer.append(payload)
@@ -578,9 +613,9 @@ class LiveTelemetryTab(BaseTelemetryTab):
             # Schedule episode rendering on the GUI thread using QMetaObject.invokeMethod.
             # This works from any thread (including background threads without Qt event loops).
             self._schedule_episode_render(payload)
-            _LOGGER.debug("add_episode: COMPLETE")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="add_episode: COMPLETE")
         except Exception as e:
-            _LOGGER.exception(f"add_episode: ERROR - {e}")
+            self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=f"add_episode: ERROR - {e}", exc_info=e)
     
     
     def _schedule_step_render(self, payload: Any) -> None:
@@ -600,7 +635,7 @@ class LiveTelemetryTab(BaseTelemetryTab):
                 _QUEUED_CONNECTION,
             )
         except Exception as e:
-            _LOGGER.exception(f"_schedule_step_render: ERROR - {e}")
+            self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=f"_schedule_step_render: ERROR - {e}", exc_info=e)
 
 
     def _schedule_episode_render(self, payload: Any) -> None:
@@ -620,7 +655,7 @@ class LiveTelemetryTab(BaseTelemetryTab):
                 _QUEUED_CONNECTION,
             )
         except Exception as e:
-            _LOGGER.exception(f"_schedule_episode_render: ERROR - {e}")
+            self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=f"_schedule_episode_render: ERROR - {e}", exc_info=e)
             
     @pyqtSlot()
     def _render_latest_step_from_pending(self) -> None:
@@ -631,7 +666,7 @@ class LiveTelemetryTab(BaseTelemetryTab):
                 delattr(self, '_pending_step_payload')
                 self._render_latest_step(payload)
         except Exception as e:
-            _LOGGER.exception(f"_render_latest_step_from_pending: ERROR - {e}")
+            self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=f"_render_latest_step_from_pending: ERROR - {e}", exc_info=e)
             
     @pyqtSlot()
     def _render_episode_row_from_pending(self) -> None:
@@ -642,17 +677,17 @@ class LiveTelemetryTab(BaseTelemetryTab):
                 delattr(self, '_pending_episode_payload')
                 self._render_episode_row(payload)
         except Exception as e:
-            _LOGGER.exception(f"_render_episode_row_from_pending: ERROR - {e}")
+            self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=f"_render_episode_row_from_pending: ERROR - {e}", exc_info=e)
 
 
 
     def _render_episode_row(self, payload: Any) -> None:
         """Add a row to the episodes table."""
         try:
-            _LOGGER.debug(f"_render_episode_row: START (is_destroyed={self._is_destroyed})")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_render_episode_row: START (is_destroyed={self._is_destroyed})")
 
             if self._is_destroyed:
-                _LOGGER.debug("_render_episode_row: Widget is destroyed, skipping")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_render_episode_row: Widget is destroyed, skipping")
                 return
 
             # Helper function to handle both dict and object payloads
@@ -729,9 +764,13 @@ class LiveTelemetryTab(BaseTelemetryTab):
                     new_game_id = game_id if isinstance(game_id, GameId) else GameId(str(game_id))
                     if self._current_game != new_game_id:
                         self._current_game = new_game_id
-                        _LOGGER.debug(f"_render_episode_row: Updated current_game to {self._current_game} from episode metadata")
-                except (ValueError, KeyError):
-                    _LOGGER.warning(f"_render_episode_row: Invalid game_id in metadata: {game_id}")
+                        self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_render_episode_row: Updated current_game to {self._current_game} from episode metadata")
+                except (ValueError, KeyError) as exc:
+                    self.log_constant(
+                        LOG_UI_LIVE_TAB_WARNING,
+                        message=f"_render_episode_row: Invalid game_id in metadata: {game_id}",
+                        exc_info=exc,
+                    )
 
             # CRITICAL FIX: Display episode should equal seed + episode_index
             # episode_index is 0-based (0, 1, 2, 3...)
@@ -740,9 +779,9 @@ class LiveTelemetryTab(BaseTelemetryTab):
                 seed_int = int(seed) if seed != "—" else 0
                 episode_idx_int = int(episode_index)
                 display_episode = seed_int + episode_idx_int
-                _LOGGER.debug(f"_render_episode_row: seed={seed} ({seed_int}), episode_index={episode_index} ({episode_idx_int}), display_episode={display_episode}")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_render_episode_row: seed={seed} ({seed_int}), episode_index={episode_index} ({episode_idx_int}), display_episode={display_episode}")
             except (TypeError, ValueError) as e:
-                _LOGGER.warning(f"_render_episode_row: Failed to calculate display_episode: {e}")
+                self.log_constant(LOG_UI_LIVE_TAB_WARNING, message=f"_render_episode_row: Failed to calculate display_episode: {e}", exc_info=e)
                 display_episode = int(episode_index) if episode_index else 0
 
             # Compute outcome display from episode state
@@ -792,14 +831,14 @@ class LiveTelemetryTab(BaseTelemetryTab):
             if self._episodes_table.rowCount() > 100:
                 self._episodes_table.removeRow(0)
 
-            _LOGGER.info(f"_render_episode_row: COMPLETE (row_count={self._episodes_table.rowCount()})")
+            self.log_constant(LOG_UI_LIVE_TAB_INFO, message=f"_render_episode_row: COMPLETE (row_count={self._episodes_table.rowCount()})")
         except Exception as e:
             # NEW: Never let UI rendering die silently - log raw payload preview
             try:
                 preview = (json.dumps(payload)[:400] + "…") if isinstance(payload, dict) else str(payload)[:400] + "…"
             except Exception:
                 preview = "<uninspectable>"
-            _LOGGER.exception(
+            self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=
                 "EPISODE ROW RENDER FAILED",
                 extra={
                     "agent": self.agent_id,
@@ -877,7 +916,7 @@ class LiveTelemetryTab(BaseTelemetryTab):
 
         # Copy to clipboard
         clipboard.setText("\n".join(rows))
-        _LOGGER.debug(f"Copied {len(rows)-1} episodes to clipboard")
+        self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"Copied {len(rows)-1} episodes to clipboard")
 
     def _copy_steps_table_to_clipboard(self) -> None:
         """Copy steps table contents to clipboard in TSV format."""
@@ -905,7 +944,7 @@ class LiveTelemetryTab(BaseTelemetryTab):
 
         # Copy to clipboard
         clipboard.setText("\n".join(rows))
-        _LOGGER.debug(f"Copied {len(rows)-1} steps to clipboard")
+        self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"Copied {len(rows)-1} steps to clipboard")
 
     def cleanup(self) -> None:
         """Clean up resources before widget destruction.
@@ -915,50 +954,50 @@ class LiveTelemetryTab(BaseTelemetryTab):
         destroyed widgets.
         """
         try:
-            _LOGGER.info(f"cleanup: START for {self.run_id}/{self.agent_id}")
+            self.log_constant(LOG_UI_LIVE_TAB_INFO, message=f"cleanup: START for {self.run_id}/{self.agent_id}")
 
             # Set destroyed flag FIRST to prevent any pending timers from accessing the widget
             self._is_destroyed = True
-            _LOGGER.debug("cleanup: Set _is_destroyed = True")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="cleanup: Set _is_destroyed = True")
 
             # Clear pending render payload to prevent timer callbacks from using it
             self._last_render_payload = None
-            _LOGGER.debug("cleanup: Cleared _last_render_payload")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="cleanup: Cleared _last_render_payload")
 
             # Clear buffers
             step_count = len(self._step_buffer)
             self._step_buffer.clear()
-            _LOGGER.debug(f"cleanup: Cleared step buffer (was {step_count} items)")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"cleanup: Cleared step buffer (was {step_count} items)")
 
             episode_count = len(self._episode_buffer)
             self._episode_buffer.clear()
-            _LOGGER.debug(f"cleanup: Cleared episode buffer (was {episode_count} items)")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"cleanup: Cleared episode buffer (was {episode_count} items)")
 
             # Stop rendering speed regulator
             if hasattr(self, '_render_regulator') and self._render_regulator is not None:
-                _LOGGER.debug("cleanup: Stopping RenderingSpeedRegulator")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="cleanup: Stopping RenderingSpeedRegulator")
                 try:
                     self._render_regulator.stop()
                     self._render_regulator.clear_queue()
-                    _LOGGER.debug("cleanup: RenderingSpeedRegulator stopped and queue cleared")
+                    self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="cleanup: RenderingSpeedRegulator stopped and queue cleared")
                 except Exception as e:
-                    _LOGGER.exception(f"cleanup: Error stopping regulator: {e}")
+                    self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=f"cleanup: Error stopping regulator: {e}", exc_info=e)
 
             # Clear renderer strategy
             if self._renderer_strategy is not None:
-                _LOGGER.debug(f"cleanup: Cleaning up renderer strategy: {self._renderer_strategy}")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"cleanup: Cleaning up renderer strategy: {self._renderer_strategy}")
                 try:
                     if hasattr(self._renderer_strategy, 'cleanup'):
-                        _LOGGER.debug("cleanup: Calling renderer.cleanup()")
+                        self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="cleanup: Calling renderer.cleanup()")
                         self._renderer_strategy.cleanup()
                 except Exception as e:
-                    _LOGGER.exception(f"cleanup: Error cleaning up renderer: {e}")
+                    self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=f"cleanup: Error cleaning up renderer: {e}", exc_info=e)
                 self._renderer_strategy = None
-                _LOGGER.debug("cleanup: Set _renderer_strategy = None")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="cleanup: Set _renderer_strategy = None")
 
-            _LOGGER.info(f"cleanup: COMPLETE for {self.run_id}/{self.agent_id}")
+            self.log_constant(LOG_UI_LIVE_TAB_INFO, message=f"cleanup: COMPLETE for {self.run_id}/{self.agent_id}")
         except Exception as e:
-            _LOGGER.exception(f"cleanup: FATAL ERROR - {e}")
+            self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=f"cleanup: FATAL ERROR - {e}", exc_info=e)
 
     def _generate_render_payload_from_observation(self, payload: Any) -> Optional[dict[str, Any]]:
         """Generate a render payload from observation data (lightweight fallback).
@@ -975,7 +1014,7 @@ class LiveTelemetryTab(BaseTelemetryTab):
                 obs_json = getattr(payload, "observation_json", None)
 
             if not obs_json:
-                _LOGGER.debug("_generate_render_payload_from_observation: No observation_json found")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_generate_render_payload_from_observation: No observation_json found")
                 return None
 
             # Parse observation (fast path for simple cases)
@@ -983,28 +1022,28 @@ class LiveTelemetryTab(BaseTelemetryTab):
                 if isinstance(obs_json, str):
                     # Quick check: if it looks like a simple number, skip parsing
                     if obs_json.isdigit():
-                        _LOGGER.debug("_generate_render_payload_from_observation: observation_json is just a number, skipping")
+                        self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_generate_render_payload_from_observation: observation_json is just a number, skipping")
                         return None  # Can't render without position info
                     obs_data = json.loads(obs_json)
                 else:
                     obs_data = obs_json
             except (json.JSONDecodeError, TypeError, ValueError) as e:
-                _LOGGER.debug(f"_generate_render_payload_from_observation: Failed to parse observation_json: {e}")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_generate_render_payload_from_observation: Failed to parse observation_json: {e}")
                 return None
 
             # For FrozenLake: observation is typically {"state": N, "position": {"row": r, "col": c}, ...}
             if not isinstance(obs_data, dict):
-                _LOGGER.debug(f"_generate_render_payload_from_observation: obs_data is not a dict: {type(obs_data)}")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_generate_render_payload_from_observation: obs_data is not a dict: {type(obs_data)}")
                 return None
 
             state = obs_data.get("state")
             position = obs_data.get("position")
             holes = obs_data.get("holes")
 
-            _LOGGER.debug(f"_generate_render_payload_from_observation: state={state}, position={position}, holes={holes}")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_generate_render_payload_from_observation: state={state}, position={position}, holes={holes}")
 
             if state is None or position is None:
-                _LOGGER.debug("_generate_render_payload_from_observation: Missing state or position")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_generate_render_payload_from_observation: Missing state or position")
                 return None
 
             # Extract position (fast path)
@@ -1070,7 +1109,7 @@ class LiveTelemetryTab(BaseTelemetryTab):
             }
             return render_payload
         except Exception as e:
-            _LOGGER.debug(f"Failed to generate render payload: {e}")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"Failed to generate render payload: {e}")
             return None
 
 

@@ -30,6 +30,7 @@ from gym_gui.config.paths import (
     VAR_TRAINER_DB,
     ensure_var_directories,
 )
+from gym_gui.logging_config.log_constants import LOG_DAEMON_START
 from gym_gui.logging_config.logger import configure_logging
 from gym_gui.services.trainer import GPUAllocator, RunRegistry, RunStatus, TrainerDispatcher
 from gym_gui.services.trainer.service import _record_to_proto
@@ -391,6 +392,18 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
 
 async def _async_main(args: argparse.Namespace) -> None:
     configure_logging(level=getattr(logging, args.log_level))
+    level = (
+        LOG_DAEMON_START.level
+        if isinstance(LOG_DAEMON_START.level, int)
+        else getattr(logging, LOG_DAEMON_START.level)
+    )
+    _LOGGER.log(
+        level,
+        "%s %s",
+        LOG_DAEMON_START.code,
+        LOG_DAEMON_START.message,
+        extra={"log_code": LOG_DAEMON_START.code, "stdout_redirected": True},
+    )
     _LOGGER.info(
         "Trainer dependencies",
         extra={

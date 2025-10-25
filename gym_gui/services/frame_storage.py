@@ -10,9 +10,16 @@ import numpy as np
 from PIL import Image
 
 from gym_gui.config.paths import VAR_RECORDS_DIR, ensure_var_directories
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_SERVICE_FRAME_DEBUG,
+    LOG_SERVICE_FRAME_INFO,
+    LOG_SERVICE_FRAME_WARNING,
+    LOG_SERVICE_FRAME_ERROR,
+)
 
 
-class FrameStorageService:
+class FrameStorageService(LogConstantMixin):
     """Service for storing and retrieving rendered frames."""
 
     def __init__(self, base_dir: Optional[Path] = None) -> None:
@@ -62,13 +69,31 @@ class FrameStorageService:
                 # Grid frame from ToyText environments
                 self._save_grid_frame(frame_data, frame_path)
             else:
-                self._logger.warning(f"Unsupported frame data type: {type(frame_data)}")
+                self.log_constant(
+                    LOG_SERVICE_FRAME_WARNING,
+                    message="unsupported_frame_data",
+                    extra={"data_type": type(frame_data).__name__},
+                )
                 return None
-            
-            self._logger.debug(f"Saved frame to {frame_path}")
+
+            self.log_constant(
+                LOG_SERVICE_FRAME_INFO,
+                message="frame_saved",
+                extra={
+                    "frame_path": str(frame_path),
+                    "frame_ref": frame_ref,
+                    "run_id": run_id or "-",
+                    "data_type": type(frame_data).__name__,
+                },
+            )
             return frame_path
         except Exception as e:
-            self._logger.error(f"Failed to save frame {frame_ref}: {e}", exc_info=True)
+            self.log_constant(
+                LOG_SERVICE_FRAME_ERROR,
+                message="frame_save_failed",
+                extra={"frame_ref": frame_ref, "run_id": run_id or "-"},
+                exc_info=e,
+            )
             return None
 
     def get_frame(
@@ -93,17 +118,30 @@ class FrameStorageService:
                 frame_path = self._base_dir / frame_ref
             
             if not frame_path.exists():
-                self._logger.debug(f"Frame file not found: {frame_path}")
+                self.log_constant(
+                    LOG_SERVICE_FRAME_DEBUG,
+                    message="frame_not_found",
+                    extra={"frame_path": str(frame_path), "frame_ref": frame_ref, "run_id": run_id or "-"},
+                )
                 return None
             
             # Load frame
             image = Image.open(frame_path)
             frame_array = np.array(image)
             
-            self._logger.debug(f"Loaded frame from {frame_path}")
+            self.log_constant(
+                LOG_SERVICE_FRAME_INFO,
+                message="frame_loaded",
+                extra={"frame_path": str(frame_path), "frame_ref": frame_ref, "run_id": run_id or "-"},
+            )
             return frame_array
         except Exception as e:
-            self._logger.error(f"Failed to load frame {frame_ref}: {e}", exc_info=True)
+            self.log_constant(
+                LOG_SERVICE_FRAME_ERROR,
+                message="frame_load_failed",
+                extra={"frame_ref": frame_ref, "run_id": run_id or "-"},
+                exc_info=e,
+            )
             return None
 
     def delete_frame(
@@ -129,12 +167,21 @@ class FrameStorageService:
             
             if frame_path.exists():
                 frame_path.unlink()
-                self._logger.debug(f"Deleted frame: {frame_path}")
+                self.log_constant(
+                    LOG_SERVICE_FRAME_INFO,
+                    message="frame_deleted",
+                    extra={"frame_path": str(frame_path), "frame_ref": frame_ref, "run_id": run_id or "-"},
+                )
                 return True
             
             return False
         except Exception as e:
-            self._logger.error(f"Failed to delete frame {frame_ref}: {e}", exc_info=True)
+            self.log_constant(
+                LOG_SERVICE_FRAME_ERROR,
+                message="frame_delete_failed",
+                extra={"frame_ref": frame_ref, "run_id": run_id or "-"},
+                exc_info=e,
+            )
             return False
 
     def cleanup_run(self, run_id: str) -> bool:
@@ -151,11 +198,20 @@ class FrameStorageService:
             if run_dir.exists():
                 import shutil
                 shutil.rmtree(run_dir)
-                self._logger.debug(f"Cleaned up frames for run: {run_id}")
+                self.log_constant(
+                    LOG_SERVICE_FRAME_INFO,
+                    message="run_cleanup_completed",
+                    extra={"run_id": run_id, "path": str(run_dir)},
+                )
                 return True
             return False
         except Exception as e:
-            self._logger.error(f"Failed to cleanup run {run_id}: {e}", exc_info=True)
+            self.log_constant(
+                LOG_SERVICE_FRAME_ERROR,
+                message="run_cleanup_failed",
+                extra={"run_id": run_id},
+                exc_info=e,
+            )
             return False
 
     @staticmethod
@@ -193,4 +249,3 @@ class FrameStorageService:
 
 
 __all__ = ["FrameStorageService"]
-

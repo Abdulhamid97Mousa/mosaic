@@ -26,12 +26,20 @@ from __future__ import annotations
 
 import json
 import logging
-from pathlib import Path
+from functools import partial
 from typing import Any, Dict, List, Optional
 
 import agentspeak
 
-logger = logging.getLogger(__name__)
+from gym_gui.logging_config.helpers import log_constant
+from gym_gui.logging_config.log_constants import (
+    LOG_WORKER_POLICY_EVENT,
+    LOG_WORKER_POLICY_WARNING,
+    LOG_WORKER_POLICY_ERROR,
+)
+
+_LOGGER = logging.getLogger(__name__)
+_log = partial(log_constant, _LOGGER)
 
 # Global action registry - will be populated by register_actions()
 GLOBAL_ACTIONS = agentspeak.Actions()
@@ -64,7 +72,7 @@ def _act_reset_environment(agent, term, intention):
             agent.episode_steps = 0
             agent.episode_count += 1
             x, y = agent.adapter.state_to_pos(agent.current_state)
-            logger.info(f"[RESET] Episode {agent.episode_count}: Environment reset to ({x},{y})")
+            _log(LOG_WORKER_POLICY_EVENT, message=f"[RESET] Episode {agent.episode_count}: Environment reset to ({x},{y})")
     finally:
         yield
 
@@ -82,7 +90,7 @@ def _act_set_goal(agent, term, intention):
         if hasattr(agent, "rl_agent") and hasattr(agent.rl_agent, "q_table"):
             agent.rl_agent.q_table[:] = 0.0
             agent.rl_agent.epsilon = 0.1
-        logger.info(f"[GOAL] Set goal to ({gx},{gy}) and reset Q-table")
+        _log(LOG_WORKER_POLICY_EVENT, message=f"[GOAL] Set goal to ({gx},{gy}) and reset Q-table")
     finally:
         yield
 
@@ -107,11 +115,11 @@ def _act_check_cached_policy(agent, term, intention):
                     agentspeak.Literal(seq_str)
                 ])
                 agent.add_belief(lit, intention.scope)
-                logger.info(f"[OK] Found cached policy: {key} (conf={conf:.3f})")
+                _log(LOG_WORKER_POLICY_EVENT, message=f"[OK] Found cached policy: {key} (conf={conf:.3f})")
             else:
-                logger.info(f"[SKIP] Cached policy {key} below min conf {min_conf}")
+                _log(LOG_WORKER_POLICY_EVENT, message=f"[SKIP] Cached policy {key} below min conf {min_conf}")
         else:
-            logger.info(f"[NO_CACHE] No cached policy found for {key}")
+            _log(LOG_WORKER_POLICY_EVENT, message=f"[NO_CACHE] No cached policy found for {key}")
     finally:
         yield
 
@@ -155,7 +163,7 @@ def _act_set_epsilon(agent, term, intention):
         eps = float(_extract_value(term.args[0]))
         if hasattr(agent, "rl_agent"):
             agent.rl_agent.epsilon = eps
-        logger.info(f"[EPS] epsilon <- {eps:.3f}")
+        _log(LOG_WORKER_POLICY_EVENT, message=f"[EPS] epsilon <- {eps:.3f}")
     finally:
         yield
 
@@ -181,10 +189,10 @@ def _act_execute_action(agent, term, intention):
         if done:
             if float(r) > 0:
                 agent.add_belief(agentspeak.Literal("goal_reached", []), intention.scope)
-                logger.info(f"[ONLINE] Successfully reached goal at ({x},{y}) in {agent.episode_steps} steps")
+                _log(LOG_WORKER_POLICY_EVENT, message=f"[ONLINE] Successfully reached goal at ({x},{y}) in {agent.episode_steps} steps")
             else:
                 agent.add_belief(agentspeak.Literal("fell_in_hole", []), intention.scope)
-                logger.info(f"[ONLINE] Fell in hole at ({x},{y}) after {agent.episode_steps} steps")
+                _log(LOG_WORKER_POLICY_EVENT, message=f"[ONLINE] Fell in hole at ({x},{y}) after {agent.episode_steps} steps")
     finally:
         yield
 
@@ -200,7 +208,7 @@ def _act_exec_cached_seq(agent, term, intention):
         
         for name in seq:
             if name not in a_map:
-                logger.error(f"Invalid action '{name}' in cached sequence")
+                _log(LOG_WORKER_POLICY_ERROR, message=f"Invalid action '{name}' in cached sequence")
                 agent.add_belief(agentspeak.Literal("cached_policy_failed", []), intention.scope)
                 return
             
@@ -214,11 +222,11 @@ def _act_exec_cached_seq(agent, term, intention):
             if done:
                 if float(r) > 0:
                     agent.add_belief(agentspeak.Literal("goal_reached", []), intention.scope)
-                    logger.info("[CACHED] Successfully reached goal with cached policy")
+                    _log(LOG_WORKER_POLICY_EVENT, message="[CACHED] Successfully reached goal with cached policy")
                 else:
                     agent.add_belief(agentspeak.Literal("fell_in_hole", []), intention.scope)
                     agent.add_belief(agentspeak.Literal("cached_policy_failed", []), intention.scope)
-                    logger.info("[CACHED] Cached policy failed - fell in hole")
+                    _log(LOG_WORKER_POLICY_WARNING, message="[CACHED] Cached policy failed - fell in hole")
                 break
     finally:
         yield
@@ -260,7 +268,7 @@ def _act_cache_policy(agent, term, intention):
             seq_b = "[" + ",".join(seq) + "]"
             lit = agentspeak.Literal("has_policy", [agentspeak.Literal(key), agentspeak.Literal(seq_b)])
             agent.add_belief(lit, intention.scope)
-            logger.info(f"[CACHE] {key} (conf={conf:.3f}): {seq}")
+            _log(LOG_WORKER_POLICY_EVENT, message=f"[CACHE] {key} (conf={conf:.3f}): {seq}")
     finally:
         yield
 
@@ -285,7 +293,7 @@ def _act_remove_cached_policy(agent, term, intention):
         key = f"goal_{gx}_{gy}"
         if hasattr(agent, "cached_policies") and key in agent.cached_policies:
             del agent.cached_policies[key]
-            logger.info(f"[REMOVE] Removed cached policy for {key}")
+            _log(LOG_WORKER_POLICY_EVENT, message=f"[REMOVE] Removed cached policy for {key}")
     finally:
         yield
 
@@ -296,7 +304,7 @@ def _act_clear_policy_store(agent, term, intention):
     try:
         if hasattr(agent, "cached_policies"):
             agent.cached_policies.clear()
-        logger.info("[CLEAR] Cleared all cached policies")
+        _log(LOG_WORKER_POLICY_EVENT, message="[CLEAR] Cleared all cached policies")
     finally:
         yield
 
@@ -307,7 +315,7 @@ def _act_save_policies(agent, term, intention):
     try:
         if hasattr(agent, "cached_policies") and hasattr(agent, "policy_store"):
             agent.policy_store.save(agent.cached_policies)
-            logger.info(f"[SAVE] Saved {len(agent.cached_policies)} policies")
+            _log(LOG_WORKER_POLICY_EVENT, message=f"[SAVE] Saved {len(agent.cached_policies)} policies")
     finally:
         yield
 
@@ -318,7 +326,7 @@ def _act_load_policies(agent, term, intention):
     try:
         if hasattr(agent, "policy_store"):
             agent.cached_policies = agent.policy_store.load()
-            logger.info(f"[LOAD] Loaded {len(agent.cached_policies)} policies")
+            _log(LOG_WORKER_POLICY_EVENT, message=f"[LOAD] Loaded {len(agent.cached_policies)} policies")
     finally:
         yield
 
@@ -329,4 +337,3 @@ def register_actions() -> agentspeak.Actions:
 
 
 __all__ = ["GLOBAL_ACTIONS", "register_actions"]
-

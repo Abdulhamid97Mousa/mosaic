@@ -39,7 +39,9 @@ from gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory import (
     TabFactory,
 )
 
-from gym_gui.ui.widgets.agent_train_dialog import AgentTrainDialog
+from gym_gui.ui.forms import get_worker_form_factory
+from gym_gui.ui.widgets.spade_bdi_train_form import SpadeBdiTrainForm
+from gym_gui.ui.widgets.spade_bdi_policy_selection_form import SpadeBdiPolicySelectionForm
 
 __all__ = [
     "AgentOnlineTab",
@@ -49,3 +51,18 @@ __all__ = [
     "AgentReplayTab",
     "TabFactory",
 ]
+
+_form_factory = get_worker_form_factory()
+
+# Register SPADE-BDI specific forms if not already registered
+if not _form_factory.has_train_form("spade_bdi_rl"):
+    _form_factory.register_train_form(
+        "spade_bdi_rl",
+        lambda parent=None, **kwargs: SpadeBdiTrainForm(parent=parent, **kwargs),
+    )
+
+if not _form_factory.has_policy_form("spade_bdi_rl"):
+    _form_factory.register_policy_form(
+        "spade_bdi_rl",
+        lambda parent=None, **kwargs: SpadeBdiPolicySelectionForm(parent=parent, **kwargs),
+    )

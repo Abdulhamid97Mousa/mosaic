@@ -11,9 +11,14 @@ from typing import Any, Iterable, Optional, Sequence
 
 from gym_gui.services.trainer.client import TrainerClient, TrainerClientConfig
 from gym_gui.services.trainer.registry import RunStatus
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_TRAINER_CLIENT_LOOP_NONFATAL,
+    LOG_TRAINER_CLIENT_LOOP_ERROR,
+)
 
 
-class TrainerClientRunner:
+class TrainerClientRunner(LogConstantMixin):
     """Runs :class:`TrainerClient` coroutines on a dedicated asyncio loop."""
 
     def __init__(self, client: Optional[TrainerClient] = None, *, name: str = "trainer-client-loop") -> None:
@@ -83,9 +88,13 @@ class TrainerClientRunner:
     def _loop_exception_handler(self, loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
         exc = context.get("exception")
         if isinstance(exc, BlockingIOError) and exc.errno in {errno.EAGAIN, errno.EWOULDBLOCK}:
-            self._logger.debug(
-                "Ignoring non-fatal BlockingIOError from gRPC poller",
-                extra={"grpc_message": context.get("message")},  # Rename to avoid conflict
+            self.log_constant(
+                LOG_TRAINER_CLIENT_LOOP_NONFATAL,
+                message="grpc_blocking_io_ignored",
+                extra={
+                    "errno": getattr(exc, "errno", None),
+                    "grpc_message": context.get("message"),
+                },
             )
             return
 
@@ -98,7 +107,20 @@ class TrainerClientRunner:
                 sanitized_context[key] = value
 
         log_message = sanitized_context.pop("loop_message", "Unhandled exception in trainer client loop")
-        self._logger.error(log_message, extra=sanitized_context)
+        extra_payload: dict[str, Any] = {}
+        for key, value in sanitized_context.items():
+            if isinstance(value, (str, int, float, bool)) or value is None:
+                extra_payload[key] = value
+            else:
+                extra_payload[key] = repr(value)
+        if exc is not None:
+            extra_payload.setdefault("exception_type", type(exc).__name__)
+        self.log_constant(
+            LOG_TRAINER_CLIENT_LOOP_ERROR,
+            message=log_message,
+            extra=extra_payload,
+            exc_info=exc,
+        )
 
 
 class TrainerWatchSubscription:
