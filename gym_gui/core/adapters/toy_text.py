@@ -445,11 +445,15 @@ class FrozenLakeAdapter(ToyTextAdapter):
         self,
         context: AdapterContext | None = None,
         *,
-        game_config: FrozenLakeConfig | None = None,
+        game_config: FrozenLakeConfig | dict | None = None,
     ) -> None:
         """Initialize with optional game-specific configuration."""
         super().__init__(context, defaults=self.toy_text_defaults)
-        self._game_config = game_config or DEFAULT_FROZEN_LAKE_CONFIG
+        # Handle dict game_config (from worker) by converting to FrozenLakeConfig
+        if isinstance(game_config, dict):
+            self._game_config = FrozenLakeConfig(**game_config)
+        else:
+            self._game_config = game_config or DEFAULT_FROZEN_LAKE_CONFIG
         self._last_action: int | None = None
 
     def gym_kwargs(self) -> dict[str, Any]:
@@ -545,25 +549,14 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
         self,
         context: AdapterContext | None = None,
         *,
-        game_config: FrozenLakeConfig | None = None,
+        game_config: FrozenLakeConfig | dict | None = None,
     ) -> None:
         """Initialize with optional game-specific configuration."""
         super().__init__(context, defaults=self.toy_text_defaults)
         
         # Convert dictionary to FrozenLakeConfig if needed
         if isinstance(game_config, dict):
-            # Build FrozenLakeConfig from dictionary
-            game_config = FrozenLakeConfig(
-                is_slippery=game_config.get('is_slippery', DEFAULT_FROZEN_LAKE_V2_CONFIG.is_slippery),
-                success_rate=game_config.get('success_rate', DEFAULT_FROZEN_LAKE_V2_CONFIG.success_rate),
-                reward_schedule=game_config.get('reward_schedule', DEFAULT_FROZEN_LAKE_V2_CONFIG.reward_schedule),
-                grid_height=game_config.get('grid_height', DEFAULT_FROZEN_LAKE_V2_CONFIG.grid_height),
-                grid_width=game_config.get('grid_width', DEFAULT_FROZEN_LAKE_V2_CONFIG.grid_width),
-                start_position=tuple(game_config.get('start_position', DEFAULT_FROZEN_LAKE_V2_CONFIG.start_position)) if game_config.get('start_position') else None,
-                goal_position=tuple(game_config.get('goal_position', DEFAULT_FROZEN_LAKE_V2_CONFIG.goal_position)) if game_config.get('goal_position') else None,
-                hole_count=game_config.get('hole_count', DEFAULT_FROZEN_LAKE_V2_CONFIG.hole_count),
-                random_holes=game_config.get('random_holes', DEFAULT_FROZEN_LAKE_V2_CONFIG.random_holes),
-            )
+            game_config = FrozenLakeConfig(**game_config)
         
         self._game_config = game_config or DEFAULT_FROZEN_LAKE_V2_CONFIG
         self._last_action: int | None = None
@@ -772,9 +765,7 @@ class CliffWalkingAdapter(ToyTextAdapter):
         
         # Convert dictionary to CliffWalkingConfig if needed
         if isinstance(game_config, dict):
-            game_config = CliffWalkingConfig(
-                is_slippery=game_config.get('is_slippery', DEFAULT_CLIFF_WALKING_CONFIG.is_slippery),
-            )
+            game_config = CliffWalkingConfig(**game_config)
         
         self._game_config = game_config or DEFAULT_CLIFF_WALKING_CONFIG
         self._last_action: int | None = None
@@ -863,10 +854,7 @@ class TaxiAdapter(ToyTextAdapter):
         
         # Convert dictionary to TaxiConfig if needed
         if isinstance(game_config, dict):
-            game_config = TaxiConfig(
-                is_raining=game_config.get('is_raining', DEFAULT_TAXI_CONFIG.is_raining),
-                fickle_passenger=game_config.get('fickle_passenger', DEFAULT_TAXI_CONFIG.fickle_passenger),
-            )
+            game_config = TaxiConfig(**game_config)
         
         self._game_config = game_config or DEFAULT_TAXI_CONFIG
         self._last_action: int | None = None

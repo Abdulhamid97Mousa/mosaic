@@ -61,17 +61,25 @@ class FrozenLakeConfig:
     Only applies to FrozenLake-v2 with standard 4×4 or 8×8 grids."""
     
     def to_gym_kwargs(self) -> Dict[str, Any]:
-        """Convert to Gymnasium environment kwargs."""
+        """Convert to Gymnasium environment kwargs.
+        
+        For FrozenLake-v1: Pass only is_slippery, success_rate, reward_schedule.
+                          Do NOT pass map_name or grid dimensions.
+        
+        For FrozenLake-v2: Pass all parameters; custom map generation handled by adapter
+                           when grid dimensions or positions deviate from defaults.
+        """
         kwargs: Dict[str, Any] = {
             "is_slippery": self.is_slippery,
             "success_rate": self.success_rate,
             "reward_schedule": self.reward_schedule,
         }
         
-        # For FrozenLake-v2, we'll generate a custom map descriptor
-        if self.grid_height != 4 or self.grid_width != 4 or self.start_position is not None or self.goal_position is not None or self.hole_count is not None:
-            # Custom map generation will be handled by adapter
-            kwargs["map_name"] = None  # Signal to use desc parameter
+        # Note: grid_height, grid_width, start_position, goal_position, and hole_count
+        # should only be used by FrozenLakeV2Adapter._generate_map_descriptor().
+        # DO NOT pass map_name to Gymnasium for v1 (causes initialization failure).
+        # FrozenLakeV2Adapter handles custom map generation separately via gym_kwargs()
+        # in its subclass override.
         
         return kwargs
 

@@ -739,6 +739,36 @@ if telemetry_queue.qsize() >= max_queue_size:
 
 ---
 
+## Dual-Path Diagnostic Instrumentation (Day 16 Extension)
+
+### Why We Extended the Catalog
+
+- **Operator confusion persisted.** Despite the dispatcher bridge, the UI still blended “fast path” sliders with durable telemetry expectations (see Contrarian note in Initial Plan §3.2). Without explicit logging, we could not prove when the UI-only controls diverged from what the worker actually applied.
+- **Worker defaults hid drift.** RunConfig silently coerced step delays and buffer sizes, leaving no breadcrumb when UI selections were ignored or truncated.
+
+### New Log Constants
+
+| Constant | Component | Purpose |
+|----------|-----------|---------|
+| `LOG_UI_TRAIN_FORM_UI_PATH` | UI → TrainForm | Announces the UI-only controls (render delay, rendering throttle, step delay) captured at submission time. |
+| `LOG_UI_TRAIN_FORM_TELEMETRY_PATH` | UI → TrainForm | Emits the durable-path knobs (telemetry throttle, buffers) so operators can filter UI runtime logs for persistence-related issues. |
+| `LOG_WORKER_CONFIG_UI_PATH` | Worker → Config | Echoes the UI-only settings after RunConfig normalization and flags applied step delay in milliseconds. |
+| `LOG_WORKER_CONFIG_DURABLE_PATH` | Worker → Config | Shows the durable telemetry settings actually used by the worker (including post-validation buffer sizes). |
+
+These constants are part of the shared catalog (`logging_config/log_constants.py`) so the dispatcher bridge can resolve them without additional plumbing.
+
+### Behavior Notes
+
+- **Mismatch detection.** RunConfig now compares the requested `step_delay_ms` from the UI bundle with the computed `step_delay` (seconds). If the gap exceeds 5 ms we emit an additional `LOG_WORKER_CONFIG_WARNING` describing the mismatch.
+- **Metadata persistence.** Both the UI metadata (`metadata.ui.path_config`) and worker config block (`metadata.worker.config.path_config`) carry the same `ui_only` / `telemetry_durable` dictionary so downstream services can reason about the original intent versus applied values.
+
+### Test Coverage
+
+- `gym_gui/tests/test_logging_ui_path_config.py` (skips automatically when QtPy is unavailable) ensures the train form produces both new UI log constants and that the metadata stores a consistent `path_config`.
+- `spade_bdi_rl/tests/test_logging_path_config.py` validates RunConfig’s structured logs, including warnings for mismatched step delays and the applied telemetry buffers.
+
+> **Contrarian takeaway:** The dispatcher bridge alone could never surface UI vs. durable drift because those decisions happen before the worker is spawned. By logging both sides of the dual-path handshake we finally have a traceable story—UI submission → metadata → worker bootstrap—to diagnose throttling and persistence bugs.
+
 **Last Updated:** Day 15  
 **Status:** Phase 1A-1B-1C Complete, Phase 2+ Pending  
 **Total Constants:** 51+ (Controllers: 28, Adapters: 13, Services/UI/Worker: 200+)  

@@ -203,6 +203,11 @@ class HeadlessTrainer(LogConstantMixin):
             # Convert Mapping to Dict for render payload generation
             render_payload = self._generate_render_payload(next_state, dict(next_obs))
 
+            # Build observation dict for telemetry: include state and grid position
+            # This provides meaningful context for replays and analysis
+            obs_for_telemetry = self._build_observation_dict(state, dict(obs))
+            next_obs_for_telemetry = self._build_observation_dict(next_state, dict(next_obs))
+
             self.emitter.step(
                 self.config.run_id,
                 episode_number,  # Pass episode_number (display value = seed + episode_index)
@@ -214,8 +219,8 @@ class HeadlessTrainer(LogConstantMixin):
                 truncated=bool(truncated),
                 state=int(state),
                 next_state=int(next_state),
-                observation=obs,
-                next_observation=next_obs,
+                observation=obs_for_telemetry,
+                next_observation=next_obs_for_telemetry,
                 q_before=q_before,
                 q_after=float(self.agent.q_table[state, action]),
                 epsilon=float(self.agent.epsilon),
@@ -242,6 +247,37 @@ class HeadlessTrainer(LogConstantMixin):
             steps=steps_taken,
             success=success,
         )
+
+    def _build_observation_dict(self, state: int, info: Dict[str, Any]) -> Dict[str, Any]:
+        """Build a meaningful observation dictionary for telemetry.
+        
+        For toy-text environments like FrozenLake, converts the state integer
+        and info dict into a structured observation with position and metadata.
+        
+        Args:
+            state: Current state (flat index)
+            info: Observation info dict from adapter
+            
+        Returns:
+            Dict with state, position, and environment metadata
+        """
+        observation_dict: Dict[str, Any] = {
+            "state": int(state),
+        }
+        
+        # Try to compute grid position from state
+        try:
+            if hasattr(self.adapter, "state_to_pos"):
+                row, col = self.adapter.state_to_pos(state)
+                observation_dict["position"] = {"row": int(row), "col": int(col)}
+        except Exception:
+            pass
+        
+        # Include environment-specific info (like probability for FrozenLake)
+        if info:
+            observation_dict.update(info)
+        
+        return observation_dict
 
     def _generate_render_payload(self, state: int, obs: Dict[str, Any]) -> Dict[str, Any]:
         """Generate render payload for grid visualization.

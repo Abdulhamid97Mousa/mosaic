@@ -5,6 +5,7 @@ from .confirmation_dialogs import ConfirmationService
 from .inline_banner import InlineBanner
 from .state import IndicatorSeverity, IndicatorState
 from .tab_badge import TabBadgeController, TabBadgeState
+from .tab_closure_dialog import RunSummary, TabClosureChoice, TabClosureDialog
 
 __all__ = [
     "modal_busy_indicator",
@@ -14,4 +15,7 @@ __all__ = [
     "IndicatorSeverity",
     "TabBadgeController",
     "TabBadgeState",
+    "RunSummary",
+    "TabClosureChoice",
+    "TabClosureDialog",
 ]

@@ -138,3 +138,11 @@ User-visible dialog content (contrarian focus):
 - [ ] Design confirmation dialog wireframe (copy deck + button order) with UX review.
 - [ ] Draft TelemetryService API changes and evaluate migration impact.
 - [ ] Plan automated UI tests (PySide/Qt fuzzing) for close-tab workflow.
+
+---
+
+## Follow-Up Notes
+
+- Sync with the constants centralization work (Task 7) so severity thresholds pull from a shared telemetry defaults module instead of hard-coded percentages in the tab widgets.
+- Capture UX copy drafts for the close-tab dialog and inline banners in `docs/1.0_DAY_16/TASK_6/COPY_DECK.md` before implementation begins.
+- Confirm telemetry archive/delete API requirements with storage owners and document final contract in the Task 6 folder to unblock Phase 3.
