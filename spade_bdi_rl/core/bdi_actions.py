@@ -37,6 +37,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_WORKER_POLICY_WARNING,
     LOG_WORKER_POLICY_ERROR,
 )
+from spade_bdi_rl.constants import DEFAULT_CACHED_POLICY_EPSILON, DEFAULT_ONLINE_POLICY_EPSILON
 
 _LOGGER = logging.getLogger(__name__)
 _log = partial(log_constant, _LOGGER)
@@ -68,7 +69,8 @@ def _act_reset_environment(agent, term, intention):
     """Reset environment to initial state."""
     try:
         if hasattr(agent, "adapter"):
-            agent.current_state, _ = agent.adapter.reset(seed=None)
+            reset_result = agent.adapter.reset(seed=None)
+            agent.current_state = int(reset_result.observation)
             agent.episode_steps = 0
             agent.episode_count += 1
             x, y = agent.adapter.state_to_pos(agent.current_state)
@@ -89,7 +91,7 @@ def _act_set_goal(agent, term, intention):
         # Reset Q-table
         if hasattr(agent, "rl_agent") and hasattr(agent.rl_agent, "q_table"):
             agent.rl_agent.q_table[:] = 0.0
-            agent.rl_agent.epsilon = 0.1
+            agent.rl_agent.epsilon = DEFAULT_ONLINE_POLICY_EPSILON
         _log(LOG_WORKER_POLICY_EVENT, message=f"[GOAL] Set goal to ({gx},{gy}) and reset Q-table")
     finally:
         yield
@@ -130,10 +132,16 @@ def _act_get_state_from_pos(agent, term, intention):
     try:
         x = int(_extract_value(term.args[0]))
         y = int(_extract_value(term.args[1]))
-        if hasattr(agent.adapter, "_ncol"):
-            state = y * agent.adapter._ncol + x
+        # Try multiple ways to get grid width from adapter
+        if hasattr(agent.adapter, "_get_grid_width"):
+            width = agent.adapter._get_grid_width()
+        elif hasattr(agent.adapter, "_ncol"):
+            width = agent.adapter._ncol
+        elif hasattr(agent.adapter, "defaults") and hasattr(agent.adapter.defaults, "grid_width"):
+            width = agent.adapter.defaults.grid_width
         else:
-            state = y * 8 + x  # Default 8x8
+            width = 8  # Fallback for unknown adapters
+        state = y * width + x
         agent.set_result(int(state), intention)
     finally:
         yield
@@ -176,7 +184,11 @@ def _act_execute_action(agent, term, intention):
         a_map = {"left": 0, "down": 1, "right": 2, "up": 3}
         a = a_map.get(action_name, 0)
         s = agent.current_state
-        ns, r, done, truncated, info = agent.adapter.step(a)
+        step_result = agent.adapter.step(a)
+        ns = int(step_result.observation)
+        r = float(step_result.reward)
+        done = bool(step_result.terminated)
+        truncated = bool(step_result.truncated)
         
         # Update Q-table
         if hasattr(agent, "runtime"):
@@ -203,7 +215,7 @@ def _act_exec_cached_seq(agent, term, intention):
     try:
         raw = _extract_value(term.args[0])
         seq = [] if raw == "[]" else [s.strip() for s in raw.strip("[]").split(",") if s.strip()]
-        agent.rl_agent.epsilon = 0.0  # deterministic
+        agent.rl_agent.epsilon = DEFAULT_CACHED_POLICY_EPSILON  # deterministic
         a_map = {"left": 0, "down": 1, "right": 2, "up": 3}
         
         for name in seq:
@@ -214,7 +226,10 @@ def _act_exec_cached_seq(agent, term, intention):
             
             a = a_map[name]
             s = agent.current_state
-            ns, r, done, truncated, info = agent.adapter.step(a)
+            step_result = agent.adapter.step(a)
+            ns = int(step_result.observation)
+            r = float(step_result.reward)
+            done = bool(step_result.terminated)
             agent.runtime.update_q_online(s, a, float(r), ns, done)
             agent.current_state = ns
             agent.episode_steps += 1

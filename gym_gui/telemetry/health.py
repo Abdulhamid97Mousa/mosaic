@@ -17,6 +17,7 @@ from typing import Optional
 
 from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.telemetry.run_bus import RunBus
+from gym_gui.telemetry.constants import HEALTH_MONITOR_HEARTBEAT_INTERVAL_S
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -46,7 +47,7 @@ class HealthMonitor:
         self,
         bus: RunBus,
         *,
-        heartbeat_interval: float = 5.0,
+        heartbeat_interval: float = HEALTH_MONITOR_HEARTBEAT_INTERVAL_S,
     ) -> None:
         """Initialize health monitor.
         
@@ -247,4 +248,3 @@ class HealthMonitor:
 
 
 __all__ = ["HealthStats", "HealthMonitor"]
-

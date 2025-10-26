@@ -381,30 +381,43 @@ class RunRegistry:
             The run_id (either the new one or the existing one matching the digest).
         """
         now = datetime.now(timezone.utc).isoformat()
-        with self._lock, self._connect() as conn:
-            # Check for existing run with same digest
-            existing = conn.execute(
-                "SELECT run_id FROM runs WHERE digest = ?", (digest,)
-            ).fetchone()
-            if existing:
-                _LOGGER.info(
-                    "Run already registered for digest",
-                    extra={"run_id": existing[0], "digest": digest},
-                )
-                return existing[0]
-            
-            conn.execute(
-                """
-                INSERT INTO runs(run_id, status, config_json, digest, created_at, updated_at, gpu_slots_json)
-                VALUES(?, ?, ?, ?, ?, ?, ?)
-                """,
-                (run_id, RunStatus.PENDING.value, config_json, digest, now, now, "[]"),
-            )
-            _LOGGER.info(
-                "Registered new training run",
-                extra={"run_id": run_id, "digest": digest},
-            )
-            return run_id
+        attempt = 0
+        while True:
+            attempt += 1
+            with self._lock:
+                try:
+                    with self._connect() as conn:
+                        existing = conn.execute(
+                            "SELECT run_id FROM runs WHERE digest = ?", (digest,)
+                        ).fetchone()
+                        if existing:
+                            _LOGGER.info(
+                                "Run already registered for digest",
+                                extra={"run_id": existing[0], "digest": digest},
+                            )
+                            return existing[0]
+
+                        conn.execute(
+                            """
+                            INSERT INTO runs(run_id, status, config_json, digest, created_at, updated_at, gpu_slots_json)
+                            VALUES(?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (run_id, RunStatus.PENDING.value, config_json, digest, now, now, "[]"),
+                        )
+                        _LOGGER.info(
+                            "Registered new training run",
+                            extra={"run_id": run_id, "digest": digest},
+                        )
+                        return run_id
+                except sqlite3.OperationalError as exc:
+                    if "no such table" in str(exc).lower() and attempt == 1:
+                        _LOGGER.warning(
+                            "Trainer registry schema missing when registering run; rebuilding",
+                            extra={"error": str(exc), "db_path": self._db_path},
+                        )
+                        self._initialize()
+                        continue
+                    raise
 
     def update_status(
         self,

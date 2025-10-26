@@ -409,6 +409,42 @@ LOG_ADAPTER_ENV_CLOSED = _constant(
     tags=_tags("adapter", "environment"),
 )
 
+LOG_ADAPTER_MAP_GENERATION = _constant(
+    "LOG514",
+    "INFO",
+    "Adapter map generation details",
+    component="Adapter",
+    subcomponent="MapGeneration",
+    tags=_tags("adapter", "map", "generation"),
+)
+
+LOG_ADAPTER_HOLE_PLACEMENT = _constant(
+    "LOG515",
+    "DEBUG",
+    "Hole placement configuration",
+    component="Adapter",
+    subcomponent="MapGeneration",
+    tags=_tags("adapter", "map", "holes"),
+)
+
+LOG_ADAPTER_GOAL_OVERRIDE = _constant(
+    "LOG516",
+    "INFO",
+    "Goal position override applied",
+    component="Adapter",
+    subcomponent="MapGeneration",
+    tags=_tags("adapter", "map", "goal"),
+)
+
+LOG_ADAPTER_RENDER_PAYLOAD = _constant(
+    "LOG517",
+    "DEBUG",
+    "Adapter render payload generated",
+    component="Adapter",
+    subcomponent="Render",
+    tags=_tags("adapter", "render", "payload"),
+)
+
 
 # ---------------------------------------------------------------------------
 # Service and telemetry constants (LOG601–LOG650)
@@ -980,6 +1016,24 @@ LOG_UI_TRAIN_FORM_ERROR = _constant(
     tags=_tags("ui", "train_form", "error"),
 )
 
+LOG_UI_TRAIN_FORM_UI_PATH = _constant(
+    "LOG734",
+    "INFO",
+    "Train form UI-only path configured",
+    component="UI",
+    subcomponent="TrainForm",
+    tags=_tags("ui", "train_form", "ui_only_path"),
+)
+
+LOG_UI_TRAIN_FORM_TELEMETRY_PATH = _constant(
+    "LOG735",
+    "INFO",
+    "Train form telemetry durable path configured",
+    component="UI",
+    subcomponent="TrainForm",
+    tags=_tags("ui", "train_form", "telemetry_path"),
+)
+
 LOG_UI_WORKER_TABS_TRACE = _constant(
     "LOG740",
     "DEBUG",
@@ -1105,8 +1159,26 @@ LOG_WORKER_CONFIG_WARNING = _constant(
     tags=_tags("worker", "config", "warning"),
 )
 
-LOG_WORKER_POLICY_EVENT = _constant(
+LOG_WORKER_CONFIG_UI_PATH = _constant(
     "LOG907",
+    "INFO",
+    "Worker UI-only path settings applied",
+    component="Worker",
+    subcomponent="Config",
+    tags=_tags("worker", "config", "ui_only_path"),
+)
+
+LOG_WORKER_CONFIG_DURABLE_PATH = _constant(
+    "LOG908",
+    "INFO",
+    "Worker telemetry durable path settings applied",
+    component="Worker",
+    subcomponent="Config",
+    tags=_tags("worker", "config", "telemetry_path"),
+)
+
+LOG_WORKER_POLICY_EVENT = _constant(
+    "LOG909",
     "INFO",
     "Worker policy event",
     component="Worker",
@@ -1115,7 +1187,7 @@ LOG_WORKER_POLICY_EVENT = _constant(
 )
 
 LOG_WORKER_POLICY_WARNING = _constant(
-    "LOG908",
+    "LOG910",
     "WARNING",
     "Worker policy warning",
     component="Worker",
@@ -1124,7 +1196,7 @@ LOG_WORKER_POLICY_WARNING = _constant(
 )
 
 LOG_WORKER_POLICY_ERROR = _constant(
-    "LOG909",
+    "LOG911",
     "ERROR",
     "Worker policy error",
     component="Worker",
@@ -1133,7 +1205,7 @@ LOG_WORKER_POLICY_ERROR = _constant(
 )
 
 LOG_WORKER_BDI_EVENT = _constant(
-    "LOG910",
+    "LOG912",
     "INFO",
     "Worker BDI event",
     component="Worker",
@@ -1142,7 +1214,7 @@ LOG_WORKER_BDI_EVENT = _constant(
 )
 
 LOG_WORKER_BDI_WARNING = _constant(
-    "LOG911",
+    "LOG913",
     "WARNING",
     "Worker BDI warning",
     component="Worker",
@@ -1151,7 +1223,7 @@ LOG_WORKER_BDI_WARNING = _constant(
 )
 
 LOG_WORKER_BDI_ERROR = _constant(
-    "LOG912",
+    "LOG914",
     "ERROR",
     "Worker BDI error",
     component="Worker",
@@ -1160,7 +1232,7 @@ LOG_WORKER_BDI_ERROR = _constant(
 )
 
 LOG_WORKER_BDI_DEBUG = _constant(
-    "LOG913",
+    "LOG915",
     "DEBUG",
     "Worker BDI debug event",
     component="Worker",
@@ -1303,6 +1375,10 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_ADAPTER_ENV_RESET,
     LOG_ADAPTER_STEP_SUMMARY,
     LOG_ADAPTER_ENV_CLOSED,
+    LOG_ADAPTER_MAP_GENERATION,
+    LOG_ADAPTER_HOLE_PLACEMENT,
+    LOG_ADAPTER_GOAL_OVERRIDE,
+    LOG_ADAPTER_RENDER_PAYLOAD,
     LOG_SERVICE_TELEMETRY_STEP_REJECTED,
     LOG_SERVICE_TELEMETRY_ASYNC_ERROR,
     LOG_SERVICE_DB_SINK_INITIALIZED,
@@ -1365,6 +1441,8 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_UI_TRAIN_FORM_INFO,
     LOG_UI_TRAIN_FORM_WARNING,
     LOG_UI_TRAIN_FORM_ERROR,
+    LOG_UI_TRAIN_FORM_UI_PATH,
+    LOG_UI_TRAIN_FORM_TELEMETRY_PATH,
     LOG_UI_WORKER_TABS_TRACE,
     LOG_UI_WORKER_TABS_INFO,
     LOG_UI_WORKER_TABS_WARNING,
@@ -1378,6 +1456,8 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_WORKER_RUNTIME_ERROR,
     LOG_WORKER_CONFIG_EVENT,
     LOG_WORKER_CONFIG_WARNING,
+    LOG_WORKER_CONFIG_UI_PATH,
+    LOG_WORKER_CONFIG_DURABLE_PATH,
     LOG_WORKER_POLICY_EVENT,
     LOG_WORKER_POLICY_WARNING,
     LOG_WORKER_POLICY_ERROR,
@@ -1432,6 +1512,10 @@ __all__ = (
     "LOG_ADAPTER_ENV_RESET",
     "LOG_ADAPTER_STEP_SUMMARY",
     "LOG_ADAPTER_ENV_CLOSED",
+    "LOG_ADAPTER_MAP_GENERATION",
+    "LOG_ADAPTER_HOLE_PLACEMENT",
+    "LOG_ADAPTER_GOAL_OVERRIDE",
+    "LOG_ADAPTER_RENDER_PAYLOAD",
     "LOG_SERVICE_TELEMETRY_STEP_REJECTED",
     "LOG_SERVICE_TELEMETRY_ASYNC_ERROR",
     "LOG_SERVICE_DB_SINK_INITIALIZED",
@@ -1494,6 +1578,8 @@ __all__ = (
     "LOG_UI_TRAIN_FORM_INFO",
     "LOG_UI_TRAIN_FORM_WARNING",
     "LOG_UI_TRAIN_FORM_ERROR",
+    "LOG_UI_TRAIN_FORM_UI_PATH",
+    "LOG_UI_TRAIN_FORM_TELEMETRY_PATH",
     "LOG_UI_WORKER_TABS_TRACE",
     "LOG_UI_WORKER_TABS_INFO",
     "LOG_UI_WORKER_TABS_WARNING",
@@ -1507,6 +1593,8 @@ __all__ = (
     "LOG_WORKER_RUNTIME_ERROR",
     "LOG_WORKER_CONFIG_EVENT",
     "LOG_WORKER_CONFIG_WARNING",
+    "LOG_WORKER_CONFIG_UI_PATH",
+    "LOG_WORKER_CONFIG_DURABLE_PATH",
     "LOG_WORKER_POLICY_EVENT",
     "LOG_WORKER_POLICY_WARNING",
     "LOG_WORKER_POLICY_ERROR",

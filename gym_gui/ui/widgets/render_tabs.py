@@ -20,7 +20,7 @@ from gym_gui.rendering import (
 from gym_gui.replays import EpisodeReplay, EpisodeReplayLoader
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
-from gym_gui.ui.widgets.busy_indicator import modal_busy_indicator
+from gym_gui.ui.indicators.busy_indicator import modal_busy_indicator
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
     LOG_UI_RENDER_TABS_TRACE,

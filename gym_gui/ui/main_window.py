@@ -46,7 +46,7 @@ from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.ui.logging_bridge import LogRecordPayload, QtLogHandler
 from gym_gui.ui.presenters.main_window_presenter import MainWindowPresenter, MainWindowView
 from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWidget
-from gym_gui.ui.widgets.busy_indicator import modal_busy_indicator
+from gym_gui.ui.indicators.busy_indicator import modal_busy_indicator
 from gym_gui.ui.widgets.render_tabs import RenderTabs
 from gym_gui.docs.game_info import get_game_info
 from gym_gui.services.actor import ActorService
@@ -1764,3 +1764,4 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
 
 __all__ = ["MainWindow"]
+from gym_gui.ui.constants import DEFAULT_RENDER_DELAY_MS

@@ -101,6 +101,9 @@ def main(argv: Optional[list[str]] = None) -> int:
         adapter_kwargs["game_config"] = game_config
     
     adapter = create_adapter(run_config.game_id, **adapter_kwargs)
+    
+    # GUI adapters require explicit load() call to initialize the environment
+    adapter.load()
 
     if parsed.dry_run:
         emitter.run_started(run_config.run_id, _dry_run_payload(run_config))

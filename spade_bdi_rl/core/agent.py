@@ -31,6 +31,18 @@ if TYPE_CHECKING:
 
 from ..assets import asl_path
 from .bdi_agent import BDIRLAgent
+from spade_bdi_rl.constants import (
+    DEFAULT_AGENT_JID,
+    DEFAULT_AGENT_PASSWORD,
+    DEFAULT_AGENT_START_TIMEOUT_S,
+)
+from spade_bdi_rl.constants import (
+    DEFAULT_AGENT_JID,
+    DEFAULT_AGENT_PASSWORD,
+    DEFAULT_AGENT_START_TIMEOUT_S,
+    DEFAULT_EJABBERD_HOST,
+    DEFAULT_EJABBERD_PORT,
+)
 from gym_gui.logging_config.helpers import log_constant
 from gym_gui.logging_config.log_constants import (
     LOG_WORKER_BDI_EVENT,
@@ -42,10 +54,9 @@ from gym_gui.logging_config.log_constants import (
 LOGGER = logging.getLogger(__name__)
 _log = partial(log_constant, LOGGER)
 
-DEFAULT_JID = "agent@localhost"
-DEFAULT_PASSWORD = "secret"
-_DEFAULT_START_TIMEOUT = 10.0
-
+DEFAULT_JID = DEFAULT_AGENT_JID
+DEFAULT_PASSWORD = DEFAULT_AGENT_PASSWORD
+_DEFAULT_START_TIMEOUT = DEFAULT_AGENT_START_TIMEOUT_S
 
 class LegacyImportError(ImportError):
     """Raised when legacy BDI agent features are attempted.
@@ -100,11 +111,11 @@ class AgentHandle:
     """
 
     agent: Optional["BDIAgentLike"]
-    jid: str
-    password: str
+    jid: str = DEFAULT_AGENT_JID
+    password: str = DEFAULT_AGENT_PASSWORD
     started: bool = False
 
-    async def start(self, auto_register: bool = True, timeout: float = _DEFAULT_START_TIMEOUT) -> None:
+    async def start(self, auto_register: bool = True, timeout: float = DEFAULT_AGENT_START_TIMEOUT_S) -> None:
         """Start the BDI agent.
         
         Raises:

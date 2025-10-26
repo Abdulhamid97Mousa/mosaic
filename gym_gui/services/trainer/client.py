@@ -11,6 +11,7 @@ from weakref import WeakKeyDictionary
 
 import grpc
 
+from . import constants as trainer_constants
 from .registry import RunStatus
 from gym_gui.services.trainer.proto import trainer_pb2 as trainer_pb2_module
 from gym_gui.services.trainer.proto import trainer_pb2_grpc
@@ -31,19 +32,19 @@ class _ClientLoopState:
     channel: Optional[grpc.aio.Channel] = None
     stub: Optional[trainer_pb2_grpc.TrainerServiceStub] = None
 
-_DEFAULT_DEADLINE = 10.0
-_DEFAULT_CONNECT_TIMEOUT = 5.0
-_DEFAULT_MAX_MESSAGE_BYTES = 64 * 1024 * 1024
+
+CLIENT_DEFAULTS = trainer_constants.TRAINER_DEFAULTS.client
 
 
 @dataclass(slots=True)
 class TrainerClientConfig:
-    target: str = "127.0.0.1:50055"
-    deadline: float = _DEFAULT_DEADLINE
-    keepalive_time: float = 30.0
-    keepalive_timeout: float = 10.0
-    connect_timeout: float = _DEFAULT_CONNECT_TIMEOUT
-    max_message_bytes: int = _DEFAULT_MAX_MESSAGE_BYTES
+    target: str = CLIENT_DEFAULTS.target
+    deadline: float = CLIENT_DEFAULTS.deadline_s
+    keepalive_time: float = CLIENT_DEFAULTS.keepalive_time_s
+    keepalive_timeout: float = CLIENT_DEFAULTS.keepalive_timeout_s
+    connect_timeout: float = CLIENT_DEFAULTS.connect_timeout_s
+    max_message_bytes: int = CLIENT_DEFAULTS.max_message_bytes
+    http2_min_ping_interval_ms: int = CLIENT_DEFAULTS.http2_min_ping_interval_ms
 
 
 class TrainerClientConnectionError(RuntimeError):
@@ -79,7 +80,7 @@ class TrainerClient(LogConstantMixin):
                 ("grpc.max_receive_message_length", self._config.max_message_bytes),
                 ("grpc.http2.max_pings_without_data", 0),
                 ("grpc.keepalive_permit_without_calls", 1),
-                ("grpc.http2.min_time_between_pings_ms", 10_000),
+                ("grpc.http2.min_time_between_pings_ms", self._config.http2_min_ping_interval_ms),
                 # TODO: tune message limits based on production payloads.
             )
             channel = grpc.aio.insecure_channel(self._config.target, options=options)

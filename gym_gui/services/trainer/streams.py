@@ -13,6 +13,10 @@ from qtpy import QtCore
 from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.telemetry.run_bus import get_bus
 from gym_gui.telemetry.credit_manager import get_credit_manager
+from gym_gui.telemetry.constants import (
+    TELEMETRY_HUB_MAX_QUEUE,
+    TELEMETRY_HUB_BUFFER_SIZE,
+)
 from gym_gui.logging_config.log_constants import (
     LOG_SERVICE_TELEMETRY_BRIDGE_STEP_QUEUED,
     LOG_SERVICE_TELEMETRY_BRIDGE_EPISODE_QUEUED,
@@ -194,7 +198,12 @@ class RunStreamBuffer:
 
 
 class TelemetryAsyncHub:
-    def __init__(self, *, max_queue: int = 1024, buffer_size: int = 256) -> None:
+    def __init__(
+        self,
+        *,
+        max_queue: int = TELEMETRY_HUB_MAX_QUEUE,
+        buffer_size: int = TELEMETRY_HUB_BUFFER_SIZE,
+    ) -> None:
         # Defer loop detection until start() is called
         # This allows the Qt event loop to be set up first
         self._loop: Optional[asyncio.AbstractEventLoop] = None

@@ -15,6 +15,13 @@ from gym_gui.logging_config.helpers import log_constant
 from gym_gui.logging_config.log_constants import (
     LOG_WORKER_CONFIG_EVENT,
     LOG_WORKER_CONFIG_WARNING,
+    LOG_WORKER_CONFIG_UI_PATH,
+    LOG_WORKER_CONFIG_DURABLE_PATH,
+)
+from spade_bdi_rl.constants import (
+    DEFAULT_STEP_DELAY_S,
+    DEFAULT_WORKER_TELEMETRY_BUFFER_SIZE,
+    DEFAULT_WORKER_EPISODE_BUFFER_SIZE,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -55,7 +62,7 @@ class RunConfig:
     agent_id: str = "bdi_rl"
     capture_video: bool = False
     headless: bool = True
-    step_delay: float = 0.0  # Delay in seconds between training steps (for real-time observation)
+    step_delay: float = DEFAULT_STEP_DELAY_S  # Delay in seconds between training steps (for real-time observation)
     extra: Dict[str, Any] = field(default_factory=dict)
 
     @classmethod
@@ -75,7 +82,7 @@ class RunConfig:
         agent_id = str(data.pop("agent_id", "bdi_rl"))
         capture_video = bool(data.pop("capture_video", False))
         headless = bool(data.pop("headless", True))
-        step_delay = float(data.pop("step_delay", 0.0))
+        step_delay = float(data.pop("step_delay", DEFAULT_STEP_DELAY_S))
 
         return cls(
             run_id=run_id,
@@ -122,6 +129,79 @@ class RunConfig:
                 "extra_keys": list(self.extra.keys()),
             },
         )
+
+        path_config = self.extra.get("path_config")
+        if not isinstance(path_config, dict):
+            _log(
+                LOG_WORKER_CONFIG_WARNING,
+                message="Missing path_config overrides; falling back to defaults",
+                extra={"run_id": self.run_id},
+            )
+            path_config = {}
+
+        ui_only_config = path_config.get("ui_only") if isinstance(path_config, dict) else None
+        telemetry_config = path_config.get("telemetry_durable") if isinstance(path_config, dict) else None
+
+        if not isinstance(ui_only_config, dict):
+            ui_only_config = {}
+        if not isinstance(telemetry_config, dict):
+            telemetry_config = {}
+
+        requested_step_delay_ms = ui_only_config.get("step_delay_ms")
+        applied_step_delay_ms = int(round(self.step_delay * 1000))
+        step_delay_mismatch = (
+            requested_step_delay_ms is not None
+            and abs(int(requested_step_delay_ms) - applied_step_delay_ms) > 5
+        )
+
+        _log(
+            LOG_WORKER_CONFIG_UI_PATH,
+            message="UI path settings applied",
+            extra={
+                "run_id": self.run_id,
+                "live_rendering_enabled": bool(ui_only_config.get("live_rendering_enabled", True)),
+                "ui_rendering_throttle": ui_only_config.get("ui_rendering_throttle"),
+                "render_delay_ms": ui_only_config.get("render_delay_ms"),
+                "requested_step_delay_ms": requested_step_delay_ms,
+                "applied_step_delay_ms": applied_step_delay_ms,
+                "step_delay_mismatch": step_delay_mismatch,
+            },
+        )
+
+        telemetry_buffer_config = telemetry_config.get("telemetry_buffer_size")
+        telemetry_buffer_applied = self.extra.get(
+            "telemetry_buffer_size",
+            DEFAULT_WORKER_TELEMETRY_BUFFER_SIZE,
+        )
+        episode_buffer_config = telemetry_config.get("episode_buffer_size")
+        episode_buffer_applied = self.extra.get(
+            "episode_buffer_size",
+            DEFAULT_WORKER_EPISODE_BUFFER_SIZE,
+        )
+
+        _log(
+            LOG_WORKER_CONFIG_DURABLE_PATH,
+            message="Telemetry durable path settings applied",
+            extra={
+                "run_id": self.run_id,
+                "training_telemetry_throttle": telemetry_config.get("training_telemetry_throttle"),
+                "telemetry_buffer_requested": telemetry_buffer_config,
+                "telemetry_buffer_applied": telemetry_buffer_applied,
+                "episode_buffer_requested": episode_buffer_config,
+                "episode_buffer_applied": episode_buffer_applied,
+            },
+        )
+
+        if step_delay_mismatch:
+            _log(
+                LOG_WORKER_CONFIG_WARNING,
+                message="Step delay mismatch between UI request and applied configuration",
+                extra={
+                    "run_id": self.run_id,
+                    "requested_step_delay_ms": requested_step_delay_ms,
+                    "applied_step_delay_ms": applied_step_delay_ms,
+                },
+            )
 
     def ensure_policy_path(self) -> Path:
         """Ensure a canonical policy path exists, creating parent dirs as needed."""

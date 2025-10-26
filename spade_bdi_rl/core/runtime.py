@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, Union
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Union
 import time
 
 if TYPE_CHECKING:
@@ -49,8 +49,9 @@ class HeadlessTrainer(LogConstantMixin):
         policy_path = self.config.ensure_policy_path()
         self.policy_store = PolicyStorage(policy_path)
 
-        self.agent = create_agent(adapter)
-        self.runtime = create_runtime(adapter, self.agent)
+        # Type ignore: GUI adapters return AdapterStep, but create_agent handles this
+        self.agent = create_agent(adapter)  # type: ignore[arg-type]
+        self.runtime = create_runtime(adapter, self.agent)  # type: ignore[arg-type]
 
         # Strategy flags
         self._is_training = config.policy_strategy in (
@@ -172,7 +173,9 @@ class HeadlessTrainer(LogConstantMixin):
         # CRITICAL: Use episode_seed to reset the environment
         # Each episode gets a unique seed (0, 1, 2, 3, ...) for environment variation
         # This allows the agent to learn from diverse starting states
-        state, obs = self.adapter.reset(seed=episode_seed)
+        reset_result = self.adapter.reset(seed=episode_seed)
+        state = int(reset_result.observation)  # GUI adapters return AdapterStep objects
+        obs = reset_result.info
         total_reward = 0.0
         success = False
         steps_taken = 0
@@ -182,7 +185,12 @@ class HeadlessTrainer(LogConstantMixin):
             action = self.runtime.get_action(state, training=self._is_training)
             q_before = float(self.agent.q_table[state, action])
 
-            next_state, reward, terminated, truncated, next_obs = self.adapter.step(action)
+            step_result = self.adapter.step(action)
+            next_state = int(step_result.observation)
+            reward = float(step_result.reward)
+            terminated = bool(step_result.terminated)
+            truncated = bool(step_result.truncated)
+            next_obs = step_result.info
             if not terminated and not truncated and (step_index + 1) >= max_steps:
                 truncated = True
             done = terminated or truncated
@@ -192,7 +200,8 @@ class HeadlessTrainer(LogConstantMixin):
 
             # Generate render payload for grid visualization from the NEW observation
             # CRITICAL: Use next_obs (after step), not obs (before step)
-            render_payload = self._generate_render_payload(next_state, next_obs)
+            # Convert Mapping to Dict for render payload generation
+            render_payload = self._generate_render_payload(next_state, dict(next_obs))
 
             self.emitter.step(
                 self.config.run_id,
@@ -235,89 +244,77 @@ class HeadlessTrainer(LogConstantMixin):
         )
 
     def _generate_render_payload(self, state: int, obs: Dict[str, Any]) -> Dict[str, Any]:
-        """Generate render payload for grid visualization from observation.
+        """Generate render payload for grid visualization.
+        
+        GUI adapters don't populate observation info dicts with game metadata,
+        so we need to query the adapter directly for holes, goal positions, etc.
 
         Args:
             state: Current state (flat index)
-            obs: Observation dict from adapter
+            obs: Observation info dict from adapter (minimal Gymnasium info)
 
         Returns:
             Render payload dict with grid, agent position, and game metadata
         """
-        if not obs:
-            return {}
-
-        # Extract grid information from observation
-        grid_size = obs.get("grid_size")
-        if isinstance(grid_size, dict):
-            nrow = grid_size.get("height", 4)
-            ncol = grid_size.get("width", 4)
+        # Call the adapter's render() method to get the full payload
+        # GUI adapters have a render() method that produces complete visualization data
+        if hasattr(self.adapter, "render") and callable(self.adapter.render):
+            try:
+                payload = self.adapter.render()
+                self.log_constant(
+                    LOG_WORKER_RUNTIME_EVENT,
+                    message="Render payload from adapter.render()",
+                    extra={
+                        "state": state,
+                        "payload_keys": list(payload.keys()) if isinstance(payload, dict) else "not_dict",
+                        "has_holes": "holes" in payload if isinstance(payload, dict) else False,
+                        "has_goal": "goal" in payload if isinstance(payload, dict) else False,
+                        "has_grid": "grid" in payload if isinstance(payload, dict) else False,
+                    },
+                )
+                return payload
+            except Exception as e:
+                self.log_constant(
+                    LOG_WORKER_RUNTIME_EVENT,
+                    message=f"Adapter render() failed, falling back to manual construction: {e}",
+                )
+        
+        # Fallback: manual construction (for adapters without render method)
+        # Get grid dimensions from adapter
+        if hasattr(self.adapter, "_get_grid_width"):
+            ncol = self.adapter._get_grid_width()
+            if hasattr(self.adapter, "defaults"):
+                nrow = self.adapter.defaults.grid_height
+            else:
+                nrow = ncol  # Assume square
         else:
-            nrow = ncol = grid_size if isinstance(grid_size, int) else 4
-
-        # Get agent position
-        position = obs.get("position", {})
-        agent_row = position.get("row", 0)
-        agent_col = position.get("col", 0)
-
-        # Get goal position
-        goal = obs.get("goal", {})
-        goal_row = goal.get("row", nrow - 1)
-        goal_col = goal.get("col", ncol - 1)
-
-        # Get holes
-        holes_list = obs.get("holes", [])
-        holes = set()
-        for h in holes_list:
-            if isinstance(h, dict):
-                holes.add((h.get("row", 0), h.get("col", 0)))
-
-        # Create grid representation
+            nrow = ncol = 8  # Default fallback
+        
+        # Get agent position from state
+        if hasattr(self.adapter, "state_to_pos"):
+            agent_row, agent_col = self.adapter.state_to_pos(state)
+        else:
+            agent_row = state // ncol
+            agent_col = state % ncol
+        
+        # Get goal from adapter defaults
+        if hasattr(self.adapter, "defaults"):
+            goal_row, goal_col = self.adapter.defaults.goal
+        else:
+            goal_row, goal_col = nrow - 1, ncol - 1
+        
+        # Basic grid (will be missing holes in fallback mode)
         grid = [['F' for _ in range(ncol)] for _ in range(nrow)]
-
-        # Mark holes
-        for h_row, h_col in holes:
-            if 0 <= h_row < nrow and 0 <= h_col < ncol:
-                grid[h_row][h_col] = 'H'
-
-        # Mark cliffs (CliffWalking) - bottom row excluding start and goal
-        is_cliff_walking = self.config.game_id in ("CliffWalking-v0", "CliffWalking-v1")
-        if is_cliff_walking:
-            start_pos = obs.get("start", {})
-            start_col = start_pos.get("col", 0)
-            # Mark cliff positions: bottom row (nrow-1), excluding start (col=0) and goal (col=ncol-1)
-            for col in range(1, ncol - 1):
-                grid[nrow - 1][col] = 'C'
-
-        # Mark start position (for CliffWalking display)
-        if is_cliff_walking:
-            start_pos = obs.get("start", {})
-            start_row = start_pos.get("row", nrow - 1)
-            start_col = start_pos.get("col", 0)
-            grid[start_row][start_col] = 'S'
-
-        # Mark goal
-        if 0 <= goal_row < nrow and 0 <= goal_col < ncol:
-            grid[goal_row][goal_col] = 'G'
-
-        # Mark agent position (after cliffs and goal, so agent takes precedence)
-        if 0 <= agent_row < nrow and 0 <= agent_col < ncol:
-            grid[agent_row][agent_col] = 'A'
-
-        payload = {
+        grid[goal_row][goal_col] = 'G'
+        grid[agent_row][agent_col] = 'A'
+        
+        return {
             "mode": "grid",
             "grid": grid,
             "agent_position": (int(agent_row), int(agent_col)),
             "game_id": self.config.game_id,
+            "goal": {"row": int(goal_row), "col": int(goal_col)},
         }
-
-        # Include holes and goal for UI rendering
-        if holes_list:
-            payload["holes"] = holes_list
-        if goal:
-            payload["goal"] = goal
-
-        return payload
 
     def _maybe_load_policy(self) -> None:
         snapshot = self.policy_store.load()

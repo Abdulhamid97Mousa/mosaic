@@ -16,6 +16,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_SERVICE_TELEMETRY_STEP_REJECTED,
 )
 from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.telemetry.constants import TELEMETRY_SERVICE_HISTORY_LIMIT
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
     from gym_gui.services.storage import StorageRecorderService
@@ -28,7 +29,12 @@ _LOGGER = logging.getLogger(__name__)
 class TelemetryService(LogConstantMixin):
     """Aggregates telemetry events and forwards them to storage."""
 
-    def __init__(self, *, history_limit: int = 512, validation_service: Optional["ValidationService"] = None) -> None:
+    def __init__(
+        self,
+        *,
+        history_limit: int = TELEMETRY_SERVICE_HISTORY_LIMIT,
+        validation_service: Optional["ValidationService"] = None,
+    ) -> None:
         self._logger = _LOGGER
         self._history_limit = max(1, history_limit)
         self._step_history: Deque[StepRecord] = deque(maxlen=self._history_limit)

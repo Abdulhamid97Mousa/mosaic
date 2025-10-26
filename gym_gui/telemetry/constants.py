@@ -16,6 +16,26 @@ RUNBUS_DEFAULT_QUEUE_SIZE = 2048  # default for all subscribers
 RUNBUS_UI_PATH_QUEUE_SIZE = 512  # fast path (UI updates)
 RUNBUS_DB_PATH_QUEUE_SIZE = 1024  # durable path (SQLite writes)
 
+# Live telemetry controller queue sizes
+LIVE_STEP_QUEUE_SIZE = 64
+LIVE_EPISODE_QUEUE_SIZE = 64
+LIVE_CONTROL_QUEUE_SIZE = 32
+
+# Telemetry hub defaults
+TELEMETRY_HUB_MAX_QUEUE = 4096
+TELEMETRY_HUB_BUFFER_SIZE = 2048
+
+# Durable sink defaults
+DB_SINK_BATCH_SIZE = 128
+DB_SINK_CHECKPOINT_INTERVAL = 1024
+DB_SINK_WRITER_QUEUE_SIZE = 4096
+
+# Telemetry service history
+TELEMETRY_SERVICE_HISTORY_LIMIT = 512
+
+# Health monitor configuration
+HEALTH_MONITOR_HEARTBEAT_INTERVAL_S = 5.0
+
 # ================================================================
 # Logging Levels for Telemetry
 # ================================================================
@@ -43,9 +63,6 @@ MIN_CREDITS_THRESHOLD = 10
 # Rendering Configuration
 # ================================================================
 
-# Default rendering delay in milliseconds
-DEFAULT_RENDER_DELAY_MS = 100  # 10 FPS
-
 # Time to wait before auto-starting rendering regulator (ms)
 RENDER_BOOTSTRAP_TIMEOUT_MS = 500
 
@@ -56,11 +73,20 @@ __all__ = [
     "RUNBUS_DEFAULT_QUEUE_SIZE",
     "RUNBUS_UI_PATH_QUEUE_SIZE",
     "RUNBUS_DB_PATH_QUEUE_SIZE",
+    "LIVE_STEP_QUEUE_SIZE",
+    "LIVE_EPISODE_QUEUE_SIZE",
+    "LIVE_CONTROL_QUEUE_SIZE",
+    "TELEMETRY_HUB_MAX_QUEUE",
+    "TELEMETRY_HUB_BUFFER_SIZE",
+    "DB_SINK_BATCH_SIZE",
+    "DB_SINK_CHECKPOINT_INTERVAL",
+    "DB_SINK_WRITER_QUEUE_SIZE",
+    "TELEMETRY_SERVICE_HISTORY_LIMIT",
+    "HEALTH_MONITOR_HEARTBEAT_INTERVAL_S",
     "STEP_LOG_LEVEL",
     "BATCH_LOG_LEVEL",
     "ERROR_LOG_LEVEL",
     "INITIAL_CREDITS",
     "MIN_CREDITS_THRESHOLD",
-    "DEFAULT_RENDER_DELAY_MS",
     "RENDER_BOOTSTRAP_TIMEOUT_MS",
 ]

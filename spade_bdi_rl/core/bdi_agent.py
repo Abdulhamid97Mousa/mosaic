@@ -62,11 +62,10 @@ class BDIRLAgent(BDIAgent):
     - Event streaming for UI integration
     """
 
-    # Type hints for major attributes
+    # Type hints for major attributes (assigned in __init__)
     adapter: AdapterType
     rl_agent: QLearningAgent
     runtime: QLearningRuntime
-    event_sink: Optional[Callable[[dict], None]]
     current_state: int
     episode_steps: int
     episode_count: int
@@ -75,6 +74,7 @@ class BDIRLAgent(BDIAgent):
     cached_policies: Dict[str, Any]
     max_episode_steps: int
     reset_epsilon: float
+    # event_sink is assigned in __init__, not declared here to avoid redeclaration
 
     def __init__(
         self,
@@ -94,12 +94,19 @@ class BDIRLAgent(BDIAgent):
             policy_store_path: Path to policy cache storage
         """
         # Environment setup (before BDI init)
-        self.adapter = adapter or FrozenLakeAdapter(map_size="8x8")
+        if adapter is None:
+            from gym_gui.config.game_configs import FrozenLakeConfig
+            config = FrozenLakeConfig(grid_height=8, grid_width=8, is_slippery=False)
+            adapter = FrozenLakeV2Adapter(game_config=config)
+            adapter.load()
+        self.adapter = adapter
         
         # RL components (before BDI init)
+        # GUI adapters expose action_space/observation_space (Gym Space objects)
+        # Extract .n from these discrete spaces
         self.rl_agent = QLearningAgent(
-            observation_space_n=self.adapter.observation_space_n,
-            action_space_n=self.adapter.action_space_n,
+            observation_space_n=int(self.adapter.observation_space.n),  # type: ignore[attr-defined]
+            action_space_n=int(self.adapter.action_space.n),  # type: ignore[attr-defined]
             alpha=0.1,
             gamma=0.99,
             epsilon=1.0,
@@ -114,10 +121,12 @@ class BDIRLAgent(BDIAgent):
         )
 
         # Now set up RL runtime after BDI is initialized
-        self.runtime = QLearningRuntime(self.adapter, self.rl_agent)
+        # Type ignore: GUI adapters return AdapterStep, but runtime handles unpacking
+        self.runtime = QLearningRuntime(self.adapter, self.rl_agent)  # type: ignore[arg-type]
 
         # Episode management
-        self.current_state, _ = self.adapter.reset()
+        reset_result = self.adapter.reset()
+        self.current_state = int(reset_result.observation)
         self.episode_count = 0
         self.episode_steps = 0
         self.episode_rewards = []
@@ -293,7 +302,8 @@ class BDIRLAgent(BDIAgent):
             }
 
         # Execute episode directly through RL
-        state, _ = self.adapter.reset()
+        reset_result = self.adapter.reset()
+        state = int(reset_result.observation)
         self.current_state = state
         self.episode_steps = 0
         self.episode_count += 1
@@ -305,7 +315,11 @@ class BDIRLAgent(BDIAgent):
             action = self.rl_agent.select_action(state, training=True)
             
             # Execute in environment
-            next_state, reward, terminated, truncated, info = self.adapter.step(action)
+            step_result = self.adapter.step(action)
+            next_state = int(step_result.observation)
+            reward = float(step_result.reward)
+            terminated = bool(step_result.terminated)
+            truncated = bool(step_result.truncated)
             done = terminated or truncated
             
             # Update Q-learning
@@ -375,7 +389,11 @@ class BDIRLAgent(BDIAgent):
         Returns:
             (next_state, reward, done)
         """
-        next_state, reward, terminated, truncated, info = self.adapter.step(action)
+        step_result = self.adapter.step(action)
+        next_state = int(step_result.observation)
+        reward = float(step_result.reward)
+        terminated = bool(step_result.terminated)
+        truncated = bool(step_result.truncated)
         done = terminated or truncated
         
         # Update Q-learning
@@ -556,8 +574,10 @@ def create_agent(
         AgentHandle wrapping the agent
     """
     if adapter is None:
-        # Default to FrozenLake-v1 with 4x4 map (not 8x8 which is FrozenLake-v2)
-        adapter = FrozenLakeAdapter(map_size="4x4")
+        # Default to FrozenLake-v1 with 4x4 map
+        from gym_gui.config.game_configs import DEFAULT_FROZEN_LAKE_CONFIG
+        adapter = FrozenLakeAdapter(game_config=DEFAULT_FROZEN_LAKE_CONFIG)
+        adapter.load()
 
     try:
         agent = BDIRLAgent(jid, password, adapter=adapter, asl_file=asl_file)

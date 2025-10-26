@@ -42,6 +42,7 @@ class TrainerSignals(QObject):
 
     _instance: Optional[TrainerSignals] = None
     _lock = QMutex()
+    # No class-wide init flags; guard per-instance to avoid double QObject init
 
     def __new__(cls) -> TrainerSignals:
         """Singleton pattern - ensure only one instance exists."""

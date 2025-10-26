@@ -114,9 +114,25 @@ class QLearningRuntime:
 
 def create_agent(adapter: Environment, **kwargs: Any) -> QLearningAgent:
     """Factory for Q-learning agent (extracts space sizes from adapter)."""
-    # FrozenLakeAdapter has observation_space_n and action_space_n properties
-    obs_n = getattr(adapter, "observation_space_n", getattr(adapter, "num_states", 16))
-    act_n = getattr(adapter, "action_space_n", getattr(adapter, "num_actions", 4))
+    # Try multiple ways to get space sizes (old worker adapters vs GUI adapters)
+    # 1. Old worker adapters: observation_space_n, action_space_n properties
+    # 2. GUI adapters: observation_space.n, action_space.n from Gym spaces
+    # 3. Fallback: default values
+    
+    if hasattr(adapter, "observation_space_n"):
+        obs_n = getattr(adapter, "observation_space_n")
+    elif hasattr(adapter, "observation_space") and hasattr(adapter.observation_space, "n"):  # type: ignore[attr-defined]
+        obs_n = int(adapter.observation_space.n)  # type: ignore[attr-defined, union-attr]
+    else:
+        obs_n = getattr(adapter, "num_states", 16)
+    
+    if hasattr(adapter, "action_space_n"):
+        act_n = getattr(adapter, "action_space_n")
+    elif hasattr(adapter, "action_space") and hasattr(adapter.action_space, "n"):  # type: ignore[attr-defined]
+        act_n = int(adapter.action_space.n)  # type: ignore[attr-defined, union-attr]
+    else:
+        act_n = getattr(adapter, "num_actions", 4)
+    
     return QLearningAgent(observation_space_n=obs_n, action_space_n=act_n, **kwargs)
 
 

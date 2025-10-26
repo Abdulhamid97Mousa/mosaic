@@ -2,7 +2,7 @@
 
 This controller subscribes to RunBus for independent event delivery:
 - Subscribes to STEP_APPENDED and EPISODE_FINALIZED topics
-- Uses UI queue size (64 events) for responsive rendering
+- Uses UI-sized queues for responsive rendering
 - Processes events in background thread
 - Emits Qt signals for main thread rendering
 """
@@ -46,7 +46,21 @@ from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.telemetry.run_bus import get_bus
 from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.telemetry.credit_manager import get_credit_manager
-from gym_gui.telemetry.constants import STEP_BUFFER_SIZE, EPISODE_BUFFER_SIZE
+from gym_gui.telemetry.constants import (
+    STEP_BUFFER_SIZE,
+    EPISODE_BUFFER_SIZE,
+    LIVE_STEP_QUEUE_SIZE,
+    LIVE_EPISODE_QUEUE_SIZE,
+    LIVE_CONTROL_QUEUE_SIZE,
+)
+from gym_gui.ui.constants import (
+    DEFAULT_RENDER_DELAY_MS,
+    DEFAULT_TELEMETRY_BUFFER_SIZE,
+    DEFAULT_EPISODE_BUFFER_SIZE,
+    TELEMETRY_BUFFER_MIN,
+    EPISODE_BUFFER_MIN,
+    UI_RENDERING_THROTTLE_MIN,
+)
 
 if TYPE_CHECKING:
     from gym_gui.services.trainer import TrainerClient
@@ -220,16 +234,21 @@ class LiveTelemetryController(QtCore.QObject, LogConstantMixin):
             extra={"run_id": run_id, "throttle_interval": throttle_interval},
         )
 
-    def set_buffer_sizes_for_run(self, run_id: str, step_buffer_size: int = 100, episode_buffer_size: int = 100) -> None:
+    def set_buffer_sizes_for_run(
+        self,
+        run_id: str,
+        step_buffer_size: int = DEFAULT_TELEMETRY_BUFFER_SIZE,
+        episode_buffer_size: int = DEFAULT_EPISODE_BUFFER_SIZE,
+    ) -> None:
         """Set the buffer sizes for a run.
 
         Args:
             run_id: The training run ID
-            step_buffer_size: Number of steps to keep in UI display buffer (default: 100)
-            episode_buffer_size: Number of episodes to keep in UI display buffer (default: 100)
+            step_buffer_size: Number of steps to keep in UI display buffer (defaults to UI constant)
+            episode_buffer_size: Number of episodes to keep in UI display buffer (defaults to UI constant)
         """
-        self._step_buffer_size_per_run[run_id] = max(10, step_buffer_size)
-        self._episode_buffer_size_per_run[run_id] = max(10, episode_buffer_size)
+        self._step_buffer_size_per_run[run_id] = max(TELEMETRY_BUFFER_MIN, step_buffer_size)
+        self._episode_buffer_size_per_run[run_id] = max(EPISODE_BUFFER_MIN, episode_buffer_size)
         _LOGGER.debug(
             "Set buffer sizes for run",
             extra={
@@ -248,15 +267,15 @@ class LiveTelemetryController(QtCore.QObject, LogConstantMixin):
         Returns:
             Tuple of (step_buffer_size, episode_buffer_size)
         """
-        step_size = self._step_buffer_size_per_run.get(run_id, 100)
-        episode_size = self._episode_buffer_size_per_run.get(run_id, 100)
+        step_size = self._step_buffer_size_per_run.get(run_id, DEFAULT_TELEMETRY_BUFFER_SIZE)
+        episode_size = self._episode_buffer_size_per_run.get(run_id, DEFAULT_EPISODE_BUFFER_SIZE)
         return step_size, episode_size
 
     def set_render_delay_for_run(self, run_id: str, delay_ms: int) -> None:
         self._render_delay_per_run[run_id] = max(0, delay_ms)
 
     def get_render_delay_for_run(self, run_id: str) -> int:
-        return self._render_delay_per_run.get(run_id, 100)
+        return self._render_delay_per_run.get(run_id, DEFAULT_RENDER_DELAY_MS)
 
     def set_live_render_enabled_for_run(self, run_id: str, enabled: bool) -> None:
         self._render_enabled_per_run[run_id] = enabled
@@ -297,7 +316,7 @@ class LiveTelemetryController(QtCore.QObject, LogConstantMixin):
         Returns:
             The throttle interval (render every Nth step), defaults to 1 if not set
         """
-        return self._render_throttle_per_run.get(run_id, 1)
+        return self._render_throttle_per_run.get(run_id, UI_RENDERING_THROTTLE_MIN)
 
     def register_tab(self, run_id: str, agent_id: str, tab: "LiveTelemetryTab") -> None:
         """Register a newly created tab widget for routing telemetry.
@@ -406,20 +425,24 @@ class LiveTelemetryController(QtCore.QObject, LogConstantMixin):
             self._loop = asyncio.new_event_loop()
             asyncio.set_event_loop(self._loop)
 
-            # Subscribe to RunBus with UI queue size (64)
+            # Subscribe to RunBus with UI queue sizes
             self._step_queue = self._bus.subscribe_with_size(
-                Topic.STEP_APPENDED, "live-ui", 64
+                Topic.STEP_APPENDED, "live-ui", LIVE_STEP_QUEUE_SIZE
             )
             self._episode_queue = self._bus.subscribe_with_size(
-                Topic.EPISODE_FINALIZED, "live-ui", 64
+                Topic.EPISODE_FINALIZED, "live-ui", LIVE_EPISODE_QUEUE_SIZE
             )
             self._control_queue = self._bus.subscribe_with_size(
-                Topic.CONTROL, "live-ui-control", 32
+                Topic.CONTROL, "live-ui-control", LIVE_CONTROL_QUEUE_SIZE
             )
 
             self.log_constant(
                 LOG_LIVE_CONTROLLER_RUNBUS_SUBSCRIBED,
-                extra={"step_queue_size": 64, "episode_queue_size": 64, "control_queue_size": 32},
+                extra={
+                    "step_queue_size": LIVE_STEP_QUEUE_SIZE,
+                    "episode_queue_size": LIVE_EPISODE_QUEUE_SIZE,
+                    "control_queue_size": LIVE_CONTROL_QUEUE_SIZE,
+                },
             )
 
             # Run async loop

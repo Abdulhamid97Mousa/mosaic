@@ -67,3 +67,7 @@ var/trainer.pid
 var/trainer.lock
 
 
+.cursorignore
+
+#Ignore cursor AI rules
+.cursor/rules/codacy.mdc

@@ -29,6 +29,7 @@ from gym_gui.telemetry.constants import (
 )
 from gym_gui.telemetry.credit_manager import CreditManager
 from gym_gui.telemetry.rendering_speed_regulator import RenderingSpeedRegulator
+from gym_gui.ui.constants import DEFAULT_RENDER_DELAY_MS
 from gym_gui.telemetry.run_bus import get_bus, reset_bus, RunBus
 from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.controllers.live_telemetry_controllers import LiveTelemetryController
@@ -207,14 +208,26 @@ class TestLoggingDowngrade:
             time.sleep(0.2)
             store.flush()
             
-            # Should have INFO for batch flush, DEBUG for individual steps
-            info_logs = [r for r in caplog.records if r.levelname == "INFO" and "[DB_FLUSH]" in r.message]
-            debug_logs = [r for r in caplog.records if r.levelname == "DEBUG" and "[DB_FLUSH]" in r.message]
-            error_logs = [r for r in caplog.records if r.levelname == "ERROR" and "[DB_FLUSH]" in r.message]
-            
-            assert len(info_logs) > 0, "Should have INFO level for batch flush"
-            assert len(debug_logs) >= 0, "May have DEBUG logs for individual steps"
-            assert len(error_logs) == 0, "Should not have ERROR level logs"
+            # Should have INFO for batch flush, DEBUG for individual steps (via structured log constants)
+            info_codes = {
+                r.__dict__.get("log_code")
+                for r in caplog.records
+                if r.levelname == "INFO"
+            }
+            debug_codes = {
+                r.__dict__.get("log_code")
+                for r in caplog.records
+                if r.levelname == "DEBUG"
+            }
+            error_codes = {
+                r.__dict__.get("log_code")
+                for r in caplog.records
+                if r.levelname == "ERROR"
+            }
+
+            assert "LOG618" in info_codes, "Should have INFO level for batch flush"
+            assert "LOG617" in debug_codes, "Should emit DEBUG detail for individual steps"
+            assert not error_codes, "Should not have ERROR level logs"
 
 
 # ========================================================================
@@ -294,7 +307,7 @@ class TestRenderingRegulatorBootstrap:
 
     def test_regulator_buffers_early_payloads(self, qt_app):
         """Test that payloads submitted before start() are buffered."""
-        regulator = RenderingSpeedRegulator(render_delay_ms=100)
+        regulator = RenderingSpeedRegulator(render_delay_ms=DEFAULT_RENDER_DELAY_MS)
         
         # Submit payload before starting
         payload_1 = {"frame": 1}
@@ -308,7 +321,7 @@ class TestRenderingRegulatorBootstrap:
 
     def test_regulator_drains_early_payloads_on_start(self, qt_app):
         """Test that early payloads are drained when start() is called."""
-        regulator = RenderingSpeedRegulator(render_delay_ms=100)
+        regulator = RenderingSpeedRegulator(render_delay_ms=DEFAULT_RENDER_DELAY_MS)
         
         # Submit payloads before start
         regulator.submit_payload({"frame": 1})
@@ -324,7 +337,7 @@ class TestRenderingRegulatorBootstrap:
 
     def test_regulator_accepts_payloads_after_start(self, qt_app):
         """Test that payloads submitted after start() go to main queue."""
-        regulator = RenderingSpeedRegulator(render_delay_ms=100)
+        regulator = RenderingSpeedRegulator(render_delay_ms=DEFAULT_RENDER_DELAY_MS)
         regulator.start()
         
         payload = {"frame": 1}

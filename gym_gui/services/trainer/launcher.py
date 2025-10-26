@@ -15,11 +15,13 @@ from pathlib import Path
 from typing import IO, Optional
 
 from gym_gui.config.paths import VAR_LOGS_DIR, ensure_var_directories
+from . import constants as trainer_constants
+
+
+CLIENT_DEFAULTS = trainer_constants.TRAINER_DEFAULTS.client
+DAEMON_DEFAULTS = trainer_constants.TRAINER_DEFAULTS.daemon
 
 LOGGER = logging.getLogger("gym_gui.trainer.launcher")
-
-_DEFAULT_TARGET = "127.0.0.1:50055"
-_POLL_INTERVAL = 0.5  # seconds
 
 
 class TrainerDaemonLaunchError(RuntimeError):
@@ -35,7 +37,7 @@ class TrainerDaemonHandle:
     log_path: Optional[Path]
     _log_file: Optional[IO[str]]
 
-    def stop(self, timeout: float = 5.0) -> None:
+    def stop(self, timeout: float = DAEMON_DEFAULTS.stop_timeout_s) -> None:
         """Terminate the daemon if we spawned it."""
 
         if self.reused or self.process is None:
@@ -70,9 +72,9 @@ class TrainerDaemonHandle:
 
 def ensure_trainer_daemon_running(
     *,
-    target: str = _DEFAULT_TARGET,
+    target: str = CLIENT_DEFAULTS.target,
     python_executable: Optional[str] = None,
-    startup_timeout: float = 10.0,
+    startup_timeout: float = DAEMON_DEFAULTS.startup_timeout_s,
 ) -> TrainerDaemonHandle:
     """Ensure the trainer daemon is accepting connections.
 
@@ -81,7 +83,7 @@ def ensure_trainer_daemon_running(
     """
 
     host, port = _split_target(target)
-    if _is_port_open(host, port, timeout=1.0):
+    if _is_port_open(host, port, timeout=DAEMON_DEFAULTS.port_probe_timeout_s):
         LOGGER.debug("Trainer daemon already reachable at %s", target)
         return TrainerDaemonHandle(reused=True, process=None, log_path=None, _log_file=None)
 
@@ -148,9 +150,9 @@ def _wait_for_daemon_ready(
                 "Trainer daemon exited before becoming ready. "
                 "Check var/logs/trainer_daemon.log for details."
             )
-        if _is_port_open(host, port, timeout=_POLL_INTERVAL):
+        if _is_port_open(host, port, timeout=DAEMON_DEFAULTS.port_probe_timeout_s):
             return
-        time.sleep(_POLL_INTERVAL)
+        time.sleep(DAEMON_DEFAULTS.poll_interval_s)
 
     raise TrainerDaemonLaunchError(
         "Trainer daemon did not become ready in time. "

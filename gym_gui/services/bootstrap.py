@@ -20,6 +20,14 @@ from gym_gui.telemetry import TelemetrySQLiteStore
 from gym_gui.telemetry.db_sink import TelemetryDBSink
 from gym_gui.telemetry.run_bus import get_bus
 from gym_gui.telemetry.health import HealthMonitor
+from gym_gui.telemetry.constants import (
+    TELEMETRY_HUB_MAX_QUEUE,
+    TELEMETRY_HUB_BUFFER_SIZE,
+    DB_SINK_BATCH_SIZE,
+    DB_SINK_CHECKPOINT_INTERVAL,
+    DB_SINK_WRITER_QUEUE_SIZE,
+    HEALTH_MONITOR_HEARTBEAT_INTERVAL_S,
+)
 from gym_gui.controllers.live_telemetry_controllers import LiveTelemetryController
 
 
@@ -91,7 +99,10 @@ def bootstrap_default_services() -> ServiceLocator:
     # Initialize telemetry hub for live streaming
     # Increased buffer_size from 256 to 512 to handle high-frequency training (episode 658+)
     # max_queue=2048 handles gRPC stream buffering, buffer_size=512 handles UI processing lag
-    telemetry_hub = TelemetryAsyncHub(max_queue=4096, buffer_size=2048)
+    telemetry_hub = TelemetryAsyncHub(
+        max_queue=TELEMETRY_HUB_MAX_QUEUE,
+        buffer_size=TELEMETRY_HUB_BUFFER_SIZE,
+    )
     # Hub will auto-start on first subscribe_run call
 
     # Create live telemetry controller and start RunBus subscription
@@ -105,15 +116,18 @@ def bootstrap_default_services() -> ServiceLocator:
     db_sink = TelemetryDBSink(
         telemetry_store,
         bus,
-        batch_size=128,
-        checkpoint_interval=1024,
-        writer_queue_size=4096,
+        batch_size=DB_SINK_BATCH_SIZE,
+        checkpoint_interval=DB_SINK_CHECKPOINT_INTERVAL,
+        writer_queue_size=DB_SINK_WRITER_QUEUE_SIZE,
     )
     db_sink.start()
 
     # Initialize and start health monitor for observability
     # Emits RUN_HEARTBEAT events every 5 seconds
-    health_monitor = HealthMonitor(bus, heartbeat_interval=5.0)
+    health_monitor = HealthMonitor(
+        bus,
+        heartbeat_interval=HEALTH_MONITOR_HEARTBEAT_INTERVAL_S,
+    )
     health_monitor.start()
 
     locator.register(RendererRegistry, renderer_registry)

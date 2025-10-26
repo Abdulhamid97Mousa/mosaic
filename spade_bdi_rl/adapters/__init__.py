@@ -4,9 +4,12 @@ from __future__ import annotations
 
 from typing import Any, Dict, Type, Union
 
-from .frozenlake import FrozenLakeAdapter, FrozenLakeV2Adapter
-from .cliffwalking import CliffWalkingAdapter
-from .taxi import TaxiAdapter
+from gym_gui.core.adapters.toy_text import (
+    FrozenLakeAdapter,
+    FrozenLakeV2Adapter,
+    CliffWalkingAdapter,
+    TaxiAdapter,
+)
 
 # Type alias for all adapter types
 AdapterType = Union[FrozenLakeAdapter, FrozenLakeV2Adapter, CliffWalkingAdapter, TaxiAdapter]

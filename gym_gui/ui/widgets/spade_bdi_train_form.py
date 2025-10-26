@@ -19,6 +19,26 @@ from gym_gui.logging_config.log_constants import (
     LOG_UI_TRAIN_FORM_INFO,
     LOG_UI_TRAIN_FORM_WARNING,
     LOG_UI_TRAIN_FORM_ERROR,
+    LOG_UI_TRAIN_FORM_UI_PATH,
+    LOG_UI_TRAIN_FORM_TELEMETRY_PATH,
+)
+from gym_gui.ui.constants import (
+    DEFAULT_RENDER_DELAY_MS,
+    RENDER_DELAY_MIN_MS,
+    RENDER_DELAY_MAX_MS,
+    RENDER_DELAY_TICK_INTERVAL_MS,
+    TRAINING_TELEMETRY_THROTTLE_MIN,
+    TRAINING_TELEMETRY_THROTTLE_MAX,
+    UI_RENDERING_THROTTLE_MIN,
+    UI_RENDERING_THROTTLE_MAX,
+    UI_TRAINING_SPEED_MIN,
+    UI_TRAINING_SPEED_MAX,
+    DEFAULT_TELEMETRY_BUFFER_SIZE,
+    DEFAULT_EPISODE_BUFFER_SIZE,
+    TELEMETRY_BUFFER_MIN,
+    TELEMETRY_BUFFER_MAX,
+    EPISODE_BUFFER_MIN,
+    EPISODE_BUFFER_MAX,
 )
 
 
@@ -156,8 +176,11 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         # SLIDER 1: Training Telemetry Throttle (controls data collection speed)
         telemetry_throttle_layout = QtWidgets.QHBoxLayout()
         self._training_telemetry_throttle_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        self._training_telemetry_throttle_slider.setRange(1, 10)
-        self._training_telemetry_throttle_slider.setValue(1)
+        self._training_telemetry_throttle_slider.setRange(
+            TRAINING_TELEMETRY_THROTTLE_MIN,
+            TRAINING_TELEMETRY_THROTTLE_MAX,
+        )
+        self._training_telemetry_throttle_slider.setValue(TRAINING_TELEMETRY_THROTTLE_MIN)
         self._training_telemetry_throttle_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
         self._training_telemetry_throttle_slider.setTickInterval(1)
         self._training_telemetry_throttle_slider.valueChanged.connect(self._on_training_telemetry_throttle_changed)
@@ -180,8 +203,11 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         # SLIDER 2: UI Live Rendering Throttle
         ui_rendering_layout = QtWidgets.QHBoxLayout()
         self._ui_rendering_throttle_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        self._ui_rendering_throttle_slider.setRange(1, 10)
-        self._ui_rendering_throttle_slider.setValue(1)
+        self._ui_rendering_throttle_slider.setRange(
+            UI_RENDERING_THROTTLE_MIN,
+            UI_RENDERING_THROTTLE_MAX,
+        )
+        self._ui_rendering_throttle_slider.setValue(UI_RENDERING_THROTTLE_MIN)
         self._ui_rendering_throttle_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
         self._ui_rendering_throttle_slider.setTickInterval(1)
         self._ui_rendering_throttle_slider.valueChanged.connect(self._on_ui_rendering_throttle_changed)
@@ -204,14 +230,17 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         # SLIDER 2b: Render Delay
         render_delay_layout = QtWidgets.QHBoxLayout()
         self._render_delay_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        self._render_delay_slider.setRange(10, 500)
-        self._render_delay_slider.setValue(100)
+        self._render_delay_slider.setRange(RENDER_DELAY_MIN_MS, RENDER_DELAY_MAX_MS)
+        self._render_delay_slider.setValue(DEFAULT_RENDER_DELAY_MS)
         self._render_delay_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
-        self._render_delay_slider.setTickInterval(50)
+        self._render_delay_slider.setTickInterval(RENDER_DELAY_TICK_INTERVAL_MS)
         self._render_delay_slider.valueChanged.connect(self._on_render_delay_changed)
         render_delay_layout.addWidget(self._render_delay_slider)
 
-        self._render_delay_label = QtWidgets.QLabel("100ms (10 FPS)")
+        default_fps = max(1, round(1000 / DEFAULT_RENDER_DELAY_MS))
+        self._render_delay_label = QtWidgets.QLabel(
+            f"{DEFAULT_RENDER_DELAY_MS}ms ({default_fps} FPS)"
+        )
         self._render_delay_label.setMinimumWidth(100)
         render_delay_layout.addWidget(self._render_delay_label)
 
@@ -227,14 +256,14 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         # SLIDER 3: UI Training Speed
         ui_speed_layout = QtWidgets.QHBoxLayout()
         self._ui_training_speed_slider = QtWidgets.QSlider(QtCore.Qt.Orientation.Horizontal)
-        self._ui_training_speed_slider.setRange(0, 100)
-        self._ui_training_speed_slider.setValue(100)
+        self._ui_training_speed_slider.setRange(UI_TRAINING_SPEED_MIN, UI_TRAINING_SPEED_MAX)
+        self._ui_training_speed_slider.setValue(UI_TRAINING_SPEED_MAX)
         self._ui_training_speed_slider.setTickPosition(QtWidgets.QSlider.TickPosition.TicksBelow)
         self._ui_training_speed_slider.setTickInterval(10)
         self._ui_training_speed_slider.valueChanged.connect(self._on_ui_training_speed_changed)
         ui_speed_layout.addWidget(self._ui_training_speed_slider)
 
-        self._ui_training_speed_label = QtWidgets.QLabel("1000ms")
+        self._ui_training_speed_label = QtWidgets.QLabel(f"{UI_TRAINING_SPEED_MAX * 10}ms")
         self._ui_training_speed_label.setMinimumWidth(50)
         ui_speed_layout.addWidget(self._ui_training_speed_label)
 
@@ -251,8 +280,8 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         # Telemetry Buffer Size
         buffer_layout = QtWidgets.QHBoxLayout()
         self._telemetry_buffer_spin = QtWidgets.QSpinBox(self)
-        self._telemetry_buffer_spin.setRange(256, 10000)
-        self._telemetry_buffer_spin.setValue(512)
+        self._telemetry_buffer_spin.setRange(TELEMETRY_BUFFER_MIN, TELEMETRY_BUFFER_MAX)
+        self._telemetry_buffer_spin.setValue(DEFAULT_TELEMETRY_BUFFER_SIZE)
         self._telemetry_buffer_spin.setSingleStep(256)
         buffer_layout.addWidget(self._telemetry_buffer_spin)
 
@@ -265,8 +294,8 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         # Episode Buffer Size
         episode_buffer_layout = QtWidgets.QHBoxLayout()
         self._episode_buffer_spin = QtWidgets.QSpinBox(self)
-        self._episode_buffer_spin.setRange(10, 1000)
-        self._episode_buffer_spin.setValue(100)
+        self._episode_buffer_spin.setRange(EPISODE_BUFFER_MIN, EPISODE_BUFFER_MAX)
+        self._episode_buffer_spin.setValue(DEFAULT_EPISODE_BUFFER_SIZE)
         self._episode_buffer_spin.setSingleStep(10)
         episode_buffer_layout.addWidget(self._episode_buffer_spin)
 
@@ -767,14 +796,49 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         step_delay = ui_training_speed_value / 100.0  # Convert to seconds (0.0 to 1.0)
 
         # Get telemetry buffer size from spin box
-        # This controls the in-memory ring buffer size for UI display
+        # This controls the in-memory ring buffer size for durable telemetry persistence
         telemetry_buffer_size = self._telemetry_buffer_spin.value()
 
         # Get episode buffer size from spin box
-        # This controls the in-memory ring buffer size for episodes in UI display
+        # This controls the in-memory ring buffer size for episodes in durable storage
         episode_buffer_size = self._episode_buffer_spin.value()
 
         env_render_delay_ms = render_delay_ms if live_rendering_enabled else 0
+
+        ui_path_settings = {
+            "live_rendering_enabled": live_rendering_enabled,
+            "ui_rendering_throttle": ui_rendering_throttle,
+            "render_delay_ms": render_delay_ms,
+            "step_delay_ms": ui_training_speed_value * 10,
+        }
+
+        telemetry_path_settings = {
+            "training_telemetry_throttle": training_telemetry_throttle,
+            "telemetry_buffer_size": telemetry_buffer_size,
+            "episode_buffer_size": episode_buffer_size,
+        }
+
+        self.log_constant(
+            LOG_UI_TRAIN_FORM_UI_PATH,
+            extra={
+                "run_name": run_name,
+                "agent_type": agent_type,
+                "live_rendering_enabled": ui_path_settings["live_rendering_enabled"],
+                "ui_rendering_throttle": ui_path_settings["ui_rendering_throttle"],
+                "render_delay_ms": ui_path_settings["render_delay_ms"],
+                "step_delay_ms": ui_path_settings["step_delay_ms"],
+            },
+        )
+        self.log_constant(
+            LOG_UI_TRAIN_FORM_TELEMETRY_PATH,
+            extra={
+                "run_name": run_name,
+                "agent_type": agent_type,
+                "training_telemetry_throttle": telemetry_path_settings["training_telemetry_throttle"],
+                "telemetry_buffer_size": telemetry_path_settings["telemetry_buffer_size"],
+                "episode_buffer_size": telemetry_path_settings["episode_buffer_size"],
+            },
+        )
 
         environment = {
             "GYM_ENV_ID": game_id,
@@ -792,7 +856,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             "UI_LIVE_RENDERING_ENABLED": "1" if live_rendering_enabled else "0",
             "UI_RENDER_DELAY_MS": str(env_render_delay_ms),
         }
-        
+
         # Add BDI-specific environment variables if enabled
         if bdi_enabled:
             environment["BDI_ENABLED"] = "1"
@@ -800,7 +864,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             environment["BDI_PASSWORD"] = bdi_config["password"]
             if "asl_file" in bdi_config:
                 environment["BDI_ASL_FILE"] = bdi_config["asl_file"]
-        
+
         metadata: Dict[str, Any] = {
             "ui": {
                 "algorithm": algorithm,
@@ -819,6 +883,10 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                     "max_episodes": max_episodes,
                     "seed": seed,
                     "max_steps_per_episode": max_steps,
+                },
+                "path_config": {
+                    "ui_only": ui_path_settings,
+                    "telemetry_durable": telemetry_path_settings,
                 },
             },
             "worker": {
@@ -849,6 +917,10 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                         "learning_rate": learning_rate,
                         "gamma": gamma,
                         "epsilon_decay": epsilon_decay,
+                    },
+                    "path_config": {
+                        "ui_only": ui_path_settings,
+                        "telemetry_durable": telemetry_path_settings,
                     },
                 },
             },

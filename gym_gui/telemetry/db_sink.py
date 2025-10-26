@@ -19,6 +19,11 @@ from gym_gui.core.data_model.telemetry_core import StepRecord, EpisodeRollup
 from gym_gui.telemetry.sqlite_store import TelemetrySQLiteStore
 from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.telemetry.run_bus import RunBus
+from gym_gui.telemetry.constants import (
+    DB_SINK_BATCH_SIZE,
+    DB_SINK_CHECKPOINT_INTERVAL,
+    DB_SINK_WRITER_QUEUE_SIZE,
+)
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
     LOG_SERVICE_DB_SINK_INITIALIZED,
@@ -47,9 +52,9 @@ class TelemetryDBSink(LogConstantMixin):
         store: TelemetrySQLiteStore,
         bus: RunBus,
         *,
-        batch_size: int = 64,
-        checkpoint_interval: int = 1000,
-        writer_queue_size: int = 512,
+        batch_size: int = DB_SINK_BATCH_SIZE,
+        checkpoint_interval: int = DB_SINK_CHECKPOINT_INTERVAL,
+        writer_queue_size: int = DB_SINK_WRITER_QUEUE_SIZE,
     ) -> None:
         """Initialize the DB sink.
 

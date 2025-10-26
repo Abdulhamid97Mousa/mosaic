@@ -17,6 +17,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_RENDER_REGULATOR_NOT_STARTED,
 )
 from gym_gui.telemetry.constants import RENDER_QUEUE_SIZE, RENDER_BOOTSTRAP_TIMEOUT_MS
+from gym_gui.ui.constants import DEFAULT_RENDER_DELAY_MS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -37,8 +38,8 @@ class RenderingSpeedRegulator(QtCore.QObject):
 
     def __init__(
         self,
-        render_delay_ms: int = 100,
-        max_queue_size: int = 32,
+        render_delay_ms: int = DEFAULT_RENDER_DELAY_MS,
+        max_queue_size: int = RENDER_QUEUE_SIZE,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         """Initialize the rendering speed regulator.

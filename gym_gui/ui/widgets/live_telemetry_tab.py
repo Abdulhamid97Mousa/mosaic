@@ -26,6 +26,12 @@ from gym_gui.ui.widgets.base_telemetry_tab import BaseTelemetryTab
 from gym_gui.rendering import RendererRegistry, create_default_renderer_registry, RendererContext
 from gym_gui.core.enums import GameId, RenderMode
 from gym_gui.telemetry.rendering_speed_regulator import RenderingSpeedRegulator
+from gym_gui.ui.constants import (
+    DEFAULT_RENDER_DELAY_MS,
+    DEFAULT_TELEMETRY_BUFFER_SIZE,
+    DEFAULT_EPISODE_BUFFER_SIZE,
+    UI_RENDERING_THROTTLE_MIN,
+)
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -40,10 +46,10 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
         agent_id: str,
         *,
         game_id: Optional[GameId] = None,
-        buffer_size: int = 100,
-        episode_buffer_size: int = 100,
-        render_throttle_interval: int = 1,
-        render_delay_ms: int = 100,
+        buffer_size: int = DEFAULT_TELEMETRY_BUFFER_SIZE,
+        episode_buffer_size: int = DEFAULT_EPISODE_BUFFER_SIZE,
+        render_throttle_interval: int = UI_RENDERING_THROTTLE_MIN,
+        render_delay_ms: int = DEFAULT_RENDER_DELAY_MS,
         live_render_enabled: bool = True,
         renderer_registry: Optional[RendererRegistry] = None,
         parent: Optional[QtWidgets.QWidget] = None,
