@@ -7,7 +7,7 @@ from __future__ import annotations
 import asyncio
 import logging
 from collections import deque
-from typing import Deque, Iterable, Optional, TYPE_CHECKING
+from typing import Any, Deque, Dict, Iterable, Optional, TYPE_CHECKING
 
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.storage.session import EpisodeRecord
@@ -202,6 +202,51 @@ class TelemetryService(LogConstantMixin):
         self._episode_history.clear()
         if self._store:
             self._store.delete_all_episodes(wait=True)
+
+    # ------------------------------------------------------------------
+    def delete_run(self, run_id: str, *, wait: bool = True) -> None:
+        """Delete a run's telemetry data and mark it as deleted."""
+
+        if self._store:
+            self._store.delete_run(run_id, wait=wait)
+
+    def archive_run(self, run_id: str, *, wait: bool = True) -> None:
+        """Archive a run's telemetry data for replay."""
+
+        if self._store:
+            self._store.archive_run(run_id, wait=wait)
+
+    def is_run_deleted(self, run_id: str) -> bool:
+        """Return True if a run has been marked as deleted."""
+
+        if not self._store:
+            return False
+        return self._store.is_run_deleted(run_id)
+
+    def is_run_archived(self, run_id: str) -> bool:
+        """Return True if a run has been marked as archived."""
+
+        if not self._store:
+            return False
+        return self._store.is_run_archived(run_id)
+
+    def get_run_summary(self, run_id: str) -> Dict[str, Any]:
+        """Fetch aggregate metrics for a run from persistent storage."""
+
+        if not self._store:
+            return {
+                "run_id": run_id,
+                "episodes": 0,
+                "steps": 0,
+                "total_reward": 0.0,
+                "last_update": "",
+                "status": "unknown",
+                "agent_id": "",
+            }
+
+        # Ensure any queued writes are persisted before reading summary data
+        self._store.flush()
+        return self._store.get_run_summary(run_id)
 
 
 __all__ = ["TelemetryService"]
