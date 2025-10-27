@@ -25,6 +25,18 @@ service TrainerService {
 
   // Lightweight daemon heartbeat so the GUI can report liveness.
   rpc GetHealth(HealthCheckRequest) returns (HealthCheckResponse);
+
+  // Streams telemetry step records for the requested run.
+  rpc StreamRunSteps(StreamStepsRequest) returns (stream RunStep);
+
+  // Streams telemetry episode rollups for the requested run.
+  rpc StreamRunEpisodes(StreamEpisodesRequest) returns (stream RunEpisode);
+
+  // Worker-side ingestion stream for step telemetry.
+  rpc PublishRunSteps(stream RunStep) returns (PublishTelemetryResponse);
+
+  // Worker-side ingestion stream for episode telemetry.
+  rpc PublishRunEpisodes(stream RunEpisode) returns (PublishTelemetryResponse);
 }
 
 message SubmitRunRequest {
@@ -94,4 +106,54 @@ message HealthCheckResponse {
   google.protobuf.Timestamp started_at = 2;
   string listen_address = 3;
   bool healthy = 4;
+}
+
+message StreamStepsRequest {
+  string run_id = 1;
+  uint64 since_seq = 2;
+}
+
+message StreamEpisodesRequest {
+  string run_id = 1;
+  uint64 since_seq = 2;
+}
+
+message RunStep {
+  string run_id = 1;
+  uint64 episode_index = 2;
+  uint64 step_index = 3;
+  string action_json = 4;
+  string observation_json = 5;
+  double reward = 6;
+  bool terminated = 7;
+  bool truncated = 8;
+  google.protobuf.Timestamp timestamp = 9;
+  string policy_label = 10;
+  string backend = 11;
+  uint64 seq_id = 12;
+  string agent_id = 13;
+  string render_hint_json = 14;
+  string frame_ref = 15;
+  uint32 payload_version = 16;
+  string render_payload_json = 17;  // Grid/RGB rendering data
+  uint64 episode_seed = 18;  // NEW: Unique seed per episode for environment variation
+}
+
+message RunEpisode {
+  string run_id = 1;
+  uint64 episode_index = 2;
+  
+  double total_reward = 3;
+  uint64 steps = 4;
+  bool terminated = 5;
+  bool truncated = 6;
+  string metadata_json = 7;
+  google.protobuf.Timestamp timestamp = 8;
+  uint64 seq_id = 9;
+  string agent_id = 10;
+}
+
+message PublishTelemetryResponse {
+  uint64 accepted = 1;
+  uint64 dropped = 2;
 }

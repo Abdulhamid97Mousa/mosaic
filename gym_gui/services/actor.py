@@ -1,10 +1,15 @@
+# gym_gui/services/actor.py
+
 from __future__ import annotations
 
 """Actor abstractions and registry for human and autonomous agents."""
 
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, Iterable, Optional, Protocol
+from typing import Any, Dict, Iterable, Optional, Protocol
+
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import LOG_SERVICE_ACTOR_SEED_ERROR
 
 
 class Actor(Protocol):
@@ -52,9 +57,11 @@ class ActorDescriptor:
     actor_id: str
     display_name: str
     description: str | None = None
+    policy_label: str | None = None
+    backend_label: str | None = None
 
 
-class ActorService:
+class ActorService(LogConstantMixin):
     """Registry that coordinates active actors for the current session."""
 
     def __init__(self) -> None:
@@ -73,12 +80,20 @@ class ActorService:
         *,
         display_name: str | None = None,
         description: str | None = None,
+        policy_label: str | None = None,
+        backend_label: str | None = None,
         activate: bool = False,
     ) -> None:
         actor_id = actor.id
         label = display_name or actor_id.replace("_", " ").title()
         self._actors[actor_id] = actor
-        self._descriptors[actor_id] = ActorDescriptor(actor_id=actor_id, display_name=label, description=description)
+        self._descriptors[actor_id] = ActorDescriptor(
+            actor_id=actor_id,
+            display_name=label,
+            description=description,
+            policy_label=policy_label,
+            backend_label=backend_label,
+        )
         if activate or self._active_actor_id is None:
             self._active_actor_id = actor_id
 
@@ -143,8 +158,13 @@ class ActorService:
                 continue
             try:
                 callback(seed)
-            except Exception:  # pragma: no cover - defensive guard
-                self._logger.exception("Actor '%s' failed during seeding", actor_id)
+            except Exception as exc:  # pragma: no cover - defensive guard
+                self.log_constant(
+                    LOG_SERVICE_ACTOR_SEED_ERROR,
+                    message="actor_seed_failed",
+                    extra={"actor_id": actor_id},
+                    exc_info=exc,
+                )
 
     @property
     def last_seed(self) -> Optional[int]:
@@ -171,21 +191,68 @@ class HumanKeyboardActor:
 
 @dataclass(slots=True)
 class BDIQAgent:
-    """Skeleton for a BDI + Q-learning driven agent implementation."""
+    """BDI + Q-learning driven agent implementation with epsilon-greedy action selection."""
 
     id: str = "bdi_q_agent"
+    q_table: Optional[Any] = None  # Reference to RL agent's Q-table (numpy array)
+    epsilon: float = 0.1  # Exploration rate
+    training: bool = True  # Whether in training mode (affects exploration)
 
     def select_action(self, step: StepSnapshot) -> Optional[int]:
-        # Placeholder: real implementation will consult Q-table / policy.
-        return None
+        """Select action using epsilon-greedy policy from Q-table.
+        
+        If training: randomly explore with probability epsilon, else exploit best action.
+        If not training: always select greedy best action (no exploration).
+        
+        Args:
+            step: Current step snapshot with observation
+            
+        Returns:
+            Integer action index (0 to num_actions-1) or None if Q-table unavailable
+        """
+        if self.q_table is None or step.observation is None:
+            return None  # Abstain if Q-table not initialized
+        
+        try:
+            import numpy as np
+            state_val = step.observation
+            if not isinstance(state_val, int):
+                state_val = int(state_val)  # type: ignore[arg-type]
+            state = state_val
+            
+            # Check if state is valid
+            if state < 0 or state >= len(self.q_table):
+                return None
+            
+            q_values = self.q_table[state]
+            num_actions = len(q_values)
+            
+            if self.training and np.random.random() < self.epsilon:
+                # Exploration: random action
+                return int(np.random.randint(0, num_actions))
+            else:
+                # Exploitation: greedy action (highest Q-value)
+                return int(np.argmax(q_values))
+        except (TypeError, IndexError, ValueError):
+            return None
 
     def on_step(self, step: StepSnapshot) -> None:
-        # Placeholder hook for Q-value updates.
-        return
+        """Receive feedback after an action has been applied.
+        
+        Q-table updates are handled by the trainer/RL agent, not here.
+        This hook can be used for logging or observation filtering.
+        """
+        pass
 
     def on_episode_end(self, summary: EpisodeSummary) -> None:
-        # Placeholder for logging or checkpointing.
-        return
+        """Episode lifecycle hook for learning rate decay or checkpointing.
+        
+        Args:
+            summary: Aggregated episode statistics
+        """
+        # Decay exploration rate over episodes
+        if self.training and self.epsilon > 0.01:
+            self.epsilon = max(0.01, self.epsilon * 0.99)
 
 
 @dataclass(slots=True)

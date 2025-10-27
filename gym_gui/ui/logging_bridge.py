@@ -15,6 +15,9 @@ class LogRecordPayload:
     name: str
     message: str
     created: float
+    component: str
+    subcomponent: str
+    log_code: str | None
 
 
 class LogEmitter(QtCore.QObject):
@@ -35,11 +38,20 @@ class QtLogHandler(logging.Handler):
             msg = self.format(record)
         except Exception:  # pragma: no cover - formatting errors
             msg = record.getMessage()
+        component = getattr(record, "component", "Unknown")
+        subcomponent = getattr(record, "subcomponent", "-")
+        log_code = getattr(record, "log_code", None)
+        if log_code is not None:
+            log_code = str(log_code)
+
         payload = LogRecordPayload(
             level=record.levelname,
             name=record.name,
             message=msg,
             created=record.created,
+            component=component,
+            subcomponent=subcomponent,
+            log_code=log_code,
         )
         self.emitter.record_emitted.emit(payload)
 

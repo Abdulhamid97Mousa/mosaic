@@ -3,22 +3,31 @@ from __future__ import annotations
 """Background thread helper to access :class:`TrainerClient` from Qt controllers."""
 
 import asyncio
+import errno
+import logging
 import threading
 from queue import Queue, Empty
 from typing import Any, Iterable, Optional, Sequence
 
 from gym_gui.services.trainer.client import TrainerClient, TrainerClientConfig
 from gym_gui.services.trainer.registry import RunStatus
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_TRAINER_CLIENT_LOOP_NONFATAL,
+    LOG_TRAINER_CLIENT_LOOP_ERROR,
+)
 
 
-class TrainerClientRunner:
+class TrainerClientRunner(LogConstantMixin):
     """Runs :class:`TrainerClient` coroutines on a dedicated asyncio loop."""
 
     def __init__(self, client: Optional[TrainerClient] = None, *, name: str = "trainer-client-loop") -> None:
         self._client = client or TrainerClient(TrainerClientConfig())
         self._loop = asyncio.new_event_loop()
+        self._loop.set_exception_handler(self._loop_exception_handler)
         self._thread = threading.Thread(target=self._loop.run_forever, name=name, daemon=True)
         self._thread.start()
+        self._logger = logging.getLogger("gym_gui.trainer.client_runner")
 
     # ------------------------------------------------------------------
     def submit_run(self, config_json: str, *, run_id: Optional[str] = None, deadline: Optional[float] = None):
@@ -75,6 +84,43 @@ class TrainerClientRunner:
 
     def _submit(self, coro: Any):
         return asyncio.run_coroutine_threadsafe(coro, self._loop)
+
+    def _loop_exception_handler(self, loop: asyncio.AbstractEventLoop, context: dict[str, Any]) -> None:
+        exc = context.get("exception")
+        if isinstance(exc, BlockingIOError) and exc.errno in {errno.EAGAIN, errno.EWOULDBLOCK}:
+            self.log_constant(
+                LOG_TRAINER_CLIENT_LOOP_NONFATAL,
+                message="grpc_blocking_io_ignored",
+                extra={
+                    "errno": getattr(exc, "errno", None),
+                    "grpc_message": context.get("message"),
+                },
+            )
+            return
+
+        # Sanitize context to avoid LogRecord key conflicts
+        sanitized_context: dict[str, Any] = {}
+        for key, value in context.items():
+            if key in {"message", "exc_info", "stack_info", "args"}:
+                sanitized_context[f"loop_{key}"] = value
+            else:
+                sanitized_context[key] = value
+
+        log_message = sanitized_context.pop("loop_message", "Unhandled exception in trainer client loop")
+        extra_payload: dict[str, Any] = {}
+        for key, value in sanitized_context.items():
+            if isinstance(value, (str, int, float, bool)) or value is None:
+                extra_payload[key] = value
+            else:
+                extra_payload[key] = repr(value)
+        if exc is not None:
+            extra_payload.setdefault("exception_type", type(exc).__name__)
+        self.log_constant(
+            LOG_TRAINER_CLIENT_LOOP_ERROR,
+            message=log_message,
+            extra=extra_payload,
+            exc_info=exc,
+        )
 
 
 class TrainerWatchSubscription:

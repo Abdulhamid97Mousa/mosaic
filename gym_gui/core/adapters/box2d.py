@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 from typing import Any, Mapping
 
 import gymnasium as gym
@@ -14,6 +15,7 @@ from gym_gui.core.adapters.base import AdapterContext, AdapterStep, EnvironmentA
 from gym_gui.core.enums import ControlMode, GameId, RenderMode
 from gym_gui.services.action_mapping import ContinuousActionMapper
 from gym_gui.services.service_locator import get_service_locator
+from gym_gui.logging_config.log_constants import LOG_ADAPTER_STEP_SUMMARY
 
 
 class Box2DAdapter(EnvironmentAdapter[np.ndarray, Any]):
@@ -30,6 +32,26 @@ class Box2DAdapter(EnvironmentAdapter[np.ndarray, Any]):
             "rgb": frame,
             "game_id": self.id,
         }
+
+    def build_frame_reference(self, render_payload: Any | None, state: StepState) -> str | None:
+        """Generate timestamped frame reference for media storage.
+
+        Args:
+            render_payload: The render payload (unused for Box2D)
+            state: The step state (unused for Box2D)
+
+        Returns:
+            Timestamped frame reference string or None if payload is invalid
+        """
+        if render_payload is None:
+            return None
+
+        # Generate timestamp: YYYY-MM-DD_HH-MM-SS_NNN
+        now = datetime.now()
+        timestamp = now.strftime("%Y-%m-%d_%H-%M-%S")
+        microseconds = now.microsecond // 1000  # Convert to milliseconds
+
+        return f"frames/{timestamp}_{microseconds:03d}.png"
 
     def build_step_state(self, observation: np.ndarray, info: Mapping[str, Any]) -> StepState:
         return StepState(
@@ -106,8 +128,10 @@ class LunarLanderAdapter(Box2DAdapter):
             if mapped is not None:
                 action = mapped
             else:
-                self.logger.warning(
-                    "No continuous action mapping available for Lunar Lander; using idle thrust"
+                self.log_constant(
+                    LOG_ADAPTER_STEP_SUMMARY,
+                    message="continuous_mapping_missing",
+                    extra={"env_id": self.id, "fallback": "idle_thrust"},
                 )
                 action = np.zeros(2, dtype=np.float32)
         return super().step(action)

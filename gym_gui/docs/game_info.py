@@ -78,6 +78,43 @@ FROZEN_HTML = (
 )
 
 
+FROZEN_V2_HTML = (
+    "<h3>FrozenLake-v2</h3>"
+    "<p>A highly configurable grid world where the agent must reach the goal while avoiding holes.</p>"
+    "<h4>Starting state</h4>"
+    "<p>The episode starts at a configurable position (default: upper-left corner at position (0,0)).</p>"
+    "<h4>Rewards</h4>"
+    "<ul>"
+    "<li>Reach goal → +1</li>"
+    "<li>Reach hole → 0</li>"
+    "<li>Each frozen tile otherwise → 0</li>"
+    "</ul>"
+    "<h4>Episode end</h4>"
+    "<ul>"
+    "<li>Termination: fall into a hole, or reach the goal</li>"
+    "<li>Truncation (with time_limit): 100 steps for 4×4, 200 for 8×8, scales with grid size</li>"
+    "</ul>"
+    "<h4>Keyboard (human controls)</h4>"
+    "<ul>"
+    "<li>Up → Up arrow</li>"
+    "<li>Right → Right arrow</li>"
+    "<li>Down → Down arrow</li>"
+    "<li>Left → Left arrow</li>"
+    "</ul>"
+    "<h4>Configuration Options</h4>"
+    "<p><strong>Grid Dimensions:</strong> Customize grid height and width independently (e.g., 4×4, 8×8, 6×10). Default: 8×8.</p>"
+    "<p><strong>Start Position:</strong> Choose where the agent begins. Default: (0, 0) top-left corner.</p>"
+    "<p><strong>Goal Position:</strong> Select the target tile from available non-hole positions. Default: bottom-right for standard grids.</p>"
+    "<p><strong>Hole Count:</strong> Adjust the number of holes in the grid. Default: 4 for 4×4, 10 for 8×8.</p>"
+    "<p><strong>Random Holes:</strong> Toggle between official Gymnasium hole layouts (OFF) and randomly generated placements (ON). Default: OFF.</p>"
+    "<p><strong>is_slippery:</strong> When True, movement is stochastic (agent may slip to perpendicular directions); when False, movement is deterministic. Default: False (deterministic).</p>"
+    "<p><strong>success_rate:</strong> Probability of moving in the intended direction when <code>is_slippery=True</code>. Default: 1/3.</p>"
+    "<p><strong>reward_schedule:</strong> Tuple of (goal_reward, hole_reward, step_reward). Default: (1, 0, 0).</p>"
+    "<p><strong>Note:</strong> With Random Holes OFF, the environment uses the official Gymnasium maps with fixed hole positions for 4×4 and 8×8 grids. With Random Holes ON, holes are placed randomly based on the hole count.</p>"
+    "<p>See the docs: <a href=\"https://gymnasium.farama.org/environments/toy_text/frozen_lake/\">FrozenLake (Gymnasium)</a></p>"
+)
+
+
 CLIFF_HTML = (
     "<h3>CliffWalking-v1</h3>"
     "<p>Navigate from start to goal along a cliff; stepping off the cliff is heavily penalized.</p>"
@@ -197,6 +234,7 @@ BIPEDAL_WALKER_HTML = (
 GAME_INFO: Dict[GameId, str] = {
     GameId.TAXI: TAXI_HTML,
     GameId.FROZEN_LAKE: FROZEN_HTML,
+    GameId.FROZEN_LAKE_V2: FROZEN_V2_HTML,
     GameId.CLIFF_WALKING: CLIFF_HTML,
     GameId.LUNAR_LANDER: LUNAR_LANDER_HTML,
     GameId.CAR_RACING: CAR_RACING_HTML,

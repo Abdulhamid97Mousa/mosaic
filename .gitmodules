@@ -92,3 +92,7 @@
 [submodule "valkka-core"]
   path = valkka-core
   url = https://github.com/elsampsa/valkka-core.git
+
+[submodule "ray"]
+  path = ray
+  url = https://github.com/ray-project/ray.git

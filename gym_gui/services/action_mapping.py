@@ -1,3 +1,5 @@
+# gym_gui/services/action_mapping.py
+
 """Mappings that transform discrete human inputs into continuous action vectors."""
 
 from __future__ import annotations

@@ -80,7 +80,7 @@ class GameConfigBuilder:
             if isinstance(hole_count, (int, float)):
                 hole_count = int(hole_count)
             else:
-                hole_count = 19
+                hole_count = 10
             
             # Extract random_holes flag
             random_holes = bool(overrides.get("random_holes", False))

@@ -8,6 +8,7 @@ from .client_runner import TrainerClientRunner, TrainerWatchStopped, TrainerWatc
 from .registry import RunRecord, RunRegistry, RunStatus
 from .gpu import GPUAllocator, GPUReservation, GPUReservationError
 from .dispatcher import TrainerDispatcher, WorkerHandle
+from .signals import TrainerSignals, get_trainer_signals
 
 __all__ = [
     "TrainRunConfig",
@@ -27,4 +28,6 @@ __all__ = [
     "GPUReservationError",
     "TrainerDispatcher",
     "WorkerHandle",
+    "TrainerSignals",
+    "get_trainer_signals",
 ]

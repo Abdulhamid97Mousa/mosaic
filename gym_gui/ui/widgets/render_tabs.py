@@ -3,13 +3,14 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime
+from datetime import datetime, timezone
+import logging
 from typing import Any, List, Mapping, Optional
 
 from qtpy import QtCore, QtGui, QtWidgets
 
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
-from gym_gui.core.enums import GameId, RenderMode
+from gym_gui.core.enums import ControlMode, GameId, RenderMode
 from gym_gui.rendering import (
     RendererContext,
     RendererRegistry,
@@ -19,10 +20,20 @@ from gym_gui.rendering import (
 from gym_gui.replays import EpisodeReplay, EpisodeReplayLoader
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
-from gym_gui.ui.widgets.busy_indicator import modal_busy_indicator
+from gym_gui.ui.indicators.busy_indicator import modal_busy_indicator
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_UI_RENDER_TABS_TRACE,
+    LOG_UI_RENDER_TABS_INFO,
+    LOG_UI_RENDER_TABS_WARNING,
+    LOG_UI_RENDER_TABS_ERROR,
+)
 
 
-class RenderTabs(QtWidgets.QTabWidget):
+_LOGGER = logging.getLogger(__name__)
+
+
+class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
     """Tab widget combining grid, raw text, video, and replay views."""
 
     _current_game: GameId | None
@@ -34,6 +45,7 @@ class RenderTabs(QtWidgets.QTabWidget):
         telemetry_service: TelemetryService | None = None,
     ) -> None:
         super().__init__(parent)
+        self._logger = _LOGGER
 
         locator = get_service_locator()
         registry = locator.resolve(RendererRegistry)
@@ -69,7 +81,145 @@ class RenderTabs(QtWidgets.QTabWidget):
             telemetry_service=telemetry_service,
             renderer_registry=registry,
         )
-        self._replay_tab_index = self.addTab(self._replay_tab, "Replay")
+        self._replay_tab_index = self.addTab(self._replay_tab, "Human Replay")
+        self.setTabToolTip(self._replay_tab_index, "Review episodes from manual gameplay sessions only")
+
+        # Dynamic agent tabs state
+        self.init_dynamic_tab_state()
+
+    def init_dynamic_tab_state(self) -> None:
+        """Initialize state for dynamically created agent tabs."""
+        # keyed by run_id → dict(name → QWidget)
+        self._agent_tabs: dict[str, dict[str, QtWidgets.QWidget]] = {}
+
+    def add_dynamic_tab(self, run_id: str, name: str, widget: QtWidgets.QWidget) -> None:
+        """Add (or focus) a dynamic tab; stable across re-emits."""
+        if run_id not in self._agent_tabs:
+            self._agent_tabs[run_id] = {}
+        if name in self._agent_tabs[run_id]:
+            # Tab already exists, just focus it
+            idx = self.indexOf(self._agent_tabs[run_id][name])
+            if idx >= 0:
+                self.setCurrentIndex(idx)
+            return
+        # Create new tab
+        self._agent_tabs[run_id][name] = widget
+        idx = self.addTab(widget, name)
+        self.setTabToolTip(idx, f"{name} - Live training telemetry")
+        
+        # Add close button to the tab
+        self._add_close_button_to_tab(idx, run_id, name)
+        
+        self.setCurrentIndex(idx)
+    
+    def _add_close_button_to_tab(self, tab_index: int, run_id: str, tab_name: str) -> None:
+        """Add a close button to a dynamic tab."""
+        close_button = QtWidgets.QPushButton(self)
+        close_button.setText("✕")
+        close_button.setMaximumWidth(30)
+        close_button.setMaximumHeight(20)
+        close_button.setCursor(QtGui.QCursor(QtCore.Qt.CursorShape.PointingHandCursor))
+        close_button.setToolTip("Close this tab")
+        close_button.setStyleSheet("""
+            QPushButton {
+                border: none;
+                background-color: transparent;
+                padding: 0px;
+            }
+            QPushButton:hover {
+                background-color: #dd4444;
+                color: white;
+                border-radius: 2px;
+            }
+        """)
+        # Create a lambda to capture the parameters
+        close_button.clicked.connect(
+            lambda: self._close_dynamic_tab(run_id, tab_name, tab_index)
+        )
+        tab_bar = self.tabBar()
+        if tab_bar is not None:
+            tab_bar.setTabButton(tab_index, QtWidgets.QTabBar.ButtonPosition.RightSide, close_button)
+    
+    def _close_dynamic_tab(self, run_id: str, tab_name: str, tab_index: int) -> None:
+        """Close a dynamic tab and cleanup resources."""
+        try:
+            self.log_constant(LOG_UI_RENDER_TABS_TRACE, message=f"_close_dynamic_tab: START (run_id={run_id}, tab_name={tab_name}, tab_index={tab_index})")
+
+            # Get the widget before removing the tab
+            widget = self.widget(tab_index)
+            self.log_constant(LOG_UI_RENDER_TABS_TRACE, message=f"_close_dynamic_tab: Got widget: {widget}")
+
+            # Remove from tracking
+            if run_id in self._agent_tabs and tab_name in self._agent_tabs[run_id]:
+                del self._agent_tabs[run_id][tab_name]
+                self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="_close_dynamic_tab: Removed from tracking")
+
+                # If this was the last tab for this run, clean up the run entry
+                if not self._agent_tabs[run_id]:
+                    del self._agent_tabs[run_id]
+                    self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="_close_dynamic_tab: Removed run entry")
+
+            # Remove the tab from the widget
+            self.log_constant(LOG_UI_RENDER_TABS_TRACE, message=f"_close_dynamic_tab: Removing tab at index {tab_index}")
+            self.removeTab(tab_index)
+
+            # Cleanup the widget
+            if widget is not None:
+                self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="_close_dynamic_tab: Cleaning up widget")
+                # Call cleanup on LiveTelemetryTab to prevent segfaults from pending QTimer callbacks
+                if hasattr(widget, 'cleanup'):
+                    try:
+                        self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="_close_dynamic_tab: Calling widget.cleanup()")
+                        # Type: ignore because cleanup is a custom method on LiveTelemetryTab
+                        widget.cleanup()  # type: ignore[attr-defined]
+                        self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="_close_dynamic_tab: widget.cleanup() completed")
+                    except Exception as e:
+                        self.log_constant(LOG_UI_RENDER_TABS_ERROR, message=f"_close_dynamic_tab: Error cleaning up tab: {e}", exc_info=e)
+                self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="_close_dynamic_tab: Calling widget.deleteLater()")
+                widget.deleteLater()
+
+            self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="_close_dynamic_tab: COMPLETE")
+        except Exception as e:
+            self.log_constant(LOG_UI_RENDER_TABS_ERROR, message=f"_close_dynamic_tab: FATAL ERROR - {e}", exc_info=e)
+
+    def remove_dynamic_tabs_for_run(self, run_id: str) -> None:
+        """Remove all dynamic tabs associated with a run_id."""
+        try:
+            self.log_constant(LOG_UI_RENDER_TABS_INFO, message=f"remove_dynamic_tabs_for_run: START (run_id={run_id})")
+
+            tabs = self._agent_tabs.pop(run_id, {})
+            self.log_constant(LOG_UI_RENDER_TABS_TRACE, message=f"remove_dynamic_tabs_for_run: Found {len(tabs)} tabs to remove")
+
+            for i, widget in enumerate(tabs.values()):
+                try:
+                    self.log_constant(LOG_UI_RENDER_TABS_TRACE, message=f"remove_dynamic_tabs_for_run: Processing tab {i+1}/{len(tabs)}: {widget}")
+
+                    # Call cleanup on LiveTelemetryTab to prevent segfaults from pending QTimer callbacks
+                    if hasattr(widget, 'cleanup'):
+                        try:
+                            self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="remove_dynamic_tabs_for_run: Calling widget.cleanup()")
+                            # Type: ignore because cleanup is a custom method on LiveTelemetryTab
+                            widget.cleanup()  # type: ignore[attr-defined]
+                            self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="remove_dynamic_tabs_for_run: widget.cleanup() completed")
+                        except Exception as e:
+                            self.log_constant(LOG_UI_RENDER_TABS_ERROR, message=f"remove_dynamic_tabs_for_run: Error cleaning up tab: {e}", exc_info=e)
+
+                    idx = self.indexOf(widget)
+                    self.log_constant(LOG_UI_RENDER_TABS_TRACE, message=f"remove_dynamic_tabs_for_run: Widget index: {idx}")
+
+                    if idx >= 0:
+                        self.log_constant(LOG_UI_RENDER_TABS_TRACE, message=f"remove_dynamic_tabs_for_run: Removing tab at index {idx}")
+                        self.removeTab(idx)
+
+                    self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="remove_dynamic_tabs_for_run: Calling widget.deleteLater()")
+                    widget.deleteLater()
+                    self.log_constant(LOG_UI_RENDER_TABS_TRACE, message=f"remove_dynamic_tabs_for_run: Tab {i+1} cleanup complete")
+                except Exception as e:
+                    self.log_constant(LOG_UI_RENDER_TABS_ERROR, message=f"remove_dynamic_tabs_for_run: Error processing tab {i+1}: {e}", exc_info=e)
+
+            self.log_constant(LOG_UI_RENDER_TABS_INFO, message="remove_dynamic_tabs_for_run: COMPLETE")
+        except Exception as e:
+            self.log_constant(LOG_UI_RENDER_TABS_ERROR, message=f"remove_dynamic_tabs_for_run: FATAL ERROR - {e}", exc_info=e)
 
     # ------------------------------------------------------------------
     # Public API
@@ -211,6 +361,7 @@ class _ReplayPreview(QtWidgets.QStackedWidget):
         registry: RendererRegistry | None = None,
     ) -> None:
         super().__init__(parent)
+        self._logger = _LOGGER
         self._registry = registry or create_default_renderer_registry()
         self._mode_hosts: dict[RenderMode, _RendererHost] = {}
         self._mode_indices: dict[RenderMode, int] = {}
@@ -320,6 +471,7 @@ class _ReplayTab(QtWidgets.QWidget):
         renderer_registry: RendererRegistry | None = None,
     ) -> None:
         super().__init__(parent)
+        self._logger = _LOGGER
         self._telemetry = telemetry_service
         self._loader = EpisodeReplayLoader(telemetry_service) if telemetry_service else None
         self._current_game = None
@@ -486,11 +638,19 @@ class _ReplayTab(QtWidgets.QWidget):
     def _fetch_recent_episodes(self) -> List[dict[str, Any]]:
         if self._telemetry is None:
             return []
-        episodes = list(self._telemetry.recent_episodes())
+        episodes = [
+            ep
+            for ep in self._telemetry.recent_episodes()
+            if self._is_human_episode(ep)
+        ]
         return [self._format_episode_row(ep) for ep in episodes]
 
     def _format_episode_row(self, episode: EpisodeRollup) -> dict[str, Any]:
         seed_value, episode_index, game_label = self._parse_episode_metadata(episode.metadata)
+        timestamp = episode.timestamp
+        if timestamp.tzinfo is None:
+            timestamp = timestamp.replace(tzinfo=timezone.utc)
+        display_ts = timestamp.astimezone(timezone.utc)
         return {
             "episode_id": episode.episode_id,
             "episode_index": episode_index,
@@ -499,8 +659,8 @@ class _ReplayTab(QtWidgets.QWidget):
             "steps": str(episode.steps),
             "reward": f"{episode.total_reward:.2f}",
             "terminated": self._termination_label(episode),
-            "timestamp": episode.timestamp.strftime("%Y-%m-%d %H:%M:%S"),
-            "timestamp_sort": episode.timestamp,
+            "timestamp": display_ts.strftime("%Y-%m-%d %H:%M:%S UTC"),
+            "timestamp_sort": display_ts,
         }
 
     def _parse_episode_metadata(
@@ -529,6 +689,19 @@ class _ReplayTab(QtWidgets.QWidget):
             except ValueError:
                 return raw_game
         return "—"
+
+    @staticmethod
+    def _is_human_episode(episode: EpisodeRollup) -> bool:
+        metadata = episode.metadata
+        if not isinstance(metadata, Mapping):
+            return True
+        mode = metadata.get("control_mode") or metadata.get("controlMode")
+        if mode is None:
+            return True
+        if isinstance(mode, ControlMode):
+            return mode is ControlMode.HUMAN_ONLY or mode.value == "human_only"
+        normalized = str(mode).strip().lower()
+        return normalized in {"human", "human_only"}
 
     @staticmethod
     def _termination_label(episode: EpisodeRollup) -> str:

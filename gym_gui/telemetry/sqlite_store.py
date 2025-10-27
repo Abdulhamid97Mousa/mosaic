@@ -7,18 +7,32 @@ from pathlib import Path
 import logging
 import queue
 import sqlite3
+import sys
 import threading
-from typing import Any, List, Sequence
+from typing import Any, List, Mapping, Optional, Sequence
 
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.utils import json_serialization
+from gym_gui.telemetry.migrations import MigrationRunner, WALConfiguration
+from gym_gui.logging_config.helpers import LogConstantMixin, log_constant
+from gym_gui.logging_config.log_constants import (
+    LOG_SERVICE_SQLITE_DEBUG,
+    LOG_SERVICE_SQLITE_INFO,
+    LOG_SERVICE_SQLITE_WARNING,
+    LOG_SERVICE_SQLITE_DESERIALIZATION_FAILED,
+    LOG_SERVICE_SQLITE_WORKER_STARTED,
+    LOG_SERVICE_SQLITE_WORKER_STOPPED,
+    LOG_SERVICE_SQLITE_WRITE_ERROR,
+)
+
+_LOGGER = logging.getLogger("gym_gui.telemetry.sqlite_store")
 
 
 def _ensure_parent(path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
 
 
-class TelemetrySQLiteStore:
+class TelemetrySQLiteStore(LogConstantMixin):
     """Persist telemetry events to a SQLite database."""
 
     _DEFAULT_BATCH_SIZE = 32
@@ -36,7 +50,7 @@ class TelemetrySQLiteStore:
         _ensure_parent(self._db_path)
         self._batch_size = max(1, batch_size or self._DEFAULT_BATCH_SIZE)
         self._max_buffer_bytes = max(1, max_buffer_bytes or self._DEFAULT_MAX_BUFFER_BYTES)
-        self._logger = logging.getLogger("gym_gui.telemetry.sqlite_store")
+        self._logger = _LOGGER
         self._deserialization_failures: set[str] = set()
 
         self._conn = sqlite3.connect(
@@ -59,6 +73,7 @@ class TelemetrySQLiteStore:
 
         self._initialize()
         self._worker.start()
+        self.log_constant(LOG_SERVICE_SQLITE_WORKER_STARTED)
 
     # ------------------------------------------------------------------
     def _initialize(self) -> None:
@@ -75,7 +90,12 @@ class TelemetrySQLiteStore:
                 truncated INTEGER NOT NULL,
                 info BLOB,
                 render_payload BLOB,
-                timestamp TEXT NOT NULL
+                timestamp TEXT NOT NULL,
+                agent_id TEXT,
+                render_hint BLOB,
+                frame_ref TEXT,
+                payload_version INTEGER NOT NULL DEFAULT 0,
+                run_id TEXT
             )
             """
         )
@@ -88,7 +108,9 @@ class TelemetrySQLiteStore:
                 terminated INTEGER NOT NULL,
                 truncated INTEGER NOT NULL,
                 metadata BLOB,
-                timestamp TEXT NOT NULL
+                timestamp TEXT NOT NULL,
+                agent_id TEXT,
+                run_id TEXT
             )
             """
         )
@@ -99,7 +121,15 @@ class TelemetrySQLiteStore:
             """
         )
         self._conn.commit()
+
+        # Apply idempotent migrations (Phase 4)
+        MigrationRunner.run_telemetry_migrations(self._db_path)
+
+        # Configure WAL mode for optimal performance
+        WALConfiguration.configure_wal(self._conn)
+
         self._ensure_columns()
+        self._ensure_indexes()
 
     def _connect(self) -> sqlite3.Connection:
         return sqlite3.connect(
@@ -110,9 +140,65 @@ class TelemetrySQLiteStore:
     def _ensure_columns(self) -> None:
         cursor = self._conn.execute("PRAGMA table_info(steps)")
         column_names = {row[1] for row in cursor.fetchall()}
-        if "render_payload" not in column_names:
-            self._conn.execute("ALTER TABLE steps ADD COLUMN render_payload BLOB")
-            self._conn.commit()
+        migrations = [
+            ("render_payload", "ALTER TABLE steps ADD COLUMN render_payload BLOB"),
+            ("agent_id", "ALTER TABLE steps ADD COLUMN agent_id TEXT"),
+            ("render_hint", "ALTER TABLE steps ADD COLUMN render_hint BLOB"),
+            ("frame_ref", "ALTER TABLE steps ADD COLUMN frame_ref TEXT"),
+            (
+                "payload_version",
+                "ALTER TABLE steps ADD COLUMN payload_version INTEGER NOT NULL DEFAULT 0",
+            ),
+            ("run_id", "ALTER TABLE steps ADD COLUMN run_id TEXT"),
+            ("game_id", "ALTER TABLE steps ADD COLUMN game_id TEXT"),
+            ("episode_seed", "ALTER TABLE steps ADD COLUMN episode_seed INTEGER"),
+        ]
+        for name, ddl in migrations:
+            if name not in column_names:
+                self._conn.execute(ddl)
+        cursor = self._conn.execute("PRAGMA table_info(episodes)")
+        episode_columns = {row[1] for row in cursor.fetchall()}
+        if "agent_id" not in episode_columns:
+            self._conn.execute("ALTER TABLE episodes ADD COLUMN agent_id TEXT")
+        if "run_id" not in episode_columns:
+            self._conn.execute("ALTER TABLE episodes ADD COLUMN run_id TEXT")
+        if "game_id" not in episode_columns:
+            self._conn.execute("ALTER TABLE episodes ADD COLUMN game_id TEXT")
+        self._conn.commit()
+
+    def _ensure_indexes(self) -> None:
+        """Create indexes for efficient querying of game_id and other fields."""
+        cursor = self._conn.cursor()
+
+        # Get existing indexes
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='index'")
+        existing_indexes = {row[0] for row in cursor.fetchall()}
+
+        # Define indexes to create
+        indexes = [
+            ("idx_steps_game_id", "CREATE INDEX IF NOT EXISTS idx_steps_game_id ON steps(game_id)"),
+            ("idx_steps_run_id_agent_id", "CREATE INDEX IF NOT EXISTS idx_steps_run_id_agent_id ON steps(run_id, agent_id)"),
+            ("idx_episodes_game_id", "CREATE INDEX IF NOT EXISTS idx_episodes_game_id ON episodes(game_id)"),
+            ("idx_episodes_run_id", "CREATE INDEX IF NOT EXISTS idx_episodes_run_id ON episodes(run_id)"),
+        ]
+
+        for index_name, ddl in indexes:
+            if index_name not in existing_indexes:
+                try:
+                    cursor.execute(ddl)
+                    self.log_constant(
+                        LOG_SERVICE_SQLITE_INFO,
+                        message="index_created",
+                        extra={"index": index_name},
+                    )
+                except sqlite3.OperationalError as e:
+                    self.log_constant(
+                        LOG_SERVICE_SQLITE_WARNING,
+                        message="index_create_failed",
+                        extra={"index": index_name, "error": str(e)},
+                    )
+
+        self._conn.commit()
 
     # ------------------------------------------------------------------
     def record_step(self, record: StepRecord) -> None:
@@ -230,19 +316,55 @@ class TelemetrySQLiteStore:
     def _flush_steps(self, steps: List[dict[str, object]]) -> None:
         if not steps:
             return
+        
+        # Log what we're about to insert (DEBUG for individual steps to avoid spam)
+        batch_size = len(steps)
+        for index, step in enumerate(steps, start=1):
+            self.log_constant(
+                LOG_SERVICE_SQLITE_DEBUG,
+                message="batch_step_prepared",
+                extra={
+                    "batch_position": index,
+                    "batch_size": batch_size,
+                    "episode_id": step.get("episode_id"),
+                    "step_index": step.get("step_index"),
+                    "reward": step.get("reward"),
+                    "terminated": step.get("terminated"),
+                    "truncated": step.get("truncated"),
+                    "agent_id": step.get("agent_id"),
+                },
+            )
+            self.log_constant(
+                LOG_SERVICE_SQLITE_DEBUG,
+                message="batch_step_types",
+                extra={
+                    "reward_type": type(step.get("reward")).__name__,
+                    "terminated_type": type(step.get("terminated")).__name__,
+                    "truncated_type": type(step.get("truncated")).__name__,
+                },
+            )
+        
         cursor = self._conn.cursor()
         cursor.execute("BEGIN")
         cursor.executemany(
             """
             INSERT INTO steps (
                 episode_id, step_index, action, observation, reward,
-                terminated, truncated, info, render_payload, timestamp
+                terminated, truncated, info, render_payload, timestamp,
+                agent_id, render_hint, frame_ref, payload_version, run_id, game_id
             ) VALUES (:episode_id, :step_index, :action, :observation, :reward,
-                :terminated, :truncated, :info, :render_payload, :timestamp)
+                :terminated, :truncated, :info, :render_payload, :timestamp,
+                :agent_id, :render_hint, :frame_ref, :payload_version, :run_id, :game_id)
             """,
             steps,
         )
         cursor.execute("COMMIT")
+        # Use INFO for batch commit (less noise than per-step ERROR logs)
+        self.log_constant(
+            LOG_SERVICE_SQLITE_INFO,
+            message="batch_commit_success",
+            extra={"step_count": batch_size},
+        )
         self._pending_payload_bytes = 0
 
     def _delete_episode_rows(self, episode_id: str) -> None:
@@ -265,7 +387,11 @@ class TelemetrySQLiteStore:
         try:
             return json_serialization.dumps(value)
         except json_serialization.SerializationError:
-            self._logger.warning("Failed to serialize %s; dropping value", context, exc_info=True)
+            self.log_constant(
+                LOG_SERVICE_SQLITE_DESERIALIZATION_FAILED,
+                extra={"context": context, "phase": "serialize"},
+                exc_info=sys.exc_info()[1],
+            )
             return None
 
     def _deserialize_field(self, payload: Any, *, context: str, default: Any) -> Any:
@@ -276,13 +402,16 @@ class TelemetrySQLiteStore:
         except json_serialization.SerializationError:
             if context not in self._deserialization_failures:
                 self._deserialization_failures.add(context)
-                self._logger.warning(
-                    "Failed to deserialize %s; using default fallback", context, exc_info=True
+                self.log_constant(
+                    LOG_SERVICE_SQLITE_DESERIALIZATION_FAILED,
+                    extra={"context": context, "phase": "deserialize"},
+                    exc_info=sys.exc_info()[1],
                 )
             else:
-                self._logger.debug(
-                    "Repeated deserialization failure for %s; default applied", context,
-                    exc_info=False,
+                self.log_constant(
+                    LOG_SERVICE_SQLITE_DEBUG,
+                    message="repeated_deserialization_failure",
+                    extra={"context": context},
                 )
             return self._clone_default(default)
 
@@ -305,27 +434,38 @@ class TelemetrySQLiteStore:
             "truncated": int(rollup.truncated),
             "metadata": self._serialize_field(rollup.metadata, context="episode metadata"),
             "timestamp": rollup.timestamp.isoformat(),
+            "agent_id": rollup.agent_id,
+            "run_id": rollup.run_id,
+            "game_id": rollup.game_id,
         }
         cursor = self._conn.cursor()
         cursor.execute("BEGIN")
         cursor.execute(
             """
             INSERT INTO episodes (
-                episode_id, total_reward, steps, terminated, truncated, metadata, timestamp
-            ) VALUES (:episode_id, :total_reward, :steps, :terminated, :truncated, :metadata, :timestamp)
+                episode_id, total_reward, steps, terminated, truncated, metadata, timestamp, agent_id, run_id, game_id
+            ) VALUES (:episode_id, :total_reward, :steps, :terminated, :truncated, :metadata, :timestamp, :agent_id, :run_id, :game_id)
             ON CONFLICT(episode_id) DO UPDATE SET
                 total_reward=excluded.total_reward,
                 steps=excluded.steps,
                 terminated=excluded.terminated,
                 truncated=excluded.truncated,
                 metadata=excluded.metadata,
-                timestamp=excluded.timestamp
+                timestamp=excluded.timestamp,
+                agent_id=excluded.agent_id,
+                run_id=excluded.run_id,
+                game_id=excluded.game_id
             """,
             payload,
         )
         cursor.execute("COMMIT")
 
     def _step_payload(self, record: StepRecord) -> dict[str, object]:
+        # Extract game_id from render_payload if available
+        game_id = None
+        if isinstance(record.render_payload, dict):
+            game_id = record.render_payload.get("game_id")
+
         return {
             "episode_id": record.episode_id,
             "step_index": record.step_index,
@@ -337,6 +477,12 @@ class TelemetrySQLiteStore:
             "info": self._serialize_field(record.info, context="info"),
             "render_payload": self._serialize_field(record.render_payload, context="render payload"),
             "timestamp": record.timestamp.isoformat(),
+            "agent_id": record.agent_id,
+            "render_hint": self._serialize_field(record.render_hint, context="render hint"),
+            "frame_ref": record.frame_ref,
+            "payload_version": int(record.payload_version),
+            "run_id": record.run_id,
+            "game_id": game_id,
         }
 
     def _prepare_step_payload(self, record: StepRecord) -> tuple[dict[str, object], int]:
@@ -347,7 +493,7 @@ class TelemetrySQLiteStore:
     @staticmethod
     def _payload_size(payload: dict[str, object]) -> int:
         size = 0
-        for key in ("observation", "info", "render_payload"):
+        for key in ("observation", "info", "render_payload", "render_hint"):
             value = payload.get(key)
             if isinstance(value, (bytes, bytearray, memoryview)):
                 size += len(value)
@@ -359,6 +505,27 @@ class TelemetrySQLiteStore:
         self._queue.put(("flush", None))
         self._queue.join()
 
+    def checkpoint_wal(self, mode: str = "TRUNCATE") -> None:
+        """Perform a WAL checkpoint to manage WAL file size.
+
+        Args:
+            mode: Checkpoint mode (PASSIVE, FULL, RESTART, TRUNCATE).
+                  TRUNCATE is recommended for background checkpoints.
+        """
+        try:
+            self._conn.execute(f"PRAGMA wal_checkpoint({mode})")
+            self.log_constant(
+                LOG_SERVICE_SQLITE_DEBUG,
+                message="wal_checkpoint_completed",
+                extra={"mode": mode},
+            )
+        except Exception as e:
+            self.log_constant(
+                LOG_SERVICE_SQLITE_WRITE_ERROR,
+                extra={"context": "wal_checkpoint", "mode": mode},
+                exc_info=e,
+            )
+
     def close(self) -> None:
         if self._stop_event.is_set():
             return
@@ -369,6 +536,7 @@ class TelemetrySQLiteStore:
             self._worker.join(timeout=2.0)
         finally:
             self._conn.close()
+        self.log_constant(LOG_SERVICE_SQLITE_WORKER_STOPPED)
 
     def __enter__(self) -> "TelemetrySQLiteStore":
         return self
@@ -380,34 +548,76 @@ class TelemetrySQLiteStore:
     def __del__(self) -> None:  # pragma: no cover - defensive shutdown
         try:
             self.close()
-        except Exception:  # pragma: no cover - best-effort logging during GC
-            logger = getattr(self, "_logger", logging.getLogger("gym_gui.telemetry.sqlite_store"))
-            logger.warning("TelemetrySQLiteStore close during __del__ failed", exc_info=True)
+        except Exception as exc:  # pragma: no cover - best-effort logging during GC
+            logger = getattr(self, "_logger", _LOGGER)
+            log_constant(
+                logger,
+                LOG_SERVICE_SQLITE_WARNING,
+                message="close_failed_during_gc",
+                exc_info=exc,
+            )
 
     # ------------------------------------------------------------------
     def recent_steps(self, limit: int = 100) -> Sequence[StepRecord]:
         query = (
             "SELECT episode_id, step_index, action, observation, reward, terminated, truncated, info, "
-            "render_payload, timestamp FROM steps ORDER BY rowid DESC LIMIT ?"
+            "render_payload, timestamp, agent_id, render_hint, frame_ref, payload_version,  run_id "
+            "FROM steps ORDER BY rowid DESC LIMIT ?"
         )
         with self._connect() as conn:
             rows = conn.execute(query, (limit,)).fetchall()
         return tuple(self._row_to_step(row) for row in rows)
 
     def recent_episodes(self, limit: int = 20) -> Sequence[EpisodeRollup]:
-        query = "SELECT episode_id, total_reward, steps, terminated, truncated, metadata, timestamp FROM episodes ORDER BY timestamp DESC LIMIT ?"
+        query = "SELECT episode_id, total_reward, steps, terminated, truncated, metadata, timestamp, agent_id, run_id FROM episodes ORDER BY timestamp DESC LIMIT ?"
         with self._connect() as conn:
             rows = conn.execute(query, (limit,)).fetchall()
         return tuple(self._row_to_episode(row) for row in rows)
 
     def episode_steps(self, episode_id: str) -> Sequence[StepRecord]:
         query = (
-            "SELECT episode_id, step_index, action, observation, reward, terminated, truncated, info, render_payload, timestamp "
+            "SELECT episode_id, step_index, action, observation, reward, terminated, truncated, info, render_payload, "
+            "timestamp, agent_id, render_hint, frame_ref, payload_version "
             "FROM steps WHERE episode_id = ? ORDER BY step_index ASC"
         )
         with self._connect() as conn:
             rows = conn.execute(query, (episode_id,)).fetchall()
         return tuple(self._row_to_step(row) for row in rows)
+
+    def episodes_for_run(
+        self,
+        run_id: str,
+        *,
+        agent_id: Optional[str] = None,
+        limit: Optional[int] = None,
+        order_desc: bool = False,
+    ) -> Sequence[EpisodeRollup]:
+        """Return all episodes associated with a specific training run."""
+
+        self.flush()
+        clauses: list[str] = ["run_id = ?"]
+        params: list[Any] = [run_id]
+        if agent_id:
+            clauses.append("agent_id = ?")
+            params.append(agent_id)
+        query = (
+            "SELECT episode_id, total_reward, steps, terminated, truncated, metadata, timestamp, agent_id, run_id "
+            "FROM episodes"
+        )
+        query += " WHERE " + " AND ".join(clauses)
+        query += " ORDER BY timestamp {}".format("DESC" if order_desc else "ASC")
+        if limit is not None:
+            query += " LIMIT ?"
+            params.append(limit)
+
+        with self._connect() as conn:
+            rows = conn.execute(query, tuple(params)).fetchall()
+
+        episodes: list[EpisodeRollup] = []
+        for row in rows:
+            episode = self._row_to_episode(row)
+            episodes.append(episode)
+        return tuple(episodes)
 
     def purge_steps(self, keep_recent: int) -> None:
         self.flush()
@@ -427,12 +637,15 @@ class TelemetrySQLiteStore:
     def _row_to_step(self, row: Sequence) -> StepRecord:
         observation = self._deserialize_field(row[3], context="observation", default=None)
         info = self._deserialize_field(row[7], context="info", default={})
-        render_payload = None
-        if len(row) > 8:
-            render_payload = self._deserialize_field(
-                row[8], context="render payload", default=None
-            )
+        render_payload = self._deserialize_field(row[8], context="render payload", default=None)
         timestamp_value = row[9] if len(row) > 9 else None
+        agent_id = row[10] if len(row) > 10 else None
+        render_hint = None
+        if len(row) > 11:
+            render_hint = self._deserialize_field(row[11], context="render hint", default=None)
+        frame_ref = row[12] if len(row) > 12 else None
+        payload_version = int(row[13]) if len(row) > 13 and row[13] is not None else 0
+        run_id = row[14] if len(row) > 14 else None
         return StepRecord(
             episode_id=row[0],
             step_index=row[1],
@@ -444,6 +657,11 @@ class TelemetrySQLiteStore:
             info=info,
             timestamp=datetime.fromisoformat(timestamp_value) if timestamp_value else datetime.utcnow(),
             render_payload=render_payload,
+            agent_id=agent_id,
+            render_hint=render_hint,
+            frame_ref=frame_ref,
+            payload_version=payload_version,
+            run_id=run_id,
         )
 
     def _row_to_episode(self, row: Sequence) -> EpisodeRollup:
@@ -456,6 +674,8 @@ class TelemetrySQLiteStore:
             truncated=bool(row[4]),
             metadata=metadata,
             timestamp=datetime.fromisoformat(row[6]) if row[6] else datetime.utcnow(),
+            agent_id=row[7] if len(row) > 7 else None,
+            run_id=row[8] if len(row) > 8 else None,
         )
 
 

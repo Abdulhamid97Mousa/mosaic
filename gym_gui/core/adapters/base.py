@@ -10,9 +10,25 @@ from typing import Any, Callable, Generic, Mapping, Sequence, TypeVar
 import gymnasium as gym
 
 from gym_gui.core.enums import ControlMode, RenderMode
+from gym_gui.logging_config.log_constants import (
+    LOG_ADAPTER_ENV_CLOSED,
+    LOG_ADAPTER_ENV_CREATED,
+    LOG_ADAPTER_ENV_RESET,
+    LOG_ADAPTER_INIT_ERROR,
+    LOG_ADAPTER_PAYLOAD_ERROR,
+    LOG_ADAPTER_RENDER_ERROR,
+    LOG_ADAPTER_STEP_ERROR,
+    LOG_ADAPTER_STEP_SUMMARY,
+    LOG_ADAPTER_STATE_INVALID,
+    LogConstant,
+)
+from gym_gui.logging_config.helpers import LogConstantMixin
 
 ObservationT = TypeVar("ObservationT")
 ActionT = TypeVar("ActionT")
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -87,6 +103,10 @@ class AdapterStep(Generic[ObservationT]):
     truncated: bool
     info: Mapping[str, Any]
     render_payload: Any | None = None
+    render_hint: Mapping[str, Any] | None = None
+    agent_id: str | None = None
+    frame_ref: str | None = None
+    payload_version: int = 1
     state: StepState = field(default_factory=StepState)
 
 
@@ -98,7 +118,7 @@ class UnsupportedModeError(RuntimeError):
     """Raised when a requested control mode is incompatible with the adapter."""
 
 
-class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT]):
+class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT], LogConstantMixin):
     """Lifecycle contract for all Gymnasium environment adapters."""
 
     id: str
@@ -108,10 +128,8 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT]):
 
     def __init__(self, context: AdapterContext | None = None) -> None:
         self._context = context
+        self._logger = _LOGGER
         self._env: gym.Env[Any, Any] | None = None
-        self._logger = (
-            context.get_logger(self.__class__.__name__) if context else logging.getLogger(self.__class__.__name__)
-        )
 
     # ------------------------------------------------------------------
     # Lifecycle hooks
@@ -121,7 +139,6 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT]):
         """Bind the adapter to a runtime context after instantiation."""
 
         self._context = context
-        self._logger = context.get_logger(self.__class__.__name__)
 
     def load(self) -> None:
         """Instantiate underlying Gymnasium environment resources."""
@@ -132,31 +149,51 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT]):
             kwargs.update(extra_kwargs)
         env = gym.make(self.id, **kwargs)
         env = self.apply_wrappers(env)
-        self._logger.debug("Created Gymnasium environment '%s'", self.id)
+        self.log_constant(
+            LOG_ADAPTER_ENV_CREATED,
+            extra={
+                "env_id": self.id,
+                "render_mode": self.default_render_mode.value,
+                "gym_kwargs": ",".join(sorted(extra_kwargs.keys())) if extra_kwargs else "-",
+                "wrapped_class": env.__class__.__name__,
+            },
+        )
         self._set_env(env)
 
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None) -> AdapterStep[ObservationT]:
         env = self._require_env()
         observation, info = env.reset(seed=seed, options=options)
-        self._logger.debug("Reset environment '%s' with seed=%s", self.id, seed)
+        self.log_constant(
+            LOG_ADAPTER_ENV_RESET,
+            extra={
+                "env_id": self.id,
+                "seed": seed if seed is not None else "None",
+                "has_options": bool(options),
+            },
+        )
         return self._package_step(observation, 0.0, False, False, info)
 
     def step(self, action: ActionT) -> AdapterStep[ObservationT]:
         env = self._require_env()
         observation, reward, terminated, truncated, info = env.step(action)
-        self._logger.debug(
-            "Step env='%s' action=%s -> reward=%s terminated=%s truncated=%s",
-            self.id,
-            action,
-            reward,
-            terminated,
-            truncated,
+        self.log_constant(
+            LOG_ADAPTER_STEP_SUMMARY,
+            extra={
+                "env_id": self.id,
+                "action": repr(action),
+                "reward": float(reward) if isinstance(reward, (int, float)) else repr(reward),
+                "terminated": terminated,
+                "truncated": truncated,
+            },
         )
         return self._package_step(observation, float(reward), terminated, truncated, info)
 
     def close(self) -> None:
         if self._env is not None:
-            self._logger.debug("Closing environment '%s'", self.id)
+            self.log_constant(
+                LOG_ADAPTER_ENV_CLOSED,
+                extra={"env_id": self.id},
+            )
             self._env.close()
             self._env = None
 
@@ -194,20 +231,91 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT]):
         truncated: bool,
         info: Mapping[str, Any],
     ) -> AdapterStep[ObservationT]:
+        state = self.build_step_state(observation, info)
+        render_payload: Any | None = None
+        try:
+            render_payload = self.render()
+        except Exception as exc:
+            self.log_constant(
+                LOG_ADAPTER_RENDER_ERROR,
+                exc_info=exc,
+                extra={
+                    "env_id": self.id,
+                    "state_snapshot": bool(state.raw),
+                },
+            )
+        render_hint = None
+        try:
+            render_hint = self.build_render_hint(observation, info, state)
+        except Exception as exc:
+            self.log_constant(
+                LOG_ADAPTER_PAYLOAD_ERROR,
+                exc_info=exc,
+                extra={
+                    "env_id": self.id,
+                    "context": "render_hint",
+                },
+            )
+        frame_ref = None
+        try:
+            frame_ref = self.build_frame_reference(render_payload, state)
+        except Exception as exc:
+            self.log_constant(
+                LOG_ADAPTER_PAYLOAD_ERROR,
+                exc_info=exc,
+                extra={
+                    "env_id": self.id,
+                    "context": "frame_reference",
+                },
+            )
         return AdapterStep(
             observation=observation,
             reward=reward,
             terminated=terminated,
             truncated=truncated,
             info=info,
-            render_payload=self.render(),
-            state=self.build_step_state(observation, info),
+            render_payload=render_payload,
+            render_hint=render_hint,
+            agent_id=state.active_agent,
+            frame_ref=frame_ref,
+            payload_version=self.telemetry_payload_version(),
+            state=state,
         )
 
     def build_step_state(self, observation: ObservationT, info: Mapping[str, Any]) -> StepState:
         """Construct the canonical :class:`StepState` for the current step."""
 
         return StepState()
+
+    def build_render_hint(
+        self,
+        observation: ObservationT,
+        info: Mapping[str, Any],
+        state: StepState,
+    ) -> Mapping[str, Any] | None:
+        """Return lightweight render metadata for downstream consumers."""
+
+        hint: dict[str, Any] = {}
+        if state.active_agent:
+            hint["active_agent"] = state.active_agent
+        if state.metrics:
+            hint["metrics"] = dict(state.metrics)
+        if state.environment:
+            hint["environment"] = dict(state.environment)
+        if state.inventory:
+            hint["inventory"] = dict(state.inventory)
+        return hint or None
+
+    def build_frame_reference(self, render_payload: Any | None, state: StepState) -> str | None:
+        """Optional hook to derive an external frame reference for media pipelines."""
+
+        del render_payload, state
+        return None
+
+    def telemetry_payload_version(self) -> int:
+        """Version marker for downstream telemetry consumers."""
+
+        return 1
 
     # ------------------------------------------------------------------
     # Optional utilities
@@ -237,7 +345,8 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT]):
 
     @property
     def logger(self) -> logging.Logger:
-        return self._logger
+        """Return the module-level logger for backward compatibility."""
+        return _LOGGER
 
     @property
     def settings(self) -> Any | None:

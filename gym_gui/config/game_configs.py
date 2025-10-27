@@ -10,6 +10,12 @@ from dataclasses import dataclass
 import os
 from typing import Any, Dict
 
+from gym_gui.constants.game_constants import (
+    CLIFF_WALKING_DEFAULTS,
+    FROZEN_LAKE_DEFAULTS,
+    FROZEN_LAKE_V2_DEFAULTS,
+)
+
 
 def _clamp(value: float, low: float, high: float) -> float:
     return max(low, min(high, value))
@@ -55,17 +61,25 @@ class FrozenLakeConfig:
     Only applies to FrozenLake-v2 with standard 4×4 or 8×8 grids."""
     
     def to_gym_kwargs(self) -> Dict[str, Any]:
-        """Convert to Gymnasium environment kwargs."""
+        """Convert to Gymnasium environment kwargs.
+        
+        For FrozenLake-v1: Pass only is_slippery, success_rate, reward_schedule.
+                          Do NOT pass map_name or grid dimensions.
+        
+        For FrozenLake-v2: Pass all parameters; custom map generation handled by adapter
+                           when grid dimensions or positions deviate from defaults.
+        """
         kwargs: Dict[str, Any] = {
             "is_slippery": self.is_slippery,
             "success_rate": self.success_rate,
             "reward_schedule": self.reward_schedule,
         }
         
-        # For FrozenLake-v2, we'll generate a custom map descriptor
-        if self.grid_height != 4 or self.grid_width != 4 or self.start_position is not None or self.goal_position is not None or self.hole_count is not None:
-            # Custom map generation will be handled by adapter
-            kwargs["map_name"] = None  # Signal to use desc parameter
+        # Note: grid_height, grid_width, start_position, goal_position, and hole_count
+        # should only be used by FrozenLakeV2Adapter._generate_map_descriptor().
+        # DO NOT pass map_name to Gymnasium for v1 (causes initialization failure).
+        # FrozenLakeV2Adapter handles custom map generation separately via gym_kwargs()
+        # in its subclass override.
         
         return kwargs
 
@@ -273,28 +287,31 @@ class BipedalWalkerConfig:
 
 # Default configurations for each game
 DEFAULT_FROZEN_LAKE_CONFIG = FrozenLakeConfig(
-    is_slippery=True,
+    is_slippery=FROZEN_LAKE_DEFAULTS.slippery,
     success_rate=1.0 / 3.0,
     reward_schedule=(1.0, 0.0, 0.0),
-    grid_height=4,
-    grid_width=4,
-    start_position=(0, 0),  # "S" tile at top-left
-    goal_position=(3, 3),   # "G" tile at bottom-right for 4×4
-    hole_count=4,  # Gymnasium default 4×4 map
+    grid_height=FROZEN_LAKE_DEFAULTS.grid_height,
+    grid_width=FROZEN_LAKE_DEFAULTS.grid_width,
+    start_position=FROZEN_LAKE_DEFAULTS.start,
+    goal_position=FROZEN_LAKE_DEFAULTS.goal,
+    hole_count=FROZEN_LAKE_DEFAULTS.hole_count,
+    random_holes=FROZEN_LAKE_DEFAULTS.random_holes,
 )
 DEFAULT_FROZEN_LAKE_V2_CONFIG = FrozenLakeConfig(
-    is_slippery=True,
+    is_slippery=FROZEN_LAKE_V2_DEFAULTS.slippery,
     success_rate=1.0 / 3.0,
     reward_schedule=(1.0, 0.0, 0.0),
-    grid_height=8,
-    grid_width=8,
-    start_position=(0, 0),  # "S" tile at top-left
-    goal_position=(7, 7),   # "G" tile at bottom-right for 8×8
-    hole_count=10,  # Gymnasium default 8×8 map has 10 holes
-    random_holes=False,  # Use fixed Gymnasium default map by default
+    grid_height=FROZEN_LAKE_V2_DEFAULTS.grid_height,
+    grid_width=FROZEN_LAKE_V2_DEFAULTS.grid_width,
+    start_position=FROZEN_LAKE_V2_DEFAULTS.start,
+    goal_position=FROZEN_LAKE_V2_DEFAULTS.goal,
+    hole_count=FROZEN_LAKE_V2_DEFAULTS.hole_count,
+    random_holes=FROZEN_LAKE_V2_DEFAULTS.random_holes,
 )
 DEFAULT_TAXI_CONFIG = TaxiConfig(is_raining=False, fickle_passenger=False)
-DEFAULT_CLIFF_WALKING_CONFIG = CliffWalkingConfig(is_slippery=False)
+DEFAULT_CLIFF_WALKING_CONFIG = CliffWalkingConfig(
+    is_slippery=CLIFF_WALKING_DEFAULTS.slippery
+)
 DEFAULT_LUNAR_LANDER_CONFIG = LunarLanderConfig()
 DEFAULT_CAR_RACING_CONFIG = CarRacingConfig.from_env()
 DEFAULT_BIPEDAL_WALKER_CONFIG = BipedalWalkerConfig.from_env()

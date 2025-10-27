@@ -56,5 +56,7 @@ class EpisodeReplayLoader:
                 terminated=steps[-1].terminated,
                 truncated=steps[-1].truncated,
                 metadata={},
+                agent_id=steps[-1].agent_id,
+                game_id=steps[-1].render_payload.get("game_id") if isinstance(steps[-1].render_payload, dict) else None,
             )
         return EpisodeReplay(rollup=rollup, steps=steps)

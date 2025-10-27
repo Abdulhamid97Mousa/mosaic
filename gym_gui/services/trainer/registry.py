@@ -2,16 +2,20 @@ from __future__ import annotations
 
 """SQLite-backed registry for trainer runs and resource bookkeeping."""
 
+import asyncio
 import json
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from enum import Enum
 import logging
 import sqlite3
+import threading
 from threading import RLock
 from typing import Iterable, Optional, cast
 
 from gym_gui.config.paths import VAR_TRAINER_DB, ensure_var_directories
+from gym_gui.telemetry.events import Topic, TelemetryEvent
+from gym_gui.telemetry.run_bus import RunBus, get_bus
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -25,6 +29,35 @@ class RunStatus(str, Enum):
     FAILED = "failed"
     CANCELLED = "cancelled"
 
+    @classmethod
+    def from_proto(cls, proto_value: int) -> "RunStatus":
+        """Convert protobuf status integer to RunStatus enum.
+        
+        Args:
+            proto_value: Protobuf enum value (0-6):
+                0 = UNSPECIFIED (maps to PENDING)
+                1 = PENDING
+                2 = DISPATCHING
+                3 = RUNNING
+                4 = COMPLETED
+                5 = FAILED
+                6 = CANCELLED
+        
+        Returns:
+            RunStatus enum value (defaults to PENDING if unknown)
+        """
+        # Protobuf enum values match the order above
+        _PROTO_TO_ENUM = {
+            0: cls.PENDING,  # UNSPECIFIED → default to PENDING
+            1: cls.PENDING,
+            2: cls.DISPATCHING,
+            3: cls.RUNNING,
+            4: cls.COMPLETED,
+            5: cls.FAILED,
+            6: cls.CANCELLED,
+        }
+        return _PROTO_TO_ENUM.get(proto_value, cls.PENDING)
+
 
 @dataclass(slots=True)
 class RunRecord:
@@ -37,6 +70,8 @@ class RunRecord:
     gpu_slot: Optional[int]
     failure_reason: Optional[str]
     gpu_slots: list[int] = field(default_factory=list)
+    finished_at: Optional[datetime] = None
+    outcome: Optional[str] = None
 
 
 @dataclass(slots=True)
@@ -59,6 +94,116 @@ class RunRegistry:
         self._db_path = db_path or str(VAR_TRAINER_DB)
         self._lock = RLock()
         self._initialize()
+
+        # RunBus subscription for RUN_COMPLETED events
+        self._bus: Optional[RunBus] = None
+        self._subscriber_thread: Optional[threading.Thread] = None
+        self._stop_event = threading.Event()
+        self._loop: Optional[asyncio.AbstractEventLoop] = None
+
+    def start_run_bus_subscriber(self) -> None:
+        """Start the RunBus subscriber thread for RUN_COMPLETED events."""
+        if self._subscriber_thread is not None:
+            _LOGGER.warning("RunBus subscriber already started")
+            return
+
+        self._stop_event.clear()
+        self._subscriber_thread = threading.Thread(
+            target=self._run_bus_subscriber,
+            name="registry-run-bus-subscriber",
+            daemon=True,
+        )
+        self._subscriber_thread.start()
+        _LOGGER.info("RunRegistry RunBus subscriber started")
+
+    def stop_run_bus_subscriber(self) -> None:
+        """Stop the RunBus subscriber thread."""
+        if self._subscriber_thread is None:
+            return
+
+        self._stop_event.set()
+        self._subscriber_thread.join(timeout=5.0)
+        if self._subscriber_thread.is_alive():
+            _LOGGER.warning("RunBus subscriber thread did not stop cleanly")
+        else:
+            _LOGGER.info("RunRegistry RunBus subscriber stopped")
+        self._subscriber_thread = None
+
+    def _run_bus_subscriber(self) -> None:
+        """Main loop for the RunBus subscriber thread."""
+        try:
+            self._loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(self._loop)
+            self._loop.run_until_complete(self._subscribe_to_run_completed())
+        except Exception as e:
+            _LOGGER.exception("Fatal error in RunBus subscriber", extra={"error": str(e)})
+        finally:
+            if self._loop is not None:
+                self._loop.close()
+            _LOGGER.info("RunBus subscriber loop exited")
+
+    async def _subscribe_to_run_completed(self) -> None:
+        """Subscribe to RUN_COMPLETED events and update registry."""
+        try:
+            self._bus = get_bus()
+            queue = self._bus.subscribe(Topic.RUN_COMPLETED, "registry")
+
+            _LOGGER.debug("Registry subscribed to RUN_COMPLETED topic")
+
+            while not self._stop_event.is_set():
+                try:
+                    # Check for run completed events (non-blocking)
+                    try:
+                        evt = queue.get_nowait()
+                        if isinstance(evt, TelemetryEvent):
+                            self._handle_run_completed_event(evt)
+                    except Exception as e:
+                        # Catch queue.Empty (from thread-safe queue.Queue)
+                        if type(e).__name__ != 'Empty':
+                            raise
+
+                    # Small sleep to avoid busy-waiting
+                    await asyncio.sleep(0.1)
+                except Exception as e:
+                    _LOGGER.exception("Error in subscriber loop", extra={"error": str(e)})
+        except Exception as e:
+            _LOGGER.exception("Fatal error in subscribe_to_run_completed", extra={"error": str(e)})
+
+    def _handle_run_completed_event(self, evt: TelemetryEvent) -> None:
+        """Handle a RUN_COMPLETED event and update registry."""
+        run_id = evt.run_id
+        payload = evt.payload
+        outcome = payload.get("outcome", "unknown")
+        failure_reason = payload.get("failure_reason")
+
+        try:
+            # Map outcome to RunStatus
+            if outcome == "succeeded":
+                status = RunStatus.COMPLETED
+            elif outcome == "failed":
+                status = RunStatus.FAILED
+            elif outcome == "canceled":
+                status = RunStatus.CANCELLED
+            else:
+                status = RunStatus.COMPLETED
+
+            # Update registry with outcome
+            self.update_run_outcome(
+                run_id=run_id,
+                status=status,
+                outcome=outcome,
+                failure_reason=failure_reason,
+            )
+
+            _LOGGER.info(
+                "Updated run outcome from RUN_COMPLETED event",
+                extra={"run_id": run_id, "outcome": outcome, "status": status.value},
+            )
+        except Exception as e:
+            _LOGGER.exception(
+                "Error handling RUN_COMPLETED event",
+                extra={"run_id": run_id, "error": str(e)},
+            )
 
     # ------------------------------------------------------------------
     def _connect(self) -> sqlite3.Connection:
@@ -86,7 +231,9 @@ class RunRegistry:
                     last_heartbeat TEXT,
                     gpu_slot INTEGER,
                     failure_reason TEXT,
-                    gpu_slots_json TEXT NOT NULL DEFAULT '[]'
+                    gpu_slots_json TEXT NOT NULL DEFAULT '[]',
+                    finished_at TEXT,
+                    outcome TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS gpu_slots (
@@ -113,6 +260,9 @@ class RunRegistry:
                     "INSERT INTO gpu_slots(slot_id, run_id, locked_at) VALUES(?, NULL, NULL)",
                     [(slot,) for slot in range(8)],
                 )
+
+            # Log database initialization with schema details
+            self._log_database_schema(conn)
 
     def _migrate_gpu_slots_table(self, conn: sqlite3.Connection) -> None:
         row = conn.execute(
@@ -146,30 +296,128 @@ class RunRegistry:
         if not has_column:
             conn.execute("ALTER TABLE runs ADD COLUMN gpu_slots_json TEXT NOT NULL DEFAULT '[]'")
 
+    def _log_database_schema(self, conn: sqlite3.Connection) -> None:
+        """Log database initialization with complete schema details."""
+        try:
+            # Get all tables
+            cursor = conn.execute("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+            tables = [row[0] for row in cursor.fetchall()]
+
+            _LOGGER.info(
+                f"Database initialized successfully with {len(tables)} tables: {', '.join(tables)}",
+                extra={
+                    "db_path": self._db_path,
+                    "tables": tables,
+                    "table_count": len(tables),
+                }
+            )
+
+            # Log schema for each table
+            for table_name in tables:
+                cursor = conn.execute(f"PRAGMA table_info({table_name})")
+                columns = cursor.fetchall()
+                column_info = [
+                    {
+                        "name": col[1],
+                        "type": col[2],
+                        "notnull": bool(col[3]),
+                        "default": col[4],
+                        "pk": bool(col[5]),
+                    }
+                    for col in columns
+                ]
+
+                # Get row count
+                row_count = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+
+                # Format column schema for logging
+                column_schema = ", ".join(
+                    f"{col['name']}({col['type']}, pk={col['pk']}, notnull={col['notnull']})"
+                    for col in column_info
+                )
+
+                _LOGGER.info(
+                    f"Table '{table_name}': {len(column_info)} columns, {row_count} rows | Schema: {column_schema}",
+                    extra={
+                        "table": table_name,
+                        "columns": len(column_info),
+                        "rows": row_count,
+                        "schema": column_info,
+                    }
+                )
+
+            # Log triggers
+            cursor = conn.execute("SELECT name, sql FROM sqlite_master WHERE type='trigger'")
+            triggers = cursor.fetchall()
+            if triggers:
+                trigger_names = [t[0] for t in triggers]
+                _LOGGER.info(
+                    f"Database triggers: {', '.join(trigger_names)}",
+                    extra={
+                        "trigger_count": len(triggers),
+                        "triggers": trigger_names,
+                    }
+                )
+
+            _LOGGER.info(
+                "✓ Database ready to accept training runs",
+                extra={
+                    "status": "initialized",
+                    "waiting_for": "training submissions",
+                }
+            )
+        except Exception as e:
+            _LOGGER.error(
+                "Failed to log database schema",
+                exc_info=e,
+                extra={"db_path": self._db_path}
+            )
+
     # ------------------------------------------------------------------
     def register_run(self, run_id: str, config_json: str, digest: str) -> Optional[str]:
         """Register a new run or return existing run_id if digest already exists.
-        
+
         Returns:
             The run_id (either the new one or the existing one matching the digest).
         """
         now = datetime.now(timezone.utc).isoformat()
-        with self._lock, self._connect() as conn:
-            # Check for existing run with same digest
-            existing = conn.execute(
-                "SELECT run_id FROM runs WHERE digest = ?", (digest,)
-            ).fetchone()
-            if existing:
-                return existing[0]
-            
-            conn.execute(
-                """
-                INSERT INTO runs(run_id, status, config_json, digest, created_at, updated_at, gpu_slots_json)
-                VALUES(?, ?, ?, ?, ?, ?, ?)
-                """,
-                (run_id, RunStatus.PENDING.value, config_json, digest, now, now, "[]"),
-            )
-            return run_id
+        attempt = 0
+        while True:
+            attempt += 1
+            with self._lock:
+                try:
+                    with self._connect() as conn:
+                        existing = conn.execute(
+                            "SELECT run_id FROM runs WHERE digest = ?", (digest,)
+                        ).fetchone()
+                        if existing:
+                            _LOGGER.info(
+                                "Run already registered for digest",
+                                extra={"run_id": existing[0], "digest": digest},
+                            )
+                            return existing[0]
+
+                        conn.execute(
+                            """
+                            INSERT INTO runs(run_id, status, config_json, digest, created_at, updated_at, gpu_slots_json)
+                            VALUES(?, ?, ?, ?, ?, ?, ?)
+                            """,
+                            (run_id, RunStatus.PENDING.value, config_json, digest, now, now, "[]"),
+                        )
+                        _LOGGER.info(
+                            "Registered new training run",
+                            extra={"run_id": run_id, "digest": digest},
+                        )
+                        return run_id
+                except sqlite3.OperationalError as exc:
+                    if "no such table" in str(exc).lower() and attempt == 1:
+                        _LOGGER.warning(
+                            "Trainer registry schema missing when registering run; rebuilding",
+                            extra={"error": str(exc), "db_path": self._db_path},
+                        )
+                        self._initialize()
+                        continue
+                    raise
 
     def update_status(
         self,
@@ -183,6 +431,42 @@ class RunRegistry:
                 "UPDATE runs SET status = ?, failure_reason = ?, updated_at = datetime('now') WHERE run_id = ?",
                 (status.value, failure_reason, run_id),
             )
+        _LOGGER.info(
+            "Run status updated",
+            extra={"run_id": run_id, "status": status.value, "reason": failure_reason},
+        )
+
+    def update_run_outcome(
+        self,
+        run_id: str,
+        status: RunStatus,
+        outcome: str,
+        *,
+        failure_reason: Optional[str] = None,
+    ) -> None:
+        """Update run status, outcome, and finished_at timestamp.
+
+        Args:
+            run_id: The run identifier.
+            status: The new status (COMPLETED, FAILED, CANCELLED).
+            outcome: The outcome string (success, failure, cancelled).
+            failure_reason: Optional reason for failure.
+        """
+        now = datetime.now(timezone.utc).isoformat()
+        with self._lock, self._connect() as conn:
+            conn.execute(
+                "UPDATE runs SET status = ?, outcome = ?, finished_at = ?, failure_reason = ?, updated_at = datetime('now') WHERE run_id = ?",
+                (status.value, outcome, now, failure_reason, run_id),
+            )
+        _LOGGER.info(
+            "Run outcome updated",
+            extra={
+                "run_id": run_id,
+                "status": status.value,
+                "outcome": outcome,
+                "failure_reason": failure_reason,
+            },
+        )
 
     def record_heartbeat(self, run_id: str) -> None:
         with self._lock, self._connect() as conn:
@@ -190,6 +474,7 @@ class RunRegistry:
                 "UPDATE runs SET last_heartbeat = datetime('now') WHERE run_id = ?",
                 (run_id,),
             )
+        _LOGGER.debug("Heartbeat recorded", extra={"run_id": run_id})
 
     def update_gpu_slots(self, run_id: str, slots: Iterable[int]) -> None:
         slots_list = list(slots)
@@ -207,15 +492,40 @@ class RunRegistry:
         else:
             self.update_gpu_slots(run_id, [slot])
 
+    def get_run_config_json(self, run_id: str) -> Optional[str]:
+        with self._lock, self._connect() as conn:
+            row = conn.execute(
+                "SELECT config_json FROM runs WHERE run_id = ?",
+                (run_id,),
+            ).fetchone()
+        if row is None:
+            return None
+        config_json = row[0]
+        return str(config_json) if config_json is not None else None
+
     def load_runs(self, statuses: Optional[Iterable[RunStatus]] = None) -> list[RunRecord]:
-        query = "SELECT run_id, status, digest, created_at, updated_at, last_heartbeat, gpu_slot, failure_reason, gpu_slots_json FROM runs"
+        query = "SELECT run_id, status, digest, created_at, updated_at, last_heartbeat, gpu_slot, failure_reason, gpu_slots_json, finished_at, outcome FROM runs"
         params: tuple[object, ...] = ()
-        if statuses:
-            placeholders = ",".join("?" for _ in statuses)
+        status_list = list(statuses) if statuses else []
+        if status_list:
+            placeholders = ",".join("?" for _ in status_list)
             query += f" WHERE status IN ({placeholders})"
-            params = tuple(status.value for status in statuses)
+            params = tuple(status.value for status in status_list)
+            _LOGGER.debug(
+                "Loading runs with status filter",
+                extra={"statuses": [s.value for s in status_list], "query": query[:100]}
+            )
+        else:
+            _LOGGER.debug("Loading all runs (no status filter)")
+        
         with self._lock, self._connect() as conn:
             rows = conn.execute(query, params).fetchall()
+        
+        _LOGGER.debug(
+            "Loaded runs from database",
+            extra={"count": len(rows), "requested_statuses": [s.value for s in status_list] if status_list else None}
+        )
+        
         records: list[RunRecord] = []
         for row in rows:
             gpu_slots: list[int] = []
@@ -238,6 +548,8 @@ class RunRegistry:
                     gpu_slot=row["gpu_slot"],
                     failure_reason=row["failure_reason"],
                     gpu_slots=gpu_slots,
+                    finished_at=datetime.fromisoformat(row["finished_at"]) if row["finished_at"] else None,
+                    outcome=row["outcome"],
                 )
             )
         return records
@@ -245,7 +557,7 @@ class RunRegistry:
     def get_run(self, run_id: str) -> Optional[RunRecord]:
         with self._lock, self._connect() as conn:
             row = conn.execute(
-                "SELECT run_id, status, digest, created_at, updated_at, last_heartbeat, gpu_slot, failure_reason, gpu_slots_json FROM runs WHERE run_id = ?",
+                "SELECT run_id, status, digest, created_at, updated_at, last_heartbeat, gpu_slot, failure_reason, gpu_slots_json, finished_at, outcome FROM runs WHERE run_id = ?",
                 (run_id,),
             ).fetchone()
         if not row:
@@ -269,6 +581,8 @@ class RunRegistry:
             gpu_slot=row["gpu_slot"],
             failure_reason=row["failure_reason"],
             gpu_slots=gpu_slots,
+            finished_at=datetime.fromisoformat(row["finished_at"]) if row["finished_at"] else None,
+            outcome=row["outcome"],
         )
 
     # ------------------------------------------------------------------

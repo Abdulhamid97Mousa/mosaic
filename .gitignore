@@ -13,7 +13,7 @@ __pycache__/
 *.pyd
 
 # Local environment overrides for the Gym GUI project
-.env
+# .env
 
 .venv
 
@@ -32,8 +32,42 @@ gym_gui/var/tmp/*
 !gym_gui/var/tmp/README.md
 gym_gui/var/logs/*
 !gym_gui/var/logs/README.md
+gym_gui/var/config/*
+!gym_gui/var/config/README.md
+
+
+# Protocol Buffers generated files
+*_pb2.py
+*_pb2.pyi
+*_pb2_grpc.py
+gym_gui/services/trainer/proto/trainer_pb2.pyi
+
+
+#
+.env
+.codex
+.github
+.idea
+.venv
+.pytest_cache
 
 spadeBDI_RL
-graphrag
-openrlbenchmark
+cleanrl
+ray
 
+var/records/*
+var/telemetry/*
+var/cache/*
+var/tmp/*
+var/logs/*
+var/config/*
+var/policies/*
+var/trainer.sqlite
+var/trainer.pid
+var/trainer.lock
+
+
+.cursorignore
+
+#Ignore cursor AI rules
+.cursor/rules/codacy.mdc

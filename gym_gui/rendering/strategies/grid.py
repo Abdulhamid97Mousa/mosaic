@@ -74,6 +74,26 @@ class GridRendererStrategy(RendererStrategy):
             scene.clear()
         self._current_game = None
 
+    def cleanup(self) -> None:
+        """Clean up resources before widget destruction.
+
+        This prevents segmentation faults from Qt trying to access
+        deleted scene items after the widget is destroyed.
+        """
+        try:
+            # Clear the scene to remove all items
+            scene = self._view.scene()
+            if scene is not None:
+                scene.clear()
+
+            # Clear renderer state
+            self._renderer._current_grid = []
+            self._renderer._last_actor_position = None
+            self._current_game = None
+        except Exception:
+            # Silently ignore errors during cleanup
+            pass
+
 
 # ----------------------------------------------------------------------
 # Helpers
@@ -155,7 +175,7 @@ class _GridRenderer:
         self._asset_manager = get_asset_manager()
         self._current_game: GameId | None = None
         self._current_grid: List[List[str]] = []
-        self._tile_size = 48
+        self._tile_size = 120  # Increased from 48 for better visibility
         self._last_actor_position: tuple[int, int] | None = None
 
     def render(

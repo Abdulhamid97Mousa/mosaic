@@ -1,3 +1,5 @@
+# /home/hamid/Desktop/Projects/GUI_BDI_RL/gym_gui/services/trainer_daemon.py
+
 from __future__ import annotations
 
 """Async trainer daemon responsible for orchestrating trainer runs."""
@@ -22,19 +24,33 @@ import grpc
 from google.protobuf import __version__ as protobuf_version
 from packaging.version import Version
 
-from gym_gui.config.paths import VAR_TRAINER_DIR, VAR_TRAINER_DB, ensure_var_directories
+from gym_gui.config.paths import (
+    VAR_TELEMETRY_DIR,
+    VAR_TRAINER_DIR,
+    VAR_TRAINER_DB,
+    ensure_var_directories,
+)
+from gym_gui.logging_config.log_constants import LOG_DAEMON_START
 from gym_gui.logging_config.logger import configure_logging
 from gym_gui.services.trainer import GPUAllocator, RunRegistry, RunStatus, TrainerDispatcher
+from gym_gui.services.trainer.service import _record_to_proto
 from google.protobuf.timestamp_pb2 import Timestamp
 
 from gym_gui.services.trainer.proto import trainer_pb2, trainer_pb2_grpc
 from gym_gui.services.trainer.registry import WALCheckpointStats
+from gym_gui.telemetry import TelemetrySQLiteStore
+from gym_gui.telemetry.db_sink import TelemetryDBSink
+from gym_gui.telemetry.run_bus import get_bus
 
 if TYPE_CHECKING:
     HealthCheckResponseType = Any  # pragma: no cover - typing alias
 else:  # pragma: no cover - alias only used for runtime
     HealthCheckResponseType = getattr(trainer_pb2, "HealthCheckResponse")
-from gym_gui.services.trainer.service import RunEventBroadcaster, TrainerService
+from gym_gui.services.trainer.service import (
+    RunEventBroadcaster,
+    RunTelemetryBroadcaster,
+    TrainerService,
+)
 
 _LOGGER = logging.getLogger("gym_gui.trainer.daemon")
 
@@ -162,22 +178,27 @@ class TrainerDaemon:
         self._grpc_server: Optional[grpc.aio.Server] = None
         self._listen = listen
         self._broadcaster = RunEventBroadcaster()
+        self._telemetry_broadcaster = RunTelemetryBroadcaster()
         self._dispatcher: Optional[TrainerDispatcher] = None
         self._pid_file = pid_file
         self._started_at: Optional[datetime] = None
         self._healthy = False
         self._fallback_full_streak = 0
+        # gRPC server options - keepalive settings disabled to avoid immediate GOAWAY on idle connections
         self._grpc_options = (
             ("grpc.max_send_message_length", max_message_bytes),
             ("grpc.max_receive_message_length", max_message_bytes),
-            ("grpc.keepalive_time_ms", 30_000),
-            ("grpc.keepalive_timeout_ms", 10_000),
-            ("grpc.http2.max_pings_without_data", 0),
-            ("grpc.keepalive_permit_without_calls", 1),
-            ("grpc.http2.min_time_between_pings_ms", 10_000),
-            ("grpc.max_connection_idle_ms", 0),
-            # TODO: tighten these limits once production telemetry envelopes are known.
+            # TODO: Re-enable keepalive once we understand why it causes GOAWAY on first connection
+            # ("grpc.keepalive_time_ms", 30_000),
+            # ("grpc.keepalive_timeout_ms", 10_000),
+            # ("grpc.http2.max_pings_without_data", 0),
+            # ("grpc.keepalive_permit_without_calls", 1),
+            # ("grpc.http2.min_time_between_pings_ms", 10_000),
+            # ("grpc.max_connection_idle_ms", 0),
         )
+        ensure_var_directories()
+        telemetry_db = VAR_TELEMETRY_DIR / "telemetry.sqlite"
+        self._telemetry_store = TelemetrySQLiteStore(telemetry_db)
 
     async def run(self) -> None:
         _LOGGER.info("Trainer daemon starting")
@@ -201,7 +222,7 @@ class TrainerDaemon:
         async def broadcast_callback(run_id: str) -> None:
             record = self._registry.get_run(run_id)
             if record:
-                from gym_gui.services.trainer.service import _record_to_proto
+                
                 await self._broadcaster.publish(_record_to_proto(record))
         
         self._dispatcher = TrainerDispatcher(
@@ -210,12 +231,28 @@ class TrainerDaemon:
             broadcaster=broadcast_callback,
         )
         await self._dispatcher.start()
-        
+
+        # Initialize and start database sink for durable persistence
+        # This ensures telemetry events are persisted to SQLite
+        bus = get_bus()
+        assert self._telemetry_store is not None, "Telemetry store must be initialized"
+        db_sink = TelemetryDBSink(
+            self._telemetry_store,
+            bus,
+            batch_size=64,
+            checkpoint_interval=1000,
+            writer_queue_size=512,
+        )
+        db_sink.start()
+        _LOGGER.info("Telemetry database sink started in daemon")
+
         service = TrainerService(
             self._registry,
             self._gpu_allocator,
             broadcaster=self._broadcaster,
+            telemetry_broadcaster=self._telemetry_broadcaster,
             health_provider=self._build_health_response,
+            telemetry_store=self._telemetry_store,
         )
         self._grpc_server = grpc.aio.server(options=self._grpc_options)
         trainer_pb2_grpc.add_TrainerServiceServicer_to_server(service, self._grpc_server)
@@ -253,6 +290,12 @@ class TrainerDaemon:
         _LOGGER.info("Final WAL checkpoint", extra=self._wal_stats_extra(wal_stats, "TRUNCATE"))
         if self._pid_file:
             self._pid_file.remove()
+        store = getattr(self, "_telemetry_store", None)
+        if store is not None:
+            try:
+                store.close()
+            finally:
+                self._telemetry_store = None
         _LOGGER.info("Trainer daemon shutdown complete")
 
     async def _maintenance_loop(self) -> None:
@@ -349,6 +392,18 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
 
 async def _async_main(args: argparse.Namespace) -> None:
     configure_logging(level=getattr(logging, args.log_level))
+    level = (
+        LOG_DAEMON_START.level
+        if isinstance(LOG_DAEMON_START.level, int)
+        else getattr(logging, LOG_DAEMON_START.level)
+    )
+    _LOGGER.log(
+        level,
+        "%s %s",
+        LOG_DAEMON_START.code,
+        LOG_DAEMON_START.message,
+        extra={"log_code": LOG_DAEMON_START.code, "stdout_redirected": True},
+    )
     _LOGGER.info(
         "Trainer dependencies",
         extra={

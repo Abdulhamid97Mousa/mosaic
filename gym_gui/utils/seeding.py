@@ -4,6 +4,7 @@
 from collections.abc import Callable
 import hashlib
 import logging
+from functools import partial
 import random
 from dataclasses import dataclass, field
 from typing import Any
@@ -11,6 +12,13 @@ from typing import Any
 import numpy as np
 
 from gym_gui.utils import json_serialization
+from gym_gui.logging_config.helpers import log_constant
+from gym_gui.logging_config.log_constants import (
+    LOG_UTIL_QT_RESEED_SKIPPED,
+    LOG_UTIL_QT_STATE_CAPTURE_FAILED,
+    LOG_UTIL_SEED_CALLBACK_FAILED,
+    LogConstant,
+)
 
 try:  # pragma: no cover - optional Qt dependency during testing
     from qtpy import QtCore
@@ -18,8 +26,8 @@ except Exception:  # noqa: BLE001 - fallback when Qt bindings unavailable
     QtCore = None  # type: ignore[assignment]
 
 
-logger = logging.getLogger("gym_gui.utils.seeding")
-
+_LOGGER = logging.getLogger("gym_gui.utils.seeding")
+_log = partial(log_constant, _LOGGER)
 
 def _seed_qt_random(seed: int) -> None:
     del seed
@@ -28,7 +36,10 @@ def _seed_qt_random(seed: int) -> None:
     # Qt aborts if the global random generator is reseeded after initialization.
     # Instead of forcing determinism here (which would require invasive hooks),
     # we simply log the requested seed so other subsystems remain deterministic.
-    logger.debug("Skipping Qt random reseed; relying on Python/NumPy determinism")
+    _log(
+        LOG_UTIL_QT_RESEED_SKIPPED,
+        message="Skipping Qt random reseed; relying on Python/NumPy determinism",
+    )
 
 
 def _capture_qt_state() -> dict[str, Any] | None:
@@ -41,8 +52,13 @@ def _capture_qt_state() -> dict[str, Any] | None:
             qt_state = generator.state()  # type: ignore[attr-defined]
             state["state"] = int(qt_state)
         return state
-    except Exception:  # pragma: no cover - defensive guard
-        logger.exception("Failed to capture Qt random generator state")
+    except Exception as e:  # pragma: no cover - defensive guard
+        _log(
+            LOG_UTIL_QT_STATE_CAPTURE_FAILED,
+            message="Failed to capture Qt random generator state",
+            extra={"exception": type(e).__name__},
+            exc_info=e,
+        )
         return None
 
 
@@ -98,8 +114,13 @@ class SessionSeedManager:
         for name, callback in self._callbacks.items():
             try:
                 callback(seed)
-            except Exception:  # pragma: no cover - defensive guard
-                logger.exception("Seed callback '%s' failed", name)
+            except Exception as exc:  # pragma: no cover - defensive guard
+                _log(
+                    LOG_UTIL_SEED_CALLBACK_FAILED,
+                    message=f"Seed callback '{name}' failed",
+                    extra={"callback": name},
+                    exc_info=exc,
+                )
         self._last_applied_seed = seed
 
     def capture_state(self) -> dict[str, Any]:

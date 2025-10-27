@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
-from functools import lru_cache
+from gym_gui.cache.memory import memoize
 from typing import Iterable, Mapping, TypeVar
 
+from gym_gui.cache.memory import memoize
 from gym_gui.config.game_configs import (
     CliffWalkingConfig,
     CarRacingConfig,
@@ -25,7 +26,7 @@ class AdapterFactoryError(KeyError):
     """Raised when an adapter cannot be created for the requested game."""
 
 
-@lru_cache(maxsize=None)
+@memoize()
 def _registry() -> Mapping[GameId, type[EnvironmentAdapter]]:
     """Build the adapter registry on first use.
 

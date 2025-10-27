@@ -12,6 +12,11 @@ from qtpy.QtGui import QKeySequence, QShortcut
 
 from gym_gui.core.enums import ControlMode, GameId
 from gym_gui.controllers.session import SessionController
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import LOG_INPUT_CONTROLLER_ERROR
+
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(frozen=True)
@@ -82,40 +87,51 @@ _BOX_2D_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
 }
 
 
-class HumanInputController(QtCore.QObject):
+class HumanInputController(QtCore.QObject, LogConstantMixin):
     """Registers keyboard shortcuts and forwards them to the session controller."""
 
     def __init__(self, widget: QtWidgets.QWidget, session: SessionController) -> None:
         super().__init__(widget)
+        self._logger = _LOGGER
         self._widget = widget
         self._session = session
         self._shortcuts: List[QShortcut] = []
         self._mode_allows_input = True
         self._requested_enabled = True
-        self._logger = logging.getLogger("gym_gui.controllers.human_input")
 
     def configure(self, game_id: GameId | None, action_space: object | None) -> None:
         self._clear_shortcuts()
         if game_id is None or action_space is None:
             return
 
-        mappings = _TOY_TEXT_MAPPINGS.get(game_id)
-        if mappings is None:
-            mappings = _BOX_2D_MAPPINGS.get(game_id)
-        if mappings is None and isinstance(action_space, spaces.Discrete):
-            mappings = self._fallback_mappings(action_space)
+        try:
+            mappings = _TOY_TEXT_MAPPINGS.get(game_id)
+            if mappings is None:
+                mappings = _BOX_2D_MAPPINGS.get(game_id)
+            if mappings is None and isinstance(action_space, spaces.Discrete):
+                mappings = self._fallback_mappings(action_space)
 
-        if not mappings:
-            return
+            if not mappings:
+                return
 
-        for mapping in mappings:
-            for sequence in mapping.key_sequences:
-                shortcut = QShortcut(sequence, self._widget)
-                shortcut.setContext(QtCore.Qt.ShortcutContext.WidgetWithChildrenShortcut)
-                shortcut_label = sequence.toString() or repr(sequence)
-                shortcut.activated.connect(self._make_activation(mapping.action, shortcut_label))
-                self._shortcuts.append(shortcut)
-        self._update_shortcuts_enabled()
+            for mapping in mappings:
+                for sequence in mapping.key_sequences:
+                    shortcut = QShortcut(sequence, self._widget)
+                    shortcut.setContext(QtCore.Qt.ShortcutContext.WidgetWithChildrenShortcut)
+                    shortcut_label = sequence.toString() or repr(sequence)
+                    shortcut.activated.connect(self._make_activation(mapping.action, shortcut_label))
+                    self._shortcuts.append(shortcut)
+            self._update_shortcuts_enabled()
+        except Exception as exc:  # pragma: no cover - defensive
+            self.log_constant(
+                LOG_INPUT_CONTROLLER_ERROR,
+                exc_info=exc,
+                extra={
+                    "game_id": game_id.value if game_id else "unknown",
+                    "space_type": type(action_space).__name__ if action_space is not None else "None",
+                },
+            )
+            self._clear_shortcuts()
 
     def set_enabled(self, enabled: bool) -> None:
         self._requested_enabled = enabled
@@ -123,7 +139,7 @@ class HumanInputController(QtCore.QObject):
 
     def _make_activation(self, action: int, shortcut_label: str) -> Callable[[], None]:
         def trigger() -> None:
-            self._logger.debug("Shortcut activated key='%s' action=%s", shortcut_label, action)
+            _LOGGER.debug("Shortcut activated key='%s' action=%s", shortcut_label, action)
             self._session.perform_human_action(action, key_label=shortcut_label)
 
         return trigger
@@ -162,7 +178,7 @@ class HumanInputController(QtCore.QObject):
         enabled = self._mode_allows_input and self._requested_enabled
         for shortcut in self._shortcuts:
             shortcut.setEnabled(enabled)
-        self._logger.debug("Shortcuts enabled=%s (mode_allows=%s, requested=%s)", 
+        _LOGGER.debug("Shortcuts enabled=%s (mode_allows=%s, requested=%s)", 
                           enabled, self._mode_allows_input, self._requested_enabled)
 
 
