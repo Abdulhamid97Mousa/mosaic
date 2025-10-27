@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, Iterable, List, Mapping
 
 from qtpy import QtCore, QtGui, QtWidgets
 
 from gym_gui.core.enums import GameId, RenderMode
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_UI_RENDER_TABS_TRACE,
+    LOG_UI_RENDER_TABS_INFO,
+    LOG_UI_RENDER_TABS_WARNING,
+)
 from gym_gui.rendering.assets import (
     CliffWalkingAssets,
     FrozenLakeAssets,
@@ -159,10 +166,11 @@ def _as_dict(value: object) -> dict[str, Any] | None:
     return None
 
 
-class _GridRenderer:
+class _GridRenderer(LogConstantMixin):
     """Legacy asset-backed grid renderer used by the grid strategy."""
 
     def __init__(self, graphics_view: QtWidgets.QGraphicsView) -> None:
+        self._logger = logging.getLogger(__name__)
         self._view = graphics_view
         self._scene = QtWidgets.QGraphicsScene()
         self._view.setScene(self._scene)
@@ -192,6 +200,13 @@ class _GridRenderer:
         self._current_grid = grid
         rows = len(grid)
         cols = len(grid[0]) if rows > 0 else 0
+        
+        # Log at WARNING level to ensure visibility
+        self._logger.warning(f"_GridRenderer.render() CALLED: game_id={game_id}, grid_size={rows}x{cols}, agent_pos={agent_position}, has_taxi_state={taxi_state is not None}")
+        self.log_constant(
+            LOG_UI_RENDER_TABS_INFO,
+            message=f"_GridRenderer.render() START: game_id={game_id}, grid_size={rows}x{cols}, agent_position={agent_position}"
+        )
 
         self._scene.clear()
 
@@ -199,6 +214,7 @@ class _GridRenderer:
         if terminated and effective_actor_position is None and self._last_actor_position is not None:
             effective_actor_position = self._last_actor_position
 
+        pixmap_count = 0
         for r, row in enumerate(grid):
             for c, cell_value in enumerate(row):
                 pixmap = self._create_cell_pixmap(
@@ -211,10 +227,17 @@ class _GridRenderer:
                     payload,
                 )
                 if pixmap and not pixmap.isNull():
+                    pixmap_count += 1
                     item = self._scene.addPixmap(pixmap)
                     if item is not None:
                         item.setPos(c * self._tile_size, r * self._tile_size)
 
+        # Log completion at WARNING level for visibility
+        self._logger.warning(f"_GridRenderer.render() COMPLETE: Added {pixmap_count} pixmaps to scene (game={self._current_game}, grid={rows}x{cols})")
+        self.log_constant(
+            LOG_UI_RENDER_TABS_INFO,
+            message=f"_GridRenderer.render() COMPLETE: Added {pixmap_count} pixmaps to scene"
+        )
         self._scene.setSceneRect(0, 0, cols * self._tile_size, rows * self._tile_size)
         self._view.fitInView(self._scene.sceneRect(), QtCore.Qt.AspectRatioMode.KeepAspectRatio)
 
@@ -238,7 +261,17 @@ class _GridRenderer:
         if self._current_game == GameId.TAXI:
             pixmap = self._asset_manager.get_pixmap("taxi_background.png")
             if pixmap is None:
+                self._logger.error(f"TAXI ASSET MISSING: taxi_background.png not found at cell ({row},{col})")
+                self.log_constant(
+                    LOG_UI_RENDER_TABS_WARNING,
+                    message=f"TAXI cell ({row},{col}): taxi_background.png not found"
+                )
                 return None
+            self._logger.debug(f"TAXI cell ({row},{col}): Got taxi_background.png")
+            self.log_constant(
+                LOG_UI_RENDER_TABS_TRACE,
+                message=f"TAXI cell ({row},{col}): Got taxi_background.png"
+            )
         elif self._current_game in (GameId.FROZEN_LAKE, GameId.FROZEN_LAKE_V2):
             base_pixmap = self._asset_manager.get_pixmap(FrozenLakeAssets.ICE)
             if base_pixmap is None:
@@ -329,7 +362,10 @@ class _GridRenderer:
             actor_asset = self._get_actor_asset(taxi_state, payload)
             actor_pixmap = self._asset_manager.get_pixmap(actor_asset)
             if actor_pixmap is not None:
+                self._logger.warning(f"TAXI ACTOR LOADED at ({row},{col}): {actor_asset}")
                 pixmap = self._composite_pixmaps(pixmap, actor_pixmap)
+            else:
+                self._logger.error(f"TAXI ACTOR ASSET MISSING at ({row},{col}): {actor_asset} not found")
 
         if not pixmap.isNull():
             pixmap = pixmap.scaled(

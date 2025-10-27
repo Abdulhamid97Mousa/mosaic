@@ -9,7 +9,14 @@ from typing import Optional
 
 from PyQt6 import QtCore, QtGui, QtWidgets
 
-logger = logging.getLogger(__name__)
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_UI_TAB_CLOSURE_DIALOG_OPENED,
+    LOG_UI_TAB_CLOSURE_CHOICE_SELECTED,
+    LOG_UI_TAB_CLOSURE_CHOICE_CANCELLED,
+)
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class TabClosureChoice(str, Enum):
@@ -36,7 +43,7 @@ class RunSummary:
     last_update_timestamp: str
 
 
-class TabClosureDialog(QtWidgets.QDialog):
+class TabClosureDialog(QtWidgets.QDialog, LogConstantMixin):
     """
     Modal dialog for handling live training tab closure with pause/keep/archive/delete options.
 
@@ -52,16 +59,20 @@ class TabClosureDialog(QtWidgets.QDialog):
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
+        self._logger = _LOGGER  # Initialize LogConstantMixin
         self.setWindowTitle("Close Live Training Tab")
         self.setWindowModality(QtCore.Qt.WindowModality.ApplicationModal)
-        self.setMinimumWidth(500)
-        self.setMinimumHeight(400)
+        self.setMinimumWidth(600)
+        self.setMinimumHeight(700)
 
         self._current_summary: Optional[RunSummary] = None
         self._selected_choice: TabClosureChoice = TabClosureChoice.CANCEL
 
         self._init_ui()
         self._apply_styling()
+        
+        # Initialize selected choice to KEEP (default radio button)
+        self._update_selected_choice()
 
     def _init_ui(self) -> None:
         """Build dialog layout."""
@@ -79,15 +90,18 @@ class TabClosureDialog(QtWidgets.QDialog):
         summary_layout = QtWidgets.QGridLayout()
         summary_layout.setSpacing(10)
 
+        self._run_label = QtWidgets.QLabel("Run ID: —")
+        self._run_label.setStyleSheet("font-weight: 500;")
         self._episodes_label = QtWidgets.QLabel("Episodes: 0")
         self._steps_label = QtWidgets.QLabel("Steps: 0")
         self._dropped_label = QtWidgets.QLabel("Dropped: 0 steps, 0 episodes")
         self._reward_label = QtWidgets.QLabel("Total Reward: 0.0")
 
-        summary_layout.addWidget(self._episodes_label, 0, 0)
-        summary_layout.addWidget(self._steps_label, 0, 1)
-        summary_layout.addWidget(self._dropped_label, 1, 0, 1, 2)
-        summary_layout.addWidget(self._reward_label, 2, 0, 1, 2)
+        summary_layout.addWidget(self._run_label, 0, 0, 1, 2)
+        summary_layout.addWidget(self._episodes_label, 1, 0)
+        summary_layout.addWidget(self._steps_label, 1, 1)
+        summary_layout.addWidget(self._dropped_label, 2, 0, 1, 2)
+        summary_layout.addWidget(self._reward_label, 3, 0, 1, 2)
 
         self._summary_group.setLayout(summary_layout)
         layout.addWidget(self._summary_group)
@@ -100,13 +114,17 @@ class TabClosureDialog(QtWidgets.QDialog):
         prompt_label.setStyleSheet("font-weight: bold;")
         layout.addWidget(prompt_label)
 
-        # Radio buttons for choices
+        # Radio buttons for choices - use button group to ensure mutual exclusivity
         self._choice_group = QtWidgets.QGroupBox("Data Retention")
         choice_layout = QtWidgets.QVBoxLayout()
+        
+        # Create a button group to manage radio buttons
+        self._button_group = QtWidgets.QButtonGroup()
 
         # Keep option
         self._keep_radio = QtWidgets.QRadioButton("Keep data (default)")
         self._keep_radio.setChecked(True)
+        self._button_group.addButton(self._keep_radio, 0)
         keep_desc = QtWidgets.QLabel(
             "Retain telemetry and keep run history accessible.\nTraining may continue."
         )
@@ -118,6 +136,7 @@ class TabClosureDialog(QtWidgets.QDialog):
 
         # Archive option
         self._archive_radio = QtWidgets.QRadioButton("Archive snapshot")
+        self._button_group.addButton(self._archive_radio, 1)
         archive_desc = QtWidgets.QLabel(
             "Seal the run for replay; move it to archived run list for review."
         )
@@ -129,6 +148,7 @@ class TabClosureDialog(QtWidgets.QDialog):
 
         # Delete option (with warning icon)
         self._delete_radio = QtWidgets.QRadioButton("Delete data  (⚠ Warning)")
+        self._button_group.addButton(self._delete_radio, 2)
         delete_desc = QtWidgets.QLabel(
             "Remove telemetry from storage and worker cache. CANNOT BE UNDONE."
         )
@@ -205,6 +225,14 @@ class TabClosureDialog(QtWidgets.QDialog):
         """
         self._current_summary = summary
 
+        # Log dialog opened with run info
+        self.log_constant(
+            LOG_UI_TAB_CLOSURE_DIALOG_OPENED,
+            message=f"Dialog opened for run_id={summary.run_id}, agent_id={summary.agent_id}, "
+                    f"episodes={summary.episodes_collected}, steps={summary.steps_collected}",
+            extra={"run_id": summary.run_id, "agent_id": summary.agent_id}
+        )
+
         # Update labels
         self._episodes_label.setText(f"Episodes: {summary.episodes_collected}")
         self._steps_label.setText(f"Steps: {summary.steps_collected}")
@@ -212,7 +240,9 @@ class TabClosureDialog(QtWidgets.QDialog):
         self._reward_label.setText(f"Total Reward: {summary.total_reward:.2f}")
 
         # Update title with agent ID
-        self._title_label.setText(f"Close Live Tab for {summary.agent_id}")
+        title_run_preview = summary.run_id if len(summary.run_id) <= 16 else f"{summary.run_id[:12]}…"
+        self._title_label.setText(f"Close Live Tab for {summary.agent_id} — Run {title_run_preview}")
+        self._run_label.setText(f"Run ID: {summary.run_id}")
 
     def get_selected_choice(self) -> TabClosureChoice:
         """Get the user's selected action."""
@@ -225,6 +255,10 @@ class TabClosureDialog(QtWidgets.QDialog):
         else:
             return TabClosureChoice.CANCEL
 
+    def _update_selected_choice(self) -> None:
+        """Update the internal selected choice based on current radio button state."""
+        self._selected_choice = self.get_selected_choice()
+
     def is_batch_apply(self) -> bool:
         """Check if user wants to apply decision to all tabs from this run."""
         return self._batch_checkbox.isChecked()
@@ -232,12 +266,23 @@ class TabClosureDialog(QtWidgets.QDialog):
     def _on_cancel(self) -> None:
         """User clicked Cancel button."""
         self._selected_choice = TabClosureChoice.CANCEL
+        run_id = self._current_summary.run_id if self._current_summary else "unknown"
+        self.log_constant(
+            LOG_UI_TAB_CLOSURE_CHOICE_CANCELLED,
+            message=f"Tab closure cancelled for run_id={run_id}",
+            extra={"run_id": run_id}
+        )
         self.reject()
 
     def _on_continue(self) -> None:
         """User clicked Continue button."""
         self._selected_choice = self.get_selected_choice()
-        logger.info(f"Tab closure choice: {self._selected_choice.value}")
+        run_id = self._current_summary.run_id if self._current_summary else "unknown"
+        self.log_constant(
+            LOG_UI_TAB_CLOSURE_CHOICE_SELECTED,
+            message=f"Tab closure choice selected - choice={self._selected_choice.value} for run_id={run_id}",
+            extra={"run_id": run_id, "choice": self._selected_choice.value}
+        )
         self.action_selected.emit(self._selected_choice)
         self.accept()
 

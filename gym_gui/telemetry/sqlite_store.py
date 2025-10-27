@@ -116,6 +116,16 @@ class TelemetrySQLiteStore(LogConstantMixin):
         )
         cursor.execute(
             """
+            CREATE TABLE IF NOT EXISTS run_status (
+                run_id TEXT PRIMARY KEY,
+                status TEXT NOT NULL DEFAULT 'active',
+                deleted_at TEXT,
+                archived_at TEXT
+            )
+            """
+        )
+        cursor.execute(
+            """
             CREATE INDEX IF NOT EXISTS idx_steps_episode
                 ON steps(episode_id, step_index)
             """
@@ -228,6 +238,110 @@ class TelemetrySQLiteStore(LogConstantMixin):
         if wait:
             self._queue.join()
 
+    def delete_run(self, run_id: str, *, wait: bool = True) -> None:
+        """Mark a run as deleted and remove all its telemetry data."""
+        self._queue.put(("delete_run", run_id))
+        if wait:
+            self._queue.join()
+
+    def archive_run(self, run_id: str, *, wait: bool = True) -> None:
+        """Mark a run as archived (read-only snapshot for replay)."""
+        self._queue.put(("archive_run", run_id))
+        if wait:
+            self._queue.join()
+
+    def is_run_deleted(self, run_id: str) -> bool:
+        """Check if a run has been deleted."""
+        cursor = self._conn.cursor()
+        cursor.execute(
+            "SELECT status FROM run_status WHERE run_id = ? AND status = 'deleted'",
+            (run_id,),
+        )
+        return cursor.fetchone() is not None
+
+    def is_run_archived(self, run_id: str) -> bool:
+        """Check if a run has been archived."""
+        cursor = self._conn.cursor()
+        cursor.execute(
+            "SELECT status FROM run_status WHERE run_id = ? AND status = 'archived'",
+            (run_id,),
+        )
+        return cursor.fetchone() is not None
+
+    def get_run_summary(self, run_id: str) -> dict[str, Any]:
+        """Return aggregate metrics for a run."""
+
+        cursor = self._conn.cursor()
+        legacy_prefix = f"{run_id}-ep%"
+
+        cursor.execute(
+            """
+            SELECT COUNT(*) AS episode_count,
+                   COALESCE(SUM(steps), 0) AS total_steps,
+                   COALESCE(SUM(total_reward), 0.0) AS total_reward
+            FROM episodes
+            WHERE run_id = ? OR (run_id IS NULL AND episode_id LIKE ?)
+            """,
+            (run_id, legacy_prefix),
+        )
+        episode_row = cursor.fetchone() or (0, 0, 0.0)
+        episodes_collected = int(episode_row[0] or 0)
+        steps_collected = int(episode_row[1] or 0)
+        total_reward = float(episode_row[2] or 0.0)
+
+        cursor.execute(
+            """
+            SELECT COUNT(*)
+            FROM steps
+            WHERE run_id = ? OR (run_id IS NULL AND episode_id LIKE ?)
+            """,
+            (run_id, legacy_prefix),
+        )
+        steps_row = cursor.fetchone()
+        if steps_row and steps_row[0] and steps_row[0] > steps_collected:
+            steps_collected = int(steps_row[0])
+
+        cursor.execute(
+            """
+            SELECT MAX(timestamp)
+            FROM steps
+            WHERE run_id = ? OR (run_id IS NULL AND episode_id LIKE ?)
+            """,
+            (run_id, legacy_prefix),
+        )
+        last_update = cursor.fetchone()
+        last_update_ts = last_update[0] if last_update and last_update[0] else ""
+
+        cursor.execute(
+            """
+            SELECT agent_id
+            FROM steps
+            WHERE (run_id = ? OR (run_id IS NULL AND episode_id LIKE ?)) AND agent_id IS NOT NULL
+            ORDER BY timestamp DESC
+            LIMIT 1
+            """,
+            (run_id, legacy_prefix),
+        )
+        agent_row = cursor.fetchone()
+        agent_id = agent_row[0] if agent_row and agent_row[0] else ""
+
+        cursor.execute(
+            "SELECT status FROM run_status WHERE run_id = ?",
+            (run_id,),
+        )
+        status_row = cursor.fetchone()
+        status = status_row[0] if status_row and status_row[0] else "unknown"
+
+        return {
+            "run_id": run_id,
+            "episodes": episodes_collected,
+            "steps": steps_collected,
+            "total_reward": total_reward,
+            "last_update": last_update_ts,
+            "status": status,
+            "agent_id": agent_id,
+        }
+
     # ------------------------------------------------------------------
     def _worker_loop(self) -> None:
         pending_steps: List[dict[str, object]] = []
@@ -273,6 +387,18 @@ class TelemetrySQLiteStore(LogConstantMixin):
                         self._flush_steps(pending_steps)
                         pending_steps = []
                     self._delete_all_rows()
+                elif cmd == "delete_run":
+                    if pending_steps:
+                        self._flush_steps(pending_steps)
+                        pending_steps = []
+                    if isinstance(payload, str):
+                        self._delete_run_data(payload, mark_deleted=True)
+                elif cmd == "archive_run":
+                    if pending_steps:
+                        self._flush_steps(pending_steps)
+                        pending_steps = []
+                    if isinstance(payload, str):
+                        self._delete_run_data(payload, mark_archived=True)
                 elif cmd == "stop":
                     if pending_steps:
                         self._flush_steps(pending_steps)
@@ -307,6 +433,16 @@ class TelemetrySQLiteStore(LogConstantMixin):
                         self._flush_steps(pending_steps)
                         pending_steps = []
                     self._delete_all_rows()
+                elif cmd == "delete_run" and isinstance(payload, str):
+                    if pending_steps:
+                        self._flush_steps(pending_steps)
+                        pending_steps = []
+                    self._delete_run_data(payload, mark_deleted=True)
+                elif cmd == "archive_run" and isinstance(payload, str):
+                    if pending_steps:
+                        self._flush_steps(pending_steps)
+                        pending_steps = []
+                    self._delete_run_data(payload, mark_archived=True)
             finally:
                 self._queue.task_done()
 
@@ -380,6 +516,64 @@ class TelemetrySQLiteStore(LogConstantMixin):
         cursor.execute("DELETE FROM steps")
         cursor.execute("DELETE FROM episodes")
         cursor.execute("COMMIT")
+
+    def _delete_run_data(self, run_id: str, mark_deleted: bool = False, mark_archived: bool = False) -> None:
+        """Delete all telemetry data for a run and mark its status."""
+        try:
+            cursor = self._conn.cursor()
+            
+            # Explicit transaction with BEGIN/COMMIT (required since isolation_level=None)
+            cursor.execute("BEGIN")
+            
+            # Delete all steps and episodes for this run. Older builds stored the run identifier
+            # only in the episode_id column ("{run_id}-epXXXX"), leaving run_id NULL. The
+            # fallback LIKE clause ensures those legacy rows are also purged.
+            legacy_episode_prefix = f"{run_id}-ep%"
+
+            cursor.execute(
+                "DELETE FROM steps WHERE run_id = ? OR (run_id IS NULL AND episode_id LIKE ?)",
+                (run_id, legacy_episode_prefix),
+            )
+            cursor.execute(
+                "DELETE FROM episodes WHERE run_id = ? OR (run_id IS NULL AND episode_id LIKE ?)",
+                (run_id, legacy_episode_prefix),
+            )
+            
+            # Mark run status
+            if mark_deleted:
+                from datetime import datetime, timezone
+                now = datetime.now(timezone.utc).isoformat()
+                cursor.execute(
+                    "INSERT OR REPLACE INTO run_status (run_id, status, deleted_at) VALUES (?, 'deleted', ?)",
+                    (run_id, now),
+                )
+                self.log_constant(
+                    LOG_SERVICE_SQLITE_INFO,
+                    message=f"Run deleted and marked in database: run_id={run_id}",
+                    extra={"run_id": run_id}
+                )
+            elif mark_archived:
+                from datetime import datetime, timezone
+                now = datetime.now(timezone.utc).isoformat()
+                cursor.execute(
+                    "INSERT OR REPLACE INTO run_status (run_id, status, archived_at) VALUES (?, 'archived', ?)",
+                    (run_id, now),
+                )
+                self.log_constant(
+                    LOG_SERVICE_SQLITE_INFO,
+                    message=f"Run archived and marked in database: run_id={run_id}",
+                    extra={"run_id": run_id}
+                )
+            
+            # Commit the transaction
+            cursor.execute("COMMIT")
+        except Exception as e:
+            self.log_constant(
+                LOG_SERVICE_SQLITE_WRITE_ERROR,
+                message=f"_delete_run_data failed: {e}",
+                exc_info=e,
+                extra={"run_id": run_id}
+            )
 
     def _serialize_field(self, value: Any, *, context: str) -> bytes | None:
         if value is None:

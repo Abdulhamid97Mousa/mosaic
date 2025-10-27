@@ -18,6 +18,7 @@ from .telemetry_worker import TelemetryEmitter
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
     LOG_WORKER_RUNTIME_EVENT,
+    LOG_WORKER_RUNTIME_JSON_SANITIZED,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -275,9 +276,69 @@ class HeadlessTrainer(LogConstantMixin):
         
         # Include environment-specific info (like probability for FrozenLake)
         if info:
-            observation_dict.update(info)
-        
+            observation_dict.update(self._make_json_safe(info))
+
         return observation_dict
+
+    def _make_json_safe(self, value: Any, path: str = "root") -> Any:
+        """Recursively convert telemetry payloads into JSON-serialisable structures."""
+
+        # Handle mappings
+        if isinstance(value, dict):
+            return {
+                key: self._make_json_safe(item, f"{path}.{key}")
+                for key, item in value.items()
+            }
+
+        # Handle sequences (lists/tuples)
+        if isinstance(value, (list, tuple)):
+            return [self._make_json_safe(item, f"{path}[{idx}]") for idx, item in enumerate(value)]
+
+        # Handle sets by converting to lists to preserve JSON compatibility
+        if isinstance(value, set):
+            self.log_constant(
+                LOG_WORKER_RUNTIME_JSON_SANITIZED,
+                message="Converted set to list for telemetry",
+                extra={"field": path, "strategy": "set_to_list"},
+            )
+            return [self._make_json_safe(item, f"{path}[{idx}]") for idx, item in enumerate(sorted(value, key=str))]
+
+        # NumPy arrays/scalars expose ``tolist``/``item`` helpers; use them when available
+        if hasattr(value, "tolist"):
+            try:
+                safe_value = value.tolist()
+                self.log_constant(
+                    LOG_WORKER_RUNTIME_JSON_SANITIZED,
+                    message="Converted ndarray to list for telemetry",
+                    extra={"field": path, "strategy": "tolist"},
+                )
+                return self._make_json_safe(safe_value, path)
+            except Exception:
+                pass
+
+        if hasattr(value, "item") and callable(getattr(value, "item")):
+            try:
+                scalar_value = value.item()
+                self.log_constant(
+                    LOG_WORKER_RUNTIME_JSON_SANITIZED,
+                    message="Converted numpy scalar to Python scalar",
+                    extra={"field": path, "strategy": "item"},
+                )
+                return self._make_json_safe(scalar_value, path)
+            except Exception:
+                pass
+
+        # Primitives are already JSON friendly
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+
+        # Fallback: stringify any remaining unsupported object
+        self.log_constant(
+            LOG_WORKER_RUNTIME_JSON_SANITIZED,
+            message="Stringified unsupported telemetry value",
+            extra={"field": path, "strategy": "str"},
+        )
+        return str(value)
 
     def _generate_render_payload(self, state: int, obs: Dict[str, Any]) -> Dict[str, Any]:
         """Generate render payload for grid visualization.

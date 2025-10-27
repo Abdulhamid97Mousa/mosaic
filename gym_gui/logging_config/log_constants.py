@@ -324,6 +324,24 @@ LOG_TELEMETRY_SUBSCRIBE_ERROR = _constant(
     tags=_tags("telemetry", "subscription", "error"),
 )
 
+LOG_LIVE_CONTROLLER_EVENT_FOR_DELETED_RUN = _constant(
+    "LOG429",
+    "WARNING",
+    "Received telemetry for run marked deleted",
+    component="Controller",
+    subcomponent="LiveTelemetry",
+    tags=_tags("telemetry", "deleted", "diagnostics"),
+)
+
+LOG_LIVE_CONTROLLER_TAB_REQUESTED = _constant(
+    "LOG430",
+    "INFO",
+    "Requested creation of live telemetry tab",
+    component="Controller",
+    subcomponent="LiveTelemetry",
+    tags=_tags("telemetry", "tab", "request"),
+)
+
 
 # ---------------------------------------------------------------------------
 # Adapter constants (LOG501–LOG513)
@@ -980,6 +998,63 @@ LOG_UI_RENDER_TABS_ERROR = _constant(
     tags=_tags("ui", "render", "error"),
 )
 
+LOG_UI_RENDER_TABS_DELETE_REQUESTED = _constant(
+    "LOG736",
+    "INFO",
+    "User requested run deletion from tab",
+    component="UI",
+    subcomponent="RenderTabs",
+    tags=_tags("ui", "render", "tab_closure", "delete"),
+)
+
+LOG_UI_RENDER_TABS_EVENT_FOR_DELETED_RUN = _constant(
+    "LOG737",
+    "WARNING",
+    "Live tab recreated for run already marked deleted",
+    component="UI",
+    subcomponent="RenderTabs",
+    tags=_tags("ui", "render", "deleted", "diagnostics"),
+)
+
+LOG_UI_RENDER_TABS_TAB_ADDED = _constant(
+    "LOG738",
+    "INFO",
+    "Render tabs added dynamic tab",
+    component="UI",
+    subcomponent="RenderTabs",
+    tags=_tags("ui", "render", "tab"),
+)
+
+# ---------------------------------------------------------------------------
+# Tab Closure Dialog constants (LOG724–LOG729)
+# ---------------------------------------------------------------------------
+LOG_UI_TAB_CLOSURE_DIALOG_OPENED = _constant(
+    "LOG724",
+    "INFO",
+    "Tab closure dialog opened for run",
+    component="UI",
+    subcomponent="TabClosureDialog",
+    tags=_tags("ui", "tab_closure", "dialog", "opened"),
+)
+
+LOG_UI_TAB_CLOSURE_CHOICE_SELECTED = _constant(
+    "LOG725",
+    "INFO",
+    "Tab closure choice selected by user",
+    component="UI",
+    subcomponent="TabClosureDialog",
+    tags=_tags("ui", "tab_closure", "choice"),
+)
+
+LOG_UI_TAB_CLOSURE_CHOICE_CANCELLED = _constant(
+    "LOG726",
+    "INFO",
+    "Tab closure dialog cancelled",
+    component="UI",
+    subcomponent="TabClosureDialog",
+    tags=_tags("ui", "tab_closure", "cancelled"),
+)
+
 LOG_UI_TRAIN_FORM_TRACE = _constant(
     "LOG730",
     "DEBUG",
@@ -1139,6 +1214,15 @@ LOG_WORKER_RUNTIME_DEBUG = _constant(
     component="Worker",
     subcomponent="Runtime",
     tags=_tags("worker", "runtime", "debug"),
+)
+
+LOG_WORKER_RUNTIME_JSON_SANITIZED = _constant(
+    "LOG916",
+    "INFO",
+    "Worker sanitized telemetry payload for JSON compatibility",
+    component="Worker",
+    subcomponent="Runtime",
+    tags=_tags("worker", "runtime", "telemetry", "json"),
 )
 
 LOG_WORKER_CONFIG_EVENT = _constant(
@@ -1366,6 +1450,8 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_CREDIT_RESUMED,
     LOG_LIVE_CONTROLLER_LOOP_EXITED,
     LOG_TELEMETRY_SUBSCRIBE_ERROR,
+    LOG_LIVE_CONTROLLER_EVENT_FOR_DELETED_RUN,
+    LOG_LIVE_CONTROLLER_TAB_REQUESTED,
     LOG_ADAPTER_INIT_ERROR,
     LOG_ADAPTER_STEP_ERROR,
     LOG_ADAPTER_PAYLOAD_ERROR,
@@ -1437,6 +1523,12 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_UI_RENDER_TABS_INFO,
     LOG_UI_RENDER_TABS_WARNING,
     LOG_UI_RENDER_TABS_ERROR,
+    LOG_UI_RENDER_TABS_DELETE_REQUESTED,
+    LOG_UI_RENDER_TABS_EVENT_FOR_DELETED_RUN,
+    LOG_UI_RENDER_TABS_TAB_ADDED,
+    LOG_UI_TAB_CLOSURE_DIALOG_OPENED,
+    LOG_UI_TAB_CLOSURE_CHOICE_SELECTED,
+    LOG_UI_TAB_CLOSURE_CHOICE_CANCELLED,
     LOG_UI_TRAIN_FORM_TRACE,
     LOG_UI_TRAIN_FORM_INFO,
     LOG_UI_TRAIN_FORM_WARNING,
@@ -1451,9 +1543,10 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_UTIL_QT_STATE_CAPTURE_FAILED,
     LOG_UTIL_SEED_CALLBACK_FAILED,
     LOG_WORKER_RUNTIME_EVENT,
-    LOG_WORKER_RUNTIME_DEBUG,
     LOG_WORKER_RUNTIME_WARNING,
     LOG_WORKER_RUNTIME_ERROR,
+    LOG_WORKER_RUNTIME_DEBUG,
+    LOG_WORKER_RUNTIME_JSON_SANITIZED,
     LOG_WORKER_CONFIG_EVENT,
     LOG_WORKER_CONFIG_WARNING,
     LOG_WORKER_CONFIG_UI_PATH,
@@ -1503,6 +1596,8 @@ __all__ = (
     "LOG_CREDIT_RESUMED",
     "LOG_LIVE_CONTROLLER_LOOP_EXITED",
     "LOG_TELEMETRY_SUBSCRIBE_ERROR",
+    "LOG_LIVE_CONTROLLER_EVENT_FOR_DELETED_RUN",
+    "LOG_LIVE_CONTROLLER_TAB_REQUESTED",
     "LOG_ADAPTER_INIT_ERROR",
     "LOG_ADAPTER_STEP_ERROR",
     "LOG_ADAPTER_PAYLOAD_ERROR",
@@ -1574,6 +1669,12 @@ __all__ = (
     "LOG_UI_RENDER_TABS_INFO",
     "LOG_UI_RENDER_TABS_WARNING",
     "LOG_UI_RENDER_TABS_ERROR",
+    "LOG_UI_RENDER_TABS_DELETE_REQUESTED",
+    "LOG_UI_RENDER_TABS_EVENT_FOR_DELETED_RUN",
+    "LOG_UI_RENDER_TABS_TAB_ADDED",
+    "LOG_UI_TAB_CLOSURE_DIALOG_OPENED",
+    "LOG_UI_TAB_CLOSURE_CHOICE_SELECTED",
+    "LOG_UI_TAB_CLOSURE_CHOICE_CANCELLED",
     "LOG_UI_TRAIN_FORM_TRACE",
     "LOG_UI_TRAIN_FORM_INFO",
     "LOG_UI_TRAIN_FORM_WARNING",
@@ -1588,9 +1689,10 @@ __all__ = (
     "LOG_UTIL_QT_STATE_CAPTURE_FAILED",
     "LOG_UTIL_SEED_CALLBACK_FAILED",
     "LOG_WORKER_RUNTIME_EVENT",
-    "LOG_WORKER_RUNTIME_DEBUG",
     "LOG_WORKER_RUNTIME_WARNING",
     "LOG_WORKER_RUNTIME_ERROR",
+    "LOG_WORKER_RUNTIME_DEBUG",
+    "LOG_WORKER_RUNTIME_JSON_SANITIZED",
     "LOG_WORKER_CONFIG_EVENT",
     "LOG_WORKER_CONFIG_WARNING",
     "LOG_WORKER_CONFIG_UI_PATH",

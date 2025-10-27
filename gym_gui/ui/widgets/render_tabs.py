@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import logging
-from typing import Any, List, Mapping, Optional
+from typing import Any, List, Mapping, Optional, Tuple
 
 from qtpy import QtCore, QtGui, QtWidgets
 
@@ -21,12 +21,17 @@ from gym_gui.replays import EpisodeReplay, EpisodeReplayLoader
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
 from gym_gui.ui.indicators.busy_indicator import modal_busy_indicator
+from gym_gui.ui.indicators import RunSummary, TabClosureChoice, TabClosureDialog
+from gym_gui.ui.widgets.live_telemetry_tab import LiveTelemetryTab
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
     LOG_UI_RENDER_TABS_TRACE,
     LOG_UI_RENDER_TABS_INFO,
     LOG_UI_RENDER_TABS_WARNING,
     LOG_UI_RENDER_TABS_ERROR,
+    LOG_UI_RENDER_TABS_DELETE_REQUESTED,
+    LOG_UI_RENDER_TABS_EVENT_FOR_DELETED_RUN,
+    LOG_UI_RENDER_TABS_TAB_ADDED,
 )
 
 
@@ -55,6 +60,7 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
         self._registry = registry
 
         self._mode_hosts: dict[RenderMode, _RendererHost] = {}
+        self._telemetry_service = telemetry_service
         self._current_game = None
 
         self._raw_tab = _RawTab(parent=self)
@@ -149,6 +155,30 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
             widget = self.widget(tab_index)
             self.log_constant(LOG_UI_RENDER_TABS_TRACE, message=f"_close_dynamic_tab: Got widget: {widget}")
 
+            apply_to_all = False
+
+            if self._should_prompt_tab_closure(widget, tab_name):
+                if widget is None:
+                    return
+                choice, apply_to_all = self._prompt_tab_closure(run_id, widget)
+                if choice == TabClosureChoice.CANCEL:
+                    self.log_constant(
+                        LOG_UI_RENDER_TABS_INFO,
+                        message="_close_dynamic_tab: User cancelled tab closure",
+                        extra={"run_id": run_id, "tab_name": tab_name},
+                    )
+                    return
+                self._execute_closure_choice(run_id, choice)
+
+            if apply_to_all:
+                self.log_constant(
+                    LOG_UI_RENDER_TABS_INFO,
+                    message="_close_dynamic_tab: Applying decision to all tabs",
+                    extra={"run_id": run_id, "tab_name": tab_name},
+                )
+                self.remove_dynamic_tabs_for_run(run_id)
+                return
+
             # Remove from tracking
             if run_id in self._agent_tabs and tab_name in self._agent_tabs[run_id]:
                 del self._agent_tabs[run_id][tab_name]
@@ -181,6 +211,116 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
             self.log_constant(LOG_UI_RENDER_TABS_TRACE, message="_close_dynamic_tab: COMPLETE")
         except Exception as e:
             self.log_constant(LOG_UI_RENDER_TABS_ERROR, message=f"_close_dynamic_tab: FATAL ERROR - {e}", exc_info=e)
+
+    def _should_prompt_tab_closure(self, widget: QtWidgets.QWidget | None, tab_name: str) -> bool:
+        """Determine whether we should show the tab closure dialog."""
+
+        if widget is None:
+            return False
+        if isinstance(widget, LiveTelemetryTab):
+            return True
+        # Support legacy naming for live agent tabs even if widget type changes
+        return tab_name.lower().startswith("live-agent-")
+
+    def _prompt_tab_closure(self, run_id: str, widget: QtWidgets.QWidget) -> Tuple[TabClosureChoice, bool]:
+        """Display the tab closure dialog and return the user's decision."""
+
+        dialog = TabClosureDialog(self)
+        summary = self._build_run_summary(run_id, widget)
+        dialog.set_run_summary(summary)
+        choice = dialog.exec()
+        apply_to_all = dialog.is_batch_apply()
+        self.log_constant(
+            LOG_UI_RENDER_TABS_TRACE,
+            message="_prompt_tab_closure: Dialog completed",
+            extra={
+                "run_id": run_id,
+                "choice": getattr(choice, "value", str(choice)),
+                "apply_to_all": apply_to_all,
+            },
+        )
+        return choice, apply_to_all
+
+    def _build_run_summary(self, run_id: str, widget: QtWidgets.QWidget) -> RunSummary:
+        """Construct a RunSummary for the dialog, using stored stats when available."""
+
+        agent_id = getattr(widget, "agent_id", "unknown")
+        dropped_steps = int(getattr(widget, "_dropped_steps", 0))
+        dropped_episodes = int(getattr(widget, "_dropped_episodes", 0))
+
+        telemetry_stats = {
+            "episodes": 0,
+            "steps": 0,
+            "total_reward": 0.0,
+            "last_update": "",
+            "status": "unknown",
+            "agent_id": agent_id,
+        }
+
+        if self._telemetry_service is not None:
+            try:
+                telemetry_stats = self._telemetry_service.get_run_summary(run_id)
+            except Exception as exc:  # pragma: no cover - defensive logging
+                self.log_constant(
+                    LOG_UI_RENDER_TABS_WARNING,
+                    message=f"_build_run_summary: Failed to fetch summary ({exc})",
+                    extra={"run_id": run_id},
+                )
+
+        episodes_collected = int(telemetry_stats.get("episodes", 0) or 0)
+        steps_collected = int(telemetry_stats.get("steps", 0) or 0)
+        total_reward = float(telemetry_stats.get("total_reward", 0.0) or 0.0)
+        last_update = telemetry_stats.get("last_update", "") or ""
+        status = (telemetry_stats.get("status") or "unknown").lower()
+
+        if isinstance(widget, LiveTelemetryTab):
+            buffer_episodes = len(getattr(widget, "_episode_buffer", []))
+            buffer_steps = len(getattr(widget, "_step_buffer", []))
+            steps_collected = max(steps_collected, buffer_steps, getattr(widget, "_current_step_in_episode", 0))
+            episodes_collected = max(episodes_collected, buffer_episodes)
+
+        is_active = status == "active"
+
+        return RunSummary(
+            run_id=run_id,
+            agent_id=agent_id,
+            episodes_collected=episodes_collected,
+            steps_collected=steps_collected,
+            dropped_episodes=dropped_episodes,
+            dropped_steps=dropped_steps,
+            total_reward=total_reward,
+            is_active=is_active,
+            last_update_timestamp=str(last_update),
+        )
+
+    def _execute_closure_choice(self, run_id: str, choice: TabClosureChoice) -> None:
+        """Execute the side effects associated with the user's choice."""
+
+        if choice == TabClosureChoice.KEEP_AND_CLOSE:
+            return
+
+        if self._telemetry_service is None:
+            self.log_constant(
+                LOG_UI_RENDER_TABS_WARNING,
+                message="_execute_closure_choice: No telemetry service available",
+                extra={"run_id": run_id, "choice": choice.value},
+            )
+            return
+
+        if choice == TabClosureChoice.DELETE:
+            self.log_constant(
+                LOG_UI_RENDER_TABS_INFO,
+                message="_execute_closure_choice: Deleting run",
+                extra={"run_id": run_id},
+            )
+            self._telemetry_service.delete_run(run_id)
+        elif choice == TabClosureChoice.ARCHIVE:
+            self.log_constant(
+                LOG_UI_RENDER_TABS_INFO,
+                message="_execute_closure_choice: Archiving run",
+                extra={"run_id": run_id},
+            )
+            self._telemetry_service.archive_run(run_id)
 
     def remove_dynamic_tabs_for_run(self, run_id: str) -> None:
         """Remove all dynamic tabs associated with a run_id."""
