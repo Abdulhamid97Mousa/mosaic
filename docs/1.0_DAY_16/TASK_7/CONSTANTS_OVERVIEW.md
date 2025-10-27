@@ -396,3 +396,4 @@ render_delay = UI_DEFAULTS.render.default_delay_ms
 - Audit unit tests that still import legacy literals (notably telemetry queue sizes) and migrate them to consume the structured defaults exported here.
 - Coordinate with Day 16 Task 2 logging work so any new logging scopes reuse the same `TRAINER_DEFAULTS`/`UI_DEFAULTS` registries instead of introducing subsystem-specific constants.
 
+
