@@ -16,9 +16,45 @@ Reproducible records. Every step is captured in structured telemetry (JSONL + WA
 
 Library-neutral training. Use your preferred trainers. CleanRL, for example, supplies concise, reproducible single-file baselines and logs metrics/videos; Jumanji orchestrates such runs and centralizes their artifacts.[^[How to open a WAL-enabled db file](https://sqlite.org/forum/info/50a4bfdb294333eec1ba4749661934521af19e6fc0790a6189696607f67c2b54?t=h)]
 
+## Project Status — October 2025
+
+### Recent milestones
+- **Constants & adapters unified.** Toy-text maps, trainer defaults, UI sliders, and telemetry buffers now live in dedicated modules (see `docs/1.0_DAY_16/TASK_7/*`). Worker code imports GUI adapters directly, eliminating ~635 duplicated lines.
+- **Tab deletion persistence verified.** The closure dialog now drives SQLite-backed run deletion/archival, and the worker queue commits those changes without respawning tabs (`docs/1.0_DAY_16/TASK_6/*`).
+- **Telemetry contract deep dive.** Day 18 research catalogued every shape the GUI consumes today and outlined schemas needed for vectorised and composite Gym spaces.
+
+### Known limitations
+- **Vector metadata gaps.** Run payloads do not yet ship autoreset modes, reset masks, or composite space descriptors, so vector env dashboards remain experimental (compare with [Gymnasium’s Vector API](https://gymnasium.farama.org/api/vector/)).
+- **Visual indicators backlog.** Live tab badges, status bar summaries, and toast notifications are still tracked for post-Task 6 polish.
+- **Schema formalisation pending.** The telemetry schema/serializer RFC is still in draft; without it, integrations with external analytics stacks remain bespoke.
+
+### Near-term focus
+1. Confirm the SQLite transaction strategy in `gym_gui/telemetry/sqlite_store.py` matches the documented fix.
+2. Ship the Taxi telemetry sanitisation patch and regression tests.
+3. Formalise the telemetry schema/serializer RFC to unblock vector environments.
+4. Land the outstanding UI indicator work so tab persistence is user-facing safe.
+5. Capture environment-variable override matrices for the new constants registry.
+
+### Why researchers need Jumanji
+- **Bridge CLI baselines to an interactive lab.** Projects such as CleanRL and LeanRL deliberately favour single-file command-line scripts for clarity and speed, leaving experimenters to assemble their own orchestration, logging, and playback layers.[^cleanrl][^leanrl] Jumanji layers a Qt6 shell, trainer daemon, and telemetry recorder on top of those scripts so the same runs gain pause/rewind, per-step annotations, and reproducible artefacts without abandoning proven baselines.
+- **Human-mode without sacrificing agent throughput.** The GUI runs human-controlled sessions while the trainer daemon continues to schedule headless workers; environment adapters expose observation/state deltas so human play never blocks the worker queues. Tabs can be launched per agent with CPU/GPU/memory reservations surfaced through the trainer registry, enabling comparative experiments on the same host.
+- **Live tab isolation and replay.** Each tab hooks a dedicated RunBus queue, WAL-backed SQLite store, and frame buffer, keeping telemetry streams sandboxed even when multiple agents run concurrently. Researchers can stage A/B tests by launching parallel tabs, altering hyper-parameters, and replaying the resulting trajectories side by side.
+- **Stepping stone to multi-agent research.** The architecture reserves room for shared-environment adapters: once the schema RFC lands, the GUI can visualise parallel agent streams, aligning with the multi-agent interface conventions established by PettingZoo’s AEC/parallel APIs and the broader MARL community.[^pettingzoo]
+
+### From CLI scripts to a visual operations deck
+
+1. **Submit existing trainers.** Point the trainer daemon at your CleanRL/LeanRL entrypoints; the dispatcher wraps them with resource reservations (`cpus`, `memory_mb`, `gpus`) instead of rewriting launch scripts.
+2. **Inspect in human mode.** Spin up human sessions in neighbouring tabs to benchmark intuition versus policy behaviour without starving the worker processes.
+3. **Scale out with multi-tabs.** Spawn additional tabs per run ID—each tab instantiates its own telemetry queues, render widgets, and log filters so experiments remain isolated but concurrently observable.
+4. **Prepare for multi-agent.** Planned shared-environment adapters will let multiple agents interleave in one tab while preserving per-agent configuration panels; today’s tab infrastructure and service locator already handle the isolation mechanics, so the upcoming schema work simply feeds richer payloads into the same UI.
+
 ## 🎯 Vision: the interactive RL laboratory
 
 RL tooling is powerful but fragmented—scripts here, logs there, videos elsewhere. Jumanji turns experiment management into a live, visual workflow: play as a human, train an agent, and replay every decision with synchronized telemetry. It targets Gymnasium-compatible environments and research workflows that need observability and reproducibility, not just final scores.
+
+[^cleanrl]: CleanRL emphasises single-file reference implementations and CLI-driven experiment management. See https://docs.cleanrl.dev/.
+[^leanrl]: LeanRL extends the CleanRL scripts with PyTorch 2 compilation to minimise runtime, remaining command-line driven. See https://github.com/pytorch-labs/LeanRL.
+[^pettingzoo]: PettingZoo defines standard APIs (AEC and parallel) for multi-agent reinforcement learning, underscoring the need for shared-environment visualisation. See https://pettingzoo.farama.org.
 ## ✨ Core Philosophy: Human-Led Today, Agent Assist Tomorrow
 
 Jumanji already doubles as an exploratory cockpit for humans while laying the groundwork for automated agents. The philosophy is to ship reliable human tooling first, then layer agent orchestration and hybrid hand-offs as the daemon stack matures.
