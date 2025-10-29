@@ -22,7 +22,11 @@ from gym_gui.logging_config.log_constants import (
     LOG_UI_TRAIN_FORM_UI_PATH,
     LOG_UI_TRAIN_FORM_TELEMETRY_PATH,
 )
-from gym_gui.ui.constants import (
+from gym_gui.validations import (
+    AgentTrainFormInputs,
+    validate_agent_train_form,
+)
+from gym_gui.constants import (
     DEFAULT_RENDER_DELAY_MS,
     RENDER_DELAY_MIN_MS,
     RENDER_DELAY_MAX_MS,
@@ -39,6 +43,7 @@ from gym_gui.ui.constants import (
     TELEMETRY_BUFFER_MAX,
     EPISODE_BUFFER_MIN,
     EPISODE_BUFFER_MAX,
+    WORKER_ID_WIDTH,
 )
 
 
@@ -127,6 +132,12 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._agent_id_edit.setPlaceholderText("e.g. agent_run_20251017")
         self._agent_id_edit.setText(self._default_agent_id())
         left_layout.addRow("Agent ID:", self._agent_id_edit)
+
+        # Worker identifier input (supports distributed runs)
+        self._worker_id_edit = QtWidgets.QLineEdit(self)
+        self._worker_id_edit.setPlaceholderText("000001")
+        self._worker_id_edit.setText(self._default_worker_id())
+        left_layout.addRow("Worker ID:", self._worker_id_edit)
 
         # Episodes
         self._episodes_spin = QtWidgets.QSpinBox(self)
@@ -644,7 +655,20 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._ui_training_speed_warning_label.setVisible(value == 0)
 
     def _on_accept(self) -> None:
-        """Validate and build config before accepting."""
+        """Validate inputs and build config before accepting."""
+        # Validate input types and ranges
+        validation_errors = self._validate_inputs()
+        if validation_errors:
+            error_msg = "⚠ Input Validation Errors:\n\n" + "\n".join(
+                [f"• {err}" for err in validation_errors]
+            )
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Invalid Input",
+                error_msg,
+            )
+            return
+
         try:
             custom_overrides = self._parse_custom_overrides()
             base_payload = self._build_base_config()
@@ -677,6 +701,27 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                     },
                 )
 
+    def _validate_inputs(self) -> list[str]:
+        """Validate all input fields and return list of error messages.
+        
+        Returns:
+            List of error messages (empty if all inputs valid)
+        """
+        inputs = AgentTrainFormInputs(
+            episodes=self._episodes_spin.value(),
+            max_steps_per_episode=self._max_steps_spin.value(),
+            seed=self._seed_spin.value(),
+            learning_rate=self._lr_edit.text(),
+            discount=self._gamma_edit.text(),
+            epsilon_decay=self._epsilon_edit.text(),
+            agent_id=self._agent_id_edit.text(),
+            bdi_enabled=self._bdi_group.isChecked(),
+            bdi_jid=self._bdi_jid_edit.text(),
+            bdi_password=self._bdi_password_edit.text(),
+            worker_id=self._worker_id_edit.text(),
+        )
+        return validate_agent_train_form(inputs)
+
     def _parse_custom_overrides(self) -> dict[str, Any]:
         if not self._advanced_group.isChecked():
             return {}
@@ -694,11 +739,14 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         max_episodes = self._episodes_spin.value()
         max_steps = self._max_steps_spin.value()
         seed = self._seed_spin.value()
+        worker_id_input = self._worker_id_edit.text().strip()
+        worker_id = self._normalize_worker_id(worker_id_input)
         learning_rate = float(self._lr_edit.text())
         gamma = float(self._gamma_edit.text())
         epsilon_decay = float(self._epsilon_edit.text())
         agent_id_input = self._agent_id_edit.text().strip()
-        worker_agent_id = self._normalize_agent_id(agent_id_input) or self._default_agent_id()
+        normalized_agent_id = self._normalize_agent_id(agent_id_input)
+        worker_agent_id = normalized_agent_id or f"worker_{worker_id}" if worker_id.isdigit() else (normalized_agent_id or worker_id)
 
         # BDI settings
         bdi_enabled = self._bdi_group.isChecked()
@@ -810,6 +858,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             "ui_rendering_throttle": ui_rendering_throttle,
             "render_delay_ms": render_delay_ms,
             "step_delay_ms": ui_training_speed_value * 10,
+            "worker_id": worker_id,
         }
 
         telemetry_path_settings = {
@@ -827,6 +876,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 "ui_rendering_throttle": ui_path_settings["ui_rendering_throttle"],
                 "render_delay_ms": ui_path_settings["render_delay_ms"],
                 "step_delay_ms": ui_path_settings["step_delay_ms"],
+                "worker_id": worker_id,
             },
         )
         self.log_constant(
@@ -855,6 +905,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             "TELEMETRY_SAMPLING_INTERVAL": str(ui_rendering_throttle),
             "UI_LIVE_RENDERING_ENABLED": "1" if live_rendering_enabled else "0",
             "UI_RENDER_DELAY_MS": str(env_render_delay_ms),
+            "WORKER_ID": worker_id,
         }
 
         # Add BDI-specific environment variables if enabled
@@ -873,6 +924,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 "ui_rendering_throttle": ui_rendering_throttle,
                 "render_delay_ms": render_delay_ms,
                 "live_rendering_enabled": live_rendering_enabled,
+                "worker_id": worker_id,
                 "ui_training_speed_ms": ui_training_speed_value * 10,
                 "telemetry_buffer_size": telemetry_buffer_size,
                 "episode_buffer_size": episode_buffer_size,
@@ -895,6 +947,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 "grpc_target": "127.0.0.1:50055",
                 "agent_id": worker_agent_id,
                 "agent_type": agent_type,
+                "worker_id": worker_id,
                 "bdi_enabled": bdi_enabled,
                 "bdi_config": bdi_config,
                 "config": {
@@ -922,6 +975,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                         "ui_only": ui_path_settings,
                         "telemetry_durable": telemetry_path_settings,
                     },
+                    "worker_id": worker_id,
                 },
             },
         }
@@ -966,6 +1020,21 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             return ""
         slug = re.sub(r"[^A-Za-z0-9_-]+", "_", value.strip())
         slug = re.sub(r"_+", "_", slug).strip("_")
+        return slug.lower()
+
+    def _default_worker_id(self) -> str:
+        return "000001"
+
+    @staticmethod
+    def _normalize_worker_id(value: str) -> str:
+        if not value:
+            return "000001"
+        slug = re.sub(r"[^A-Za-z0-9_-]+", "", value.strip())
+        if not slug:
+            return "000001"
+        slug = slug[:WORKER_ID_WIDTH]
+        if slug.isdigit():
+            return slug.zfill(WORKER_ID_WIDTH)
         return slug.lower()
 
 

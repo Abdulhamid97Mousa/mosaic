@@ -1,6 +1,13 @@
-from __future__ import annotations
+"""Persistence-related defaults for telemetry and trainer state.
 
-"""Persistence-related defaults for telemetry and trainer state."""
+Consolidated from:
+- Original: gym_gui/telemetry/constants_db.py
+
+Defines batch sizes, checkpoint intervals, and database sink configuration
+for durable telemetry persistence.
+"""
+
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 

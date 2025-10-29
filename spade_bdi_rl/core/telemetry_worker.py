@@ -34,13 +34,35 @@ class TelemetryEmitter:
         self._stream.flush()
 
     # Convenience helpers -------------------------------------------------
-    def run_started(self, run_id: str, config: Dict[str, Any]) -> None:
-        self.emit("run_started", run_id=run_id, config=config)
+    def run_started(self, run_id: str, config: Dict[str, Any], **fields: Any) -> None:
+        """Emit run_started event.
+        
+        Args:
+            run_id: Run identifier
+            config: Configuration dictionary
+            **fields: Additional fields (e.g., worker_id, agent_id, etc.)
+        """
+        self.emit("run_started", run_id=run_id, config=config, **fields)
 
     def run_completed(self, run_id: str, status: str, **fields: Any) -> None:
+        """Emit run_completed event.
+        
+        Args:
+            run_id: Run identifier
+            status: Completion status (completed, failed, cancelled)
+            **fields: Additional fields (e.g., worker_id, error, etc.)
+        """
         self.emit("run_completed", run_id=run_id, status=status, **fields)
 
     def step(self, run_id: str, episode: int, step_index: int, **fields: Any) -> None:
+        """Emit step event.
+        
+        Args:
+            run_id: Run identifier
+            episode: Episode number (display value = seed + episode_index)
+            step_index: Step index within episode
+            **fields: Additional fields (e.g., worker_id, action, reward, state, etc.)
+        """
         # CRITICAL: episode parameter is the display value (episode_index + seed)
         # Extract episode_index from fields if present, otherwise derive from episode_seed
         episode_index = fields.get("episode_index")
@@ -62,6 +84,13 @@ class TelemetryEmitter:
         )
 
     def episode(self, run_id: str, episode: int, **fields: Any) -> None:
+        """Emit episode event.
+        
+        Args:
+            run_id: Run identifier
+            episode: Episode number (display value = seed + episode_index)
+            **fields: Additional fields (e.g., worker_id, reward, steps, success, metadata, etc.)
+        """
         # CRITICAL: episode parameter is the display value (episode_index + seed)
         # Extract episode_index from metadata if present
         episode_index = None
@@ -85,4 +114,12 @@ class TelemetryEmitter:
         )
 
     def artifact(self, run_id: str, kind: str, path: str, **fields: Any) -> None:
+        """Emit artifact event.
+        
+        Args:
+            run_id: Run identifier
+            kind: Artifact type (e.g., policy, checkpoint, video)
+            path: Path to artifact
+            **fields: Additional fields (e.g., worker_id, metadata, etc.)
+        """
         self.emit("artifact", run_id=run_id, kind=kind, path=path, **fields)

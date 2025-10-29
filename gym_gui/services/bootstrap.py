@@ -20,7 +20,7 @@ from gym_gui.telemetry import TelemetrySQLiteStore
 from gym_gui.telemetry.db_sink import TelemetryDBSink
 from gym_gui.telemetry.run_bus import get_bus
 from gym_gui.telemetry.health import HealthMonitor
-from gym_gui.telemetry.constants import (
+from gym_gui.constants import (
     TELEMETRY_HUB_MAX_QUEUE,
     TELEMETRY_HUB_BUFFER_SIZE,
     DB_SINK_BATCH_SIZE,

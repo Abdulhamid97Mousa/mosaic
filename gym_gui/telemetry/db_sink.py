@@ -19,7 +19,7 @@ from gym_gui.core.data_model.telemetry_core import StepRecord, EpisodeRollup
 from gym_gui.telemetry.sqlite_store import TelemetrySQLiteStore
 from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.telemetry.run_bus import RunBus
-from gym_gui.telemetry.constants import (
+from gym_gui.constants import (
     DB_SINK_BATCH_SIZE,
     DB_SINK_CHECKPOINT_INTERVAL,
     DB_SINK_WRITER_QUEUE_SIZE,

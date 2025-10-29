@@ -16,11 +16,11 @@ from gym_gui.logging_config.log_constants import (
     LOG_SERVICE_TELEMETRY_STEP_REJECTED,
 )
 from gym_gui.logging_config.helpers import LogConstantMixin
-from gym_gui.telemetry.constants import TELEMETRY_SERVICE_HISTORY_LIMIT
+from gym_gui.constants import TELEMETRY_SERVICE_HISTORY_LIMIT
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
     from gym_gui.services.storage import StorageRecorderService
-    from gym_gui.services.validation import ValidationService
+    from gym_gui.validations import ValidationService
     from gym_gui.telemetry import TelemetrySQLiteStore
 
 _LOGGER = logging.getLogger(__name__)

@@ -9,7 +9,7 @@ from __future__ import annotations
 from typing import Mapping, Iterable
 
 from gym_gui.core.enums import GameId
-from .game_constants import ToyTextDefaults, TOY_TEXT_DEFAULTS
+from .constants_game import ToyTextDefaults, TOY_TEXT_DEFAULTS
 
 
 def get_toy_text_defaults(game_id: GameId | str) -> ToyTextDefaults:

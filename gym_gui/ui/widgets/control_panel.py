@@ -4,8 +4,8 @@ import os
 from dataclasses import dataclass
 from typing import Dict, Iterable, Optional
 
-from qtpy import QtCore, QtWidgets
-from PyQt6.QtCore import pyqtSignal as Signal
+from PyQt6 import QtCore, QtWidgets
+from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 
 from gym_gui.config.game_configs import (
     CliffWalkingConfig,
@@ -39,26 +39,26 @@ class ControlPanelConfig:
 
 
 class ControlPanelWidget(QtWidgets.QWidget):
-    control_mode_changed = Signal(ControlMode)
-    game_changed = Signal(GameId)
-    load_requested = Signal(GameId, ControlMode, int)
-    reset_requested = Signal(int)
-    agent_form_requested = Signal()
-    slippery_toggled = Signal(bool)
-    frozen_v2_config_changed = Signal(str, object)  # (param_name, value)
-    taxi_config_changed = Signal(str, bool)  # (param_name, value)
-    cliff_config_changed = Signal(str, bool)  # (param_name, value)
-    lunar_config_changed = Signal(str, object)  # (param_name, value)
-    car_config_changed = Signal(str, object)  # (param_name, value)
-    bipedal_config_changed = Signal(str, object)  # (param_name, value)
-    start_game_requested = Signal()
-    pause_game_requested = Signal()
-    continue_game_requested = Signal()
-    terminate_game_requested = Signal()
-    agent_step_requested = Signal()
-    actor_changed = Signal(str)
-    train_agent_requested = Signal()  # New signal for headless training
-    trained_agent_requested = Signal()  # Load trained policy/evaluation
+    control_mode_changed = pyqtSignal(ControlMode)
+    game_changed = pyqtSignal(GameId)
+    load_requested = pyqtSignal(GameId, ControlMode, int)
+    reset_requested = pyqtSignal(int)
+    agent_form_requested = pyqtSignal()
+    slippery_toggled = pyqtSignal(bool)
+    frozen_v2_config_changed = pyqtSignal(str, object)  # (param_name, value)
+    taxi_config_changed = pyqtSignal(str, bool)  # (param_name, value)
+    cliff_config_changed = pyqtSignal(str, bool)  # (param_name, value)
+    lunar_config_changed = pyqtSignal(str, object)  # (param_name, value)
+    car_config_changed = pyqtSignal(str, object)  # (param_name, value)
+    bipedal_config_changed = pyqtSignal(str, object)  # (param_name, value)
+    start_game_requested = pyqtSignal()
+    pause_game_requested = pyqtSignal()
+    continue_game_requested = pyqtSignal()
+    terminate_game_requested = pyqtSignal()
+    agent_step_requested = pyqtSignal()
+    actor_changed = pyqtSignal(str)
+    train_agent_requested = pyqtSignal()  # New signal for headless training
+    trained_agent_requested = pyqtSignal()  # Load trained policy/evaluation
 
     def __init__(
         self,
@@ -1193,4 +1193,3 @@ class ControlPanelWidget(QtWidgets.QWidget):
             placeholder = QtWidgets.QLabel("No overrides available for this game.")
             placeholder.setWordWrap(True)
             self._config_layout.addRow(placeholder)
-

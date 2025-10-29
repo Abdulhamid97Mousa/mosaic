@@ -25,6 +25,7 @@ jsonschema==4.23.0
 grpcio==1.67.1
 grpcio-tools==1.67.1
 protobuf==5.27.2
+python-ulid==2.7.0
 
 ############################
 spade==4.0.1

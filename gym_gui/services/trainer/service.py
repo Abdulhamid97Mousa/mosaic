@@ -15,6 +15,7 @@ from google.protobuf.timestamp_pb2 import Timestamp
 import grpc
 
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
+from gym_gui.constants import format_episode_id
 from gym_gui.telemetry import TelemetrySQLiteStore
 from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.telemetry.run_bus import get_bus
@@ -639,6 +640,7 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
                                 'truncated': bool(getattr(message, 'truncated', False)),
                                 'timestamp': getattr(message, 'timestamp', ''),
                                 'action': int(getattr(message, 'action', -1)) if hasattr(message, 'action') else None,
+                                'worker_id': getattr(message, 'worker_id', ''),
                             }
                             evt = TelemetryEvent(
                                 topic=Topic.STEP_APPENDED,
@@ -708,6 +710,7 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
                                 'truncated': bool(getattr(message, 'truncated', False)),
                                 'timestamp': getattr(message, 'timestamp', ''),
                                 'metadata_json': getattr(message, 'metadata_json', ''),
+                                'worker_id': getattr(message, 'worker_id', ''),
                             }
                             evt = TelemetryEvent(
                                 topic=Topic.EPISODE_FINALIZED,
@@ -742,8 +745,13 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
 
     # ------------------------------------------------------------------
     def _step_from_proto(self, message: Any) -> StepRecord:
-        episode_suffix = int(message.episode_index)
-        episode_id = f"{message.run_id}-ep{episode_suffix:04d}" if message.run_id else f"ep{episode_suffix:04d}"
+        episode_index = int(message.episode_index)
+        run_id = message.run_id or ""
+        worker_id = message.worker_id or None
+        if run_id:
+            episode_id = format_episode_id(run_id, episode_index, worker_id)
+        else:
+            episode_id = format_episode_id("legacy", episode_index, worker_id)
         timestamp = self._timestamp_from_proto(message)
         action_value = self._decode_action(message.action_json)
         observation = self._decode_json_field(message.observation_json, default=None)
@@ -755,6 +763,10 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
             info_payload["policy_label"] = message.policy_label
         if message.backend:
             info_payload["backend"] = message.backend
+        if message.episode_seed:
+            info_payload.setdefault("episode_seed", int(message.episode_seed))
+        if worker_id:
+            info_payload.setdefault("worker_id", worker_id)
 
         return StepRecord(
             episode_id=episode_id,
@@ -771,11 +783,18 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
             render_hint=render_hint if isinstance(render_hint, Mapping) else None,
             frame_ref=message.frame_ref or None,
             payload_version=int(message.payload_version) if message.payload_version else 0,
+            run_id=run_id or None,
+            worker_id=worker_id,
         )
 
     def _episode_from_proto(self, message: Any) -> EpisodeRollup:
-        episode_suffix = int(message.episode_index)
-        episode_id = f"{message.run_id}-ep{episode_suffix:04d}" if message.run_id else f"ep{episode_suffix:04d}"
+        episode_index = int(message.episode_index)
+        run_id = message.run_id or ""
+        worker_id = message.worker_id or None
+        if run_id:
+            episode_id = format_episode_id(run_id, episode_index, worker_id)
+        else:
+            episode_id = format_episode_id("legacy", episode_index, worker_id)
         metadata = self._decode_json_field(message.metadata_json, default={})
         if not isinstance(metadata, Mapping):
             metadata = {}
@@ -792,6 +811,7 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
             agent_id=message.agent_id or None,
             run_id=message.run_id or None,
             game_id=game_id,
+            worker_id=worker_id,
         )
 
     @staticmethod

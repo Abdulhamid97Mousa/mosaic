@@ -8,12 +8,13 @@ import logging
 import threading
 from typing import Any, Deque, Dict, Optional, TYPE_CHECKING
 
-from qtpy import QtCore
+from PyQt6 import QtCore
+from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 
 from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.telemetry.run_bus import get_bus
 from gym_gui.telemetry.credit_manager import get_credit_manager
-from gym_gui.telemetry.constants import (
+from gym_gui.constants import (
     TELEMETRY_HUB_MAX_QUEUE,
     TELEMETRY_HUB_BUFFER_SIZE,
 )
@@ -117,10 +118,10 @@ class _TelemetryEvent(QtCore.QEvent):
 
 
 class TelemetryBridge(QtCore.QObject):
-    step_received = QtCore.Signal(object)  # type: ignore[attr-defined]
-    episode_received = QtCore.Signal(object)  # type: ignore[attr-defined]
-    queue_overflow = QtCore.Signal(str, str, int)  # type: ignore[attr-defined]
-    run_completed = QtCore.Signal(str)  # type: ignore[attr-defined]  # NEW: emits run_id when run finishes
+    step_received = pyqtSignal(object)
+    episode_received = pyqtSignal(object)
+    queue_overflow = pyqtSignal(str, str, int)
+    run_completed = pyqtSignal(str)  # NEW: emits run_id when run finishes
 
     def emit_step(self, message: TelemetryStep) -> None:
         # Normalize payload to ensure consistent dictionary format

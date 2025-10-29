@@ -91,7 +91,11 @@ class HeadlessTrainer(LogConstantMixin):
     def run(self) -> int:
         """Execute training/evaluation and emit JSONL telemetry to stdout."""
         config_payload = _config_payload(self.config)
-        self.emitter.run_started(self.config.run_id, config_payload)
+        self.emitter.run_started(
+            self.config.run_id,
+            config_payload,
+            worker_id=self.config.worker_id,  # type: ignore[call-arg]
+        )
 
         try:
             summaries: list[EpisodeMetrics] = []
@@ -123,6 +127,7 @@ class HeadlessTrainer(LogConstantMixin):
                     "control_mode": "agent_only",
                     "run_id": self.config.run_id,
                     "agent_id": self.config.agent_id,
+                    "worker_id": self.config.worker_id,
                     "game_id": self.config.game_id,
                     "seed": self.config.seed,  # Base seed (constant, for reproducibility)
                     "episode_seed": episode_seed,  # Unique seed per episode (for variation)
@@ -139,6 +144,7 @@ class HeadlessTrainer(LogConstantMixin):
                     steps=summary.steps,
                     success=summary.success,
                     metadata=episode_metadata,
+                    worker_id=self.config.worker_id,  # type: ignore[call-arg]
                 )
 
             if self._should_save:
@@ -150,15 +156,25 @@ class HeadlessTrainer(LogConstantMixin):
                     "strategy": self.config.policy_strategy.value,
                 }
                 path = self.policy_store.save(self.agent.q_table, metadata)
-                self.emitter.artifact(self.config.run_id, "policy", str(path))
+                self.emitter.artifact(
+                    self.config.run_id,
+                    "policy",
+                    str(path),
+                    worker_id=self.config.worker_id,  # type: ignore[call-arg]
+                )
 
-            self.emitter.run_completed(self.config.run_id, status="completed")
+            self.emitter.run_completed(
+                self.config.run_id,
+                status="completed",
+                worker_id=self.config.worker_id,  # type: ignore[call-arg]
+            )
             return 0
         except Exception as exc:  # noqa: BLE001
             self.emitter.run_completed(
                 self.config.run_id,
                 status="failed",
                 error=str(exc),
+                worker_id=self.config.worker_id,  # type: ignore[call-arg]
             )
             return 1
 
@@ -214,6 +230,7 @@ class HeadlessTrainer(LogConstantMixin):
                 episode_number,  # Pass episode_number (display value = seed + episode_index)
                 step_index,
                 agent_id=self.config.agent_id,
+                worker_id=self.config.worker_id,  # type: ignore[call-arg]
                 action=int(action),
                 reward=float(reward),
                 terminated=bool(terminated),
@@ -442,6 +459,7 @@ def _config_payload(config: RunConfig) -> Dict[str, Any]:
         "policy_strategy": config.policy_strategy.value,
         "policy_path": str(config.ensure_policy_path()),
         "agent_id": config.agent_id,
+        "worker_id": config.worker_id,
         "capture_video": config.capture_video,
         "headless": config.headless,
         "extra": config.extra,

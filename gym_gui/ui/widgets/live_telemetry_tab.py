@@ -26,7 +26,7 @@ from gym_gui.ui.widgets.base_telemetry_tab import BaseTelemetryTab
 from gym_gui.rendering import RendererRegistry, create_default_renderer_registry, RendererContext
 from gym_gui.core.enums import GameId, RenderMode
 from gym_gui.telemetry.rendering_speed_regulator import RenderingSpeedRegulator
-from gym_gui.ui.constants import (
+from gym_gui.constants import (
     DEFAULT_RENDER_DELAY_MS,
     DEFAULT_TELEMETRY_BUFFER_SIZE,
     DEFAULT_EPISODE_BUFFER_SIZE,
@@ -871,9 +871,16 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
         # OLD (BROKEN): f"Steps: {len(self._step_buffer)} | Episodes: {len(self._episode_buffer)}"
         # Problem: Buffer maxes at 100, so counter gets stuck showing "100" for multiple episodes
         
-        # NEW (FIXED): Show actual current episode and step indices
+        has_steps = len(self._step_buffer) > 0 or self._current_step_in_episode > 0
+        if has_steps:
+            episode_display = max(0, self._current_episode_index) + 1
+            step_display = max(0, self._current_step_in_episode) + 1
+        else:
+            episode_display = 0
+            step_display = 0
+
         self._stats_label.setText(
-            f"Episode: {self._current_episode_index} Step: {self._current_step_in_episode}"
+            f"Episode: {episode_display} Step: {step_display}"
         )
 
     def _update_overflow_label(self) -> None:

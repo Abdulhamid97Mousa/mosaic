@@ -11,13 +11,13 @@ import json
 import contextlib
 from pathlib import Path
 import signal
-import subprocess
 import re
 from typing import Any, Callable, Optional
 
 from gym_gui.services.trainer import RunRecord, RunRegistry, RunStatus
 from gym_gui.config.paths import VAR_TRAINER_DIR
 from gym_gui.services.trainer.gpu import GPUAllocator
+from gym_gui.core.subprocess_validation import validated_create_subprocess_exec
 from gym_gui.core.agent_config import get_agent_config
 from gym_gui.logging_config.helpers import log_constant
 from gym_gui.logging_config.log_constants import get_constant_by_code
@@ -220,8 +220,10 @@ class TrainerDispatcher:
 
         _LOGGER.info("Spawning worker", extra={"run_id": run.run_id, "cmd": cmd})
 
-        process = await asyncio.create_subprocess_exec(
+        # Spawn worker with validated command arguments
+        process = await validated_create_subprocess_exec(
             *cmd,
+            run_id=run.run_id,
             env=env,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
@@ -273,6 +275,11 @@ class TrainerDispatcher:
             config_json = None
 
         worker_meta = config_json.get("metadata", {}).get("worker", {}) if config_json else {}
+        worker_id = ""
+        if isinstance(worker_meta, dict):
+            raw_worker_id = worker_meta.get("worker_id")
+            if raw_worker_id is not None:
+                worker_id = str(raw_worker_id).strip()
 
         if config_json and worker_meta:
             module = worker_meta.get("module")
@@ -285,9 +292,12 @@ class TrainerDispatcher:
             if worker_config:
                 config_dir = VAR_TRAINER_DIR / "configs"
                 config_dir.mkdir(parents=True, exist_ok=True)
-                config_path = config_dir / f"{run.run_id}.json"
+                suffix = f"-{worker_id}" if worker_id else ""
+                config_path = config_dir / f"worker-{run.run_id}{suffix}.json"
                 worker_payload = dict(worker_config)
                 worker_payload.setdefault("run_id", run.run_id)
+                if worker_id:
+                    worker_payload.setdefault("worker_id", worker_id)
                 config_path.write_text(json.dumps(worker_payload, indent=2), encoding="utf-8")
                 self._worker_config_paths[run.run_id] = config_path
                 _LOGGER.debug(
@@ -308,6 +318,8 @@ class TrainerDispatcher:
                         args.append("--grpc")
                     if "--grpc-target" not in args:
                         args.extend(["--grpc-target", grpc_target])
+                if worker_id and "--worker-id" not in args:
+                    args.extend(["--worker-id", worker_id])
                 
                 # Add BDI flags if BDI mode is enabled
                 agent_type = worker_meta.get("agent_type", "Headless")
@@ -401,8 +413,10 @@ class TrainerDispatcher:
                 "--target", grpc_target,
                 "--run-id", run.run_id,
                 "--agent-id", agent_id,
-                "--",
             ]
+            if worker_id:
+                proxy_cmd.extend(["--worker-id", worker_id])
+            proxy_cmd.append("--")
             return proxy_cmd + worker_cmd
 
         proxy_cmd = [
@@ -410,8 +424,10 @@ class TrainerDispatcher:
             "--target", worker_meta.get("grpc_target", "127.0.0.1:50055"),
             "--run-id", run.run_id,
             "--agent-id", worker_meta.get("agent_id", f"agent_{run.run_id[:8]}"),
-            "--",
         ]
+        if worker_id:
+            proxy_cmd.extend(["--worker-id", worker_id])
+        proxy_cmd.append("--")
 
         _LOGGER.debug(
             "Assembled proxy command",
@@ -429,6 +445,30 @@ class TrainerDispatcher:
         config_path = self._worker_config_paths.get(run.run_id)
         if config_path is not None:
             env["TRAINER_WORKER_CONFIG_PATH"] = str(config_path)
+
+        # Merge environment overrides from run configuration.
+        config_payload = self._registry.get_run_config_json(run.run_id)
+        config_json: dict[str, Any] = {}
+        if config_payload:
+            try:
+                config_json = json.loads(config_payload)
+            except json.JSONDecodeError:
+                _LOGGER.warning("Failed to parse run config JSON when building env", extra={"run_id": run.run_id})
+
+        env_overrides = config_json.get("environment") if isinstance(config_json, dict) else None
+        if isinstance(env_overrides, dict):
+            for key, value in env_overrides.items():
+                if key and value is not None:
+                    env[str(key)] = str(value)
+
+        worker_meta = config_json.get("metadata", {}).get("worker", {}) if isinstance(config_json, dict) else {}
+        worker_id = ""
+        if isinstance(worker_meta, dict):
+            raw_worker_id = worker_meta.get("worker_id")
+            if raw_worker_id is not None:
+                worker_id = str(raw_worker_id).strip()
+        if worker_id and not env.get("WORKER_ID"):
+            env["WORKER_ID"] = worker_id
         return env
 
     async def _stream_stdout(self, handle: WorkerHandle) -> None:

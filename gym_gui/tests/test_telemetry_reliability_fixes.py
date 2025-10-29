@@ -21,15 +21,15 @@ import pytest
 from qtpy import QtCore, QtWidgets
 
 # Import the classes/functions under test
-from gym_gui.telemetry.constants import (
+from gym_gui.constants import (
     STEP_BUFFER_SIZE,
     EPISODE_BUFFER_SIZE,
     RENDER_QUEUE_SIZE,
     INITIAL_CREDITS,
+    DEFAULT_RENDER_DELAY_MS,
 )
 from gym_gui.telemetry.credit_manager import CreditManager
 from gym_gui.telemetry.rendering_speed_regulator import RenderingSpeedRegulator
-from gym_gui.ui.constants import DEFAULT_RENDER_DELAY_MS
 from gym_gui.telemetry.run_bus import get_bus, reset_bus, RunBus
 from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.controllers.live_telemetry_controllers import LiveTelemetryController
@@ -444,7 +444,7 @@ class TestTelemetryReliabilityIntegration:
 
     def test_constants_file_has_all_config_values(self):
         """Test that constants.py exports all required configuration values."""
-        from gym_gui.telemetry import constants
+        from gym_gui.constants import constants_telemetry as telemetry_constants
         
         required_attrs = [
             "STEP_BUFFER_SIZE",
@@ -457,7 +457,7 @@ class TestTelemetryReliabilityIntegration:
         ]
         
         for attr in required_attrs:
-            assert hasattr(constants, attr), f"constants.py missing {attr}"
+            assert hasattr(telemetry_constants, attr), f"constants_telemetry missing {attr}"
 
     def test_rendering_regulator_handles_lifecycle(self, qt_app):
         """Test that rendering regulator handles full lifecycle correctly."""

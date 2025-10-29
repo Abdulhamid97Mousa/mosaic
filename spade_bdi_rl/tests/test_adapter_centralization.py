@@ -158,7 +158,7 @@ class TestAdapterDefaults:
     def test_frozenlake_v1_defaults(self):
         """FrozenLake-v1 uses correct default dimensions."""
         from spade_bdi_rl.adapters import create_adapter
-        from gym_gui.constants.game_constants import FROZEN_LAKE_DEFAULTS
+        from gym_gui.constants.constants_game import FROZEN_LAKE_DEFAULTS
         
         adapter = create_adapter("FrozenLake-v1")
         assert adapter.defaults.grid_height == FROZEN_LAKE_DEFAULTS.grid_height
@@ -169,7 +169,7 @@ class TestAdapterDefaults:
     def test_frozenlake_v2_defaults(self):
         """FrozenLake-v2 uses correct default dimensions."""
         from spade_bdi_rl.adapters import create_adapter
-        from gym_gui.constants.game_constants import FROZEN_LAKE_V2_DEFAULTS
+        from gym_gui.constants.constants_game import FROZEN_LAKE_V2_DEFAULTS
         
         adapter = create_adapter("FrozenLake-v2")
         assert adapter.defaults.grid_height == FROZEN_LAKE_V2_DEFAULTS.grid_height
@@ -180,7 +180,7 @@ class TestAdapterDefaults:
     def test_cliffwalking_defaults(self):
         """CliffWalking uses correct default dimensions."""
         from spade_bdi_rl.adapters import create_adapter
-        from gym_gui.constants.game_constants import CLIFF_WALKING_DEFAULTS
+        from gym_gui.constants.constants_game import CLIFF_WALKING_DEFAULTS
         
         adapter = create_adapter("CliffWalking-v0")
         assert adapter.defaults.grid_height == CLIFF_WALKING_DEFAULTS.grid_height
@@ -320,7 +320,7 @@ class TestFrozenLakeV2MapGeneration:
     def test_uses_official_map_when_matching(self):
         """FrozenLake-v2 uses official map when conditions match."""
         from spade_bdi_rl.adapters import create_adapter
-        from gym_gui.constants.game_constants import FROZEN_LAKE_V2_DEFAULTS
+        from gym_gui.constants.constants_game import FROZEN_LAKE_V2_DEFAULTS
         
         adapter = create_adapter("FrozenLake-v2")
         adapter.load()

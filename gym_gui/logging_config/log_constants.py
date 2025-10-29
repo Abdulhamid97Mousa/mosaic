@@ -1325,6 +1325,100 @@ LOG_WORKER_BDI_DEBUG = _constant(
 )
 
 
+# ---------------------------------------------------------------------------
+# Episode Counter constants (LOG921–LOG930)
+# ---------------------------------------------------------------------------
+LOG_COUNTER_INITIALIZED = _constant(
+    "LOG921",
+    "INFO",
+    "Episode counter initialized",
+    component="Core",
+    subcomponent="EpisodeCounter",
+    tags=_tags("counter", "initialization", "info"),
+)
+
+LOG_COUNTER_RESUME_SUCCESS = _constant(
+    "LOG922",
+    "INFO",
+    "Episode counter resumed from database",
+    component="Core",
+    subcomponent="EpisodeCounter",
+    tags=_tags("counter", "resume", "persistence", "info"),
+)
+
+LOG_COUNTER_RESUME_FAILURE = _constant(
+    "LOG923",
+    "ERROR",
+    "Failed to resume episode counter from database",
+    component="Core",
+    subcomponent="EpisodeCounter",
+    tags=_tags("counter", "resume", "persistence", "error"),
+)
+
+LOG_COUNTER_MAX_REACHED = _constant(
+    "LOG924",
+    "ERROR",
+    "Maximum episodes per run limit reached",
+    component="Core",
+    subcomponent="EpisodeCounter",
+    tags=_tags("counter", "bounds", "limit", "error"),
+)
+
+LOG_COUNTER_INVALID_STATE = _constant(
+    "LOG925",
+    "ERROR",
+    "Episode counter in invalid state",
+    component="Core",
+    subcomponent="EpisodeCounter",
+    tags=_tags("counter", "state", "error"),
+)
+
+LOG_COUNTER_CONCURRENCY_ERROR = _constant(
+    "LOG926",
+    "ERROR",
+    "Episode counter concurrency error",
+    component="Core",
+    subcomponent="EpisodeCounter",
+    tags=_tags("counter", "concurrency", "threading", "error"),
+)
+
+LOG_COUNTER_PERSISTENCE_ERROR = _constant(
+    "LOG927",
+    "ERROR",
+    "Episode counter persistence error",
+    component="Core",
+    subcomponent="EpisodeCounter",
+    tags=_tags("counter", "persistence", "database", "error"),
+)
+
+LOG_COUNTER_VALIDATION_ERROR = _constant(
+    "LOG928",
+    "ERROR",
+    "Episode counter validation error",
+    component="Core",
+    subcomponent="EpisodeCounter",
+    tags=_tags("counter", "validation", "bounds", "error"),
+)
+
+LOG_COUNTER_NEXT_EPISODE = _constant(
+    "LOG929",
+    "DEBUG",
+    "Episode counter allocated next episode index",
+    component="Core",
+    subcomponent="EpisodeCounter",
+    tags=_tags("counter", "allocation", "debug"),
+)
+
+LOG_COUNTER_RESET = _constant(
+    "LOG930",
+    "INFO",
+    "Episode counter reset for new run",
+    component="Core",
+    subcomponent="EpisodeCounter",
+    tags=_tags("counter", "reset", "info"),
+)
+
+
 # =========================================================================
 # Helper Functions for Runtime Discovery & Validation
 # =========================================================================
@@ -1558,6 +1652,16 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_WORKER_BDI_WARNING,
     LOG_WORKER_BDI_ERROR,
     LOG_WORKER_BDI_DEBUG,
+    LOG_COUNTER_INITIALIZED,
+    LOG_COUNTER_RESUME_SUCCESS,
+    LOG_COUNTER_RESUME_FAILURE,
+    LOG_COUNTER_MAX_REACHED,
+    LOG_COUNTER_INVALID_STATE,
+    LOG_COUNTER_CONCURRENCY_ERROR,
+    LOG_COUNTER_PERSISTENCE_ERROR,
+    LOG_COUNTER_VALIDATION_ERROR,
+    LOG_COUNTER_NEXT_EPISODE,
+    LOG_COUNTER_RESET,
 )
 
 
@@ -1704,4 +1808,14 @@ __all__ = (
     "LOG_WORKER_BDI_WARNING",
     "LOG_WORKER_BDI_ERROR",
     "LOG_WORKER_BDI_DEBUG",
+    "LOG_COUNTER_INITIALIZED",
+    "LOG_COUNTER_RESUME_SUCCESS",
+    "LOG_COUNTER_RESUME_FAILURE",
+    "LOG_COUNTER_MAX_REACHED",
+    "LOG_COUNTER_INVALID_STATE",
+    "LOG_COUNTER_CONCURRENCY_ERROR",
+    "LOG_COUNTER_PERSISTENCE_ERROR",
+    "LOG_COUNTER_VALIDATION_ERROR",
+    "LOG_COUNTER_NEXT_EPISODE",
+    "LOG_COUNTER_RESET",
 )

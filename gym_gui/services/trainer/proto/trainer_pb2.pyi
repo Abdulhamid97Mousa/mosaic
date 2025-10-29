@@ -137,7 +137,7 @@ class StreamEpisodesRequest(_message.Message):
     def __init__(self, run_id: _Optional[str] = ..., since_seq: _Optional[int] = ...) -> None: ...
 
 class RunStep(_message.Message):
-    __slots__ = ("run_id", "episode_index", "step_index", "action_json", "observation_json", "reward", "terminated", "truncated", "timestamp", "policy_label", "backend", "seq_id", "agent_id", "render_hint_json", "frame_ref", "payload_version", "render_payload_json", "episode_seed")
+    __slots__ = ("run_id", "episode_index", "step_index", "action_json", "observation_json", "reward", "terminated", "truncated", "timestamp", "policy_label", "backend", "seq_id", "agent_id", "render_hint_json", "frame_ref", "payload_version", "render_payload_json", "episode_seed", "worker_id")
     RUN_ID_FIELD_NUMBER: _ClassVar[int]
     EPISODE_INDEX_FIELD_NUMBER: _ClassVar[int]
     STEP_INDEX_FIELD_NUMBER: _ClassVar[int]
@@ -156,6 +156,7 @@ class RunStep(_message.Message):
     PAYLOAD_VERSION_FIELD_NUMBER: _ClassVar[int]
     RENDER_PAYLOAD_JSON_FIELD_NUMBER: _ClassVar[int]
     EPISODE_SEED_FIELD_NUMBER: _ClassVar[int]
+    WORKER_ID_FIELD_NUMBER: _ClassVar[int]
     run_id: str
     episode_index: int
     step_index: int
@@ -174,10 +175,11 @@ class RunStep(_message.Message):
     payload_version: int
     render_payload_json: str
     episode_seed: int
-    def __init__(self, run_id: _Optional[str] = ..., episode_index: _Optional[int] = ..., step_index: _Optional[int] = ..., action_json: _Optional[str] = ..., observation_json: _Optional[str] = ..., reward: _Optional[float] = ..., terminated: bool = ..., truncated: bool = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ..., policy_label: _Optional[str] = ..., backend: _Optional[str] = ..., seq_id: _Optional[int] = ..., agent_id: _Optional[str] = ..., render_hint_json: _Optional[str] = ..., frame_ref: _Optional[str] = ..., payload_version: _Optional[int] = ..., render_payload_json: _Optional[str] = ..., episode_seed: _Optional[int] = ...) -> None: ...
+    worker_id: str
+    def __init__(self, run_id: _Optional[str] = ..., episode_index: _Optional[int] = ..., step_index: _Optional[int] = ..., action_json: _Optional[str] = ..., observation_json: _Optional[str] = ..., reward: _Optional[float] = ..., terminated: bool = ..., truncated: bool = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ..., policy_label: _Optional[str] = ..., backend: _Optional[str] = ..., seq_id: _Optional[int] = ..., agent_id: _Optional[str] = ..., render_hint_json: _Optional[str] = ..., frame_ref: _Optional[str] = ..., payload_version: _Optional[int] = ..., render_payload_json: _Optional[str] = ..., episode_seed: _Optional[int] = ..., worker_id: _Optional[str] = ...) -> None: ...
 
 class RunEpisode(_message.Message):
-    __slots__ = ("run_id", "episode_index", "total_reward", "steps", "terminated", "truncated", "metadata_json", "timestamp", "seq_id", "agent_id")
+    __slots__ = ("run_id", "episode_index", "total_reward", "steps", "terminated", "truncated", "metadata_json", "timestamp", "seq_id", "agent_id", "worker_id")
     RUN_ID_FIELD_NUMBER: _ClassVar[int]
     EPISODE_INDEX_FIELD_NUMBER: _ClassVar[int]
     TOTAL_REWARD_FIELD_NUMBER: _ClassVar[int]
@@ -188,6 +190,7 @@ class RunEpisode(_message.Message):
     TIMESTAMP_FIELD_NUMBER: _ClassVar[int]
     SEQ_ID_FIELD_NUMBER: _ClassVar[int]
     AGENT_ID_FIELD_NUMBER: _ClassVar[int]
+    WORKER_ID_FIELD_NUMBER: _ClassVar[int]
     run_id: str
     episode_index: int
     total_reward: float
@@ -198,7 +201,8 @@ class RunEpisode(_message.Message):
     timestamp: _timestamp_pb2.Timestamp
     seq_id: int
     agent_id: str
-    def __init__(self, run_id: _Optional[str] = ..., episode_index: _Optional[int] = ..., total_reward: _Optional[float] = ..., steps: _Optional[int] = ..., terminated: bool = ..., truncated: bool = ..., metadata_json: _Optional[str] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ..., seq_id: _Optional[int] = ..., agent_id: _Optional[str] = ...) -> None: ...
+    worker_id: str
+    def __init__(self, run_id: _Optional[str] = ..., episode_index: _Optional[int] = ..., total_reward: _Optional[float] = ..., steps: _Optional[int] = ..., terminated: bool = ..., truncated: bool = ..., metadata_json: _Optional[str] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ..., seq_id: _Optional[int] = ..., agent_id: _Optional[str] = ..., worker_id: _Optional[str] = ...) -> None: ...
 
 class PublishTelemetryResponse(_message.Message):
     __slots__ = ("accepted", "dropped")

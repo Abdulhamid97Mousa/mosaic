@@ -80,9 +80,19 @@ def main(argv: Optional[list[str]] = None) -> int:
         default=None,
         help="Path to custom AgentSpeak (.asl) file for BDI agent.",
     )
+    parser.add_argument(
+        "--worker-id",
+        default=None,
+        help="Worker identifier for distributed training runs.",
+    )
     parsed = parser.parse_args(argv)
 
     run_config = _load_config(parsed)
+
+    worker_id_override = parsed.worker_id or os.environ.get("WORKER_ID")
+    if worker_id_override:
+        run_config.worker_id = str(worker_id_override)
+        run_config.extra.setdefault("worker_id", run_config.worker_id)
 
     # Override config with CLI flags
     if parsed.grpc:
@@ -106,8 +116,17 @@ def main(argv: Optional[list[str]] = None) -> int:
     adapter.load()
 
     if parsed.dry_run:
-        emitter.run_started(run_config.run_id, _dry_run_payload(run_config))
-        emitter.run_completed(run_config.run_id, status="skipped", reason="dry-run")
+        emitter.run_started(
+            run_config.run_id,
+            _dry_run_payload(run_config),
+            worker_id=run_config.worker_id,
+        )
+        emitter.run_completed(
+            run_config.run_id,
+            status="skipped",
+            reason="dry-run",
+            worker_id=run_config.worker_id,
+        )
         return 0
 
     # Choose trainer based on BDI flag
@@ -126,7 +145,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     try:
         return trainer.run()
     except KeyboardInterrupt:
-        emitter.run_completed(run_config.run_id, status="cancelled")
+        emitter.run_completed(
+            run_config.run_id,
+            status="cancelled",
+            worker_id=run_config.worker_id,
+        )
         return 2
 
 
@@ -136,6 +159,7 @@ def _dry_run_payload(config: RunConfig) -> Dict[str, Any]:
         "policy_strategy": config.policy_strategy.value,
         "policy_path": str(config.ensure_policy_path()),
         "agent_id": config.agent_id,
+        "worker_id": config.worker_id,
         "headless": config.headless,
     }
 

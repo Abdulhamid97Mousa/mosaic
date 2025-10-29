@@ -84,7 +84,11 @@ class BDITrainer(HeadlessTrainer):
             0 on success, non-zero on failure
         """
         config_payload = self._build_config_payload()
-        self.emitter.run_started(self.config.run_id, config_payload)
+        self.emitter.run_started(
+            self.config.run_id,
+            config_payload,
+            worker_id=self.config.worker_id,
+        )
 
         try:
             # Start BDI agent
@@ -122,15 +126,25 @@ class BDITrainer(HeadlessTrainer):
                     steps=summary.steps,
                     success=summary.success,
                     metadata=episode_metadata,
+                    worker_id=self.config.worker_id,
                 )
 
             # Save policy if configured
             if self._should_save:
                 metadata = self._build_policy_metadata()
                 path = self.policy_store.save(self.agent.q_table, metadata)
-                self.emitter.artifact(self.config.run_id, "policy", str(path))
+                self.emitter.artifact(
+                    self.config.run_id,
+                    "policy",
+                    str(path),
+                    worker_id=self.config.worker_id,
+                )
 
-            self.emitter.run_completed(self.config.run_id, status="completed")
+            self.emitter.run_completed(
+                self.config.run_id,
+                status="completed",
+                worker_id=self.config.worker_id,
+            )
             return 0
 
         except Exception as exc:
@@ -143,6 +157,7 @@ class BDITrainer(HeadlessTrainer):
                 self.config.run_id,
                 status="failed",
                 error=str(exc),
+                worker_id=self.config.worker_id,
             )
             return 1
 
@@ -268,6 +283,7 @@ class BDITrainer(HeadlessTrainer):
             "policy_strategy": self.config.policy_strategy.value,
             "policy_path": str(self.config.ensure_policy_path()),
             "agent_id": self.config.agent_id,
+            "worker_id": self.config.worker_id,
             "capture_video": self.config.capture_video,
             "headless": self.config.headless,
             "bdi_enabled": True,
@@ -287,6 +303,7 @@ class BDITrainer(HeadlessTrainer):
             "control_mode": "bdi_agent",
             "run_id": self.config.run_id,
             "agent_id": self.config.agent_id,
+            "worker_id": self.config.worker_id,
             "game_id": self.config.game_id,
             "seed": self.config.seed,  # Base seed for reproducibility
             "episode_index": episode_index,  # 0-based counter
@@ -304,6 +321,7 @@ class BDITrainer(HeadlessTrainer):
             "run_id": self.config.run_id,
             "game_id": self.config.game_id,
             "agent_id": self.config.agent_id,
+            "worker_id": self.config.worker_id,
             "episodes": self.config.max_episodes,
             "strategy": self.config.policy_strategy.value,
             "bdi_enabled": True,

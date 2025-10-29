@@ -11,7 +11,7 @@ from weakref import WeakKeyDictionary
 
 import grpc
 
-from . import constants as trainer_constants
+from gym_gui.constants import TRAINER_DEFAULTS
 from .registry import RunStatus
 from gym_gui.services.trainer.proto import trainer_pb2 as trainer_pb2_module
 from gym_gui.services.trainer.proto import trainer_pb2_grpc
@@ -33,7 +33,7 @@ class _ClientLoopState:
     stub: Optional[trainer_pb2_grpc.TrainerServiceStub] = None
 
 
-CLIENT_DEFAULTS = trainer_constants.TRAINER_DEFAULTS.client
+CLIENT_DEFAULTS = TRAINER_DEFAULTS.client
 
 
 @dataclass(slots=True)

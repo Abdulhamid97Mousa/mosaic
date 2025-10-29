@@ -3,7 +3,7 @@ from __future__ import annotations
 """Main Qt window for the Gym GUI application."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
 import json
@@ -48,7 +48,7 @@ from gym_gui.ui.presenters.main_window_presenter import MainWindowPresenter, Mai
 from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWidget
 from gym_gui.ui.indicators.busy_indicator import modal_busy_indicator
 from gym_gui.ui.widgets.render_tabs import RenderTabs
-from gym_gui.docs.game_info import get_game_info
+from gym_gui.game_docs.game_info import get_game_info
 from gym_gui.services.actor import ActorService
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
@@ -1764,4 +1764,4 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
 
 __all__ = ["MainWindow"]
-from gym_gui.ui.constants import DEFAULT_RENDER_DELAY_MS
+from gym_gui.constants import DEFAULT_RENDER_DELAY_MS

@@ -1,4 +1,13 @@
-"""Centralized telemetry configuration constants."""
+"""Centralized telemetry configuration constants.
+
+Consolidated from:
+- Original: gym_gui/telemetry/constants.py
+
+Defines queue sizes, buffer configuration, logging levels, and credit system
+for the telemetry event streaming infrastructure.
+"""
+
+from __future__ import annotations
 
 # ================================================================
 # Queue and Buffer Sizes

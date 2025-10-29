@@ -60,6 +60,7 @@ class RunConfig:
     policy_strategy: PolicyStrategy = PolicyStrategy.EVAL
     policy_path: Optional[Path] = None
     agent_id: str = "bdi_rl"
+    worker_id: Optional[str] = None
     capture_video: bool = False
     headless: bool = True
     step_delay: float = DEFAULT_STEP_DELAY_S  # Delay in seconds between training steps (for real-time observation)
@@ -80,6 +81,8 @@ class RunConfig:
         policy_path = Path(policy_path_val).expanduser().resolve() if policy_path_val else None
 
         agent_id = str(data.pop("agent_id", "bdi_rl"))
+        worker_id_val = data.pop("worker_id", None)
+        worker_id = str(worker_id_val) if worker_id_val is not None else None
         capture_video = bool(data.pop("capture_video", False))
         headless = bool(data.pop("headless", True))
         step_delay = float(data.pop("step_delay", DEFAULT_STEP_DELAY_S))
@@ -93,6 +96,7 @@ class RunConfig:
             policy_strategy=strategy,
             policy_path=policy_path,
             agent_id=agent_id,
+            worker_id=worker_id,
             capture_video=capture_video,
             headless=headless,
             step_delay=step_delay,
@@ -117,11 +121,13 @@ class RunConfig:
             extra={
                 "run_id": self.run_id,
                 "game_id": self.game_id,
+                "worker_id": self.worker_id,
                 "seed": self.seed,
                 "max_episodes": self.max_episodes,
                 "max_steps_per_episode": self.max_steps_per_episode,
                 "policy_strategy": self.policy_strategy.value,
                 "agent_id": self.agent_id,
+                "worker_id": self.worker_id,
                 "capture_video": self.capture_video,
                 "headless": self.headless,
                 "step_delay_s": self.step_delay,

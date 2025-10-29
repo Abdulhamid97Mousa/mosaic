@@ -11,7 +11,8 @@ from typing import Any, Mapping, Optional
 import gymnasium.spaces as spaces
 import numpy as np
 
-from qtpy import QtCore
+from PyQt6 import QtCore
+from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 
 from gym_gui.config.game_configs import (
     CliffWalkingConfig,
@@ -25,6 +26,8 @@ from gym_gui.config.settings import Settings
 from gym_gui.core.adapters.base import AdapterContext, AdapterStep, EnvironmentAdapter
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.core.enums import ControlMode, GameId, EnvironmentFamily, ENVIRONMENT_FAMILY_BY_GAME
+from gym_gui.core.run_counter_manager import RunCounterManager
+from gym_gui.constants import format_episode_id
 from gym_gui.core.factories.adapters import create_adapter, get_adapter_cls
 from gym_gui.logging_config.log_constants import (
     LOG_SESSION_ADAPTER_LOAD_ERROR,
@@ -60,15 +63,15 @@ class SessionState:
 class SessionController(QtCore.QObject, LogConstantMixin):
     """Manage adapter lifecycle and emit Qt-friendly signals for the UI."""
 
-    session_initialized = QtCore.Signal(str, str, object)  # type: ignore[attr-defined]
-    step_processed = QtCore.Signal(object, int)  # type: ignore[attr-defined]
-    episode_finished = QtCore.Signal(bool)  # type: ignore[attr-defined]
-    status_message = QtCore.Signal(str)  # type: ignore[attr-defined]
-    awaiting_human = QtCore.Signal(bool, str)  # type: ignore[attr-defined]
-    turn_changed = QtCore.Signal(str)  # type: ignore[attr-defined]
-    error_occurred = QtCore.Signal(str)  # type: ignore[attr-defined]
-    auto_play_state_changed = QtCore.Signal(bool)  # type: ignore[attr-defined]
-    seed_applied = QtCore.Signal(int)  # type: ignore[attr-defined]
+    session_initialized = pyqtSignal(str, str, object)
+    step_processed = pyqtSignal(object, int)
+    episode_finished = pyqtSignal(bool)
+    status_message = pyqtSignal(str)
+    awaiting_human = pyqtSignal(bool, str)
+    turn_changed = pyqtSignal(str)
+    error_occurred = pyqtSignal(str)
+    auto_play_state_changed = pyqtSignal(bool)
+    seed_applied = pyqtSignal(int)
 
     def __init__(self, settings: Settings, parent: Optional[QtCore.QObject] = None) -> None:
         super().__init__(parent)
@@ -121,7 +124,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         if self._actor_service is not None:
             self._seed_manager.register_consumer("actor_service", self._actor_service.seed)
         self._seed_manager.register_consumer("session_timers", self._seed_timers)
-        self._episode_counter = 0
+        self._run_counter_manager: RunCounterManager | None = None  # Set on load_game
         self._episode_id: str | None = None
         self._episode_active = False
         self._episode_reward = 0.0
@@ -564,44 +567,91 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             if not self._auto_timer.isActive():
                 self.start_auto_play()
 
+    def set_run_context(
+        self,
+        run_id: str,
+        max_episodes: int | None = None,
+        db_conn: Any | None = None,
+        *,
+        worker_id: str | None = None,
+    ) -> None:
+        """Set the run context for this session (e.g., when launched from trainer).
+        
+        Args:
+            run_id: ULID or unique run identifier
+            max_episodes: Max episodes per run (default: 1M)
+            db_conn: SQLite connection for counter persistence (optional for human mode)
+        """
+        if db_conn is not None:
+            self._run_counter_manager = RunCounterManager(
+                db_conn,
+                run_id,
+                max_episodes=max_episodes,
+                worker_id=worker_id,
+            )
+            try:
+                self._run_counter_manager.initialize()
+            except Exception as exc:
+                _LOGGER.error(f"Failed to initialize RunCounterManager: {exc}")
+                self._run_counter_manager = None
+        else:
+            _LOGGER.debug(f"No DB connection provided; counter will start at 0 for run {run_id}")
+            self._run_counter_manager = RunCounterManager(
+                None,
+                run_id,
+                max_episodes=max_episodes,
+                worker_id=worker_id,
+            )
+            self._run_counter_manager._current_index = -1
+
     def _begin_episode(self, game_id: GameId | None, control_mode: ControlMode) -> None:
+        """Begin a new episode with counter-based episode ID.
+        
+        Episode ID format:
+        - With run context: f"{run_id}-ep{ep_index:06d}"
+        - Without run context: f"{game_id.value}-ep{ep_index:06d}"
+        """
         if game_id is None:
             return
         if self._episode_active and self._last_step is not None:
             self._finalize_episode(self._last_step, aborted=True, timestamp=datetime.utcnow())
-        self._episode_counter += 1
+
         state_snapshot = self._seed_manager.capture_state()
         self._last_seed_state = state_snapshot
-        seed_component = state_snapshot.get("seed")
-        seed_label = f"seed{seed_component:010d}" if isinstance(seed_component, int) else "seedNA"
-        python_signature = (
-            state_snapshot.get("python_random_digest")
-            or state_snapshot.get("python_random_json")
-            or ""
-        )
-        numpy_signature = (
-            state_snapshot.get("numpy_random_digest")
-            or state_snapshot.get("numpy_random_json")
-            or ""
-        )
-        fingerprint_source = "|".join(
-            [
-                game_id.value,
-                seed_label,
-                str(self._episode_counter),
-                python_signature,
-                numpy_signature,
-            ]
-        )
-        fingerprint = hashlib.sha256(fingerprint_source.encode("utf-8")).hexdigest()[:8]
-        self._episode_id = f"{game_id.value}-{seed_label}-ep{self._episode_counter:04d}-{fingerprint}"
+
+        # Determine episode index and ID
+        if self._run_counter_manager is not None:
+            try:
+                # Use RunCounterManager for bounded, ordered episodes
+                with self._run_counter_manager.next_episode() as ep_index:
+                    self._episode_id = format_episode_id(
+                        self._run_counter_manager._run_id,
+                        ep_index,
+                        self._run_counter_manager._worker_id,
+                    )
+                    ep_index_for_metadata = ep_index
+            except RuntimeError as exc:
+                _LOGGER.error(f"RunCounterManager error: {exc}")
+                self.error_occurred.emit(str(exc))
+                return
+        else:
+            # Fallback for human-input mode: use simple counter without SHA256
+            # Counter starts at 0 on each load
+            ep_index_for_metadata = self._step_index  # Use step index as episode marker
+            self._episode_id = format_episode_id(game_id.value, ep_index_for_metadata)
+
         self._episode_reward = 0.0
+        run_context = self._run_counter_manager
+        run_id = getattr(run_context, "_run_id", None) if run_context is not None else None
+        worker_id = getattr(run_context, "_worker_id", None) if run_context is not None else None
         self._episode_metadata = {
             "game_id": game_id.value,
             "control_mode": control_mode.value,
             "seed": self._current_seed,
-            "episode_index": self._episode_counter,
+            "episode_index": ep_index_for_metadata,
             "rng_state": state_snapshot,
+            "run_id": run_id,
+            "worker_id": worker_id,
         }
         self._episode_active = True
         self._last_step = None
@@ -643,13 +693,17 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         frame_ref = step.frame_ref or self._extract_frame_reference(step)
         payload_version = step.payload_version if step.payload_version is not None else 0
 
+        run_context = self._run_counter_manager
+        run_id = getattr(run_context, "_run_id", None) if run_context is not None else None
+        worker_id = getattr(run_context, "_worker_id", None) if run_context is not None else None
+
         # Save frame to disk if frame_ref is available
         if frame_ref and self._frame_storage is not None and step.render_payload is not None:
             try:
                 self._frame_storage.save_frame(
                     step.render_payload,
                     frame_ref,
-                    run_id=None,  # No run_id in human input mode
+                    run_id=run_id,
                 )
             except Exception as e:
                 _LOGGER.debug(f"Failed to save frame {frame_ref}: {e}")
@@ -669,6 +723,8 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             render_hint=render_hint,
             frame_ref=frame_ref,
             payload_version=payload_version,
+            run_id=run_id,
+            worker_id=worker_id,
         )
         if self._telemetry is not None:
             self._telemetry.record_step(record)
@@ -858,8 +914,10 @@ class SessionController(QtCore.QObject, LogConstantMixin):
     ) -> None:
         if not self._episode_active or self._episode_id is None:
             return
+        # Get episode_index from metadata (set in _begin_episode)
+        episode_index = self._episode_metadata.get("episode_index", 0)
         summary = EpisodeSummary(
-            episode_index=self._episode_counter,
+            episode_index=episode_index,
             total_reward=self._episode_reward,
             steps=self._step_index + 1,
             metadata=dict(self._episode_metadata),
@@ -879,6 +937,9 @@ class SessionController(QtCore.QObject, LogConstantMixin):
                     },
                 )
         if self._telemetry is not None:
+            run_context = self._run_counter_manager
+            run_id = getattr(run_context, "_run_id", None) if run_context is not None else None
+            worker_id = getattr(run_context, "_worker_id", None) if run_context is not None else None
             rollup = EpisodeRollup(
                 episode_id=self._episode_id,
                 total_reward=self._episode_reward,
@@ -889,6 +950,8 @@ class SessionController(QtCore.QObject, LogConstantMixin):
                 timestamp=timestamp or datetime.utcnow(),
                 agent_id=getattr(step.state, "active_agent", None),
                 game_id=self._game_id.value if self._game_id else None,
+                run_id=run_id,
+                worker_id=worker_id,
             )
             self._telemetry.complete_episode(rollup)
         self._episode_active = False

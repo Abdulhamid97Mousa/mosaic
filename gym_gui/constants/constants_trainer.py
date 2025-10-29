@@ -1,6 +1,13 @@
-from __future__ import annotations
+"""Shared trainer defaults organised by client, daemon, retry, and schema.
 
-"""Shared trainer defaults organised by client, daemon, retry, and schema."""
+Consolidated from:
+- Original: gym_gui/services/trainer/constants.py
+
+Defines gRPC client configuration, daemon lifecycle, retry policies,
+and training run validation defaults.
+"""
+
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 
@@ -26,6 +33,13 @@ class TrainerDaemonDefaults:
     startup_timeout_s: float = 10.0
     stop_timeout_s: float = 5.0
     port_probe_timeout_s: float = 1.0
+    wal_checkpoint_interval_s: int = 300
+    telemetry_batch_size: int = 64
+    telemetry_checkpoint_interval: int = 1000
+    telemetry_writer_queue_size: int = 512
+    lock_file_name: str = "trainer.lock"
+    pid_file_name: str = "trainer.pid"
+    default_log_level: str = "INFO"
 
 
 @dataclass(frozen=True)

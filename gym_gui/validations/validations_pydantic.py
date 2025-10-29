@@ -1,4 +1,4 @@
-"""Pydantic models for data validation across the application."""
+"""Pydantic models and helpers for telemetry and trainer validation."""
 
 from __future__ import annotations
 
@@ -12,10 +12,14 @@ class TelemetryEventBase(BaseModel):
     """Base model for all telemetry events."""
 
     type: str = Field(..., description="Event type identifier")
-    ts: datetime = Field(default_factory=lambda: datetime.now(timezone.utc), description="Event timestamp")
+    ts: datetime = Field(
+        default_factory=lambda: datetime.now(timezone.utc),
+        description="Event timestamp",
+    )
 
     class Config:
-        """Pydantic config."""
+        """Pydantic config allowing forward-compatible fields."""
+
         extra = "allow"  # Allow additional fields for extensibility
 
 
@@ -28,11 +32,10 @@ class RunStartedEvent(TelemetryEventBase):
 
     @field_validator("run_id")
     @classmethod
-    def validate_run_id(cls, v: str) -> str:
-        """Validate run_id is non-empty."""
-        if not v or not v.strip():
+    def validate_run_id(cls, value: str) -> str:
+        if not value or not value.strip():
             raise ValueError("run_id must be non-empty")
-        return v.strip()
+        return value.strip()
 
 
 class RunCompletedEvent(TelemetryEventBase):
@@ -45,12 +48,11 @@ class RunCompletedEvent(TelemetryEventBase):
 
     @field_validator("status")
     @classmethod
-    def validate_status(cls, v: str) -> str:
-        """Validate status is one of allowed values."""
+    def validate_status(cls, value: str) -> str:
         allowed = {"completed", "failed", "cancelled"}
-        if v not in allowed:
-            raise ValueError(f"status must be one of {allowed}, got {v}")
-        return v
+        if value not in allowed:
+            raise ValueError(f"status must be one of {allowed}, got {value}")
+        return value
 
 
 class StepEvent(TelemetryEventBase):
@@ -74,11 +76,10 @@ class StepEvent(TelemetryEventBase):
 
     @field_validator("episode", "step")
     @classmethod
-    def validate_non_negative(cls, v: int) -> int:
-        """Validate episode and step are non-negative."""
-        if v < 0:
+    def validate_non_negative(cls, value: int) -> int:
+        if value < 0:
             raise ValueError("episode and step must be non-negative")
-        return v
+        return value
 
 
 class EpisodeEvent(TelemetryEventBase):
@@ -94,11 +95,10 @@ class EpisodeEvent(TelemetryEventBase):
 
     @field_validator("steps")
     @classmethod
-    def validate_steps(cls, v: int) -> int:
-        """Validate steps is non-negative."""
-        if v < 0:
+    def validate_steps(cls, value: int) -> int:
+        if value < 0:
             raise ValueError("steps must be non-negative")
-        return v
+        return value
 
 
 class ArtifactEvent(TelemetryEventBase):
@@ -111,12 +111,35 @@ class ArtifactEvent(TelemetryEventBase):
 
     @field_validator("kind")
     @classmethod
-    def validate_kind(cls, v: str) -> str:
-        """Validate artifact kind."""
+    def validate_kind(cls, value: str) -> str:
         allowed = {"policy", "video", "checkpoint", "log"}
-        if v not in allowed:
-            raise ValueError(f"kind must be one of {allowed}, got {v}")
-        return v
+        if value not in allowed:
+            raise ValueError(f"kind must be one of {allowed}, got {value}")
+        return value
+
+
+class SubprocessCommand(BaseModel):
+    """Validated subprocess command with argument type safety."""
+
+    args: list[str] = Field(..., description="Command arguments")
+
+    @field_validator("args")
+    @classmethod
+    def validate_args(cls, value: list[str]) -> list[str]:
+        if not isinstance(value, list):
+            raise ValueError(f"args must be a list, got {type(value).__name__}")
+        if not value:
+            raise ValueError("args list cannot be empty")
+
+        for idx, arg in enumerate(value):
+            if not isinstance(arg, str):
+                raise ValueError(
+                    f"Command argument at index {idx} must be a string, "
+                    f"got {type(arg).__name__}: {arg!r}"
+                )
+            if not arg:
+                raise ValueError(f"Command argument at index {idx} is empty string")
+        return value
 
 
 class TrainingConfig(BaseModel):
@@ -136,40 +159,29 @@ class TrainingConfig(BaseModel):
 
     @field_validator("policy_strategy")
     @classmethod
-    def validate_strategy(cls, v: str) -> str:
-        """Validate policy strategy."""
+    def validate_strategy(cls, value: str) -> str:
         allowed = {"train", "load", "eval", "train_and_save"}
-        if v not in allowed:
-            raise ValueError(f"policy_strategy must be one of {allowed}, got {v}")
-        return v
+        if value not in allowed:
+            raise ValueError(f"policy_strategy must be one of {allowed}, got {value}")
+        return value
 
 
 def validate_telemetry_event(event_data: Dict[str, Any]) -> TelemetryEventBase:
-    """Validate and parse a telemetry event from raw data.
-    
-    Args:
-        event_data: Raw event data dictionary
-        
-    Returns:
-        Validated telemetry event
-        
-    Raises:
-        ValueError: If event data is invalid
-    """
+    """Validate and parse a telemetry event from raw data."""
+
     event_type = event_data.get("type")
-    
+
     if event_type == "run_started":
         return RunStartedEvent(**event_data)
-    elif event_type == "run_completed":
+    if event_type == "run_completed":
         return RunCompletedEvent(**event_data)
-    elif event_type == "step":
+    if event_type == "step":
         return StepEvent(**event_data)
-    elif event_type == "episode":
+    if event_type == "episode":
         return EpisodeEvent(**event_data)
-    elif event_type == "artifact":
+    if event_type == "artifact":
         return ArtifactEvent(**event_data)
-    else:
-        raise ValueError(f"Unknown event type: {event_type}")
+    raise ValueError(f"Unknown event type: {event_type}")
 
 
 __all__ = [
@@ -179,7 +191,7 @@ __all__ = [
     "StepEvent",
     "EpisodeEvent",
     "ArtifactEvent",
+    "SubprocessCommand",
     "TrainingConfig",
     "validate_telemetry_event",
 ]
-

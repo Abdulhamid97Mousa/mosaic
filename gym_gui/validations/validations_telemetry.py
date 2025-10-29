@@ -1,37 +1,28 @@
-"""Validation service for telemetry data and configuration."""
+"""Telemetry validation helpers used across services and controllers."""
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional, TYPE_CHECKING
+from typing import Any, Dict, Optional
 
 from pydantic import ValidationError
 
-from gym_gui.core.validation import (
-    validate_telemetry_event,
-    TrainingConfig,
-    TelemetryEventBase,
-)
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
     LOG_SERVICE_VALIDATION_DEBUG,
     LOG_SERVICE_VALIDATION_WARNING,
     LOG_SERVICE_VALIDATION_ERROR,
 )
-
-if TYPE_CHECKING:  # pragma: no cover
-    pass
+from gym_gui.validations.validations_pydantic import (
+    TelemetryEventBase,
+    TrainingConfig,
+    validate_telemetry_event,
+)
 
 
 class ValidationService(LogConstantMixin):
-    """Service for validating telemetry data and configuration."""
+    """Service object for validating telemetry payloads and trainer configs."""
 
-    def __init__(self, strict_mode: bool = False) -> None:
-        """Initialize validation service.
-        
-        Args:
-            strict_mode: If True, raise exceptions on validation errors.
-                        If False, log warnings and continue.
-        """
+    def __init__(self, *, strict_mode: bool = False) -> None:
         import logging
 
         self.strict_mode = strict_mode
@@ -39,15 +30,10 @@ class ValidationService(LogConstantMixin):
         self._validation_warnings: list[str] = []
         self._logger = logging.getLogger("gym_gui.services.validation")
 
+    # ------------------------------------------------------------------
+    # Telemetry events
+    # ------------------------------------------------------------------
     def validate_telemetry_event(self, event_data: Dict[str, Any]) -> Optional[TelemetryEventBase]:
-        """Validate a telemetry event.
-        
-        Args:
-            event_data: Raw event data
-            
-        Returns:
-            Validated event or None if validation failed
-        """
         try:
             event = validate_telemetry_event(event_data)
             self.log_constant(
@@ -56,41 +42,34 @@ class ValidationService(LogConstantMixin):
                 extra={"event_type": event.type},
             )
             return event
-        except ValidationError as e:
-            error_msg = f"Telemetry validation error: {e}"
+        except ValidationError as exc:
+            error_msg = f"Telemetry validation error: {exc}"
             self._validation_errors.append(error_msg)
             self.log_constant(
                 LOG_SERVICE_VALIDATION_ERROR,
                 message=error_msg,
                 extra={"phase": "telemetry_event"},
             )
-            
             if self.strict_mode:
                 raise
             return None
-        except Exception as e:
-            error_msg = f"Unexpected validation error: {e}"
+        except Exception as exc:  # pragma: no cover - unexpected path
+            error_msg = f"Unexpected validation error: {exc}"
             self._validation_errors.append(error_msg)
             self.log_constant(
                 LOG_SERVICE_VALIDATION_ERROR,
                 message=error_msg,
-                extra={"phase": "telemetry_event", "error_type": type(e).__name__},
-                exc_info=e,
+                extra={"phase": "telemetry_event", "error_type": type(exc).__name__},
+                exc_info=exc,
             )
-            
             if self.strict_mode:
                 raise
             return None
 
+    # ------------------------------------------------------------------
+    # Trainer configuration
+    # ------------------------------------------------------------------
     def validate_training_config(self, config_data: Dict[str, Any]) -> Optional[TrainingConfig]:
-        """Validate training configuration.
-        
-        Args:
-            config_data: Raw configuration data
-            
-        Returns:
-            Validated config or None if validation failed
-        """
         try:
             config = TrainingConfig(**config_data)
             self.log_constant(
@@ -99,34 +78,36 @@ class ValidationService(LogConstantMixin):
                 extra={"run_id": config.run_id},
             )
             return config
-        except ValidationError as e:
-            error_msg = f"Config validation error: {e}"
+        except ValidationError as exc:
+            error_msg = f"Config validation error: {exc}"
             self._validation_errors.append(error_msg)
             self.log_constant(
                 LOG_SERVICE_VALIDATION_ERROR,
                 message=error_msg,
                 extra={"phase": "training_config"},
             )
-            
             if self.strict_mode:
                 raise
             return None
-        except Exception as e:
-            error_msg = f"Unexpected config validation error: {e}"
+        except Exception as exc:  # pragma: no cover - unexpected path
+            error_msg = f"Unexpected config validation error: {exc}"
             self._validation_errors.append(error_msg)
             self.log_constant(
                 LOG_SERVICE_VALIDATION_ERROR,
                 message=error_msg,
-                extra={"phase": "training_config", "error_type": type(e).__name__},
-                exc_info=e,
+                extra={"phase": "training_config", "error_type": type(exc).__name__},
+                exc_info=exc,
             )
-            
             if self.strict_mode:
                 raise
             return None
 
+    # ------------------------------------------------------------------
+    # Lightweight step validation
+    # ------------------------------------------------------------------
     def validate_step_data(
         self,
+        *,
         episode: int,
         step: int,
         action: int,
@@ -134,19 +115,6 @@ class ValidationService(LogConstantMixin):
         state: int,
         next_state: int,
     ) -> bool:
-        """Quick validation of step data without full event creation.
-        
-        Args:
-            episode: Episode number
-            step: Step index
-            action: Action taken
-            reward: Reward received
-            state: Current state
-            next_state: Next state
-            
-        Returns:
-            True if valid, False otherwise
-        """
         try:
             if episode < 0:
                 raise ValueError("episode must be non-negative")
@@ -158,7 +126,7 @@ class ValidationService(LogConstantMixin):
                 raise ValueError("state must be non-negative")
             if next_state < 0:
                 raise ValueError("next_state must be non-negative")
-            
+
             self.log_constant(
                 LOG_SERVICE_VALIDATION_DEBUG,
                 message="step_data_valid",
@@ -172,8 +140,8 @@ class ValidationService(LogConstantMixin):
                 },
             )
             return True
-        except ValueError as e:
-            warning_msg = f"Step data validation warning: {e}"
+        except ValueError as exc:
+            warning_msg = f"Step data validation warning: {exc}"
             self._validation_warnings.append(warning_msg)
             self.log_constant(
                 LOG_SERVICE_VALIDATION_WARNING,
@@ -182,36 +150,20 @@ class ValidationService(LogConstantMixin):
             )
             return False
 
+    # ------------------------------------------------------------------
+    # Introspection helpers
+    # ------------------------------------------------------------------
     def get_validation_errors(self) -> list[str]:
-        """Get list of validation errors."""
         return self._validation_errors.copy()
 
     def get_validation_warnings(self) -> list[str]:
-        """Get list of validation warnings."""
         return self._validation_warnings.copy()
 
     def clear_errors(self) -> None:
-        """Clear validation error history."""
         self._validation_errors.clear()
 
     def clear_warnings(self) -> None:
-        """Clear validation warning history."""
         self._validation_warnings.clear()
-
-    def reset(self) -> None:
-        """Reset all validation state."""
-        self.clear_errors()
-        self.clear_warnings()
-
-    def get_summary(self) -> Dict[str, Any]:
-        """Get validation summary."""
-        return {
-            "error_count": len(self._validation_errors),
-            "warning_count": len(self._validation_warnings),
-            "strict_mode": self.strict_mode,
-            "errors": self._validation_errors,
-            "warnings": self._validation_warnings,
-        }
 
 
 __all__ = ["ValidationService"]

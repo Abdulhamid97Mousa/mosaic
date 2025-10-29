@@ -1,6 +1,13 @@
-from __future__ import annotations
+"""Domain-scoped defaults for the telemetry event bus and hub.
 
-"""Domain-scoped defaults for the telemetry event bus and hub."""
+Consolidated from:
+- Original: gym_gui/telemetry/constants_bus.py
+
+Organizes queue capacities, event fan-out, and streaming defaults
+for the RunBus and telemetry event orchestration layer.
+"""
+
+from __future__ import annotations
 
 from dataclasses import dataclass, field
 

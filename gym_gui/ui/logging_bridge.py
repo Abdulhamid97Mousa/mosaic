@@ -6,7 +6,8 @@ import logging
 from dataclasses import dataclass
 from typing import Optional
 
-from qtpy import QtCore
+from PyQt6 import QtCore
+from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 
 
 @dataclass(slots=True)
@@ -23,7 +24,7 @@ class LogRecordPayload:
 class LogEmitter(QtCore.QObject):
     """Qt object that emits logging payloads across threads safely."""
 
-    record_emitted = QtCore.Signal(LogRecordPayload)  # type: ignore[attr-defined]
+    record_emitted = pyqtSignal(LogRecordPayload)
 
 
 class QtLogHandler(logging.Handler):
