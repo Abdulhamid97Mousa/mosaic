@@ -85,6 +85,11 @@ def main(argv: Optional[list[str]] = None) -> int:
         default=None,
         help="Worker identifier for distributed training runs.",
     )
+    parser.add_argument(
+        "--no-telemetry",
+        action="store_true",
+        help="Disable per-step telemetry emission for fast training.",
+    )
     parsed = parser.parse_args(argv)
 
     run_config = _load_config(parsed)
@@ -94,12 +99,16 @@ def main(argv: Optional[list[str]] = None) -> int:
         run_config.worker_id = str(worker_id_override)
         run_config.extra.setdefault("worker_id", run_config.worker_id)
 
+    # Extract disable_telemetry flag from CLI or environment
+    disable_telemetry_flag = parsed.no_telemetry or os.environ.get("DISABLE_TELEMETRY", "").lower() == "true"
+    run_config.extra["disable_telemetry"] = disable_telemetry_flag
+
     # Override config with CLI flags
     if parsed.grpc:
         run_config.extra["use_grpc_telemetry"] = True
         run_config.extra["grpc_target"] = parsed.grpc_target
 
-    emitter = TelemetryEmitter()
+    emitter = TelemetryEmitter(disabled=run_config.extra.get("disable_telemetry", False))
 
     # Extract game_config from run_config.extra (set by GUI's Agent Train Form)
     # and pass it to the adapter factory

@@ -278,9 +278,20 @@ class LiveTelemetryController(QtCore.QObject, LogConstantMixin):
 
     def set_live_render_enabled_for_run(self, run_id: str, enabled: bool) -> None:
         self._render_enabled_per_run[run_id] = enabled
+        self.log_constant(
+            LOG_LIVE_CONTROLLER_INITIALIZED,
+            message=f"Set live_render_enabled_for_run",
+            extra={"run_id": run_id, "enabled": enabled},
+        )
 
     def is_live_render_enabled(self, run_id: str) -> bool:
-        return self._render_enabled_per_run.get(run_id, True)
+        value = self._render_enabled_per_run.get(run_id, True)
+        self.log_constant(
+            LOG_LIVE_CONTROLLER_INITIALIZED,
+            message=f"is_live_render_enabled check",
+            extra={"run_id": run_id, "value": value, "has_key": run_id in self._render_enabled_per_run},
+        )
+        return value
 
     def set_game_id_for_run(self, run_id: str, game_id: str) -> None:
         """Store the game_id for a run (for passing to dynamic tabs).

@@ -94,12 +94,11 @@ class TestGlobalRegistry(unittest.TestCase):
     def test_global_registry_has_spade_presenter(self) -> None:
         """Test that the global registry has SPADE-BDI presenter registered."""
         registry = get_worker_presenter_registry()
-        self.assertTrue("spade_bdi_rl" in registry)
-        presenter = registry.get("spade_bdi_rl")
+        self.assertTrue("spade_bdi_rl_worker" in registry)
+        presenter = registry.get("spade_bdi_rl_worker")
         self.assertIsNotNone(presenter)
         if presenter is not None:
-            self.assertEqual(presenter.id, "spade_bdi_rl")
-
+            self.assertEqual(presenter.id, "spade_bdi_rl_worker")
 
 class TestSpadeBdiWorkerPresenterBasics(unittest.TestCase):
     """Test SpadeBdiWorkerPresenter basic properties and protocol compliance."""
@@ -110,7 +109,7 @@ class TestSpadeBdiWorkerPresenterBasics(unittest.TestCase):
 
     def test_presenter_id(self) -> None:
         """Test that presenter has correct ID."""
-        self.assertEqual(self.presenter.id, "spade_bdi_rl")
+        self.assertEqual(self.presenter.id, "spade_bdi_rl_worker")
 
     def test_presenter_implements_protocol(self) -> None:
         """Test that presenter implements WorkerPresenter protocol."""
@@ -244,7 +243,7 @@ class TestBuildTrainRequest(unittest.TestCase):
             "metadata": {
                 "ui": {"algorithm": "QLearning", "source_policy": "/path/to/policy.json"},
                 "worker": {
-                    "module": "spade_bdi_rl.worker",
+                    "module": "spade_bdi_rl_worker.worker",
                     "agent_id": "agent_1",
                     "config": {
                         "game_id": "FrozenLake-v1",
@@ -485,7 +484,7 @@ class TestRegistryIntegration(unittest.TestCase):
         retrieved = registry.get(presenter.id)
         self.assertIsNotNone(retrieved)
         if retrieved is not None:
-            self.assertEqual(retrieved.id, "spade_bdi_rl")
+            self.assertEqual(retrieved.id, "spade_bdi_rl_worker")
             # Use
             self.assertEqual(retrieved.id, presenter.id)
 
@@ -501,12 +500,12 @@ class TestRegistryIntegration(unittest.TestCase):
         registry.register(presenter2.id, presenter2)
 
         self.assertEqual(len(registry.available_workers()), 2)
-        p1 = registry.get("spade_bdi_rl")
+        p1 = registry.get("spade_bdi_rl_worker")
         p2 = registry.get("future_worker")
         self.assertIsNotNone(p1)
         self.assertIsNotNone(p2)
         if p1 is not None:
-            self.assertEqual(p1.id, "spade_bdi_rl")
+            self.assertEqual(p1.id, "spade_bdi_rl_worker")
         if p2 is not None:
             self.assertEqual(p2.id, "future_worker")
 

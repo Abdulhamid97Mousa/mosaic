@@ -10,6 +10,7 @@
 Choosing the right unique identifier is one of the most impactful decisions in database design and distributed systems. This guide explores the complete landscape of identifier strategies, from traditional sequential IDs to modern solutions like ULID and Nano ID, helping you make informed decisions for your specific use case.
 
 **TL;DR:**
+
 - **Need deterministic from config?** → UUID5 ✅ (our implementation)
 - **Building time-series systems?** → ULID (sortable, 50% faster)
 - **Need RFC 4122 standard?** → UUID4 (random) or UUID5 (deterministic)
@@ -23,7 +24,7 @@ Before we explore modern identifier solutions, let's understand why sequential i
 
 ### Sequential ID Limitations
 
-```
+```bash
 User 1 → ID: 1
 User 2 → ID: 2
 User 3 → ID: 3
@@ -44,10 +45,12 @@ User 1000 → ID: 1000
    - Risk of counter synchronization failure
 
 3. **Data leakage** — Sequential IDs expose sensitive information
+
    ```
    https://yourwebsite.com/users/793/details  ← Easy to guess user 794, 795...
    https://yourwebsite.com/products/1005       ← Reveals you have ~1000 products
    ```
+
    - Attackers can enumerate resources by incrementing IDs
    - Exposes business metrics (user count, product inventory)
    - Enables IDOR (Insecure Direct Object Reference) exploits
@@ -84,19 +87,23 @@ In the world of software development, unique identifiers play a critical role. T
 ## 1. UID (Unique Identifier)
 
 ### What is it?
+
 A UID is a general term for any identifier that is unique within a specific scope. For example, a student ID, a username, or a database record key can all be considered UIDs.
 
 ### Length and Structure
+
 - **No fixed length or structure**
 - Can be a number, a string of characters, or a combination of both
 - Must be unique within the context where it's used
 
 ### Examples
+
 - Student ID: `123456`
 - Username: `osamahaider`
 - Employee ID: `EMP-2024-001`
 
 ### Use Cases
+
 - Identifying users in a system
 - Records in a database
 - Items in a catalog
@@ -111,6 +118,7 @@ A UID is a general term for any identifier that is unique within a specific scop
 A UUID is a 128-bit number used to uniquely identify information across systems and networks. Standardized by RFC 4122 (obsoleted by RFC 9562 in 2024), UUIDs are designed to be unique universally, not just within a single system.
 
 Unlike sequential IDs, UUIDs solve fundamental problems:
+
 - ✅ Can be generated on **any node** without coordination
 - ✅ **No central authority** needed
 - ✅ **Parallel generation** possible (no contention)
@@ -137,6 +145,7 @@ Unlike sequential IDs, UUIDs solve fundamental problems:
 ### Python Implementation Examples
 
 **UUID1: MAC Address + Timestamp (Deprecated)**
+
 ```python
 import uuid
 
@@ -146,6 +155,7 @@ uid1 = uuid.uuid1()
 ```
 
 **UUID4: Random (Recommended for General Use)**
+
 ```python
 import uuid
 
@@ -155,6 +165,7 @@ uid4 = uuid.uuid4()
 ```
 
 **UUID5: SHA-1 Hash of Namespace + Name (Deterministic)**
+
 ```python
 import uuid
 
@@ -201,6 +212,7 @@ run_id = uuid.uuid5(TRAINER_NAMESPACE, config_seed)
 ### Real-World Security Example
 
 **With Sequential IDs (Vulnerable):**
+
 ```python
 # Attacker can easily enumerate all users
 for user_id in range(1, 10000):
@@ -212,6 +224,7 @@ for user_id in range(1, 10000):
 ```
 
 **With UUID4 (Secure):**
+
 ```python
 # Attacker cannot guess valid UUIDs
 # Only 1 in 5.3 × 10^36 chance of hitting valid ID
@@ -224,20 +237,24 @@ response = requests.get("/api/users/550e8400-e29b-41d4-a716-446655440000")
 ## 3. GUID (Globally Unique Identifier)
 
 ### What is it?
+
 A GUID is essentially the same as a UUID but is a term primarily used by Microsoft. GUIDs are widely used in Microsoft's software and systems.
 
 ### Length and Structure
+
 - **128 bits** — same as UUID
 - Represented similarly to UUIDs
 - **Example**: `3f2504e0-4f89-11d3-9a0c-0305e82c3301`
 
 ### Use Cases
+
 - Windows applications
 - SQL Server databases
 - Microsoft development environments
 - COM (Component Object Model) interfaces
 
 ### Note
+
 In the Microsoft ecosystem, GUID is the preferred terminology, but functionally they are equivalent to UUIDs.
 
 ---
@@ -245,9 +262,11 @@ In the Microsoft ecosystem, GUID is the preferred terminology, but functionally 
 ## 4. CUID (Collision-Resistant Unique Identifier)
 
 ### What is it?
+
 CUID is a type of unique identifier designed to minimize the chance of collisions, even in distributed systems where multiple machines might generate IDs simultaneously.
 
 ### Length and Structure
+
 - **Typically ~25 characters**
 - Components:
   - Timestamp (milliseconds since epoch)
@@ -257,18 +276,21 @@ CUID is a type of unique identifier designed to minimize the chance of collision
 - **Example**: `cixf02ym000001b66m45ae4k8`
 
 ### Use Cases
+
 - Web applications with multiple servers
 - Distributed ID generation
 - Chat applications or real-time systems
 - Shorter IDs than UUID but collision-resistant
 
 ### Advantages
+
 - ✅ Shorter than UUID (25 chars vs 36)
 - ✅ Collision-resistant in distributed systems
 - ✅ Sortable (timestamp-based)
 - ✅ URL-friendly
 
 ### Disadvantages
+
 - ❌ Less standardized than UUID
 - ❌ Requires additional library (not built-in)
 - ❌ Not deterministic
@@ -494,6 +516,7 @@ Winner: UUID5 (determinism is critical)
 ```
 
 ### Use Cases
+
 - **Database records** — Natural ordering by creation time
 - **Event logs** — Sortable events for analysis
 - **Time-series data** — Ordered data naturally
@@ -503,6 +526,7 @@ Winner: UUID5 (determinism is critical)
 - **Microservices** — Distributed tracing with natural ordering
 
 ### Advantages
+
 - ✅ **Lexicographically sortable** — Direct alphabetical ordering by time
 - ✅ **Faster generation** — Up to 50% faster than UUID4 (single random component)
 - ✅ **More compact** — 26 chars vs 36 for UUID
@@ -512,6 +536,7 @@ Winner: UUID5 (determinism is critical)
 - ✅ **Monotonic capabilities** — Can enforce strict ordering for distributed systems
 
 ### Disadvantages
+
 - ❌ Not deterministic by default (random component)
 - ❌ Less standardized than UUID (no RFC, de facto standard)
 - ❌ Requires dedicated library (not in Python stdlib)
@@ -519,6 +544,7 @@ Winner: UUID5 (determinism is critical)
 - ❌ Microsecond precision lost (millisecond precision only)
 
 ### Python Implementation Example
+
 ```python
 from ulid import ULID
 
@@ -535,6 +561,7 @@ parsed = ULID.from_str("01ARZ3NDEKTSV4RRFFQ69G5FAV")
 ```
 
 ### When to Choose ULID Over UUID
+
 | Scenario | Recommendation | Reason |
 |----------|----------------|--------|
 | **Require sortability** | ULID | Natural alphabetical ordering |
@@ -546,6 +573,7 @@ parsed = ULID.from_str("01ARZ3NDEKTSV4RRFFQ69G5FAV")
 | **Embedded timestamp needed** | ULID | Time in ID itself |
 
 ### Real-World Performance Comparison
+
 ```
 Operation       | UUID4  | ULID
 Generation      | 1.0x   | 0.5x (50% faster)
@@ -556,7 +584,9 @@ String repr     | 36     | 26 (26% smaller)
 ```
 
 ### ULID Design Philosophy
+
 ULIDs solve a specific problem: UUIDs are great for uniqueness but terrible for sorting. In distributed systems where:
+
 1. You generate millions of IDs
 2. You need to query data by timestamp
 3. You want natural chronological ordering
@@ -571,6 +601,7 @@ ULIDs solve a specific problem: UUIDs are great for uniqueness but terrible for 
 ### The Core Problem ULID Solves
 
 Traditional UUID4 (random):
+
 ```
 550e8400-e29b-41d4-a716-446655440000  ← Unsorted, random order
 5c3e7f8a-b1d2-4c7e-9f2a-3b8e1d5c7a9f  ← Different order in database
@@ -578,6 +609,7 @@ Traditional UUID4 (random):
 ```
 
 ULID (timestamp-based sortable):
+
 ```
 01ARZ3NDEKTSV4RRFFQ69G5FAV  ← 1st (created first)
 01ARZ3NDEKTSV4RRFFQ69G5FBG  ← 2nd (created second)
@@ -588,12 +620,14 @@ ULID (timestamp-based sortable):
 ### Performance Impact on Databases
 
 #### Problem with Random UUIDs in Databases
+
 - **B-tree fragmentation** — Random inserts cause tree rebalancing
 - **Cache misses** — Related data not stored nearby
 - **Slow range queries** — Can't efficiently find records by date
 - **Poor index utilization** — B-tree becomes inefficient
 
 #### Benefits with ULID (or sorted UUIDs)
+
 - **Locality of reference** — Similar timestamps stored together
 - **Reduced B-tree fragmentation** — Sequential inserts are efficient
 - **Fast range queries** — `WHERE created_at BETWEEN ? AND ?` uses index effectively
@@ -637,6 +671,7 @@ ULID (timestamp-based sortable):
 ### Implementation Considerations
 
 #### UUID5 (Current Implementation)
+
 ```python
 from uuid import UUID, uuid5
 
@@ -647,17 +682,20 @@ run_id = str(uuid5(namespace, config_seed))
 ```
 
 **Pros:**
+
 - ✅ RFC 4122 standard
 - ✅ Built-in Python (no external library)
 - ✅ Deterministic from config
 - ✅ Wide ecosystem support
 
 **Cons:**
+
 - ❌ 36-character string (longer)
 - ❌ Not chronologically sortable
 - ❌ Not ideal for high-volume databases
 
 #### ULID (If Needed for Database Performance)
+
 ```python
 # Would require: pip install python-ulid
 from ulid import ULID
@@ -672,12 +710,14 @@ run_id = str(ULID(timestamp=int(time.time() * 1000)))
 ```
 
 **Pros:**
+
 - ✅ Smaller string (26 chars)
 - ✅ Chronologically sortable
 - ✅ Faster generation (50% vs UUID4)
 - ✅ Better database index performance
 
 **Cons:**
+
 - ❌ Not deterministic by default
 - ❌ External library required
 - ❌ De facto standard (not RFC)
@@ -714,15 +754,18 @@ def generate_identifiers(config):
 ## 7. Nano ID
 
 ### What is it?
+
 Nano ID is a modern, customizable, and performance-optimized unique identifier that is shorter than a UUID but still highly collision-resistant.
 
 ### Length and Structure
+
 - **Typically ~21 characters** (customizable)
 - Base-64 encoded strings, making them compact
 - Uses URL-friendly alphabet by default
 - **Example**: `V1StGXR8_Z5jdHi6B-myT`
 
 ### Use Cases
+
 - Web applications requiring short IDs
 - URLs and slugs
 - API keys
@@ -731,6 +774,7 @@ Nano ID is a modern, customizable, and performance-optimized unique identifier t
 - Distributed systems
 
 ### Advantages
+
 - ✅ Very short (21 chars vs 36 for UUID)
 - ✅ Fast generation
 - ✅ URL-safe by default
@@ -738,6 +782,7 @@ Nano ID is a modern, customizable, and performance-optimized unique identifier t
 - ✅ Excellent collision resistance
 
 ### Disadvantages
+
 - ❌ Not deterministic (random by default)
 - ❌ Less standardized than UUID
 - ❌ Requires npm package
@@ -790,6 +835,7 @@ run_id = str(uuid5(namespace, run_id_seed))
 ### Migration from SHA1
 
 **Before (Problematic)**:
+
 ```python
 run_id_seed = f"{run_name}::{submitted}::{digest}".encode("utf-8")
 run_id = hashlib.sha1(run_id_seed, usedforsecurity=False).hexdigest()
@@ -797,6 +843,7 @@ run_id = hashlib.sha1(run_id_seed, usedforsecurity=False).hexdigest()
 ```
 
 **After (Improved)**:
+
 ```python
 run_id_seed = f"{run_name}::{submitted}::{digest}"
 run_id = str(uuid5(namespace, run_id_seed))
@@ -821,6 +868,7 @@ run_id = str(uuid5(namespace, run_id_seed))
 The choice between UUID and ULID depends on specific application requirements:
 
 **Choose UUID (UUID4 or UUID5) when:**
+
 - You require RFC 4122 standardization and global compliance
 - You need cryptographic-grade randomness (UUID4)
 - You need deterministic IDs from configuration (UUID5)
@@ -829,6 +877,7 @@ The choice between UUID and ULID depends on specific application requirements:
 - You prioritize standardization over performance
 
 **Choose ULID when:**
+
 - You need **lexicographically sortable** identifiers
 - Database query performance matters (sortable IDs improve index efficiency)
 - You have **high-volume** data streams requiring chronological ordering
@@ -884,6 +933,7 @@ The choice between UUID and ULID depends on specific application requirements:
 ## Implementation Best Practices
 
 ### 1. Document the Identifier Strategy
+
 ```python
 """
 Generate deterministic run_id using UUID5.
@@ -895,6 +945,7 @@ This ensures:
 ```
 
 ### 2. Use Stable Namespaces
+
 ```python
 # Define namespace constants
 TRAINER_NAMESPACE = UUID("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
@@ -904,6 +955,7 @@ run_id = str(uuid5(TRAINER_NAMESPACE, seed))
 ```
 
 ### 3. Version Your Identifier Format
+
 ```python
 # If changing ID strategy, track version
 RUN_ID_VERSION = "2"  # UUID5-based
@@ -916,6 +968,7 @@ metadata = {
 ```
 
 ### 4. Test Determinism
+
 ```python
 def test_run_id_deterministic():
     config1 = {...}

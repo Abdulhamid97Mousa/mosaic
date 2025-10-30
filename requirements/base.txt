@@ -1,0 +1,29 @@
+# Base requirements for gym_gui application (GUI + shared infrastructure)
+# This file contains dependencies required for the GUI to run, plus shared
+# libraries used by both the GUI and workers (e.g., grpcio, gymnasium core).
+
+# Environment configuration
+python-dotenv==1.1.1
+
+# Qt GUI framework
+PyQt6==6.9.1
+PyQt6-Qt6==6.9.2
+PyQt6-sip==13.10.2
+qtpy==2.4.3
+
+# Core dependencies
+packaging==25.0
+PyYAML>=6.0
+numpy==2.3.3
+jsonschema==4.23.0
+
+# gRPC for trainer communication
+grpcio==1.67.1
+grpcio-tools==1.67.1
+protobuf==5.27.2
+
+# Run ID generation
+python-ulid==2.7.0
+
+# Gymnasium core (shared by all workers)
+gymnasium[box2d]>=1.2

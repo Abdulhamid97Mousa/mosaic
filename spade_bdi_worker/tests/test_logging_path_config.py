@@ -12,7 +12,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_WORKER_CONFIG_UI_PATH,
     LOG_WORKER_CONFIG_WARNING,
 )
-from spade_bdi_rl.core.config import RunConfig
+from spade_bdi_worker.core.config import RunConfig
 
 
 def _collect_log_records(caplog: pytest.LogCaptureFixture) -> dict[str, list[logging.LogRecord]]:

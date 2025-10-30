@@ -60,6 +60,17 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
         self._render_regulator: Optional[RenderingSpeedRegulator] = None
         self._live_render_enabled = live_render_enabled
 
+        # DEBUG: Log the flag value
+        self.log_constant(
+            LOG_UI_LIVE_TAB_TRACE,
+            message=f"LiveTelemetryTab.__init__: live_render_enabled={live_render_enabled}",
+            extra={"run_id": run_id, "agent_id": agent_id, "live_render_enabled": live_render_enabled},
+        )
+
+        # Store buffer sizes for dynamic table limits
+        self._buffer_size = buffer_size
+        self._episode_buffer_size = episode_buffer_size
+        
         self._step_buffer: Deque[Any] = deque(maxlen=buffer_size)
         self._episode_buffer: Deque[Any] = deque(maxlen=episode_buffer_size)
         self._dropped_steps = 0
@@ -146,12 +157,14 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
         episodes_toolbar.addWidget(self._episodes_copy_button)
         episodes_layout.addLayout(episodes_toolbar)
 
-        self._episodes_table = QtWidgets.QTableWidget(0, 11, episodes_group)
+        self._episodes_table = QtWidgets.QTableWidget(0, 13, episodes_group)
         self._episodes_table.setHorizontalHeaderLabels([
             "Timestamp",
+            "Worker",
+            "Agent",
             "Episode",
             "Steps",
-            "Reward",
+            "Total Episode Reward",
             "Terminated",
             "Truncated",
             "Seed",
@@ -179,18 +192,19 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
         steps_toolbar.addWidget(self._steps_copy_button)
         steps_layout.addLayout(steps_toolbar)
 
-        self._steps_table = QtWidgets.QTableWidget(0, 10, steps_group)
+        self._steps_table = QtWidgets.QTableWidget(0, 11, steps_group)
         self._steps_table.setHorizontalHeaderLabels([
             "Timestamp",
+            "Agent",
             "Episode",
             "Step",
             "Episode Seed",
             "Action",
-            "Reward",
+            "Step Reward",
             "Terminated",
             "Truncated",
             "Observation",
-            "Info",
+            "Game Config Info",
         ])
         header = self._steps_table.horizontalHeader()
         if header is not None:
@@ -445,37 +459,55 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
         render_hint_json = _get_field(payload, "render_hint_json", default="")
         info_value = _get_field(payload, "info", default=None)
 
+        info_chunks: list[str] = []
         if render_hint_json:
-            info_display = self._preview(render_hint_json, n=200)
-        elif info_value:
+            info_chunks.append(f"render_hint={self._preview(render_hint_json, n=160)}")
+
+        if info_value:
             try:
-                info_display = self._preview(json.dumps(info_value), n=200)
+                info_chunks.append(f"info={self._preview(json.dumps(info_value), n=160)}")
             except (TypeError, ValueError):
-                info_display = self._preview(str(info_value), n=200)
-        else:
-            info_display = "—"
+                info_chunks.append(f"info={self._preview(str(info_value), n=160)}")
+
+        game_config_value: Any = metadata.get("game_config")
+        if not game_config_value:
+            game_config_value = _get_field(payload, "gameConfig", "game_config", default=None)
+        if game_config_value:
+            try:
+                config_preview = self._preview(json.dumps(game_config_value), n=160)
+            except (TypeError, ValueError):
+                config_preview = self._preview(str(game_config_value), n=160)
+            info_chunks.append(f"game_config={config_preview}")
+
+        info_display = " | ".join(info_chunks) if info_chunks else "—"
+
+        # Extract agent_id from payload for multi-agent support
+        agent_id_value = _get_field(payload, "agentId", "agent_id", default=None)
+        if agent_id_value is None:
+            agent_id_value = metadata.get("agent_id")
+        agent_display = agent_id_value if agent_id_value not in (None, "") else "—"
 
         # Add row to steps table
         row = self._steps_table.rowCount()
         self._steps_table.insertRow(row)
 
-        # Keep only last 100 rows
-        if row > 100:
+        # Keep table size consistent with configured buffer size
+        if row >= self._buffer_size:
             self._steps_table.removeRow(0)
             row = self._steps_table.rowCount() - 1
 
-        # Populate row
+        # Populate row with new column layout:
         self._steps_table.setItem(row, 0, QtWidgets.QTableWidgetItem(ts_display))
-        # CRITICAL FIX: Use display_episode (seed + episode_index) instead of raw episode_index
-        self._steps_table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(display_episode)))
-        self._steps_table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(int(step_index))))
-        self._steps_table.setItem(row, 3, QtWidgets.QTableWidgetItem(str(episode_seed)))
-        self._steps_table.setItem(row, 4, QtWidgets.QTableWidgetItem(action_display))
-        self._steps_table.setItem(row, 5, QtWidgets.QTableWidgetItem(f"{reward:+.3f}"))
-        self._steps_table.setItem(row, 6, QtWidgets.QTableWidgetItem(str(terminated)))
-        self._steps_table.setItem(row, 7, QtWidgets.QTableWidgetItem(str(truncated)))
-        self._steps_table.setItem(row, 8, QtWidgets.QTableWidgetItem(observation_display))
-        self._steps_table.setItem(row, 9, QtWidgets.QTableWidgetItem(info_display))
+        self._steps_table.setItem(row, 1, QtWidgets.QTableWidgetItem(agent_display))  
+        self._steps_table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(display_episode)))
+        self._steps_table.setItem(row, 3, QtWidgets.QTableWidgetItem(str(int(step_index))))
+        self._steps_table.setItem(row, 4, QtWidgets.QTableWidgetItem(str(episode_seed)))
+        self._steps_table.setItem(row, 5, QtWidgets.QTableWidgetItem(action_display))
+        self._steps_table.setItem(row, 6, QtWidgets.QTableWidgetItem(f"{reward:+.3f}"))
+        self._steps_table.setItem(row, 7, QtWidgets.QTableWidgetItem(str(terminated)))
+        self._steps_table.setItem(row, 8, QtWidgets.QTableWidgetItem(str(truncated)))
+        self._steps_table.setItem(row, 9, QtWidgets.QTableWidgetItem(observation_display))
+        self._steps_table.setItem(row, 10, QtWidgets.QTableWidgetItem(info_display))  # RENAMED: Game Config Info
 
         # Scroll to bottom
         self._steps_table.scrollToBottom()
@@ -762,6 +794,15 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
             episode_seed = metadata.get("episode_seed", "—")
             control_mode = metadata.get("mode") or metadata.get("control_mode") or "—"
             game_id = metadata.get("game_id", "—")
+            agent_id_value = _get_field(payload, "agentId", "agent_id", default=None)
+            if agent_id_value is None:
+                agent_id_value = metadata.get("agent_id")
+            agent_display = agent_id_value if agent_id_value not in (None, "") else "—"
+
+            worker_id_value = _get_field(payload, "workerId", "worker_id", default=None)
+            if worker_id_value is None:
+                worker_id_value = metadata.get("worker_id")
+            worker_display = worker_id_value if worker_id_value not in (None, "") else "—"
 
             # CRITICAL FIX: Update current_game from episode metadata
             # This ensures the renderer uses the correct game_id for rendering
@@ -805,19 +846,26 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
 
             row = self._episodes_table.rowCount()
             self._episodes_table.insertRow(row)
+            
+            # Keep table size consistent with configured episode buffer size
+            if row >= self._episode_buffer_size:
+                self._episodes_table.removeRow(0)
+                row = self._episodes_table.rowCount() - 1
+            
             # Column 0: Timestamp
             self._episodes_table.setItem(row, 0, QtWidgets.QTableWidgetItem(ts_display))
-            # Column 1: Episode (display value = seed + episode_index)
-            self._episodes_table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(display_episode)))
-            self._episodes_table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(steps)))
-            self._episodes_table.setItem(row, 3, QtWidgets.QTableWidgetItem(f"{total_reward:.2f}"))
-            self._episodes_table.setItem(row, 4, QtWidgets.QTableWidgetItem(str(terminated)))
-            self._episodes_table.setItem(row, 5, QtWidgets.QTableWidgetItem(str(truncated)))
-            self._episodes_table.setItem(row, 6, QtWidgets.QTableWidgetItem(str(seed)))
-            self._episodes_table.setItem(row, 7, QtWidgets.QTableWidgetItem(str(episode_seed)))
-            self._episodes_table.setItem(row, 8, QtWidgets.QTableWidgetItem(str(control_mode)))
-            self._episodes_table.setItem(row, 9, QtWidgets.QTableWidgetItem(str(game_id)))
-            self._episodes_table.setItem(row, 10, QtWidgets.QTableWidgetItem(str(outcome_display)))
+            self._episodes_table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(worker_display)))
+            self._episodes_table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(agent_display)))
+            self._episodes_table.setItem(row, 3, QtWidgets.QTableWidgetItem(str(display_episode)))
+            self._episodes_table.setItem(row, 4, QtWidgets.QTableWidgetItem(str(steps)))
+            self._episodes_table.setItem(row, 5, QtWidgets.QTableWidgetItem(f"{total_reward:.2f}"))
+            self._episodes_table.setItem(row, 6, QtWidgets.QTableWidgetItem(str(terminated)))
+            self._episodes_table.setItem(row, 7, QtWidgets.QTableWidgetItem(str(truncated)))
+            self._episodes_table.setItem(row, 8, QtWidgets.QTableWidgetItem(str(seed)))
+            self._episodes_table.setItem(row, 9, QtWidgets.QTableWidgetItem(str(episode_seed)))
+            self._episodes_table.setItem(row, 10, QtWidgets.QTableWidgetItem(str(control_mode)))
+            self._episodes_table.setItem(row, 11, QtWidgets.QTableWidgetItem(str(game_id)))
+            self._episodes_table.setItem(row, 12, QtWidgets.QTableWidgetItem(str(outcome_display)))
 
             if metadata:
                 tooltip = json.dumps(metadata, indent=2)

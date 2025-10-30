@@ -19,9 +19,9 @@ sys.modules['matplotlib'] = None
 sys.modules['matplotlib.pyplot'] = None
 
 # Now try importing the worker components
-from spade_bdi_rl.core import RunConfig, HeadlessTrainer, TelemetryEmitter
-from spade_bdi_rl.adapters.frozenlake import FrozenLakeAdapter
-from spade_bdi_rl.algorithms import QLearningAgent
+from spade_bdi_rl_worker.core import RunConfig, HeadlessTrainer, TelemetryEmitter
+from spade_bdi_rl_worker.adapters.frozenlake import FrozenLakeAdapter
+from spade_bdi_rl_worker.algorithms import QLearningAgent
 
 print("SUCCESS: All imports work without matplotlib")
 """
@@ -59,7 +59,7 @@ def test_worker_dry_run():
             [
                 sys.executable,
                 "-m",
-                "spade_bdi_rl.worker",
+                "spade_bdi_rl_worker.worker",
             ],
             input=json.dumps(config),
             capture_output=True,

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from spade_bdi_rl.core.config import RunConfig
+from spade_bdi_worker.core.config import RunConfig
 
 
 def test_run_config_respects_live_rendering_flag():

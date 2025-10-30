@@ -185,16 +185,18 @@ class RunStreamBuffer:
         before = len(self.steps)
         self.steps.append(step)
         if len(self.steps) == before:
+            # Buffer was full, deque dropped the oldest item
             self.dropped_steps += 1
-            return self.dropped_steps
+            return 1  # Return 1 to indicate a single drop occurred (not cumulative)
         return None
 
     def add_episode(self, episode: TelemetryEpisode) -> Optional[int]:
         before = len(self.episodes)
         self.episodes.append(episode)
         if len(self.episodes) == before:
+            # Buffer was full, deque dropped the oldest item
             self.dropped_episodes += 1
-            return self.dropped_episodes
+            return 1  # Return 1 to indicate a single drop occurred (not cumulative)
         return None
 
 
@@ -210,7 +212,8 @@ class TelemetryAsyncHub:
         self._loop: Optional[asyncio.AbstractEventLoop] = None
         self._owns_loop = False
         self._max_queue = max_queue
-        self._buffer_size = buffer_size
+        self._buffer_size = buffer_size  # Default buffer size
+        self._run_buffer_sizes: Dict[str, int] = {}  # Per-run buffer size overrides
         self._queue: Optional[asyncio.Queue[tuple[str, str, Any]]] = None
         self._buffers: Dict[str, RunStreamBuffer] = {}
         self.bridge = TelemetryBridge()
@@ -296,6 +299,23 @@ class TelemetryAsyncHub:
                 sanitized_context[key] = value
 
         log_constant(_LOGGER, LOG_SERVICE_TELEMETRY_HUB_ERROR, extra=sanitized_context)
+
+    def set_run_buffer_size(self, run_id: str, buffer_size: int) -> None:
+        """Set custom buffer size for a specific run.
+        
+        This should be called BEFORE subscribing to the run to ensure the buffer
+        is created with the correct size based on training configuration.
+        
+        Args:
+            run_id: The run identifier
+            buffer_size: Buffer size for this run's telemetry stream
+        """
+        self._run_buffer_sizes[run_id] = buffer_size
+        log_constant(
+            _LOGGER,
+            LOG_SERVICE_TELEMETRY_HUB_TRACE,
+            extra={"run_id": run_id, "buffer_size": buffer_size, "action": "set_run_buffer_size"}
+        )
 
     def subscribe_run(self, run_id: str, client: Any) -> None:
         """Subscribe to both step and episode streams for a run."""
@@ -544,7 +564,9 @@ class TelemetryAsyncHub:
             except asyncio.CancelledError:
                 break
 
-            buffer = self._buffers.setdefault(run_id, RunStreamBuffer(self._buffer_size))
+            # Use per-run buffer size if configured, otherwise use default
+            run_buffer_size = self._run_buffer_sizes.get(run_id, self._buffer_size)
+            buffer = self._buffers.setdefault(run_id, RunStreamBuffer(run_buffer_size))
             if stream_type == "step":
                 # Convert protobuf to dict for UI consumption
                 payload_dict = _proto_to_dict(payload)

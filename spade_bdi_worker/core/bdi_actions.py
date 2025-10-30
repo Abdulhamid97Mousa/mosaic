@@ -37,7 +37,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_WORKER_POLICY_WARNING,
     LOG_WORKER_POLICY_ERROR,
 )
-from spade_bdi_rl.constants import DEFAULT_CACHED_POLICY_EPSILON, DEFAULT_ONLINE_POLICY_EPSILON
+from spade_bdi_worker.constants import DEFAULT_CACHED_POLICY_EPSILON, DEFAULT_ONLINE_POLICY_EPSILON
 
 _LOGGER = logging.getLogger(__name__)
 _log = partial(log_constant, _LOGGER)

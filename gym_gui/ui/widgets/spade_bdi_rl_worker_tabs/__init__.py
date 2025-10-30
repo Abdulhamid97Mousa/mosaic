@@ -55,14 +55,14 @@ __all__ = [
 _form_factory = get_worker_form_factory()
 
 # Register SPADE-BDI specific forms if not already registered
-if not _form_factory.has_train_form("spade_bdi_rl"):
+if not _form_factory.has_train_form("spade_bdi_rl_worker"):
     _form_factory.register_train_form(
-        "spade_bdi_rl",
+        "spade_bdi_rl_worker",
         lambda parent=None, **kwargs: SpadeBdiTrainForm(parent=parent, **kwargs),
     )
 
-if not _form_factory.has_policy_form("spade_bdi_rl"):
+if not _form_factory.has_policy_form("spade_bdi_rl_worker_worker"):
     _form_factory.register_policy_form(
-        "spade_bdi_rl",
+        "spade_bdi_rl_worker",
         lambda parent=None, **kwargs: SpadeBdiPolicySelectionForm(parent=parent, **kwargs),
     )

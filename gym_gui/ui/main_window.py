@@ -863,7 +863,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
     def _on_trained_agent_requested(self) -> None:
         """Handle the 'Load Trained Policy' button."""
         factory = get_worker_form_factory()
-        worker_id = "spade_bdi_rl"
+        worker_id = "spade_bdi_rl_worker"
         try:
             dialog = cast(
                 "SpadeBdiPolicySelectionForm",
@@ -903,7 +903,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
     def _on_agent_form_requested(self) -> None:
         """Open the SPADE-BDI agent training form."""
         factory = get_worker_form_factory()
-        worker_id = "spade_bdi_rl"
+        worker_id = "spade_bdi_rl_worker"
         try:
             dialog = cast(
                 "SpadeBdiTrainForm",
@@ -948,7 +948,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         """
         try:
             registry = get_worker_presenter_registry()
-            worker_id = "spade_bdi_rl"
+            worker_id = "spade_bdi_rl_worker"
             presenter = registry.get(worker_id)
             
             if presenter is None:
@@ -1084,7 +1084,22 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             ui_config = metadata.get("ui", {})
             step_buffer_size = ui_config.get("telemetry_buffer_size", 100)
             episode_buffer_size = ui_config.get("episode_buffer_size", 100)
+            hub_buffer_size = ui_config.get("hub_buffer_size")  # Hub buffer from training config
+            
             self._live_controller.set_buffer_sizes_for_run(run_id, step_buffer_size, episode_buffer_size)
+            
+            # Set hub buffer size if provided
+            if hub_buffer_size is not None:
+                self._telemetry_hub.set_run_buffer_size(run_id, hub_buffer_size)
+                self.log_constant( 
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message="Set hub buffer size for run",
+                    extra={
+                        "run_id": run_id,
+                        "hub_buffer_size": hub_buffer_size,
+                    },
+                )
+            
             self.log_constant( 
                 LOG_UI_MAINWINDOW_TRACE,
                 message="Set buffer sizes for run",
@@ -1092,6 +1107,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     "run_id": run_id,
                     "step_buffer_size": step_buffer_size,
                     "episode_buffer_size": episode_buffer_size,
+                    "hub_buffer_size": hub_buffer_size,
                 },
             )
         except Exception as e:
@@ -1266,7 +1282,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         try:
             # Get the presenter registry and resolve the worker presenter
             registry = get_worker_presenter_registry()
-            worker_id = "spade_bdi_rl"  # TODO: Extract from config/payload if supporting multiple workers
+            worker_id = "spade_bdi_rl_worker"  # TODO: Extract from config/payload if supporting multiple workers
             presenter = registry.get(worker_id)
             
             if presenter is None:

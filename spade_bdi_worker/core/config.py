@@ -18,7 +18,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_WORKER_CONFIG_UI_PATH,
     LOG_WORKER_CONFIG_DURABLE_PATH,
 )
-from spade_bdi_rl.constants import (
+from spade_bdi_worker.constants import (
     DEFAULT_STEP_DELAY_S,
     DEFAULT_WORKER_TELEMETRY_BUFFER_SIZE,
     DEFAULT_WORKER_EPISODE_BUFFER_SIZE,

@@ -69,7 +69,7 @@ class WorkerPresenterRegistry:
         """Register a presenter for a worker.
 
         Args:
-            worker_id: Unique identifier for the worker (e.g., 'spade_bdi_rl')
+            worker_id: Unique identifier for the worker (e.g., 'spade_bdi_rl_worker')
             presenter: WorkerPresenter instance
 
         Raises:

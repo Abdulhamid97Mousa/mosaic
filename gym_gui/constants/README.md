@@ -8,7 +8,7 @@ This package consolidates all project-wide configuration constants into a single
 
 All constants are defined in domain-specific modules and re-exported through the central `__init__.py`:
 
-```
+```bash
 gym_gui/constants/
 ├── __init__.py                    # Main exports, backwards compatibility wrappers
 ├── constants_core.py              # Episode counter, worker ID, persistence
@@ -72,6 +72,7 @@ Episode counter bounds, formatting, worker ID configuration for distributed roll
 | `RESUME_CAPACITY_WARNING_THRESHOLD` | float | 0.95 | Warn if using >95% of counter capacity on resume |
 
 **Dataclass:** `EpisodeCounterConfig(frozen=True)`
+
 - `max_episodes_per_run`: int
 - `counter_width`: int
 - `worker_id_width`: int
@@ -80,6 +81,7 @@ Episode counter bounds, formatting, worker ID configuration for distributed roll
 - `.max_counter_value` property
 
 **Functions:**
+
 - `format_episode_id(run_id, ep_index, worker_id=None)` → str
 - `run_id` values are 26-character ULIDs (`01ARZ3NDEKTSV4RRFFQ69G5FAV`), generated when
   the trainer validates a submission. ULIDs remain lexicographically sortable so
@@ -89,6 +91,7 @@ Episode counter bounds, formatting, worker ID configuration for distributed roll
 - `parse_episode_id(episode_id)` → dict[str, str | int | None]
 
 **Error Messages:**
+
 - `COUNTER_NOT_INITIALIZED_ERROR`
 - `MAX_EPISODES_REACHED_ERROR`
 - `COUNTER_EXCEEDS_MAX_ERROR`
@@ -96,25 +99,29 @@ Episode counter bounds, formatting, worker ID configuration for distributed roll
 - `COUNTER_CAPACITY_EXCEEDED_ERROR`
 
 **Database Columns:**
+
 - `EPISODE_ID_COLUMN = "episode_id"`
 - `EP_INDEX_COLUMN = "ep_index"`
 - `WORKER_ID_COLUMN = "worker_id"`
 - `MAX_EPISODES_COLUMN = "max_episodes_per_run"`
 
 #### Example: Single-Process Episode ID
-```
+
+```bash
 run_id = "01ARZ3NDEKTSV4RRFFQ69G5FAV"  # ULID
 ep_index = 42
 format_episode_id(run_id, ep_index)  # "01ARZ3NDEKTSV4RRFFQ69G5FAV-ep000042"
 ```
 
 #### Example: Multi-Worker (Distributed) Episode ID
-```
+
+```bash
 worker_id = "w001"
 format_episode_id(run_id, ep_index, worker_id)  # "01ARZ3NDEKTSV4RRFFQ69G5FAV-ww001-ep000042"
 ```
 
 **DB Constraints:**
+
 - Single-process: `UNIQUE(run_id, ep_index)`
 - Distributed: `UNIQUE(run_id, worker_id, ep_index)` (when worker_id is not NULL)
 
@@ -145,6 +152,7 @@ Render delay ranges, training speed config, buffer sizing for telemetry and epis
 | `BUFFER_BUFFER_MIN` | int | 256 | Backwards-compat alias for TELEMETRY_BUFFER_MIN |
 
 **Dataclasses:**
+
 - `RenderDefaults`: Render delay configuration
 - `SliderDefaults`: Training speed slider configuration
 - `BufferDefaults`: Buffer sizing defaults
@@ -179,6 +187,7 @@ Queue and buffer sizes for telemetry infrastructure, credit system, logging leve
 | `MIN_CREDITS_THRESHOLD` | int | 100 | Threshold before requesting credit refill |
 
 **Logging Levels:**
+
 - `STEP_LOG_LEVEL = logging.DEBUG`
 - `BATCH_LOG_LEVEL = logging.INFO`
 - `ERROR_LOG_LEVEL = logging.ERROR`
@@ -190,6 +199,7 @@ Queue and buffer sizes for telemetry infrastructure, credit system, logging leve
 RunBus queue configuration, event fan-out bounds, telemetry streaming, credit system.
 
 **Dataclasses:**
+
 - `RunBusQueueDefaults`: Queue sizing for RunBus components
 - `RunEventDefaults`: Event fan-out bounds and configuration
 - `TelemetryStreamDefaults`: Streaming history and buffering
@@ -199,6 +209,7 @@ RunBus queue configuration, event fan-out bounds, telemetry streaming, credit sy
 - `BusDefaults`: Aggregated bus-level configuration (includes all above)
 
 **Usage:**
+
 ```python
 from gym_gui.constants import BUS_DEFAULTS
 
@@ -213,6 +224,7 @@ credit_limit = BUS_DEFAULTS.credit_defaults.credit_limit
 Database sink batching, health monitoring, trainer registry bounds.
 
 **Dataclasses:**
+
 - `TelemetryDBSinkDefaults`: DB writer queue, batch size, checkpoint interval
 - `HealthMonitorDefaults`: Heartbeat interval, timeout thresholds
 - `RegistryDefaults`: Trainer registry persistence bounds
@@ -225,6 +237,7 @@ Database sink batching, health monitoring, trainer registry bounds.
 gRPC client configuration, daemon lifecycle, retry policies, training run schema.
 
 **Dataclasses:**
+
 - `TrainerClientDefaults`: gRPC endpoint, timeouts, keepalive settings
 - `TrainerDaemonDefaults`: Daemon startup/shutdown, event loop config
 - `TrainerRetryDefaults`: Retry policy, exponential backoff, max attempts

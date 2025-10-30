@@ -20,7 +20,7 @@ from .spade_bdi_rl_worker_presenter import SpadeBdiWorkerPresenter
 
 # Create and auto-register default presenters
 _registry = WorkerPresenterRegistry()
-_registry.register("spade_bdi_rl", SpadeBdiWorkerPresenter())
+_registry.register("spade_bdi_rl_worker", SpadeBdiWorkerPresenter())
 
 
 def get_worker_presenter_registry() -> WorkerPresenterRegistry:

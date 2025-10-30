@@ -17,12 +17,32 @@ def _utc_timestamp_ns() -> int:
 class TelemetryEmitter:
     """Handle emission of newline-delimited JSON telemetry events."""
 
-    def __init__(self, stream: IO[str] | None = None) -> None:
+    def __init__(self, stream: IO[str] | None = None, disabled: bool = False) -> None:
         self._stream: IO[str] = stream or sys.stdout
+        self._disabled: bool = disabled
 
     def emit(self, event_type: str, **fields: Any) -> None:
+        if self._disabled:
+            return  # Skip emission when disabled
         ts_ns = _utc_timestamp_ns()
         # Emit both ts (ISO format) and ts_unix_ns for compatibility
+        payload: Dict[str, Any] = {
+            "type": event_type,
+            "ts": datetime.fromtimestamp(ts_ns / 1e9, tz=timezone.utc).isoformat(),
+            "ts_unix_ns": ts_ns,
+            **fields,
+        }
+        json.dump(payload, self._stream, separators=(",", ":"))
+        self._stream.write("\n")
+        self._stream.flush()
+
+    def emit_lifecycle(self, event_type: str, **fields: Any) -> None:
+        """Emit lifecycle events bypassing the disabled flag.
+
+        Lifecycle events (run_started, run_completed) should always be emitted
+        so the trainer daemon can track run state, even in fast mode.
+        """
+        ts_ns = _utc_timestamp_ns()
         payload: Dict[str, Any] = {
             "type": event_type,
             "ts": datetime.fromtimestamp(ts_ns / 1e9, tz=timezone.utc).isoformat(),

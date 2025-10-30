@@ -299,7 +299,7 @@ class BDITrainer(HeadlessTrainer):
         # seed = base seed (self.config.seed) for reproducibility
         # episode (display) = seed + episode_index
         episode = self.config.seed + episode_index
-        return {
+        metadata = {
             "control_mode": "bdi_agent",
             "run_id": self.config.run_id,
             "agent_id": self.config.agent_id,
@@ -314,6 +314,10 @@ class BDITrainer(HeadlessTrainer):
             "bdi_enabled": True,
             "bdi_jid": self.jid,
         }
+        game_config_snapshot = self._game_config_snapshot()
+        if game_config_snapshot is not None:
+            metadata["game_config"] = dict(game_config_snapshot)
+        return metadata
 
     def _build_policy_metadata(self) -> Dict[str, Any]:
         """Build policy save metadata with BDI-specific fields."""

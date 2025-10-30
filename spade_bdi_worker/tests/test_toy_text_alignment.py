@@ -5,7 +5,7 @@ import pytest
 from gym_gui.config.game_configs import FrozenLakeConfig
 from gym_gui.core.adapters.toy_text import FrozenLakeV2Adapter
 
-from spade_bdi_rl.adapters import create_adapter
+from spade_bdi_worker.adapters import create_adapter
 
 
 @pytest.mark.parametrize(

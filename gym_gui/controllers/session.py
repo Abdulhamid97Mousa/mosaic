@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Qt session controller that bridges Gym adapters to the GUI."""
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, replace, asdict, is_dataclass
 import hashlib
 import logging
 from datetime import datetime
@@ -653,6 +653,9 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             "run_id": run_id,
             "worker_id": worker_id,
         }
+        game_config_snapshot = self._game_config_snapshot()
+        if game_config_snapshot is not None:
+            self._episode_metadata["game_config"] = game_config_snapshot
         self._episode_active = True
         self._last_step = None
         if self._telemetry is not None:
@@ -685,6 +688,9 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         info_payload = dict(snapshot.info)
         if input_source is not None:
             info_payload.setdefault("input_source", input_source)
+        game_config_snapshot = self._game_config_snapshot()
+        if game_config_snapshot is not None:
+            info_payload.setdefault("game_config", game_config_snapshot)
         # Ensure telemetry StepRecord mirrors the augmented snapshot information.
         agent_id = step.agent_id or getattr(step.state, "active_agent", None)
         if agent_id is None and self._actor_service is not None:
@@ -867,6 +873,32 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             seed=self._current_seed,
             info=info_payload,
         )
+
+    def _json_safe(self, value: Any) -> Any:
+        """Coerce nested telemetry values into JSON-serialisable structures."""
+        if isinstance(value, Mapping):
+            return {key: self._json_safe(item) for key, item in value.items()}
+        if isinstance(value, (list, tuple, set)):
+            return [self._json_safe(item) for item in value]
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        return str(value)
+
+    def _game_config_snapshot(self) -> dict[str, Any] | None:
+        """Return the active game configuration as a JSON-safe mapping."""
+        config = self._game_config
+        if config is None:
+            return None
+        if is_dataclass(config):
+            snapshot: Any = asdict(config)
+        elif isinstance(config, Mapping):
+            snapshot = dict(config)
+        else:
+            snapshot = None
+        if not snapshot:
+            return None
+        safe_snapshot = self._json_safe(snapshot)
+        return safe_snapshot if isinstance(safe_snapshot, dict) else None
 
     def _coalesce_render_hint(self, step: AdapterStep) -> dict[str, Any] | None:
         if step.render_hint:

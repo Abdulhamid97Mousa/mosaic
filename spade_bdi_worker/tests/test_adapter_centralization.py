@@ -22,13 +22,13 @@ class TestAdapterImports:
 
     def test_import_adapter_factory(self):
         """Worker adapter factory imports successfully."""
-        from spade_bdi_rl.adapters import create_adapter, AdapterType
+        from spade_bdi_worker.adapters import create_adapter, AdapterType
         assert create_adapter is not None
         assert AdapterType is not None
 
     def test_import_gui_adapters_via_factory(self):
         """GUI adapters are accessible via factory module."""
-        from spade_bdi_rl.adapters import (
+        from spade_bdi_worker.adapters import (
             FrozenLakeAdapter,
             FrozenLakeV2Adapter,
             CliffWalkingAdapter,
@@ -41,7 +41,7 @@ class TestAdapterImports:
 
     def test_adapters_are_gui_classes(self):
         """Imported adapters are actually GUI adapter classes."""
-        from spade_bdi_rl.adapters import FrozenLakeAdapter
+        from spade_bdi_worker.adapters import FrozenLakeAdapter
         from gym_gui.core.adapters.toy_text import FrozenLakeAdapter as GUIAdapter
         assert FrozenLakeAdapter is GUIAdapter
 
@@ -51,35 +51,35 @@ class TestAdapterCreation:
 
     def test_create_frozenlake_v1(self):
         """FrozenLake-v1 adapter can be created."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         adapter = create_adapter("FrozenLake-v1")
         assert adapter is not None
         assert adapter.id == "FrozenLake-v1"
 
     def test_create_frozenlake_v2(self):
         """FrozenLake-v2 adapter can be created."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         adapter = create_adapter("FrozenLake-v2")
         assert adapter is not None
         assert adapter.id == "FrozenLake-v2"
 
     def test_create_cliffwalking(self):
         """CliffWalking adapter can be created."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         adapter = create_adapter("CliffWalking-v0")
         assert adapter is not None
         assert adapter.id == "CliffWalking-v1"
 
     def test_create_taxi(self):
         """Taxi adapter can be created."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         adapter = create_adapter("Taxi-v3")
         assert adapter is not None
         assert adapter.id == "Taxi-v3"
 
     def test_create_with_game_config(self):
         """Adapter can be created with game_config parameter."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         from gym_gui.config.game_configs import FrozenLakeConfig
         
         config = FrozenLakeConfig(
@@ -93,7 +93,7 @@ class TestAdapterCreation:
 
     def test_create_invalid_game_raises(self):
         """Creating adapter with invalid game_id raises ValueError."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         
         with pytest.raises(ValueError, match="Unsupported game_id"):
             create_adapter("InvalidGame-v1")
@@ -104,7 +104,7 @@ class TestAdapterLifecycle:
 
     def test_adapter_requires_load(self):
         """GUI adapters require load() before use."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         
         adapter = create_adapter("FrozenLake-v1")
         # Should raise AdapterNotReadyError if we try to use without loading
@@ -113,7 +113,7 @@ class TestAdapterLifecycle:
 
     def test_adapter_load_and_reset(self):
         """Adapter can be loaded and reset."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         
         adapter = create_adapter("FrozenLake-v1")
         adapter.load()
@@ -125,7 +125,7 @@ class TestAdapterLifecycle:
 
     def test_adapter_step_returns_adapterstep(self):
         """Adapter step() returns AdapterStep object."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         
         adapter = create_adapter("FrozenLake-v1")
         adapter.load()
@@ -141,7 +141,7 @@ class TestAdapterLifecycle:
 
     def test_observation_is_int(self):
         """Observation from toy-text adapters is an integer state."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         
         adapter = create_adapter("FrozenLake-v1")
         adapter.load()
@@ -157,7 +157,7 @@ class TestAdapterDefaults:
 
     def test_frozenlake_v1_defaults(self):
         """FrozenLake-v1 uses correct default dimensions."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         from gym_gui.constants.constants_game import FROZEN_LAKE_DEFAULTS
         
         adapter = create_adapter("FrozenLake-v1")
@@ -168,7 +168,7 @@ class TestAdapterDefaults:
 
     def test_frozenlake_v2_defaults(self):
         """FrozenLake-v2 uses correct default dimensions."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         from gym_gui.constants.constants_game import FROZEN_LAKE_V2_DEFAULTS
         
         adapter = create_adapter("FrozenLake-v2")
@@ -179,7 +179,7 @@ class TestAdapterDefaults:
 
     def test_cliffwalking_defaults(self):
         """CliffWalking uses correct default dimensions."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         from gym_gui.constants.constants_game import CLIFF_WALKING_DEFAULTS
         
         adapter = create_adapter("CliffWalking-v0")
@@ -192,7 +192,7 @@ class TestWorkerConstants:
 
     def test_worker_specific_constants_exist(self):
         """Worker-specific constants are retained."""
-        from spade_bdi_rl import constants
+        from spade_bdi_worker import constants
         
         # Agent credentials
         assert hasattr(constants, "DEFAULT_AGENT_JID")
@@ -218,7 +218,7 @@ class TestWorkerConstants:
 
     def test_game_constants_removed(self):
         """Game-related constants are removed."""
-        from spade_bdi_rl import constants
+        from spade_bdi_worker import constants
         
         # These should NOT exist
         assert not hasattr(constants, "DEFAULT_FROZEN_LAKE_GRID")
@@ -232,7 +232,7 @@ class TestAdapterMethods:
 
     def test_state_to_pos(self):
         """Adapter can convert state to position."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         
         adapter = create_adapter("FrozenLake-v1")
         adapter.load()
@@ -251,7 +251,7 @@ class TestAdapterMethods:
 
     def test_get_grid_width_method(self):
         """Adapter exposes grid width method."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         
         adapter = create_adapter("FrozenLake-v1")
         adapter.load()
@@ -266,7 +266,7 @@ class TestAdapterMethods:
 
     def test_goal_pos_method(self):
         """FrozenLake adapter has goal_pos method."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         
         adapter = create_adapter("FrozenLake-v1")
         adapter.load()
@@ -285,7 +285,7 @@ class TestFrozenLakeV2MapGeneration:
 
     def test_custom_grid_size(self):
         """FrozenLake-v2 respects custom grid size."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         from gym_gui.config.game_configs import FrozenLakeConfig
         
         config = FrozenLakeConfig(
@@ -303,7 +303,7 @@ class TestFrozenLakeV2MapGeneration:
 
     def test_custom_goal_position(self):
         """FrozenLake-v2 respects custom goal position."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         from gym_gui.config.game_configs import FrozenLakeConfig
         
         config = FrozenLakeConfig(
@@ -319,7 +319,7 @@ class TestFrozenLakeV2MapGeneration:
 
     def test_uses_official_map_when_matching(self):
         """FrozenLake-v2 uses official map when conditions match."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         from gym_gui.constants.constants_game import FROZEN_LAKE_V2_DEFAULTS
         
         adapter = create_adapter("FrozenLake-v2")
@@ -336,7 +336,7 @@ class TestRuntimeIntegration:
 
     def test_runtime_can_reset_adapter(self):
         """Runtime pattern of unpacking reset result works."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         
         adapter = create_adapter("FrozenLake-v1")
         adapter.load()
@@ -351,7 +351,7 @@ class TestRuntimeIntegration:
 
     def test_runtime_can_step_adapter(self):
         """Runtime pattern of unpacking step result works."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         
         adapter = create_adapter("FrozenLake-v1")
         adapter.load()
@@ -377,7 +377,7 @@ class TestBDIActionsCompatibility:
 
     def test_adapter_has_state_to_pos(self):
         """Adapter has state_to_pos method for BDI actions."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         
         adapter = create_adapter("FrozenLake-v1")
         adapter.load()
@@ -388,7 +388,7 @@ class TestBDIActionsCompatibility:
 
     def test_adapter_grid_width_query(self):
         """BDI actions can query grid width from adapter."""
-        from spade_bdi_rl.adapters import create_adapter
+        from spade_bdi_worker.adapters import create_adapter
         
         adapter = create_adapter("FrozenLake-v1")
         adapter.load()

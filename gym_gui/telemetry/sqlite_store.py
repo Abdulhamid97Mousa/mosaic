@@ -791,7 +791,7 @@ class TelemetrySQLiteStore(LogConstantMixin):
     def recent_steps(self, limit: int = 100) -> Sequence[StepRecord]:
         query = (
             "SELECT episode_id, step_index, action, observation, reward, terminated, truncated, info, "
-            "render_payload, timestamp, agent_id, render_hint, frame_ref, payload_version,  run_id "
+            "render_payload, timestamp, agent_id, render_hint, frame_ref, payload_version, run_id, worker_id "
             "FROM steps ORDER BY rowid DESC LIMIT ?"
         )
         with self._connect() as conn:
@@ -799,7 +799,10 @@ class TelemetrySQLiteStore(LogConstantMixin):
         return tuple(self._row_to_step(row) for row in rows)
 
     def recent_episodes(self, limit: int = 20) -> Sequence[EpisodeRollup]:
-        query = "SELECT episode_id, total_reward, steps, terminated, truncated, metadata, timestamp, agent_id, run_id FROM episodes ORDER BY timestamp DESC LIMIT ?"
+        query = (
+            "SELECT episode_id, total_reward, steps, terminated, truncated, metadata, timestamp, agent_id, run_id, game_id, worker_id "
+            "FROM episodes ORDER BY timestamp DESC LIMIT ?"
+        )
         with self._connect() as conn:
             rows = conn.execute(query, (limit,)).fetchall()
         return tuple(self._row_to_episode(row) for row in rows)
@@ -831,7 +834,7 @@ class TelemetrySQLiteStore(LogConstantMixin):
             clauses.append("agent_id = ?")
             params.append(agent_id)
         query = (
-            "SELECT episode_id, total_reward, steps, terminated, truncated, metadata, timestamp, agent_id, run_id "
+            "SELECT episode_id, total_reward, steps, terminated, truncated, metadata, timestamp, agent_id, run_id, game_id, worker_id "
             "FROM episodes"
         )
         query += " WHERE " + " AND ".join(clauses)
@@ -898,6 +901,10 @@ class TelemetrySQLiteStore(LogConstantMixin):
 
     def _row_to_episode(self, row: Sequence) -> EpisodeRollup:
         metadata = self._deserialize_field(row[5], context="episode metadata", default={})
+        agent_id = row[7] if len(row) > 7 else None
+        run_id = row[8] if len(row) > 8 else None
+        game_id = row[9] if len(row) > 9 else None
+        worker_id = row[10] if len(row) > 10 else None
         return EpisodeRollup(
             episode_id=row[0],
             total_reward=row[1],
@@ -906,9 +913,10 @@ class TelemetrySQLiteStore(LogConstantMixin):
             truncated=bool(row[4]),
             metadata=metadata,
             timestamp=datetime.fromisoformat(row[6]) if row[6] else datetime.utcnow(),
-            agent_id=row[7] if len(row) > 7 else None,
-            run_id=row[8] if len(row) > 8 else None,
-            worker_id=row[9] if len(row) > 9 else None,
+            agent_id=agent_id,
+            run_id=run_id,
+            game_id=game_id,
+            worker_id=worker_id,
         )
 
 
