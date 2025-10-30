@@ -99,12 +99,28 @@ class BufferDefaults:
 
 
 @dataclass(frozen=True)
+class LayoutDefaults:
+    """Splitter column sizing for the main window layout."""
+
+    control_panel_min_width: int = 320
+    control_panel_default_width: int = 360
+    render_min_width: int = 640
+    render_default_width: int = 720
+    render_max_width: int | None = None
+    info_min_width: int = 260
+    info_default_width: int = 280
+    log_min_width: int = 320
+    log_default_width: int = 360
+
+
+@dataclass(frozen=True)
 class UIDefaults:
     """Aggregated UI defaults."""
 
     render: RenderDefaults = field(default_factory=RenderDefaults)
     sliders: SliderDefaults = field(default_factory=SliderDefaults)
     buffers: BufferDefaults = field(default_factory=BufferDefaults)
+    layout: LayoutDefaults = field(default_factory=LayoutDefaults)
 
 
 UI_DEFAULTS = UIDefaults()
@@ -134,4 +150,5 @@ __all__ = [
     "RenderDefaults",
     "SliderDefaults",
     "BufferDefaults",
+    "LayoutDefaults",
 ]

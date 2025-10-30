@@ -23,6 +23,7 @@ from gym_gui.config.game_configs import (
     LunarLanderConfig,
     TaxiConfig,
 )
+from gym_gui.constants import UI_DEFAULTS
 from gym_gui.config.game_config_builder import GameConfigBuilder
 from gym_gui.config.settings import Settings
 from gym_gui.core.enums import ControlMode, GameId
@@ -59,7 +60,7 @@ from gym_gui.ui.widgets.live_telemetry_tab import LiveTelemetryTab
 from gym_gui.ui.presenters.workers import (
     get_worker_presenter_registry,
 )
-from gym_gui.ui.widgets.spade_bdi_rl_worker_tabs import (
+from gym_gui.ui.widgets.spade_bdi_worker_tabs import (
     AgentReplayTab,
 )
 from gym_gui.ui.forms import get_worker_form_factory
@@ -227,25 +228,39 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
     def _build_ui(self) -> None:
         self.setWindowTitle("Gym GUI – Qt Shell")
-        self.resize(1200, 800)
+        self.resize(800, 600)
 
         central = QtWidgets.QWidget(self)
         self.setCentralWidget(central)
 
         layout = QtWidgets.QHBoxLayout(central)
-        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setContentsMargins(10, 10, 10, 10)
 
         splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal, central)
+        splitter.setChildrenCollapsible(False)
         layout.addWidget(splitter)
 
-        # Use the ControlPanelWidget created in __init__
-        splitter.addWidget(self._control_panel)
+        layout_defaults = UI_DEFAULTS.layout
+
+        # Use the ControlPanelWidget created in __init__ and wrap it in a scroll area
+        self._control_panel_scroll = QtWidgets.QScrollArea(splitter)
+        self._control_panel_scroll.setWidgetResizable(True)
+        self._control_panel_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._control_panel_scroll.setWidget(self._control_panel)
+        splitter.addWidget(self._control_panel_scroll)
+        self._control_panel_scroll.setMinimumWidth(layout_defaults.control_panel_min_width)
+        self._control_panel.setMinimumWidth(layout_defaults.control_panel_min_width)
 
         right_panel = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical, central)
         splitter.addWidget(right_panel)
         splitter.setStretchFactor(1, 1)
+        right_panel.setChildrenCollapsible(False)
+        right_panel.setMinimumWidth(layout_defaults.render_min_width)
+        if layout_defaults.render_max_width:
+            right_panel.setMaximumWidth(layout_defaults.render_max_width)
 
         self._render_group = QtWidgets.QGroupBox("Render View", right_panel)
+        self._render_group.setMinimumWidth(layout_defaults.render_min_width)
         render_layout = QtWidgets.QVBoxLayout(self._render_group)
         self._render_tabs = RenderTabs(
             self._render_group,
@@ -261,7 +276,6 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._game_info.setReadOnly(True)
         self._game_info.setOpenExternalLinks(True)
         info_layout.addWidget(self._game_info, 1)
-        splitter.addWidget(self._info_group)
 
         # Runtime Log panel (far-right column)
         self._log_group = QtWidgets.QGroupBox("Runtime Log", self)
@@ -288,13 +302,36 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._log_console.setReadOnly(True)
         self._log_console.setLineWrapMode(QtWidgets.QPlainTextEdit.LineWrapMode.NoWrap)
         log_layout.addWidget(self._log_console, 1)
-        splitter.addWidget(self._log_group)
+        self._log_group.setMinimumWidth(layout_defaults.log_min_width)
 
-        # Configure splitter stretch: control panel (left) small, right_panel (middle) large, game info (right) small, runtime log (far-right) medium
+        info_log_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical, central)
+        info_log_splitter.setChildrenCollapsible(False)
+        self._info_group.setMinimumWidth(layout_defaults.info_min_width)
+        info_log_splitter.addWidget(self._info_group)
+        info_log_splitter.addWidget(self._log_group)
+        info_log_splitter.setStretchFactor(0, 2)
+        info_log_splitter.setStretchFactor(1, 1)
+        info_log_splitter.setMinimumWidth(layout_defaults.info_min_width + layout_defaults.log_min_width)
+        info_log_splitter.setSizes(
+            [
+                layout_defaults.info_default_width,
+                layout_defaults.log_default_width,
+            ]
+        )
+        splitter.addWidget(info_log_splitter)
+
+        splitter.setSizes(
+            [
+                layout_defaults.control_panel_default_width,
+                layout_defaults.render_default_width,
+                layout_defaults.info_default_width + layout_defaults.log_default_width,
+            ]
+        )
+
+        # Configure splitter stretch: control panel (left) small, render view large, info/log column medium
         splitter.setStretchFactor(0, 1)  # Control Panel
-        splitter.setStretchFactor(1, 3)  # Render View  
-        splitter.setStretchFactor(2, 1)  # Game Info
-        splitter.setStretchFactor(3, 2)  # Runtime Log
+        splitter.setStretchFactor(1, 3)  # Render View
+        splitter.setStretchFactor(2, 2)  # Game Info + Runtime Log
 
     def _create_view_toolbar(self) -> None:
         """Create toolbar with quick toggles for key panels."""
@@ -306,7 +343,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self.addToolBar(QtCore.Qt.ToolBarArea.TopToolBarArea, self._view_toolbar)
 
         self._view_actions: dict[str, QAction] = {}
-        self._add_view_toggle("Control Panel", self._control_panel)
+        self._add_view_toggle("Control Panel", self._control_panel_scroll)
         self._add_view_toggle("Render View", self._render_group)
         self._add_view_toggle("Game Info", self._info_group)
         self._add_view_toggle("Runtime Log", self._log_group)
@@ -863,7 +900,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
     def _on_trained_agent_requested(self) -> None:
         """Handle the 'Load Trained Policy' button."""
         factory = get_worker_form_factory()
-        worker_id = "spade_bdi_rl_worker"
+        worker_id = "spade_bdi_worker"
         try:
             dialog = cast(
                 "SpadeBdiPolicySelectionForm",
@@ -903,7 +940,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
     def _on_agent_form_requested(self) -> None:
         """Open the SPADE-BDI agent training form."""
         factory = get_worker_form_factory()
-        worker_id = "spade_bdi_rl_worker"
+        worker_id = "spade_bdi_worker"
         try:
             dialog = cast(
                 "SpadeBdiTrainForm",
@@ -948,7 +985,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         """
         try:
             registry = get_worker_presenter_registry()
-            worker_id = "spade_bdi_rl_worker"
+            worker_id = "spade_bdi_worker"
             presenter = registry.get(worker_id)
             
             if presenter is None:
@@ -1282,7 +1319,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         try:
             # Get the presenter registry and resolve the worker presenter
             registry = get_worker_presenter_registry()
-            worker_id = "spade_bdi_rl_worker"  # TODO: Extract from config/payload if supporting multiple workers
+            worker_id = "spade_bdi_worker"  # TODO: Extract from config/payload if supporting multiple workers
             presenter = registry.get(worker_id)
             
             if presenter is None:

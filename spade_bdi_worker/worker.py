@@ -15,6 +15,34 @@ from .core.runtime import HeadlessTrainer
 from .core.bdi_trainer import BDITrainer
 
 
+_TRUTHY_ENV_VALUES = {"1", "true", "yes", "on"}
+
+
+def _coerce_bool(value: Any) -> bool:
+    """Best-effort conversion of various flag representations to bool."""
+    if isinstance(value, bool):
+        return value
+    if value is None:
+        return False
+    if isinstance(value, (int, float)):
+        return bool(value)
+    if isinstance(value, str):
+        return value.strip().lower() in _TRUTHY_ENV_VALUES
+    return False
+
+
+def _resolve_disable_telemetry(
+    cli_flag: bool,
+    env_value: Optional[str],
+    config_value: Any,
+) -> bool:
+    """Resolve the disable telemetry flag across CLI, environment, and config."""
+    if cli_flag:
+        return True
+    if _coerce_bool(env_value):
+        return True
+    return _coerce_bool(config_value)
+
 def _read_config_from_path(path: Path) -> Dict[str, Any]:
     with path.open("r", encoding="utf-8") as handle:
         return json.load(handle)
@@ -100,8 +128,43 @@ def main(argv: Optional[list[str]] = None) -> int:
         run_config.extra.setdefault("worker_id", run_config.worker_id)
 
     # Extract disable_telemetry flag from CLI or environment
-    disable_telemetry_flag = parsed.no_telemetry or os.environ.get("DISABLE_TELEMETRY", "").lower() == "true"
+    env_disable_value = os.environ.get("DISABLE_TELEMETRY")
+    config_disable_value = run_config.extra.get("disable_telemetry")
+    disable_telemetry_flag = _resolve_disable_telemetry(
+        parsed.no_telemetry,
+        env_disable_value,
+        config_disable_value,
+    )
     run_config.extra["disable_telemetry"] = disable_telemetry_flag
+
+    if disable_telemetry_flag and run_config.step_delay > 0:
+        run_config.step_delay = 0.0
+
+    if disable_telemetry_flag:
+        run_config.extra["telemetry_buffer_size"] = 0
+        run_config.extra["episode_buffer_size"] = 0
+        path_config = run_config.extra.get("path_config")
+        if not isinstance(path_config, dict):
+            path_config = {}
+            run_config.extra["path_config"] = path_config
+
+        ui_path = path_config.get("ui_only")
+        if not isinstance(ui_path, dict):
+            ui_path = {}
+            path_config["ui_only"] = ui_path
+        ui_path["live_rendering_enabled"] = False
+        ui_path["render_delay_ms"] = 0
+        ui_path["step_delay_ms"] = 0
+        ui_path["headless_only"] = True
+
+        telemetry_path = path_config.get("telemetry_durable")
+        if not isinstance(telemetry_path, dict):
+            telemetry_path = {}
+            path_config["telemetry_durable"] = telemetry_path
+        telemetry_path["disabled"] = True
+        telemetry_path["telemetry_buffer_size"] = telemetry_path.get("telemetry_buffer_size", 0)
+        telemetry_path["episode_buffer_size"] = telemetry_path.get("episode_buffer_size", 0)
+        telemetry_path["hub_buffer_size"] = telemetry_path.get("hub_buffer_size", 0)
 
     # Override config with CLI flags
     if parsed.grpc:

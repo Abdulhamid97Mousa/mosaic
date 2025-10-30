@@ -63,10 +63,12 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self.setWindowTitle("Agent Train Form")
         # Set larger initial size to accommodate two-column layout
         # Dialog will resize dynamically when game configuration changes
-        self.resize(1000, 800)
-        self.setMinimumWidth(800)
+        self.resize(800, 600)
+        self.setMinimumWidth(600)
 
         self._selected_config: Optional[dict[str, Any]] = None
+        # Track the user's live render preference so fast mode can restore it
+        self._cached_live_render_disabled: Optional[bool] = None
 
         self._build_ui()
         if default_game is not None:
@@ -611,8 +613,11 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._fast_training_warning.setVisible(checked)
 
         if checked:
+            # Remember the current user preference before forcing the switch
+            self._cached_live_render_disabled = self._disable_live_render_checkbox.isChecked()
             # When fast mode is on, force live rendering to be disabled
-            self._disable_live_render_checkbox.setChecked(True)
+            if not self._disable_live_render_checkbox.isChecked():
+                self._disable_live_render_checkbox.setChecked(True)
             self._disable_live_render_checkbox.setEnabled(False)
             # Also disable rendering throttles since they won't be used
             self._ui_rendering_throttle_slider.setEnabled(False)
@@ -622,6 +627,11 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             self._disable_live_render_checkbox.setEnabled(True)
             self._ui_rendering_throttle_slider.setEnabled(True)
             self._training_telemetry_throttle_slider.setEnabled(True)
+            if self._cached_live_render_disabled is not None:
+                self._disable_live_render_checkbox.setChecked(self._cached_live_render_disabled)
+                self._cached_live_render_disabled = None
+            # Ensure dependent controls reflect the restored state
+            self._update_render_control_states()
 
     def _update_render_control_states(self) -> None:
         """Enable/disable render-related controls based on toggle."""
@@ -912,6 +922,9 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
         run_name = f"{game_id.lower()}-{algorithm.split()[0].lower()}-{timestamp}"
 
+        # Get fast training mode flag
+        fast_training_mode = self._fast_training_checkbox.isChecked()
+
         # Get training telemetry throttle from slider
         # This controls how fast telemetry data is collected and written to database
         # Affects: Telemetry Recent Episodes and Telemetry Recent Steps table population speed
@@ -926,8 +939,6 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
 
         live_rendering_enabled = not self._disable_live_render_checkbox.isChecked()
 
-        # Get fast training mode flag
-        fast_training_mode = self._fast_training_checkbox.isChecked()
         # This controls the artificial delay between training steps for human observation
         # Slider value (0-100) maps to delay in seconds (0.0 to 1.0)
         ui_training_speed_value = self._ui_training_speed_slider.value()
@@ -950,14 +961,28 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             min(total_expected_steps, 50000)  # Cap at 50k to prevent excessive memory
         )
 
+        # Fast training mode completely disables UI rendering and telemetry buffers
+        if fast_training_mode:
+            live_rendering_enabled = False
+            ui_rendering_throttle = 1
+            render_delay_ms = 0
+            ui_training_speed_value = 0
+            step_delay = 0.0
+            telemetry_buffer_size = 0
+            episode_buffer_size = 0
+            hub_buffer_size = 0
+            training_telemetry_throttle = TRAINING_TELEMETRY_THROTTLE_MIN
+
+        step_delay_ms = int(round(step_delay * 1000))
         env_render_delay_ms = render_delay_ms if live_rendering_enabled else 0
 
         ui_path_settings = {
             "live_rendering_enabled": live_rendering_enabled,
             "ui_rendering_throttle": ui_rendering_throttle,
             "render_delay_ms": render_delay_ms,
-            "step_delay_ms": ui_training_speed_value * 10,
+            "step_delay_ms": step_delay_ms,
             "worker_id": worker_id,
+            "headless_only": fast_training_mode,
         }
 
         telemetry_path_settings = {
@@ -965,6 +990,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             "telemetry_buffer_size": telemetry_buffer_size,
             "episode_buffer_size": episode_buffer_size,
             "hub_buffer_size": hub_buffer_size,  # Add hub buffer size to config
+            "disabled": fast_training_mode,
         }
 
         self.log_constant(
@@ -1028,7 +1054,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 "live_rendering_enabled": live_rendering_enabled,
                 "disable_telemetry": fast_training_mode,
                 "worker_id": worker_id,
-                "ui_training_speed_ms": ui_training_speed_value * 10,
+                "ui_training_speed_ms": step_delay_ms,
                 "telemetry_buffer_size": telemetry_buffer_size,
                 "episode_buffer_size": episode_buffer_size,
                 "hyperparameters": {
@@ -1045,7 +1071,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 },
             },
             "worker": {
-                "module": "spade_bdi_rl_worker.worker",
+                "module": "spade_bdi_worker.worker",
                 "use_grpc": True,
                 "grpc_target": "127.0.0.1:50055",
                 "agent_id": worker_agent_id,
@@ -1089,7 +1115,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             "entry_point": "python",
             "arguments": [
                 "-m",
-                "spade_bdi_rl_worker.worker",
+                "spade_bdi_worker.worker",
             ],
             "environment": environment,
             "resources": {

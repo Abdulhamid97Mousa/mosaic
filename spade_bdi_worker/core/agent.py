@@ -4,8 +4,8 @@ This module provides agent lifecycle management (start, stop, setup) with
 graceful degradation. Prefers the local refactored BDIRLAgent from bdi_agent.py.
 
 If BDI capabilities are not needed, use HeadlessTrainer instead:
-   - See: spade_bdi_rl_worker.core.runtime.HeadlessTrainer
-   - Entry: spade_bdi_rl_worker.worker (JSONL telemetry output)
+   - See: spade_bdi_worker.core.runtime.HeadlessTrainer
+   - Entry: spade_bdi_worker.worker (JSONL telemetry output)
 """
 
 from __future__ import annotations

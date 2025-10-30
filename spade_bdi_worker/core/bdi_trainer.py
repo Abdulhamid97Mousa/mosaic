@@ -7,6 +7,8 @@ BDI reasoning capabilities using SPADE agents and AgentSpeak plans.
 from __future__ import annotations
 
 import asyncio
+from collections.abc import Mapping
+from dataclasses import asdict, is_dataclass
 from typing import TYPE_CHECKING, Any, Dict, Optional, Union
 
 if TYPE_CHECKING:
@@ -318,6 +320,55 @@ class BDITrainer(HeadlessTrainer):
         if game_config_snapshot is not None:
             metadata["game_config"] = dict(game_config_snapshot)
         return metadata
+
+    def _game_config_snapshot(self) -> Optional[Dict[str, Any]]:
+        """Capture immutable snapshot of the active game configuration.
+
+        Returns a plain dictionary suitable for telemetry metadata or ``None``
+        when the adapter does not expose any configuration payload."""
+
+        config_obj = getattr(self.adapter, "_game_config", None)
+        if config_obj is None:
+            config_obj = getattr(self.adapter, "defaults", None)
+        if config_obj is None:
+            return None
+
+        try:
+            if is_dataclass(config_obj) and not isinstance(config_obj, type):
+                snapshot: Dict[str, Any] = asdict(config_obj)
+            elif is_dataclass(config_obj) and isinstance(config_obj, type):
+                snapshot = {
+                    field_name: getattr(config_obj, field_name)
+                    for field_name in getattr(config_obj, "__dataclass_fields__", {})
+                }
+            elif isinstance(config_obj, Mapping):
+                snapshot = dict(config_obj)
+            else:
+                snapshot = {}
+                for attribute in dir(config_obj):
+                    if attribute.startswith("_"):
+                        continue
+                    try:
+                        value = getattr(config_obj, attribute)
+                    except AttributeError:
+                        continue
+                    if callable(value):
+                        continue
+                    snapshot[attribute] = value
+        except Exception:  # noqa: BLE001 - defensive snapshotting
+            return None
+
+        def _normalise(value: Any) -> Any:
+            if isinstance(value, tuple):
+                return [_normalise(item) for item in value]
+            if isinstance(value, list):
+                return [_normalise(item) for item in value]
+            if isinstance(value, Mapping):
+                return {k: _normalise(v) for k, v in value.items()}
+            return value
+
+        normalised = {key: _normalise(val) for key, val in snapshot.items()}
+        return normalised if normalised else None
 
     def _build_policy_metadata(self) -> Dict[str, Any]:
         """Build policy save metadata with BDI-specific fields."""

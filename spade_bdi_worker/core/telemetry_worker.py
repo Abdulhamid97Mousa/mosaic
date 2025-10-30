@@ -62,7 +62,7 @@ class TelemetryEmitter:
             config: Configuration dictionary
             **fields: Additional fields (e.g., worker_id, agent_id, etc.)
         """
-        self.emit("run_started", run_id=run_id, config=config, **fields)
+        self.emit_lifecycle("run_started", run_id=run_id, config=config, **fields)
 
     def run_completed(self, run_id: str, status: str, **fields: Any) -> None:
         """Emit run_completed event.
@@ -72,7 +72,7 @@ class TelemetryEmitter:
             status: Completion status (completed, failed, cancelled)
             **fields: Additional fields (e.g., worker_id, error, etc.)
         """
-        self.emit("run_completed", run_id=run_id, status=status, **fields)
+        self.emit_lifecycle("run_completed", run_id=run_id, status=status, **fields)
 
     def step(self, run_id: str, episode: int, step_index: int, **fields: Any) -> None:
         """Emit step event.

@@ -14,7 +14,7 @@ from pathlib import Path
 from typing import Optional
 import json
 
-from gym_gui.ui.widgets.spade_bdi_rl_worker_tabs import TabFactory
+from gym_gui.ui.widgets.spade_bdi_worker_tabs import TabFactory
 
 
 class SpadeBdiWorkerPresenter:

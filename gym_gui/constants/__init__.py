@@ -114,6 +114,7 @@ from gym_gui.constants.constants_ui import (
     DEFAULT_TELEMETRY_BUFFER_SIZE,
     EPISODE_BUFFER_MAX,
     EPISODE_BUFFER_MIN,
+    LayoutDefaults,
     RENDER_DELAY_MAX_MS,
     RENDER_DELAY_MIN_MS,
     RENDER_DELAY_TICK_INTERVAL_MS,
@@ -263,6 +264,7 @@ __all__: list[str] = [
     "UI_TRAINING_SPEED_MAX",
     "UI_TRAINING_SPEED_MIN",
     "UIDefaults",
+    "LayoutDefaults",
     # Telemetry
     "BATCH_LOG_LEVEL",
     "DB_SINK_BATCH_SIZE",

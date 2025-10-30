@@ -34,7 +34,7 @@ def test_full_training_run():
     }
     
     result = subprocess.run(
-        [sys.executable, "-m", "spade_bdi_rl_worker.worker"],
+        [sys.executable, "-m", "spade_bdi_worker.worker"],
         input=json.dumps(config),
         capture_output=True,
         text=True,
