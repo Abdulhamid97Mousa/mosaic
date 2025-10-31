@@ -97,7 +97,10 @@ class TelemetrySQLiteStore(LogConstantMixin):
                 frame_ref TEXT,
                 payload_version INTEGER NOT NULL DEFAULT 0,
                 run_id TEXT,
-                worker_id TEXT
+                worker_id TEXT,
+                space_signature BLOB,
+                vector_metadata BLOB,
+                time_step INTEGER
             )
             """
         )
@@ -166,6 +169,9 @@ class TelemetrySQLiteStore(LogConstantMixin):
             ("game_id", "ALTER TABLE steps ADD COLUMN game_id TEXT"),
             ("episode_seed", "ALTER TABLE steps ADD COLUMN episode_seed INTEGER"),
             ("worker_id", "ALTER TABLE steps ADD COLUMN worker_id TEXT"),
+            ("space_signature", "ALTER TABLE steps ADD COLUMN space_signature BLOB"),
+            ("vector_metadata", "ALTER TABLE steps ADD COLUMN vector_metadata BLOB"),
+            ("time_step", "ALTER TABLE steps ADD COLUMN time_step INTEGER"),
         ]
         for name, ddl in migrations:
             if name not in column_names:
@@ -493,10 +499,12 @@ class TelemetrySQLiteStore(LogConstantMixin):
             INSERT INTO steps (
                 episode_id, step_index, action, observation, reward,
                 terminated, truncated, info, render_payload, timestamp,
-                agent_id, render_hint, frame_ref, payload_version, run_id, game_id, worker_id
+                agent_id, render_hint, frame_ref, payload_version, run_id, game_id, worker_id,
+                space_signature, vector_metadata, time_step
             ) VALUES (:episode_id, :step_index, :action, :observation, :reward,
                 :terminated, :truncated, :info, :render_payload, :timestamp,
-                :agent_id, :render_hint, :frame_ref, :payload_version, :run_id, :game_id, :worker_id)
+                :agent_id, :render_hint, :frame_ref, :payload_version, :run_id, :game_id, :worker_id,
+                :space_signature, :vector_metadata, :time_step)
             """,
             steps,
         )
@@ -713,6 +721,15 @@ class TelemetrySQLiteStore(LogConstantMixin):
             "run_id": record.run_id,
             "game_id": game_id,
             "worker_id": record.worker_id,
+            "space_signature": self._serialize_field(
+                record.space_signature, context="space signature"
+            ),
+            "vector_metadata": self._serialize_field(
+                record.vector_metadata, context="vector metadata"
+            ),
+            "time_step": int(record.time_step)
+            if record.time_step is not None
+            else None,
         }
 
     def _prepare_step_payload(self, record: StepRecord) -> tuple[dict[str, object], int]:
@@ -723,7 +740,14 @@ class TelemetrySQLiteStore(LogConstantMixin):
     @staticmethod
     def _payload_size(payload: dict[str, object]) -> int:
         size = 0
-        for key in ("observation", "info", "render_payload", "render_hint"):
+        for key in (
+            "observation",
+            "info",
+            "render_payload",
+            "render_hint",
+            "space_signature",
+            "vector_metadata",
+        ):
             value = payload.get(key)
             if isinstance(value, (bytes, bytearray, memoryview)):
                 size += len(value)
@@ -791,7 +815,8 @@ class TelemetrySQLiteStore(LogConstantMixin):
     def recent_steps(self, limit: int = 100) -> Sequence[StepRecord]:
         query = (
             "SELECT episode_id, step_index, action, observation, reward, terminated, truncated, info, "
-            "render_payload, timestamp, agent_id, render_hint, frame_ref, payload_version, run_id, worker_id "
+            "render_payload, timestamp, agent_id, render_hint, frame_ref, payload_version, run_id, worker_id, "
+            "space_signature, vector_metadata, time_step "
             "FROM steps ORDER BY rowid DESC LIMIT ?"
         )
         with self._connect() as conn:
@@ -810,7 +835,7 @@ class TelemetrySQLiteStore(LogConstantMixin):
     def episode_steps(self, episode_id: str) -> Sequence[StepRecord]:
         query = (
             "SELECT episode_id, step_index, action, observation, reward, terminated, truncated, info, render_payload, "
-            "timestamp, agent_id, render_hint, frame_ref, payload_version "
+            "timestamp, agent_id, render_hint, frame_ref, payload_version, run_id, worker_id, space_signature, vector_metadata, time_step "
             "FROM steps WHERE episode_id = ? ORDER BY step_index ASC"
         )
         with self._connect() as conn:
@@ -880,6 +905,22 @@ class TelemetrySQLiteStore(LogConstantMixin):
         payload_version = int(row[13]) if len(row) > 13 and row[13] is not None else 0
         run_id = row[14] if len(row) > 14 else None
         worker_id = row[15] if len(row) > 15 else None
+        space_signature = None
+        if len(row) > 16:
+            space_signature = self._deserialize_field(
+                row[16], context="space signature", default=None
+            )
+        vector_metadata = None
+        if len(row) > 17:
+            vector_metadata = self._deserialize_field(
+                row[17], context="vector metadata", default=None
+            )
+        time_step = None
+        if len(row) > 18 and row[18] is not None:
+            try:
+                time_step = int(row[18])
+            except (TypeError, ValueError):
+                time_step = None
         return StepRecord(
             episode_id=row[0],
             step_index=row[1],
@@ -897,6 +938,9 @@ class TelemetrySQLiteStore(LogConstantMixin):
             payload_version=payload_version,
             run_id=run_id,
             worker_id=worker_id,
+            space_signature=space_signature,
+            vector_metadata=vector_metadata,
+            time_step=time_step,
         )
 
     def _row_to_episode(self, row: Sequence) -> EpisodeRollup:

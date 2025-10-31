@@ -847,6 +847,42 @@ LOG_SERVICE_ACTOR_SEED_ERROR = _constant(
     tags=_tags("service", "actor", "seeding", "error"),
 )
 
+LOG_SCHEMA_MISMATCH = _constant(
+    "LOG668",
+    "WARNING",
+    "Telemetry payload failed schema validation",
+    component="Service",
+    subcomponent="Telemetry",
+    tags=_tags("telemetry", "schema", "validation"),
+)
+
+LOG_VECTOR_AUTORESET_MODE = _constant(
+    "LOG669",
+    "WARNING",
+    "Unsupported vector autoreset mode encountered",
+    component="Service",
+    subcomponent="Telemetry",
+    tags=_tags("telemetry", "vector", "schema"),
+)
+
+LOG_SPACE_DESCRIPTOR_MISSING = _constant(
+    "LOG670",
+    "WARNING",
+    "Space descriptor missing from telemetry payload",
+    component="Service",
+    subcomponent="Telemetry",
+    tags=_tags("telemetry", "schema", "space"),
+)
+
+LOG_NORMALIZATION_STATS_DROPPED = _constant(
+    "LOG671",
+    "INFO",
+    "Normalization statistics absent for schema-enabled payload",
+    component="Service",
+    subcomponent="Telemetry",
+    tags=_tags("telemetry", "schema", "normalization"),
+)
+
 # ---------------------------------------------------------------------------
 # Runtime/application constants (LOG680–LOG683)
 # ---------------------------------------------------------------------------
@@ -1600,6 +1636,10 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_SERVICE_VALIDATION_DEBUG,
     LOG_SERVICE_VALIDATION_WARNING,
     LOG_SERVICE_VALIDATION_ERROR,
+    LOG_SCHEMA_MISMATCH,
+    LOG_VECTOR_AUTORESET_MODE,
+    LOG_SPACE_DESCRIPTOR_MISSING,
+    LOG_NORMALIZATION_STATS_DROPPED,
     LOG_SERVICE_ACTOR_SEED_ERROR,
     LOG_RUNTIME_APP_DEBUG,
     LOG_RUNTIME_APP_INFO,

@@ -78,6 +78,14 @@ def test_train_form_emits_dual_path_logs(qt_app, caplog, monkeypatch):
         worker_path = config["metadata"]["worker"]["config"]["path_config"]
         assert worker_path["telemetry_durable"]["telemetry_buffer_size"] == 4096
         assert worker_path["ui_only"]["render_delay_ms"] == 150
+
+        worker_config = config["metadata"]["worker"]["config"]
+        assert worker_config["schema_id"] == "telemetry.step.default"
+        assert worker_config["schema_version"] == 1
+        assert isinstance(worker_config["schema_definition"], dict)
+        ui_meta_root = config["metadata"]["ui"]
+        assert ui_meta_root["schema_id"] == "telemetry.step.default"
+        assert ui_meta_root["schema_version"] == 1
     finally:
         form.deleteLater()
 
@@ -105,6 +113,9 @@ def test_fast_training_mode_clears_ui_and_telemetry_paths(qt_app, monkeypatch):
         worker_config = config["metadata"]["worker"]["config"]
         assert worker_config["step_delay"] == 0.0
         assert worker_config["extra"]["disable_telemetry"] is True
+        assert worker_config["schema_id"] == "telemetry.step.default"
+        assert worker_config["schema_version"] == 1
+        assert isinstance(worker_config["schema_definition"], dict)
 
         ui_path = worker_config["path_config"]["ui_only"]
         assert ui_path["live_rendering_enabled"] is False
@@ -122,5 +133,7 @@ def test_fast_training_mode_clears_ui_and_telemetry_paths(qt_app, monkeypatch):
         assert ui_metadata["live_rendering_enabled"] is False
         assert ui_metadata["telemetry_buffer_size"] == 0
         assert ui_metadata["episode_buffer_size"] == 0
+        assert ui_metadata["schema_id"] == "telemetry.step.default"
+        assert ui_metadata["schema_version"] == 1
     finally:
         form.deleteLater()

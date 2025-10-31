@@ -6,7 +6,7 @@ from dataclasses import dataclass, replace, asdict, is_dataclass
 import hashlib
 import logging
 from datetime import datetime
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, cast
 
 import gymnasium.spaces as spaces
 import numpy as np
@@ -28,13 +28,25 @@ from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.core.enums import ControlMode, GameId, EnvironmentFamily, ENVIRONMENT_FAMILY_BY_GAME
 from gym_gui.core.run_counter_manager import RunCounterManager
 from gym_gui.constants import format_episode_id
+from gym_gui.constants.constants_vector import SUPPORTED_AUTORESET_MODES
+from gym_gui.constants.constants_telemetry import (
+    TELEMETRY_KEY_AUTORESET_MODE,
+    TELEMETRY_KEY_SPACE_SIGNATURE,
+    TELEMETRY_KEY_TIME_STEP,
+    TELEMETRY_KEY_VECTOR_METADATA,
+)
+from gym_gui.core.spaces.vector_metadata import extract_vector_step_details
+from gym_gui.core.schema import schema_registry
 from gym_gui.core.factories.adapters import create_adapter, get_adapter_cls
 from gym_gui.logging_config.log_constants import (
+    LOG_NORMALIZATION_STATS_DROPPED,
+    LOG_SCHEMA_MISMATCH,
     LOG_SESSION_ADAPTER_LOAD_ERROR,
-    LOG_SESSION_STEP_ERROR,
     LOG_SESSION_EPISODE_ERROR,
+    LOG_SESSION_STEP_ERROR,
     LOG_SESSION_TIMER_PRECISION_WARNING,
-    
+    LOG_SPACE_DESCRIPTOR_MISSING,
+    LOG_VECTOR_AUTORESET_MODE,
 )
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.services.actor import ActorService, EpisodeSummary, StepSnapshot
@@ -111,6 +123,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._user_idle_interval: int | None = None
         self._current_idle_interval = self._idle_timer.interval()
         self._awaiting_human = False
+        self._schema_alerts_emitted: set[str] = set()
         self._pending_input_label: str | None = None
         self._last_agent_position: tuple[int, int] | None = None
         self._timers = SessionTimers()
@@ -253,6 +266,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._adapter = adapter
         self._game_id = game_id
         self._control_mode = control_mode
+        self._schema_alerts_emitted.clear()
         self._game_config = game_config
         self._step_index = 0
         self._turn = "human"
@@ -297,6 +311,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._game_started = False  # Reset requires "Start Game" again
         self._game_paused = False
         self._awaiting_human = False
+        self._schema_alerts_emitted.clear()
         self._begin_episode(self._game_id, self._control_mode)
         self.step_processed.emit(step, self._step_index)
         self._update_status(step, prefix="Environment reset")
@@ -691,6 +706,155 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         game_config_snapshot = self._game_config_snapshot()
         if game_config_snapshot is not None:
             info_payload.setdefault("game_config", game_config_snapshot)
+
+        adapter = self._adapter
+        space_signature: Mapping[str, Any] | None = None
+        vector_metadata: Mapping[str, Any] | None = None
+        time_step_value: int | None = None
+        raw_episode_step = cast(Any, snapshot.info.get("episode_step"))
+        if raw_episode_step is not None:
+            try:
+                time_step_value = int(raw_episode_step)
+            except (TypeError, ValueError, OverflowError):  # pragma: no cover - defensive
+                time_step_value = None
+        if adapter is not None:
+            raw_signature = adapter.space_signature
+            if raw_signature:
+                space_signature = dict(raw_signature)
+            raw_vector_metadata = adapter.vector_metadata
+            if raw_vector_metadata:
+                vector_metadata = dict(raw_vector_metadata)
+            if time_step_value is None:
+                time_step_value = adapter.elapsed_steps()
+
+        step_vector_details = extract_vector_step_details(step.info)
+        combined_vector_metadata: Mapping[str, Any] | None = vector_metadata
+        if step_vector_details:
+            normalized_details: dict[str, Any] = {}
+            for key, value in step_vector_details.items():
+                if hasattr(value, "tolist"):
+                    try:
+                        normalized_details[key] = value.tolist()
+                        continue
+                    except Exception:  # pragma: no cover - defensive conversion
+                        pass
+                normalized_details[key] = value
+            if combined_vector_metadata is not None:
+                merged = dict(combined_vector_metadata)
+                merged.update(normalized_details)
+                combined_vector_metadata = merged
+            else:
+                combined_vector_metadata = normalized_details
+
+        if time_step_value is None:
+            time_step_value = self._step_index
+
+        if space_signature is not None:
+            info_payload.setdefault(TELEMETRY_KEY_SPACE_SIGNATURE, space_signature)
+        if combined_vector_metadata is not None:
+            info_payload.setdefault(TELEMETRY_KEY_VECTOR_METADATA, combined_vector_metadata)
+            autoreset_value = combined_vector_metadata.get(TELEMETRY_KEY_AUTORESET_MODE)
+            if autoreset_value is not None:
+                info_payload.setdefault(TELEMETRY_KEY_AUTORESET_MODE, autoreset_value)
+        if time_step_value is not None:
+            info_payload.setdefault(TELEMETRY_KEY_TIME_STEP, time_step_value)
+
+        schema_key = None
+        if self._game_id is not None:
+            schema_key = self._game_id.value
+        schema = schema_registry.get(schema_key) or schema_registry.get("default")
+        if schema is not None:
+            missing_required = [
+                field
+                for field in schema.required_fields
+                if field not in info_payload
+            ]
+            if missing_required:
+                cache_key = f"schema_missing:{','.join(sorted(missing_required))}"
+                if cache_key not in self._schema_alerts_emitted:
+                    self._schema_alerts_emitted.add(cache_key)
+                    self.log_constant(
+                        LOG_SCHEMA_MISMATCH,
+                        extra={
+                            "game_id": schema_key or "unknown",
+                            "missing": sorted(missing_required),
+                            "schema_id": schema.schema_id,
+                        },
+                    )
+            if space_signature is None:
+                cache_key = "space_signature_missing"
+                if cache_key not in self._schema_alerts_emitted:
+                    self._schema_alerts_emitted.add(cache_key)
+                    self.log_constant(
+                        LOG_SPACE_DESCRIPTOR_MISSING,
+                        extra={
+                            "game_id": schema_key or "unknown",
+                            "schema_id": schema.schema_id,
+                        },
+                    )
+            if schema.vector_metadata is not None:
+                if combined_vector_metadata is None:
+                    cache_key = "vector_metadata_missing"
+                    if cache_key not in self._schema_alerts_emitted:
+                        self._schema_alerts_emitted.add(cache_key)
+                        self.log_constant(
+                            LOG_SCHEMA_MISMATCH,
+                            extra={
+                                "game_id": schema_key or "unknown",
+                                "missing": [TELEMETRY_KEY_VECTOR_METADATA],
+                                "schema_id": schema.schema_id,
+                            },
+                        )
+                else:
+                    vector_missing = [
+                        key
+                        for key in schema.vector_metadata.required_keys
+                        if key not in combined_vector_metadata
+                    ]
+                    if vector_missing:
+                        cache_key = f"vector_missing:{','.join(sorted(vector_missing))}"
+                        if cache_key not in self._schema_alerts_emitted:
+                            self._schema_alerts_emitted.add(cache_key)
+                            self.log_constant(
+                                LOG_SCHEMA_MISMATCH,
+                                extra={
+                                    "game_id": schema_key or "unknown",
+                                    "missing": sorted(vector_missing),
+                                    "schema_id": schema.schema_id,
+                                },
+                            )
+                    autoreset_value = combined_vector_metadata.get(TELEMETRY_KEY_AUTORESET_MODE)
+                    if (
+                        autoreset_value
+                        and autoreset_value not in SUPPORTED_AUTORESET_MODES
+                    ):
+                        cache_key = f"autoreset:{autoreset_value}"
+                        if cache_key not in self._schema_alerts_emitted:
+                            self._schema_alerts_emitted.add(cache_key)
+                            self.log_constant(
+                                LOG_VECTOR_AUTORESET_MODE,
+                                extra={
+                                    "autoreset_mode": autoreset_value,
+                                    "supported": sorted(SUPPORTED_AUTORESET_MODES),
+                                },
+                            )
+
+        if (
+            combined_vector_metadata
+            and combined_vector_metadata.get("vectorized")
+            and "normalization_stats" not in info_payload
+        ):
+            cache_key = "normalization_stats_missing"
+            if cache_key not in self._schema_alerts_emitted:
+                self._schema_alerts_emitted.add(cache_key)
+                self.log_constant(
+                    LOG_NORMALIZATION_STATS_DROPPED,
+                    extra={
+                        "game_id": schema_key or "unknown",
+                        "reason": "normalization stats missing in vector payload",
+                    },
+                )
+
         # Ensure telemetry StepRecord mirrors the augmented snapshot information.
         agent_id = step.agent_id or getattr(step.state, "active_agent", None)
         if agent_id is None and self._actor_service is not None:
@@ -731,6 +895,9 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             payload_version=payload_version,
             run_id=run_id,
             worker_id=worker_id,
+            time_step=time_step_value,
+            space_signature=space_signature,
+            vector_metadata=combined_vector_metadata,
         )
         if self._telemetry is not None:
             self._telemetry.record_step(record)

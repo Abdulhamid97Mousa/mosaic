@@ -16,6 +16,7 @@ VAR_CACHE_DIR = VAR_ROOT / "cache"
 VAR_TMP_DIR = VAR_ROOT / "tmp"
 VAR_LOGS_DIR = VAR_ROOT / "logs"
 VAR_TRAINER_DIR = VAR_ROOT / "trainer"
+VAR_TENSORBOARD_DIR = VAR_TRAINER_DIR / "runs"
 VAR_TRAINER_DB = VAR_TRAINER_DIR / "trainer.sqlite"
 VAR_DATA_DIR = VAR_ROOT / "data"
 
@@ -32,6 +33,7 @@ def ensure_var_directories() -> None:
         VAR_TMP_DIR,
         VAR_LOGS_DIR,
         VAR_TRAINER_DIR,
+        VAR_TENSORBOARD_DIR,
         VAR_DATA_DIR,
     ):
         path.mkdir(parents=True, exist_ok=True)
@@ -46,6 +48,7 @@ __all__ = [
     "VAR_LOGS_DIR",
     "VAR_TRAINER_DIR",
     "VAR_TRAINER_DB",
+    "VAR_TENSORBOARD_DIR",
     "VAR_DATA_DIR",
     "ensure_var_directories",
 ]

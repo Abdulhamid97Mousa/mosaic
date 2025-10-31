@@ -12,6 +12,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_SERVICE_VALIDATION_WARNING,
     LOG_SERVICE_VALIDATION_ERROR,
 )
+from gym_gui.core.schema import schema_registry
 from gym_gui.validations.validations_pydantic import (
     TelemetryEventBase,
     TrainingConfig,
@@ -164,6 +165,17 @@ class ValidationService(LogConstantMixin):
 
     def clear_warnings(self) -> None:
         self._validation_warnings.clear()
+
+    # ------------------------------------------------------------------
+    # Schema helpers
+    # ------------------------------------------------------------------
+    def get_step_schema(self, schema_key: str | None = None) -> Optional[Dict[str, Any]]:
+        """Return the JSON schema for a telemetry step payload."""
+
+        schema = schema_registry.get(schema_key) or schema_registry.get("default")
+        if schema is None:
+            return None
+        return schema.as_json_schema()
 
 
 __all__ = ["ValidationService"]

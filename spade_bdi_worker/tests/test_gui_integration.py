@@ -104,6 +104,7 @@ class TestGUITabPopulation:
         telemetry_stream = StringIO()
         emitter = TelemetryEmitter(telemetry_stream)
         adapter = create_adapter(run_config.game_id)
+        adapter.load()
         trainer = HeadlessTrainer(adapter, run_config, emitter)
 
         # Run training
@@ -114,6 +115,14 @@ class TestGUITabPopulation:
         telemetry_stream.seek(0)
         events = [json.loads(line) for line in telemetry_stream if line.strip()]
 
+        run_started = next((e for e in events if e.get("type") == "run_started"), None)
+        assert run_started is not None, "run_started event missing"
+        config_payload = run_started.get("config", {})
+        assert config_payload.get("schema_id") == "telemetry.step.default"
+        assert config_payload.get("schema_version") == 1
+        assert "schema_definition" in config_payload and isinstance(config_payload["schema_definition"], dict)
+        assert config_payload.get("space_signature")
+
         # Find first step event
         step_events = [e for e in events if e.get("type") == "step"]
         assert len(step_events) > 0, "Should have step events"
@@ -121,6 +130,13 @@ class TestGUITabPopulation:
         first_step = step_events[0]
         assert "agent_id" in first_step, "Step should have agent_id"
         assert first_step["agent_id"] == run_config.agent_id
+        assert first_step.get("schema_id") == "telemetry.step.default"
+        assert first_step.get("schema_version") == 1
+        assert "space_signature" in first_step and isinstance(first_step["space_signature"], dict)
+        assert "time_step" in first_step and isinstance(first_step["time_step"], int)
+        # frame_ref is optional; ensure key present only when adapter emits it
+        if first_step.get("frame_ref") is not None:
+            assert isinstance(first_step["frame_ref"], str)
 
         logger.info(f"✓ First step has agent_id: {first_step['agent_id']}")
 
@@ -129,6 +145,7 @@ class TestGUITabPopulation:
         telemetry_stream = StringIO()
         emitter = TelemetryEmitter(telemetry_stream)
         adapter = create_adapter(run_config.game_id)
+        adapter.load()
         trainer = HeadlessTrainer(adapter, run_config, emitter)
 
         # Run training
@@ -169,6 +186,7 @@ class TestGUITabPopulation:
         telemetry_stream = StringIO()
         emitter = TelemetryEmitter(telemetry_stream)
         adapter = create_adapter(run_config.game_id)
+        adapter.load()
         trainer = HeadlessTrainer(adapter, run_config, emitter)
 
         # Run training
@@ -217,6 +235,7 @@ class TestGUITabPopulation:
         telemetry_stream = StringIO()
         emitter = TelemetryEmitter(telemetry_stream)
         adapter = create_adapter(run_config.game_id)
+        adapter.load()
         trainer = HeadlessTrainer(adapter, run_config, emitter)
 
         # Run training
@@ -248,6 +267,7 @@ class TestGUITabPopulation:
         telemetry_stream = StringIO()
         emitter = TelemetryEmitter(telemetry_stream)
         adapter = create_adapter(run_config.game_id)
+        adapter.load()
         trainer = HeadlessTrainer(adapter, run_config, emitter)
 
         # Run training
@@ -280,6 +300,7 @@ class TestGUITabPopulation:
         telemetry_stream = StringIO()
         emitter = TelemetryEmitter(telemetry_stream)
         adapter = create_adapter(run_config.game_id)
+        adapter.load()
         trainer = HeadlessTrainer(adapter, run_config, emitter)
 
         # Run training
@@ -310,6 +331,7 @@ class TestGUITabPopulation:
         telemetry_stream = StringIO()
         emitter = TelemetryEmitter(telemetry_stream)
         adapter = create_adapter(run_config.game_id)
+        adapter.load()
         trainer = HeadlessTrainer(adapter, run_config, emitter)
 
         # Run training
@@ -347,4 +369,3 @@ class TestGUITabPopulation:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])
-

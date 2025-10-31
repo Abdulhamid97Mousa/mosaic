@@ -9,6 +9,13 @@ from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Iterable, List
 
+from gym_gui.constants.constants_telemetry import (
+    TELEMETRY_KEY_AUTORESET_MODE,
+    TELEMETRY_KEY_SPACE_SIGNATURE,
+    TELEMETRY_KEY_TIME_STEP,
+    TELEMETRY_KEY_VECTOR_METADATA,
+)
+
 
 @dataclass(slots=True)
 class EpisodeRecord:
@@ -22,6 +29,14 @@ class EpisodeRecord:
     truncated: bool
     info: dict[str, Any] = field(default_factory=dict)
     timestamp: datetime = field(default_factory=datetime.utcnow)
+    agent_id: str | None = None
+    frame_ref: str | None = None
+    payload_version: int = 0
+    run_id: str | None = None
+    worker_id: str | None = None
+    time_step: int | None = None
+    space_signature: Mapping[str, Any] | None = None
+    vector_metadata: Mapping[str, Any] | None = None
 
 
 
@@ -151,6 +166,29 @@ class SessionRecorder:
         }
         if not self._telemetry_only:
             data["observation"] = _json_safe(step.observation)
+        if step.agent_id is not None:
+            data["agent_id"] = step.agent_id
+        if step.frame_ref is not None:
+            data["frame_ref"] = step.frame_ref
+        if step.payload_version:
+            data["payload_version"] = int(step.payload_version)
+        if step.run_id is not None:
+            data["run_id"] = step.run_id
+        if step.worker_id is not None:
+            data["worker_id"] = step.worker_id
+        if step.time_step is not None:
+            data[TELEMETRY_KEY_TIME_STEP] = int(step.time_step)
+        if step.space_signature is not None:
+            data[TELEMETRY_KEY_SPACE_SIGNATURE] = _json_safe(step.space_signature)
+        if step.vector_metadata is not None:
+            vector_payload = _json_safe(step.vector_metadata)
+            data[TELEMETRY_KEY_VECTOR_METADATA] = vector_payload
+            if (
+                isinstance(step.vector_metadata, Mapping)
+                and TELEMETRY_KEY_AUTORESET_MODE in step.vector_metadata
+                and TELEMETRY_KEY_AUTORESET_MODE not in data
+            ):
+                data[TELEMETRY_KEY_AUTORESET_MODE] = step.vector_metadata[TELEMETRY_KEY_AUTORESET_MODE]
         if self._compress_frames:
             # Placeholder hook for future compression
             data["compressed"] = False

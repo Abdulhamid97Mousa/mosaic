@@ -14,6 +14,9 @@ from pathlib import Path
 from typing import Optional
 import json
 
+from gym_gui.core.schema import resolve_schema_for_game
+from gym_gui.validations.validations_telemetry import ValidationService
+
 from gym_gui.ui.widgets.spade_bdi_worker_tabs import TabFactory
 
 
@@ -31,7 +34,7 @@ class SpadeBdiWorkerPresenter:
     @property
     def id(self) -> str:
         """Unique identifier for this worker."""
-        return "spade_bdi_rl"
+        return "spade_bdi_worker"
 
     def build_train_request(self, policy_path: Path, current_game: Optional[object]) -> dict:
         """Build a training request from policy path and game selection.
@@ -70,6 +73,16 @@ class SpadeBdiWorkerPresenter:
                 "Either embed metadata.game_id in the policy file or select a game before loading."
             )
 
+        schema = resolve_schema_for_game(game_id)
+        schema_id = schema.schema_id if schema is not None else "telemetry.step.default"
+        schema_version = schema.version if schema is not None else 1
+        validator = ValidationService(strict_mode=False)
+        schema_definition = validator.get_step_schema(game_id)
+        if schema_definition is None and schema is not None:
+            schema_definition = schema.as_json_schema()
+        if schema_definition is None:
+            schema_definition = {}
+
         # Extract configuration parameters
         agent_id = metadata.get("agent_id") or policy_path.stem
         seed = int(metadata.get("seed", 0))
@@ -92,6 +105,9 @@ class SpadeBdiWorkerPresenter:
             "agent_id": agent_id,
             "capture_video": False,
             "headless": True,
+            "schema_id": schema_id,
+            "schema_version": schema_version,
+            "schema_definition": schema_definition,
             "extra": {
                 "policy_path": str(policy_path),
                 "algorithm": algorithm_label,
@@ -108,13 +124,23 @@ class SpadeBdiWorkerPresenter:
                     "max_steps_per_episode": max_steps,
                     "seed": seed,
                 },
+                "schema_id": schema_id,
+                "schema_version": schema_version,
             },
             "worker": {
                 "module": "spade_bdi_rl.worker",
                 "use_grpc": True,
                 "grpc_target": "127.0.0.1:50055",
                 "agent_id": agent_id,
+                "schema_id": schema_id,
+                "schema_version": schema_version,
                 "config": worker_config,
+            },
+            "artifacts": {
+                "tensorboard": {
+                    "enabled": True,
+                    "relative_path": f"var/trainer/runs/{run_name}/tensorboard",
+                }
             },
         }
 

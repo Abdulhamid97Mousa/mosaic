@@ -2,9 +2,10 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Union
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Union
 import time
 
 if TYPE_CHECKING:
@@ -15,11 +16,15 @@ from ..algorithms import create_agent, create_runtime
 from ..policies import PolicyStorage
 from .config import PolicyStrategy, RunConfig
 from .telemetry_worker import TelemetryEmitter
+from .tensorboard_logger import TensorboardLogger
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
     LOG_WORKER_RUNTIME_EVENT,
     LOG_WORKER_RUNTIME_JSON_SANITIZED,
 )
+from gym_gui.core.schema import BaseStepSchema, resolve_schema_for_game
+from gym_gui.core.spaces.vector_metadata import extract_vector_step_details
+from gym_gui.validations.validations_telemetry import ValidationService
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -70,8 +75,44 @@ class HeadlessTrainer(LogConstantMixin):
         )
 
         self._maybe_load_policy()
+        self._telemetry_disabled = bool(self.config.extra.get("disable_telemetry"))
+        self._tensorboard: Optional[TensorboardLogger] = None
+        try:
+            self._tensorboard = TensorboardLogger.from_run_config(self.config)
+        except RuntimeError as exc:
+            self.log_constant(
+                LOG_WORKER_RUNTIME_EVENT,
+                message="TENSORBOARD_DISABLED",
+                extra={"reason": str(exc)},
+            )
+        except Exception as exc:  # noqa: BLE001
+            self.log_constant(
+                LOG_WORKER_RUNTIME_EVENT,
+                message="TENSORBOARD_INIT_FAILED",
+                extra={"error": str(exc)},
+            )
+            self._tensorboard = None
         if config.policy_strategy is PolicyStrategy.EVAL:
             self.agent.epsilon = 0.0
+
+        self._schema = resolve_schema_for_game(self.config.game_id)
+        self._schema_id = self._schema.schema_id if self._schema is not None else "telemetry.step.default"
+        self._schema_version = self._schema.version if self._schema is not None else 1
+        if self.adapter.space_signature:
+            self._space_signature = self._make_json_safe(dict(self.adapter.space_signature))
+        else:
+            self._space_signature = None
+        base_vector_metadata = self.adapter.vector_metadata
+        if base_vector_metadata:
+            self._base_vector_metadata = self._make_json_safe(dict(base_vector_metadata))
+        else:
+            self._base_vector_metadata = None
+
+        validator = ValidationService(strict_mode=False)
+        schema_json = validator.get_step_schema(self.config.game_id)
+        if schema_json is None and self._schema is not None:
+            schema_json = self._schema.as_json_schema()
+        self._schema_definition = schema_json
         
         self.log_constant(
             LOG_WORKER_RUNTIME_EVENT,
@@ -90,55 +131,54 @@ class HeadlessTrainer(LogConstantMixin):
     # ------------------------------------------------------------------
     def run(self) -> int:
         """Execute training/evaluation and emit JSONL telemetry to stdout."""
-        config_payload = _config_payload(self.config)
+        config_payload = _config_payload(
+            self.config,
+            schema=self._schema,
+            space_signature=self._space_signature,
+            vector_metadata=self._base_vector_metadata,
+            schema_definition=self._schema_definition,
+        )
         self.emitter.run_started(
             self.config.run_id,
             config_payload,
             worker_id=self.config.worker_id,  # type: ignore[call-arg]
         )
 
+        if self._tensorboard:
+            self._tensorboard.on_run_started(config_payload)
+            self.emitter.artifact(
+                self.config.run_id,
+                kind="tensorboard",
+                path=str(self._tensorboard.log_dir),
+                worker_id=self.config.worker_id,  # type: ignore[call-arg]
+            )
+
         try:
             summaries: list[EpisodeMetrics] = []
             for episode_index in range(self.config.max_episodes):
                 # CRITICAL: Separation of concerns for reproducibility and environment variation
-                #
-                # seed (config.seed): Base seed for reproducible experiment (e.g., seed=1)
-                #   - Constant throughout the run
-                #   - Used for reproducibility across runs
-                #   - Does NOT change per episode
-                #
-                # episode_number: Display value for user (seed + episode_index)
-                #   - For seed=1: episodes 1, 2, 3, 4, ...
-                #   - For seed=39: episodes 39, 40, 41, 42, ...
-                #   - Used in telemetry and UI display
-                #
-                # episode_seed: Unique seed for environment variation per episode
-                #   - Derived from episode_index (0, 1, 2, 3, ...)
-                #   - Each episode gets different environment starting state
-                #   - Allows agent to learn from diverse experiences
-                #   - Still reproducible (deterministically derived from episode_index)
-                #
                 episode_number = self.config.seed + episode_index
-                episode_seed = episode_index  # Unique seed per episode (0, 1, 2, 3, ...)
+                episode_seed = episode_index  # unique episode seed for environment variation
 
                 summary = self._run_episode(episode_index, episode_number, episode_seed)
                 summaries.append(summary)
+
                 episode_metadata = {
                     "control_mode": "agent_only",
                     "run_id": self.config.run_id,
                     "agent_id": self.config.agent_id,
                     "worker_id": self.config.worker_id,
                     "game_id": self.config.game_id,
-                    "seed": self.config.seed,  # Base seed (constant, for reproducibility)
-                    "episode_seed": episode_seed,  # Unique seed per episode (for variation)
+                    "seed": self.config.seed,
+                    "episode_seed": episode_seed,
                     "episode_index": episode_index,
-                    "episode_number": episode_number,  # Display value (seed + episode_index)
+                    "episode_number": episode_number,
                     "policy_strategy": self.config.policy_strategy.value,
                     "success": summary.success,
                 }
                 self.emitter.episode(
                     self.config.run_id,
-                    episode_number,  # Pass episode_number (display value = seed + episode_index)
+                    episode_number,
                     agent_id=self.config.agent_id,
                     reward=summary.total_reward,
                     steps=summary.steps,
@@ -146,6 +186,15 @@ class HeadlessTrainer(LogConstantMixin):
                     metadata=episode_metadata,
                     worker_id=self.config.worker_id,  # type: ignore[call-arg]
                 )
+
+                if self._tensorboard:
+                    self._tensorboard.log_episode(
+                        episode_number=episode_number,
+                        reward=summary.total_reward,
+                        steps=summary.steps,
+                        epsilon=float(self.agent.epsilon),
+                        success=summary.success,
+                    )
 
             if self._should_save:
                 metadata = {
@@ -155,13 +204,17 @@ class HeadlessTrainer(LogConstantMixin):
                     "episodes": self.config.max_episodes,
                     "strategy": self.config.policy_strategy.value,
                 }
-                path = self.policy_store.save(self.agent.q_table, metadata)
+                policy_path = self.policy_store.save(self.agent.q_table, metadata)
                 self.emitter.artifact(
                     self.config.run_id,
                     "policy",
-                    str(path),
+                    str(policy_path),
                     worker_id=self.config.worker_id,  # type: ignore[call-arg]
                 )
+
+            if self._tensorboard and summaries:
+                self._tensorboard.log_run_summary(summaries)
+                self._tensorboard.on_run_completed(status="completed")
 
             self.emitter.run_completed(
                 self.config.run_id,
@@ -170,21 +223,39 @@ class HeadlessTrainer(LogConstantMixin):
             )
             return 0
         except Exception as exc:  # noqa: BLE001
+            if self._tensorboard:
+                self._tensorboard.on_run_completed(status="failed", error=str(exc))
             self.emitter.run_completed(
                 self.config.run_id,
                 status="failed",
                 error=str(exc),
                 worker_id=self.config.worker_id,  # type: ignore[call-arg]
             )
+            self.log_constant(
+                LOG_WORKER_RUNTIME_EVENT,
+                message="HEADLESS_TRAINER_RUN_FAILED",
+                extra={"run_id": self.config.run_id, "error": str(exc)},
+            )
             return 1
+        finally:
+            if self._tensorboard:
+                self._tensorboard.close()
 
     # ------------------------------------------------------------------
     def _run_episode(self, episode_index: int, episode_number: int, episode_seed: int) -> EpisodeMetrics:
         """Run single episode with JSONL telemetry.
+            if self._tensorboard:
+                self._tensorboard.on_run_completed(status="failed", error=str(exc))
 
         Args:
+            if self._tensorboard:
+                self._tensorboard.close()
+            if self._tensorboard:
+                self._tensorboard.on_run_completed(status="failed", error=str(exc))
             episode_index: 0-based loop counter (0, 1, 2, 3, ...)
             episode_number: Display value for telemetry (seed + episode_index)
+            if self._tensorboard:
+                self._tensorboard.close()
             episode_seed: Unique seed for environment variation (derived from episode_index)
         """
         # CRITICAL: Use episode_seed to reset the environment
@@ -215,36 +286,61 @@ class HeadlessTrainer(LogConstantMixin):
             if self._is_training:
                 self.runtime.update_q_online(state, action, reward, next_state, done)
 
-            # Generate render payload for grid visualization from the NEW observation
-            # CRITICAL: Use next_obs (after step), not obs (before step)
-            # Convert Mapping to Dict for render payload generation
-            render_payload = self._generate_render_payload(next_state, dict(next_obs))
+            if not self._telemetry_disabled:
+                # Generate render payload for grid visualization from the NEW observation
+                # CRITICAL: Use next_obs (after step), not obs (before step)
+                # Convert Mapping to Dict for render payload generation
+                render_payload = self._generate_render_payload(next_state, dict(next_obs))
 
-            # Build observation dict for telemetry: include state and grid position
-            # This provides meaningful context for replays and analysis
-            obs_for_telemetry = self._build_observation_dict(state, dict(obs))
-            next_obs_for_telemetry = self._build_observation_dict(next_state, dict(next_obs))
+                # Build observation dict for telemetry: include state and grid position
+                # This provides meaningful context for replays and analysis
+                obs_for_telemetry = self._build_observation_dict(state, dict(obs))
+                next_obs_for_telemetry = self._build_observation_dict(next_state, dict(next_obs))
 
-            self.emitter.step(
-                self.config.run_id,
-                episode_number,  # Pass episode_number (display value = seed + episode_index)
-                step_index,
-                agent_id=self.config.agent_id,
-                worker_id=self.config.worker_id,  # type: ignore[call-arg]
-                action=int(action),
-                reward=float(reward),
-                terminated=bool(terminated),
-                truncated=bool(truncated),
-                state=int(state),
-                next_state=int(next_state),
-                observation=obs_for_telemetry,
-                next_observation=next_obs_for_telemetry,
-                q_before=q_before,
-                q_after=float(self.agent.q_table[state, action]),
-                epsilon=float(self.agent.epsilon),
-                render_payload=render_payload,
-                episode_seed=int(episode_seed),  # NEW FIELD: Unique seed per episode for environment variation
-            )
+                vector_metadata_payload: Optional[Dict[str, Any]] = None
+                if self._base_vector_metadata is not None:
+                    vector_metadata_payload = copy.deepcopy(self._base_vector_metadata)
+                per_step_vector = extract_vector_step_details(step_result.info)
+                if per_step_vector:
+                    per_step_normalized = self._make_json_safe(dict(per_step_vector))
+                    if vector_metadata_payload is not None:
+                        vector_metadata_payload.update(per_step_normalized)  # type: ignore[arg-type]
+                    else:
+                        vector_metadata_payload = per_step_normalized  # type: ignore[assignment]
+
+                step_kwargs: Dict[str, Any] = {
+                    "agent_id": self.config.agent_id,
+                    "worker_id": self.config.worker_id,
+                    "action": int(action),
+                    "reward": float(reward),
+                    "terminated": bool(terminated),
+                    "truncated": bool(truncated),
+                    "state": int(state),
+                    "next_state": int(next_state),
+                    "observation": obs_for_telemetry,
+                    "next_observation": next_obs_for_telemetry,
+                    "q_before": q_before,
+                    "q_after": float(self.agent.q_table[state, action]),
+                    "epsilon": float(self.agent.epsilon),
+                    "render_payload": render_payload,
+                    "episode_seed": int(episode_seed),
+                    "schema_id": self._schema_id,
+                    "schema_version": self._schema_version,
+                    "time_step": int(step_index),
+                }
+                if self._space_signature is not None:
+                    step_kwargs["space_signature"] = self._space_signature
+                if vector_metadata_payload is not None:
+                    step_kwargs["vector_metadata"] = vector_metadata_payload
+                if step_result.frame_ref is not None:
+                    step_kwargs["frame_ref"] = step_result.frame_ref
+
+                self.emitter.step(
+                    self.config.run_id,
+                    episode_number,  # Display value = seed + episode_index
+                    step_index,
+                    **step_kwargs,
+                )
 
             # Apply step delay for real-time observation (if configured)
             if self.config.step_delay > 0:
@@ -450,8 +546,15 @@ class HeadlessTrainer(LogConstantMixin):
     # ------------------------------------------------------------------
 
 
-def _config_payload(config: RunConfig) -> Dict[str, Any]:
-    return {
+def _config_payload(
+    config: RunConfig,
+    *,
+    schema: BaseStepSchema | None,
+    space_signature: Optional[Dict[str, Any]] = None,
+    vector_metadata: Optional[Dict[str, Any]] = None,
+    schema_definition: Optional[Dict[str, Any]] = None,
+) -> Dict[str, Any]:
+    payload: Dict[str, Any] = {
         "game_id": config.game_id,
         "seed": config.seed,
         "max_episodes": config.max_episodes,
@@ -464,3 +567,13 @@ def _config_payload(config: RunConfig) -> Dict[str, Any]:
         "headless": config.headless,
         "extra": config.extra,
     }
+    if schema is not None:
+        payload["schema_id"] = schema.schema_id
+        payload["schema_version"] = schema.version
+    if space_signature is not None:
+        payload["space_signature"] = space_signature
+    if vector_metadata is not None:
+        payload["vector_metadata"] = vector_metadata
+    if schema_definition is not None:
+        payload["schema_definition"] = schema_definition
+    return payload

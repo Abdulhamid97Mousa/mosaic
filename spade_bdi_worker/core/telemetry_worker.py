@@ -142,4 +142,6 @@ class TelemetryEmitter:
             path: Path to artifact
             **fields: Additional fields (e.g., worker_id, metadata, etc.)
         """
-        self.emit("artifact", run_id=run_id, kind=kind, path=path, **fields)
+        # Treat artifacts as lifecycle emissions so fast-mode runs (disable_telemetry)
+        # still surface paths to downstream consumers.
+        self.emit_lifecycle("artifact", run_id=run_id, kind=kind, path=path, **fields)

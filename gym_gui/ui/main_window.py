@@ -25,6 +25,7 @@ from gym_gui.config.game_configs import (
 )
 from gym_gui.constants import UI_DEFAULTS
 from gym_gui.config.game_config_builder import GameConfigBuilder
+from gym_gui.config.paths import VAR_ROOT, VAR_TRAINER_DIR
 from gym_gui.config.settings import Settings
 from gym_gui.core.enums import ControlMode, GameId
 from gym_gui.core.factories.adapters import available_games
@@ -63,6 +64,7 @@ from gym_gui.ui.presenters.workers import (
 from gym_gui.ui.widgets.spade_bdi_worker_tabs import (
     AgentReplayTab,
 )
+from gym_gui.ui.widgets.tensorboard_artifact_tab import TensorboardArtifactTab
 from gym_gui.ui.forms import get_worker_form_factory
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -366,7 +368,6 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # Connect control panel signals to session controller
         self._control_panel.load_requested.connect(self._on_load_requested)
         self._control_panel.reset_requested.connect(self._on_reset_requested)
-
         self._control_panel.agent_form_requested.connect(self._on_agent_form_requested)
         self._control_panel.train_agent_requested.connect(self._on_train_agent_requested)
         self._control_panel.trained_agent_requested.connect(self._on_trained_agent_requested)
@@ -895,20 +896,24 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._auto_running = running
         self._control_panel.set_auto_running(running)
         self._update_input_state()
-    
 
-    def _on_trained_agent_requested(self) -> None:
-        """Handle the 'Load Trained Policy' button."""
+
+    def _on_trained_agent_requested(self, worker_id: str) -> None:
+        """Handle the 'Load Trained Policy' button for a specific worker."""
+        if not worker_id:
+            QtWidgets.QMessageBox.information(
+                self,
+                "Worker Required",
+                "Select a worker integration before loading a trained policy.",
+            )
+            return
+
         factory = get_worker_form_factory()
-        worker_id = "spade_bdi_worker"
         try:
-            dialog = cast(
-                "SpadeBdiPolicySelectionForm",
-                factory.create_policy_form(
-                    worker_id,
-                    parent=self,
-                    current_game=self._control_panel.current_game(),
-                ),
+            dialog = factory.create_policy_form(
+                worker_id,
+                parent=self,
+                current_game=self._control_panel.current_game(),
             )
         except KeyError:
             QtWidgets.QMessageBox.warning(
@@ -917,38 +922,50 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 f"No policy selection form registered for worker '{worker_id}'.",
             )
             return
+
         if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
             return
-        policy_path = dialog.selected_path
+
+        policy_path = getattr(dialog, "selected_path", None)
         if policy_path is None:
             return
+
         self._selected_policy_path = policy_path
-        self.log_constant( 
+        self.log_constant(
             LOG_UI_MAINWINDOW_INFO,
-            message=f"Selected policy for evaluation: {policy_path}",
-            extra={"policy_path": str(policy_path)},
+            message="Selected policy for evaluation",
+            extra={
+                "policy_path": str(policy_path),
+                "worker_id": worker_id,
+            },
         )
-        config = self._build_policy_evaluation_config(policy_path)
+
+        config = self._build_policy_evaluation_config(worker_id, policy_path)
         if config is None:
             return
+
         self._status_bar.showMessage(
             f"Launching evaluation run for {policy_path.name}",
             5000,
         )
         self._submit_training_config(config)
 
-    def _on_agent_form_requested(self) -> None:
-        """Open the SPADE-BDI agent training form."""
+    def _on_agent_form_requested(self, worker_id: str) -> None:
+        """Open the worker-specific training form."""
+        if not worker_id:
+            QtWidgets.QMessageBox.information(
+                self,
+                "Worker Required",
+                "Select a worker integration before configuring training.",
+            )
+            return
+
         factory = get_worker_form_factory()
-        worker_id = "spade_bdi_worker"
         try:
-            dialog = cast(
-                "SpadeBdiTrainForm",
-                factory.create_train_form(
-                    worker_id,
-                    parent=self,
-                    default_game=self._control_panel.current_game(),
-                ),
+            dialog = factory.create_train_form(
+                worker_id,
+                parent=self,
+                default_game=self._control_panel.current_game(),
             )
         except KeyError:
             QtWidgets.QMessageBox.warning(
@@ -957,27 +974,46 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 f"No train form registered for worker '{worker_id}'.",
             )
             return
+
         if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
             return
 
-        config = dialog.get_config()
+        get_config = getattr(dialog, "get_config", None)
+        if not callable(get_config):
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Unsupported Form",
+                "Selected worker form does not provide a configuration payload.",
+            )
+            return
+
+        config = get_config()
         if config is None:
             return
-        
-        self.log_constant( 
+        if not isinstance(config, dict):
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Invalid Configuration",
+                "Worker form returned an unexpected payload. Expected a dictionary.",
+            )
+            return
+
+        config_payload = cast(dict[str, object], config)
+        self.log_constant(
             LOG_UI_MAINWINDOW_INFO,
             message="Agent training configuration submitted from dialog",
+            extra={"worker_id": worker_id},
         )
         self._status_bar.showMessage("Launching training run...", 5000)
-        self._submit_training_config(config)
+        self._submit_training_config(config_payload)
 
-    def _on_train_agent_requested(self) -> None:
-        """Handle the 'Train Agent' button - opens the agent training configuration dialog."""
-        # The "Train Agent" button also opens the dialog, similar to "Configure Agent"
-        # This is the primary entry point for the training workflow
-        self._on_agent_form_requested()
+    def _on_train_agent_requested(self, worker_id: str) -> None:
+        """Handle the 'Train Agent' button by delegating to the configure workflow."""
+        self._on_agent_form_requested(worker_id)
 
-    def _build_policy_evaluation_config(self, policy_path: Path) -> Optional[dict]:
+    def _build_policy_evaluation_config(
+        self, worker_id: str, policy_path: Path
+    ) -> Optional[dict[str, object]]:
         """Build training config using the worker presenter registry.
         
         Delegates configuration composition to the appropriate worker presenter,
@@ -985,7 +1021,6 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         """
         try:
             registry = get_worker_presenter_registry()
-            worker_id = "spade_bdi_worker"
             presenter = registry.get(worker_id)
             
             if presenter is None:
@@ -1220,6 +1255,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         worker_config = worker_meta.get("config", {}) if isinstance(worker_meta, dict) else {}
         agent_id_key = worker_meta.get("agent_id") or worker_config.get("agent_id") or "default"
         self._run_metadata[(run_id, agent_id_key)] = metadata
+        self._maybe_add_tensorboard_tab(run_id, agent_id_key, metadata)
 
         # Subscribe to telemetry
         # NOTE: Do NOT call _create_agent_tabs_for() here!
@@ -1390,6 +1426,153 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 exc_info=e,
             )
 
+    def _backfill_run_metadata_from_disk(self, run_id: str) -> None:
+        """Load run metadata for previously scheduled runs discovered outside the submission flow."""
+        config_path = VAR_TRAINER_DIR / "configs" / f"config-{run_id}.json"
+        if not config_path.exists():
+            self.log_constant(
+                LOG_UI_MAINWINDOW_TRACE,
+                message="Metadata backfill skipped; trainer config not found",
+                extra={"run_id": run_id, "path": str(config_path)},
+            )
+            return
+
+        try:
+            with config_path.open("r", encoding="utf-8") as handle:
+                config_payload = json.load(handle)
+        except Exception as exc:
+            self.log_constant(
+                LOG_UI_MAINWINDOW_WARNING,
+                message="Failed to load trainer config for metadata backfill",
+                extra={"run_id": run_id, "path": str(config_path)},
+                exc_info=exc,
+            )
+            return
+
+        metadata = config_payload.get("metadata")
+        if not isinstance(metadata, dict):
+            self.log_constant(
+                LOG_UI_MAINWINDOW_TRACE,
+                message="Metadata backfill skipped; config payload missing metadata",
+                extra={"run_id": run_id, "path": str(config_path)},
+            )
+            return
+
+        candidate_agent_ids: List[str] = []
+        worker_meta = metadata.get("worker")
+        if isinstance(worker_meta, dict):
+            worker_agent = worker_meta.get("agent_id")
+            if worker_agent is not None:
+                candidate_agent_ids.append(str(worker_agent))
+            worker_config = worker_meta.get("config")
+            if isinstance(worker_config, dict):
+                config_agent = worker_config.get("agent_id")
+                if config_agent is not None:
+                    candidate_agent_ids.append(str(config_agent))
+
+        env_payload = config_payload.get("environment")
+        if isinstance(env_payload, dict):
+            env_agent = env_payload.get("TRAIN_AGENT_ID")
+            if env_agent is not None:
+                candidate_agent_ids.append(str(env_agent))
+
+        if not candidate_agent_ids:
+            candidate_agent_ids.append("default")
+
+        ordered_unique_agent_ids: List[str] = []
+        for agent_id in candidate_agent_ids:
+            if agent_id not in ordered_unique_agent_ids:
+                ordered_unique_agent_ids.append(agent_id)
+
+        artifacts_payload = metadata.get("artifacts") if isinstance(metadata, dict) else None
+
+        for agent_id in ordered_unique_agent_ids:
+            key = (run_id, agent_id)
+            if key in self._run_metadata:
+                existing_payload = self._run_metadata[key]
+                if isinstance(existing_payload, dict):
+                    current_artifacts = existing_payload.get("artifacts")
+                    if not isinstance(current_artifacts, dict) and isinstance(artifacts_payload, dict):
+                        existing_payload["artifacts"] = artifacts_payload
+                        self.log_constant(
+                            LOG_UI_MAINWINDOW_TRACE,
+                            message="Backfilled tensorboard artifacts into existing metadata",
+                            extra={"run_id": run_id, "agent_id": agent_id},
+                        )
+                self._maybe_add_tensorboard_tab(run_id, agent_id, self._run_metadata.get(key))
+                continue
+
+            self._run_metadata[key] = metadata
+            self.log_constant(
+                LOG_UI_MAINWINDOW_TRACE,
+                message="Backfilled run metadata from trainer config",
+                extra={"run_id": run_id, "agent_id": agent_id, "path": str(config_path)},
+            )
+            self._maybe_add_tensorboard_tab(run_id, agent_id, metadata)
+
+    def _maybe_add_tensorboard_tab(self, run_id: str, agent_id: str, metadata: dict | None) -> None:
+        """Create or refresh the TensorBoard artifact tab when metadata provides a log path."""
+        if not metadata:
+            return
+
+        artifacts = metadata.get("artifacts") if isinstance(metadata, dict) else None
+        if not isinstance(artifacts, dict):
+            return
+
+        tensorboard_meta = artifacts.get("tensorboard")
+        if not isinstance(tensorboard_meta, dict):
+            return
+
+        if tensorboard_meta.get("enabled", True) is False:
+            return
+
+        resolved_path: Path | None = None
+        log_dir = tensorboard_meta.get("log_dir")
+        relative_path = tensorboard_meta.get("relative_path")
+        if isinstance(log_dir, str) and log_dir.strip():
+            resolved_path = Path(log_dir).expanduser()
+        elif isinstance(relative_path, str) and relative_path.strip():
+            resolved_path = (VAR_ROOT.parent / relative_path).resolve()
+
+        if resolved_path is None:
+            return
+
+        tab_name = f"TensorBoard-Agent-{agent_id}"
+        existing_tabs = self._render_tabs._agent_tabs.get(run_id, {})
+        existing_widget = existing_tabs.get(tab_name)
+        if existing_widget is not None:
+            setter = getattr(existing_widget, "set_log_dir", None)
+            if callable(setter):
+                setter(resolved_path)
+            refresher = getattr(existing_widget, "refresh", None)
+            if callable(refresher):
+                refresher()
+            return
+
+        try:
+            tab = TensorboardArtifactTab(run_id, agent_id, resolved_path, parent=self)
+            self._render_tabs.add_dynamic_tab(run_id, tab_name, tab)
+            self.log_constant(
+                LOG_UI_MAINWINDOW_INFO,
+                message="Created TensorBoard artifact tab",
+                extra={
+                    "run_id": run_id,
+                    "agent_id": agent_id,
+                    "log_dir": str(resolved_path),
+                },
+            )
+        except Exception as exc:
+            self.log_constant(
+                LOG_UI_MAINWINDOW_WARNING,
+                message="Failed to create TensorBoard artifact tab",
+                extra={
+                    "run_id": run_id,
+                    "agent_id": agent_id,
+                    "error": str(exc),
+                },
+                exc_info=exc,
+            )
+
     def _on_training_finished(self, run_id: str, outcome: str, failure_reason: str) -> None:
         """Handle training_finished signal - create/refresh replay tabs for all agents in this run."""
         self.log_constant( 
@@ -1434,6 +1617,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 message="_on_training_finished: processing agent",
                 extra={"run_id": run_id, "agent_id": agent_id, "replay_tab_name": replay_tab_name},
             )
+
+            metadata = self._run_metadata.get((run_id, agent_id))
+            self._maybe_add_tensorboard_tab(run_id, agent_id, metadata)
 
             # Check if replay tab already exists
             if replay_tab_name in agent_tabs:
@@ -1629,6 +1815,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             extra={"run_id": run_id},
         )
         self._known_runs.add(run_id)
+        self._backfill_run_metadata_from_disk(run_id)
         try:
             self._live_controller.subscribe_to_run(run_id)
             self._render_group.setTitle(f"Live Training - {run_id[:12]}...")

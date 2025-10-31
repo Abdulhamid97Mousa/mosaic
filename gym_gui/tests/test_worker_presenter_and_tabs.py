@@ -201,6 +201,14 @@ class TestBuildTrainRequest(unittest.TestCase):
         self.assertIn("worker", metadata)
         self.assertEqual(metadata["ui"]["algorithm"], "QLearning")
         self.assertEqual(metadata["worker"]["agent_id"], "test_agent")
+        self.assertEqual(metadata["worker"]["schema_id"], "telemetry.step.default")
+        self.assertEqual(metadata["worker"]["schema_version"], 1)
+        worker_config = metadata["worker"]["config"]
+        self.assertEqual(worker_config["schema_id"], "telemetry.step.default")
+        self.assertEqual(worker_config["schema_version"], 1)
+        self.assertIsInstance(worker_config["schema_definition"], dict)
+        self.assertEqual(metadata["ui"]["schema_id"], "telemetry.step.default")
+        self.assertEqual(metadata["ui"]["schema_version"], 1)
 
     def test_build_train_request_missing_file(self) -> None:
         """Test train request fails with missing policy file."""
@@ -235,6 +243,8 @@ class TestBuildTrainRequest(unittest.TestCase):
         self.assertIsNotNone(config)
         worker_config = config["metadata"]["worker"]["config"]
         self.assertEqual(worker_config["game_id"], "CliffWalking-v1")
+        self.assertEqual(worker_config["schema_id"], "telemetry.step.default")
+        self.assertEqual(config["metadata"]["worker"]["schema_id"], "telemetry.step.default")
 
     def test_extract_metadata_from_config(self) -> None:
         """Test extract_metadata utility method."""

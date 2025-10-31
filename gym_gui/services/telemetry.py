@@ -108,6 +108,14 @@ class TelemetryService(LogConstantMixin):
                 terminated=record.terminated,
                 truncated=record.truncated,
                 info=dict(record.info),
+                agent_id=record.agent_id,
+                frame_ref=record.frame_ref,
+                payload_version=record.payload_version,
+                run_id=record.run_id,
+                worker_id=record.worker_id,
+                time_step=record.time_step,
+                space_signature=record.space_signature,
+                vector_metadata=record.vector_metadata,
             )
             self._storage.record_step(storage_record)
         if self._store:

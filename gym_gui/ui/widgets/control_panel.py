@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from typing import Dict, Iterable, Optional
+from typing import Dict, Iterable, Optional, Tuple
 
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
@@ -18,6 +18,7 @@ from gym_gui.config.game_configs import (
 )
 from gym_gui.core.enums import ControlMode, GameId
 from gym_gui.services.actor import ActorDescriptor
+from gym_gui.ui.workers import WorkerDefinition, get_worker_catalog
 
 
 @dataclass(frozen=True)
@@ -36,6 +37,7 @@ class ControlPanelConfig:
     allow_seed_reuse: bool
     actors: tuple[ActorDescriptor, ...]
     default_actor_id: Optional[str] = None
+    workers: Tuple[WorkerDefinition, ...] = tuple()
 
 
 class ControlPanelWidget(QtWidgets.QWidget):
@@ -43,7 +45,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
     game_changed = pyqtSignal(GameId)
     load_requested = pyqtSignal(GameId, ControlMode, int)
     reset_requested = pyqtSignal(int)
-    agent_form_requested = pyqtSignal()
+    agent_form_requested = pyqtSignal(str)
+    worker_changed = pyqtSignal(str)
     slippery_toggled = pyqtSignal(bool)
     frozen_v2_config_changed = pyqtSignal(str, object)  # (param_name, value)
     taxi_config_changed = pyqtSignal(str, bool)  # (param_name, value)
@@ -57,8 +60,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
     terminate_game_requested = pyqtSignal()
     agent_step_requested = pyqtSignal()
     actor_changed = pyqtSignal(str)
-    train_agent_requested = pyqtSignal()  # New signal for headless training
-    trained_agent_requested = pyqtSignal()  # Load trained policy/evaluation
+    train_agent_requested = pyqtSignal(str)  # New signal for headless training
+    trained_agent_requested = pyqtSignal(str)  # Load trained policy/evaluation
 
     def __init__(
         self,
@@ -67,10 +70,28 @@ class ControlPanelWidget(QtWidgets.QWidget):
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         super().__init__(parent)
+        if not config.workers:
+            config = ControlPanelConfig(
+                available_modes=config.available_modes,
+                default_mode=config.default_mode,
+                frozen_lake_config=config.frozen_lake_config,
+                taxi_config=config.taxi_config,
+                cliff_walking_config=config.cliff_walking_config,
+                lunar_lander_config=config.lunar_lander_config,
+                car_racing_config=config.car_racing_config,
+                bipedal_walker_config=config.bipedal_walker_config,
+                default_seed=config.default_seed,
+                allow_seed_reuse=config.allow_seed_reuse,
+                actors=config.actors,
+                default_actor_id=config.default_actor_id,
+                workers=get_worker_catalog(),
+            )
+
         self._config = config
         self._available_modes = config.available_modes
         self._default_seed = max(1, config.default_seed)
         self._allow_seed_reuse = config.allow_seed_reuse
+        self._worker_definitions: Tuple[WorkerDefinition, ...] = config.workers
         self._game_overrides: Dict[GameId, Dict[str, object]] = {
             GameId.FROZEN_LAKE: {
                 "is_slippery": config.frozen_lake_config.is_slippery,
@@ -164,11 +185,13 @@ class ControlPanelWidget(QtWidgets.QWidget):
             },
         }
 
+        self._current_worker_id: Optional[str] = None
         self._build_ui()
         self._apply_current_mode_selection()
         self._connect_signals()
         self._update_control_states()
         self._populate_actor_combo()
+        self._populate_worker_combo()
 
     # ------------------------------------------------------------------
     # Public API
@@ -195,6 +218,12 @@ class ControlPanelWidget(QtWidgets.QWidget):
 
     def current_actor(self) -> Optional[str]:
         return self._active_actor_id
+
+    def current_worker_id(self) -> Optional[str]:
+        return self._current_worker_id
+
+    def current_worker(self) -> Optional[WorkerDefinition]:
+        return self._current_worker_definition()
 
     def set_active_actor(self, actor_id: str) -> None:
         if actor_id == self._active_actor_id:
@@ -415,6 +444,16 @@ class ControlPanelWidget(QtWidgets.QWidget):
         layout.addWidget(actor_group)
 
         # Train Agent button (headless mode)
+        worker_group = QtWidgets.QGroupBox("Worker Integration", self)
+        worker_layout = QtWidgets.QVBoxLayout(worker_group)
+        self._worker_combo = QtWidgets.QComboBox(worker_group)
+        self._worker_combo.setEnabled(bool(self._worker_definitions))
+        worker_layout.addWidget(self._worker_combo)
+        self._worker_description = QtWidgets.QLabel("Select a worker to view capabilities.", worker_group)
+        self._worker_description.setWordWrap(True)
+        worker_layout.addWidget(self._worker_description)
+        layout.addWidget(worker_group)
+
         train_group = QtWidgets.QGroupBox("Headless Training", self)
         train_layout = QtWidgets.QVBoxLayout(train_group)
         self._configure_agent_button = QtWidgets.QPushButton("🚀 Configure Agent…", train_group)
@@ -529,11 +568,12 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._game_combo.currentIndexChanged.connect(self._on_game_changed)
         self._seed_spin.valueChanged.connect(lambda _: self._update_control_states())
         self._wire_mode_combo()
-        self._configure_agent_button.clicked.connect(self.agent_form_requested.emit)
+        self._worker_combo.currentIndexChanged.connect(self._on_worker_selection_changed)
+        self._configure_agent_button.clicked.connect(self._emit_agent_form_requested)
 
         self._load_button.clicked.connect(self._on_load_clicked)
-        self._train_agent_button.clicked.connect(self.train_agent_requested.emit)
-        self._trained_agent_button.clicked.connect(self.trained_agent_requested.emit)
+        self._train_agent_button.clicked.connect(self._emit_train_agent_requested)
+        self._trained_agent_button.clicked.connect(self._emit_trained_agent_requested)
         self._start_button.clicked.connect(self._on_start_clicked)
         self._pause_button.clicked.connect(self._on_pause_clicked)
         self._continue_button.clicked.connect(self._on_continue_clicked)
@@ -705,11 +745,16 @@ class ControlPanelWidget(QtWidgets.QWidget):
         has_agent_component = self._current_mode != ControlMode.HUMAN_ONLY
         agent_only_mode = self._current_mode == ControlMode.AGENT_ONLY
         self._actor_combo.setEnabled(has_agent_component and self._actor_combo.count() > 0)
-        self._configure_agent_button.setEnabled(agent_only_mode)
-        self._train_agent_button.setEnabled(agent_only_mode)
-        self._trained_agent_button.setEnabled(agent_only_mode)
+        
+        worker_def = self._current_worker_definition()
+        supports_training = bool(worker_def and worker_def.supports_training)
+        supports_policy = bool(worker_def and worker_def.supports_policy_load)
+        self._configure_agent_button.setEnabled(agent_only_mode and supports_training)
+        self._train_agent_button.setEnabled(agent_only_mode and supports_training)
+        self._trained_agent_button.setEnabled(agent_only_mode and supports_policy)
 
         self._update_actor_description()
+        self._update_worker_description()
 
     def _apply_current_mode_selection(self) -> None:
         index = self._mode_combo.findData(self._current_mode)
@@ -757,6 +802,28 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._active_actor_id = current_data if isinstance(current_data, str) else None
         self._update_actor_description()
 
+    def _populate_worker_combo(self) -> None:
+        self._worker_combo.blockSignals(True)
+        self._worker_combo.clear()
+        for definition in self._worker_definitions:
+            self._worker_combo.addItem(definition.display_name, definition.worker_id)
+
+        if not self._worker_definitions:
+            self._worker_combo.setEnabled(False)
+            self._worker_combo.blockSignals(False)
+            self._worker_description.setText(
+                "No worker integrations are registered. Configure a worker to enable training."
+            )
+            self._current_worker_id = None
+            self._update_control_states()
+            return
+
+        # Select the first worker by default without emitting cascaded signals
+        self._worker_combo.setEnabled(True)
+        self._worker_combo.setCurrentIndex(0)
+        self._worker_combo.blockSignals(False)
+        self._on_worker_selection_changed(self._worker_combo.currentIndex())
+
     def _on_actor_selection_changed(self, index: int) -> None:
         actor_id = self._actor_combo.itemData(index)
         if not isinstance(actor_id, str):
@@ -767,6 +834,36 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._update_actor_description()
         self.actor_changed.emit(actor_id)
 
+    def _on_worker_selection_changed(self, index: int) -> None:
+        worker_id = self._worker_combo.itemData(index)
+        if not isinstance(worker_id, str):
+            worker_id = None
+        if worker_id == self._current_worker_id:
+            return
+        self._current_worker_id = worker_id
+        self._update_worker_description()
+        self._update_control_states()
+        if worker_id:
+            self.worker_changed.emit(worker_id)
+
+    def _emit_agent_form_requested(self) -> None:
+        worker_id = self._current_worker_id
+        if worker_id is None:
+            return
+        self.agent_form_requested.emit(worker_id)
+
+    def _emit_train_agent_requested(self) -> None:
+        worker_id = self._current_worker_id
+        if worker_id is None:
+            return
+        self.train_agent_requested.emit(worker_id)
+
+    def _emit_trained_agent_requested(self) -> None:
+        worker_id = self._current_worker_id
+        if worker_id is None:
+            return
+        self.trained_agent_requested.emit(worker_id)
+
     def _update_actor_description(self) -> None:
         if self._active_actor_id is None:
             self._actor_description.setText("—")
@@ -776,6 +873,24 @@ class ControlPanelWidget(QtWidgets.QWidget):
             self._actor_description.setText("—")
             return
         self._actor_description.setText(descriptor.description)
+
+    def _current_worker_definition(self) -> Optional[WorkerDefinition]:
+        if self._current_worker_id is None:
+            return None
+        for definition in self._worker_definitions:
+            if definition.worker_id == self._current_worker_id:
+                return definition
+        return None
+
+    def _update_worker_description(self) -> None:
+        definition = self._current_worker_definition()
+        if definition is None:
+            self._worker_description.setText(
+                "No worker selected. Please choose an integration to enable training."
+            )
+            return
+        capabilities = ", ".join(definition.capabilities()) or "No declared capabilities"
+        self._worker_description.setText(f"{definition.description}\nCapabilities: {capabilities}")
 
     @staticmethod
     def _format_bool(value: bool) -> str:

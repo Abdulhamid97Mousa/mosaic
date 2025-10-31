@@ -77,6 +77,21 @@ MIN_CREDITS_THRESHOLD = 10
 # Time to wait before auto-starting rendering regulator (ms)
 RENDER_BOOTSTRAP_TIMEOUT_MS = 500
 
+# ================================================================
+# Telemetry Schema Keys
+# ================================================================
+
+# Render payload variants supplied to the UI
+RENDER_PAYLOAD_GRID = "grid"
+RENDER_PAYLOAD_RGB = "rgb"
+RENDER_PAYLOAD_GRAPH = "graph"
+
+# Step metadata keys propagated through telemetry and storage
+TELEMETRY_KEY_SPACE_SIGNATURE = "space_signature"
+TELEMETRY_KEY_VECTOR_METADATA = "vector_metadata"
+TELEMETRY_KEY_AUTORESET_MODE = "autoreset_mode"
+TELEMETRY_KEY_TIME_STEP = "time_step"
+
 __all__ = [
     "STEP_BUFFER_SIZE",
     "EPISODE_BUFFER_SIZE",
@@ -100,4 +115,11 @@ __all__ = [
     "INITIAL_CREDITS",
     "MIN_CREDITS_THRESHOLD",
     "RENDER_BOOTSTRAP_TIMEOUT_MS",
+    "RENDER_PAYLOAD_GRID",
+    "RENDER_PAYLOAD_RGB",
+    "RENDER_PAYLOAD_GRAPH",
+    "TELEMETRY_KEY_SPACE_SIGNATURE",
+    "TELEMETRY_KEY_VECTOR_METADATA",
+    "TELEMETRY_KEY_AUTORESET_MODE",
+    "TELEMETRY_KEY_TIME_STEP",
 ]

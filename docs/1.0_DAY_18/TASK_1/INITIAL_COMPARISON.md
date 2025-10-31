@@ -212,7 +212,7 @@ To keep observability aligned with the schema work, introduce dedicated constant
 | `gym_gui/logging_config/log_constants.py` | `LOG_SCHEMA_MISMATCH`, `LOG_VECTOR_AUTORESET_MODE`, `LOG_SPACE_DESCRIPTOR_MISSING`, `LOG_NORMALIZATION_STATS_DROPPED` | Emit when incoming telemetry lacks required schema bits (grid descriptors, autoreset, normalization stats). |
 | `gym_gui/constants/telemetry_constants.py` | `RENDER_PAYLOAD_GRID`, `RENDER_PAYLOAD_RGB`, `RENDER_PAYLOAD_GRAPH`, `TELEMETRY_KEY_AUTORESET_MODE`, `TELEMETRY_KEY_SPACE_DESCRIPTOR` | Canonical keys for schema generation/validation. |
 | `gym_gui/constants/space_signatures.py` | `SPACE_SIGNATURE_DICT`, `SPACE_SIGNATURE_GRAPH`, `SPACE_SIGNATURE_SEQUENCE`, `SPACE_SIGNATURE_TEXT` | Blueprint descriptors for GUI layout components. |
-| `gym_gui/constants/vector.py` | `DEFAULT_AUTORESET_MODE`, `RESET_MASK_KEY`, `VECTOR_ENV_INDEX_KEY`, `VECTOR_SEED_KEY` | Shared between adapters, session controller, and telemetry. |
+| `gym_gui/constants/constants_vector.py` | `DEFAULT_AUTORESET_MODE`, `RESET_MASK_KEY`, `VECTOR_ENV_INDEX_KEY`, `VECTOR_SEED_KEY` | Shared between adapters, session controller, and telemetry. |
 
 ### Intended logging usage
 

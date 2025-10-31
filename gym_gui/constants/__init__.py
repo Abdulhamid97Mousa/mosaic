@@ -149,6 +149,9 @@ from gym_gui.constants.constants_telemetry import (
     LIVE_EPISODE_QUEUE_SIZE,
     LIVE_STEP_QUEUE_SIZE,
     MIN_CREDITS_THRESHOLD,
+    RENDER_PAYLOAD_GRAPH,
+    RENDER_PAYLOAD_GRID,
+    RENDER_PAYLOAD_RGB,
     RENDER_BOOTSTRAP_TIMEOUT_MS,
     RENDER_QUEUE_SIZE,
     RUNBUS_DB_PATH_QUEUE_SIZE,
@@ -156,9 +159,26 @@ from gym_gui.constants.constants_telemetry import (
     RUNBUS_UI_PATH_QUEUE_SIZE,
     STEP_BUFFER_SIZE,
     STEP_LOG_LEVEL,
+    TELEMETRY_KEY_AUTORESET_MODE,
+    TELEMETRY_KEY_SPACE_SIGNATURE,
+    TELEMETRY_KEY_TIME_STEP,
+    TELEMETRY_KEY_VECTOR_METADATA,
     TELEMETRY_HUB_BUFFER_SIZE,
     TELEMETRY_HUB_MAX_QUEUE,
     TELEMETRY_SERVICE_HISTORY_LIMIT,
+)
+
+# ================================================================
+# Vector Metadata Constants
+# ================================================================
+
+from gym_gui.constants.constants_vector import (
+    DEFAULT_AUTORESET_MODE,
+    RESET_MASK_KEY,
+    SUPPORTED_AUTORESET_MODES,
+    VECTOR_ENV_BATCH_SIZE_KEY,
+    VECTOR_ENV_INDEX_KEY,
+    VECTOR_SEED_KEY,
 )
 
 # ================================================================
@@ -278,6 +298,9 @@ __all__: list[str] = [
     "LIVE_EPISODE_QUEUE_SIZE",
     "LIVE_STEP_QUEUE_SIZE",
     "MIN_CREDITS_THRESHOLD",
+    "RENDER_PAYLOAD_GRAPH",
+    "RENDER_PAYLOAD_GRID",
+    "RENDER_PAYLOAD_RGB",
     "RENDER_BOOTSTRAP_TIMEOUT_MS",
     "RENDER_QUEUE_SIZE",
     "RUNBUS_DB_PATH_QUEUE_SIZE",
@@ -285,9 +308,20 @@ __all__: list[str] = [
     "RUNBUS_UI_PATH_QUEUE_SIZE",
     "STEP_BUFFER_SIZE",
     "STEP_LOG_LEVEL",
+    "TELEMETRY_KEY_AUTORESET_MODE",
+    "TELEMETRY_KEY_SPACE_SIGNATURE",
+    "TELEMETRY_KEY_TIME_STEP",
+    "TELEMETRY_KEY_VECTOR_METADATA",
     "TELEMETRY_HUB_BUFFER_SIZE",
     "TELEMETRY_HUB_MAX_QUEUE",
     "TELEMETRY_SERVICE_HISTORY_LIMIT",
+    # Vector Metadata
+    "DEFAULT_AUTORESET_MODE",
+    "SUPPORTED_AUTORESET_MODES",
+    "RESET_MASK_KEY",
+    "VECTOR_ENV_INDEX_KEY",
+    "VECTOR_ENV_BATCH_SIZE_KEY",
+    "VECTOR_SEED_KEY",
     # Telemetry Bus
     "BUS_DEFAULTS",
     "BusDefaults",

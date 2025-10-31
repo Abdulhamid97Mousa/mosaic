@@ -298,6 +298,18 @@ class TrainerDispatcher:
                 worker_payload.setdefault("run_id", run.run_id)
                 if worker_id:
                     worker_payload.setdefault("worker_id", worker_id)
+                schema_id = worker_payload.get("schema_id")
+                schema_definition = worker_payload.get("schema_definition")
+                if schema_definition:
+                    _LOGGER.debug(
+                        "Worker schema supplied",
+                        extra={"run_id": run.run_id, "schema_id": schema_id},
+                    )
+                else:
+                    _LOGGER.warning(
+                        "Worker schema definition missing",
+                        extra={"run_id": run.run_id, "schema_id": schema_id},
+                    )
                 config_path.write_text(json.dumps(worker_payload, indent=2), encoding="utf-8")
                 self._worker_config_paths[run.run_id] = config_path
                 _LOGGER.debug(

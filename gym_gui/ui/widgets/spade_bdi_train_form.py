@@ -26,6 +26,8 @@ from gym_gui.validations import (
     AgentTrainFormInputs,
     validate_agent_train_form,
 )
+from gym_gui.core.schema import resolve_schema_for_game
+from gym_gui.validations.validations_telemetry import ValidationService
 from gym_gui.constants import (
     DEFAULT_RENDER_DELAY_MS,
     RENDER_DELAY_MIN_MS,
@@ -419,6 +421,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
 
         # Initialize control states based on live rendering toggle
         self._update_render_control_states()
+        self._update_step_delay_state()
 
         # Info label
         info_label = QtWidgets.QLabel(
@@ -633,6 +636,8 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             # Ensure dependent controls reflect the restored state
             self._update_render_control_states()
 
+        self._update_step_delay_state()
+
     def _update_render_control_states(self) -> None:
         """Enable/disable render-related controls based on toggle."""
         enabled = not getattr(self, "_disable_live_render_checkbox", None) or not self._disable_live_render_checkbox.isChecked()
@@ -661,6 +666,34 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 self._ui_rendering_throttle_label.setText("Disabled")
             if hasattr(self, "_render_delay_label"):
                 self._render_delay_label.setText("Disabled")
+
+    def _update_step_delay_state(self) -> None:
+        """Disable the step delay control when telemetry is disabled and fast training is enabled."""
+        slider = getattr(self, "_ui_training_speed_slider", None)
+        label = getattr(self, "_ui_training_speed_label", None)
+        warning_label = getattr(self, "_ui_training_speed_warning_label", None)
+        if slider is None or label is None:
+            return
+
+        fast_training_enabled = self._fast_training_checkbox.isChecked()
+
+        telemetry_disabled = fast_training_enabled
+        telemetry_spin = getattr(self, "_telemetry_buffer_spin", None)
+        if isinstance(telemetry_spin, QtWidgets.QSpinBox) and telemetry_spin.value() == 0:
+            telemetry_disabled = True
+
+        should_disable = fast_training_enabled and telemetry_disabled
+
+        slider.setEnabled(not should_disable)
+        if warning_label is not None:
+            warning_label.setEnabled(not should_disable)
+
+        if should_disable:
+            label.setText("Disabled (Fast Training)")
+            if warning_label is not None:
+                warning_label.setVisible(False)
+        else:
+            self._on_ui_training_speed_changed(slider.value())
 
     def _on_ui_rendering_throttle_changed(self, value: int) -> None:
         """Handle UI rendering throttle slider change.
@@ -838,6 +871,15 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         max_episodes = self._episodes_spin.value()
         max_steps = self._max_steps_spin.value()
         seed = self._seed_spin.value()
+        schema = resolve_schema_for_game(game_id)
+        schema_id = schema.schema_id if schema is not None else "telemetry.step.default"
+        schema_version = schema.version if schema is not None else 1
+        validator = ValidationService(strict_mode=False)
+        schema_definition = validator.get_step_schema(game_id)
+        if schema_definition is None and schema is not None:
+            schema_definition = schema.as_json_schema()
+        if schema_definition is None:
+            schema_definition = {}
         worker_id_input = self._worker_id_edit.text().strip()
         worker_id = self._normalize_worker_id(worker_id_input)
         learning_rate = float(self._lr_edit.text())
@@ -1057,6 +1099,8 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 "ui_training_speed_ms": step_delay_ms,
                 "telemetry_buffer_size": telemetry_buffer_size,
                 "episode_buffer_size": episode_buffer_size,
+                "schema_id": schema_id,
+                "schema_version": schema_version,
                 "hyperparameters": {
                     "learning_rate": learning_rate,
                     "gamma": gamma,
@@ -1079,6 +1123,8 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 "worker_id": worker_id,
                 "bdi_enabled": bdi_enabled,
                 "bdi_config": bdi_config,
+                "schema_id": schema_id,
+                "schema_version": schema_version,
                 "config": {
                     "run_id": run_name,
                     "game_id": game_id,
@@ -1094,6 +1140,9 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                     "game_config": game_config_overrides,  # Game-specific configuration
                     "telemetry_buffer_size": telemetry_buffer_size,  # In-memory ring buffer size for steps
                     "episode_buffer_size": episode_buffer_size,  # In-memory ring buffer size for episodes
+                    "schema_id": schema_id,
+                    "schema_version": schema_version,
+                    "schema_definition": schema_definition,
                     "extra": {
                         "algorithm": algorithm,
                         "learning_rate": learning_rate,
@@ -1107,6 +1156,12 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                     },
                     "worker_id": worker_id,
                 },
+            },
+            "artifacts": {
+                "tensorboard": {
+                    "enabled": True,
+                    "relative_path": f"var/trainer/runs/{run_name}/tensorboard",
+                }
             },
         }
 

@@ -3,6 +3,7 @@ from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
+from gym_gui.storage.session import EpisodeRecord
 from gym_gui.services.telemetry import TelemetryService
 
 
@@ -112,6 +113,34 @@ class TelemetryServiceTests(unittest.TestCase):
 
         self.assertEqual(len(self.storage.steps), 1)
         self.assertEqual(len(self.store.steps), 1)
+
+    def test_record_step_propagates_metadata(self) -> None:
+        space_signature = {"observation": {"shape": [3], "dtype": "float32"}, "action": {"n": 2}}
+        vector_metadata = {"autoreset_mode": "NextStep", "batch_size": 4}
+        record = StepRecord(
+            episode_id="ep-meta",
+            step_index=3,
+            action=None,
+            observation={"obs": 2},
+            reward=2.5,
+            terminated=False,
+            truncated=False,
+            info={},
+            time_step=7,
+            space_signature=space_signature,
+            vector_metadata=vector_metadata,
+        )
+        self.service.record_step(record)
+
+        storage_record = cast(EpisodeRecord, self.storage.steps[-1])
+        self.assertEqual(storage_record.time_step, 7)
+        self.assertEqual(storage_record.space_signature, space_signature)
+        self.assertEqual(storage_record.vector_metadata, vector_metadata)
+
+        stored_step = self.store.steps[-1]
+        self.assertEqual(stored_step.vector_metadata, vector_metadata)
+        self.assertEqual(stored_step.space_signature, space_signature)
+        self.assertEqual(stored_step.time_step, 7)
 
     def test_complete_episode_flushes_storage_and_store(self) -> None:
         rollup = EpisodeRollup(
