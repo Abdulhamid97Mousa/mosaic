@@ -322,7 +322,7 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
 
         if self._status_label is not None:
             self._status_label.setText(
-                f"Embedded TensorBoard running on http://127.0.0.1:{self._tensorboard_port}""
+                f"Embedded TensorBoard running on http://127.0.0.1:{self._tensorboard_port}"
             )
 
     # ------------------------------------------------------------------
