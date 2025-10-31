@@ -7,7 +7,7 @@ from dataclasses import dataclass, field
 import logging
 from typing import Any, Callable, Generic, Mapping, Sequence, TypeVar
 
-import gymnasium as gym
+import gymnasium as gym  # type: ignore[import]
 
 from gym_gui.core.enums import ControlMode, RenderMode
 from gym_gui.core.spaces.serializer import describe_space
@@ -147,7 +147,8 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT], LogConstantMixin):
     def load(self) -> None:
         """Instantiate underlying Gymnasium environment resources."""
 
-        kwargs: dict[str, Any] = {"render_mode": self.default_render_mode.value}
+        default_mode = self._resolve_default_render_mode()
+        kwargs: dict[str, Any] = {"render_mode": default_mode.value}
         extra_kwargs = self.gym_kwargs()
         if extra_kwargs:
             kwargs.update(extra_kwargs)
@@ -157,7 +158,7 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT], LogConstantMixin):
             LOG_ADAPTER_ENV_CREATED,
             extra={
                 "env_id": self.id,
-                "render_mode": self.default_render_mode.value,
+                "render_mode": default_mode.value,
                 "gym_kwargs": ",".join(sorted(extra_kwargs.keys())) if extra_kwargs else "-",
                 "wrapped_class": env.__class__.__name__,
             },
@@ -341,7 +342,17 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT], LogConstantMixin):
     def supports_render_mode(self, mode: RenderMode) -> bool:
         if self.supported_render_modes:
             return mode in self.supported_render_modes
-        return mode == self.default_render_mode
+        return mode == self._resolve_default_render_mode()
+
+    def _resolve_default_render_mode(self) -> RenderMode:
+        """Return the configured default render mode, raising if missing."""
+
+        default_mode = getattr(self, "default_render_mode", None)
+        if not isinstance(default_mode, RenderMode):
+            raise AdapterNotReadyError(
+                f"Adapter '{self.id}' must set 'default_render_mode' before loading."
+            )
+        return default_mode
 
     # ------------------------------------------------------------------
     # Convenience accessors

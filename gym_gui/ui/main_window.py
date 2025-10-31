@@ -9,7 +9,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
 import json
 import threading
 
-from qtpy import QtCore, QtGui, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets  # type: ignore[attr-defined]
 try:
     from qtpy.QtGui import QAction
 except ImportError:
@@ -77,6 +77,8 @@ _LOGGER = logging.getLogger(__name__)
 
 class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
     """Primary window that orchestrates the Gym session."""
+
+    _auto_subscribe_requested = QtCore.Signal(str)
 
     # Severity-level filters
     LOG_SEVERITY_OPTIONS: Dict[str, str | None] = {
@@ -172,6 +174,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         
         # Create presenter to coordinate
         self._presenter = MainWindowPresenter(self._session, self._human_input, parent=self)
+
+        # Ensure auto-subscribe dispatches cross-thread via Qt's signal delivery
+        self._auto_subscribe_requested.connect(self._auto_subscribe_run_main_thread)
         
         status_bar = self.statusBar()
         if status_bar is None:
@@ -1808,7 +1813,27 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             )
     
     def _auto_subscribe_run(self, run_id: str) -> None:
-        """Auto-subscribe to a newly discovered run (called on main thread)."""
+        """Ensure auto-subscribe logic executes on the GUI thread."""
+        current_thread = QtCore.QThread.currentThread()
+        widget_thread = self.thread()
+        if current_thread != widget_thread:
+            self.log_constant(
+                LOG_UI_MAINWINDOW_TRACE,
+                message="Queueing auto-subscribe on GUI thread",
+                extra={
+                    "run_id": run_id,
+                    "current_thread": repr(current_thread),
+                    "widget_thread": repr(widget_thread),
+                },
+            )
+            self._auto_subscribe_requested.emit(run_id)
+            return
+
+        self._auto_subscribe_run_main_thread(run_id)
+
+    @QtCore.Slot(str)
+    def _auto_subscribe_run_main_thread(self, run_id: str) -> None:
+        """Auto-subscribe to a newly discovered run (always called on main thread)."""
         self.log_constant( 
             LOG_UI_MAINWINDOW_INFO,
             message="Auto-subscribing to new run",

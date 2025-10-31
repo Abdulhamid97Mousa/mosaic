@@ -170,13 +170,13 @@ def _build_descriptor(space: gym.Space[Any]) -> SpaceDescriptor:
 
 
 def _array_like(value: Any) -> Any:
-    if isinstance(value, np.ndarray):
-        return value.tolist()
-    if hasattr(value, "tolist") and callable(value.tolist):  # type: ignore[attr-defined]
-        try:
-            return value.tolist()
-        except TypeError:
-            pass
+    if not isinstance(value, (bytes, bytearray, str)):
+        tolist = getattr(value, "tolist", None)
+        if callable(tolist):
+            try:
+                return tolist()
+            except TypeError:
+                pass
     if isinstance(value, Iterable) and not isinstance(value, (bytes, bytearray, str)):
         return [_array_like(item) for item in value]
     return value
@@ -185,10 +185,12 @@ def _array_like(value: Any) -> Any:
 def _json_safe(value: Any) -> Any:
     if isinstance(value, Mapping):
         return {str(k): _json_safe(v) for k, v in value.items()}
+    if not isinstance(value, (str, bytes, bytearray)):
+        tolist = getattr(value, "tolist", None)
+        if callable(tolist):
+            return tolist()
     if isinstance(value, Sequence) and not isinstance(value, (str, bytes, bytearray)):
         return [_json_safe(item) for item in value]
-    if isinstance(value, np.ndarray):
-        return value.tolist()
     return value
 
 

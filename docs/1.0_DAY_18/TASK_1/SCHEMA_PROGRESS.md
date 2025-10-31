@@ -9,6 +9,7 @@
 - Headless SPADE-BDI worker now advertises schema metadata (ID/version), space signatures, vector metadata, and per-step `time_step` counters in emitted telemetry.
 - Training configurations handed off to the trainer now embed `schema_id`, `schema_version`, and the JSON `schema_definition` so remote bootstrap scripts can reject mismatched payloads before launch.
 - Fast-training/TensorBoard-only runs log the same schema identifiers, keeping analytics in sync even when per-step telemetry is disabled.
+- Embedded TensorBoard viewer launches automatically in the GUI (auto-start, WebEngine-backed) with optional log cleanup when the tab is closed.
 - Expanded base requirements with MiniGrid/Atari runtime dependencies (`requirements/base.txt`).
 
 ## Verification

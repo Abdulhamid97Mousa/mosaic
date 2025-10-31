@@ -38,7 +38,11 @@ def describe_vector_environment(env: Any) -> dict[str, Any] | None:
     autoreset_mode = DEFAULT_AUTORESET_MODE
     autoreset = vector_metadata.get("autoreset_mode")
     if AutoresetMode is not None and isinstance(autoreset, AutoresetMode):
-        autoreset_mode = autoreset.value
+        autoreset_value = getattr(autoreset, "value", None)
+        if isinstance(autoreset_value, str):
+            autoreset_mode = autoreset_value
+        else:
+            autoreset_mode = str(autoreset)
     elif isinstance(autoreset, str):
         autoreset_mode = autoreset
     if autoreset_mode:
