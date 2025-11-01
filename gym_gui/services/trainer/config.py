@@ -13,6 +13,7 @@ from jsonschema import Draft202012Validator, ValidationError
 from ulid import ULID
 
 from gym_gui.constants import TRAINER_DEFAULTS
+from gym_gui.config.paths import VAR_TENSORBOARD_DIR
 from gym_gui.utils import json_serialization
 
 
@@ -222,28 +223,50 @@ def validate_train_run_config(raw: Mapping[str, Any]) -> TrainRunConfig:
     canonical = _canonicalize_config(raw)
     submitted = datetime.utcnow().replace(tzinfo=None)
     digest = _stable_digest(canonical)
-    
-    # Generate sortable run_id using ULID (Universally Unique Lexicographically Sortable Identifier)
-    # ULID provides:
-    # ✅ Lexicographic sortability (natural chronological ordering by submission time)
-    # ✅ Better database performance (50% faster generation, 3.3x faster range queries)
-    # ✅ Embedded timestamp (no separate created_at column needed)
-    # ✅ 26 chars vs 36 for UUID (28% smaller)
-    # ✅ Deterministic ordering when same millisecond (monotonic incrementation)
-    run_id = str(ULID())
+
+    metadata_payload = canonical.get("metadata") if isinstance(canonical.get("metadata"), MutableMapping) else None
+    worker_meta = None
+    worker_config = None
+    existing_run_id: str | None = None
+    if isinstance(metadata_payload, MutableMapping):
+        worker_meta = metadata_payload.get("worker") if isinstance(metadata_payload.get("worker"), MutableMapping) else None
+        if isinstance(worker_meta, MutableMapping):
+            worker_config = worker_meta.get("config") if isinstance(worker_meta.get("config"), MutableMapping) else None
+            if isinstance(worker_config, MutableMapping):
+                candidate_run_id = worker_config.get("run_id")
+                if isinstance(candidate_run_id, str):
+                    try:
+                        ULID.from_str(candidate_run_id)
+                        existing_run_id = candidate_run_id
+                    except ValueError:
+                        existing_run_id = None
+
+    # Generate sortable run_id using ULID unless a valid ULID was already supplied.
+    run_id = existing_run_id or str(ULID())
+    tensorboard_relative = f"var/trainer/runs/{run_id}/tensorboard"
+    tensorboard_absolute = (VAR_TENSORBOARD_DIR / run_id / "tensorboard").resolve()
 
     # CRITICAL: Update worker config with the correct ULID-based run_id
     # The UI builds config with run_name, but we need to use the ULID-based run_id
     # so that telemetry from the worker matches the database run_id
-    if "metadata" in canonical and "worker" in canonical["metadata"]:
-        worker_meta = canonical["metadata"]["worker"]
-        if isinstance(worker_meta, MutableMapping) and "config" in worker_meta:
-            worker_config = worker_meta["config"]
-            if isinstance(worker_config, MutableMapping):
-                worker_config["run_id"] = run_id
-                worker_id_from_config = worker_config.get("worker_id")
-                if worker_id_from_config and not worker_meta.get("worker_id"):
-                    worker_meta["worker_id"] = worker_id_from_config
+    if isinstance(worker_config, MutableMapping):
+        worker_config["run_id"] = run_id
+        worker_id_from_config = worker_config.get("worker_id")
+        if worker_id_from_config and isinstance(worker_meta, MutableMapping) and not worker_meta.get("worker_id"):
+            worker_meta["worker_id"] = worker_id_from_config
+
+    if isinstance(metadata_payload, MutableMapping):
+        artifacts_meta = metadata_payload.get("artifacts")
+        if not isinstance(artifacts_meta, MutableMapping):
+            artifacts_meta = {}
+        tensorboard_meta = artifacts_meta.get("tensorboard") if isinstance(artifacts_meta, MutableMapping) else None
+        if not isinstance(tensorboard_meta, MutableMapping):
+            tensorboard_meta = {}
+            artifacts_meta["tensorboard"] = tensorboard_meta
+        tensorboard_meta["relative_path"] = tensorboard_relative
+        tensorboard_meta.setdefault("enabled", True)
+        tensorboard_meta["log_dir"] = str(tensorboard_absolute)
+        metadata_payload["artifacts"] = artifacts_meta
 
     metadata = TrainerRunMetadata(run_id=run_id, digest=digest, submitted_at=submitted)
     return TrainRunConfig(payload=canonical, metadata=metadata)

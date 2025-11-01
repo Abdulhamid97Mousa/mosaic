@@ -112,7 +112,7 @@ class ArtifactEvent(TelemetryEventBase):
     @field_validator("kind")
     @classmethod
     def validate_kind(cls, value: str) -> str:
-        allowed = {"policy", "video", "checkpoint", "log"}
+        allowed = {"policy", "video", "checkpoint", "log", "tensorboard"}
         if value not in allowed:
             raise ValueError(f"kind must be one of {allowed}, got {value}")
         return value

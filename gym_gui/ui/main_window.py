@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
 import json
 import threading
 
+from PyQt6.QtCore import pyqtSlot, pyqtSignal  # type: ignore[attr-defined]
 from qtpy import QtCore, QtGui, QtWidgets  # type: ignore[attr-defined]
 try:
     from qtpy.QtGui import QAction
@@ -78,7 +79,7 @@ _LOGGER = logging.getLogger(__name__)
 class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
     """Primary window that orchestrates the Gym session."""
 
-    _auto_subscribe_requested = QtCore.Signal(str)
+    _auto_subscribe_requested = pyqtSignal(str)
 
     # Severity-level filters
     LOG_SEVERITY_OPTIONS: Dict[str, str | None] = {
@@ -244,7 +245,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         layout.setContentsMargins(10, 10, 10, 10)
 
         splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal, central)
-        splitter.setChildrenCollapsible(False)
+        splitter.setChildrenCollapsible(True)
         layout.addWidget(splitter)
 
         layout_defaults = UI_DEFAULTS.layout
@@ -254,14 +255,22 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._control_panel_scroll.setWidgetResizable(True)
         self._control_panel_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
         self._control_panel_scroll.setWidget(self._control_panel)
+        self._control_panel_scroll.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.MinimumExpanding,
+            QtWidgets.QSizePolicy.Policy.Expanding,
+        )
         splitter.addWidget(self._control_panel_scroll)
         self._control_panel_scroll.setMinimumWidth(layout_defaults.control_panel_min_width)
         self._control_panel.setMinimumWidth(layout_defaults.control_panel_min_width)
 
         right_panel = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical, central)
+        right_panel.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Expanding,
+        )
         splitter.addWidget(right_panel)
         splitter.setStretchFactor(1, 1)
-        right_panel.setChildrenCollapsible(False)
+        right_panel.setChildrenCollapsible(True)
         right_panel.setMinimumWidth(layout_defaults.render_min_width)
         if layout_defaults.render_max_width:
             right_panel.setMaximumWidth(layout_defaults.render_max_width)
@@ -312,13 +321,17 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._log_group.setMinimumWidth(layout_defaults.log_min_width)
 
         info_log_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical, central)
-        info_log_splitter.setChildrenCollapsible(False)
+        info_log_splitter.setChildrenCollapsible(True)
         self._info_group.setMinimumWidth(layout_defaults.info_min_width)
         info_log_splitter.addWidget(self._info_group)
         info_log_splitter.addWidget(self._log_group)
         info_log_splitter.setStretchFactor(0, 2)
         info_log_splitter.setStretchFactor(1, 1)
         info_log_splitter.setMinimumWidth(layout_defaults.info_min_width + layout_defaults.log_min_width)
+        info_log_splitter.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.MinimumExpanding,
+            QtWidgets.QSizePolicy.Policy.Expanding,
+        )
         info_log_splitter.setSizes(
             [
                 layout_defaults.info_default_width,
@@ -1831,7 +1844,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         self._auto_subscribe_run_main_thread(run_id)
 
-    @QtCore.Slot(str)
+    @pyqtSlot(str)
     def _auto_subscribe_run_main_thread(self, run_id: str) -> None:
         """Auto-subscribe to a newly discovered run (always called on main thread)."""
         self.log_constant( 

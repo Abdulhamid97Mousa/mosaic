@@ -102,15 +102,15 @@ class BufferDefaults:
 class LayoutDefaults:
     """Splitter column sizing for the main window layout."""
 
-    control_panel_min_width: int = 320
-    control_panel_default_width: int = 360
-    render_min_width: int = 640
-    render_default_width: int = 720
+    control_panel_min_width: int = 200
+    control_panel_default_width: int = 340
+    render_min_width: int = 320
+    render_default_width: int = 640
     render_max_width: int | None = None
-    info_min_width: int = 260
-    info_default_width: int = 280
-    log_min_width: int = 320
-    log_default_width: int = 360
+    info_min_width: int = 140
+    info_default_width: int = 220
+    log_min_width: int = 160
+    log_default_width: int = 300
 
 
 @dataclass(frozen=True)

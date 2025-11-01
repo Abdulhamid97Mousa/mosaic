@@ -38,6 +38,10 @@ class TelemetryContainer(QtWidgets.QWidget):
         container_layout = QtWidgets.QVBoxLayout(self)
         container_layout.setContentsMargins(0, 0, 0, 0)
         container_layout.addWidget(self._group)
+        self.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Expanding,
+        )
 
     def get_render_tabs(self) -> RenderTabs:
         """Get the underlying render tabs widget."""
@@ -57,4 +61,3 @@ class TelemetryContainer(QtWidgets.QWidget):
 
 
 __all__ = ["TelemetryContainer"]
-

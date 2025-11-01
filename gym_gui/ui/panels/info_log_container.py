@@ -81,6 +81,10 @@ class InfoLogContainer(QtWidgets.QWidget):
         container_layout = QtWidgets.QVBoxLayout(self)
         container_layout.setContentsMargins(0, 0, 0, 0)
         container_layout.addWidget(splitter)
+        self.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.MinimumExpanding,
+            QtWidgets.QSizePolicy.Policy.Expanding,
+        )
 
     def get_info_group(self) -> QtWidgets.QGroupBox:
         """Get the game info group box."""
@@ -134,4 +138,3 @@ class InfoLogContainer(QtWidgets.QWidget):
 
 
 __all__ = ["InfoLogContainer"]
-

@@ -1034,6 +1034,24 @@ LOG_UI_RENDER_TABS_ERROR = _constant(
     tags=_tags("ui", "render", "error"),
 )
 
+LOG_UI_RENDER_TABS_TENSORBOARD_STATUS = _constant(
+    "LOG724",
+    "INFO",
+    "TensorBoard log directory status",
+    component="UI",
+    subcomponent="RenderTabs",
+    tags=_tags("ui", "tensorboard", "status"),
+)
+
+LOG_UI_RENDER_TABS_TENSORBOARD_WAITING = _constant(
+    "LOG725",
+    "DEBUG",
+    "TensorBoard directory not yet available",
+    component="UI",
+    subcomponent="RenderTabs",
+    tags=_tags("ui", "tensorboard", "waiting"),
+)
+
 LOG_UI_RENDER_TABS_DELETE_REQUESTED = _constant(
     "LOG736",
     "INFO",
@@ -1657,6 +1675,8 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_UI_RENDER_TABS_INFO,
     LOG_UI_RENDER_TABS_WARNING,
     LOG_UI_RENDER_TABS_ERROR,
+    LOG_UI_RENDER_TABS_TENSORBOARD_STATUS,
+    LOG_UI_RENDER_TABS_TENSORBOARD_WAITING,
     LOG_UI_RENDER_TABS_DELETE_REQUESTED,
     LOG_UI_RENDER_TABS_EVENT_FOR_DELETED_RUN,
     LOG_UI_RENDER_TABS_TAB_ADDED,
@@ -1813,6 +1833,8 @@ __all__ = (
     "LOG_UI_RENDER_TABS_INFO",
     "LOG_UI_RENDER_TABS_WARNING",
     "LOG_UI_RENDER_TABS_ERROR",
+    "LOG_UI_RENDER_TABS_TENSORBOARD_STATUS",
+    "LOG_UI_RENDER_TABS_TENSORBOARD_WAITING",
     "LOG_UI_RENDER_TABS_DELETE_REQUESTED",
     "LOG_UI_RENDER_TABS_EVENT_FOR_DELETED_RUN",
     "LOG_UI_RENDER_TABS_TAB_ADDED",

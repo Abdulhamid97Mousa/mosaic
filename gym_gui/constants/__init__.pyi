@@ -95,10 +95,12 @@ from .constants_trainer import (
     TrainRunSchemaDefaults,
 )
 from .constants_game import (
+    FROZEN_LAKE_DEFAULTS,
     FROZEN_LAKE_V2_DEFAULTS,
-    MOUNTAIN_CAR_CONTINUOUS_V0_DEFAULTS,
-    MOUNTAIN_CAR_V0_DEFAULTS,
-    SUPPORTED_GAME_ENVS,
+    CLIFF_WALKING_DEFAULTS,
+    TAXI_DEFAULTS,
+    TOY_TEXT_DEFAULTS,
+    ToyTextDefaults,
 )
 
 __all__ = [
@@ -193,8 +195,10 @@ __all__ = [
     "TrainerRetryDefaults",
     "TrainRunSchemaDefaults",
     # Game
+    "FROZEN_LAKE_DEFAULTS",
     "FROZEN_LAKE_V2_DEFAULTS",
-    "MOUNTAIN_CAR_CONTINUOUS_V0_DEFAULTS",
-    "MOUNTAIN_CAR_V0_DEFAULTS",
-    "SUPPORTED_GAME_ENVS",
+    "CLIFF_WALKING_DEFAULTS",
+    "TAXI_DEFAULTS",
+    "TOY_TEXT_DEFAULTS",
+    "ToyTextDefaults",
 ]

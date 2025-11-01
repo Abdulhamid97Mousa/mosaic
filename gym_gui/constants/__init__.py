@@ -222,6 +222,17 @@ from gym_gui.constants.constants_trainer import (
 )
 
 # ================================================================
+# TensorBoard Constants
+# ================================================================
+
+from gym_gui.constants.constants_tensorboard import (
+    DEFAULT_TENSORBOARD,
+    TensorboardDefaults,
+    build_tensorboard_log_dir,
+    build_tensorboard_relative_path,
+)
+
+# ================================================================
 # Pre-existing Constants (game_constants.py)
 # ================================================================
 
@@ -344,6 +355,11 @@ __all__: list[str] = [
     "TrainerDefaults",
     "TrainerRetryDefaults",
     "TrainRunSchemaDefaults",
+    # TensorBoard
+    "DEFAULT_TENSORBOARD",
+    "TensorboardDefaults",
+    "build_tensorboard_log_dir",
+    "build_tensorboard_relative_path",
     # Game (will be extended if game_constants has __all__)
 ]
 
