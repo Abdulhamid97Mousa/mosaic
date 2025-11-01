@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from dataclasses import replace
 from collections import deque
 from typing import Any, Deque, Dict, Iterable, Optional, TYPE_CHECKING
 
@@ -119,20 +120,21 @@ class TelemetryService(LogConstantMixin):
             )
             self._storage.record_step(storage_record)
         if self._store:
+            store_record = self._prepare_store_record(record)
             _LOGGER.debug(f"[TELEMETRY PERSIST] Persisting to SQLite store: "
-                        f"episode_id={record.episode_id} step_index={record.step_index}")
+                        f"episode_id={store_record.episode_id} step_index={store_record.step_index}")
             # Schedule async write without blocking drain loop
             try:
                 # Check if there's a RUNNING event loop
                 # asyncio.get_running_loop() raises RuntimeError if no loop is running
                 asyncio.get_running_loop()
                 # If we get here, there's a running loop - use async write
-                asyncio.create_task(self._async_record_step(record))
-                _LOGGER.debug(f"[TELEMETRY] Scheduled async write for episode_id={record.episode_id}")
+                asyncio.create_task(self._async_record_step(store_record))
+                _LOGGER.debug(f"[TELEMETRY] Scheduled async write for episode_id={store_record.episode_id}")
             except RuntimeError:
                 # No running event loop - use sync write immediately
-                _LOGGER.debug(f"[TELEMETRY] No running event loop, using sync write for episode_id={record.episode_id}")
-                self._store.record_step(record)
+                _LOGGER.debug(f"[TELEMETRY] No running event loop, using sync write for episode_id={store_record.episode_id}")
+                self._store.record_step(store_record)
 
     async def _async_record_step(self, record: StepRecord) -> None:
         """Record step asynchronously to avoid blocking drain loop."""
@@ -158,6 +160,15 @@ class TelemetryService(LogConstantMixin):
             self._storage.flush_episode()
         if self._store:
             self._store.record_episode(rollup, wait=False)
+
+    def _prepare_store_record(self, record: StepRecord) -> StepRecord:
+        trimmed = record
+        if self._storage:
+            if self._storage.drop_render_payload_enabled():
+                trimmed = replace(trimmed, render_payload=None, frame_ref=None)
+            if self._storage.drop_observation_enabled():
+                trimmed = replace(trimmed, observation=None)
+        return trimmed
 
     # ------------------------------------------------------------------
     def recent_steps(self, *, limit: Optional[int] = None) -> Iterable[StepRecord]:

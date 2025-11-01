@@ -29,6 +29,9 @@ pytest==8.4.2
 pydantic==2.8.0
 Pillow==10.4.0
 # Gymnasium core + environment families used across GUI and workers
+
+gymnasium[box2d]
+gymnasium[mujoco]
 gymnasium
 minigrid>=2,<3.0.0
 

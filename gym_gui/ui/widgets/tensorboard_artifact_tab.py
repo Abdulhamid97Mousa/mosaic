@@ -225,7 +225,7 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
             )
             scroll_area.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
 
-            web_group = QtWidgets.QGroupBox("Embedded Viewer")
+            web_group = QtWidgets.QGroupBox("")
             web_group.setSizePolicy(
                 QtWidgets.QSizePolicy.Policy.Expanding,
                 QtWidgets.QSizePolicy.Policy.Expanding,

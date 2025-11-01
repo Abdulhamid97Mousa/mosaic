@@ -51,6 +51,7 @@ from gym_gui.logging_config.log_constants import (
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.services.actor import ActorService, EpisodeSummary, StepSnapshot
 from gym_gui.services.frame_storage import FrameStorageService
+from gym_gui.services.storage import StorageRecorderService
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
 from gym_gui.utils.seeding import SessionSeedManager
@@ -134,6 +135,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._telemetry = locator.resolve(TelemetryService)
         self._actor_service = locator.resolve(ActorService)
         self._frame_storage = locator.resolve(FrameStorageService)
+        self._storage_service = locator.resolve(StorageRecorderService)
         if self._actor_service is not None:
             self._seed_manager.register_consumer("actor_service", self._actor_service.seed)
         self._seed_manager.register_consumer("session_timers", self._seed_timers)
@@ -868,7 +870,12 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         worker_id = getattr(run_context, "_worker_id", None) if run_context is not None else None
 
         # Save frame to disk if frame_ref is available
-        if frame_ref and self._frame_storage is not None and step.render_payload is not None:
+        if (
+            frame_ref
+            and self._frame_storage is not None
+            and step.render_payload is not None
+            and self._should_capture_frames()
+        ):
             try:
                 self._frame_storage.save_frame(
                     step.render_payload,
@@ -902,6 +909,11 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         if self._telemetry is not None:
             self._telemetry.record_step(record)
         return record
+
+    def _should_capture_frames(self) -> bool:
+        if self._storage_service is None:
+            return False
+        return self._storage_service.capture_frames_enabled()
 
     def _idle_step(self) -> None:
         if not self._should_idle_tick():

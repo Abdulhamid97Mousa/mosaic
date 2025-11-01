@@ -17,6 +17,9 @@ class StorageProfile:
     ring_buffer_size: int = 1024
     retain_episodes: int = 10
     compress_frames: bool = False
+    capture_frames: bool = False
+    drop_render_payload: bool = False
+    drop_observation: bool = False
     telemetry_only: bool = False
     telemetry_store: str = "jsonl"
     extras: dict[str, Any] = field(default_factory=dict)
@@ -73,6 +76,9 @@ class StorageRecorderService:
             compress_frames = _as_bool(
                 payload.get("compress_frames") or (payload.get("frame_compression") == "png")
             )
+            capture_frames = _as_bool(payload.get("capture_frames"), default=compress_frames)
+            if not capture_frames:
+                compress_frames = False
             telemetry_store = str(payload.get("telemetry_store", "jsonl"))
             tracked_keys = {
                 "strategy",
@@ -83,6 +89,9 @@ class StorageRecorderService:
                 "frame_compression",
                 "telemetry_only",
                 "telemetry_store",
+                "capture_frames",
+                "drop_render_payload",
+                "drop_observation",
             }
             extras = {k: v for k, v in payload.items() if k not in tracked_keys}
 
@@ -92,6 +101,9 @@ class StorageRecorderService:
                 ring_buffer_size=ring_buffer,
                 retain_episodes=retain,
                 compress_frames=compress_frames,
+                capture_frames=capture_frames,
+                drop_render_payload=_as_bool(payload.get("drop_render_payload")),
+                drop_observation=_as_bool(payload.get("drop_observation")),
                 telemetry_only=telemetry_only,
                 telemetry_store=telemetry_store,
                 extras=extras,
@@ -112,6 +124,27 @@ class StorageRecorderService:
         if self._active_profile is None:
             self._active_profile = next(iter(self._profiles))
         return self._profiles[self._active_profile]
+
+    def capture_frames_enabled(self) -> bool:
+        try:
+            profile = self.get_active_profile()
+            return bool(profile.capture_frames)
+        except Exception:
+            return False
+
+    def drop_render_payload_enabled(self) -> bool:
+        try:
+            profile = self.get_active_profile()
+            return bool(profile.drop_render_payload)
+        except Exception:
+            return False
+
+    def drop_observation_enabled(self) -> bool:
+        try:
+            profile = self.get_active_profile()
+            return bool(profile.drop_observation)
+        except Exception:
+            return False
 
     # ------------------------------------------------------------------
     def _ensure_recorder(self) -> SessionRecorder:
