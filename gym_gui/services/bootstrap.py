@@ -8,7 +8,13 @@ import os
 from gym_gui.config.paths import VAR_TELEMETRY_DIR, ensure_var_directories, VAR_ROOT
 from gym_gui.rendering import RendererRegistry, create_default_renderer_registry
 from gym_gui.services.action_mapping import ContinuousActionMapper, create_default_action_mapper
-from gym_gui.services.actor import ActorService, BDIQAgent, HumanKeyboardActor, LLMMultiStepAgent
+from gym_gui.services.actor import (
+    ActorService,
+    BDIQAgent,
+    CleanRLWorkerActor,
+    HumanKeyboardActor,
+    LLMMultiStepAgent,
+)
 from gym_gui.services.frame_storage import FrameStorageService
 from gym_gui.services.service_locator import ServiceLocator, get_service_locator
 from gym_gui.services.trainer import TrainerClient, TrainerClientConfig, TrainerClientRunner
@@ -20,7 +26,7 @@ from gym_gui.telemetry import TelemetrySQLiteStore
 from gym_gui.telemetry.db_sink import TelemetryDBSink
 from gym_gui.telemetry.run_bus import get_bus
 from gym_gui.telemetry.health import HealthMonitor
-from gym_gui.telemetry.constants import (
+from gym_gui.constants import (
     TELEMETRY_HUB_MAX_QUEUE,
     TELEMETRY_HUB_BUFFER_SIZE,
     DB_SINK_BATCH_SIZE,
@@ -65,9 +71,9 @@ def bootstrap_default_services() -> ServiceLocator:
     )
     actors.register_actor(
         BDIQAgent(),
-        display_name="BDI-Q Agent",
-        description="Belief-Desire-Intention agent with Q-learning hooks.",
-        policy_label="BDI planner + Q-learning",
+        display_name="BDI Agent",
+        description="Belief-Desire-Intention agent with pluggable learning backends.",
+        policy_label="BDI planner + RL policy",
         backend_label="In-process Python actor",
     )
     actors.register_actor(
@@ -76,6 +82,13 @@ def bootstrap_default_services() -> ServiceLocator:
         description="Delegates decisions to an integrated language model pipeline.",
         policy_label="LLM planning with tool calls",
         backend_label="External language model service",
+    )
+    actors.register_actor(
+        CleanRLWorkerActor(),
+        display_name="CleanRL Worker",
+        description="Delegates decisions to a CleanRL policy running in the worker process.",
+        policy_label="External CleanRL policy",
+        backend_label="Trainer-managed worker",
     )
 
     action_mapper: ContinuousActionMapper = create_default_action_mapper()

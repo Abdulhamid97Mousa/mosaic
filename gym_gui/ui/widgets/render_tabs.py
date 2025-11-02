@@ -276,8 +276,20 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
         if isinstance(widget, LiveTelemetryTab):
             buffer_episodes = len(getattr(widget, "_episode_buffer", []))
             buffer_steps = len(getattr(widget, "_step_buffer", []))
-            steps_collected = max(steps_collected, buffer_steps, getattr(widget, "_current_step_in_episode", 0))
-            episodes_collected = max(episodes_collected, buffer_episodes)
+            current_episode_index = getattr(widget, "_current_episode_index", -1)
+            current_step_index = getattr(widget, "_current_step_in_episode", -1)
+
+            # Convert indices to counts (1-based) when activity observed
+            live_episode_count = buffer_episodes
+            if current_episode_index >= 0 and (buffer_steps > 0 or current_step_index >= 0):
+                live_episode_count = max(live_episode_count, current_episode_index + 1)
+
+            live_step_count = buffer_steps
+            if current_step_index >= 0 and (buffer_steps > 0):
+                live_step_count = max(live_step_count, current_step_index + 1)
+
+            steps_collected = max(steps_collected, live_step_count)
+            episodes_collected = max(episodes_collected, live_episode_count)
 
         is_active = status == "active"
 

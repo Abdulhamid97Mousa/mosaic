@@ -22,7 +22,7 @@ from gym_gui.config.game_configs import (
 from gym_gui.config.paths import VAR_DATA_DIR
 from gym_gui.core.adapters.base import AdapterContext, EnvironmentAdapter, StepState
 from gym_gui.core.enums import ControlMode, GameId, RenderMode
-from gym_gui.constants.game_constants import (
+from gym_gui.constants.constants_game import (
     ToyTextDefaults,
     TOY_TEXT_DEFAULTS,
     FROZEN_LAKE_DEFAULTS,

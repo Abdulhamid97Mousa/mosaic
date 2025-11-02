@@ -10,14 +10,14 @@ at a controlled rate (independent of table update speed). This allows:
 import logging
 from typing import Any, Optional
 from collections import deque
-from qtpy import QtCore, QtWidgets
+from PyQt6 import QtCore, QtWidgets
+from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 
 from gym_gui.logging_config.log_constants import (
     LOG_RENDER_DROPPED_FRAME,
     LOG_RENDER_REGULATOR_NOT_STARTED,
 )
-from gym_gui.telemetry.constants import RENDER_QUEUE_SIZE, RENDER_BOOTSTRAP_TIMEOUT_MS
-from gym_gui.ui.constants import DEFAULT_RENDER_DELAY_MS
+from gym_gui.constants import RENDER_QUEUE_SIZE, RENDER_BOOTSTRAP_TIMEOUT_MS, DEFAULT_RENDER_DELAY_MS
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -34,7 +34,7 @@ class RenderingSpeedRegulator(QtCore.QObject):
     """
 
     # Signal emitted when payload is ready to render
-    payload_ready = QtCore.Signal(dict)  # type: ignore[attr-defined]
+    payload_ready = pyqtSignal(dict)
 
     def __init__(
         self,

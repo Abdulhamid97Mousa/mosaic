@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Optional
 
 from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 
 from .state import IndicatorSeverity, IndicatorState
 
@@ -12,7 +13,7 @@ from .state import IndicatorSeverity, IndicatorState
 class InlineBanner(QtWidgets.QFrame):
     """A slim, dismissible strip to highlight run state within a panel."""
 
-    dismissed = QtCore.pyqtSignal(str)
+    dismissed = pyqtSignal(str)
 
     _BASE_STYLE = """
     QFrame { border-radius: 6px; padding: 6px 10px; }

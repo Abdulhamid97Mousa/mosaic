@@ -112,6 +112,44 @@ class MigrationRunner:
             END
             """,
         ),
+        # Phase 6: Episode counter system for bounded, per-run indexing
+        Migration(
+            "telemetry_add_ep_index_to_episodes",
+            "ALTER TABLE episodes ADD COLUMN ep_index INTEGER",
+        ),
+        Migration(
+            "telemetry_create_unique_run_ep_index",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_episodes_unique_run_ep_index ON episodes(run_id, ep_index)",
+        ),
+        Migration(
+            "telemetry_create_index_episodes_run_ep_index",
+            "CREATE INDEX IF NOT EXISTS idx_episodes_run_ep_index ON episodes(run_id, ep_index DESC)",
+        ),
+        # Phase 7: Worker ID support for distributed runs
+        Migration(
+            "telemetry_add_worker_id_to_steps",
+            "ALTER TABLE steps ADD COLUMN worker_id TEXT",
+        ),
+        Migration(
+            "telemetry_add_worker_id_to_episodes",
+            "ALTER TABLE episodes ADD COLUMN worker_id TEXT",
+        ),
+        Migration(
+            "telemetry_drop_unique_run_ep_index",
+            "DROP INDEX IF EXISTS idx_episodes_unique_run_ep_index",
+        ),
+        Migration(
+            "telemetry_create_unique_run_worker_ep_index",
+            "CREATE UNIQUE INDEX IF NOT EXISTS idx_episodes_unique_run_worker_ep_index ON episodes(run_id, worker_id, ep_index)",
+        ),
+        Migration(
+            "telemetry_create_index_steps_run_worker",
+            "CREATE INDEX IF NOT EXISTS idx_steps_run_worker ON steps(run_id, worker_id, episode_id)",
+        ),
+        Migration(
+            "telemetry_create_index_episodes_run_worker",
+            "CREATE INDEX IF NOT EXISTS idx_episodes_run_worker ON episodes(run_id, worker_id, episode_id)",
+        ),
     ]
 
     # Trainer DB migrations
@@ -135,6 +173,15 @@ class MigrationRunner:
         Migration(
             "trainer_create_index_runs_outcome",
             "CREATE INDEX IF NOT EXISTS idx_runs_outcome ON runs(outcome, finished_at DESC)",
+        ),
+        # Phase 6: Max episodes per run constraint and episode counter config
+        Migration(
+            "trainer_add_max_episodes_per_run",
+            "ALTER TABLE runs ADD COLUMN max_episodes_per_run INTEGER DEFAULT 1000000",
+        ),
+        Migration(
+            "trainer_create_index_runs_max_episodes",
+            "CREATE INDEX IF NOT EXISTS idx_runs_max_episodes ON runs(max_episodes_per_run)",
         ),
     ]
 
@@ -225,4 +272,3 @@ class WALConfiguration:
 
 
 __all__ = ["Migration", "MigrationRunner", "WALConfiguration"]
-

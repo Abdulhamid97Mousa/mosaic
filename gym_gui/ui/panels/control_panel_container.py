@@ -68,6 +68,10 @@ class ControlPanelContainer(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.addWidget(self._control_panel)
+        self.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.MinimumExpanding,
+            QtWidgets.QSizePolicy.Policy.Expanding,
+        )
 
     def get_control_panel(self) -> ControlPanelWidget:
         """Get the underlying control panel widget."""

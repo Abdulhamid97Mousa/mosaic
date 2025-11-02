@@ -191,7 +191,7 @@ class HumanKeyboardActor:
 
 @dataclass(slots=True)
 class BDIQAgent:
-    """BDI + Q-learning driven agent implementation with epsilon-greedy action selection."""
+    """BDI-driven agent wrapper with pluggable learning strategies (default: Q-learning)."""
 
     id: str = "bdi_q_agent"
     q_table: Optional[Any] = None  # Reference to RL agent's Q-table (numpy array)
@@ -265,10 +265,20 @@ class LLMMultiStepAgent:
         # Placeholder: integrate with tool/snapshot pipeline.
         return None
 
-    def on_step(self, step: StepSnapshot) -> None:
+
+@dataclass(slots=True)
+class CleanRLWorkerActor:
+    """Placeholder actor representing the CleanRL worker backend (no direct actions)."""
+
+    id: str = "cleanrl_worker"
+
+    def select_action(self, step: StepSnapshot) -> Optional[int]:  # pragma: no cover - managed out-of-band
+        return None
+
+    def on_step(self, step: StepSnapshot) -> None:  # pragma: no cover - managed out-of-band
         return
 
-    def on_episode_end(self, summary: EpisodeSummary) -> None:
+    def on_episode_end(self, summary: EpisodeSummary) -> None:  # pragma: no cover - managed out-of-band
         return
 
 
@@ -281,4 +291,5 @@ __all__ = [
     "HumanKeyboardActor",
     "BDIQAgent",
     "LLMMultiStepAgent",
+    "CleanRLWorkerActor",
 ]

@@ -19,14 +19,14 @@ from gym_gui.ui.presenters.workers.registry import (
     WorkerPresenter,
     WorkerPresenterRegistry,
 )
-from gym_gui.ui.presenters.workers.spade_bdi_rl_worker_presenter import (
+from gym_gui.ui.presenters.workers.spade_bdi_worker_presenter import (
     SpadeBdiWorkerPresenter,
 )
 from gym_gui.ui.presenters.workers import (
     get_worker_presenter_registry,
     SpadeBdiWorkerPresenter as ExportedPresenter,
 )
-from gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory import TabFactory
+from gym_gui.ui.widgets.spade_bdi_worker_tabs.factory import TabFactory
 from gym_gui.core.enums import GameId
 
 
@@ -94,12 +94,11 @@ class TestGlobalRegistry(unittest.TestCase):
     def test_global_registry_has_spade_presenter(self) -> None:
         """Test that the global registry has SPADE-BDI presenter registered."""
         registry = get_worker_presenter_registry()
-        self.assertTrue("spade_bdi_rl" in registry)
-        presenter = registry.get("spade_bdi_rl")
+        self.assertTrue("spade_bdi_worker" in registry)
+        presenter = registry.get("spade_bdi_worker")
         self.assertIsNotNone(presenter)
         if presenter is not None:
-            self.assertEqual(presenter.id, "spade_bdi_rl")
-
+            self.assertEqual(presenter.id, "spade_bdi_worker")
 
 class TestSpadeBdiWorkerPresenterBasics(unittest.TestCase):
     """Test SpadeBdiWorkerPresenter basic properties and protocol compliance."""
@@ -110,7 +109,7 @@ class TestSpadeBdiWorkerPresenterBasics(unittest.TestCase):
 
     def test_presenter_id(self) -> None:
         """Test that presenter has correct ID."""
-        self.assertEqual(self.presenter.id, "spade_bdi_rl")
+        self.assertEqual(self.presenter.id, "spade_bdi_worker")
 
     def test_presenter_implements_protocol(self) -> None:
         """Test that presenter implements WorkerPresenter protocol."""
@@ -202,6 +201,14 @@ class TestBuildTrainRequest(unittest.TestCase):
         self.assertIn("worker", metadata)
         self.assertEqual(metadata["ui"]["algorithm"], "QLearning")
         self.assertEqual(metadata["worker"]["agent_id"], "test_agent")
+        self.assertEqual(metadata["worker"]["schema_id"], "telemetry.step.default")
+        self.assertEqual(metadata["worker"]["schema_version"], 1)
+        worker_config = metadata["worker"]["config"]
+        self.assertEqual(worker_config["schema_id"], "telemetry.step.default")
+        self.assertEqual(worker_config["schema_version"], 1)
+        self.assertIsInstance(worker_config["schema_definition"], dict)
+        self.assertEqual(metadata["ui"]["schema_id"], "telemetry.step.default")
+        self.assertEqual(metadata["ui"]["schema_version"], 1)
 
     def test_build_train_request_missing_file(self) -> None:
         """Test train request fails with missing policy file."""
@@ -236,6 +243,8 @@ class TestBuildTrainRequest(unittest.TestCase):
         self.assertIsNotNone(config)
         worker_config = config["metadata"]["worker"]["config"]
         self.assertEqual(worker_config["game_id"], "CliffWalking-v1")
+        self.assertEqual(worker_config["schema_id"], "telemetry.step.default")
+        self.assertEqual(config["metadata"]["worker"]["schema_id"], "telemetry.step.default")
 
     def test_extract_metadata_from_config(self) -> None:
         """Test extract_metadata utility method."""
@@ -244,7 +253,7 @@ class TestBuildTrainRequest(unittest.TestCase):
             "metadata": {
                 "ui": {"algorithm": "QLearning", "source_policy": "/path/to/policy.json"},
                 "worker": {
-                    "module": "spade_bdi_rl.worker",
+                    "module": "spade_bdi_worker.worker",
                     "agent_id": "agent_1",
                     "config": {
                         "game_id": "FrozenLake-v1",
@@ -268,12 +277,12 @@ class TestTabFactory(unittest.TestCase):
         """Create factory instance."""
         self.factory = TabFactory()
 
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentOnlineTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentReplayTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentOnlineGridTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentOnlineRawTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentOnlineVideoTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.get_service_locator")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentOnlineTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentReplayTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentOnlineGridTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentOnlineRawTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentOnlineVideoTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.get_service_locator")
     def test_create_tabs_toytext_environment(
         self,
         mock_get_locator: Any,
@@ -307,12 +316,12 @@ class TestTabFactory(unittest.TestCase):
         self.assertEqual(len(tabs), 4)
         mock_video_tab.assert_not_called()
 
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentOnlineTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentReplayTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentOnlineGridTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentOnlineRawTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentOnlineVideoTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.get_service_locator")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentOnlineTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentReplayTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentOnlineGridTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentOnlineRawTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentOnlineVideoTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.get_service_locator")
     def test_create_tabs_visual_environment(
         self,
         mock_get_locator: Any,
@@ -347,12 +356,12 @@ class TestTabFactory(unittest.TestCase):
         self.assertEqual(len(tabs), 5)
         mock_video_tab.assert_called_once()
 
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentOnlineTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentReplayTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentOnlineGridTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentOnlineRawTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentOnlineVideoTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.get_service_locator")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentOnlineTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentReplayTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentOnlineGridTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentOnlineRawTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentOnlineVideoTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.get_service_locator")
     def test_create_tabs_handles_invalid_game_id(
         self,
         mock_get_locator: Any,
@@ -385,12 +394,12 @@ class TestTabFactory(unittest.TestCase):
         tabs = self.factory.create_tabs("run_1", "agent_1", payload, mock_parent)
         self.assertEqual(len(tabs), 5)
 
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentOnlineTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentReplayTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentOnlineGridTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentOnlineRawTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.AgentOnlineVideoTab")
-    @patch("gym_gui.ui.widgets.spade_bdi_rl_worker_tabs.factory.get_service_locator")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentOnlineTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentReplayTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentOnlineGridTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentOnlineRawTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.AgentOnlineVideoTab")
+    @patch("gym_gui.ui.widgets.spade_bdi_worker_tabs.factory.get_service_locator")
     def test_create_tabs_case_insensitive_game_id(
         self,
         mock_get_locator: Any,
@@ -485,7 +494,7 @@ class TestRegistryIntegration(unittest.TestCase):
         retrieved = registry.get(presenter.id)
         self.assertIsNotNone(retrieved)
         if retrieved is not None:
-            self.assertEqual(retrieved.id, "spade_bdi_rl")
+            self.assertEqual(retrieved.id, "spade_bdi_worker")
             # Use
             self.assertEqual(retrieved.id, presenter.id)
 
@@ -501,12 +510,12 @@ class TestRegistryIntegration(unittest.TestCase):
         registry.register(presenter2.id, presenter2)
 
         self.assertEqual(len(registry.available_workers()), 2)
-        p1 = registry.get("spade_bdi_rl")
+        p1 = registry.get("spade_bdi_worker")
         p2 = registry.get("future_worker")
         self.assertIsNotNone(p1)
         self.assertIsNotNone(p2)
         if p1 is not None:
-            self.assertEqual(p1.id, "spade_bdi_rl")
+            self.assertEqual(p1.id, "spade_bdi_worker")
         if p2 is not None:
             self.assertEqual(p2.id, "future_worker")
 

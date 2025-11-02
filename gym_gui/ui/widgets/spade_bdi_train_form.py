@@ -22,7 +22,13 @@ from gym_gui.logging_config.log_constants import (
     LOG_UI_TRAIN_FORM_UI_PATH,
     LOG_UI_TRAIN_FORM_TELEMETRY_PATH,
 )
-from gym_gui.ui.constants import (
+from gym_gui.validations import (
+    AgentTrainFormInputs,
+    validate_agent_train_form,
+)
+from gym_gui.core.schema import resolve_schema_for_game
+from gym_gui.validations.validations_telemetry import ValidationService
+from gym_gui.constants import (
     DEFAULT_RENDER_DELAY_MS,
     RENDER_DELAY_MIN_MS,
     RENDER_DELAY_MAX_MS,
@@ -39,6 +45,7 @@ from gym_gui.ui.constants import (
     TELEMETRY_BUFFER_MAX,
     EPISODE_BUFFER_MIN,
     EPISODE_BUFFER_MAX,
+    WORKER_ID_WIDTH,
 )
 
 
@@ -58,10 +65,12 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self.setWindowTitle("Agent Train Form")
         # Set larger initial size to accommodate two-column layout
         # Dialog will resize dynamically when game configuration changes
-        self.resize(1000, 800)
-        self.setMinimumWidth(800)
+        self.resize(800, 600)
+        self.setMinimumWidth(600)
 
         self._selected_config: Optional[dict[str, Any]] = None
+        # Track the user's live render preference so fast mode can restore it
+        self._cached_live_render_disabled: Optional[bool] = None
 
         self._build_ui()
         if default_game is not None:
@@ -128,6 +137,12 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._agent_id_edit.setText(self._default_agent_id())
         left_layout.addRow("Agent ID:", self._agent_id_edit)
 
+        # Worker identifier input (supports distributed runs)
+        self._worker_id_edit = QtWidgets.QLineEdit(self)
+        self._worker_id_edit.setPlaceholderText("000001")
+        self._worker_id_edit.setText(self._default_worker_id())
+        left_layout.addRow("Worker ID:", self._worker_id_edit)
+
         # Episodes
         self._episodes_spin = QtWidgets.QSpinBox(self)
         self._episodes_spin.setRange(1, 10000)
@@ -172,6 +187,30 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         )
         self._disable_live_render_checkbox.toggled.connect(self._on_live_render_toggle_changed)
         right_layout.addRow("Live Rendering:", self._disable_live_render_checkbox)
+
+        # Toggle: fast training mode (disable telemetry)
+        self._fast_training_checkbox = QtWidgets.QCheckBox(
+            "Fast Training Mode"
+        )
+        self._fast_training_checkbox.setToolTip(
+            "When enabled:\n"
+            "• Disables per-step telemetry collection (no live updates)\n"
+            "• Disables UI grid/chart rendering\n"
+            "• No live Agent-{agent-id} tab\n"
+            "• 30-50% faster training on GPU\n"
+            "• TensorBoard metrics still available after training\n\n"
+            "⚠ WARNING: Episode replay will not be available for this run"
+        )
+        self._fast_training_checkbox.toggled.connect(self._on_fast_training_toggled)
+        right_layout.addRow("Fast Training (Disable Telemetry):", self._fast_training_checkbox)
+
+        # Warning label for fast training mode
+        self._fast_training_warning = QtWidgets.QLabel(
+            "⚠ Disables live telemetry, UI updates, and episode replay. Use only for maximum speed."
+        )
+        self._fast_training_warning.setStyleSheet("color: #ff6b6b; font-size: 10px; font-weight: bold;")
+        self._fast_training_warning.setVisible(False)
+        right_layout.addRow("", self._fast_training_warning)
 
         # SLIDER 1: Training Telemetry Throttle (controls data collection speed)
         telemetry_throttle_layout = QtWidgets.QHBoxLayout()
@@ -285,7 +324,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._telemetry_buffer_spin.setSingleStep(256)
         buffer_layout.addWidget(self._telemetry_buffer_spin)
 
-        self._telemetry_buffer_label = QtWidgets.QLabel("steps")
+        self._telemetry_buffer_label = QtWidgets.QLabel("steps (UI)")
         buffer_layout.addWidget(self._telemetry_buffer_label)
         buffer_layout.addStretch()
 
@@ -298,6 +337,10 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._episode_buffer_spin.setValue(DEFAULT_EPISODE_BUFFER_SIZE)
         self._episode_buffer_spin.setSingleStep(10)
         episode_buffer_layout.addWidget(self._episode_buffer_spin)
+        
+        # Connect episodes/max_steps changes to auto-calculate buffers
+        self._episodes_spin.valueChanged.connect(self._auto_calculate_buffers)
+        self._max_steps_spin.valueChanged.connect(self._auto_calculate_buffers)
 
         self._episode_buffer_label = QtWidgets.QLabel("episodes")
         episode_buffer_layout.addWidget(self._episode_buffer_label)
@@ -378,6 +421,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
 
         # Initialize control states based on live rendering toggle
         self._update_render_control_states()
+        self._update_step_delay_state()
 
         # Info label
         info_label = QtWidgets.QLabel(
@@ -396,6 +440,9 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         button_box.accepted.connect(self._on_accept)
         button_box.rejected.connect(self.reject)
         main_layout.addWidget(button_box)
+        
+        # Trigger initial buffer calculation with default values
+        QtCore.QTimer.singleShot(0, self._auto_calculate_buffers)
 
     def _on_browse_asl_file(self) -> None:
         """Handle ASL file browser button click."""
@@ -564,6 +611,33 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         """Handle live rendering enable/disable toggle."""
         self._update_render_control_states()
 
+    def _on_fast_training_toggled(self, checked: bool) -> None:
+        """Handle fast training mode toggle."""
+        self._fast_training_warning.setVisible(checked)
+
+        if checked:
+            # Remember the current user preference before forcing the switch
+            self._cached_live_render_disabled = self._disable_live_render_checkbox.isChecked()
+            # When fast mode is on, force live rendering to be disabled
+            if not self._disable_live_render_checkbox.isChecked():
+                self._disable_live_render_checkbox.setChecked(True)
+            self._disable_live_render_checkbox.setEnabled(False)
+            # Also disable rendering throttles since they won't be used
+            self._ui_rendering_throttle_slider.setEnabled(False)
+            self._training_telemetry_throttle_slider.setEnabled(False)
+        else:
+            # Re-enable UI options when fast mode is off
+            self._disable_live_render_checkbox.setEnabled(True)
+            self._ui_rendering_throttle_slider.setEnabled(True)
+            self._training_telemetry_throttle_slider.setEnabled(True)
+            if self._cached_live_render_disabled is not None:
+                self._disable_live_render_checkbox.setChecked(self._cached_live_render_disabled)
+                self._cached_live_render_disabled = None
+            # Ensure dependent controls reflect the restored state
+            self._update_render_control_states()
+
+        self._update_step_delay_state()
+
     def _update_render_control_states(self) -> None:
         """Enable/disable render-related controls based on toggle."""
         enabled = not getattr(self, "_disable_live_render_checkbox", None) or not self._disable_live_render_checkbox.isChecked()
@@ -592,6 +666,34 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 self._ui_rendering_throttle_label.setText("Disabled")
             if hasattr(self, "_render_delay_label"):
                 self._render_delay_label.setText("Disabled")
+
+    def _update_step_delay_state(self) -> None:
+        """Disable the step delay control when telemetry is disabled and fast training is enabled."""
+        slider = getattr(self, "_ui_training_speed_slider", None)
+        label = getattr(self, "_ui_training_speed_label", None)
+        warning_label = getattr(self, "_ui_training_speed_warning_label", None)
+        if slider is None or label is None:
+            return
+
+        fast_training_enabled = self._fast_training_checkbox.isChecked()
+
+        telemetry_disabled = fast_training_enabled
+        telemetry_spin = getattr(self, "_telemetry_buffer_spin", None)
+        if isinstance(telemetry_spin, QtWidgets.QSpinBox) and telemetry_spin.value() == 0:
+            telemetry_disabled = True
+
+        should_disable = fast_training_enabled and telemetry_disabled
+
+        slider.setEnabled(not should_disable)
+        if warning_label is not None:
+            warning_label.setEnabled(not should_disable)
+
+        if should_disable:
+            label.setText("Disabled (Fast Training)")
+            if warning_label is not None:
+                warning_label.setVisible(False)
+        else:
+            self._on_ui_training_speed_changed(slider.value())
 
     def _on_ui_rendering_throttle_changed(self, value: int) -> None:
         """Handle UI rendering throttle slider change.
@@ -643,8 +745,62 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         # Show warning if value = 0 (no delay, too fast)
         self._ui_training_speed_warning_label.setVisible(value == 0)
 
+    def _auto_calculate_buffers(self) -> None:
+        """Auto-calculate buffer sizes based on training configuration.
+        
+        Smart buffer sizing:
+        - UI Step Buffer: min(episodes * max_steps * 0.1, TELEMETRY_BUFFER_MAX)
+        - UI Episode Buffer: min(episodes, EPISODE_BUFFER_MAX)
+        
+        This ensures buffers are large enough to hold a reasonable portion of training data
+        without excessive memory usage.
+        """
+        episodes = self._episodes_spin.value()
+        max_steps = self._max_steps_spin.value()
+        
+        # Calculate total expected steps
+        total_expected_steps = episodes * max_steps
+        
+        # UI Step buffer: hold 10% of total steps (or max limit)
+        # This is reasonable for UI display without overwhelming memory
+        suggested_step_buffer = min(int(total_expected_steps * 0.1), TELEMETRY_BUFFER_MAX)
+        suggested_step_buffer = max(suggested_step_buffer, TELEMETRY_BUFFER_MIN)
+        
+        # UI Episode buffer: hold all episodes (or max limit)
+        suggested_episode_buffer = min(episodes, EPISODE_BUFFER_MAX)
+        suggested_episode_buffer = max(suggested_episode_buffer, EPISODE_BUFFER_MIN)
+        
+        # Update spin boxes
+        self._telemetry_buffer_spin.setValue(suggested_step_buffer)
+        self._episode_buffer_spin.setValue(suggested_episode_buffer)
+        
+        self.log_constant(
+            LOG_UI_TRAIN_FORM_TRACE,
+            message="Auto-calculated buffer sizes",
+            extra={
+                "episodes": episodes,
+                "max_steps": max_steps,
+                "total_expected_steps": total_expected_steps,
+                "suggested_step_buffer": suggested_step_buffer,
+                "suggested_episode_buffer": suggested_episode_buffer,
+            },
+        )
+
     def _on_accept(self) -> None:
-        """Validate and build config before accepting."""
+        """Validate inputs and build config before accepting."""
+        # Validate input types and ranges
+        validation_errors = self._validate_inputs()
+        if validation_errors:
+            error_msg = "⚠ Input Validation Errors:\n\n" + "\n".join(
+                [f"• {err}" for err in validation_errors]
+            )
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Invalid Input",
+                error_msg,
+            )
+            return
+
         try:
             custom_overrides = self._parse_custom_overrides()
             base_payload = self._build_base_config()
@@ -677,6 +833,27 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                     },
                 )
 
+    def _validate_inputs(self) -> list[str]:
+        """Validate all input fields and return list of error messages.
+        
+        Returns:
+            List of error messages (empty if all inputs valid)
+        """
+        inputs = AgentTrainFormInputs(
+            episodes=self._episodes_spin.value(),
+            max_steps_per_episode=self._max_steps_spin.value(),
+            seed=self._seed_spin.value(),
+            learning_rate=self._lr_edit.text(),
+            discount=self._gamma_edit.text(),
+            epsilon_decay=self._epsilon_edit.text(),
+            agent_id=self._agent_id_edit.text(),
+            bdi_enabled=self._bdi_group.isChecked(),
+            bdi_jid=self._bdi_jid_edit.text(),
+            bdi_password=self._bdi_password_edit.text(),
+            worker_id=self._worker_id_edit.text(),
+        )
+        return validate_agent_train_form(inputs)
+
     def _parse_custom_overrides(self) -> dict[str, Any]:
         if not self._advanced_group.isChecked():
             return {}
@@ -694,11 +871,23 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         max_episodes = self._episodes_spin.value()
         max_steps = self._max_steps_spin.value()
         seed = self._seed_spin.value()
+        schema = resolve_schema_for_game(game_id)
+        schema_id = schema.schema_id if schema is not None else "telemetry.step.default"
+        schema_version = schema.version if schema is not None else 1
+        validator = ValidationService(strict_mode=False)
+        schema_definition = validator.get_step_schema(game_id)
+        if schema_definition is None and schema is not None:
+            schema_definition = schema.as_json_schema()
+        if schema_definition is None:
+            schema_definition = {}
+        worker_id_input = self._worker_id_edit.text().strip()
+        worker_id = self._normalize_worker_id(worker_id_input)
         learning_rate = float(self._lr_edit.text())
         gamma = float(self._gamma_edit.text())
         epsilon_decay = float(self._epsilon_edit.text())
         agent_id_input = self._agent_id_edit.text().strip()
-        worker_agent_id = self._normalize_agent_id(agent_id_input) or self._default_agent_id()
+        normalized_agent_id = self._normalize_agent_id(agent_id_input)
+        worker_agent_id = normalized_agent_id or f"worker_{worker_id}" if worker_id.isdigit() else (normalized_agent_id or worker_id)
 
         # BDI settings
         bdi_enabled = self._bdi_group.isChecked()
@@ -775,6 +964,9 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         timestamp = datetime.utcnow().strftime("%Y%m%d-%H%M%S")
         run_name = f"{game_id.lower()}-{algorithm.split()[0].lower()}-{timestamp}"
 
+        # Get fast training mode flag
+        fast_training_mode = self._fast_training_checkbox.isChecked()
+
         # Get training telemetry throttle from slider
         # This controls how fast telemetry data is collected and written to database
         # Affects: Telemetry Recent Episodes and Telemetry Recent Steps table population speed
@@ -789,7 +981,6 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
 
         live_rendering_enabled = not self._disable_live_render_checkbox.isChecked()
 
-        # Get UI training speed (step delay) from slider
         # This controls the artificial delay between training steps for human observation
         # Slider value (0-100) maps to delay in seconds (0.0 to 1.0)
         ui_training_speed_value = self._ui_training_speed_slider.value()
@@ -802,20 +993,46 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         # Get episode buffer size from spin box
         # This controls the in-memory ring buffer size for episodes in durable storage
         episode_buffer_size = self._episode_buffer_spin.value()
+        
+        # Calculate hub buffer size (shared telemetry hub buffer)
+        # Hub needs to be larger than UI buffer since it feeds multiple consumers
+        # Use 2x the UI buffer size or the total expected steps, whichever is larger
+        total_expected_steps = max_episodes * max_steps
+        hub_buffer_size = max(
+            telemetry_buffer_size * 2,  # At least 2x UI buffer
+            min(total_expected_steps, 50000)  # Cap at 50k to prevent excessive memory
+        )
 
+        # Fast training mode completely disables UI rendering and telemetry buffers
+        if fast_training_mode:
+            live_rendering_enabled = False
+            ui_rendering_throttle = 1
+            render_delay_ms = 0
+            ui_training_speed_value = 0
+            step_delay = 0.0
+            telemetry_buffer_size = 0
+            episode_buffer_size = 0
+            hub_buffer_size = 0
+            training_telemetry_throttle = TRAINING_TELEMETRY_THROTTLE_MIN
+
+        step_delay_ms = int(round(step_delay * 1000))
         env_render_delay_ms = render_delay_ms if live_rendering_enabled else 0
 
         ui_path_settings = {
             "live_rendering_enabled": live_rendering_enabled,
             "ui_rendering_throttle": ui_rendering_throttle,
             "render_delay_ms": render_delay_ms,
-            "step_delay_ms": ui_training_speed_value * 10,
+            "step_delay_ms": step_delay_ms,
+            "worker_id": worker_id,
+            "headless_only": fast_training_mode,
         }
 
         telemetry_path_settings = {
             "training_telemetry_throttle": training_telemetry_throttle,
             "telemetry_buffer_size": telemetry_buffer_size,
             "episode_buffer_size": episode_buffer_size,
+            "hub_buffer_size": hub_buffer_size,  # Add hub buffer size to config
+            "disabled": fast_training_mode,
         }
 
         self.log_constant(
@@ -827,6 +1044,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 "ui_rendering_throttle": ui_path_settings["ui_rendering_throttle"],
                 "render_delay_ms": ui_path_settings["render_delay_ms"],
                 "step_delay_ms": ui_path_settings["step_delay_ms"],
+                "worker_id": worker_id,
             },
         )
         self.log_constant(
@@ -837,6 +1055,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 "training_telemetry_throttle": telemetry_path_settings["training_telemetry_throttle"],
                 "telemetry_buffer_size": telemetry_path_settings["telemetry_buffer_size"],
                 "episode_buffer_size": telemetry_path_settings["episode_buffer_size"],
+                "hub_buffer_size": telemetry_path_settings["hub_buffer_size"],
             },
         )
 
@@ -855,6 +1074,8 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             "TELEMETRY_SAMPLING_INTERVAL": str(ui_rendering_throttle),
             "UI_LIVE_RENDERING_ENABLED": "1" if live_rendering_enabled else "0",
             "UI_RENDER_DELAY_MS": str(env_render_delay_ms),
+            "WORKER_ID": worker_id,
+            "DISABLE_TELEMETRY": "1" if fast_training_mode else "0",
         }
 
         # Add BDI-specific environment variables if enabled
@@ -873,9 +1094,13 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 "ui_rendering_throttle": ui_rendering_throttle,
                 "render_delay_ms": render_delay_ms,
                 "live_rendering_enabled": live_rendering_enabled,
-                "ui_training_speed_ms": ui_training_speed_value * 10,
+                "disable_telemetry": fast_training_mode,
+                "worker_id": worker_id,
+                "ui_training_speed_ms": step_delay_ms,
                 "telemetry_buffer_size": telemetry_buffer_size,
                 "episode_buffer_size": episode_buffer_size,
+                "schema_id": schema_id,
+                "schema_version": schema_version,
                 "hyperparameters": {
                     "learning_rate": learning_rate,
                     "gamma": gamma,
@@ -890,13 +1115,16 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 },
             },
             "worker": {
-                "module": "spade_bdi_rl.worker",
+                "module": "spade_bdi_worker.worker",
                 "use_grpc": True,
                 "grpc_target": "127.0.0.1:50055",
                 "agent_id": worker_agent_id,
                 "agent_type": agent_type,
+                "worker_id": worker_id,
                 "bdi_enabled": bdi_enabled,
                 "bdi_config": bdi_config,
+                "schema_id": schema_id,
+                "schema_version": schema_version,
                 "config": {
                     "run_id": run_name,
                     "game_id": game_id,
@@ -912,17 +1140,28 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                     "game_config": game_config_overrides,  # Game-specific configuration
                     "telemetry_buffer_size": telemetry_buffer_size,  # In-memory ring buffer size for steps
                     "episode_buffer_size": episode_buffer_size,  # In-memory ring buffer size for episodes
+                    "schema_id": schema_id,
+                    "schema_version": schema_version,
+                    "schema_definition": schema_definition,
                     "extra": {
                         "algorithm": algorithm,
                         "learning_rate": learning_rate,
                         "gamma": gamma,
                         "epsilon_decay": epsilon_decay,
+                        "disable_telemetry": fast_training_mode,
                     },
                     "path_config": {
                         "ui_only": ui_path_settings,
                         "telemetry_durable": telemetry_path_settings,
                     },
+                    "worker_id": worker_id,
                 },
+            },
+            "artifacts": {
+                "tensorboard": {
+                    "enabled": True,
+                    "relative_path": f"var/trainer/runs/{run_name}/tensorboard",
+                }
             },
         }
 
@@ -931,7 +1170,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             "entry_point": "python",
             "arguments": [
                 "-m",
-                "spade_bdi_rl.worker",
+                "spade_bdi_worker.worker",
             ],
             "environment": environment,
             "resources": {
@@ -966,6 +1205,21 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             return ""
         slug = re.sub(r"[^A-Za-z0-9_-]+", "_", value.strip())
         slug = re.sub(r"_+", "_", slug).strip("_")
+        return slug.lower()
+
+    def _default_worker_id(self) -> str:
+        return "000001"
+
+    @staticmethod
+    def _normalize_worker_id(value: str) -> str:
+        if not value:
+            return "000001"
+        slug = re.sub(r"[^A-Za-z0-9_-]+", "", value.strip())
+        if not slug:
+            return "000001"
+        slug = slug[:WORKER_ID_WIDTH]
+        if slug.isdigit():
+            return slug.zfill(WORKER_ID_WIDTH)
         return slug.lower()
 
 

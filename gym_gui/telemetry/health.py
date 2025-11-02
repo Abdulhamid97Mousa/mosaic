@@ -17,7 +17,7 @@ from typing import Optional
 
 from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.telemetry.run_bus import RunBus
-from gym_gui.telemetry.constants import HEALTH_MONITOR_HEARTBEAT_INTERVAL_S
+from gym_gui.constants import HEALTH_MONITOR_HEARTBEAT_INTERVAL_S
 
 _LOGGER = logging.getLogger(__name__)
 

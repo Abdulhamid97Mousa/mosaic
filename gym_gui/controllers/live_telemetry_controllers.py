@@ -16,7 +16,8 @@ import threading
 from collections import deque
 from typing import TYPE_CHECKING, Optional, Dict
 
-from qtpy import QtCore
+from PyQt6 import QtCore
+from PyQt6.QtCore import pyqtSignal, pyqtSlot  # type: ignore[attr-defined]
 
 from gym_gui.logging_config.log_constants import (
     LOG_BUFFER_DROP,
@@ -46,14 +47,12 @@ from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.telemetry.run_bus import get_bus
 from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.telemetry.credit_manager import get_credit_manager
-from gym_gui.telemetry.constants import (
+from gym_gui.constants import (
     STEP_BUFFER_SIZE,
     EPISODE_BUFFER_SIZE,
     LIVE_STEP_QUEUE_SIZE,
     LIVE_EPISODE_QUEUE_SIZE,
     LIVE_CONTROL_QUEUE_SIZE,
-)
-from gym_gui.ui.constants import (
     DEFAULT_RENDER_DELAY_MS,
     DEFAULT_TELEMETRY_BUFFER_SIZE,
     DEFAULT_EPISODE_BUFFER_SIZE,
@@ -75,9 +74,9 @@ class LiveTelemetryController(QtCore.QObject, LogConstantMixin):
     """Coordinates telemetry hub lifecycle and manages dynamic per-agent tab creation."""
 
     # Signals
-    run_tab_requested = QtCore.Signal(str, str, str)  # type: ignore[attr-defined] # (run_id, agent_id, tab_title)
-    telemetry_stats_updated = QtCore.Signal(str, dict)  # type: ignore[attr-defined] # (run_id, stats)
-    run_completed = QtCore.Signal(str)  # type: ignore[attr-defined] # (run_id)
+    run_tab_requested = pyqtSignal(str, str, str)
+    telemetry_stats_updated = pyqtSignal(str, dict)
+    run_completed = pyqtSignal(str)
 
     def __init__(
         self,
@@ -279,9 +278,20 @@ class LiveTelemetryController(QtCore.QObject, LogConstantMixin):
 
     def set_live_render_enabled_for_run(self, run_id: str, enabled: bool) -> None:
         self._render_enabled_per_run[run_id] = enabled
+        self.log_constant(
+            LOG_LIVE_CONTROLLER_INITIALIZED,
+            message=f"Set live_render_enabled_for_run",
+            extra={"run_id": run_id, "enabled": enabled},
+        )
 
     def is_live_render_enabled(self, run_id: str) -> bool:
-        return self._render_enabled_per_run.get(run_id, True)
+        value = self._render_enabled_per_run.get(run_id, True)
+        self.log_constant(
+            LOG_LIVE_CONTROLLER_INITIALIZED,
+            message=f"is_live_render_enabled check",
+            extra={"run_id": run_id, "value": value, "has_key": run_id in self._render_enabled_per_run},
+        )
+        return value
 
     def set_game_id_for_run(self, run_id: str, game_id: str) -> None:
         """Store the game_id for a run (for passing to dynamic tabs).
@@ -380,7 +390,7 @@ class LiveTelemetryController(QtCore.QObject, LogConstantMixin):
                 tab.add_episode(payload)
                 credit_mgr.grant_credits(run_id, agent_id, 1)
 
-    @QtCore.Slot(str, str, str)  # type: ignore[misc]
+    @pyqtSlot(str, str, str)
     def _emit_tab_requested(self, run_id: str, agent_id: str, tab_title: str) -> None:
         """Helper method to emit run_tab_requested signal from main thread.
 

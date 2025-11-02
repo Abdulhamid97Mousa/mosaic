@@ -48,11 +48,10 @@ gym_gui/services/trainer/proto/trainer_pb2.pyi
 .codex
 .github
 .idea
-.venv
+# .venv
 .pytest_cache
 
 spadeBDI_RL
-cleanrl
 ray
 
 var/records/*

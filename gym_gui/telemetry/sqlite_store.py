@@ -12,6 +12,7 @@ import threading
 from typing import Any, List, Mapping, Optional, Sequence
 
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
+from gym_gui.constants import parse_episode_id
 from gym_gui.utils import json_serialization
 from gym_gui.telemetry.migrations import MigrationRunner, WALConfiguration
 from gym_gui.logging_config.helpers import LogConstantMixin, log_constant
@@ -95,7 +96,11 @@ class TelemetrySQLiteStore(LogConstantMixin):
                 render_hint BLOB,
                 frame_ref TEXT,
                 payload_version INTEGER NOT NULL DEFAULT 0,
-                run_id TEXT
+                run_id TEXT,
+                worker_id TEXT,
+                space_signature BLOB,
+                vector_metadata BLOB,
+                time_step INTEGER
             )
             """
         )
@@ -110,7 +115,8 @@ class TelemetrySQLiteStore(LogConstantMixin):
                 metadata BLOB,
                 timestamp TEXT NOT NULL,
                 agent_id TEXT,
-                run_id TEXT
+                run_id TEXT,
+                worker_id TEXT
             )
             """
         )
@@ -162,6 +168,10 @@ class TelemetrySQLiteStore(LogConstantMixin):
             ("run_id", "ALTER TABLE steps ADD COLUMN run_id TEXT"),
             ("game_id", "ALTER TABLE steps ADD COLUMN game_id TEXT"),
             ("episode_seed", "ALTER TABLE steps ADD COLUMN episode_seed INTEGER"),
+            ("worker_id", "ALTER TABLE steps ADD COLUMN worker_id TEXT"),
+            ("space_signature", "ALTER TABLE steps ADD COLUMN space_signature BLOB"),
+            ("vector_metadata", "ALTER TABLE steps ADD COLUMN vector_metadata BLOB"),
+            ("time_step", "ALTER TABLE steps ADD COLUMN time_step INTEGER"),
         ]
         for name, ddl in migrations:
             if name not in column_names:
@@ -174,6 +184,8 @@ class TelemetrySQLiteStore(LogConstantMixin):
             self._conn.execute("ALTER TABLE episodes ADD COLUMN run_id TEXT")
         if "game_id" not in episode_columns:
             self._conn.execute("ALTER TABLE episodes ADD COLUMN game_id TEXT")
+        if "worker_id" not in episode_columns:
+            self._conn.execute("ALTER TABLE episodes ADD COLUMN worker_id TEXT")
         self._conn.commit()
 
     def _ensure_indexes(self) -> None:
@@ -487,10 +499,12 @@ class TelemetrySQLiteStore(LogConstantMixin):
             INSERT INTO steps (
                 episode_id, step_index, action, observation, reward,
                 terminated, truncated, info, render_payload, timestamp,
-                agent_id, render_hint, frame_ref, payload_version, run_id, game_id
+                agent_id, render_hint, frame_ref, payload_version, run_id, game_id, worker_id,
+                space_signature, vector_metadata, time_step
             ) VALUES (:episode_id, :step_index, :action, :observation, :reward,
                 :terminated, :truncated, :info, :render_payload, :timestamp,
-                :agent_id, :render_hint, :frame_ref, :payload_version, :run_id, :game_id)
+                :agent_id, :render_hint, :frame_ref, :payload_version, :run_id, :game_id, :worker_id,
+                :space_signature, :vector_metadata, :time_step)
             """,
             steps,
         )
@@ -620,6 +634,26 @@ class TelemetrySQLiteStore(LogConstantMixin):
         return value
 
     def _write_episode(self, rollup: EpisodeRollup) -> None:
+        ep_index = None
+        parsed_id: dict[str, Any] | None = None
+        if isinstance(rollup.metadata, Mapping):
+            meta_index = rollup.metadata.get("episode_index")
+            if meta_index is not None:
+                try:
+                    ep_index = int(meta_index)
+                except (TypeError, ValueError):
+                    ep_index = None
+        try:
+            parsed_id = parse_episode_id(rollup.episode_id)
+        except Exception:
+            parsed_id = None
+        if ep_index is None and parsed_id is not None:
+            ep_index_raw = parsed_id.get("ep_index")
+            if ep_index_raw is not None:
+                try:
+                    ep_index = int(ep_index_raw)
+                except (TypeError, ValueError):
+                    ep_index = None
         payload = {
             "episode_id": rollup.episode_id,
             "total_reward": rollup.total_reward,
@@ -631,14 +665,21 @@ class TelemetrySQLiteStore(LogConstantMixin):
             "agent_id": rollup.agent_id,
             "run_id": rollup.run_id,
             "game_id": rollup.game_id,
+            "worker_id": rollup.worker_id,
+            "ep_index": ep_index,
         }
+        if parsed_id is not None:
+            if payload.get("run_id") in (None, "") and parsed_id.get("run_id") is not None:
+                payload["run_id"] = parsed_id.get("run_id")
+            if payload.get("worker_id") in (None, "") and parsed_id.get("worker_id") is not None:
+                payload["worker_id"] = parsed_id.get("worker_id")
         cursor = self._conn.cursor()
         cursor.execute("BEGIN")
         cursor.execute(
             """
             INSERT INTO episodes (
-                episode_id, total_reward, steps, terminated, truncated, metadata, timestamp, agent_id, run_id, game_id
-            ) VALUES (:episode_id, :total_reward, :steps, :terminated, :truncated, :metadata, :timestamp, :agent_id, :run_id, :game_id)
+                episode_id, total_reward, steps, terminated, truncated, metadata, timestamp, agent_id, run_id, game_id, worker_id, ep_index
+            ) VALUES (:episode_id, :total_reward, :steps, :terminated, :truncated, :metadata, :timestamp, :agent_id, :run_id, :game_id, :worker_id, :ep_index)
             ON CONFLICT(episode_id) DO UPDATE SET
                 total_reward=excluded.total_reward,
                 steps=excluded.steps,
@@ -648,7 +689,9 @@ class TelemetrySQLiteStore(LogConstantMixin):
                 timestamp=excluded.timestamp,
                 agent_id=excluded.agent_id,
                 run_id=excluded.run_id,
-                game_id=excluded.game_id
+                game_id=excluded.game_id,
+                worker_id=excluded.worker_id,
+                ep_index=excluded.ep_index
             """,
             payload,
         )
@@ -677,6 +720,16 @@ class TelemetrySQLiteStore(LogConstantMixin):
             "payload_version": int(record.payload_version),
             "run_id": record.run_id,
             "game_id": game_id,
+            "worker_id": record.worker_id,
+            "space_signature": self._serialize_field(
+                record.space_signature, context="space signature"
+            ),
+            "vector_metadata": self._serialize_field(
+                record.vector_metadata, context="vector metadata"
+            ),
+            "time_step": int(record.time_step)
+            if record.time_step is not None
+            else None,
         }
 
     def _prepare_step_payload(self, record: StepRecord) -> tuple[dict[str, object], int]:
@@ -687,7 +740,14 @@ class TelemetrySQLiteStore(LogConstantMixin):
     @staticmethod
     def _payload_size(payload: dict[str, object]) -> int:
         size = 0
-        for key in ("observation", "info", "render_payload", "render_hint"):
+        for key in (
+            "observation",
+            "info",
+            "render_payload",
+            "render_hint",
+            "space_signature",
+            "vector_metadata",
+        ):
             value = payload.get(key)
             if isinstance(value, (bytes, bytearray, memoryview)):
                 size += len(value)
@@ -755,7 +815,8 @@ class TelemetrySQLiteStore(LogConstantMixin):
     def recent_steps(self, limit: int = 100) -> Sequence[StepRecord]:
         query = (
             "SELECT episode_id, step_index, action, observation, reward, terminated, truncated, info, "
-            "render_payload, timestamp, agent_id, render_hint, frame_ref, payload_version,  run_id "
+            "render_payload, timestamp, agent_id, render_hint, frame_ref, payload_version, run_id, worker_id, "
+            "space_signature, vector_metadata, time_step "
             "FROM steps ORDER BY rowid DESC LIMIT ?"
         )
         with self._connect() as conn:
@@ -763,7 +824,10 @@ class TelemetrySQLiteStore(LogConstantMixin):
         return tuple(self._row_to_step(row) for row in rows)
 
     def recent_episodes(self, limit: int = 20) -> Sequence[EpisodeRollup]:
-        query = "SELECT episode_id, total_reward, steps, terminated, truncated, metadata, timestamp, agent_id, run_id FROM episodes ORDER BY timestamp DESC LIMIT ?"
+        query = (
+            "SELECT episode_id, total_reward, steps, terminated, truncated, metadata, timestamp, agent_id, run_id, game_id, worker_id "
+            "FROM episodes ORDER BY timestamp DESC LIMIT ?"
+        )
         with self._connect() as conn:
             rows = conn.execute(query, (limit,)).fetchall()
         return tuple(self._row_to_episode(row) for row in rows)
@@ -771,7 +835,7 @@ class TelemetrySQLiteStore(LogConstantMixin):
     def episode_steps(self, episode_id: str) -> Sequence[StepRecord]:
         query = (
             "SELECT episode_id, step_index, action, observation, reward, terminated, truncated, info, render_payload, "
-            "timestamp, agent_id, render_hint, frame_ref, payload_version "
+            "timestamp, agent_id, render_hint, frame_ref, payload_version, run_id, worker_id, space_signature, vector_metadata, time_step "
             "FROM steps WHERE episode_id = ? ORDER BY step_index ASC"
         )
         with self._connect() as conn:
@@ -795,7 +859,7 @@ class TelemetrySQLiteStore(LogConstantMixin):
             clauses.append("agent_id = ?")
             params.append(agent_id)
         query = (
-            "SELECT episode_id, total_reward, steps, terminated, truncated, metadata, timestamp, agent_id, run_id "
+            "SELECT episode_id, total_reward, steps, terminated, truncated, metadata, timestamp, agent_id, run_id, game_id, worker_id "
             "FROM episodes"
         )
         query += " WHERE " + " AND ".join(clauses)
@@ -840,6 +904,23 @@ class TelemetrySQLiteStore(LogConstantMixin):
         frame_ref = row[12] if len(row) > 12 else None
         payload_version = int(row[13]) if len(row) > 13 and row[13] is not None else 0
         run_id = row[14] if len(row) > 14 else None
+        worker_id = row[15] if len(row) > 15 else None
+        space_signature = None
+        if len(row) > 16:
+            space_signature = self._deserialize_field(
+                row[16], context="space signature", default=None
+            )
+        vector_metadata = None
+        if len(row) > 17:
+            vector_metadata = self._deserialize_field(
+                row[17], context="vector metadata", default=None
+            )
+        time_step = None
+        if len(row) > 18 and row[18] is not None:
+            try:
+                time_step = int(row[18])
+            except (TypeError, ValueError):
+                time_step = None
         return StepRecord(
             episode_id=row[0],
             step_index=row[1],
@@ -856,10 +937,18 @@ class TelemetrySQLiteStore(LogConstantMixin):
             frame_ref=frame_ref,
             payload_version=payload_version,
             run_id=run_id,
+            worker_id=worker_id,
+            space_signature=space_signature,
+            vector_metadata=vector_metadata,
+            time_step=time_step,
         )
 
     def _row_to_episode(self, row: Sequence) -> EpisodeRollup:
         metadata = self._deserialize_field(row[5], context="episode metadata", default={})
+        agent_id = row[7] if len(row) > 7 else None
+        run_id = row[8] if len(row) > 8 else None
+        game_id = row[9] if len(row) > 9 else None
+        worker_id = row[10] if len(row) > 10 else None
         return EpisodeRollup(
             episode_id=row[0],
             total_reward=row[1],
@@ -868,8 +957,10 @@ class TelemetrySQLiteStore(LogConstantMixin):
             truncated=bool(row[4]),
             metadata=metadata,
             timestamp=datetime.fromisoformat(row[6]) if row[6] else datetime.utcnow(),
-            agent_id=row[7] if len(row) > 7 else None,
-            run_id=row[8] if len(row) > 8 else None,
+            agent_id=agent_id,
+            run_id=run_id,
+            game_id=game_id,
+            worker_id=worker_id,
         )
 
 

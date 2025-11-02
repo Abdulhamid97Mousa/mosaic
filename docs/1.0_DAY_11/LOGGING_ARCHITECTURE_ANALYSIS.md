@@ -9,12 +9,14 @@
 ## Executive Summary (Corrected)
 
 ### What I Expected (from docs)
+
 - Scattered logs across 2+ directories
 - Multiple `gym_gui.log` files with duplicate names
 - Separate `daemon_output.log` capturing stdout
 - Worker logs hidden from GUI
 
 ### What Actually Exists
+
 - **ONE log directory:** `/var/logs/`
 - **TWO log files only:**
   - `gym_gui.log` (3.4M) - GUI + daemon controller logs
@@ -37,9 +39,9 @@
 
 ## Current Log Locations (The Reality vs. Documentation)
 
-### Actual Structure (in production):
+### Actual Structure (in production)
 
-```
+```bash
 Project Root: /home/hamid/Desktop/Projects/GUI_BDI_RL/
 │
 └─ var/logs/                             (SINGLE directory for BOTH GUI and daemon)
@@ -50,9 +52,9 @@ Project Root: /home/hamid/Desktop/Projects/GUI_BDI_RL/
                                          (structured logging from daemon process)
 ```
 
-### What I Expected (per LOGGING_ARCHITECTURE_ANALYSIS.md assumptions):
+### What I Expected (per LOGGING_ARCHITECTURE_ANALYSIS.md assumptions)
 
-```
+```bash
 Project Root:
 ├─ gym_gui/
 │  └─ var/logs/
@@ -64,9 +66,10 @@ Project Root:
    └─ trainer_daemon.log
 ```
 
-### REALITY CHECK - What Actually Exists:
+### REALITY CHECK - What Actually Exists
 
 Only **2 log files** in **1 location** (`/var/logs/`):
+
 - **gym_gui.log** (3.4M) - Mix of GUI logs, daemon controller, and everything
 - **trainer_daemon.log** (118K) - Actual daemon process logging
 
@@ -77,12 +80,14 @@ Only **2 log files** in **1 location** (`/var/logs/`):
 ### How gym_gui.log is Created
 
 **File:** `gym_gui/app.py` (line 41)
+
 ```python
 configure_logging(level=log_level, stream=True, log_to_file=True)
 logger = logging.getLogger("gym_gui.app")
 ```
 
 **File:** `gym_gui/logging_config/logger.py`
+
 ```python
 def configure_logging(...) -> None:
     # All logs go to: VAR_LOGS_DIR / "gym_gui.log"
@@ -93,6 +98,7 @@ def configure_logging(...) -> None:
 ```
 
 **File:** `gym_gui/config/paths.py` (lines 5-14)
+
 ```python
 _REPO_ROOT = _PACKAGE_ROOT.parent  # Project root
 VAR_ROOT = (_REPO_ROOT / "var").resolve()  # Repo-level var/
@@ -102,6 +108,7 @@ VAR_LOGS_DIR = VAR_ROOT / "logs"  # → /var/logs/
 ### How trainer_daemon.log is Created
 
 **File:** `gym_gui/services/trainer/launcher.py` (lines 85-100)
+
 ```python
 log_path = VAR_LOGS_DIR / "trainer_daemon.log"
 log_file = log_path.open("a", encoding="utf-8")
@@ -117,6 +124,7 @@ process = subprocess.Popen(
 ```
 
 **File:** `gym_gui/services/trainer_daemon.py` (line 45)
+
 ```python
 from gym_gui.logging_config.logger import configure_logging
 
@@ -129,17 +137,20 @@ from gym_gui.logging_config.logger import configure_logging
 ### Standard Python logging (`import logging`)
 
 **What it does:**
+
 - Emits log records to configured handlers (console, file, network, etc.)
 - Used by ALL processes (GUI, daemon, worker, everything)
 - Used EVERYWHERE in your codebase already
 
 **Where logs go:**
-```
+
+```bash
 logging.getLogger().addHandler(FileHandler())  → /var/logs/gym_gui.log
 logging.getLogger().addHandler(StreamHandler())  → console/stdout
 ```
 
 **Current usage in your code:**
+
 - `gym_gui/app.py` configures root logger with FileHandler
 - `gym_gui/services/trainer_daemon.py` configures root logger with FileHandler (DUAL!)
 - `spade_bdi_rl/core/worker.py` uses logging for debug statements
@@ -148,19 +159,22 @@ logging.getLogger().addHandler(StreamHandler())  → console/stdout
 ### gym_gui.ui.logging_bridge (`QtLogHandler` + `LogEmitter`)
 
 **What it does:**
+
 - Intercepts Python log records
 - Converts to `LogRecordPayload` dataclass
 - Emits Qt signal across thread boundary
 - GUI receives signal and displays in real-time
 
 **Current usage in your code:**
+
 - `gym_gui/ui/main_window.py` creates QtLogHandler instance
 - Connected to `_append_log_record()` method
 - Displays logs in GUI text widget with filtering
 - **Does NOT replace** standard file logging - works alongside it
 
 **Where logs go:**
-```
+
+```bash
 Python logger → QtLogHandler → Qt signal → GUI widget text display
                 ↓ (still also goes to)
                 FileHandler → /var/logs/gym_gui.log
@@ -176,6 +190,7 @@ Python logger → QtLogHandler → Qt signal → GUI widget text display
 ### Why Have Both?
 
 Because:
+
 - **File logging** needed for: Persistence, daemon logs, worker logs, debugging after the fact
 - **GUI logging** needed for: Real-time visibility, user feedback, filtering
 
@@ -216,7 +231,7 @@ They serve different purposes and both are necessary.
 
 ### Process Separation
 
-```
+```bash
 ┌─────────────────────────────────────────┐
 │  GUI Process (PyQt6)                    │
 │  • Main thread (GUI events)             │
@@ -277,6 +292,7 @@ They serve different purposes and both are necessary.
 ### 1. **Fragmented Visibility**
 
 Problem:
+
 ```bash
 # To debug one training run, you need to check:
 tail -f gym_gui/var/logs/gym_gui.log           # GUI logs
@@ -288,6 +304,7 @@ tail -f var/logs/gym_gui.log                   # Worker output (maybe)
 ```
 
 **Better:** Single file with correlation IDs:
+
 ```bash
 # All events for run_id "abc123" in one view
 grep "run_id=abc123" gym_gui/var/logs/unified.log
@@ -296,7 +313,8 @@ grep "run_id=abc123" gym_gui/var/logs/unified.log
 ### 2. **Duplicate Files with Same Name**
 
 Problem:
-```
+
+```bash
 /gym_gui/var/logs/gym_gui.log        ← GUI process logs
 /var/logs/gym_gui.log                ← Different content?
 
@@ -306,7 +324,8 @@ Problem:
 ```
 
 **Better:** Clear naming with process identifier:
-```
+
+```bash
 gym_gui_ui_process.log              ← GUI UI thread
 gym_gui_trainer_daemon_process.log   ← Daemon subprocess
 gym_gui_worker_process.log           ← Worker subprocess
@@ -315,7 +334,8 @@ gym_gui_worker_process.log           ← Worker subprocess
 ### 3. **No Correlation Between Events**
 
 Problem:
-```
+
+```bash
 gym_gui.log:
 2025-10-19 14:30:00 - User clicked "Train Agent"
 
@@ -329,7 +349,8 @@ daemon_output.log:
 ```
 
 **Better:** Include run_id and parent process ID:
-```
+
+```bash
 2025-10-19 14:30:00 - run_id=abc123 | User clicked "Train Agent"
 2025-10-19 14:30:01 - run_id=abc123 | Daemon spawning worker
 2025-10-19 14:30:05 - run_id=abc123 | Worker started (pid=12345)
@@ -338,7 +359,8 @@ daemon_output.log:
 ### 4. **Stdout/Stderr Capture vs Structured Logging**
 
 Problem:
-```
+
+```bash
 daemon_output.log:
 
 Starting trainer daemon...
@@ -349,39 +371,45 @@ Worker output mixed in
 ```
 
 **Why bad:**
+
 - Mix of structured and unstructured output
 - Hard to parse programmatically
 - Old debug statements cause noise
 - No way to filter by level/module
 
 **Better:** Pure structured logging with format:
-```
+
+```bash
 {"ts": "2025-10-19T14:30:15.123Z", "level": "INFO", "module": "daemon", "msg": "Listening on port 50055"}
 ```
 
 ### 5. **No Real-Time Visibility in GUI**
 
 Problem:
+
 - Worker writes logs to `var/logs/`
 - GUI running in `gym_gui/`
 - GUI can't see worker logs in real-time
 - User must tail files manually to debug
 
 **Better:** Logs stream via telemetry:
-```
+
+```bash
 worker.py → JSONL telemetry → trainer_daemon → GUI (via gRPC) → Display in GUI
 ```
 
 ### 6. **No Unified Log Rotation**
 
 Problem:
+
 - No log rotation configured
 - Logs grow indefinitely
 - Old logs never deleted
 - Disk space issues
 
 **Better:** Centralized log rotation policy:
-```
+
+```bash
 gym_gui/var/logs/
 ├─ current/
 │  ├─ gym_gui.log        (current, rotating)
@@ -400,11 +428,13 @@ gym_gui/var/logs/
 ### Issue 1: Multiple gym_gui.log Files
 
 **Location 1:** `/gym_gui/var/logs/gym_gui.log`
+
 - Content: GUI application logs
 - Source: gym_gui/ package logging configuration
 - Size: ~??? bytes
 
 **Location 2:** `/var/logs/gym_gui.log`
+
 - Content: Worker process output OR daemon logs?
 - Source: Unclear
 - Size: ~??? bytes
@@ -414,11 +444,13 @@ gym_gui/var/logs/
 ### Issue 2: daemon_output.log
 
 **Location:** `/gym_gui/var/logs/daemon_output.log`
+
 - Content: Daemon process stdout/stderr captured
 - Format: Mixed (logging + print + errors)
 - Problem: Not searchable, not structured
 
 **What happens:**
+
 ```python
 # In daemon process
 print("Starting daemon...")              # → daemon_output.log
@@ -430,6 +462,7 @@ worker_proc = subprocess.Popen(...)
 ### Issue 3: No Worker Log Integration
 
 **Where worker logs go:**
+
 1. Worker writes via logging module
 2. Captured by daemon's subprocess handling (maybe)
 3. Ends up in `/var/logs/` (maybe)
@@ -443,7 +476,7 @@ worker_proc = subprocess.Popen(...)
 
 ### 1. Centralized Log Directory Structure
 
-```
+```bash
 gym_gui/var/logs/
 ├─ gym_gui_ui.log                  ← GUI process (PyQt)
 ├─ trainer_daemon.log              ← Daemon process (gRPC server)
@@ -523,7 +556,7 @@ grep "run_id=abc123" gym_gui/var/logs/*.log
 
 ### 4. Telemetry as Primary Log Source for GUI
 
-```
+```bash
 Worker Process
     ↓
 Emit telemetry (JSONL) + logs (structured JSON)
@@ -557,7 +590,7 @@ proc = subprocess.Popen(
 
 ## Visual: Complete Logging Data Flow
 
-```
+```bash
 ┌─────────────────────────────────────────────────────────────────┐
 │ GUI PROCESS (PyQt6)                                             │
 │                                                                 │
@@ -666,7 +699,7 @@ class LogRecordPayload:
 
 class LogEmitter(QtCore.QObject):
     """Qt signal emitter - runs in GUI thread."""
-    record_emitted = QtCore.Signal(LogRecordPayload)
+    record_emitted = QtCore.pyqtSignal(LogRecordPayload)
 
 class QtLogHandler(logging.Handler):
     """Custom logging handler that bridges to Qt signals."""
@@ -680,6 +713,7 @@ class QtLogHandler(logging.Handler):
 ### How It's Used
 
 **File:** `gym_gui/ui/main_window.py` (lines 85-86)
+
 ```python
 self._log_handler = QtLogHandler(parent=self)
 self._log_records: List[LogRecordPayload] = []
@@ -689,6 +723,7 @@ self._log_handler.emitter.record_emitted.connect(self._append_log_record)
 ```
 
 **File:** `gym_gui/ui/main_window.py` (lines 1348-1362)
+
 ```python
 def _append_log_record(self, payload: LogRecordPayload) -> None:
     """Append log record to history and display in UI."""
@@ -747,6 +782,7 @@ Not a redesign - just **5 specific improvements**.
 ### Priority 0 (IMMEDIATE - Bug Fix): Stop Dual Daemon Logging
 
 **Problem:** The daemon process logs to BOTH:
+
 1. stdout/stderr (redirected to `trainer_daemon.log`)
 2. Its own configured logger (writes to `gym_gui.log`)
 
@@ -793,18 +829,21 @@ file_handler = logging.handlers.RotatingFileHandler(
 ### Priority 2 (HIGH): Add Correlation IDs
 
 1. **In app.py** when starting GUI:
+
 ```python
 session_id = str(uuid.uuid4())[:8]
 # Add to all log records via LoggerAdapter
 ```
 
 2. **In worker dispatch** when spawning training:
+
 ```python
 run_id = run_config.run_id
 logger.info(f"RUN_ID={run_id} | Dispatching training job...")
 ```
 
 3. **In worker.py** when running:
+
 ```python
 logger.info(f"RUN_ID={run_id} | Training started")
 ```
@@ -844,11 +883,13 @@ var/logs/
 ### Priority 5 (MEDIUM): Real-time Worker Log Streaming
 
 **Current State:**
+
 - Worker runs in subprocess
 - Logs captured by daemon's stdout redirect
 - GUI can't see them in real-time
 
 **Solution:**
+
 - Worker emits telemetry as JSONL to stdout
 - Daemon captures and forwards via gRPC
 - GUI displays in real-time tab
@@ -864,6 +905,7 @@ This is already partially implemented via `TelemetryAsyncHub`
 #### Issue A: Multiple `configure_logging()` Calls Creating Duplicate Handlers
 
 **Files calling `configure_logging()`:**
+
 1. `gym_gui/app.py:42` - GUI main process
 2. `gym_gui/controllers/cli.py:44` - CLI interface
 3. `gym_gui/services/trainer_daemon.py:376` - Daemon process (PROBLEM!)
@@ -874,6 +916,7 @@ This is already partially implemented via `TelemetryAsyncHub`
 **Root Cause:** `gym_gui/logging_config/logger.py:32` does `root.handlers.clear()` but doesn't prevent re-initialization.
 
 **File:** `gym_gui/logging_config/logger.py` (lines 32-45)
+
 ```python
 def configure_logging(level: int = logging.INFO, stream: bool = True, *, log_to_file: bool = True) -> None:
     """Configure root logging handlers for the application."""
@@ -901,17 +944,20 @@ def configure_logging(level: int = logging.INFO, stream: bool = True, *, log_to_
 **Current:** `logging.FileHandler(log_file)` - Unbounded growth
 
 **Files Affected:**
+
 1. `/gym_gui/var/logs/gym_gui.log` - Currently 3.4M (NO rotation)
 2. `/gym_gui/var/logs/trainer_daemon.log` - Currently 118K (NO rotation)
 
 **Impact:** Logs grow indefinitely until disk full
 
 **Evidence:**
+
 - `gym_gui/logging_config/logger.py:41` uses `FileHandler` (not RotatingFileHandler)
 - `gym_gui/core/logging_config.py:63` DOES use `RotatingFileHandler` (with 10MB max) but this code path isn't used!
 - `gym_gui/services/trainer/launcher.py:85` manually opens file with `open("a")` (MANUAL rotation needed)
 
 **Why This Happened:**
+
 - Two separate logging configuration files exist!
 - `gym_gui/logging_config/logger.py` (used everywhere) has basic FileHandler
 - `gym_gui/core/logging_config.py` (NOT imported!) has better RotatingFileHandler
@@ -948,7 +994,8 @@ def configure_logging(level: int = logging.INFO, stream: bool = True, *, log_to_
    - `LOGGER` - Used in 2 files
    - `logger` - Used in 10+ files
 
-**Problem:** 
+**Problem:**
+
 - Can't grep for all logger instances (inconsistent naming)
 - Makes it hard to suppress/adjust specific modules
 - No standard across codebase
@@ -967,12 +1014,14 @@ def configure_logging(level: int = logging.INFO, stream: bool = True, *, log_to_
 5. `gym_gui/workers/demo_worker.py:21-23, 44-45, 108-115, 114-115, 139-142` - Worker progress tracking with print()
 
 **Problem:**
+
 - These don't go to log files
 - Unreliable capture (depends on stdout redirection)
 - Can't filter by level or module
 - Worker progress output especially lost from daemon
 
 **Example from demo_worker.py:**
+
 ```python
 line 21: json.dump(event, sys.stdout, separators=(",", ":"))
 line 22: sys.stdout.write("\n")
@@ -997,12 +1046,14 @@ line 45: sys.stderr.flush()
 5. `spade_bdi_rl/core/telemetry.py:26` - `self._stream: IO[str] = stream or sys.stdout`
 
 **Problem:**
+
 - Not captured by standard logging
 - Duplicates logging effort
 - Bypasses filtering and handlers
 - Worker status messages disappear from logs
 
 **From trainer_telemetry_proxy.py (lines 243, 292, 296):**
+
 ```python
 def filter_and_forward_telemetry(line):
     sys.stderr.write(f"[worker stderr] {line}\n")  # ← NOT via logger!
@@ -1028,13 +1079,15 @@ print("Proxy requires a worker command after `--`.", file=sys.stderr)  # ← Als
    - Issue: NOT imported anywhere! Dead code?
    - Better: Actually has RotatingFileHandler (10MB max, 5 backups)
 
-**Problem:** 
+**Problem:**
+
 - Code duplication
 - `LoggingConfig` class more sophisticated but unused
 - App uses simpler version without rotation
 - Confusing which to use for new code
 
 **From gym_gui/core/logging_config.py (lines 63-68):**
+
 ```python
 file_handler = logging.handlers.RotatingFileHandler(
     log_file,
@@ -1042,7 +1095,9 @@ file_handler = logging.handlers.RotatingFileHandler(
     backupCount=5,
 )  # ← Better than what's used!
 ```
+
 **From gym_gui/logging_config/logger.py (line 41):**
+
 ```python
 file_handler = logging.FileHandler(log_file, encoding="utf-8")  # ← No rotation!
 ```
@@ -1071,6 +1126,7 @@ def closeEvent(self, event: QtGui.QCloseEvent) -> None:
 ```
 
 **Problem:**
+
 - If `_configure_logging()` called twice, handlers duplicate
 - Exception before `closeEvent()` leaves handler attached
 - No guard against re-initialization
@@ -1090,6 +1146,7 @@ logging.basicConfig(
 ```
 
 **Problem:**
+
 - Worker doesn't use gym_gui's centralized logging configuration
 - Separate format string (inconsistent with gym_gui format)
 - No file handler - logs only to console
@@ -1102,12 +1159,14 @@ logging.basicConfig(
 #### Issue I: No Correlation IDs Between GUI and Daemon/Worker
 
 **Current State:**
+
 - GUI logs: No session/run ID
 - Daemon logs: No run_id context
 - Worker logs: No run_id context
 
 **Example from gym_gui.log:**
-```
+
+```bash
 2025-10-19 14:30:00 - User clicked "Train Agent"
 2025-10-19 14:30:01 - Dispatching to daemon
 2025-10-19 14:30:05 - Worker started
@@ -1116,6 +1175,7 @@ logging.basicConfig(
 **Question:** How do I know if this is all one training run or multiple concurrent ones?
 
 **No correlation mechanism exists:**
+
 - No LoggerAdapter wrapping context
 - No thread-local or context-var tracking
 - No run_id injection into log records
@@ -1138,6 +1198,7 @@ line 292: print("Proxy requires a worker command after `--`.", file=sys.stderr)
 ```
 
 **Problem:** Three different logging mechanisms in same file:
+
 1. Standard logging module
 2. Direct sys.stderr writes
 3. print() statements
@@ -1149,6 +1210,7 @@ line 292: print("Proxy requires a worker command after `--`.", file=sys.stderr)
 #### Issue K: No Asymmetric Handler Attachment
 
 **Current:** Root logger gets handlers added but:
+
 - No guard against duplicate attachment
 - No tracking of which process attached what
 - No way to know if already initialized
@@ -1156,11 +1218,13 @@ line 292: print("Proxy requires a worker command after `--`.", file=sys.stderr)
 **Symptom:** In tests or if `configure_logging()` called twice, handlers duplicate
 
 **File:** `gym_gui/logging_config/logger.py:32`
+
 ```python
 root.handlers.clear()  # ← Clears but doesn't check if already set up
 ```
 
 Better would be:
+
 ```python
 if not any(isinstance(h, logging.FileHandler) for h in root.handlers):
     # Add file handler only if not already present
@@ -1181,7 +1245,8 @@ def _some_method(self):
     logger = getattr(self, "_logger", logging.getLogger("gym_gui.telemetry.sqlite_store"))
 ```
 
-**Problem:** 
+**Problem:**
+
 - Line 429 creates logger if attribute missing
 - Why would attribute be missing? Defensive coding for what scenario?
 - If `__init__` always creates it, this is dead code
@@ -1192,17 +1257,20 @@ def _some_method(self):
 #### Issue M: No Structured Logging Format
 
 **Current format:** Plain text with fields separated by pipes
-```
+
+```bash
 2025-10-19 14:30:00 | INFO    | gym_gui.controllers.session | Started training session
 ```
 
 **Problem:**
+
 - Hard to parse programmatically
 - Can't easily filter by level across files
 - No machine-readable correlation
 - Can't search across multiple log types
 
 **Better format:** JSON-structured logs
+
 ```json
 {"ts": "2025-10-19T14:30:00Z", "level": "INFO", "module": "gym_gui.controllers.session", "msg": "Started training session", "run_id": "abc123"}
 ```
@@ -1212,11 +1280,13 @@ def _some_method(self):
 #### Issue N: No Log Level Configuration Per Module
 
 **Current:** Root logger level set globally
+
 - Can't suppress just `asyncio` logger
 - Can't enable debug for just one module
 - Works by filter (gym_gui/logging_config/logger.py:21)
 
 **File:** `gym_gui/logging_config/logger.py` (lines 21-25)
+
 ```python
 class _GrpcBlockingIOFilter(logging.Filter):
     """Filter out non-fatal gRPC BlockingIOError warnings from asyncio logger."""
@@ -1230,6 +1300,7 @@ class _GrpcBlockingIOFilter(logging.Filter):
 ```
 
 **Better approach:** Per-logger configuration
+
 ```python
 LoggingConfig.suppress_logger("asyncio")  # ← Available in core/logging_config.py but not used
 ```
@@ -1246,6 +1317,7 @@ monkeypatch.setattr("sys.stdout", mock_stdout)
 ```
 
 **Problem:** Tests mock stdout but don't test actual logging behavior
+
 - Real worker logs might not work (tests don't verify)
 - Logging infrastructure untested in worker context
 
@@ -1455,6 +1527,7 @@ def _spawn_worker(self, run_id: str, ...) -> subprocess.Popen:
 **Your current logging architecture is fragmented and difficult to maintain.** The scattered logs with duplicates and missing correlation IDs make it impossible to trace single training runs end-to-end.
 
 **The solution:**
+
 1. ✅ Centralize all logs to `gym_gui/var/logs/`
 2. ✅ Use structured JSON format
 3. ✅ Add `run_id` correlation to all logs
@@ -1462,6 +1535,7 @@ def _spawn_worker(self, run_id: str, ...) -> subprocess.Popen:
 5. ✅ Remove stdout/stderr capture mess
 
 **Impact when fixed:**
+
 - Debugging becomes 10x easier
 - End-to-end tracing of training runs
 - GUI shows real-time worker status

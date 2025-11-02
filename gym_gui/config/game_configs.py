@@ -10,7 +10,7 @@ from dataclasses import dataclass
 import os
 from typing import Any, Dict
 
-from gym_gui.constants.game_constants import (
+from gym_gui.constants.constants_game import (
     CLIFF_WALKING_DEFAULTS,
     FROZEN_LAKE_DEFAULTS,
     FROZEN_LAKE_V2_DEFAULTS,

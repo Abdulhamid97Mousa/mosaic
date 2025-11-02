@@ -30,6 +30,10 @@ class StepRecord:
     frame_ref: str | None = None
     payload_version: int = 0
     run_id: str | None = None  # NEW: Training run identifier for correlation
+    worker_id: str | None = None  # NEW: Worker identifier for distributed runs
+    time_step: int | None = None  # NEW: Snapshot of the environment's time step
+    space_signature: Mapping[str, Any] | None = None  # NEW: Describes action/observation spaces
+    vector_metadata: Mapping[str, Any] | None = None  # NEW: Vectorised env configuration details
 
 
 @dataclass(slots=True)
@@ -46,6 +50,7 @@ class EpisodeRollup:
     agent_id: str | None = None
     run_id: str | None = None  # NEW: Training run identifier for correlation
     game_id: str | None = None  # NEW: Game environment identifier
+    worker_id: str | None = None  # NEW: Worker identifier for distributed runs
 
 
 __all__ = ["StepRecord", "EpisodeRollup"]

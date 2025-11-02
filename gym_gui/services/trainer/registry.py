@@ -314,7 +314,8 @@ class RunRegistry:
 
             # Log schema for each table
             for table_name in tables:
-                cursor = conn.execute(f"PRAGMA table_info({table_name})")
+                # Use double quotes for safe identifier quoting in SQLite
+                cursor = conn.execute(f'PRAGMA table_info("{table_name}")')
                 columns = cursor.fetchall()
                 column_info = [
                     {
@@ -328,7 +329,8 @@ class RunRegistry:
                 ]
 
                 # Get row count
-                row_count = conn.execute(f"SELECT COUNT(*) FROM {table_name}").fetchone()[0]
+                # Use double quotes for safe identifier quoting in SQLite
+                row_count = conn.execute(f'SELECT COUNT(*) FROM "{table_name}"').fetchone()[0]
 
                 # Format column schema for logging
                 column_schema = ", ".join(
@@ -642,10 +644,20 @@ class RunRegistry:
         Returns:
             A dataclass containing the checkpoint statistics.
         """
+        # Validate mode against allowed values to prevent SQL injection
+        # PASSIVE: Checkpoint without blocking writers
+        # FULL: Wait for writers to finish before checkpoint
+        # RESTART: Full checkpoint + reset WAL for new snapshot
+        # TRUNCATE: Restart + truncate the -wal file
+        allowed_modes = {"PASSIVE", "FULL", "RESTART", "TRUNCATE"}
+        if mode.upper() not in allowed_modes:
+            raise ValueError(f"Invalid checkpoint mode: {mode}. Must be one of {allowed_modes}")
+        
         with self._lock, self._connect() as conn:
             # The PRAGMA returns a single row with three integers:
             # (busy, log_size, checkpointed)
-            row = conn.execute(f"PRAGMA wal_checkpoint({mode})").fetchone()
+            # Use uppercase to safely construct the PRAGMA statement
+            row = conn.execute(f"PRAGMA wal_checkpoint({mode.upper()})").fetchone()
 
         if row is None:
             # This case should be unlikely, but handle it defensively.

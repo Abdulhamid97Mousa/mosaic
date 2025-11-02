@@ -78,5 +78,62 @@ def test_train_form_emits_dual_path_logs(qt_app, caplog, monkeypatch):
         worker_path = config["metadata"]["worker"]["config"]["path_config"]
         assert worker_path["telemetry_durable"]["telemetry_buffer_size"] == 4096
         assert worker_path["ui_only"]["render_delay_ms"] == 150
+
+        worker_config = config["metadata"]["worker"]["config"]
+        assert worker_config["schema_id"] == "telemetry.step.default"
+        assert worker_config["schema_version"] == 1
+        assert isinstance(worker_config["schema_definition"], dict)
+        ui_meta_root = config["metadata"]["ui"]
+        assert ui_meta_root["schema_id"] == "telemetry.step.default"
+        assert ui_meta_root["schema_version"] == 1
+    finally:
+        form.deleteLater()
+
+
+def test_fast_training_mode_clears_ui_and_telemetry_paths(qt_app, monkeypatch):
+    """Fast training mode must disable UI rendering and mark telemetry as disabled."""
+    _install_fixed_datetime(monkeypatch)
+
+    form = SpadeBdiTrainForm()
+    try:
+        # Pre-configure non-zero values to ensure fast mode overrides them.
+        form._render_delay_slider.setValue(150)
+        form._ui_training_speed_slider.setValue(50)
+        form._telemetry_buffer_spin.setValue(2048)
+        form._episode_buffer_spin.setValue(256)
+
+        form._fast_training_checkbox.setChecked(True)
+        config = form._build_base_config()
+
+        environment = config["environment"]
+        assert environment["DISABLE_TELEMETRY"] == "1"
+        assert environment["UI_LIVE_RENDERING_ENABLED"] == "0"
+        assert environment["UI_RENDER_DELAY_MS"] == "0"
+
+        worker_config = config["metadata"]["worker"]["config"]
+        assert worker_config["step_delay"] == 0.0
+        assert worker_config["extra"]["disable_telemetry"] is True
+        assert worker_config["schema_id"] == "telemetry.step.default"
+        assert worker_config["schema_version"] == 1
+        assert isinstance(worker_config["schema_definition"], dict)
+
+        ui_path = worker_config["path_config"]["ui_only"]
+        assert ui_path["live_rendering_enabled"] is False
+        assert ui_path["render_delay_ms"] == 0
+        assert ui_path["step_delay_ms"] == 0
+        assert ui_path["headless_only"] is True
+
+        telemetry_path = worker_config["path_config"]["telemetry_durable"]
+        assert telemetry_path["disabled"] is True
+        assert telemetry_path["telemetry_buffer_size"] == 0
+        assert telemetry_path["episode_buffer_size"] == 0
+        assert telemetry_path["hub_buffer_size"] == 0
+
+        ui_metadata = config["metadata"]["ui"]
+        assert ui_metadata["live_rendering_enabled"] is False
+        assert ui_metadata["telemetry_buffer_size"] == 0
+        assert ui_metadata["episode_buffer_size"] == 0
+        assert ui_metadata["schema_id"] == "telemetry.step.default"
+        assert ui_metadata["schema_version"] == 1
     finally:
         form.deleteLater()

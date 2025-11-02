@@ -2,16 +2,17 @@ from __future__ import annotations
 
 """Qt session controller that bridges Gym adapters to the GUI."""
 
-from dataclasses import dataclass, replace
+from dataclasses import dataclass, replace, asdict, is_dataclass
 import hashlib
 import logging
 from datetime import datetime
-from typing import Any, Mapping, Optional
+from typing import Any, Mapping, Optional, cast
 
 import gymnasium.spaces as spaces
 import numpy as np
 
-from qtpy import QtCore
+from PyQt6 import QtCore
+from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 
 from gym_gui.config.game_configs import (
     CliffWalkingConfig,
@@ -25,17 +26,32 @@ from gym_gui.config.settings import Settings
 from gym_gui.core.adapters.base import AdapterContext, AdapterStep, EnvironmentAdapter
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.core.enums import ControlMode, GameId, EnvironmentFamily, ENVIRONMENT_FAMILY_BY_GAME
+from gym_gui.core.run_counter_manager import RunCounterManager
+from gym_gui.constants import format_episode_id
+from gym_gui.constants.constants_vector import SUPPORTED_AUTORESET_MODES
+from gym_gui.constants.constants_telemetry import (
+    TELEMETRY_KEY_AUTORESET_MODE,
+    TELEMETRY_KEY_SPACE_SIGNATURE,
+    TELEMETRY_KEY_TIME_STEP,
+    TELEMETRY_KEY_VECTOR_METADATA,
+)
+from gym_gui.core.spaces.vector_metadata import extract_vector_step_details
+from gym_gui.core.schema import schema_registry
 from gym_gui.core.factories.adapters import create_adapter, get_adapter_cls
 from gym_gui.logging_config.log_constants import (
+    LOG_NORMALIZATION_STATS_DROPPED,
+    LOG_SCHEMA_MISMATCH,
     LOG_SESSION_ADAPTER_LOAD_ERROR,
-    LOG_SESSION_STEP_ERROR,
     LOG_SESSION_EPISODE_ERROR,
+    LOG_SESSION_STEP_ERROR,
     LOG_SESSION_TIMER_PRECISION_WARNING,
-    
+    LOG_SPACE_DESCRIPTOR_MISSING,
+    LOG_VECTOR_AUTORESET_MODE,
 )
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.services.actor import ActorService, EpisodeSummary, StepSnapshot
 from gym_gui.services.frame_storage import FrameStorageService
+from gym_gui.services.storage import StorageRecorderService
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
 from gym_gui.utils.seeding import SessionSeedManager
@@ -60,15 +76,15 @@ class SessionState:
 class SessionController(QtCore.QObject, LogConstantMixin):
     """Manage adapter lifecycle and emit Qt-friendly signals for the UI."""
 
-    session_initialized = QtCore.Signal(str, str, object)  # type: ignore[attr-defined]
-    step_processed = QtCore.Signal(object, int)  # type: ignore[attr-defined]
-    episode_finished = QtCore.Signal(bool)  # type: ignore[attr-defined]
-    status_message = QtCore.Signal(str)  # type: ignore[attr-defined]
-    awaiting_human = QtCore.Signal(bool, str)  # type: ignore[attr-defined]
-    turn_changed = QtCore.Signal(str)  # type: ignore[attr-defined]
-    error_occurred = QtCore.Signal(str)  # type: ignore[attr-defined]
-    auto_play_state_changed = QtCore.Signal(bool)  # type: ignore[attr-defined]
-    seed_applied = QtCore.Signal(int)  # type: ignore[attr-defined]
+    session_initialized = pyqtSignal(str, str, object)
+    step_processed = pyqtSignal(object, int)
+    episode_finished = pyqtSignal(bool)
+    status_message = pyqtSignal(str)
+    awaiting_human = pyqtSignal(bool, str)
+    turn_changed = pyqtSignal(str)
+    error_occurred = pyqtSignal(str)
+    auto_play_state_changed = pyqtSignal(bool)
+    seed_applied = pyqtSignal(int)
 
     def __init__(self, settings: Settings, parent: Optional[QtCore.QObject] = None) -> None:
         super().__init__(parent)
@@ -108,6 +124,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._user_idle_interval: int | None = None
         self._current_idle_interval = self._idle_timer.interval()
         self._awaiting_human = False
+        self._schema_alerts_emitted: set[str] = set()
         self._pending_input_label: str | None = None
         self._last_agent_position: tuple[int, int] | None = None
         self._timers = SessionTimers()
@@ -118,10 +135,11 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._telemetry = locator.resolve(TelemetryService)
         self._actor_service = locator.resolve(ActorService)
         self._frame_storage = locator.resolve(FrameStorageService)
+        self._storage_service = locator.resolve(StorageRecorderService)
         if self._actor_service is not None:
             self._seed_manager.register_consumer("actor_service", self._actor_service.seed)
         self._seed_manager.register_consumer("session_timers", self._seed_timers)
-        self._episode_counter = 0
+        self._run_counter_manager: RunCounterManager | None = None  # Set on load_game
         self._episode_id: str | None = None
         self._episode_active = False
         self._episode_reward = 0.0
@@ -250,6 +268,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._adapter = adapter
         self._game_id = game_id
         self._control_mode = control_mode
+        self._schema_alerts_emitted.clear()
         self._game_config = game_config
         self._step_index = 0
         self._turn = "human"
@@ -294,6 +313,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._game_started = False  # Reset requires "Start Game" again
         self._game_paused = False
         self._awaiting_human = False
+        self._schema_alerts_emitted.clear()
         self._begin_episode(self._game_id, self._control_mode)
         self.step_processed.emit(step, self._step_index)
         self._update_status(step, prefix="Environment reset")
@@ -564,45 +584,95 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             if not self._auto_timer.isActive():
                 self.start_auto_play()
 
+    def set_run_context(
+        self,
+        run_id: str,
+        max_episodes: int | None = None,
+        db_conn: Any | None = None,
+        *,
+        worker_id: str | None = None,
+    ) -> None:
+        """Set the run context for this session (e.g., when launched from trainer).
+        
+        Args:
+            run_id: ULID or unique run identifier
+            max_episodes: Max episodes per run (default: 1M)
+            db_conn: SQLite connection for counter persistence (optional for human mode)
+        """
+        if db_conn is not None:
+            self._run_counter_manager = RunCounterManager(
+                db_conn,
+                run_id,
+                max_episodes=max_episodes,
+                worker_id=worker_id,
+            )
+            try:
+                self._run_counter_manager.initialize()
+            except Exception as exc:
+                _LOGGER.error(f"Failed to initialize RunCounterManager: {exc}")
+                self._run_counter_manager = None
+        else:
+            _LOGGER.debug(f"No DB connection provided; counter will start at 0 for run {run_id}")
+            self._run_counter_manager = RunCounterManager(
+                None,
+                run_id,
+                max_episodes=max_episodes,
+                worker_id=worker_id,
+            )
+            self._run_counter_manager._current_index = -1
+
     def _begin_episode(self, game_id: GameId | None, control_mode: ControlMode) -> None:
+        """Begin a new episode with counter-based episode ID.
+        
+        Episode ID format:
+        - With run context: f"{run_id}-ep{ep_index:06d}"
+        - Without run context: f"{game_id.value}-ep{ep_index:06d}"
+        """
         if game_id is None:
             return
         if self._episode_active and self._last_step is not None:
             self._finalize_episode(self._last_step, aborted=True, timestamp=datetime.utcnow())
-        self._episode_counter += 1
+
         state_snapshot = self._seed_manager.capture_state()
         self._last_seed_state = state_snapshot
-        seed_component = state_snapshot.get("seed")
-        seed_label = f"seed{seed_component:010d}" if isinstance(seed_component, int) else "seedNA"
-        python_signature = (
-            state_snapshot.get("python_random_digest")
-            or state_snapshot.get("python_random_json")
-            or ""
-        )
-        numpy_signature = (
-            state_snapshot.get("numpy_random_digest")
-            or state_snapshot.get("numpy_random_json")
-            or ""
-        )
-        fingerprint_source = "|".join(
-            [
-                game_id.value,
-                seed_label,
-                str(self._episode_counter),
-                python_signature,
-                numpy_signature,
-            ]
-        )
-        fingerprint = hashlib.sha256(fingerprint_source.encode("utf-8")).hexdigest()[:8]
-        self._episode_id = f"{game_id.value}-{seed_label}-ep{self._episode_counter:04d}-{fingerprint}"
+
+        # Determine episode index and ID
+        if self._run_counter_manager is not None:
+            try:
+                # Use RunCounterManager for bounded, ordered episodes
+                with self._run_counter_manager.next_episode() as ep_index:
+                    self._episode_id = format_episode_id(
+                        self._run_counter_manager._run_id,
+                        ep_index,
+                        self._run_counter_manager._worker_id,
+                    )
+                    ep_index_for_metadata = ep_index
+            except RuntimeError as exc:
+                _LOGGER.error(f"RunCounterManager error: {exc}")
+                self.error_occurred.emit(str(exc))
+                return
+        else:
+            # Fallback for human-input mode: use simple counter without SHA256
+            # Counter starts at 0 on each load
+            ep_index_for_metadata = self._step_index  # Use step index as episode marker
+            self._episode_id = format_episode_id(game_id.value, ep_index_for_metadata)
+
         self._episode_reward = 0.0
+        run_context = self._run_counter_manager
+        run_id = getattr(run_context, "_run_id", None) if run_context is not None else None
+        worker_id = getattr(run_context, "_worker_id", None) if run_context is not None else None
         self._episode_metadata = {
             "game_id": game_id.value,
             "control_mode": control_mode.value,
             "seed": self._current_seed,
-            "episode_index": self._episode_counter,
+            "episode_index": ep_index_for_metadata,
             "rng_state": state_snapshot,
+            "run_id": run_id,
+            "worker_id": worker_id,
         }
+        game_config_snapshot = self._game_config_snapshot()
+        if game_config_snapshot is not None:
+            self._episode_metadata["game_config"] = game_config_snapshot
         self._episode_active = True
         self._last_step = None
         if self._telemetry is not None:
@@ -635,6 +705,158 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         info_payload = dict(snapshot.info)
         if input_source is not None:
             info_payload.setdefault("input_source", input_source)
+        game_config_snapshot = self._game_config_snapshot()
+        if game_config_snapshot is not None:
+            info_payload.setdefault("game_config", game_config_snapshot)
+
+        adapter = self._adapter
+        space_signature: Mapping[str, Any] | None = None
+        vector_metadata: Mapping[str, Any] | None = None
+        time_step_value: int | None = None
+        raw_episode_step = cast(Any, snapshot.info.get("episode_step"))
+        if raw_episode_step is not None:
+            try:
+                time_step_value = int(raw_episode_step)
+            except (TypeError, ValueError, OverflowError):  # pragma: no cover - defensive
+                time_step_value = None
+        if adapter is not None:
+            raw_signature = adapter.space_signature
+            if raw_signature:
+                space_signature = dict(raw_signature)
+            raw_vector_metadata = adapter.vector_metadata
+            if raw_vector_metadata:
+                vector_metadata = dict(raw_vector_metadata)
+            if time_step_value is None:
+                time_step_value = adapter.elapsed_steps()
+
+        step_vector_details = extract_vector_step_details(step.info)
+        combined_vector_metadata: Mapping[str, Any] | None = vector_metadata
+        if step_vector_details:
+            normalized_details: dict[str, Any] = {}
+            for key, value in step_vector_details.items():
+                if hasattr(value, "tolist"):
+                    try:
+                        normalized_details[key] = value.tolist()
+                        continue
+                    except Exception:  # pragma: no cover - defensive conversion
+                        pass
+                normalized_details[key] = value
+            if combined_vector_metadata is not None:
+                merged = dict(combined_vector_metadata)
+                merged.update(normalized_details)
+                combined_vector_metadata = merged
+            else:
+                combined_vector_metadata = normalized_details
+
+        if time_step_value is None:
+            time_step_value = self._step_index
+
+        if space_signature is not None:
+            info_payload.setdefault(TELEMETRY_KEY_SPACE_SIGNATURE, space_signature)
+        if combined_vector_metadata is not None:
+            info_payload.setdefault(TELEMETRY_KEY_VECTOR_METADATA, combined_vector_metadata)
+            autoreset_value = combined_vector_metadata.get(TELEMETRY_KEY_AUTORESET_MODE)
+            if autoreset_value is not None:
+                info_payload.setdefault(TELEMETRY_KEY_AUTORESET_MODE, autoreset_value)
+        if time_step_value is not None:
+            info_payload.setdefault(TELEMETRY_KEY_TIME_STEP, time_step_value)
+
+        schema_key = None
+        if self._game_id is not None:
+            schema_key = self._game_id.value
+        schema = schema_registry.get(schema_key) or schema_registry.get("default")
+        if schema is not None:
+            missing_required = [
+                field
+                for field in schema.required_fields
+                if field not in info_payload
+            ]
+            if missing_required:
+                cache_key = f"schema_missing:{','.join(sorted(missing_required))}"
+                if cache_key not in self._schema_alerts_emitted:
+                    self._schema_alerts_emitted.add(cache_key)
+                    self.log_constant(
+                        LOG_SCHEMA_MISMATCH,
+                        extra={
+                            "game_id": schema_key or "unknown",
+                            "missing": sorted(missing_required),
+                            "schema_id": schema.schema_id,
+                        },
+                    )
+            if space_signature is None:
+                cache_key = "space_signature_missing"
+                if cache_key not in self._schema_alerts_emitted:
+                    self._schema_alerts_emitted.add(cache_key)
+                    self.log_constant(
+                        LOG_SPACE_DESCRIPTOR_MISSING,
+                        extra={
+                            "game_id": schema_key or "unknown",
+                            "schema_id": schema.schema_id,
+                        },
+                    )
+            if schema.vector_metadata is not None:
+                if combined_vector_metadata is None:
+                    cache_key = "vector_metadata_missing"
+                    if cache_key not in self._schema_alerts_emitted:
+                        self._schema_alerts_emitted.add(cache_key)
+                        self.log_constant(
+                            LOG_SCHEMA_MISMATCH,
+                            extra={
+                                "game_id": schema_key or "unknown",
+                                "missing": [TELEMETRY_KEY_VECTOR_METADATA],
+                                "schema_id": schema.schema_id,
+                            },
+                        )
+                else:
+                    vector_missing = [
+                        key
+                        for key in schema.vector_metadata.required_keys
+                        if key not in combined_vector_metadata
+                    ]
+                    if vector_missing:
+                        cache_key = f"vector_missing:{','.join(sorted(vector_missing))}"
+                        if cache_key not in self._schema_alerts_emitted:
+                            self._schema_alerts_emitted.add(cache_key)
+                            self.log_constant(
+                                LOG_SCHEMA_MISMATCH,
+                                extra={
+                                    "game_id": schema_key or "unknown",
+                                    "missing": sorted(vector_missing),
+                                    "schema_id": schema.schema_id,
+                                },
+                            )
+                    autoreset_value = combined_vector_metadata.get(TELEMETRY_KEY_AUTORESET_MODE)
+                    if (
+                        autoreset_value
+                        and autoreset_value not in SUPPORTED_AUTORESET_MODES
+                    ):
+                        cache_key = f"autoreset:{autoreset_value}"
+                        if cache_key not in self._schema_alerts_emitted:
+                            self._schema_alerts_emitted.add(cache_key)
+                            self.log_constant(
+                                LOG_VECTOR_AUTORESET_MODE,
+                                extra={
+                                    "autoreset_mode": autoreset_value,
+                                    "supported": sorted(SUPPORTED_AUTORESET_MODES),
+                                },
+                            )
+
+        if (
+            combined_vector_metadata
+            and combined_vector_metadata.get("vectorized")
+            and "normalization_stats" not in info_payload
+        ):
+            cache_key = "normalization_stats_missing"
+            if cache_key not in self._schema_alerts_emitted:
+                self._schema_alerts_emitted.add(cache_key)
+                self.log_constant(
+                    LOG_NORMALIZATION_STATS_DROPPED,
+                    extra={
+                        "game_id": schema_key or "unknown",
+                        "reason": "normalization stats missing in vector payload",
+                    },
+                )
+
         # Ensure telemetry StepRecord mirrors the augmented snapshot information.
         agent_id = step.agent_id or getattr(step.state, "active_agent", None)
         if agent_id is None and self._actor_service is not None:
@@ -643,13 +865,22 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         frame_ref = step.frame_ref or self._extract_frame_reference(step)
         payload_version = step.payload_version if step.payload_version is not None else 0
 
+        run_context = self._run_counter_manager
+        run_id = getattr(run_context, "_run_id", None) if run_context is not None else None
+        worker_id = getattr(run_context, "_worker_id", None) if run_context is not None else None
+
         # Save frame to disk if frame_ref is available
-        if frame_ref and self._frame_storage is not None and step.render_payload is not None:
+        if (
+            frame_ref
+            and self._frame_storage is not None
+            and step.render_payload is not None
+            and self._should_capture_frames()
+        ):
             try:
                 self._frame_storage.save_frame(
                     step.render_payload,
                     frame_ref,
-                    run_id=None,  # No run_id in human input mode
+                    run_id=run_id,
                 )
             except Exception as e:
                 _LOGGER.debug(f"Failed to save frame {frame_ref}: {e}")
@@ -669,10 +900,20 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             render_hint=render_hint,
             frame_ref=frame_ref,
             payload_version=payload_version,
+            run_id=run_id,
+            worker_id=worker_id,
+            time_step=time_step_value,
+            space_signature=space_signature,
+            vector_metadata=combined_vector_metadata,
         )
         if self._telemetry is not None:
             self._telemetry.record_step(record)
         return record
+
+    def _should_capture_frames(self) -> bool:
+        if self._storage_service is None:
+            return False
+        return self._storage_service.capture_frames_enabled()
 
     def _idle_step(self) -> None:
         if not self._should_idle_tick():
@@ -812,6 +1053,32 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             info=info_payload,
         )
 
+    def _json_safe(self, value: Any) -> Any:
+        """Coerce nested telemetry values into JSON-serialisable structures."""
+        if isinstance(value, Mapping):
+            return {key: self._json_safe(item) for key, item in value.items()}
+        if isinstance(value, (list, tuple, set)):
+            return [self._json_safe(item) for item in value]
+        if isinstance(value, (str, int, float, bool)) or value is None:
+            return value
+        return str(value)
+
+    def _game_config_snapshot(self) -> dict[str, Any] | None:
+        """Return the active game configuration as a JSON-safe mapping."""
+        config = self._game_config
+        if config is None:
+            return None
+        if is_dataclass(config):
+            snapshot: Any = asdict(config)
+        elif isinstance(config, Mapping):
+            snapshot = dict(config)
+        else:
+            snapshot = None
+        if not snapshot:
+            return None
+        safe_snapshot = self._json_safe(snapshot)
+        return safe_snapshot if isinstance(safe_snapshot, dict) else None
+
     def _coalesce_render_hint(self, step: AdapterStep) -> dict[str, Any] | None:
         if step.render_hint:
             return dict(step.render_hint)
@@ -858,8 +1125,10 @@ class SessionController(QtCore.QObject, LogConstantMixin):
     ) -> None:
         if not self._episode_active or self._episode_id is None:
             return
+        # Get episode_index from metadata (set in _begin_episode)
+        episode_index = self._episode_metadata.get("episode_index", 0)
         summary = EpisodeSummary(
-            episode_index=self._episode_counter,
+            episode_index=episode_index,
             total_reward=self._episode_reward,
             steps=self._step_index + 1,
             metadata=dict(self._episode_metadata),
@@ -879,6 +1148,9 @@ class SessionController(QtCore.QObject, LogConstantMixin):
                     },
                 )
         if self._telemetry is not None:
+            run_context = self._run_counter_manager
+            run_id = getattr(run_context, "_run_id", None) if run_context is not None else None
+            worker_id = getattr(run_context, "_worker_id", None) if run_context is not None else None
             rollup = EpisodeRollup(
                 episode_id=self._episode_id,
                 total_reward=self._episode_reward,
@@ -889,6 +1161,8 @@ class SessionController(QtCore.QObject, LogConstantMixin):
                 timestamp=timestamp or datetime.utcnow(),
                 agent_id=getattr(step.state, "active_agent", None),
                 game_id=self._game_id.value if self._game_id else None,
+                run_id=run_id,
+                worker_id=worker_id,
             )
             self._telemetry.complete_episode(rollup)
         self._episode_active = False

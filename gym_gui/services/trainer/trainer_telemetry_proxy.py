@@ -20,6 +20,7 @@ from typing import Any, AsyncIterator, Dict, Optional
 import grpc
 
 from gym_gui.services.trainer.proto import trainer_pb2, trainer_pb2_grpc
+from gym_gui.core.subprocess_validation import validated_create_subprocess_exec
 
 _LOGGER = logging.getLogger("gym_gui.trainer.telemetry_proxy")
 
@@ -64,7 +65,12 @@ def _coerce_str(x: Any) -> str:
     return str(x)
 
 
-def _mk_runstep(ev: Dict[str, Any], run_id: str, default_agent: str) -> trainer_pb2.RunStep:
+def _mk_runstep(
+    ev: Dict[str, Any],
+    run_id: str,
+    default_agent: str,
+    worker_id: str | None,
+) -> trainer_pb2.RunStep:
     """Build RunStep proto from JSONL event dict."""
     # CRITICAL: Extract episode_index from metadata dict
     # The trainer emits: episode (display value = seed + episode_index)
@@ -114,6 +120,7 @@ def _mk_runstep(ev: Dict[str, Any], run_id: str, default_agent: str) -> trainer_
         frame_ref=str(ev.get("frame_ref", "")),
         payload_version=int(ev.get("payload_version", 0)),
         episode_seed=int(ev.get("episode_seed", 0)),  # NEW: Unique seed per episode for environment variation
+        worker_id=str(worker_id or ev.get("worker_id", "")) or "",
     )
     ts_ns = ev.get("ts_unix_ns")
     if isinstance(ts_ns, (int, float, str)) and str(ts_ns).replace('.', '').replace('-', '').isdigit():
@@ -121,7 +128,12 @@ def _mk_runstep(ev: Dict[str, Any], run_id: str, default_agent: str) -> trainer_
     return msg
 
 
-def _mk_runepisode(ev: Dict[str, Any], run_id: str, default_agent: str) -> trainer_pb2.RunEpisode:
+def _mk_runepisode(
+    ev: Dict[str, Any],
+    run_id: str,
+    default_agent: str,
+    worker_id: str | None,
+) -> trainer_pb2.RunEpisode:
     """Build RunEpisode proto from JSONL event dict."""
     # CRITICAL: Extract episode_index from metadata dict
     # The trainer emits: episode (display value = seed + episode_index)
@@ -153,6 +165,7 @@ def _mk_runepisode(ev: Dict[str, Any], run_id: str, default_agent: str) -> train
         truncated=bool(ev.get("truncated", False)),
         metadata_json=_coerce_str(ev.get("metadata_json", ev.get("metadata", {}))),
         agent_id=str(ev.get("agent_id") or default_agent),
+        worker_id=str(worker_id or ev.get("worker_id", "")) or "",
     )
     ts_ns = ev.get("ts_unix_ns")
     if isinstance(ts_ns, (int, float, str)) and str(ts_ns).replace('.', '').replace('-', '').isdigit():
@@ -192,6 +205,7 @@ async def run_proxy(
     target: str,
     run_id: str,
     agent_id: str,
+    worker_id: str | None,
     worker_argv: list[str],
     max_queue: int = 2048
 ) -> int:
@@ -202,12 +216,18 @@ async def run_proxy(
     """
     _LOGGER.info(
         "Proxy launching worker",
-        extra={"run_id": run_id, "agent_id": agent_id, "worker_cmd": worker_argv},
+        extra={
+            "run_id": run_id,
+            "agent_id": agent_id,
+            "worker_id": worker_id,
+            "worker_cmd": worker_argv,
+        },
     )
 
     # Start worker subprocess whose stdout is JSONL
-    proc = await asyncio.create_subprocess_exec(
+    proc = await validated_create_subprocess_exec(
         *worker_argv,
+        run_id=run_id,
         stdout=asyncio.subprocess.PIPE,
         stderr=asyncio.subprocess.PIPE,
         env=os.environ.copy(),
@@ -241,7 +261,7 @@ async def run_proxy(
             typ = str(ev.get("type", "")).lower()
             if typ == "step":
                 try:
-                    step_msg = _mk_runstep(ev, run_id, agent_id)
+                    step_msg = _mk_runstep(ev, run_id, agent_id, worker_id)
                     step_q.put_nowait(step_msg)
                     step_count += 1
                     if step_count <= 5:
@@ -264,7 +284,7 @@ async def run_proxy(
                     )
             elif typ == "episode":
                 try:
-                    ep_msg = _mk_runepisode(ev, run_id, agent_id)
+                    ep_msg = _mk_runepisode(ev, run_id, agent_id, worker_id)
                     ep_q.put_nowait(ep_msg)
                     episode_count += 1
                     if episode_count <= 3:
@@ -353,9 +373,18 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--target", required=True, help="daemon address, e.g. 127.0.0.1:50055")
     p.add_argument("--run-id", required=True)
     p.add_argument("--agent-id", default="agent_1")
+    p.add_argument("--worker-id", default="", help="Worker identifier for distributed runs")
     args = p.parse_args(proxy_args)
 
-    return asyncio.run(run_proxy(args.target, args.run_id, args.agent_id, worker_cmd))
+    return asyncio.run(
+        run_proxy(
+            args.target,
+            args.run_id,
+            args.agent_id,
+            args.worker_id or None,
+            worker_cmd,
+        )
+    )
 
 
 if __name__ == "__main__":

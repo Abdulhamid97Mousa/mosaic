@@ -11,62 +11,23 @@ from __future__ import annotations
 import logging
 from typing import Any, Dict, Optional
 
-from PyQt6.QtCore import QObject, QMutex
-from PyQt6.QtCore import pyqtSignal as Signal
+from PyQt6 import QtCore
+from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class TrainerSignals(QObject):
-    """Qt signals for trainer lifecycle events.
+class TrainerSignals(QtCore.QObject):
+    """Qt signals for trainer lifecycle events."""
 
-    This class provides a centralized signal bus for training lifecycle events.
-    All signals are emitted on the Qt main thread for safe UI updates.
-    """
-
-    # Signal: training_started(run_id: str, metadata: dict)
-    # Emitted when a training run is submitted and begins execution
-    training_started = Signal(str, dict)
-
-    # Signal: episode_finalized(run_id: str, agent_id: str, episode_index: int, rollup: dict)
-    # Emitted after each episode completes with episode statistics
-    episode_finalized = Signal(str, str, int, dict)
-
-    # Signal: training_finished(run_id: str, outcome: str, failure_reason: Optional[str])
-    # Emitted when training completes (outcome: "succeeded", "failed", "canceled")
-    training_finished = Signal(str, str, str)
-
-    # Signal: run_heartbeat(run_id: str, timestamp: str)
-    # Emitted periodically to indicate the run is still alive
-    run_heartbeat = Signal(str, str)
-
-    _instance: Optional[TrainerSignals] = None
-    _lock = QMutex()
-    # No class-wide init flags; guard per-instance to avoid double QObject init
-
-    def __new__(cls) -> TrainerSignals:
-        """Singleton pattern - ensure only one instance exists."""
-        if cls._instance is None:
-            cls._lock.lock()
-            try:
-                if cls._instance is None:
-                    cls._instance = super().__new__(cls)
-            finally:
-                cls._lock.unlock()
-        return cls._instance
+    training_started = pyqtSignal(str, dict)
+    episode_finalized = pyqtSignal(str, str, int, dict)
+    training_finished = pyqtSignal(str, str, str)
+    run_heartbeat = pyqtSignal(str, str)
 
     def __init__(self) -> None:
-        """Initialize the signals object (called only once)."""
-        if not hasattr(self, "_initialized"):
-            try:
-                super().__init__()
-                self._initialized = True
-                _LOGGER.debug("TrainerSignals initialized")
-            except Exception as e:
-                _LOGGER.error(f"Failed to initialize TrainerSignals: {e}", exc_info=True)
-                # Mark as initialized anyway to prevent repeated attempts
-                self._initialized = True
-                raise
+        super().__init__()
+        _LOGGER.debug("TrainerSignals initialized")
 
     def emit_training_started(self, run_id: str, metadata: Dict[str, Any]) -> None:
         """Emit training_started signal.
@@ -140,14 +101,16 @@ class TrainerSignals(QObject):
         self.run_heartbeat.emit(run_id, timestamp)
 
 
+_TRAINER_SIGNALS: Optional[TrainerSignals] = None
+
+
 def get_trainer_signals() -> TrainerSignals:
-    """Get the singleton TrainerSignals instance.
-    
-    Returns:
-        The global TrainerSignals instance
-    """
-    return TrainerSignals()
+    """Return the shared TrainerSignals instance."""
+
+    global _TRAINER_SIGNALS
+    if _TRAINER_SIGNALS is None:
+        _TRAINER_SIGNALS = TrainerSignals()
+    return _TRAINER_SIGNALS
 
 
 __all__ = ["TrainerSignals", "get_trainer_signals"]
-

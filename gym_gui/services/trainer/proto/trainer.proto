@@ -137,6 +137,7 @@ message RunStep {
   uint32 payload_version = 16;
   string render_payload_json = 17;  // Grid/RGB rendering data
   uint64 episode_seed = 18;  // NEW: Unique seed per episode for environment variation
+  string worker_id = 19;  // NEW: Worker identifier for distributed runs
 }
 
 message RunEpisode {
@@ -151,6 +152,7 @@ message RunEpisode {
   google.protobuf.Timestamp timestamp = 8;
   uint64 seq_id = 9;
   string agent_id = 10;
+  string worker_id = 11;  // NEW: Worker identifier for distributed runs
 }
 
 message PublishTelemetryResponse {

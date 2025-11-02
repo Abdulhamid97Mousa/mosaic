@@ -1,9 +1,19 @@
-python-dotenv>=1.0
-qtpy>=2.4
-PyQt6>=6.7
-gymnasium[box2d]>=1.2
-
-python-dotenv==1.1.1
+# =============================================================================
+# GUI_BDI_RL Root Requirements File
+# =============================================================================
+# This file serves as the entry point for installing gym_gui dependencies.
+# Worker-specific dependencies are organized in requirements/ directory:
+#
+#   requirements/base.txt              - Core GUI + shared infrastructure
+#   requirements/spade_bdi_worker.txt  - SPADE-BDI worker dependencies
+#   requirements/cleanrl_worker.txt    - CleanRL worker dependencies
+#
+# USAGE:
+#   GUI-only:       pip install -r requirements.txt
+#   With SPADE-BDI: pip install -r requirements/spade_bdi_worker.txt
+#   With CleanRL:   pip install -r requirements/cleanrl_worker.txt
+#
+# System Requirements:
 # sudo apt-get install -y swig
 # sudo apt-get install -y python3.12-dev
 # sudo apt-get install -y \
@@ -12,29 +22,14 @@ python-dotenv==1.1.1
 #   libxcb-render-util0 libxcb-randr0 libxcb-shape0 \
 #   libxcb-xinerama0 libxcb-xkb1
 # sudo apt install sqlite3
-# source ./.venv/bin/activate && python -m grpc_tools.protoc -I gym_gui/services/trainer/proto --python_out=gym_gui/services/trainer/proto --grpc_python_out=gym_gui/services/trainer/proto gym_gui/services/trainer/proto/trainer.proto
+#
+# Protobuf Code Generation:
+# source ./.venv/bin/activate && python -m grpc_tools.protoc \
+#   -I gym_gui/services/trainer/proto \
+#   --python_out=gym_gui/services/trainer/proto \
+#   --grpc_python_out=gym_gui/services/trainer/proto \
+#   gym_gui/services/trainer/proto/trainer.proto
+# =============================================================================
 
-PyQt6==6.9.1
-PyQt6-Qt6==6.9.2
-PyQt6-sip==13.10.2
-packaging==25.0
-qtpy==2.4.3
-PyYAML>=6.0
-numpy==2.3.3
-jsonschema==4.23.0
-grpcio==1.67.1
-grpcio-tools==1.67.1
-protobuf==5.27.2
-
-############################
-spade==4.0.1
-spade-bdi==0.3.2
-gymnasium>=0.26.0
-agentspeak==0.2.2
-pygame>=2.1.0
-cython==3.1.3
-slixmpp==1.8.5
-cffi==2.0.0
-bcrypt==4.3.0
-cryptography==43.0.1
-##############################
+# Include base dependencies (GUI + shared libraries)
+-r requirements/base.txt

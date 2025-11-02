@@ -3,13 +3,14 @@ from __future__ import annotations
 """Main Qt window for the Gym GUI application."""
 
 import logging
-from datetime import datetime, timezone
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
 import json
 import threading
 
-from qtpy import QtCore, QtGui, QtWidgets
+from PyQt6.QtCore import pyqtSlot, pyqtSignal  # type: ignore[attr-defined]
+from qtpy import QtCore, QtGui, QtWidgets  # type: ignore[attr-defined]
 try:
     from qtpy.QtGui import QAction
 except ImportError:
@@ -23,7 +24,9 @@ from gym_gui.config.game_configs import (
     LunarLanderConfig,
     TaxiConfig,
 )
+from gym_gui.constants import UI_DEFAULTS
 from gym_gui.config.game_config_builder import GameConfigBuilder
+from gym_gui.config.paths import VAR_ROOT, VAR_TRAINER_DIR
 from gym_gui.config.settings import Settings
 from gym_gui.core.enums import ControlMode, GameId
 from gym_gui.core.factories.adapters import available_games
@@ -48,7 +51,7 @@ from gym_gui.ui.presenters.main_window_presenter import MainWindowPresenter, Mai
 from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWidget
 from gym_gui.ui.indicators.busy_indicator import modal_busy_indicator
 from gym_gui.ui.widgets.render_tabs import RenderTabs
-from gym_gui.docs.game_info import get_game_info
+from gym_gui.game_docs.game_info import get_game_info
 from gym_gui.services.actor import ActorService
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
@@ -59,9 +62,10 @@ from gym_gui.ui.widgets.live_telemetry_tab import LiveTelemetryTab
 from gym_gui.ui.presenters.workers import (
     get_worker_presenter_registry,
 )
-from gym_gui.ui.widgets.spade_bdi_rl_worker_tabs import (
+from gym_gui.ui.widgets.spade_bdi_worker_tabs import (
     AgentReplayTab,
 )
+from gym_gui.ui.widgets.tensorboard_artifact_tab import TensorboardArtifactTab
 from gym_gui.ui.forms import get_worker_form_factory
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
@@ -74,6 +78,8 @@ _LOGGER = logging.getLogger(__name__)
 
 class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
     """Primary window that orchestrates the Gym session."""
+
+    _auto_subscribe_requested = pyqtSignal(str)
 
     # Severity-level filters
     LOG_SEVERITY_OPTIONS: Dict[str, str | None] = {
@@ -169,6 +175,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         
         # Create presenter to coordinate
         self._presenter = MainWindowPresenter(self._session, self._human_input, parent=self)
+
+        # Ensure auto-subscribe dispatches cross-thread via Qt's signal delivery
+        self._auto_subscribe_requested.connect(self._auto_subscribe_run_main_thread)
         
         status_bar = self.statusBar()
         if status_bar is None:
@@ -227,25 +236,47 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
     def _build_ui(self) -> None:
         self.setWindowTitle("Gym GUI – Qt Shell")
-        self.resize(1200, 800)
+        self.resize(800, 600)
 
         central = QtWidgets.QWidget(self)
         self.setCentralWidget(central)
 
         layout = QtWidgets.QHBoxLayout(central)
-        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setContentsMargins(10, 10, 10, 10)
 
         splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Horizontal, central)
+        splitter.setChildrenCollapsible(True)
         layout.addWidget(splitter)
 
-        # Use the ControlPanelWidget created in __init__
-        splitter.addWidget(self._control_panel)
+        layout_defaults = UI_DEFAULTS.layout
+
+        # Use the ControlPanelWidget created in __init__ and wrap it in a scroll area
+        self._control_panel_scroll = QtWidgets.QScrollArea(splitter)
+        self._control_panel_scroll.setWidgetResizable(True)
+        self._control_panel_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+        self._control_panel_scroll.setWidget(self._control_panel)
+        self._control_panel_scroll.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.MinimumExpanding,
+            QtWidgets.QSizePolicy.Policy.Expanding,
+        )
+        splitter.addWidget(self._control_panel_scroll)
+        self._control_panel_scroll.setMinimumWidth(layout_defaults.control_panel_min_width)
+        self._control_panel.setMinimumWidth(layout_defaults.control_panel_min_width)
 
         right_panel = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical, central)
+        right_panel.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Expanding,
+        )
         splitter.addWidget(right_panel)
         splitter.setStretchFactor(1, 1)
+        right_panel.setChildrenCollapsible(True)
+        right_panel.setMinimumWidth(layout_defaults.render_min_width)
+        if layout_defaults.render_max_width:
+            right_panel.setMaximumWidth(layout_defaults.render_max_width)
 
         self._render_group = QtWidgets.QGroupBox("Render View", right_panel)
+        self._render_group.setMinimumWidth(layout_defaults.render_min_width)
         render_layout = QtWidgets.QVBoxLayout(self._render_group)
         self._render_tabs = RenderTabs(
             self._render_group,
@@ -261,7 +292,6 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._game_info.setReadOnly(True)
         self._game_info.setOpenExternalLinks(True)
         info_layout.addWidget(self._game_info, 1)
-        splitter.addWidget(self._info_group)
 
         # Runtime Log panel (far-right column)
         self._log_group = QtWidgets.QGroupBox("Runtime Log", self)
@@ -288,13 +318,40 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._log_console.setReadOnly(True)
         self._log_console.setLineWrapMode(QtWidgets.QPlainTextEdit.LineWrapMode.NoWrap)
         log_layout.addWidget(self._log_console, 1)
-        splitter.addWidget(self._log_group)
+        self._log_group.setMinimumWidth(layout_defaults.log_min_width)
 
-        # Configure splitter stretch: control panel (left) small, right_panel (middle) large, game info (right) small, runtime log (far-right) medium
+        info_log_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical, central)
+        info_log_splitter.setChildrenCollapsible(True)
+        self._info_group.setMinimumWidth(layout_defaults.info_min_width)
+        info_log_splitter.addWidget(self._info_group)
+        info_log_splitter.addWidget(self._log_group)
+        info_log_splitter.setStretchFactor(0, 2)
+        info_log_splitter.setStretchFactor(1, 1)
+        info_log_splitter.setMinimumWidth(layout_defaults.info_min_width + layout_defaults.log_min_width)
+        info_log_splitter.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.MinimumExpanding,
+            QtWidgets.QSizePolicy.Policy.Expanding,
+        )
+        info_log_splitter.setSizes(
+            [
+                layout_defaults.info_default_width,
+                layout_defaults.log_default_width,
+            ]
+        )
+        splitter.addWidget(info_log_splitter)
+
+        splitter.setSizes(
+            [
+                layout_defaults.control_panel_default_width,
+                layout_defaults.render_default_width,
+                layout_defaults.info_default_width + layout_defaults.log_default_width,
+            ]
+        )
+
+        # Configure splitter stretch: control panel (left) small, render view large, info/log column medium
         splitter.setStretchFactor(0, 1)  # Control Panel
-        splitter.setStretchFactor(1, 3)  # Render View  
-        splitter.setStretchFactor(2, 1)  # Game Info
-        splitter.setStretchFactor(3, 2)  # Runtime Log
+        splitter.setStretchFactor(1, 3)  # Render View
+        splitter.setStretchFactor(2, 2)  # Game Info + Runtime Log
 
     def _create_view_toolbar(self) -> None:
         """Create toolbar with quick toggles for key panels."""
@@ -306,7 +363,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self.addToolBar(QtCore.Qt.ToolBarArea.TopToolBarArea, self._view_toolbar)
 
         self._view_actions: dict[str, QAction] = {}
-        self._add_view_toggle("Control Panel", self._control_panel)
+        self._add_view_toggle("Control Panel", self._control_panel_scroll)
         self._add_view_toggle("Render View", self._render_group)
         self._add_view_toggle("Game Info", self._info_group)
         self._add_view_toggle("Runtime Log", self._log_group)
@@ -329,7 +386,6 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # Connect control panel signals to session controller
         self._control_panel.load_requested.connect(self._on_load_requested)
         self._control_panel.reset_requested.connect(self._on_reset_requested)
-
         self._control_panel.agent_form_requested.connect(self._on_agent_form_requested)
         self._control_panel.train_agent_requested.connect(self._on_train_agent_requested)
         self._control_panel.trained_agent_requested.connect(self._on_trained_agent_requested)
@@ -858,20 +914,24 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._auto_running = running
         self._control_panel.set_auto_running(running)
         self._update_input_state()
-    
 
-    def _on_trained_agent_requested(self) -> None:
-        """Handle the 'Load Trained Policy' button."""
+
+    def _on_trained_agent_requested(self, worker_id: str) -> None:
+        """Handle the 'Load Trained Policy' button for a specific worker."""
+        if not worker_id:
+            QtWidgets.QMessageBox.information(
+                self,
+                "Worker Required",
+                "Select a worker integration before loading a trained policy.",
+            )
+            return
+
         factory = get_worker_form_factory()
-        worker_id = "spade_bdi_rl"
         try:
-            dialog = cast(
-                "SpadeBdiPolicySelectionForm",
-                factory.create_policy_form(
-                    worker_id,
-                    parent=self,
-                    current_game=self._control_panel.current_game(),
-                ),
+            dialog = factory.create_policy_form(
+                worker_id,
+                parent=self,
+                current_game=self._control_panel.current_game(),
             )
         except KeyError:
             QtWidgets.QMessageBox.warning(
@@ -880,38 +940,50 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 f"No policy selection form registered for worker '{worker_id}'.",
             )
             return
+
         if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
             return
-        policy_path = dialog.selected_path
+
+        policy_path = getattr(dialog, "selected_path", None)
         if policy_path is None:
             return
+
         self._selected_policy_path = policy_path
-        self.log_constant( 
+        self.log_constant(
             LOG_UI_MAINWINDOW_INFO,
-            message=f"Selected policy for evaluation: {policy_path}",
-            extra={"policy_path": str(policy_path)},
+            message="Selected policy for evaluation",
+            extra={
+                "policy_path": str(policy_path),
+                "worker_id": worker_id,
+            },
         )
-        config = self._build_policy_evaluation_config(policy_path)
+
+        config = self._build_policy_evaluation_config(worker_id, policy_path)
         if config is None:
             return
+
         self._status_bar.showMessage(
             f"Launching evaluation run for {policy_path.name}",
             5000,
         )
         self._submit_training_config(config)
 
-    def _on_agent_form_requested(self) -> None:
-        """Open the SPADE-BDI agent training form."""
+    def _on_agent_form_requested(self, worker_id: str) -> None:
+        """Open the worker-specific training form."""
+        if not worker_id:
+            QtWidgets.QMessageBox.information(
+                self,
+                "Worker Required",
+                "Select a worker integration before configuring training.",
+            )
+            return
+
         factory = get_worker_form_factory()
-        worker_id = "spade_bdi_rl"
         try:
-            dialog = cast(
-                "SpadeBdiTrainForm",
-                factory.create_train_form(
-                    worker_id,
-                    parent=self,
-                    default_game=self._control_panel.current_game(),
-                ),
+            dialog = factory.create_train_form(
+                worker_id,
+                parent=self,
+                default_game=self._control_panel.current_game(),
             )
         except KeyError:
             QtWidgets.QMessageBox.warning(
@@ -920,27 +992,46 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 f"No train form registered for worker '{worker_id}'.",
             )
             return
+
         if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
             return
 
-        config = dialog.get_config()
+        get_config = getattr(dialog, "get_config", None)
+        if not callable(get_config):
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Unsupported Form",
+                "Selected worker form does not provide a configuration payload.",
+            )
+            return
+
+        config = get_config()
         if config is None:
             return
-        
-        self.log_constant( 
+        if not isinstance(config, dict):
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Invalid Configuration",
+                "Worker form returned an unexpected payload. Expected a dictionary.",
+            )
+            return
+
+        config_payload = cast(dict[str, object], config)
+        self.log_constant(
             LOG_UI_MAINWINDOW_INFO,
             message="Agent training configuration submitted from dialog",
+            extra={"worker_id": worker_id},
         )
         self._status_bar.showMessage("Launching training run...", 5000)
-        self._submit_training_config(config)
+        self._submit_training_config(config_payload)
 
-    def _on_train_agent_requested(self) -> None:
-        """Handle the 'Train Agent' button - opens the agent training configuration dialog."""
-        # The "Train Agent" button also opens the dialog, similar to "Configure Agent"
-        # This is the primary entry point for the training workflow
-        self._on_agent_form_requested()
+    def _on_train_agent_requested(self, worker_id: str) -> None:
+        """Handle the 'Train Agent' button by delegating to the configure workflow."""
+        self._on_agent_form_requested(worker_id)
 
-    def _build_policy_evaluation_config(self, policy_path: Path) -> Optional[dict]:
+    def _build_policy_evaluation_config(
+        self, worker_id: str, policy_path: Path
+    ) -> Optional[dict[str, object]]:
         """Build training config using the worker presenter registry.
         
         Delegates configuration composition to the appropriate worker presenter,
@@ -948,7 +1039,6 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         """
         try:
             registry = get_worker_presenter_registry()
-            worker_id = "spade_bdi_rl"
             presenter = registry.get(worker_id)
             
             if presenter is None:
@@ -1084,7 +1174,22 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             ui_config = metadata.get("ui", {})
             step_buffer_size = ui_config.get("telemetry_buffer_size", 100)
             episode_buffer_size = ui_config.get("episode_buffer_size", 100)
+            hub_buffer_size = ui_config.get("hub_buffer_size")  # Hub buffer from training config
+            
             self._live_controller.set_buffer_sizes_for_run(run_id, step_buffer_size, episode_buffer_size)
+            
+            # Set hub buffer size if provided
+            if hub_buffer_size is not None:
+                self._telemetry_hub.set_run_buffer_size(run_id, hub_buffer_size)
+                self.log_constant( 
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message="Set hub buffer size for run",
+                    extra={
+                        "run_id": run_id,
+                        "hub_buffer_size": hub_buffer_size,
+                    },
+                )
+            
             self.log_constant( 
                 LOG_UI_MAINWINDOW_TRACE,
                 message="Set buffer sizes for run",
@@ -1092,6 +1197,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     "run_id": run_id,
                     "step_buffer_size": step_buffer_size,
                     "episode_buffer_size": episode_buffer_size,
+                    "hub_buffer_size": hub_buffer_size,
                 },
             )
         except Exception as e:
@@ -1167,6 +1273,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         worker_config = worker_meta.get("config", {}) if isinstance(worker_meta, dict) else {}
         agent_id_key = worker_meta.get("agent_id") or worker_config.get("agent_id") or "default"
         self._run_metadata[(run_id, agent_id_key)] = metadata
+        self._maybe_add_tensorboard_tab(run_id, agent_id_key, metadata)
 
         # Subscribe to telemetry
         # NOTE: Do NOT call _create_agent_tabs_for() here!
@@ -1266,7 +1373,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         try:
             # Get the presenter registry and resolve the worker presenter
             registry = get_worker_presenter_registry()
-            worker_id = "spade_bdi_rl"  # TODO: Extract from config/payload if supporting multiple workers
+            worker_id = "spade_bdi_worker"  # TODO: Extract from config/payload if supporting multiple workers
             presenter = registry.get(worker_id)
             
             if presenter is None:
@@ -1337,6 +1444,153 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 exc_info=e,
             )
 
+    def _backfill_run_metadata_from_disk(self, run_id: str) -> None:
+        """Load run metadata for previously scheduled runs discovered outside the submission flow."""
+        config_path = VAR_TRAINER_DIR / "configs" / f"config-{run_id}.json"
+        if not config_path.exists():
+            self.log_constant(
+                LOG_UI_MAINWINDOW_TRACE,
+                message="Metadata backfill skipped; trainer config not found",
+                extra={"run_id": run_id, "path": str(config_path)},
+            )
+            return
+
+        try:
+            with config_path.open("r", encoding="utf-8") as handle:
+                config_payload = json.load(handle)
+        except Exception as exc:
+            self.log_constant(
+                LOG_UI_MAINWINDOW_WARNING,
+                message="Failed to load trainer config for metadata backfill",
+                extra={"run_id": run_id, "path": str(config_path)},
+                exc_info=exc,
+            )
+            return
+
+        metadata = config_payload.get("metadata")
+        if not isinstance(metadata, dict):
+            self.log_constant(
+                LOG_UI_MAINWINDOW_TRACE,
+                message="Metadata backfill skipped; config payload missing metadata",
+                extra={"run_id": run_id, "path": str(config_path)},
+            )
+            return
+
+        candidate_agent_ids: List[str] = []
+        worker_meta = metadata.get("worker")
+        if isinstance(worker_meta, dict):
+            worker_agent = worker_meta.get("agent_id")
+            if worker_agent is not None:
+                candidate_agent_ids.append(str(worker_agent))
+            worker_config = worker_meta.get("config")
+            if isinstance(worker_config, dict):
+                config_agent = worker_config.get("agent_id")
+                if config_agent is not None:
+                    candidate_agent_ids.append(str(config_agent))
+
+        env_payload = config_payload.get("environment")
+        if isinstance(env_payload, dict):
+            env_agent = env_payload.get("TRAIN_AGENT_ID")
+            if env_agent is not None:
+                candidate_agent_ids.append(str(env_agent))
+
+        if not candidate_agent_ids:
+            candidate_agent_ids.append("default")
+
+        ordered_unique_agent_ids: List[str] = []
+        for agent_id in candidate_agent_ids:
+            if agent_id not in ordered_unique_agent_ids:
+                ordered_unique_agent_ids.append(agent_id)
+
+        artifacts_payload = metadata.get("artifacts") if isinstance(metadata, dict) else None
+
+        for agent_id in ordered_unique_agent_ids:
+            key = (run_id, agent_id)
+            if key in self._run_metadata:
+                existing_payload = self._run_metadata[key]
+                if isinstance(existing_payload, dict):
+                    current_artifacts = existing_payload.get("artifacts")
+                    if not isinstance(current_artifacts, dict) and isinstance(artifacts_payload, dict):
+                        existing_payload["artifacts"] = artifacts_payload
+                        self.log_constant(
+                            LOG_UI_MAINWINDOW_TRACE,
+                            message="Backfilled tensorboard artifacts into existing metadata",
+                            extra={"run_id": run_id, "agent_id": agent_id},
+                        )
+                self._maybe_add_tensorboard_tab(run_id, agent_id, self._run_metadata.get(key))
+                continue
+
+            self._run_metadata[key] = metadata
+            self.log_constant(
+                LOG_UI_MAINWINDOW_TRACE,
+                message="Backfilled run metadata from trainer config",
+                extra={"run_id": run_id, "agent_id": agent_id, "path": str(config_path)},
+            )
+            self._maybe_add_tensorboard_tab(run_id, agent_id, metadata)
+
+    def _maybe_add_tensorboard_tab(self, run_id: str, agent_id: str, metadata: dict | None) -> None:
+        """Create or refresh the TensorBoard artifact tab when metadata provides a log path."""
+        if not metadata:
+            return
+
+        artifacts = metadata.get("artifacts") if isinstance(metadata, dict) else None
+        if not isinstance(artifacts, dict):
+            return
+
+        tensorboard_meta = artifacts.get("tensorboard")
+        if not isinstance(tensorboard_meta, dict):
+            return
+
+        if tensorboard_meta.get("enabled", True) is False:
+            return
+
+        resolved_path: Path | None = None
+        log_dir = tensorboard_meta.get("log_dir")
+        relative_path = tensorboard_meta.get("relative_path")
+        if isinstance(log_dir, str) and log_dir.strip():
+            resolved_path = Path(log_dir).expanduser()
+        elif isinstance(relative_path, str) and relative_path.strip():
+            resolved_path = (VAR_ROOT.parent / relative_path).resolve()
+
+        if resolved_path is None:
+            return
+
+        tab_name = f"TensorBoard-Agent-{agent_id}"
+        existing_tabs = self._render_tabs._agent_tabs.get(run_id, {})
+        existing_widget = existing_tabs.get(tab_name)
+        if existing_widget is not None:
+            setter = getattr(existing_widget, "set_log_dir", None)
+            if callable(setter):
+                setter(resolved_path)
+            refresher = getattr(existing_widget, "refresh", None)
+            if callable(refresher):
+                refresher()
+            return
+
+        try:
+            tab = TensorboardArtifactTab(run_id, agent_id, resolved_path, parent=self)
+            self._render_tabs.add_dynamic_tab(run_id, tab_name, tab)
+            self.log_constant(
+                LOG_UI_MAINWINDOW_INFO,
+                message="Created TensorBoard artifact tab",
+                extra={
+                    "run_id": run_id,
+                    "agent_id": agent_id,
+                    "log_dir": str(resolved_path),
+                },
+            )
+        except Exception as exc:
+            self.log_constant(
+                LOG_UI_MAINWINDOW_WARNING,
+                message="Failed to create TensorBoard artifact tab",
+                extra={
+                    "run_id": run_id,
+                    "agent_id": agent_id,
+                    "error": str(exc),
+                },
+                exc_info=exc,
+            )
+
     def _on_training_finished(self, run_id: str, outcome: str, failure_reason: str) -> None:
         """Handle training_finished signal - create/refresh replay tabs for all agents in this run."""
         self.log_constant( 
@@ -1381,6 +1635,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 message="_on_training_finished: processing agent",
                 extra={"run_id": run_id, "agent_id": agent_id, "replay_tab_name": replay_tab_name},
             )
+
+            metadata = self._run_metadata.get((run_id, agent_id))
+            self._maybe_add_tensorboard_tab(run_id, agent_id, metadata)
 
             # Check if replay tab already exists
             if replay_tab_name in agent_tabs:
@@ -1569,13 +1826,34 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             )
     
     def _auto_subscribe_run(self, run_id: str) -> None:
-        """Auto-subscribe to a newly discovered run (called on main thread)."""
+        """Ensure auto-subscribe logic executes on the GUI thread."""
+        current_thread = QtCore.QThread.currentThread()
+        widget_thread = self.thread()
+        if current_thread != widget_thread:
+            self.log_constant(
+                LOG_UI_MAINWINDOW_TRACE,
+                message="Queueing auto-subscribe on GUI thread",
+                extra={
+                    "run_id": run_id,
+                    "current_thread": repr(current_thread),
+                    "widget_thread": repr(widget_thread),
+                },
+            )
+            self._auto_subscribe_requested.emit(run_id)
+            return
+
+        self._auto_subscribe_run_main_thread(run_id)
+
+    @pyqtSlot(str)
+    def _auto_subscribe_run_main_thread(self, run_id: str) -> None:
+        """Auto-subscribe to a newly discovered run (always called on main thread)."""
         self.log_constant( 
             LOG_UI_MAINWINDOW_INFO,
             message="Auto-subscribing to new run",
             extra={"run_id": run_id},
         )
         self._known_runs.add(run_id)
+        self._backfill_run_metadata_from_disk(run_id)
         try:
             self._live_controller.subscribe_to_run(run_id)
             self._render_group.setTitle(f"Live Training - {run_id[:12]}...")
@@ -1764,4 +2042,4 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
 
 __all__ = ["MainWindow"]
-from gym_gui.ui.constants import DEFAULT_RENDER_DELAY_MS
+from gym_gui.constants import DEFAULT_RENDER_DELAY_MS

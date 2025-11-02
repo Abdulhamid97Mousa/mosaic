@@ -19,10 +19,15 @@ from gym_gui.core.data_model.telemetry_core import StepRecord, EpisodeRollup
 from gym_gui.telemetry.sqlite_store import TelemetrySQLiteStore
 from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.telemetry.run_bus import RunBus
-from gym_gui.telemetry.constants import (
+from gym_gui.constants import (
     DB_SINK_BATCH_SIZE,
     DB_SINK_CHECKPOINT_INTERVAL,
     DB_SINK_WRITER_QUEUE_SIZE,
+)
+from gym_gui.constants.constants_telemetry import (
+    TELEMETRY_KEY_SPACE_SIGNATURE,
+    TELEMETRY_KEY_TIME_STEP,
+    TELEMETRY_KEY_VECTOR_METADATA,
 )
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
@@ -199,6 +204,10 @@ class TelemetryDBSink(LogConstantMixin):
                     frame_ref=payload.get("frame_ref"),
                     payload_version=payload.get("payload_version", 0),
                     run_id=evt.run_id,
+                    worker_id=payload.get("worker_id"),
+                    time_step=payload.get(TELEMETRY_KEY_TIME_STEP),
+                    space_signature=payload.get(TELEMETRY_KEY_SPACE_SIGNATURE),
+                    vector_metadata=payload.get(TELEMETRY_KEY_VECTOR_METADATA),
                 )
                 if timestamp is not None:
                     step.timestamp = timestamp

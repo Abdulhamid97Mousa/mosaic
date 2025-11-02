@@ -14,11 +14,21 @@ from pathlib import Path
 import signal
 from typing import Any, Optional, TYPE_CHECKING
 
+# Initialize platform-specific modules to None
+fcntl = None  # type: ignore[assignment]
+msvcrt = None  # type: ignore[assignment]
+
 try:  # pragma: no cover - platform dependent
-    import fcntl  # type: ignore[attr-defined]
-except ImportError:  # pragma: no cover - Windows fallback
-    fcntl = None  # type: ignore[assignment]
-    import msvcrt  # type: ignore[import]
+    import fcntl as _fcntl  # type: ignore[attr-defined]
+    fcntl = _fcntl
+except ImportError:  # pragma: no cover
+    pass
+
+try:  # pragma: no cover - Windows only
+    import msvcrt as _msvcrt  # type: ignore[import]
+    msvcrt = _msvcrt
+except ImportError:  # pragma: no cover
+    pass
 
 import grpc
 from google.protobuf import __version__ as protobuf_version
@@ -33,6 +43,7 @@ from gym_gui.config.paths import (
 from gym_gui.logging_config.log_constants import LOG_DAEMON_START
 from gym_gui.logging_config.logger import configure_logging
 from gym_gui.services.trainer import GPUAllocator, RunRegistry, RunStatus, TrainerDispatcher
+from gym_gui.constants import TRAINER_DEFAULTS
 from gym_gui.services.trainer.service import _record_to_proto
 from google.protobuf.timestamp_pb2 import Timestamp
 
@@ -165,9 +176,9 @@ class TrainerDaemon:
         registry: RunRegistry,
         *,
         gpu_allocator: Optional[GPUAllocator] = None,
-        checkpoint_interval: int = 300,
-        listen: str = "127.0.0.1:50055",
-        max_message_bytes: int = 64 * 1024 * 1024,
+        checkpoint_interval: int = TRAINER_DEFAULTS.daemon.wal_checkpoint_interval_s,
+        listen: str = TRAINER_DEFAULTS.client.target,
+        max_message_bytes: int = TRAINER_DEFAULTS.client.max_message_bytes,
         pid_file: Optional[_PIDFile] = None,
     ) -> None:
         self._registry = registry
@@ -239,9 +250,9 @@ class TrainerDaemon:
         db_sink = TelemetryDBSink(
             self._telemetry_store,
             bus,
-            batch_size=64,
-            checkpoint_interval=1000,
-            writer_queue_size=512,
+            batch_size=TRAINER_DEFAULTS.daemon.telemetry_batch_size,
+            checkpoint_interval=TRAINER_DEFAULTS.daemon.telemetry_checkpoint_interval,
+            writer_queue_size=TRAINER_DEFAULTS.daemon.telemetry_writer_queue_size,
         )
         db_sink.start()
         _LOGGER.info("Telemetry database sink started in daemon")
@@ -362,29 +373,29 @@ def _parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     parser.add_argument(
         "--checkpoint-interval",
         type=int,
-        default=300,
+        default=TRAINER_DEFAULTS.daemon.wal_checkpoint_interval_s,
         help="Seconds between WAL checkpoints",
     )
     parser.add_argument(
         "--lock-file",
         type=Path,
-        default=VAR_TRAINER_DIR / "trainer.lock",
+        default=VAR_TRAINER_DIR / TRAINER_DEFAULTS.daemon.lock_file_name,
         help="Path to lock file ensuring a single daemon instance",
     )
     parser.add_argument(
         "--pid-file",
         type=Path,
-        default=VAR_TRAINER_DIR / "trainer.pid",
+        default=VAR_TRAINER_DIR / TRAINER_DEFAULTS.daemon.pid_file_name,
         help="PID file used for zombie detection and stale cleanup",
     )
     parser.add_argument(
         "--listen",
-        default="127.0.0.1:50055",
+        default=TRAINER_DEFAULTS.client.target,
         help="gRPC listen address (host:port). Use TLS when binding beyond loopback.",
     )
     parser.add_argument(
         "--log-level",
-        default="INFO",
+        default=TRAINER_DEFAULTS.daemon.default_log_level,
         choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
     )
     return parser.parse_args(argv)

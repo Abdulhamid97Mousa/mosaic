@@ -8,6 +8,7 @@ import logging
 from typing import Optional
 
 from PyQt6 import QtCore, QtGui, QtWidgets
+from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
@@ -54,8 +55,8 @@ class TabClosureDialog(QtWidgets.QDialog, LogConstantMixin):
     - Emits decision for caller to execute
     """
 
-    action_selected = QtCore.pyqtSignal(TabClosureChoice)
-    paused = QtCore.pyqtSignal()  # Emitted when training has been paused
+    action_selected = pyqtSignal(TabClosureChoice)
+    paused = pyqtSignal()  # Emitted when training has been paused
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)

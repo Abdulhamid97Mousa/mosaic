@@ -16,7 +16,7 @@ LOG_DIR.mkdir(parents=True, exist_ok=True)
 # Format includes correlation IDs and component metadata for tracing
 _DEFAULT_FORMAT = (
     "%(asctime)s | %(levelname)-7s | %(name)s | "
-    "[comp=%(component)s sub=%(subcomponent)s run=%(run_id)s agent=%(agent_id)s code=%(log_code)s] | %(message)s"
+    "[comp=%(component)s sub=%(subcomponent)s run=%(run_id)s agent=%(agent_id)s code=%(log_code)s tags=%(tags)s] | %(message)s"
 )
 
 
@@ -45,7 +45,7 @@ class _ComponentRegistry:
             "gym_gui.services": "Service",
             "gym_gui.telemetry": "Telemetry",
             "gym_gui.logging": "Logging",
-            "spade_bdi_rl": "Worker",
+            "spade_bdi_worker": "Worker",
         }
         for prefix, component in defaults.items():
             self.register_prefix(prefix, component)
@@ -120,6 +120,8 @@ class CorrelationIdFilter(logging.Filter):
             record.agent_id = "unknown"
         if not hasattr(record, "log_code"):
             record.log_code = None  # Used by log inspectors in UI
+        if not hasattr(record, "tags"):
+            record.tags = "-"
         return True
 
 
@@ -197,7 +199,7 @@ def _level_name(level: int) -> str:
 
 
 def _project_loggers() -> Iterable[str]:
-    return ("gym_gui", "spade_bdi_rl")
+    return ("gym_gui", "spade_bdi_worker")
 
 
 def configure_logging(

@@ -7,9 +7,11 @@ from dataclasses import dataclass, field
 import logging
 from typing import Any, Callable, Generic, Mapping, Sequence, TypeVar
 
-import gymnasium as gym
+import gymnasium as gym  # type: ignore[import]
 
 from gym_gui.core.enums import ControlMode, RenderMode
+from gym_gui.core.spaces.serializer import describe_space
+from gym_gui.core.spaces.vector_metadata import describe_vector_environment
 from gym_gui.logging_config.log_constants import (
     LOG_ADAPTER_ENV_CLOSED,
     LOG_ADAPTER_ENV_CREATED,
@@ -130,6 +132,8 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT], LogConstantMixin):
         self._context = context
         self._logger = _LOGGER
         self._env: gym.Env[Any, Any] | None = None
+        self._space_signature: Mapping[str, Any] | None = None
+        self._vector_metadata: Mapping[str, Any] | None = None
 
     # ------------------------------------------------------------------
     # Lifecycle hooks
@@ -143,7 +147,8 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT], LogConstantMixin):
     def load(self) -> None:
         """Instantiate underlying Gymnasium environment resources."""
 
-        kwargs: dict[str, Any] = {"render_mode": self.default_render_mode.value}
+        default_mode = self._resolve_default_render_mode()
+        kwargs: dict[str, Any] = {"render_mode": default_mode.value}
         extra_kwargs = self.gym_kwargs()
         if extra_kwargs:
             kwargs.update(extra_kwargs)
@@ -153,7 +158,7 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT], LogConstantMixin):
             LOG_ADAPTER_ENV_CREATED,
             extra={
                 "env_id": self.id,
-                "render_mode": self.default_render_mode.value,
+                "render_mode": default_mode.value,
                 "gym_kwargs": ",".join(sorted(extra_kwargs.keys())) if extra_kwargs else "-",
                 "wrapped_class": env.__class__.__name__,
             },
@@ -196,6 +201,8 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT], LogConstantMixin):
             )
             self._env.close()
             self._env = None
+            self._space_signature = None
+            self._vector_metadata = None
 
     # ------------------------------------------------------------------
     # Protected helpers
@@ -208,6 +215,8 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT], LogConstantMixin):
 
     def _set_env(self, env: gym.Env[Any, Any]) -> None:
         self._env = env
+        self._space_signature = self._build_space_signature(env)
+        self._vector_metadata = describe_vector_environment(env)
 
     def render(self) -> Any:
         env = self._require_env()
@@ -333,7 +342,17 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT], LogConstantMixin):
     def supports_render_mode(self, mode: RenderMode) -> bool:
         if self.supported_render_modes:
             return mode in self.supported_render_modes
-        return mode == self.default_render_mode
+        return mode == self._resolve_default_render_mode()
+
+    def _resolve_default_render_mode(self) -> RenderMode:
+        """Return the configured default render mode, raising if missing."""
+
+        default_mode = getattr(self, "default_render_mode", None)
+        if not isinstance(default_mode, RenderMode):
+            raise AdapterNotReadyError(
+                f"Adapter '{self.id}' must set 'default_render_mode' before loading."
+            )
+        return default_mode
 
     # ------------------------------------------------------------------
     # Convenience accessors
@@ -359,6 +378,43 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT], LogConstantMixin):
     @property
     def observation_space(self) -> gym.Space[Any]:
         return self._require_env().observation_space
+
+    @property
+    def space_signature(self) -> Mapping[str, Any] | None:
+        if self._space_signature is None and self._env is not None:
+            self._space_signature = self._build_space_signature(self._env)
+        return self._space_signature
+
+    @property
+    def vector_metadata(self) -> Mapping[str, Any] | None:
+        if self._vector_metadata is None and self._env is not None:
+            self._vector_metadata = describe_vector_environment(self._env)
+        return self._vector_metadata
+
+    def elapsed_steps(self) -> int | None:
+        env = self._env
+        visited: set[int] = set()
+        while env is not None:
+            elapsed = getattr(env, "_elapsed_steps", None)
+            if elapsed is not None:
+                try:
+                    return int(elapsed)
+                except (TypeError, ValueError):  # pragma: no cover - defensive
+                    return None
+            next_env = getattr(env, "unwrapped", None)
+            if next_env is None or id(next_env) in visited:
+                break
+            visited.add(id(env))
+            env = next_env
+        return None
+
+    def _build_space_signature(self, env: gym.Env[Any, Any]) -> Mapping[str, Any] | None:
+        try:
+            observation = describe_space(env.observation_space)
+            action = describe_space(env.action_space)
+        except Exception:  # pragma: no cover - best-effort metadata capture
+            return None
+        return {"observation": observation, "action": action}
 
 
 __all__ = [

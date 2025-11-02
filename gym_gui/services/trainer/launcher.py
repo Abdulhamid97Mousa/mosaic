@@ -15,11 +15,12 @@ from pathlib import Path
 from typing import IO, Optional
 
 from gym_gui.config.paths import VAR_LOGS_DIR, ensure_var_directories
-from . import constants as trainer_constants
+from gym_gui.constants import TRAINER_DEFAULTS
+from gym_gui.core.subprocess_validation import validated_popen
 
 
-CLIENT_DEFAULTS = trainer_constants.TRAINER_DEFAULTS.client
-DAEMON_DEFAULTS = trainer_constants.TRAINER_DEFAULTS.daemon
+CLIENT_DEFAULTS = TRAINER_DEFAULTS.client
+DAEMON_DEFAULTS = TRAINER_DEFAULTS.daemon
 
 LOGGER = logging.getLogger("gym_gui.trainer.launcher")
 
@@ -97,7 +98,7 @@ def ensure_trainer_daemon_running(
     env.setdefault("QT_DEBUG_PLUGINS", "0")
 
     LOGGER.info("Spawning trainer daemon via %s", python_executable)
-    process = subprocess.Popen(
+    process = validated_popen(
         [python_executable, "-m", "gym_gui.services.trainer_daemon"],
         stdout=log_file,
         stderr=subprocess.STDOUT,
