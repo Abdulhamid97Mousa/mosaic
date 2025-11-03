@@ -24,7 +24,7 @@ from spade_bdi_worker.constants import (
     DEFAULT_WORKER_EPISODE_BUFFER_SIZE,
 )
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger("spade_bdi_rl.core.config")
 _log = partial(log_constant, _LOGGER)
 
 

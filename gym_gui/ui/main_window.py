@@ -24,7 +24,7 @@ from gym_gui.config.game_configs import (
     LunarLanderConfig,
     TaxiConfig,
 )
-from gym_gui.constants import UI_DEFAULTS
+from gym_gui.constants import UI_DEFAULTS, TRAINER_DEFAULTS
 from gym_gui.config.game_config_builder import GameConfigBuilder
 from gym_gui.config.paths import VAR_ROOT, VAR_TRAINER_DIR
 from gym_gui.config.settings import Settings
@@ -72,6 +72,15 @@ if TYPE_CHECKING:  # pragma: no cover - typing only
     from gym_gui.ui.widgets.spade_bdi_train_form import SpadeBdiTrainForm
     from gym_gui.ui.widgets.spade_bdi_policy_selection_form import SpadeBdiPolicySelectionForm
 from gym_gui.services.trainer.signals import get_trainer_signals
+
+TRAINER_SUBMIT_DEADLINE_MULTIPLIER = 6
+
+
+def _training_submit_deadline_seconds() -> float:
+    """Return the gRPC deadline used for SubmitRun requests."""
+
+    return TRAINER_DEFAULTS.client.deadline_s * TRAINER_SUBMIT_DEADLINE_MULTIPLIER
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -139,6 +148,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._run_watch_subscription = None
         self._selected_policy_path: Optional[Path] = None
         self._run_metadata: Dict[tuple[str, str], Dict[str, Any]] = {}
+        self._trainer_daemon_ready: bool = False
+        self._trainer_poll_failures: int = 0
+        self._trainer_poll_quiet_logged: bool = False
         
         # Get live telemetry controller from service locator
         live_controller = locator.resolve(LiveTelemetryController)
@@ -1101,7 +1113,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._status_bar.showMessage("Submitting training run...", 3000)
 
             # Submit returns a Future
-            future = runner.submit_run(config_json)
+            future = runner.submit_run(config_json, deadline=_training_submit_deadline_seconds())
             self.log_constant( 
                 LOG_UI_MAINWINDOW_TRACE,
                 message="_submit_training_config: submit_run() called, future created",
@@ -1114,7 +1126,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     message="_submit_training_config: on_done callback called",
                 )
                 try:
-                    response = fut.result(timeout=3.0)
+                    response = fut.result()
                     self.log_constant( 
                         LOG_UI_MAINWINDOW_TRACE,
                         message=f"_submit_training_config: Got response with run_id={response.run_id}",
@@ -1773,21 +1785,50 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 return
             
             # List runs that should have tabs (active or recently completed)
-            self.log_constant( 
-                LOG_UI_MAINWINDOW_TRACE,
-                message="Polling daemon for active training runs...",
+            if self._trainer_daemon_ready:
+                self.log_constant( 
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message="Polling daemon for active training runs...",
+                )
+            future = runner.list_runs(
+                statuses=[
+                    RunStatus.INIT,
+                    RunStatus.HANDSHAKE,
+                    RunStatus.READY,
+                    RunStatus.EXECUTING,
+                    RunStatus.PAUSED,
+                    RunStatus.FAULTED,
+                    RunStatus.TERMINATED,
+                ],
+                deadline=3.0,
             )
-            future = runner.list_runs(statuses=[RunStatus.PENDING, RunStatus.DISPATCHING, RunStatus.RUNNING, RunStatus.COMPLETED], deadline=3.0)
             
             def on_done(fut):
                 try:
                     response = fut.result(timeout=1.0)
                 except Exception as exc:
-                    self.log_constant( 
-                        LOG_UI_MAINWINDOW_TRACE,
-                        message=f"Run poll failed: {exc}",
-                    )
+                    self._trainer_poll_failures += 1
+                    if self._trainer_daemon_ready:
+                        self.log_constant( 
+                            LOG_UI_MAINWINDOW_TRACE,
+                            message=f"Run poll failed: {exc}",
+                        )
+                    else:
+                        if not self._trainer_poll_quiet_logged:
+                            self.log_constant(
+                                LOG_UI_MAINWINDOW_TRACE,
+                                message="Trainer daemon not yet reachable; suppressing poll failures until it responds",
+                            )
+                            self._trainer_poll_quiet_logged = True
                     return
+                self._trainer_daemon_ready = True
+                if self._trainer_poll_failures and self._trainer_poll_quiet_logged:
+                    self.log_constant(
+                        LOG_UI_MAINWINDOW_TRACE,
+                        message="Trainer daemon responded; resuming poll logging",
+                    )
+                self._trainer_poll_failures = 0
+                self._trainer_poll_quiet_logged = False
                 self.log_constant( 
                     LOG_UI_MAINWINDOW_TRACE,
                     message=f"Received {len(response.runs)} active runs from daemon",
@@ -1880,7 +1921,15 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             )
             return
 
-        statuses = [RunStatus.DISPATCHING, RunStatus.RUNNING]
+        statuses = [
+            RunStatus.INIT,
+            RunStatus.HANDSHAKE,
+            RunStatus.READY,
+            RunStatus.EXECUTING,
+            RunStatus.PAUSED,
+            RunStatus.FAULTED,
+            RunStatus.TERMINATED,
+        ]
         subscription = runner.watch_runs(statuses=statuses, since_seq=0)
         self._run_watch_subscription = subscription
 

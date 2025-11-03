@@ -4,7 +4,7 @@
 
 # Environment configuration
 python-dotenv==1.1.1
-
+dotenv==0.9.9
 # Qt GUI framework
 PyQt6==6.9.1
 PyQt6-Qt6==6.9.2

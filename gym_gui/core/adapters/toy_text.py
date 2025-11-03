@@ -446,6 +446,7 @@ class FrozenLakeAdapter(ToyTextAdapter):
         context: AdapterContext | None = None,
         *,
         game_config: FrozenLakeConfig | dict | None = None,
+        map_size: str | None = None,
     ) -> None:
         """Initialize with optional game-specific configuration."""
         super().__init__(context, defaults=self.toy_text_defaults)
@@ -455,6 +456,26 @@ class FrozenLakeAdapter(ToyTextAdapter):
         else:
             self._game_config = game_config or DEFAULT_FROZEN_LAKE_CONFIG
         self._last_action: int | None = None
+        self.map_size = map_size
+
+        if map_size:
+            normalized = map_size.strip().lower()
+            if normalized not in {"4x4", "8x8"}:
+                raise ValueError(f"Unsupported map_size '{map_size}'. Expected '4x4' or '8x8'.")
+            grid_dim = 4 if normalized == "4x4" else 8
+            # Rebuild config with standardized dimensions and positions
+            base = self._game_config
+            self._game_config = FrozenLakeConfig(
+                is_slippery=base.is_slippery,
+                success_rate=base.success_rate,
+                reward_schedule=base.reward_schedule,
+                grid_height=grid_dim,
+                grid_width=grid_dim,
+                start_position=(0, 0),
+                goal_position=(grid_dim - 1, grid_dim - 1),
+                hole_count=base.hole_count,
+                random_holes=base.random_holes,
+            )
 
     def gym_kwargs(self) -> dict[str, Any]:
         """Return Gymnasium environment kwargs from game configuration."""
@@ -561,6 +582,8 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
         self._game_config = game_config or DEFAULT_FROZEN_LAKE_V2_CONFIG
         self._last_action: int | None = None
         self._custom_desc: list[str] | None = None
+        self._resolved_start: tuple[int, int] | None = None
+        self._resolved_goal: tuple[int, int] | None = None
 
     def _generate_map_descriptor(self) -> list[str]:
         """Generate custom map descriptor based on configuration.
@@ -572,14 +595,32 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
         defaults = self.defaults
         height = _coalesce(self._game_config.grid_height, defaults.grid_height)
         width = _coalesce(self._game_config.grid_width, defaults.grid_width)
+        height = max(1, int(height))
+        width = max(1, int(width))
+
         start_pos = _coalesce(self._game_config.start_position, defaults.start)
         goal_pos = _coalesce(self._game_config.goal_position, defaults.goal)
-        if start_pos is not None:
-            start_pos = tuple(start_pos)
-        if goal_pos is not None:
-            goal_pos = tuple(goal_pos)
-        height = int(height)
-        width = int(width)
+
+        def _normalize(position: tuple[int, int] | None, fallback: tuple[int, int]) -> tuple[int, int]:
+            base = fallback
+            if position is not None:
+                try:
+                    row = int(position[0])
+                    col = int(position[1])
+                except (TypeError, ValueError, IndexError):
+                    row, col = base
+                else:
+                    row = max(0, min(height - 1, row))
+                    col = max(0, min(width - 1, col))
+                    return (row, col)
+            row, col = base
+            row = max(0, min(height - 1, int(row)))
+            col = max(0, min(width - 1, int(col)))
+            return (row, col)
+
+        start_pos = _normalize(start_pos, (0, 0))
+        goal_pos = _normalize(goal_pos, (height - 1, width - 1))
+
         hole_count = _coalesce(self._game_config.hole_count, defaults.hole_count)
         random_holes = (
             self._game_config.random_holes
@@ -596,6 +637,8 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
             and start_pos == defaults.start
             and goal_pos == defaults.goal
         ):
+            self._resolved_start = start_pos
+            self._resolved_goal = goal_pos
             return list(defaults.official_map)
         
         # Generate custom map (random holes or custom start/goal positions)
@@ -609,8 +652,11 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
                 hole_count = max(1, int(total_tiles * 0.15))  # ~15% holes
         
         # Initialize grid with frozen tiles
+        self._resolved_start = start_pos
+        self._resolved_goal = goal_pos
+
         grid = [['F' for _ in range(width)] for _ in range(height)]
-        
+
         # Place start and goal
         grid[start_pos[0]][start_pos[1]] = 'S'
         grid[goal_pos[0]][goal_pos[1]] = 'G'
@@ -735,6 +781,10 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
         )
         
         return payload
+
+    def goal_pos(self) -> tuple[int, int] | None:
+        """Return the resolved goal position for worker compatibility."""
+        return self._resolved_goal
 
     @staticmethod
     def get_available_positions(grid_height: int, grid_width: int, start_position: tuple[int, int], exclude_holes: list[tuple[int, int]] | None = None) -> list[tuple[int, int]]:

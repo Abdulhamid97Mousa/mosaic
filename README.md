@@ -1,11 +1,13 @@
-# Jumanji — A Qt-powered Graphical User Interface [GUI] for exploring, benchmarking, and documenting RL with Human Mode or Automated agents
+# MOSAIC: Multi-Agent Orchestration System with Adaptive Intelligent Control for Heterogeneous Agent Workloads
 
-<p align="center"> <a href="#getting-started">🚀 Quickstart</a> • <a href="#feature-spotlight">✨ Features</a> • <a href="#architecture">🧠 Architecture</a> • <a href="#environment-support">🎮 Environments</a> • <a href="#telemetry--storage-pipeline">📦 Storage</a> • <a href="#roadmap">🧭 Roadmap</a> </p> <p align="center"> <img src="gym_gui/assets/gui_images/Jumanji_Logo.png" alt="Jumanji project logo" width="320" /> </p> <p align="center"> <img src="https://img.shields.io/badge/status-alpha-informational" alt="status badge" /> <img src="https://img.shields.io/badge/platform-desktop%20(Qt6)-blueviolet" alt="platform badge" /> <img src="https://img.shields.io/badge/envs-gymnasium%20(v26%2B)-forestgreen" alt="env badge" /> <img src="https://img.shields.io/badge/telemetry-jsonl%20%7C%20sqlite-orange" alt="telemetry badge" /> </p>
+## A Qt6-powered Graphical User Interface for Process-Supervised Reinforcement Learning Experimentation
+
+<p align="center"> <a href="#getting-started">🚀 Quickstart</a> • <a href="#feature-spotlight">✨ Features</a> • <a href="#architecture">🧠 Architecture</a> • <a href="#environment-support">🎮 Environments</a> • <a href="#telemetry--storage-pipeline">📦 Storage</a> • <a href="#roadmap">🧭 Roadmap</a> </p> <p align="center"> <img src="gym_gui/assets/gui_images/Jumanji_Logo.png" alt="MOSAIC project logo" width="320" /> </p> <p align="center"> <img src="https://img.shields.io/badge/status-alpha-informational" alt="status badge" /> <img src="https://img.shields.io/badge/platform-desktop%20(Qt6)-blueviolet" alt="platform badge" /> <img src="https://img.shields.io/badge/envs-gymnasium%20(v26%2B)-forestgreen" alt="env badge" /> <img src="https://img.shields.io/badge/telemetry-jsonl%20%7C%20sqlite-orange" alt="telemetry badge" /> </p>
 
 
-## What is Jumanji?
+## What is MOSAIC?
 
-Jumanji is an interactive RL laboratory: a desktop app that lets you (1) play environments as a human, (2) train agents as long-running jobs, and (3) replay every decision with synchronized telemetry—without stitching together notebooks, ad-hoc scripts, and log folders by hand. It is algorithm-agnostic: any trainer that runs as a CLI process can be orchestrated (e.g., CleanRL baselines), while the GUI focuses on visibility, control, and reproducible artifacts. Gymnasium provides the environment APIs and wrappers; the GUI sits above them as an operator console. [^sqlite-wal]
+MOSAIC (Multi-Agent Orchestration System with Adaptive Intelligent Control) is an interactive RL laboratory: a desktop app that lets you (1) play environments as a human, (2) train heterogeneous agents (RL trainers, LLM planners, robotic controllers) as long-running subprocess jobs, and (3) replay every decision with synchronized telemetry—without stitching together notebooks, ad-hoc scripts, and log folders by hand. It is algorithm-agnostic: any trainer that runs as a CLI process can be orchestrated (e.g., CleanRL baselines, LLM-based agents), while the GUI focuses on visibility, control, and reproducible artifacts. Gymnasium provides the environment APIs and wrappers; the GUI sits above them as an operator console implementing process-supervised experimentation. [^sqlite-wal]
 
 ## Why this matters for research
 
@@ -14,29 +16,76 @@ Human-in-the-loop understanding. Build intuition quickly: pause, step, and annot
 Reproducible records. Every step is captured in structured telemetry (JSONL + WAL-backed SQLite), enabling exact episode reconstruction and post-hoc analysis across runs and machines. (SQLite WAL allows readers to run while a writer appends.) [^[Isolation In SQLite](https://www.sqlite.org/isolation.html)]
 
 
-Library-neutral training. Use your preferred trainers. CleanRL, for example, supplies concise, reproducible single-file baselines and logs metrics/videos; Jumanji orchestrates such runs and centralizes their artifacts.[^[How to open a WAL-enabled db file](https://sqlite.org/forum/info/50a4bfdb294333eec1ba4749661934521af19e6fc0790a6189696607f67c2b54?t=h)]
+Library-neutral training. Use your preferred trainers. CleanRL, for example, supplies concise, reproducible single-file baselines and logs metrics/videos; MOSAIC orchestrates such runs and centralizes their artifacts.[^[How to open a WAL-enabled db file](https://sqlite.org/forum/info/50a4bfdb294333eec1ba4749661934521af19e6fc0790a6189696607f67c2b54?t=h)]
+
+## Project Status — October 2025
+
+### Recent milestones
+- **Process-supervised architecture formalized.** MOSAIC implements a versioned inter-process communication (IPC) protocol enabling heterogeneous workers (RL trainers, LLM planners, robotic controllers) to run as isolated subprocesses orchestrated by a unified control plane.
+- **Multi-agent worker support.** The IPC contract now supports capability negotiation and runtime scheduling, allowing seamless switching between agents (DQN, policy gradient, LLM-based) without modifying worker code.
+- **Telemetry schema and storage.** Structured telemetry is captured in SQLite with WAL-backed isolation, enabling live queries and deterministic replay without blocking active training.
+
+### Why researchers need MOSAIC
+- **Unify heterogeneous agents under one control plane.** Unlike orchestration frameworks locked to specific algorithm families, MOSAIC treats RL trainers, LLM planners, and robotic controllers as interchangeable subprocess workers, each declaring capabilities at handshake and emitting structured telemetry over versioned IPC.[^cleanrl][^leanrl] This enables rapid hypothesis iteration: swap agents mid-experiment, replay deterministically, and maintain observability without algorithm instrumentation.
+- **Live observability without code instrumentation.** The GUI runs human-controlled sessions while workers continue as unmodified subprocesses; telemetry arrives continuously over IPC and is stored durably in SQLite. No changes to trainer source code required.
+- **Deterministic replay and checkpoint-based recovery.** Each tab hooks a dedicated IPC session, checkpoint store, and telemetry buffer. Orchestrator-issued seeds and checkpoint hooks enable exact episode reconstruction for debugging and off-policy learning.
+- **Stepping stone to autonomous orchestration.** The versioned IPC contract and capability negotiation layer the groundwork for agent-guided scheduling: once the daemon scheduler matures, workers can propose actions and workers can vote on decisions, while the human operator retains veto authority.
+
+### From CLI scripts to a process-supervised laboratory
+
+1. **Wrap existing trainers.** Point MOSAIC at your CleanRL/custom entrypoints; the subprocess harness captures capabilities and telemetry without modifying launch scripts.
+2. **Inspect interactively.** Run human sessions in parallel tabs; pause agents mid-episode to debug failure modes, annotate trajectories, or perform counterfactual rollouts.
+3. **Replay deterministically.** All episodes are captured with seeds and checkpoints; reconstruct any trajectory to reproduce bugs or audit policy decisions.
+4. **Scale to multi-agent.** Planned worker-to-worker communication primitives will enable shared-environment scenarios where heterogeneous agents coordinate through the orchestrator's message bus.
+
+## 🎯 Vision: the process-supervised RL laboratory
+
+RL experimentation is fragmented—training scripts here, logs there, videos elsewhere. MOSAIC centralizes the entire workflow: run algorithms as orchestrated subprocess workers, supervise them through a Qt6 control plane with live telemetry, and replay episodes deterministically with aligned checkpoints and seeds. It targets Gymnasium-compatible environments, heterogeneous agent compositions, and research workflows demanding reproducibility, observability, and human oversight.
 
 ## Project Status — October 2025
 
 ### Recent milestones
 - **Constants & adapters unified.** Toy-text maps, trainer defaults, UI sliders, and telemetry buffers now live in dedicated modules (see `docs/1.0_DAY_16/TASK_7/*`). Worker code imports GUI adapters directly, eliminating ~635 duplicated lines.
 - **Tab deletion persistence verified.** The closure dialog now drives SQLite-backed run deletion/archival, and the worker queue commits those changes without respawning tabs (`docs/1.0_DAY_16/TASK_6/*`).
-- **Telemetry contract deep dive.** Day 18 research catalogued every shape the GUI consumes today and outlined schemas needed for vectorised and composite Gym spaces.
+- **Telemetry contract deep dive.** Day 18 research catalogued every shape the GUI consumes today and outlined schemas needed for vectorised and composite Gym spaces.
 
-### Known limitations
-- **Vector metadata gaps.** Run payloads do not yet ship autoreset modes, reset masks, or composite space descriptors, so vector env dashboards remain experimental (compare with [Gymnasium’s Vector API](https://gymnasium.farama.org/api/vector/)).
-- **Visual indicators backlog.** Live tab badges, status bar summaries, and toast notifications are still tracked for post-Task 6 polish.
-- **Schema formalisation pending.** The telemetry schema/serializer RFC is still in draft; without it, integrations with external analytics stacks remain bespoke.
+### Recent Completions (DAY_15–19)
+- **✅ Adapter centralization & constants refactoring.** DAY_16 TASK_7 consolidated 3 duplicate adapter files (~635 lines removed) and organized 8 constants modules with unified purposes. Worker now imports GUI adapters directly; all 57 tests passing with zero linter errors and 100% adapter functionality verified.
+- **✅ Telemetry schema formalized.** DAY_18 TASK_1 implemented `TelemetrySchemaRegistry` with family-specific overlays (Atari, MiniGrid), validated via `test_schema_contract.py`. Schema ID, version, and JSON definition now embedded in training configs and fast-path runs. `SessionController` enforces schema expectations; `TelemetryService` trims heavy fields before SQLite storage.
+- **✅ Visual indicators & control panel tabbed layout.** DAY_19 introduced tabbed control panel (Human, Single-Agent, Multi-Agent tabs) with `StorageProfile` optimization: flags for `capture_frames`, `drop_render_payload`, `drop_observation`. Status telemetry (step, reward, turn, timings) live in Human tab; active tab drives control mode automatically.
+
+### Remaining limitations
+- **Vector environment metadata (in progress).** Gymnasium's Vector API autoreset modes and reset masks are recognized in the schema, but composite space descriptors for multi-agent vector environments remain a post-DAY_19 extension. Single-agent vectorized envs are catalogued.
+- **Distributed deployment.** Current implementation assumes workers execute on localhost; network transport (gRPC, ZeroMQ) is planned for cluster deployments and remote worker coordination.
+
 
 ### Near-term focus
-1. Confirm the SQLite transaction strategy in `gym_gui/telemetry/sqlite_store.py` matches the documented fix.
-2. Ship the Taxi telemetry sanitisation patch and regression tests.
-3. Formalise the telemetry schema/serializer RFC to unblock vector environments.
-4. Land the outstanding UI indicator work so tab persistence is user-facing safe.
-5. Capture environment-variable override matrices for the new constants registry.
+1. Land remote worker coordination via network IPC (gRPC/ZeroMQ).
+2. Extend analytics tabs for CleanRL-driven training (TensorBoard/Weights & Biases embedded in GUI).
+3. Add composite vector space descriptors and multi-agent vector env support.
+4. Onboard MiniGrid and Atari via schema overlays with regression tests.
+5. Build multi-agent shared-environment adapters and inter-agent telemetry alignment.
 
-### Why researchers need Jumanji
-- **Bridge CLI baselines to an interactive lab.** Projects such as CleanRL and LeanRL deliberately favour single-file command-line scripts for clarity and speed, leaving experimenters to assemble their own orchestration, logging, and playback layers.[^cleanrl][^leanrl] Jumanji layers a Qt6 shell, trainer daemon, and telemetry recorder on top of those scripts so the same runs gain pause/rewind, per-step annotations, and reproducible artefacts without abandoning proven baselines.
+### 🕵️ Human Mode (Shipping Today)
+
+### From CLI scripts to a visual operations deck
+
+1. **Submit existing trainers.** Point the trainer daemon at your CleanRL/LeanRL entrypoints; the dispatcher wraps them with resource reservations (`cpus`, `memory_mb`, `gpus`) instead of rewriting launch scripts.
+2. **Inspect in human mode.** Spin up human sessions in neighbouring tabs to benchmark intuition versus policy behaviour without starving the worker processes.
+3. **Scale out with multi-tabs.** Spawn additional tabs per run ID—each tab instantiates its own telemetry queues, render widgets, and log filters so experiments remain isolated but concurrently observable.
+4. **Prepare for multi-agent.** Planned shared-environment adapters will let multiple agents interleave in one tab while preserving per-agent configuration panels; today's tab infrastructure and service locator already handle the isolation mechanics, so the upcoming schema work simply feeds richer payloads into the same UI.
+
+## 🎯 Vision: the interactive RL laboratory
+
+RL experimentation is fragmented—training scripts here, logs there, videos elsewhere. MOSAIC centralizes the entire workflow: run algorithms as orchestrated subprocess workers, supervise them through a Qt6 control plane with live telemetry, and replay episodes deterministically with aligned checkpoints and seeds. It targets Gymnasium-compatible environments, heterogeneous agent compositions, and research workflows demanding reproducibility, observability, and human oversight.
+
+[^cleanrl]: CleanRL emphasises single-file reference implementations and CLI-driven experiment management. See https://docs.cleanrl.dev/.
+[^leanrl]: LeanRL extends the CleanRL scripts with PyTorch 2 compilation to minimise runtime, remaining command-line driven. See https://github.com/pytorch-labs/LeanRL.
+[^pettingzoo]: PettingZoo defines standard APIs (AEC and parallel) for multi-agent reinforcement learning, underscoring the need for shared-environment visualisation. See https://pettingzoo.farama.org.
+
+
+### Why researchers need MOSAIC
+- **Unify heterogeneous agents under one control plane.** Unlike orchestration frameworks locked to specific algorithm families, MOSAIC treats RL trainers, LLM planners, and robotic controllers as interchangeable subprocess workers, each declaring capabilities at handshake and emitting structured telemetry over versioned IPC.[^cleanrl][^leanrl] This enables rapid hypothesis iteration: swap agents mid-experiment, replay deterministically, and maintain observability without algorithm instrumentation.
 - **Human-mode without sacrificing agent throughput.** The GUI runs human-controlled sessions while the trainer daemon continues to schedule headless workers; environment adapters expose observation/state deltas so human play never blocks the worker queues. Tabs can be launched per agent with CPU/GPU/memory reservations surfaced through the trainer registry, enabling comparative experiments on the same host.
 - **Live tab isolation and replay.** Each tab hooks a dedicated RunBus queue, WAL-backed SQLite store, and frame buffer, keeping telemetry streams sandboxed even when multiple agents run concurrently. Researchers can stage A/B tests by launching parallel tabs, altering hyper-parameters, and replaying the resulting trajectories side by side.
 - **Stepping stone to multi-agent research.** The architecture reserves room for shared-environment adapters: once the schema RFC lands, the GUI can visualise parallel agent streams, aligning with the multi-agent interface conventions established by PettingZoo’s AEC/parallel APIs and the broader MARL community.[^pettingzoo]
@@ -50,17 +99,17 @@ Library-neutral training. Use your preferred trainers. CleanRL, for example, sup
 
 ## 🎯 Vision: the interactive RL laboratory
 
-RL tooling is powerful but fragmented—scripts here, logs there, videos elsewhere. Jumanji turns experiment management into a live, visual workflow: play as a human, train an agent, and replay every decision with synchronized telemetry. It targets Gymnasium-compatible environments and research workflows that need observability and reproducibility, not just final scores.
+RL experimentation is fragmented—training scripts here, logs there, videos elsewhere. MOSAIC centralizes the entire workflow: run algorithms as orchestrated subprocess workers, supervise them through a Qt6 control plane with live telemetry, and replay episodes deterministically with aligned checkpoints and seeds. It targets Gymnasium-compatible environments, heterogeneous agent compositions, and research workflows demanding reproducibility, observability, and human oversight.
 
 [^cleanrl]: CleanRL emphasises single-file reference implementations and CLI-driven experiment management. See https://docs.cleanrl.dev/.
 [^leanrl]: LeanRL extends the CleanRL scripts with PyTorch 2 compilation to minimise runtime, remaining command-line driven. See https://github.com/pytorch-labs/LeanRL.
 [^pettingzoo]: PettingZoo defines standard APIs (AEC and parallel) for multi-agent reinforcement learning, underscoring the need for shared-environment visualisation. See https://pettingzoo.farama.org.
 ## ✨ Core Philosophy: Human-Led Today, Agent Assist Tomorrow
 
-Jumanji already doubles as an exploratory cockpit for humans while laying the groundwork for automated agents. The philosophy is to ship reliable human tooling first, then layer agent orchestration and hybrid hand-offs as the daemon stack matures.
+MOSAIC already doubles as an exploratory cockpit for humans while laying the groundwork for automated agents. The philosophy is to ship reliable human tooling first, then layer agent orchestration and hybrid hand-offs as the daemon stack matures.
 
 <p align="center">
-	<img src="gym_gui/assets/gui_images/FULL_GUI_LAYOUT.png" alt="Jumanji full GUI layout" width="900" />
+	<img src="gym_gui/assets/gui_images/FULL_GUI_LAYOUT.png" alt="MOSAIC full GUI layout" width="900" />
 </p>
 
 ### 🕵️ Human Mode (Shipping Today)
@@ -91,7 +140,7 @@ These pieces will arrive after the TrainerClient bridge and control-panel update
 
 ## 💡 Feature Spotlight
 
-| Category | Today in Jumanji | Roadmap Lift | Traditional Approach (e.g., CleanRL) |
+| Category | Today in MOSAIC | Roadmap Lift | Traditional Approach (e.g., CleanRL) |
 | --- | --- | --- | --- |
 | **Interactive Experimentation** | Human mode with live telemetry, pause, and replay tooling. | Introduce agent-driven control surfaces and curated intervention hooks once TrainerClient wiring lands. | Scripted, non-interactive training runs with no GUI feedback loop. |
 | **Visual Debugging & Replay** | Frame-by-frame playback for human sessions synchronized with JSONL/SQLite telemetry. | Extend replay loader to agent runs and persist RGB frames via the recorder service. | Generate MP4s post-run; no interactive scrubbing or linked telemetry. |
@@ -156,7 +205,7 @@ flowchart TD
 
 ### Trainer Orchestrator (Daemon)
 
-Jumanji is built on a robust client-server split: the Qt shell is an operator console, while an out-of-process trainer daemon manages long-running jobs. The diagram below recaps how the daemon components collaborate.
+MOSAIC is built on a robust client-server split: the Qt shell is an operator console, while an out-of-process trainer daemon manages long-running jobs. The diagram below recaps how the daemon components collaborate.
 
 ```mermaid
 graph TD
@@ -361,8 +410,8 @@ sudo apt-get install -y python3-pyqt6 pyqt6-dev-tools libgl1 libglu1
 ### Installation
 
 ```bash
-git clone https://github.com/Abdulhamid97Mousa/GUI_BDI_RL.git jumanji
-cd jumanji
+git clone https://github.com/Abdulhamid97Mousa/GUI_BDI_RL.git mosaic
+cd mosaic
 python -m venv .venv
 source .venv/bin/activate
 pip install --upgrade pip
@@ -404,9 +453,9 @@ python -m compileall gym_gui/core/adapters/box2d.py gym_gui/services/action_mapp
 
 Passive actions remain synchronized across human, idle, and agent ticks via the shared action-mapper service.
 
-## 🔍 Comparative Review: LeanRL & CORL Through the Jumanji Lens
+## 🔍 Comparative Review: LeanRL & CORL Through the MOSAIC Lens
 
-### LeanRL vs. Jumanji
+### LeanRL vs. MOSAIC
 
 **Where LeanRL shines**
 
@@ -414,14 +463,14 @@ Passive actions remain synchronized across human, idle, and agent ticks via the 
 - A benchmarked test suite covering PPO, SAC, TD3, and DQN variants, making it ideal for performance-focused experimentation.
 - Out-of-the-box integrations for EnvPool, multi-GPU torchrun, and JAX accelerators.
 
-**What Jumanji is building on top**
+**What MOSAIC is building on top**
 
 - A Qt control room where LeanRL policies can be launched, paused, and compared against human play without leaving the desktop shell once the TrainerClient bridge lands.
 - Unified telemetry and storage (JSONL, SQLite, planned frame archives) that will transform LeanRL’s fast training outputs into inspectable, replayable artifacts.
 - ActorService orchestration so LeanRL accelerators plug in cleanly alongside human and scripted actors.
-- Pedagogical value: LeanRL explains how to write fast code, while Jumanji surfaces what the agent is doing in real time via replay tooling.
+- Pedagogical value: LeanRL explains how to write fast code, while MOSAIC surfaces what the agent is doing in real time via replay tooling.
 
-### CORL vs. Jumanji
+### CORL vs. MOSAIC
 
 **Where CORL excels**
 
@@ -429,16 +478,16 @@ Passive actions remain synchronized across human, idle, and agent ticks via the 
 - Ready-to-run evaluation tooling for offline, offline-to-online, and fine-tuning benchmarks.
 - Rich documentation that lowers the barrier to applying state-of-the-art offline methods.
 
-**What Jumanji aims to unlock**
+**What MOSAIC aims to unlock**
 
 - Online data collection via the GUI: human or automated actors can generate new trajectories that feed directly into CORL fine-tuning flows.
 - Visual replay and explainability—exactly what CORL leaves to downstream tooling—so stakeholders can observe offline policies before deployment.
 - A managed storage pipeline that keeps datasets auditable and reproducible when moving between online sessions and CORL batch jobs.
 - Live evaluation harnesses where offline-trained agents and humans share the same environment session for interactive comparisons.
 
-### Why Jumanji Has the Edge
+### Why MOSAIC Has the Edge
 
-- **Human + Agent Interaction:** Jumanji blends LeanRL’s throughput and CORL’s dataset rigor with an operator-friendly console that encourages intervention, annotation, and decision reviews.
+- **Human + Agent Interaction:** MOSAIC blends LeanRL's throughput and CORL's dataset rigor with an operator-friendly console that encourages intervention, annotation, and decision reviews.
 - **Unified Telemetry Story:** Every episode produces synchronized step logs, metrics, and soon frame artifacts—capabilities missing from the training-centric repos.
 - **Service-Oriented Extensibility:** The service locator pattern makes it trivial to wrap LeanRL accelerators, CORL offline policies, katakomba NetHack agents, or yet-to-be-added adapters without reworking the UI.
 - **From Research to Production Readiness:** Deterministic seeds, actor metadata, and storage profiles create compliance-grade records that survive beyond the Jupyter cell.
@@ -508,15 +557,15 @@ Contributions are welcome! Please:
 - [CleanRL](https://github.com/vwxyzjn/cleanrl) – Lockfile discipline and telemetry expectations we aim to match.
 - [OpenShot](https://github.com/OpenShot/openshot-qt) – Reference for Qt service orchestration and caching strategies.
 
-## 🌍 Why Jumanji (and how it complements our submodules)
+## 🌍 Why MOSAIC (and how it complements our submodules)
 
-Jumanji is the control tower that sits above a constellation of best-in-class RL projects. Each git submodule in this repository solves a different research problem; Jumanji stitches them into an interactive, human-friendly workflow.
+MOSAIC is the control tower that sits above a constellation of best-in-class RL projects. Each git submodule in this repository solves a different research problem; MOSAIC stitches them into an interactive, human-friendly workflow.
 
-| Ecosystem component | What it excels at | How Jumanji adds value |
+| Ecosystem component | What it excels at | How MOSAIC adds value |
 | --- | --- | --- |
 | [`cleanrl/`](cleanrl) – single-file algorithm references | Teaches PPO/DQN/SAC with ~300-line scripts, rich docs, and reproducible baselines. | Wraps CleanRL agents inside the ActorService so those baselines can be driven live from the Qt shell, benchmarked against human play, and logged with the same storage pipeline. |
 | [`LeanRL/`](LeanRL) – performance-tuned PyTorch kernels | Turbo-charged CleanRL scripts using `torch.compile`, CUDA graphs, tensordict, and `vmap` for up to **6.8×** faster Atari runs. | Provides “agent-only” playback profiles and telemetry exporters so LeanRL’s high-throughput training can still be inspected frame-by-frame without patching its lean logging stack. |
-| [`CORL/`](CORL) – offline RL algorithms | 20+ single-file ORL baselines (CQL, ReBRAC, IQL, SPOT, Cal-QL, etc.) with Weights & Biases reports over 30+ datasets. | Supplies dataset ingestion hooks; Jumanji’s storage/telemetry services become the online data producers and evaluation harness for CORL fine-tuning or offline-to-online comparisons. |
+| [`CORL/`](CORL) – offline RL algorithms | 20+ single-file ORL baselines (CQL, ReBRAC, IQL, SPOT, Cal-QL, etc.) with Weights & Biases reports over 30+ datasets. | Supplies dataset ingestion hooks; MOSAIC's storage/telemetry services become the online data producers and evaluation harness for CORL fine-tuning or offline-to-online comparisons. |
 | [`katakomba/`](katakomba) – NetHack offline benchmark | Decomposed AutoAscend datasets (38 roles/races/alignments), sequential buffers, and recurrent offline baselines. | Offers adapters that surface Katakomba runs with live tty rendering, letting researchers pit NetHack agents against humans or CleanRL/LeanRL policies inside the same UI and dataset export flow. |
 | [`openrlbenchmark/`](openrlbenchmark) – experiment tracking | Public repository of benchmarked DRL runs across libraries. | Jumanji’s structured outputs (JSONL, SQLite, frames) map cleanly into Open RL Benchmark upload jobs, making our GUI sessions part of the broader reproducibility story. |
 

@@ -174,7 +174,7 @@ class TrainerDispatcher:
 
     # ------------------------------------------------------------------
     async def _dispatch_loop(self) -> None:
-        """Poll for PENDING runs and dispatch them."""
+        """Poll for INIT runs and dispatch them."""
         try:
             while not self._stop_event.is_set():
                 try:
@@ -190,9 +190,9 @@ class TrainerDispatcher:
             raise
 
     async def _dispatch_pending_runs(self) -> None:
-        """Dispatch all PENDING runs."""
-        pending = self._registry.load_runs([RunStatus.PENDING])
-        _LOGGER.info("Pending runs polled", extra={"count": len(pending)})
+        """Dispatch all INIT runs."""
+        pending = self._registry.load_runs([RunStatus.INIT])
+        _LOGGER.info("INIT runs polled", extra={"count": len(pending)})
         for run in pending:
             if run.run_id in self._workers:
                 _LOGGER.debug("Run already has worker", extra={"run_id": run.run_id})
@@ -202,17 +202,18 @@ class TrainerDispatcher:
                 await self._dispatch_run(run)
             except Exception as exc:  # pragma: no cover - defensive
                 _LOGGER.exception("Failed to dispatch run", extra={"run_id": run.run_id, "error": str(exc)})
-                self._registry.update_status(
-                    run.run_id, RunStatus.FAILED, failure_reason=f"dispatch_error: {exc}"
+                self._registry.update_run_outcome(
+                    run.run_id,
+                    status=RunStatus.TERMINATED,
+                    outcome="failed",
+                    failure_reason=f"dispatch_error: {exc}",
                 )
                 self._gpu_allocator.release_many([run.run_id])
                 self._registry.update_gpu_slots(run.run_id, [])
                 await self._broadcast_update(run.run_id)
 
     async def _dispatch_run(self, run: RunRecord) -> None:
-        """Transition run to DISPATCHING, spawn worker subprocess, transition to RUNNING."""
-        self._registry.update_status(run.run_id, RunStatus.DISPATCHING)
-        await self._broadcast_update(run.run_id)
+        """Spawn worker subprocess and advance FSM to HANDSHAKE."""
 
         # Build worker command
         cmd = self._build_worker_command(run)
@@ -238,7 +239,7 @@ class TrainerDispatcher:
         )
         self._workers[run.run_id] = handle
 
-        self._registry.update_status(run.run_id, RunStatus.RUNNING)
+        self._registry.update_status(run.run_id, RunStatus.HANDSHAKE)
         await self._broadcast_update(run.run_id)
 
         # Emit training_started signal
@@ -550,21 +551,26 @@ class TrainerDispatcher:
         """Reconcile terminal worker state and release resources."""
         exit_code = handle.process.returncode
         if handle.cancelled:
-            status = RunStatus.CANCELLED
+            outcome = "canceled"
             reason = "user_cancel"
         elif exit_code == 0:
-            status = RunStatus.COMPLETED
+            outcome = "succeeded"
             reason = None
         else:
-            status = RunStatus.FAILED
+            outcome = "failed"
             reason = f"exit_code_{exit_code}"
 
         _LOGGER.info(
             "Worker finished",
-            extra={"run_id": handle.run_id, "exit_code": exit_code, "status": status.value},
+            extra={"run_id": handle.run_id, "exit_code": exit_code, "outcome": outcome},
         )
 
-        self._registry.update_status(handle.run_id, status, failure_reason=reason)
+        self._registry.update_run_outcome(
+            run_id=handle.run_id,
+            status=RunStatus.TERMINATED,
+            outcome=outcome,
+            failure_reason=reason,
+        )
         self._gpu_allocator.release_many([handle.run_id])
         self._registry.update_gpu_slots(handle.run_id, [])
 
@@ -572,7 +578,6 @@ class TrainerDispatcher:
         signals = _get_signals()
         if signals:
             try:
-                outcome = "succeeded" if status == RunStatus.COMPLETED else "failed" if status == RunStatus.FAILED else "canceled"
                 signals.emit_training_finished(handle.run_id, outcome, reason)
                 _LOGGER.debug("Emitted training_finished signal", extra={"run_id": handle.run_id, "outcome": outcome})
             except Exception as e:
@@ -630,7 +635,7 @@ class TrainerDispatcher:
     async def _check_heartbeats(self) -> None:
         """Mark runs as FAILED if last_heartbeat is stale."""
         cutoff = datetime.now(timezone.utc) - timedelta(seconds=self._heartbeat_timeout)
-        running = self._registry.load_runs([RunStatus.RUNNING])
+        running = self._registry.load_runs([RunStatus.EXECUTING, RunStatus.PAUSED])
         for run in running:
             if run.last_heartbeat and run.last_heartbeat < cutoff:
                 _LOGGER.warning(
@@ -638,7 +643,7 @@ class TrainerDispatcher:
                     extra={"run_id": run.run_id, "last_heartbeat": run.last_heartbeat.isoformat()},
                 )
                 self._registry.update_status(
-                    run.run_id, RunStatus.FAILED, failure_reason="worker_timeout"
+                    run.run_id, RunStatus.FAULTED, failure_reason="worker_timeout"
                 )
                 self._gpu_allocator.release_many([run.run_id])
                 self._registry.update_gpu_slots(run.run_id, [])

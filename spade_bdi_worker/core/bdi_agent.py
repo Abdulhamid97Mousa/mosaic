@@ -96,9 +96,13 @@ class BDIRLAgent(BDIAgent):
         # Environment setup (before BDI init)
         if adapter is None:
             from gym_gui.config.game_configs import FrozenLakeConfig
-            config = FrozenLakeConfig(grid_height=8, grid_width=8, is_slippery=False)
-            adapter = FrozenLakeV2Adapter(game_config=config)
+
+            config = FrozenLakeConfig(is_slippery=False)
+            adapter = FrozenLakeAdapter(game_config=config)
             adapter.load()
+        else:
+            if getattr(adapter, "_env", None) is None:
+                adapter.load()
         self.adapter = adapter
         
         # RL components (before BDI init)

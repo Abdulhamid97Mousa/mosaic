@@ -51,6 +51,17 @@ class HeadlessTrainer(LogConstantMixin):
         self.config = config
         self.emitter = emitter
 
+        # Ensure the underlying Gym environment is instantiated before creating agent/runtime.
+        try:
+            adapter.load()
+        except Exception as exc:  # noqa: BLE001
+            self.log_constant(
+                LOG_WORKER_RUNTIME_EVENT,
+                message="ADAPTER_LOAD_FAILED",
+                extra={"adapter": adapter.__class__.__name__, "error": str(exc)},
+            )
+            raise
+
         # Ensure canonical policy path exists before any IO
         policy_path = self.config.ensure_policy_path()
         self.policy_store = PolicyStorage(policy_path)

@@ -7,6 +7,7 @@ import asyncio
 from collections import defaultdict, deque
 from datetime import datetime, timezone
 import json
+import secrets
 import logging
 import sqlite3
 from typing import Any, AsyncIterator, Callable, Deque, Iterable, Mapping, Optional, cast
@@ -68,12 +69,13 @@ def _record_to_proto(record: RunRecord, *, seq_id: Optional[int] = None):
 
 def _status_to_proto(status: RunStatus):
     mapping = {
-        RunStatus.PENDING: trainer_pb2.RunStatus.RUN_STATUS_PENDING,
-        RunStatus.DISPATCHING: trainer_pb2.RunStatus.RUN_STATUS_DISPATCHING,
-        RunStatus.RUNNING: trainer_pb2.RunStatus.RUN_STATUS_RUNNING,
-        RunStatus.COMPLETED: trainer_pb2.RunStatus.RUN_STATUS_COMPLETED,
-        RunStatus.FAILED: trainer_pb2.RunStatus.RUN_STATUS_FAILED,
-        RunStatus.CANCELLED: trainer_pb2.RunStatus.RUN_STATUS_CANCELLED,
+        RunStatus.INIT: trainer_pb2.RunStatus.RUN_STATUS_INIT,
+        RunStatus.HANDSHAKE: trainer_pb2.RunStatus.RUN_STATUS_HSHK,
+        RunStatus.READY: trainer_pb2.RunStatus.RUN_STATUS_RDY,
+        RunStatus.EXECUTING: trainer_pb2.RunStatus.RUN_STATUS_EXEC,
+        RunStatus.PAUSED: trainer_pb2.RunStatus.RUN_STATUS_PAUSE,
+        RunStatus.FAULTED: trainer_pb2.RunStatus.RUN_STATUS_FAULT,
+        RunStatus.TERMINATED: trainer_pb2.RunStatus.RUN_STATUS_TERM,
     }
     proto_status = mapping.get(status)
     if proto_status is None:
@@ -84,12 +86,13 @@ def _status_to_proto(status: RunStatus):
 
 def _proto_to_statuses(statuses: Iterable[int]) -> list[RunStatus]:
     mapping = {
-        trainer_pb2.RunStatus.RUN_STATUS_PENDING: RunStatus.PENDING,
-        trainer_pb2.RunStatus.RUN_STATUS_DISPATCHING: RunStatus.DISPATCHING,
-        trainer_pb2.RunStatus.RUN_STATUS_RUNNING: RunStatus.RUNNING,
-        trainer_pb2.RunStatus.RUN_STATUS_COMPLETED: RunStatus.COMPLETED,
-        trainer_pb2.RunStatus.RUN_STATUS_FAILED: RunStatus.FAILED,
-        trainer_pb2.RunStatus.RUN_STATUS_CANCELLED: RunStatus.CANCELLED,
+        trainer_pb2.RunStatus.RUN_STATUS_INIT: RunStatus.INIT,
+        trainer_pb2.RunStatus.RUN_STATUS_HSHK: RunStatus.HANDSHAKE,
+        trainer_pb2.RunStatus.RUN_STATUS_RDY: RunStatus.READY,
+        trainer_pb2.RunStatus.RUN_STATUS_EXEC: RunStatus.EXECUTING,
+        trainer_pb2.RunStatus.RUN_STATUS_PAUSE: RunStatus.PAUSED,
+        trainer_pb2.RunStatus.RUN_STATUS_FAULT: RunStatus.FAULTED,
+        trainer_pb2.RunStatus.RUN_STATUS_TERM: RunStatus.TERMINATED,
     }
     result: list[RunStatus] = []
     for status in statuses:
@@ -326,6 +329,9 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
         self._telemetry_broadcaster = telemetry_broadcaster or RunTelemetryBroadcaster()
         self._health_provider = health_provider or (lambda: trainer_pb2.HealthCheckResponse(healthy=False))
         self._telemetry_store = telemetry_store
+        self._worker_sessions: dict[str, str] = {}
+        self._worker_capabilities: dict[str, dict[str, Any]] = {}
+        self._executing_runs: set[str] = set()
         _LOGGER.debug("TrainerService initialized")
 
     def _save_run_config(self, run_id: str, config_json: str) -> None:
@@ -385,7 +391,12 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
             reservation = self._gpu_allocator.reserve(config.metadata.run_id, requested, mandatory)
             self._registry.update_gpu_slots(config.metadata.run_id, reservation.slots)
         except GPUReservationError as exc:
-            self._registry.update_status(config.metadata.run_id, RunStatus.FAILED, failure_reason=str(exc))
+            self._registry.update_run_outcome(
+                run_id=config.metadata.run_id,
+                status=RunStatus.TERMINATED,
+                outcome="failed",
+                failure_reason=str(exc),
+            )
             await context.abort(grpc.StatusCode.RESOURCE_EXHAUSTED, str(exc))
 
         await self._broadcast(config.metadata.run_id)
@@ -396,10 +407,14 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
         record = self._registry.get_run(request.run_id)
         if not record:
             await context.abort(grpc.StatusCode.NOT_FOUND, "run not found")
-        if record.status in {RunStatus.COMPLETED, RunStatus.FAILED, RunStatus.CANCELLED}:
+        if record.status == RunStatus.TERMINATED:
             return trainer_pb2.CancelRunResponse()
 
-        self._registry.update_status(request.run_id, RunStatus.CANCELLED)
+        self._registry.update_run_outcome(
+            run_id=request.run_id,
+            status=RunStatus.TERMINATED,
+            outcome="canceled",
+        )
         self._gpu_allocator.release_many([request.run_id])
         self._registry.update_gpu_slots(request.run_id, [])
         await self._broadcast(request.run_id)
@@ -449,6 +464,57 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
         self._registry.record_heartbeat(request.run_id)
         await self._broadcast(request.run_id)
         return trainer_pb2.HeartbeatResponse()
+
+    async def RegisterWorker(self, request: trainer_pb2.RegisterWorkerRequest, context: grpc.aio.ServicerContext) -> trainer_pb2.RegisterWorkerResponse:  # type: ignore[override]
+        if not request.run_id:
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "run_id is required")
+
+        record = self._registry.get_run(request.run_id)
+        if not record:
+            await context.abort(grpc.StatusCode.NOT_FOUND, "run not found")
+        if record.status == RunStatus.TERMINATED:
+            await context.abort(grpc.StatusCode.FAILED_PRECONDITION, "run already terminated")
+
+        accepted_version = request.proto_version or "MOSAIC/1.0"
+        session_token = secrets.token_hex(16)
+
+        self._worker_sessions[request.run_id] = session_token
+        self._worker_capabilities[request.run_id] = {
+            "worker_id": request.worker_id,
+            "worker_kind": request.worker_kind,
+            "proto_version": request.proto_version,
+            "schema_id": request.schema_id,
+            "schema_version": request.schema_version,
+            "supports_pause": request.supports_pause,
+            "supports_checkpoint": request.supports_checkpoint,
+            "registered_at": datetime.now(timezone.utc).isoformat(),
+        }
+
+        _LOGGER.info(
+            "Worker registered",
+            extra={
+                "run_id": request.run_id,
+                "worker_id": request.worker_id or "",
+                "worker_kind": request.worker_kind or "",
+                "proto_version": request.proto_version or "",
+                "schema_id": request.schema_id or "",
+            },
+        )
+
+        self._registry.record_heartbeat(request.run_id)
+
+        if record.status not in {RunStatus.READY, RunStatus.EXECUTING, RunStatus.PAUSED}:
+            self._registry.update_status(request.run_id, RunStatus.READY)
+            await self._broadcast(request.run_id)
+
+        return trainer_pb2.RegisterWorkerResponse(
+            accepted_version=accepted_version,
+            session_token=session_token,
+        )
+
+    async def ControlStream(self, request_iterator: AsyncIterator[trainer_pb2.ControlEvent], context: grpc.aio.ServicerContext) -> AsyncIterator[trainer_pb2.ControlEvent]:  # type: ignore[override]
+        await context.abort(grpc.StatusCode.UNIMPLEMENTED, "ControlStream is not enabled for FSM rollout")
+        yield trainer_pb2.ControlEvent()  # pragma: no cover - unreachable
 
     async def GetHealth(self, request: trainer_pb2.HealthCheckRequest, context: grpc.aio.ServicerContext) -> trainer_pb2.HealthCheckResponse:  # type: ignore[override]
         response = self._health_provider()
@@ -602,6 +668,7 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
         accepted = 0
         dropped = 0
         run_id: Optional[str] = None
+        session_validated = False
         try:
             async for message in request_iterator:
                 if not message.run_id:
@@ -612,6 +679,18 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
                     run_id = message.run_id
                 elif message.run_id != run_id:
                     await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "telemetry stream cannot change run_id")
+
+                if not session_validated:
+                    if run_id not in self._worker_sessions:
+                        await context.abort(
+                            grpc.StatusCode.FAILED_PRECONDITION,
+                            "worker must RegisterWorker before publishing telemetry",
+                        )
+                    session_validated = True
+                    if run_id not in self._executing_runs:
+                        self._registry.update_status(run_id, RunStatus.EXECUTING)
+                        self._executing_runs.add(run_id)
+                        await self._broadcast(run_id)
                 try:
                     _, dropped_now = await self._telemetry_broadcaster.publish_step(message)
                 except ValueError as exc:
@@ -664,6 +743,8 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
             _LOGGER.debug("PublishRunSteps cancelled", extra={"accepted": accepted})
             raise
         _LOGGER.info("PublishRunSteps close", extra={"run_id": run_id, "accepted": accepted, "dropped": dropped})
+        if run_id:
+            self._executing_runs.discard(run_id)
         return trainer_pb2.PublishTelemetryResponse(accepted=accepted, dropped=dropped)
 
     async def PublishRunEpisodes(self, request_iterator: AsyncIterator[trainer_pb2.RunEpisode], context: grpc.aio.ServicerContext) -> trainer_pb2.PublishTelemetryResponse:  # type: ignore[override]
@@ -671,6 +752,7 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
         accepted = 0
         dropped = 0
         run_id: Optional[str] = None
+        session_validated = False
         try:
             async for message in request_iterator:
                 if not message.run_id:
@@ -681,6 +763,14 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
                     run_id = message.run_id
                 elif message.run_id != run_id:
                     await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "telemetry stream cannot change run_id")
+
+                if not session_validated:
+                    if run_id not in self._worker_sessions:
+                        await context.abort(
+                            grpc.StatusCode.FAILED_PRECONDITION,
+                            "worker must RegisterWorker before publishing telemetry",
+                        )
+                    session_validated = True
                 try:
                     _, dropped_now = await self._telemetry_broadcaster.publish_episode(message)
                 except ValueError as exc:
@@ -741,6 +831,10 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
         record = self._registry.get_run(run_id)
         if not record:
             return
+        if record.status == RunStatus.TERMINATED:
+            self._worker_sessions.pop(run_id, None)
+            self._worker_capabilities.pop(run_id, None)
+            self._executing_runs.discard(run_id)
         await self._broadcaster.publish(_record_to_proto(record))
 
     # ------------------------------------------------------------------

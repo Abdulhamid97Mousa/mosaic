@@ -164,9 +164,12 @@ class TelemetryService(LogConstantMixin):
     def _prepare_store_record(self, record: StepRecord) -> StepRecord:
         trimmed = record
         if self._storage:
-            if self._storage.drop_render_payload_enabled():
+            drop_render = getattr(self._storage, "drop_render_payload_enabled", None)
+            if callable(drop_render) and drop_render():
                 trimmed = replace(trimmed, render_payload=None, frame_ref=None)
-            if self._storage.drop_observation_enabled():
+
+            drop_observation = getattr(self._storage, "drop_observation_enabled", None)
+            if callable(drop_observation) and drop_observation():
                 trimmed = replace(trimmed, observation=None)
         return trimmed
 
