@@ -12,12 +12,12 @@ from __future__ import annotations
 import pytest
 import tempfile
 from pathlib import Path
-from datetime import datetime
+from datetime import datetime, timezone
 
 from gym_gui.core.enums import GameId, ControlMode
 from gym_gui.core.adapters.toy_text import BlackjackAdapter
 from gym_gui.config.game_configs import DEFAULT_BLACKJACK_CONFIG
-from gym_gui.core.data_model import EpisodeRollup
+from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.replays.loader import EpisodeReplayLoader
 from gym_gui.telemetry.sqlite_store import TelemetrySQLiteStore
 from gym_gui.services.telemetry import TelemetryService
@@ -37,7 +37,8 @@ class TestBlackjackReplay:
     def telemetry_service(self, temp_db_path):
         """Create telemetry service with temporary database."""
         store = TelemetrySQLiteStore(temp_db_path)  # Pass Path object directly
-        service = TelemetryService(store)
+        service = TelemetryService()
+        service.attach_store(store)
         yield service
         store.close()
 
@@ -60,11 +61,9 @@ class TestBlackjackReplay:
             "episode_index": 0,
         }
         
-        telemetry_service.begin_episode(episode_id, metadata=episode_metadata)
-        
         # Record initial step
         initial_step = adapter.reset(seed=42)
-        step_record = telemetry_service.record_step(
+        step_record = StepRecord(
             episode_id=episode_id,
             step_index=0,
             observation=initial_step.observation,
@@ -75,14 +74,13 @@ class TestBlackjackReplay:
             info={},
             render_payload=adapter.render(),
             agent_id="human",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )
-        
-        assert step_record is not None
+        telemetry_service.record_step(step_record)
         
         # Record a game step (Stick action)
         step_result = adapter.step(0)  # Stick
-        step_record = telemetry_service.record_step(
+        step_record = StepRecord(
             episode_id=episode_id,
             step_index=1,
             observation=step_result.observation,
@@ -93,19 +91,23 @@ class TestBlackjackReplay:
             info=step_result.info,
             render_payload=adapter.render(),
             agent_id="human",
-            timestamp=datetime.utcnow(),
+            timestamp=datetime.now(timezone.utc),
         )
+        telemetry_service.record_step(step_record)
         
-        assert step_record is not None
-        
-        # Finalize episode
-        telemetry_service.finalize_episode(
+        # Complete episode
+        rollup = EpisodeRollup(
             episode_id=episode_id,
             total_reward=step_result.reward,
+            steps=2,
             terminated=step_result.terminated,
             truncated=step_result.truncated,
-            timestamp=datetime.utcnow(),
+            metadata=episode_metadata,
+            timestamp=datetime.now(timezone.utc),
+            agent_id="human",
+            game_id=GameId.BLACKJACK.value,
         )
+        telemetry_service.complete_episode(rollup)
         
         # Verify episode was recorded
         episodes = list(telemetry_service.recent_episodes())
@@ -125,11 +127,9 @@ class TestBlackjackReplay:
             "seed": 123,
         }
         
-        telemetry_service.begin_episode(episode_id, metadata=episode_metadata)
-        
         # Record multiple steps
         initial_step = adapter.reset(seed=123)
-        telemetry_service.record_step(
+        telemetry_service.record_step(StepRecord(
             episode_id=episode_id,
             step_index=0,
             observation=initial_step.observation,
@@ -140,12 +140,12 @@ class TestBlackjackReplay:
             info={},
             render_payload=adapter.render(),
             agent_id="human",
-            timestamp=datetime.utcnow(),
-        )
+            timestamp=datetime.now(timezone.utc),
+        ))
         
         # Hit action
         step1 = adapter.step(1)
-        telemetry_service.record_step(
+        telemetry_service.record_step(StepRecord(
             episode_id=episode_id,
             step_index=1,
             observation=step1.observation,
@@ -156,12 +156,12 @@ class TestBlackjackReplay:
             info=step1.info,
             render_payload=adapter.render(),
             agent_id="human",
-            timestamp=datetime.utcnow(),
-        )
+            timestamp=datetime.now(timezone.utc),
+        ))
         
         # Stick action
         step2 = adapter.step(0)
-        telemetry_service.record_step(
+        telemetry_service.record_step(StepRecord(
             episode_id=episode_id,
             step_index=2,
             observation=step2.observation,
@@ -172,16 +172,20 @@ class TestBlackjackReplay:
             info=step2.info,
             render_payload=adapter.render(),
             agent_id="human",
-            timestamp=datetime.utcnow(),
-        )
+            timestamp=datetime.now(timezone.utc),
+        ))
         
-        telemetry_service.finalize_episode(
+        telemetry_service.complete_episode(EpisodeRollup(
             episode_id=episode_id,
             total_reward=step2.reward,
+            steps=3,
             terminated=step2.terminated,
             truncated=step2.truncated,
-            timestamp=datetime.utcnow(),
-        )
+            metadata=episode_metadata,
+            timestamp=datetime.now(timezone.utc),
+            agent_id="human",
+            game_id=GameId.BLACKJACK.value,
+        ))
         
         # Load episode via replay loader
         replay = replay_loader.load_episode(episode_id)
@@ -203,9 +207,8 @@ class TestBlackjackReplay:
             "control_mode": ControlMode.HUMAN_ONLY.value,
             "seed": 42,
         }
-        telemetry_service.begin_episode(human_episode_id, metadata=human_metadata)
         initial_step = adapter.reset(seed=42)
-        telemetry_service.record_step(
+        telemetry_service.record_step(StepRecord(
             episode_id=human_episode_id,
             step_index=0,
             observation=initial_step.observation,
@@ -216,15 +219,19 @@ class TestBlackjackReplay:
             info={},
             render_payload=adapter.render(),
             agent_id="human",
-            timestamp=datetime.utcnow(),
-        )
-        telemetry_service.finalize_episode(
+            timestamp=datetime.now(timezone.utc),
+        ))
+        telemetry_service.complete_episode(EpisodeRollup(
             episode_id=human_episode_id,
             total_reward=0.0,
+            steps=1,
             terminated=False,
             truncated=False,
-            timestamp=datetime.utcnow(),
-        )
+            metadata=human_metadata,
+            timestamp=datetime.now(timezone.utc),
+            agent_id="human",
+            game_id=GameId.BLACKJACK.value,
+        ))
         
         # Create agent episode
         agent_episode_id = "blackjack-agent-001"
@@ -233,12 +240,11 @@ class TestBlackjackReplay:
             "control_mode": ControlMode.AGENT_ONLY.value,
             "seed": 43,
         }
-        telemetry_service.begin_episode(agent_episode_id, metadata=agent_metadata)
-        adapter.reset(seed=43)
-        telemetry_service.record_step(
+        agent_step = adapter.reset(seed=43)
+        telemetry_service.record_step(StepRecord(
             episode_id=agent_episode_id,
             step_index=0,
-            observation=initial_step.observation,
+            observation=agent_step.observation,
             action=None,
             reward=0.0,
             terminated=False,
@@ -246,15 +252,19 @@ class TestBlackjackReplay:
             info={},
             render_payload=adapter.render(),
             agent_id="agent",
-            timestamp=datetime.utcnow(),
-        )
-        telemetry_service.finalize_episode(
+            timestamp=datetime.now(timezone.utc),
+        ))
+        telemetry_service.complete_episode(EpisodeRollup(
             episode_id=agent_episode_id,
             total_reward=0.0,
+            steps=1,
             terminated=False,
             truncated=False,
-            timestamp=datetime.utcnow(),
-        )
+            metadata=agent_metadata,
+            timestamp=datetime.now(timezone.utc),
+            agent_id="agent",
+            game_id=GameId.BLACKJACK.value,
+        ))
         
         # Get all episodes
         all_episodes = list(telemetry_service.recent_episodes())
@@ -291,9 +301,8 @@ class TestBlackjackReplay:
             "control_mode": ControlMode.HUMAN_ONLY.value,
         }
         
-        telemetry_service.begin_episode(episode_id, metadata=episode_metadata)
         initial_step = adapter.reset(seed=42)
-        telemetry_service.record_step(
+        telemetry_service.record_step(StepRecord(
             episode_id=episode_id,
             step_index=0,
             observation=initial_step.observation,
@@ -304,15 +313,19 @@ class TestBlackjackReplay:
             info={},
             render_payload=adapter.render(),
             agent_id="human",
-            timestamp=datetime.utcnow(),
-        )
-        telemetry_service.finalize_episode(
+            timestamp=datetime.now(timezone.utc),
+        ))
+        telemetry_service.complete_episode(EpisodeRollup(
             episode_id=episode_id,
             total_reward=0.0,
+            steps=1,
             terminated=False,
             truncated=False,
-            timestamp=datetime.utcnow(),
-        )
+            metadata=episode_metadata,
+            timestamp=datetime.now(timezone.utc),
+            agent_id="human",
+            game_id=GameId.BLACKJACK.value,
+        ))
         
         episodes = list(telemetry_service.recent_episodes())
         assert len(episodes) == 1

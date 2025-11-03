@@ -99,7 +99,7 @@ CleanRL runs continue to use the standard JSON payload persisted by the trainer.
 
 1. **GUI submission** — The train dialog serialises the CleanRL config, including selected algorithm, extras, and analytics toggles. The config is validated by `gym_gui.services.trainer.validation.train_config.validate_train_run_config`.
 2. **Dispatcher spawn** — `TrainerDispatcher._dispatch_run` reserves resources, writes the worker config, and spawns `python -m cleanrl_worker.cli --config <path> --grpc --grpc-target 127.0.0.1:50055`.
-3. **Handshake** — `cleanrl_worker.cli` loads the config, obtains worker metadata (algo, env ID, extras), and calls `TrainerClient.RegisterWorker`. The trainer transitions the run to `HSHK` and records the `session_token`.
+3. **Handshake** — TODO: wire `cleanrl_worker.cli` into the trainer client so the worker performs `RegisterWorker` before emitting lifecycle events. Until then, the telemetry proxy performs the handshake on behalf of analytics runs.
 4. **Training loop** — The runtime imports the requested CleanRL script, builds tyro arguments, starts TensorBoard logging, and periodically emits lifecycle JSONL messages (`run_started`, `heartbeat`, `run_completed`/`run_failed`). These events feed the telemetry proxy so the daemon can update the FSM to `EXEC` and `TERM`.
 5. **Analytics ingestion** — On process exit, the worker persists a manifest describing TensorBoard/W&B/Optuna artifacts under `var/trainer/runs/<run_id>/analytics.json`. The GUI analytics tabs use this manifest to render dashboards.
 6. **Cleanup** — The dispatcher releases GPU/CPU slots, updates `RunRegistry`, and archives worker stdout/stderr under `var/logs/trainer/<run_id>/`.
@@ -107,18 +107,18 @@ CleanRL runs continue to use the standard JSON payload persisted by the trainer.
 ## Implementation Checklist
 
 1. **Runtime scaffolding**
-   - [ ] Create `cleanrl_worker/cli.py` with tyro-style argument parsing and config loading helpers.
-   - [ ] Implement `cleanrl_worker/runtime.py` with dynamic import logic for CleanRL scripts and analytics emitters.
-   - [ ] Add `cleanrl_worker/telemetry.py` and `cleanrl_worker/analytics.py` for lifecycle events and manifest construction.
+   - [x] Create `cleanrl_worker/cli.py` with tyro-style argument parsing and config loading helpers.
+   - [x] Implement `cleanrl_worker/runtime.py` with dynamic import logic for CleanRL scripts, lifecycle events, and analytics manifest writing.
+   - [x] Add `cleanrl_worker/telemetry.py` and `cleanrl_worker/analytics.py` for lifecycle events and manifest construction.
 2. **Trainer wiring**
    - [ ] Extend `_build_worker_command` to handle CleanRL metadata and requirement extras.
    - [ ] Update `_build_worker_env` to export `CLEANRL_RUN_DIR`, `WANDB_RUN_ID`, etc., inside the worker process.
    - [ ] Ensure dispatcher log streaming re-emits CleanRL structured logs via `log_constant` when available.
 3. **GUI workflow**
-   - [ ] Build dedicated CleanRL train form widget (`gym_gui/ui/widgets/cleanrl_train_form.py`) that inherits from a shared base and exposes only algorithm, seed, and analytics toggles.
-   - [ ] Register a `CleanRlWorkerPresenter` in `gym_gui/ui/presenters/workers/registry.py` and ensure the CleanRL form resolves it while SPADE-BDI continues using `SpadeBdiWorkerPresenter`.
-   - [ ] Update the main window train dialog flow to choose the form via the worker catalog, removing SPADE-BDI-only inputs (JID, password, behaviour tree) from CleanRL submissions.
-   - [ ] Wire analytics tabs (TensorBoard, W&B, Optuna) to manifests produced by the worker.
+   - [x] Build dedicated CleanRL train form widget (`gym_gui/ui/widgets/cleanrl_train_form.py`) that inherits from a shared base and exposes only algorithm, seed, and analytics toggles.
+   - [x] Register a `CleanRlWorkerPresenter` in `gym_gui/ui/presenters/workers/registry.py` and ensure the CleanRL form resolves it while SPADE-BDI continues using `SpadeBdiWorkerPresenter`.
+   - [x] Update the main window train dialog flow to choose the form via the worker catalog, removing SPADE-BDI-only inputs (JID, password, behaviour tree) from CleanRL submissions.
+   - [x] Wire analytics tabs (TensorBoard, WAB) to manifests produced by the worker; see `docs/1.0_DAY_20/TASK_5/WAB_TAB.md` for details.
 4. **Dependencies**
    - [ ] Verify `requirements/cleanrl_worker.txt` installs base dependencies plus optional extras (Atari, Procgen, EnvPool, JAX).
    - [ ] Provide helper scripts to bootstrap these extras (`python -m cleanrl_worker.tools.install_extras --set atari,procgen`).

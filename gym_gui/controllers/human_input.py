@@ -65,6 +65,153 @@ _TOY_TEXT_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
         _mapping(("Key_1", "Key_Q"), 0),      # STICK (stop taking cards) - 1 or Q
         _mapping(("Key_2", "Key_E"), 1),      # HIT (take another card) - 2 or E
     ),
+    GameId.MINIGRID_EMPTY_5x5: (
+        _mapping(("Key_Left", "Key_A"), 0),    # turn left
+        _mapping(("Key_Right", "Key_D"), 1),   # turn right
+        _mapping(("Key_Up", "Key_W"), 2),      # move forward
+        _mapping(("Key_G", "Key_Space"), 3),   # pick up
+        _mapping(("Key_H",), 4),                # drop (rarely used)
+        _mapping(("Key_E", "Key_Return"), 5),  # toggle / use
+        _mapping(("Key_Q",), 6),                # done / no-op
+    ),
+    GameId.MINIGRID_EMPTY_RANDOM_5x5: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+        _mapping(("Key_G", "Key_Space"), 3),
+        _mapping(("Key_H",), 4),
+        _mapping(("Key_E", "Key_Return"), 5),
+        _mapping(("Key_Q",), 6),
+    ),
+    GameId.MINIGRID_EMPTY_6x6: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+        _mapping(("Key_G", "Key_Space"), 3),
+        _mapping(("Key_H",), 4),
+        _mapping(("Key_E", "Key_Return"), 5),
+        _mapping(("Key_Q",), 6),
+    ),
+    GameId.MINIGRID_EMPTY_RANDOM_6x6: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+        _mapping(("Key_G", "Key_Space"), 3),
+        _mapping(("Key_H",), 4),
+        _mapping(("Key_E", "Key_Return"), 5),
+        _mapping(("Key_Q",), 6),
+    ),
+    GameId.MINIGRID_EMPTY_8x8: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+        _mapping(("Key_G", "Key_Space"), 3),
+        _mapping(("Key_H",), 4),
+        _mapping(("Key_E", "Key_Return"), 5),
+        _mapping(("Key_Q",), 6),
+    ),
+    GameId.MINIGRID_EMPTY_16x16: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+        _mapping(("Key_G", "Key_Space"), 3),
+        _mapping(("Key_H",), 4),
+        _mapping(("Key_E", "Key_Return"), 5),
+        _mapping(("Key_Q",), 6),
+    ),
+    GameId.MINIGRID_DOORKEY_5x5: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+        _mapping(("Key_G", "Key_Space"), 3),
+        _mapping(("Key_H",), 4),
+        _mapping(("Key_E", "Key_Return"), 5),
+        _mapping(("Key_Q",), 6),
+    ),
+    GameId.MINIGRID_DOORKEY_6x6: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+        _mapping(("Key_G", "Key_Space"), 3),
+        _mapping(("Key_H",), 4),
+        _mapping(("Key_E", "Key_Return"), 5),
+        _mapping(("Key_Q",), 6),
+    ),
+    GameId.MINIGRID_DOORKEY_8x8: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+        _mapping(("Key_G", "Key_Space"), 3),
+        _mapping(("Key_H",), 4),
+        _mapping(("Key_E", "Key_Return"), 5),
+        _mapping(("Key_Q",), 6),
+    ),
+    GameId.MINIGRID_DOORKEY_16x16: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+        _mapping(("Key_G", "Key_Space"), 3),
+        _mapping(("Key_H",), 4),
+        _mapping(("Key_E", "Key_Return"), 5),
+        _mapping(("Key_Q",), 6),
+    ),
+    GameId.MINIGRID_LAVAGAP_S5: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+        _mapping(("Key_G", "Key_Space"), 3),
+        _mapping(("Key_H",), 4),
+        _mapping(("Key_E", "Key_Return"), 5),
+        _mapping(("Key_Q",), 6),
+    ),
+    GameId.MINIGRID_LAVAGAP_S6: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+        _mapping(("Key_G", "Key_Space"), 3),
+        _mapping(("Key_H",), 4),
+        _mapping(("Key_E", "Key_Return"), 5),
+        _mapping(("Key_Q",), 6),
+    ),
+    GameId.MINIGRID_LAVAGAP_S7: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+        _mapping(("Key_G", "Key_Space"), 3),
+        _mapping(("Key_H",), 4),
+        _mapping(("Key_E", "Key_Return"), 5),
+        _mapping(("Key_Q",), 6),
+    ),
+    GameId.MINIGRID_DYNAMIC_OBSTACLES_5X5: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+    ),
+    GameId.MINIGRID_DYNAMIC_OBSTACLES_RANDOM_5X5: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+    ),
+    GameId.MINIGRID_DYNAMIC_OBSTACLES_6X6: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+    ),
+    GameId.MINIGRID_DYNAMIC_OBSTACLES_RANDOM_6X6: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+    ),
+    GameId.MINIGRID_DYNAMIC_OBSTACLES_8X8: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+    ),
+    GameId.MINIGRID_DYNAMIC_OBSTACLES_16X16: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+    ),
 }
 
 _BOX_2D_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
@@ -162,6 +309,8 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
             (("Key_Right", "Key_D"), 2),
             (("Key_Up", "Key_W"), 3),
             (("Key_Space",), 4),
+            (("Key_E",), 5),
+            (("Key_Q",), 6),
         ]
         for keys, action in base_mappings:
             if action >= action_space.n:

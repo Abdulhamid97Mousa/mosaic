@@ -771,6 +771,10 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
                             "worker must RegisterWorker before publishing telemetry",
                         )
                     session_validated = True
+                    if run_id not in self._executing_runs:
+                        self._registry.update_status(run_id, RunStatus.EXECUTING)
+                        self._executing_runs.add(run_id)
+                        await self._broadcast(run_id)
                 try:
                     _, dropped_now = await self._telemetry_broadcaster.publish_episode(message)
                 except ValueError as exc:
@@ -824,6 +828,8 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
             _LOGGER.debug("PublishRunEpisodes cancelled", extra={"accepted": accepted})
             raise
         _LOGGER.info("PublishRunEpisodes close", extra={"run_id": run_id, "accepted": accepted, "dropped": dropped})
+        if run_id:
+            self._executing_runs.discard(run_id)
         return trainer_pb2.PublishTelemetryResponse(accepted=accepted, dropped=dropped)
 
     # ------------------------------------------------------------------

@@ -19,7 +19,7 @@ from gym_gui.core.enums import GameId, RenderMode, ControlMode
 from gym_gui.core.adapters.toy_text import BlackjackAdapter
 from gym_gui.config.game_configs import BlackjackConfig, DEFAULT_BLACKJACK_CONFIG
 from gym_gui.core.factories.adapters import create_adapter
-from gym_gui.game_docs.game_info import get_game_info
+from gym_gui.game_docs import get_game_info
 from gym_gui.utils import json_serialization
 from gym_gui.controllers.human_input import _TOY_TEXT_MAPPINGS
 

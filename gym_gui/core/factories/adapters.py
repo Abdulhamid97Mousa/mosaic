@@ -12,12 +12,14 @@ from gym_gui.config.game_configs import (
     BipedalWalkerConfig,
     FrozenLakeConfig,
     LunarLanderConfig,
+    MiniGridConfig,
     TaxiConfig,
     BlackjackConfig,
 )
 from gym_gui.core.adapters.base import AdapterContext, EnvironmentAdapter
 from gym_gui.core.adapters.toy_text import TOY_TEXT_ADAPTERS
 from gym_gui.core.adapters.box2d import BOX2D_ADAPTERS
+from gym_gui.core.adapters.minigrid import MINIGRID_ADAPTERS
 from gym_gui.core.enums import GameId
 
 AdapterT = TypeVar("AdapterT", bound=EnvironmentAdapter)
@@ -38,6 +40,7 @@ def _registry() -> Mapping[GameId, type[EnvironmentAdapter]]:
     return {
         **TOY_TEXT_ADAPTERS,
         **BOX2D_ADAPTERS,
+        **MINIGRID_ADAPTERS,
     }
 
 
@@ -68,6 +71,7 @@ def create_adapter(
         | LunarLanderConfig
         | CarRacingConfig
         | BipedalWalkerConfig
+        | MiniGridConfig
         | None
     ) = None,
 ) -> EnvironmentAdapter:
@@ -82,6 +86,11 @@ def create_adapter(
         FrozenLakeV2Adapter,
         TaxiAdapter,
         BlackjackAdapter,
+    )
+    from gym_gui.core.adapters.minigrid import (
+        MiniGridAdapter,
+        MiniGridDoorKeyAdapter,
+        MiniGridLavaGapAdapter,
     )
     from gym_gui.core.adapters.box2d import (
         BipedalWalkerAdapter,
@@ -107,6 +116,12 @@ def create_adapter(
             adapter = CarRacingAdapter(context, config=game_config)
         elif adapter_cls is BipedalWalkerAdapter and isinstance(game_config, BipedalWalkerConfig):
             adapter = BipedalWalkerAdapter(context, config=game_config)
+        elif adapter_cls is MiniGridAdapter and isinstance(game_config, MiniGridConfig):
+            adapter = MiniGridAdapter(context, config=game_config)
+        elif adapter_cls is MiniGridDoorKeyAdapter and isinstance(game_config, MiniGridConfig):
+            adapter = MiniGridDoorKeyAdapter(context, config=game_config)
+        elif adapter_cls is MiniGridLavaGapAdapter and isinstance(game_config, MiniGridConfig):
+            adapter = MiniGridLavaGapAdapter(context, config=game_config)
         else:
             adapter = adapter_cls(context)
     else:

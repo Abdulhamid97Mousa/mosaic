@@ -8,19 +8,20 @@ Presenters handle:
 
 Included presenters:
 - SpadeBdiWorkerPresenter: Orchestration for SPADE-BDI RL agents
-- (Future) HuggingFaceWorkerPresenter: Orchestration for HuggingFace models
-- (Future) TensorFlowWorkerPresenter: Orchestration for TensorFlow models
+- CleanRlWorkerPresenter: Placeholder for analytics-first CleanRL worker
 
 The registry is auto-populated at module load to support service discovery.
 """
 
 from .registry import WorkerPresenter, WorkerPresenterRegistry
 from .spade_bdi_worker_presenter import SpadeBdiWorkerPresenter
+from .cleanrl_worker_presenter import CleanRlWorkerPresenter
 
 
 # Create and auto-register default presenters
 _registry = WorkerPresenterRegistry()
 _registry.register("spade_bdi_worker", SpadeBdiWorkerPresenter())
+_registry.register("cleanrl_worker", CleanRlWorkerPresenter())
 
 
 def get_worker_presenter_registry() -> WorkerPresenterRegistry:
@@ -36,5 +37,6 @@ __all__ = [
     "WorkerPresenter",
     "WorkerPresenterRegistry",
     "SpadeBdiWorkerPresenter",
+    "CleanRlWorkerPresenter",
     "get_worker_presenter_registry",
 ]

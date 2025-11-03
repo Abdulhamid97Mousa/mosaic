@@ -464,6 +464,43 @@ LOG_ADAPTER_RENDER_PAYLOAD = _constant(
 )
 
 
+LOG_ENV_MINIGRID_BOOT = _constant(
+    "LOG518",
+    "INFO",
+    "MiniGrid adapter bootstrapped",
+    component="Adapter",
+    subcomponent="MiniGrid",
+    tags=_tags("minigrid", "environment", "boot"),
+)
+
+LOG_ENV_MINIGRID_STEP = _constant(
+    "LOG519",
+    "DEBUG",
+    "MiniGrid step checkpoint",
+    component="Adapter",
+    subcomponent="MiniGrid",
+    tags=_tags("minigrid", "step"),
+)
+
+LOG_ENV_MINIGRID_ERROR = _constant(
+    "LOG520",
+    "ERROR",
+    "MiniGrid adapter failure",
+    component="Adapter",
+    subcomponent="MiniGrid",
+    tags=_tags("minigrid", "error"),
+)
+
+LOG_ENV_MINIGRID_RENDER_WARNING = _constant(
+    "LOG521",
+    "WARNING",
+    "MiniGrid render payload unavailable",
+    component="Adapter",
+    subcomponent="MiniGrid",
+    tags=_tags("minigrid", "render", "warning"),
+)
+
+
 # ---------------------------------------------------------------------------
 # Service and telemetry constants (LOG601–LOG650)
 # ---------------------------------------------------------------------------
@@ -1052,6 +1089,33 @@ LOG_UI_RENDER_TABS_TENSORBOARD_WAITING = _constant(
     tags=_tags("ui", "tensorboard", "waiting"),
 )
 
+LOG_UI_RENDER_TABS_WANDB_STATUS = _constant(
+    "LOG726",
+    "INFO",
+    "Weights & Biases run status",
+    component="UI",
+    subcomponent="RenderTabs",
+    tags=_tags("ui", "wandb", "status"),
+)
+
+LOG_UI_RENDER_TABS_WANDB_WARNING = _constant(
+    "LOG727",
+    "WARNING",
+    "Weights & Biases run warning",
+    component="UI",
+    subcomponent="RenderTabs",
+    tags=_tags("ui", "wandb", "warning"),
+)
+
+LOG_UI_RENDER_TABS_WANDB_ERROR = _constant(
+    "LOG728",
+    "ERROR",
+    "Weights & Biases run error",
+    component="UI",
+    subcomponent="RenderTabs",
+    tags=_tags("ui", "wandb", "error"),
+)
+
 LOG_UI_RENDER_TABS_DELETE_REQUESTED = _constant(
     "LOG736",
     "INFO",
@@ -1613,6 +1677,10 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_ADAPTER_HOLE_PLACEMENT,
     LOG_ADAPTER_GOAL_OVERRIDE,
     LOG_ADAPTER_RENDER_PAYLOAD,
+    LOG_ENV_MINIGRID_BOOT,
+    LOG_ENV_MINIGRID_STEP,
+    LOG_ENV_MINIGRID_ERROR,
+    LOG_ENV_MINIGRID_RENDER_WARNING,
     LOG_SERVICE_TELEMETRY_STEP_REJECTED,
     LOG_SERVICE_TELEMETRY_ASYNC_ERROR,
     LOG_SERVICE_DB_SINK_INITIALIZED,
@@ -1677,6 +1745,9 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_UI_RENDER_TABS_ERROR,
     LOG_UI_RENDER_TABS_TENSORBOARD_STATUS,
     LOG_UI_RENDER_TABS_TENSORBOARD_WAITING,
+    LOG_UI_RENDER_TABS_WANDB_STATUS,
+    LOG_UI_RENDER_TABS_WANDB_WARNING,
+    LOG_UI_RENDER_TABS_WANDB_ERROR,
     LOG_UI_RENDER_TABS_DELETE_REQUESTED,
     LOG_UI_RENDER_TABS_EVENT_FOR_DELETED_RUN,
     LOG_UI_RENDER_TABS_TAB_ADDED,
@@ -1775,6 +1846,10 @@ __all__ = (
     "LOG_ADAPTER_HOLE_PLACEMENT",
     "LOG_ADAPTER_GOAL_OVERRIDE",
     "LOG_ADAPTER_RENDER_PAYLOAD",
+    "LOG_ENV_MINIGRID_BOOT",
+    "LOG_ENV_MINIGRID_STEP",
+    "LOG_ENV_MINIGRID_ERROR",
+    "LOG_ENV_MINIGRID_RENDER_WARNING",
     "LOG_SERVICE_TELEMETRY_STEP_REJECTED",
     "LOG_SERVICE_TELEMETRY_ASYNC_ERROR",
     "LOG_SERVICE_DB_SINK_INITIALIZED",
@@ -1835,6 +1910,9 @@ __all__ = (
     "LOG_UI_RENDER_TABS_ERROR",
     "LOG_UI_RENDER_TABS_TENSORBOARD_STATUS",
     "LOG_UI_RENDER_TABS_TENSORBOARD_WAITING",
+    "LOG_UI_RENDER_TABS_WANDB_STATUS",
+    "LOG_UI_RENDER_TABS_WANDB_WARNING",
+    "LOG_UI_RENDER_TABS_WANDB_ERROR",
     "LOG_UI_RENDER_TABS_DELETE_REQUESTED",
     "LOG_UI_RENDER_TABS_EVENT_FOR_DELETED_RUN",
     "LOG_UI_RENDER_TABS_TAB_ADDED",

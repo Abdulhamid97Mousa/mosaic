@@ -73,6 +73,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._cached_live_render_disabled: Optional[bool] = None
 
         self._build_ui()
+        self._update_analytics_controls()
         if default_game is not None:
             idx = self._game_combo.findText(default_game.value)
             if idx >= 0:
@@ -211,6 +212,27 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._fast_training_warning.setStyleSheet("color: #ff6b6b; font-size: 10px; font-weight: bold;")
         self._fast_training_warning.setVisible(False)
         right_layout.addRow("", self._fast_training_warning)
+
+        analytics_widget = QtWidgets.QWidget()
+        analytics_layout = QtWidgets.QVBoxLayout(analytics_widget)
+        analytics_layout.setContentsMargins(0, 0, 0, 0)
+        analytics_layout.setSpacing(4)
+
+        self._analytics_hint_label = QtWidgets.QLabel(
+            "Enable Fast Training to export TensorBoard and W&B analytics after the run completes."
+        )
+        self._analytics_hint_label.setStyleSheet("color: #777777; font-size: 10px;")
+        analytics_layout.addWidget(self._analytics_hint_label)
+
+        self._tensorboard_checkbox = QtWidgets.QCheckBox("Export TensorBoard artifacts")
+        self._tensorboard_checkbox.setEnabled(False)
+        analytics_layout.addWidget(self._tensorboard_checkbox)
+
+        self._wandb_checkbox = QtWidgets.QCheckBox("Export Weights & Biases run")
+        self._wandb_checkbox.setEnabled(False)
+        analytics_layout.addWidget(self._wandb_checkbox)
+
+        right_layout.addRow("Analytics Export:", analytics_widget)
 
         # SLIDER 1: Training Telemetry Throttle (controls data collection speed)
         telemetry_throttle_layout = QtWidgets.QHBoxLayout()
@@ -637,6 +659,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             self._update_render_control_states()
 
         self._update_step_delay_state()
+        self._update_analytics_controls()
 
     def _update_render_control_states(self) -> None:
         """Enable/disable render-related controls based on toggle."""
@@ -694,6 +717,27 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 warning_label.setVisible(False)
         else:
             self._on_ui_training_speed_changed(slider.value())
+
+    def _update_analytics_controls(self) -> None:
+        """Enable analytics export controls only when fast training is active."""
+        enabled = self._fast_training_checkbox.isChecked()
+        for checkbox in (
+            getattr(self, "_tensorboard_checkbox", None),
+            getattr(self, "_wandb_checkbox", None),
+        ):
+            if checkbox is not None:
+                checkbox.setEnabled(enabled)
+                if not enabled:
+                    checkbox.setChecked(False)
+
+        hint = getattr(self, "_analytics_hint_label", None)
+        if hint is not None:
+            if enabled:
+                hint.setText("Select analytics to export after the run completes (fast training only).")
+                hint.setStyleSheet("color: #2e7d32; font-size: 10px;")
+            else:
+                hint.setText("Enable Fast Training to export TensorBoard and W&B analytics.")
+                hint.setStyleSheet("color: #777777; font-size: 10px;")
 
     def _on_ui_rendering_throttle_changed(self, value: int) -> None:
         """Handle UI rendering throttle slider change.
@@ -967,6 +1011,15 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         # Get fast training mode flag
         fast_training_mode = self._fast_training_checkbox.isChecked()
 
+        tensorboard_enabled = False
+        wandb_enabled = False
+        tensorboard_checkbox = getattr(self, "_tensorboard_checkbox", None)
+        wandb_checkbox = getattr(self, "_wandb_checkbox", None)
+        if fast_training_mode and isinstance(tensorboard_checkbox, QtWidgets.QCheckBox):
+            tensorboard_enabled = tensorboard_checkbox.isChecked()
+        if fast_training_mode and isinstance(wandb_checkbox, QtWidgets.QCheckBox):
+            wandb_enabled = wandb_checkbox.isChecked()
+
         # Get training telemetry throttle from slider
         # This controls how fast telemetry data is collected and written to database
         # Affects: Telemetry Recent Episodes and Telemetry Recent Steps table population speed
@@ -1076,6 +1129,8 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             "UI_RENDER_DELAY_MS": str(env_render_delay_ms),
             "WORKER_ID": worker_id,
             "DISABLE_TELEMETRY": "1" if fast_training_mode else "0",
+            "TRACK_TENSORBOARD": "1" if tensorboard_enabled else "0",
+            "TRACK_WANDB": "1" if wandb_enabled else "0",
         }
 
         # Add BDI-specific environment variables if enabled
@@ -1149,6 +1204,8 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                         "gamma": gamma,
                         "epsilon_decay": epsilon_decay,
                         "disable_telemetry": fast_training_mode,
+                        "track_tensorboard": tensorboard_enabled,
+                        "track_wandb": wandb_enabled,
                     },
                     "path_config": {
                         "ui_only": ui_path_settings,
@@ -1157,11 +1214,17 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                     "worker_id": worker_id,
                 },
             },
-            "artifacts": {
-                "tensorboard": {
-                    "enabled": True,
-                    "relative_path": f"var/trainer/runs/{run_name}/tensorboard",
-                }
+        }
+
+        tensorboard_relative = f"var/trainer/runs/{run_name}/tensorboard"
+        metadata["artifacts"] = {
+            "tensorboard": {
+                "enabled": tensorboard_enabled,
+                "relative_path": tensorboard_relative,
+            },
+            "wandb": {
+                "enabled": wandb_enabled,
+                "run_path": None,
             },
         }
 

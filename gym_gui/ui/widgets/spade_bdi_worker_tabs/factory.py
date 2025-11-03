@@ -48,7 +48,7 @@ class TabFactory:
         """Create all tabs for a running agent.
 
         Instantiates tabs based on environment type detected from payload.
-        ToyText environments (FrozenLake, CliffWalking, Taxi, GridWorld)
+        ToyText environments (FrozenLake, CliffWalking, Taxi, MiniGrid, GridWorld)
         get grid visualization; visual environments also get video tab.
 
         Args:
@@ -65,7 +65,10 @@ class TabFactory:
 
         # Extract game_id and determine environment family
         game_id_str = first_payload.get("game_id", "").lower()
-        is_toytext = any(name in game_id_str for name in ["frozenlake", "cliffwalking", "taxi", "gridworld"])
+        is_toytext = any(
+            name in game_id_str
+            for name in ["frozenlake", "cliffwalking", "taxi", "gridworld", "minigrid"]
+        )
 
         # Convert game_id string to GameId enum if possible
         game_id_enum = None

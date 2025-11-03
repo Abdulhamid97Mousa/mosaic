@@ -59,7 +59,7 @@ The net effect is that handshake, execution, pause/fault handling, and terminati
 
 ## Logs of Interest
 
-```
+```bash
 04:29:56 LOG702 Start run watch (statuses=INIT…TERM)
 04:53:48 LOG704 SubmitRun deadline exceeded – observed before GUI deadline extension; resolved after bumping timeout
 ```

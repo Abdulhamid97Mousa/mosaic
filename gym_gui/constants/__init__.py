@@ -232,6 +232,12 @@ from gym_gui.constants.constants_tensorboard import (
     build_tensorboard_relative_path,
 )
 
+from gym_gui.constants.constants_wandb import (
+    DEFAULT_WANDB,
+    WandbDefaults,
+    build_wandb_run_url,
+)
+
 # ================================================================
 # Pre-existing Constants (game_constants.py)
 # ================================================================
@@ -360,6 +366,10 @@ __all__: list[str] = [
     "TensorboardDefaults",
     "build_tensorboard_log_dir",
     "build_tensorboard_relative_path",
+    # W&B
+    "DEFAULT_WANDB",
+    "WandbDefaults",
+    "build_wandb_run_url",
     # Game (will be extended if game_constants has __all__)
 ]
 

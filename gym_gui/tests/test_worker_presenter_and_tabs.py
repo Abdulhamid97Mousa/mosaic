@@ -19,12 +19,12 @@ from gym_gui.ui.presenters.workers.registry import (
     WorkerPresenter,
     WorkerPresenterRegistry,
 )
-from gym_gui.ui.presenters.workers.spade_bdi_worker_presenter import (
-    SpadeBdiWorkerPresenter,
-)
+from gym_gui.ui.presenters.workers.spade_bdi_worker_presenter import SpadeBdiWorkerPresenter
+from gym_gui.ui.presenters.workers.cleanrl_worker_presenter import CleanRlWorkerPresenter
 from gym_gui.ui.presenters.workers import (
     get_worker_presenter_registry,
-    SpadeBdiWorkerPresenter as ExportedPresenter,
+    SpadeBdiWorkerPresenter as ExportedSpadePresenter,
+    CleanRlWorkerPresenter as ExportedCleanPresenter,
 )
 from gym_gui.ui.widgets.spade_bdi_worker_tabs.factory import TabFactory
 from gym_gui.core.enums import GameId
@@ -99,6 +99,19 @@ class TestGlobalRegistry(unittest.TestCase):
         self.assertIsNotNone(presenter)
         if presenter is not None:
             self.assertEqual(presenter.id, "spade_bdi_worker")
+        exported = ExportedSpadePresenter()
+        self.assertEqual(exported.id, "spade_bdi_worker")
+
+    def test_global_registry_has_cleanrl_presenter(self) -> None:
+        """Test that the global registry has CleanRL presenter registered."""
+        registry = get_worker_presenter_registry()
+        self.assertTrue("cleanrl_worker" in registry)
+        presenter = registry.get("cleanrl_worker")
+        self.assertIsNotNone(presenter)
+        if presenter is not None:
+            self.assertEqual(presenter.id, "cleanrl_worker")
+        exported = ExportedCleanPresenter()
+        self.assertEqual(exported.id, "cleanrl_worker")
 
 class TestSpadeBdiWorkerPresenterBasics(unittest.TestCase):
     """Test SpadeBdiWorkerPresenter basic properties and protocol compliance."""
@@ -477,6 +490,17 @@ class TestWorkerPresenterProtocolCompliance(unittest.TestCase):
 
         # For protocols with runtime_checkable, we can verify adherence
         self.assertIsInstance(presenter, WorkerPresenter)
+
+    def test_cleanrl_presenter_protocol(self) -> None:
+        """Test that CleanRL presenter satisfies protocol requirements."""
+        presenter = CleanRlWorkerPresenter()
+        self.assertEqual(presenter.id, "cleanrl_worker")
+        self.assertTrue(callable(presenter.build_train_request))
+        self.assertTrue(callable(presenter.create_tabs))
+        self.assertIsInstance(presenter, WorkerPresenter)
+        with self.assertRaises(NotImplementedError):
+            presenter.build_train_request(policy_path=None, current_game=None)
+        self.assertEqual(presenter.create_tabs("run", "agent", {}, None), [])
 
 
 class TestRegistryIntegration(unittest.TestCase):

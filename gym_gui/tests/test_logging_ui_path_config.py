@@ -2,10 +2,13 @@
 
 from __future__ import annotations
 
+import os
 import logging
 from datetime import datetime as real_datetime
 
 import pytest
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 qtpy = pytest.importorskip("qtpy", reason="QtPy is required for UI logging tests")
 from qtpy import QtWidgets
@@ -135,5 +138,36 @@ def test_fast_training_mode_clears_ui_and_telemetry_paths(qt_app, monkeypatch):
         assert ui_metadata["episode_buffer_size"] == 0
         assert ui_metadata["schema_id"] == "telemetry.step.default"
         assert ui_metadata["schema_version"] == 1
+
+        artifacts = config["metadata"]["artifacts"]
+        assert artifacts["tensorboard"]["enabled"] is False
+        assert artifacts["wandb"]["enabled"] is False
+        assert config["environment"]["TRACK_TENSORBOARD"] == "0"
+        assert config["environment"]["TRACK_WANDB"] == "0"
+    finally:
+        form.deleteLater()
+
+
+def test_analytics_checkboxes_require_fast_training(qt_app, monkeypatch):
+    _install_fixed_datetime(monkeypatch)
+
+    form = SpadeBdiTrainForm()
+    try:
+        assert form._tensorboard_checkbox.isEnabled() is False
+        assert form._wandb_checkbox.isEnabled() is False
+
+        form._fast_training_checkbox.setChecked(True)
+        assert form._tensorboard_checkbox.isEnabled() is True
+        assert form._wandb_checkbox.isEnabled() is True
+
+        form._tensorboard_checkbox.setChecked(True)
+        form._wandb_checkbox.setChecked(True)
+
+        config = form._build_base_config()
+        artifacts = config["metadata"]["artifacts"]
+        assert artifacts["tensorboard"]["enabled"] is True
+        assert artifacts["wandb"]["enabled"] is True
+        assert config["environment"]["TRACK_TENSORBOARD"] == "1"
+        assert config["environment"]["TRACK_WANDB"] == "1"
     finally:
         form.deleteLater()

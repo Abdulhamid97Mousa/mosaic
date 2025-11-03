@@ -13,6 +13,12 @@ from gym_gui.config.game_configs import (
     FrozenLakeConfig,
     LunarLanderConfig,
     TaxiConfig,
+    DEFAULT_MINIGRID_EMPTY_5x5_CONFIG,
+    DEFAULT_MINIGRID_DOORKEY_5x5_CONFIG,
+    DEFAULT_MINIGRID_DOORKEY_6x6_CONFIG,
+    DEFAULT_MINIGRID_DOORKEY_8x8_CONFIG,
+    DEFAULT_MINIGRID_DOORKEY_16x16_CONFIG,
+    DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG,
 )
 from gym_gui.core.factories.adapters import available_games
 from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWidget
@@ -55,6 +61,12 @@ class ControlPanelContainer(QtWidgets.QWidget):
             lunar_lander_config=LunarLanderConfig(),
             car_racing_config=CarRacingConfig.from_env(),
             bipedal_walker_config=BipedalWalkerConfig.from_env(),
+            minigrid_empty_config=DEFAULT_MINIGRID_EMPTY_5x5_CONFIG,
+            minigrid_doorkey_5x5_config=DEFAULT_MINIGRID_DOORKEY_5x5_CONFIG,
+            minigrid_doorkey_6x6_config=DEFAULT_MINIGRID_DOORKEY_6x6_CONFIG,
+            minigrid_doorkey_8x8_config=DEFAULT_MINIGRID_DOORKEY_8x8_CONFIG,
+            minigrid_doorkey_16x16_config=DEFAULT_MINIGRID_DOORKEY_16x16_CONFIG,
+            minigrid_lavagap_config=DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG,
             default_seed=settings.default_seed,
             allow_seed_reuse=settings.allow_seed_reuse,
             actors=actor_descriptors,

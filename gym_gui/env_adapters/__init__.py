@@ -13,6 +13,10 @@ from gym_gui.core.adapters import (
 	CarRacingAdapter,
 	BipedalWalkerAdapter,
 	BOX2D_ADAPTERS,
+	MiniGridAdapter,
+	MiniGridDoorKeyAdapter,
+	MiniGridLavaGapAdapter,
+	MINIGRID_ADAPTERS,
 )
 
 __all__ = [
@@ -28,4 +32,8 @@ __all__ = [
 	"CarRacingAdapter",
 	"BipedalWalkerAdapter",
 	"BOX2D_ADAPTERS",
+	"MiniGridAdapter",
+	"MiniGridDoorKeyAdapter",
+	"MiniGridLavaGapAdapter",
+	"MINIGRID_ADAPTERS",
 ]

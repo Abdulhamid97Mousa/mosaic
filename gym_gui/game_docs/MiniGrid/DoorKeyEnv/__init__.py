@@ -1,0 +1,36 @@
+"""Documentation for MiniGrid DoorKey environments."""
+from __future__ import annotations
+
+MINIGRID_DOORKEY_HTML = (
+    "<h3>MiniGrid-DoorKey-8x8-v0</h3>"
+    "<h3>MiniGrid-DoorKey-8x8-v0</h3>"
+    "<p>Collect the yellow key, unlock a door, and reach the goal in an 8×8 room split by a wall. Sparse rewards make this environment a classic test-bed for curiosity and curriculum learning.</p>"
+    "<h4>Observation</h4>"
+    "<p>Dict observation with <code>image</code> (RGB, 7×7×3), <code>direction</code>, and <code>mission</code> string (e.g., 'use the key to open the door and then get to the goal'). Tile encodings follow MiniGrid's <code>OBJECT_TO_IDX</code> / <code>COLOR_TO_IDX</code> tables.</p>"
+    "<h4>Action space (Discrete(7))</h4>"
+    "<ul>"
+    "<li>0 → turn left</li>"
+    "<li>1 → turn right</li>"
+    "<li>2 → move forward</li>"
+    "<li>3 → pick up an object (key)</li>"
+    "<li>4 → drop (unused)</li>"
+    "<li>5 → toggle / open the door</li>"
+    "<li>6 → done (no-op)</li>"
+    "</ul>"
+    "<p><strong>Keyboard:</strong> ←/A, →/D, ↑/W, Space/G (pick up), H (drop), E/Enter (toggle), Q (done).</p>"
+    "<h4>Rewards</h4>"
+    "<ul>"
+    "<li>Reach goal → <code>1 - 0.9 × (step_count / max_steps)</code> scaled by the GUI multiplier (default ×10)</li>"
+    "<li>Otherwise → 0</li>"
+    "</ul>"
+    "<h4>Episode end</h4>"
+    "<ul>"
+    "<li>Termination: goal reached</li>"
+    "<li>Truncation: default max steps 100</li>"
+    "</ul>"
+    "<p><strong>Variant quick facts:</strong> 5×5 (tiny map for fast curriculum starts), 6×6 (intermediate), 8×8 (standard benchmark), 16×16 (long-horizon, sparse reward).</p>"
+    "<p><strong>Registered configs:</strong> Gym GUI exposes DoorKey 5×5, 6×6, 8×8, and 16×16 out of the box, matching the Gymnasium catalogue.</p>"
+    "<p>See the docs: <a href=\"https://minigrid.farama.org/environments/minigrid/doorkey/\">MiniGrid DoorKey</a></p>"
+)
+
+__all__ = ["MINIGRID_DOORKEY_HTML"]

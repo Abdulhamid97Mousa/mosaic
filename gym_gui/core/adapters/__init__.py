@@ -21,6 +21,15 @@ from .box2d import (
     BipedalWalkerAdapter,
     BOX2D_ADAPTERS,
 )
+from .minigrid import (
+    MiniGridAdapter,
+    MiniGridDoorKey5x5Adapter,
+    MiniGridDoorKey6x6Adapter,
+    MiniGridDoorKeyAdapter,
+    MiniGridDoorKey16x16Adapter,
+    MiniGridLavaGapAdapter,
+    MINIGRID_ADAPTERS,
+)
 
 __all__ = [
     "AdapterContext",
@@ -38,4 +47,11 @@ __all__ = [
     "CarRacingAdapter",
     "BipedalWalkerAdapter",
     "BOX2D_ADAPTERS",
+    "MiniGridAdapter",
+    "MiniGridDoorKey5x5Adapter",
+    "MiniGridDoorKey6x6Adapter",
+    "MiniGridDoorKeyAdapter",
+    "MiniGridDoorKey16x16Adapter",
+    "MiniGridLavaGapAdapter",
+    "MINIGRID_ADAPTERS",
 ]
