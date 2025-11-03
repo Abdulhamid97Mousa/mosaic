@@ -13,6 +13,25 @@ The MOSAIC lifecycle is now fully represented in code. The trainer daemon, GUI c
 
 The net effect is that handshake, execution, pause/fault handling, and termination all map one-to-one with the MOSAIC memo.
 
+### Source Files Touched
+
+| Area | Files | Highlights |
+| --- | --- | --- |
+| Protocol & stubs | `gym_gui/services/trainer/proto/trainer.proto`, `trainer_pb2.py`, `trainer_pb2_grpc.py` | MOSAIC enum, handshake messages, regenerated Python bindings. |
+| Registry/FSM persistence | `gym_gui/services/trainer/registry.py` | New `RunStatus` enum, status migration, fixed RUN_COMPLETED logging. |
+| Dispatcher orchestration | `gym_gui/services/trainer/dispatcher.py` | `INIT` polling, `HANDSHAKE`/`EXECUTING` transitions, heartbeat → `FAULTED`. |
+| Handshake & telemetry | `gym_gui/services/trainer/service.py`, `gym_gui/services/trainer/trainer_telemetry_proxy.py`, `gym_gui/services/telemetry.py` | Session token tracking, telemetry gating, optional storage helpers. |
+| Client/UI | `gym_gui/services/trainer/client.py`, `gym_gui/ui/main_window.py`, `pytest.ini` | Status filters, longer SubmitRun deadline, async marker for new tests. |
+| Worker compatibility | `spade_bdi_worker/core/bdi_agent.py`, `core/runtime.py`, `core/config.py`, `gym_gui/core/adapters/toy_text.py`, `spadeBDI_RL` assets, `var/data/toy_text/*.txt` | Ensure adapters load eagerly, expose goal metadata, align toy-text fixtures. |
+| Requirements/docs | `requirements/base.txt`, `requirements/spade_bdi_worker.txt`, `README.md`, this doc | Dependency updates, handshake documentation. |
+
+### Session Tokens – Why and How
+
+- **Generation**: `TrainerService.RegisterWorker` calls `secrets.token_hex(16)` and stores the 32‑character token in `_worker_sessions`. The payload restates the worker id/kind, schema, and capability flags for auditing.
+- **Enforcement today**: the first message on `PublishRunSteps/PublishRunEpisodes` checks for the presence of a session; if absent, the daemon aborts the stream with `FAILED_PRECONDITION`. This ensures only workers that completed the handshake can publish telemetry into a run.
+- **Lifecycle**: tokens are cleared when a run reaches `TERMINATED` or when a handshake attempt fails. The telemetry proxy logs the accepted token for troubleshooting.
+- **Future use**: once `ControlStream` is implemented, the same token can authenticate pause/resume acknowledgements or lett the GUI issue targeted control messages. Exposing the token to external tooling remains optional until control RPCs land.
+
 ## Current State
 
 - **Trainer service** now exposes the MOSAIC lifecycle end-to-end:

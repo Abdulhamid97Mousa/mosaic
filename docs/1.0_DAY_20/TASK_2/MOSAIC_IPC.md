@@ -52,6 +52,33 @@ stateDiagram-v2
 - **Telemetry Streaming:** JSONL output is parsed by `_mk_runstep/_mk_runepisode` and converted to `trainer_pb2.RunStep/RunEpisode`. These are consumed by `RunTelemetryBroadcaster` and `TelemetryAsyncHub`, which deliver updates to Qt widgets (e.g., `gym_gui/ui/widgets/live_telemetry_tab.py`).
 - **Fault Handling:** Heartbeat gaps promote runs to `FAILED`, freeing GPU slots through `GPUAllocator.release_many`. Recovery hooks exist via `_terminate_worker` plus the ability to re-dispatch the run, though automated checkpoint rollback is still TODO.
 
+## November 2025 FSM Rollout – Code Changes
+
+The MOSAIC FSM landed across several subsystems. The bullet list below calls out the most relevant edits so future readers can grep the exact implementation:
+
+- **Protocol & generated stubs**
+  - `gym_gui/services/trainer/proto/trainer.proto` now carries the MOSAIC enum (`RUN_STATUS_INIT … RUN_STATUS_TERM`), the `RegisterWorker{Request,Response}` handshake, and the placeholder `ControlEvent` stream.
+  - `trainer_pb2.py` / `trainer_pb2_grpc.py` were regenerated from that schema.
+- **Registry & migrations**
+  - `gym_gui/services/trainer/registry.py` replaced the legacy `pending/dispatching/running` enum with the MOSAIC values and added `_migrate_status_values` so pre-existing rows upgrade in place.
+  - Outcome handling logs were fixed to reference `RunStatus.TERMINATED.value` instead of a removed local variable.
+- **Dispatcher orchestration**
+  - `gym_gui/services/trainer/dispatcher.py` now polls only `RunStatus.INIT`, flips spawned runs to `HANDSHAKE`, promotes to `EXECUTING` after the first telemetry payload, and escalates heartbeat misses to `RunStatus.FAULTED`.
+- **Handshake + telemetry ingestion**
+  - `gym_gui/services/trainer/service.py` implements `RegisterWorker`, tracks session tokens, gates telemetry streams until a handshake occurs, and automatically transitions `READY → EXECUTING` when telemetry starts.
+  - `gym_gui/services/trainer/trainer_telemetry_proxy.py` performs the handshake before streaming stdout.
+  - `gym_gui/services/telemetry.py` defensively checks optional storage helpers when trimming payloads.
+- **Client/UI**
+  - `gym_gui/services/trainer/client.py` maps the new statuses to proto integers.
+  - `gym_gui/ui/main_window.py` requests the MOSAIC statuses in both watch and poll flows, and `_training_submit_deadline_seconds()` extends the SubmitRun timeout (6× default) to avoid false deadline errors with large SPADE-BDI payloads.
+- **Worker compatibility**
+  - `spade_bdi_worker/core/bdi_agent.py`, `core/runtime.py`, and `core/config.py` guarantee adapters are loaded before RL components use them and expose goal metadata for alignment tests.
+  - `gym_gui/core/adapters/toy_text.py` records the resolved start/goal positions (needed by SPADE tests) and tolerates older `map_size` hints.
+- **Housekeeping**
+  - Requirements files (`requirements/base.txt`, `requirements/spade_bdi_worker.txt`) picked up the dependencies required by the new code paths, and `pytest.ini` documents the asyncio marker we use in new tests.
+
+At the repo root, `README.md` was refreshed to mention the handshake-driven lifecycle, and log fixtures under `var/data/toy_text/*.txt` were regenerated to match the new adapter behaviour. The `spadeBDI_RL` subtree contains the worker assets touched in the process (goal metadata, telemetry config templates, etc.).
+
 ## Sequence Overview
 
 ```mermaid
