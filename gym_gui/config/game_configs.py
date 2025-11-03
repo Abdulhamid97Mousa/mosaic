@@ -14,6 +14,7 @@ from gym_gui.constants.constants_game import (
     CLIFF_WALKING_DEFAULTS,
     FROZEN_LAKE_DEFAULTS,
     FROZEN_LAKE_V2_DEFAULTS,
+    BLACKJACK_DEFAULTS,
 )
 
 
@@ -122,6 +123,25 @@ class CliffWalkingConfig:
     def to_gym_kwargs(self) -> Dict[str, Any]:
         """Convert to Gymnasium environment kwargs."""
         return {"is_slippery": self.is_slippery}
+
+
+@dataclass(frozen=True)
+class BlackjackConfig:
+    """Configuration for Blackjack environment."""
+    
+    natural: bool = False
+    """If True, give an additional reward for starting with a natural blackjack
+    (ace and ten, sum is 21). Natural gives 1.5 reward instead of 1.0."""
+    
+    sab: bool = False
+    """If True, follow the exact rules from Sutton and Barto's book.
+    When sab=True, the natural parameter is ignored. If the player achieves
+    a natural blackjack and the dealer does not, the player wins (+1 reward).
+    If both get a natural, it's a draw (0 reward)."""
+    
+    def to_gym_kwargs(self) -> Dict[str, Any]:
+        """Convert to Gymnasium environment kwargs."""
+        return {"natural": self.natural, "sab": self.sab}
 
 
 @dataclass(frozen=True)
@@ -312,6 +332,7 @@ DEFAULT_TAXI_CONFIG = TaxiConfig(is_raining=False, fickle_passenger=False)
 DEFAULT_CLIFF_WALKING_CONFIG = CliffWalkingConfig(
     is_slippery=CLIFF_WALKING_DEFAULTS.slippery
 )
+DEFAULT_BLACKJACK_CONFIG = BlackjackConfig()
 DEFAULT_LUNAR_LANDER_CONFIG = LunarLanderConfig()
 DEFAULT_CAR_RACING_CONFIG = CarRacingConfig.from_env()
 DEFAULT_BIPEDAL_WALKER_CONFIG = BipedalWalkerConfig.from_env()
@@ -321,6 +342,7 @@ __all__ = [
     "FrozenLakeConfig",
     "TaxiConfig",
     "CliffWalkingConfig",
+    "BlackjackConfig",
     "LunarLanderConfig",
     "CarRacingConfig",
     "BipedalWalkerConfig",
@@ -328,6 +350,7 @@ __all__ = [
     "DEFAULT_FROZEN_LAKE_V2_CONFIG",
     "DEFAULT_TAXI_CONFIG",
     "DEFAULT_CLIFF_WALKING_CONFIG",
+    "DEFAULT_BLACKJACK_CONFIG",
     "DEFAULT_LUNAR_LANDER_CONFIG",
     "DEFAULT_CAR_RACING_CONFIG",
     "DEFAULT_BIPEDAL_WALKER_CONFIG",

@@ -13,6 +13,7 @@ from gym_gui.config.game_configs import (
     FrozenLakeConfig,
     LunarLanderConfig,
     TaxiConfig,
+    BlackjackConfig,
 )
 from gym_gui.core.adapters.base import AdapterContext, EnvironmentAdapter
 from gym_gui.core.adapters.toy_text import TOY_TEXT_ADAPTERS
@@ -63,6 +64,7 @@ def create_adapter(
         FrozenLakeConfig
         | TaxiConfig
         | CliffWalkingConfig
+        | BlackjackConfig
         | LunarLanderConfig
         | CarRacingConfig
         | BipedalWalkerConfig
@@ -79,6 +81,7 @@ def create_adapter(
         FrozenLakeAdapter,
         FrozenLakeV2Adapter,
         TaxiAdapter,
+        BlackjackAdapter,
     )
     from gym_gui.core.adapters.box2d import (
         BipedalWalkerAdapter,
@@ -96,6 +99,8 @@ def create_adapter(
             adapter = TaxiAdapter(context, game_config=game_config)
         elif adapter_cls is CliffWalkingAdapter and isinstance(game_config, CliffWalkingConfig):
             adapter = CliffWalkingAdapter(context, game_config=game_config)
+        elif adapter_cls is BlackjackAdapter and isinstance(game_config, BlackjackConfig):
+            adapter = BlackjackAdapter(context, game_config=game_config)
         elif adapter_cls is LunarLanderAdapter and isinstance(game_config, LunarLanderConfig):
             adapter = LunarLanderAdapter(context, config=game_config)
         elif adapter_cls is CarRacingAdapter and isinstance(game_config, CarRacingConfig):

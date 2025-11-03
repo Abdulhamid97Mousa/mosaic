@@ -140,6 +140,43 @@ CLIFF_HTML = (
 )
 
 
+BLACKJACK_HTML = (
+    "<h3>Blackjack-v1</h3>"
+    "<p>A card game where the goal is to beat the dealer by obtaining cards that sum closer to 21 (without going over) than the dealer's cards.</p>"
+    "<h4>Card Values</h4>"
+    "<ul>"
+    "<li>Face cards (Jack, Queen, King) → 10 points</li>"
+    "<li>Aces → 11 (usable ace) or 1 point</li>"
+    "<li>Numerical cards (2-10) → face value</li>"
+    "</ul>"
+    "<h4>Starting state</h4>"
+    "<p>The game starts with the dealer having one face-up and one face-down card, while the player has two face-up cards. Player's sum ranges from 4-21, dealer's showing card is 1-10 (Ace-10).</p>"
+    "<h4>Rewards</h4>"
+    "<ul>"
+    "<li>Win game → +1</li>"
+    "<li>Lose game → -1</li>"
+    "<li>Draw game → 0</li>"
+    "<li>Win with natural blackjack → +1.5 (if natural=True) or +1 (if natural=False)</li>"
+    "</ul>"
+    "<h4>Episode end</h4>"
+    "<ul>"
+    "<li>Termination: player hits and exceeds 21 (bust), or player sticks</li>"
+    "</ul>"
+    "<h4>Info returned</h4>"
+    "<p><code>step()</code> and <code>reset()</code> return an <code>info</code> dict (currently empty).</p>"
+    "<h4>Keyboard (human controls)</h4>"
+    "<p>Map the Blackjack action space to keys for human play:</p>"
+    "<ul>"
+    "<li>Stick (0) → 1 or Q</li>"
+    "<li>Hit (1) → 2 or E</li>"
+    "</ul>"
+    "<h4>Arguments / Config</h4>"
+    "<p><code>natural</code>: If True, give +1.5 reward for starting with a natural blackjack (ace + 10-value card, sum is 21). Default: False.</p>"
+    "<p><code>sab</code>: If True, follow exact rules from Sutton and Barto's book. When sab=True, natural is ignored. If player achieves natural and dealer does not, player wins (+1). If both get natural, it's a draw (0). Default: False.</p>"
+    "<p>See the docs: <a href=\"https://gymnasium.farama.org/environments/toy_text/blackjack/\">Blackjack (Gymnasium)</a></p>"
+)
+
+
 LUNAR_LANDER_HTML = (
     "<h3>LunarLander-v3</h3>"
     "<p>Control a lunar lander and guide it to a safe landing pad with minimal fuel usage.</p>"
@@ -236,6 +273,7 @@ GAME_INFO: Dict[GameId, str] = {
     GameId.FROZEN_LAKE: FROZEN_HTML,
     GameId.FROZEN_LAKE_V2: FROZEN_V2_HTML,
     GameId.CLIFF_WALKING: CLIFF_HTML,
+    GameId.BLACKJACK: BLACKJACK_HTML,
     GameId.LUNAR_LANDER: LUNAR_LANDER_HTML,
     GameId.CAR_RACING: CAR_RACING_HTML,
     GameId.BIPEDAL_WALKER: BIPEDAL_WALKER_HTML,

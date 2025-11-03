@@ -14,10 +14,12 @@ from gym_gui.config.game_configs import (
     FrozenLakeConfig,
     TaxiConfig,
     CliffWalkingConfig,
+    BlackjackConfig,
     DEFAULT_FROZEN_LAKE_CONFIG,
     DEFAULT_FROZEN_LAKE_V2_CONFIG,
     DEFAULT_TAXI_CONFIG,
     DEFAULT_CLIFF_WALKING_CONFIG,
+    DEFAULT_BLACKJACK_CONFIG,
 )
 from gym_gui.config.paths import VAR_DATA_DIR
 from gym_gui.core.adapters.base import AdapterContext, EnvironmentAdapter, StepState
@@ -29,6 +31,7 @@ from gym_gui.constants.constants_game import (
     FROZEN_LAKE_V2_DEFAULTS,
     CLIFF_WALKING_DEFAULTS,
     TAXI_DEFAULTS,
+    BLACKJACK_DEFAULTS,
 )
 from gym_gui.logging_config.log_constants import (
     LOG_ADAPTER_ENV_CREATED,
@@ -950,11 +953,98 @@ class TaxiAdapter(ToyTextAdapter):
         return payload
 
 
+class BlackjackAdapter(ToyTextAdapter):
+    """Adapter for Blackjack environment with pygame-based card rendering."""
+    
+    id = GameId.BLACKJACK.value
+    toy_text_defaults = BLACKJACK_DEFAULTS
+    _gym_render_mode = "rgb_array"  # Override: use pygame rendering instead of ANSI
+    
+    default_render_mode = RenderMode.RGB_ARRAY
+    supported_render_modes = (RenderMode.RGB_ARRAY,)
+    
+    supported_control_modes = (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    )
+    
+    def __init__(
+        self,
+        context: AdapterContext | None = None,
+        *,
+        game_config: BlackjackConfig | dict | None = None,
+    ) -> None:
+        """Initialize with optional game-specific configuration."""
+        super().__init__(context, defaults=self.toy_text_defaults)
+        
+        # Convert dictionary to BlackjackConfig if needed
+        if isinstance(game_config, dict):
+            game_config = BlackjackConfig(**game_config)
+        
+        self._game_config = game_config or DEFAULT_BLACKJACK_CONFIG
+    
+    def gym_kwargs(self) -> dict[str, Any]:
+        """Return Gymnasium environment kwargs from game configuration."""
+        return self._game_config.to_gym_kwargs()
+    
+    def render(self) -> dict[str, Any]:
+        """Render Blackjack game state using pygame card display.
+        
+        Returns RGB array from pygame renderer along with game state information.
+        """
+        env = self._require_env()
+        
+        # Get RGB array from pygame renderer (returns numpy array H×W×3)
+        rgb_array = env.render()
+        
+        # Extract current game state from environment
+        unwrapped = getattr(env, "unwrapped", env)
+        player_sum, dealer_card, usable_ace = None, None, None
+        
+        if hasattr(unwrapped, 'player') and hasattr(unwrapped, 'dealer'):
+            # Import helper functions from blackjack module
+            try:
+                from gymnasium.envs.toy_text.blackjack import sum_hand, usable_ace as check_usable_ace
+                # Type checker doesn't know about BlackjackEnv's player/dealer attributes
+                player_hand = getattr(unwrapped, 'player')  # type: ignore[attr-defined]
+                dealer_hand = getattr(unwrapped, 'dealer')  # type: ignore[attr-defined]
+                player_sum = sum_hand(player_hand)
+                dealer_card = dealer_hand[0] if dealer_hand else None
+                usable_ace = check_usable_ace(player_hand)
+            except (ImportError, AttributeError):
+                pass
+        
+        # Build formatted state description for UI display
+        state_lines = []
+        if player_sum is not None:
+            state_lines.append(f"Player Sum: {player_sum}")
+        if dealer_card is not None:
+            state_lines.append(f"Dealer Showing: {dealer_card}")
+        if usable_ace is not None:
+            state_lines.append(f"Usable Ace: {'Yes' if usable_ace else 'No'}")
+        
+        payload = {
+            "mode": RenderMode.RGB_ARRAY.value,
+            "rgb": rgb_array,  # Use "rgb" key to match RgbRendererStrategy
+            "game_id": self.id,
+            "player_sum": player_sum,
+            "dealer_card": dealer_card,
+            "usable_ace": bool(usable_ace) if usable_ace is not None else None,
+            "terminated": self._last_terminated,
+            "truncated": self._last_truncated,
+            "state_description": "\n".join(state_lines) if state_lines else None,
+        }
+        
+        return payload
+
+
 TOY_TEXT_ADAPTERS: dict[GameId, Type[ToyTextAdapter]] = {
     GameId.FROZEN_LAKE: FrozenLakeAdapter,
     GameId.FROZEN_LAKE_V2: FrozenLakeV2Adapter,
     GameId.CLIFF_WALKING: CliffWalkingAdapter,
     GameId.TAXI: TaxiAdapter,
+    GameId.BLACKJACK: BlackjackAdapter,
 }
 
 __all__ = [
@@ -963,5 +1053,6 @@ __all__ = [
     "FrozenLakeV2Adapter",
     "CliffWalkingAdapter",
     "TaxiAdapter",
+    "BlackjackAdapter",
     "TOY_TEXT_ADAPTERS",
 ]

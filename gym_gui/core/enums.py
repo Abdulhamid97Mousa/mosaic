@@ -33,6 +33,7 @@ class GameId(StrEnum):
     FROZEN_LAKE_V2 = "FrozenLake-v2"
     CLIFF_WALKING = "CliffWalking-v1"
     TAXI = "Taxi-v3"
+    BLACKJACK = "Blackjack-v1"
     LUNAR_LANDER = "LunarLander-v3"
     CAR_RACING = "CarRacing-v3"
     BIPEDAL_WALKER = "BipedalWalker-v3"
@@ -88,6 +89,7 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.FROZEN_LAKE_V2: EnvironmentFamily.TOY_TEXT,
     GameId.CLIFF_WALKING: EnvironmentFamily.TOY_TEXT,
     GameId.TAXI: EnvironmentFamily.TOY_TEXT,
+    GameId.BLACKJACK: EnvironmentFamily.TOY_TEXT,
     GameId.LUNAR_LANDER: EnvironmentFamily.BOX2D,
     GameId.CAR_RACING: EnvironmentFamily.BOX2D,
     GameId.BIPEDAL_WALKER: EnvironmentFamily.BOX2D,
@@ -99,6 +101,7 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.FROZEN_LAKE_V2: RenderMode.GRID,
     GameId.CLIFF_WALKING: RenderMode.GRID,
     GameId.TAXI: RenderMode.GRID,
+    GameId.BLACKJACK: RenderMode.RGB_ARRAY,
     GameId.LUNAR_LANDER: RenderMode.RGB_ARRAY,
     GameId.CAR_RACING: RenderMode.RGB_ARRAY,
     GameId.BIPEDAL_WALKER: RenderMode.RGB_ARRAY,
@@ -137,6 +140,11 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
         ControlMode.HYBRID_HUMAN_AGENT,
         ControlMode.MULTI_AGENT_COOP,
         ControlMode.MULTI_AGENT_COMPETITIVE,
+    ),
+    GameId.BLACKJACK: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
     ),
     GameId.LUNAR_LANDER: (
         ControlMode.HUMAN_ONLY,

@@ -61,6 +61,10 @@ _TOY_TEXT_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
         _mapping(("Key_Space",), 4),            # PICKUP
         _mapping(("Key_E",), 5),                # DROPOFF
     ),
+    GameId.BLACKJACK: (
+        _mapping(("Key_1", "Key_Q"), 0),      # STICK (stop taking cards) - 1 or Q
+        _mapping(("Key_2", "Key_E"), 1),      # HIT (take another card) - 2 or E
+    ),
 }
 
 _BOX_2D_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
