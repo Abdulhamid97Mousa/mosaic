@@ -29,7 +29,9 @@ def _base_form(qt_app) -> CleanRlTrainForm:
     if index >= 0:
         form._algo_combo.setCurrentIndex(index)
     form._custom_env_checkbox.setChecked(False)
-    form._env_combo.setCurrentIndex(0)
+    env_index = form._env_combo.findData("CartPole-v1")
+    assert env_index >= 0
+    form._env_combo.setCurrentIndex(env_index)
     form._timesteps_spin.setValue(4096)
     form._seed_spin.setValue(123)
     form._agent_id_input.setText("agent-cleanrl-test")
@@ -55,6 +57,7 @@ def test_get_config_includes_worker_metadata(qt_app) -> None:
     assert worker_meta.get("arguments") == ["--dry-run", "--emit-summary"]
 
     extras = worker_meta.get("config", {}).get("extras", {})
+    assert extras.get("cuda") is True
     assert extras.get("tensorboard_dir") == "tensorboard"
     assert extras.get("notes") == "integration-test"
     assert "algo_params" in extras
@@ -76,5 +79,38 @@ def test_disable_dry_run_removes_arguments(qt_app) -> None:
     config = form.get_config()
     worker_meta = config["metadata"]["worker"]
     assert worker_meta.get("arguments") == []
+
+    form.deleteLater()
+
+
+def test_wandb_fields_populate_extras_and_environment(qt_app) -> None:
+    form = _base_form(qt_app)
+    form._track_wandb_checkbox.setChecked(True)
+    form._wandb_project_input.setText("MOSAIC")
+    form._wandb_entity_input.setText("abdulhamid97mousa")
+    form._wandb_run_name_input.setText("demo-run")
+    form._wandb_api_key_input.setText("test-key-123")
+
+    config = form.get_config()
+    metadata = config["metadata"]
+    worker_meta = metadata["worker"]
+    extras = worker_meta["config"].get("extras", {})
+    assert extras.get("track_wandb") is True
+    assert extras.get("wandb_project_name") == "MOSAIC"
+    assert extras.get("wandb_entity") == "abdulhamid97mousa"
+    assert extras.get("wandb_run_name") == "demo-run"
+    env_overrides = config["environment"]
+    assert env_overrides.get("WANDB_API_KEY") == "test-key-123"
+
+    form.deleteLater()
+
+
+def test_disable_gpu_sets_cuda_false(qt_app) -> None:
+    form = _base_form(qt_app)
+    form._use_gpu_checkbox.setChecked(False)
+
+    config = form.get_config()
+    extras = config["metadata"]["worker"]["config"].get("extras", {})
+    assert extras.get("cuda") is False
 
     form.deleteLater()

@@ -293,7 +293,9 @@ class TrainerDaemon:
             with contextlib.suppress(asyncio.CancelledError):
                 await self._grpc_server.stop(5)
             self._grpc_server = None
-        active_runs = self._registry.load_runs((RunStatus.RUNNING, RunStatus.DISPATCHING))
+        active_runs = self._registry.load_runs(
+            (RunStatus.HANDSHAKE, RunStatus.READY, RunStatus.EXECUTING)
+        )
         self._gpu_allocator.release_many(run.run_id for run in active_runs)
         for run in active_runs:
             self._registry.update_gpu_slots(run.run_id, [])

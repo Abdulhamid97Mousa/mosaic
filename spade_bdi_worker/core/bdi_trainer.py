@@ -91,6 +91,7 @@ class BDITrainer(HeadlessTrainer):
             config_payload,
             worker_id=self.config.worker_id,
         )
+        self._maybe_start_wandb(config_payload)
 
         try:
             # Start BDI agent
@@ -130,6 +131,7 @@ class BDITrainer(HeadlessTrainer):
                     metadata=episode_metadata,
                     worker_id=self.config.worker_id,
                 )
+                self._log_wandb_episode(episode_number, summary)
 
             # Save policy if configured
             if self._should_save:
@@ -165,6 +167,8 @@ class BDITrainer(HeadlessTrainer):
 
         finally:
             self._stop_bdi_agent()
+            self._finalize_wandb(summaries)
+            self._write_analytics_manifest()
 
     def _start_bdi_agent(self) -> None:
         """Initialize and start the SPADE-BDI agent."""

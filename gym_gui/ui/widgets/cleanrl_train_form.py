@@ -5,11 +5,15 @@ from __future__ import annotations
 import sys
 from dataclasses import dataclass
 from datetime import datetime, timezone
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Optional, Sequence
 
 from qtpy import QtCore, QtWidgets
 
-from gym_gui.core.enums import GameId
+from gym_gui.core.enums import (
+    EnvironmentFamily,
+    GameId,
+    ENVIRONMENT_FAMILY_BY_GAME,
+)
 
 
 _DEFAULT_ALGOS: tuple[str, ...] = (
@@ -20,18 +24,6 @@ _DEFAULT_ALGOS: tuple[str, ...] = (
     "c51",
     "ppg_procgen",
     "ppo_rnd_envpool",
-)
-
-_ENVIRONMENT_CHOICES: tuple[tuple[str, str], ...] = (
-    ("CartPole-v1 (Classic Control)", "CartPole-v1"),
-    ("Acrobot-v1 (Classic Control)", "Acrobot-v1"),
-    ("MountainCar-v0 (Classic Control)", "MountainCar-v0"),
-    ("LunarLander-v2 (Box2D)", "LunarLander-v2"),
-    ("BipedalWalker-v3 (Box2D)", "BipedalWalker-v3"),
-    ("Atari PongNoFrameskip-v4", "PongNoFrameskip-v4"),
-    ("Atari BreakoutNoFrameskip-v4", "BreakoutNoFrameskip-v4"),
-    ("Procgen CoinRun (easy)", "procgen:procgen-coinrun-v0"),
-    ("Procgen Maze (easy)", "procgen:procgen-maze-v0"),
 )
 
 
@@ -62,6 +54,84 @@ _ALGO_PARAM_SPECS: dict[str, tuple[_AlgoParamSpec, ...]] = {
 }
 
 
+_SUPPORTED_FAMILIES: set[EnvironmentFamily] = {
+    EnvironmentFamily.CLASSIC_CONTROL,
+    EnvironmentFamily.BOX2D,
+    EnvironmentFamily.MUJOCO,
+}
+
+_ADDITIONAL_SUPPORTED_GAMES: set[GameId] = {
+    GameId.PONG_NO_FRAMESKIP,
+    GameId.BREAKOUT_NO_FRAMESKIP,
+    GameId.PROCGEN_COINRUN,
+    GameId.PROCGEN_MAZE,
+}
+
+_PREFERRED_GAME_ORDER: Sequence[GameId] = (
+    GameId.CART_POLE,
+    GameId.ACROBOT,
+    GameId.MOUNTAIN_CAR,
+    GameId.LUNAR_LANDER,
+    GameId.CAR_RACING,
+    GameId.BIPEDAL_WALKER,
+    GameId.ANT,
+    GameId.HALF_CHEETAH,
+    GameId.HOPPER,
+    GameId.WALKER2D,
+    GameId.HUMANOID,
+    GameId.HUMANOID_STANDUP,
+    GameId.INVERTED_PENDULUM,
+    GameId.INVERTED_DOUBLE_PENDULUM,
+    GameId.REACHER,
+    GameId.PUSHER,
+    GameId.SWIMMER,
+    GameId.PONG_NO_FRAMESKIP,
+    GameId.BREAKOUT_NO_FRAMESKIP,
+    GameId.PROCGEN_COINRUN,
+    GameId.PROCGEN_MAZE,
+)
+
+
+def _format_family_label(family: EnvironmentFamily | None) -> str:
+    if family is None:
+        return "General"
+    if family == EnvironmentFamily.OTHER:
+        return "Other"
+    return family.value.replace("_", " ").title()
+
+
+def _build_environment_choices() -> tuple[tuple[str, str], ...]:
+    supported: list[GameId] = []
+    for game in GameId:
+        family = ENVIRONMENT_FAMILY_BY_GAME.get(game)
+        if family in _SUPPORTED_FAMILIES or game in _ADDITIONAL_SUPPORTED_GAMES:
+            supported.append(game)
+
+    ordered: list[GameId] = []
+    for game in _PREFERRED_GAME_ORDER:
+        if game in supported and game not in ordered:
+            ordered.append(game)
+    for game in sorted(supported, key=lambda g: g.value):
+        if game not in ordered:
+            ordered.append(game)
+
+    choices: list[tuple[str, str]] = []
+    for game in ordered:
+        family = ENVIRONMENT_FAMILY_BY_GAME.get(game)
+        label = f"{game.value} ({_format_family_label(family)})"
+        # Special-case for Procgen and Atari where get_game_display_name already includes prefix
+        if family == EnvironmentFamily.ATARI:
+            label = f"{game.value} (Atari)"
+        elif game in _ADDITIONAL_SUPPORTED_GAMES and family == EnvironmentFamily.OTHER:
+            if "procgen" in game.value:
+                label = f"{game.value} (Procgen)"
+        choices.append((label, game.value))
+    return tuple(choices)
+
+
+_ENVIRONMENT_CHOICES: tuple[tuple[str, str], ...] = _build_environment_choices()
+
+
 def _generate_run_id(prefix: str, algo: str) -> str:
     timestamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S")
     slug = algo.replace("_", "-")
@@ -76,8 +146,14 @@ class _FormState:
     seed: Optional[int]
     agent_id: Optional[str]
     worker_id: Optional[str]
+    use_gpu: bool
     track_tensorboard: bool
     track_wandb: bool
+    wandb_project: Optional[str]
+    wandb_entity: Optional[str]
+    wandb_run_name: Optional[str]
+    wandb_api_key: Optional[str]
+    wandb_email: Optional[str]
     notes: Optional[str]
     dry_run: bool
     algo_params: Dict[str, Any]
@@ -114,10 +190,10 @@ class CleanRlTrainForm(QtWidgets.QDialog):
         env_layout.addWidget(self._env_custom_input, 1)
         self._custom_env_checkbox.toggled.connect(self._on_custom_env_toggled)
         if default_game is not None:
-            try:
-                index = [env for _, env in _ENVIRONMENT_CHOICES].index(default_game.value)
+            index = self._env_combo.findData(default_game.value)
+            if index >= 0:
                 self._env_combo.setCurrentIndex(index)
-            except ValueError:
+            else:
                 self._custom_env_checkbox.setChecked(True)
                 self._env_custom_input.setText(default_game.value)
         layout.addWidget(self._labeled("Environment", env_widget))
@@ -144,6 +220,11 @@ class CleanRlTrainForm(QtWidgets.QDialog):
         self._worker_id_input.setPlaceholderText("Optional worker override (e.g. cleanrl-gpu-01)")
         layout.addWidget(self._labeled("Worker ID", self._worker_id_input))
 
+        self._use_gpu_checkbox = QtWidgets.QCheckBox("Enable CUDA (GPU)", self)
+        self._use_gpu_checkbox.setChecked(True)
+        self._use_gpu_checkbox.setToolTip("Toggle CleanRL's --cuda flag; disable if the host lacks a GPU.")
+        layout.addWidget(self._labeled("GPU", self._use_gpu_checkbox))
+
         self._tensorboard_checkbox = QtWidgets.QCheckBox("Track TensorBoard", self)
         self._tensorboard_checkbox.setToolTip("Write TensorBoard event files to var/trainer/runs/<run_id>/tensorboard")
         layout.addWidget(self._tensorboard_checkbox)
@@ -151,6 +232,26 @@ class CleanRlTrainForm(QtWidgets.QDialog):
         self._track_wandb_checkbox = QtWidgets.QCheckBox("Track Weights & Biases", self)
         self._track_wandb_checkbox.setToolTip("Requires wandb login on the trainer host")
         layout.addWidget(self._track_wandb_checkbox)
+        wandb_container = QtWidgets.QWidget(self)
+        wandb_layout = QtWidgets.QFormLayout(wandb_container)
+        wandb_layout.setContentsMargins(0, 0, 0, 0)
+        self._wandb_project_input = QtWidgets.QLineEdit(self)
+        self._wandb_project_input.setPlaceholderText("e.g. MOSAIC")
+        wandb_layout.addRow("W&B Project", self._wandb_project_input)
+        self._wandb_entity_input = QtWidgets.QLineEdit(self)
+        self._wandb_entity_input.setPlaceholderText("e.g. abdulhamid97mousa")
+        wandb_layout.addRow("W&B Entity", self._wandb_entity_input)
+        self._wandb_run_name_input = QtWidgets.QLineEdit(self)
+        self._wandb_run_name_input.setPlaceholderText("Optional custom run name")
+        wandb_layout.addRow("W&B Run Name", self._wandb_run_name_input)
+        self._wandb_api_key_input = QtWidgets.QLineEdit(self)
+        self._wandb_api_key_input.setPlaceholderText("Optional API key override")
+        self._wandb_api_key_input.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+        wandb_layout.addRow("W&B API Key", self._wandb_api_key_input)
+        self._wandb_email_input = QtWidgets.QLineEdit(self)
+        self._wandb_email_input.setPlaceholderText("Optional W&B account email")
+        wandb_layout.addRow("W&B Email", self._wandb_email_input)
+        layout.addWidget(self._labeled("Weights & Biases", wandb_container))
 
         self._notes_edit = QtWidgets.QPlainTextEdit(self)
         self._notes_edit.setPlaceholderText("Optional notes for analytics manifest.")
@@ -195,6 +296,11 @@ class CleanRlTrainForm(QtWidgets.QDialog):
         notes = self._notes_edit.toPlainText().strip() or None
         worker_id_value = self._worker_id_input.text().strip() or None
         agent_id_value = self._agent_id_input.text().strip() or None
+        wandb_project = self._wandb_project_input.text().strip() or None
+        wandb_entity = self._wandb_entity_input.text().strip() or None
+        wandb_run_name = self._wandb_run_name_input.text().strip() or None
+        wandb_api_key = self._wandb_api_key_input.text().strip() or None
+        wandb_email = self._wandb_email_input.text().strip() or None
 
         algo_params: Dict[str, Any] = {}
         for key, widget in self._algo_param_inputs.items():
@@ -214,8 +320,14 @@ class CleanRlTrainForm(QtWidgets.QDialog):
             seed=selected_seed,
             agent_id=agent_id_value or None,
             worker_id=worker_id_value,
+            use_gpu=self._use_gpu_checkbox.isChecked(),
             track_tensorboard=self._tensorboard_checkbox.isChecked(),
             track_wandb=self._track_wandb_checkbox.isChecked(),
+            wandb_project=wandb_project,
+            wandb_entity=wandb_entity,
+            wandb_run_name=wandb_run_name,
+            wandb_api_key=wandb_api_key,
+            wandb_email=wandb_email,
             notes=notes,
             dry_run=self._dry_run_checkbox.isChecked(),
             algo_params=algo_params,
@@ -252,11 +364,19 @@ class CleanRlTrainForm(QtWidgets.QDialog):
         state = self._collect_state()
         run_id = _generate_run_id("cleanrl", state.algo)
 
-        extras: Dict[str, Any] = {}
+        extras: Dict[str, Any] = {"cuda": state.use_gpu}
         if state.track_tensorboard:
             extras["tensorboard_dir"] = "tensorboard"
         if state.track_wandb:
             extras["track_wandb"] = True
+        if state.wandb_project:
+            extras["wandb_project_name"] = state.wandb_project
+        if state.wandb_entity:
+            extras["wandb_entity"] = state.wandb_entity
+        if state.wandb_run_name:
+            extras["wandb_run_name"] = state.wandb_run_name
+        if state.wandb_email:
+            extras["wandb_email"] = state.wandb_email
         if state.notes:
             extras["notes"] = state.notes
         if state.algo_params:
@@ -324,6 +444,8 @@ class CleanRlTrainForm(QtWidgets.QDialog):
                 "CLEANRL_AGENT_ID": state.agent_id or "cleanrl_agent",
                 "TRACK_TENSORBOARD": "1" if state.track_tensorboard else "0",
                 "TRACK_WANDB": "1" if state.track_wandb else "0",
+                **({"WANDB_API_KEY": state.wandb_api_key} if state.wandb_api_key else {}),
+                **({"WANDB_EMAIL": state.wandb_email} if state.wandb_email else {}),
             },
             "resources": {
                 "cpus": 4,

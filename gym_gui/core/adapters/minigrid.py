@@ -357,6 +357,24 @@ class MiniGridDynamicObstaclesAdapter(MiniGridAdapter):
     DEFAULT_ENV_ID = GameId.MINIGRID_DYNAMIC_OBSTACLES_16X16.value
 
 
+class MiniGridBlockedUnlockPickupAdapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-BlockedUnlockPickup-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_BLOCKED_UNLOCK_PICKUP.value
+
+
+class MiniGridMultiRoomAdapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-MultiRoom-N6-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_MULTIROOM_N6.value
+
+
+class MiniGridObstructedMazeAdapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid Obstructed Maze environments."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_OBSTRUCTED_MAZE_FULL.value
+
+
 MINIGRID_ADAPTERS: dict[GameId, type[MiniGridAdapter]] = {
     GameId.MINIGRID_EMPTY_5x5: MiniGridAdapter,
     GameId.MINIGRID_EMPTY_RANDOM_5x5: MiniGridAdapter,
@@ -377,6 +395,12 @@ MINIGRID_ADAPTERS: dict[GameId, type[MiniGridAdapter]] = {
     GameId.MINIGRID_DYNAMIC_OBSTACLES_RANDOM_6X6: MiniGridDynamicObstaclesAdapter,
     GameId.MINIGRID_DYNAMIC_OBSTACLES_8X8: MiniGridDynamicObstaclesAdapter,
     GameId.MINIGRID_DYNAMIC_OBSTACLES_16X16: MiniGridDynamicObstaclesAdapter,
+    GameId.MINIGRID_BLOCKED_UNLOCK_PICKUP: MiniGridBlockedUnlockPickupAdapter,
+    GameId.MINIGRID_MULTIROOM_N2_S4: MiniGridMultiRoomAdapter,
+    GameId.MINIGRID_MULTIROOM_N4_S5: MiniGridMultiRoomAdapter,
+    GameId.MINIGRID_MULTIROOM_N6: MiniGridMultiRoomAdapter,
+    GameId.MINIGRID_OBSTRUCTED_MAZE_1DLHB: MiniGridObstructedMazeAdapter,
+    GameId.MINIGRID_OBSTRUCTED_MAZE_FULL: MiniGridObstructedMazeAdapter,
 }
 
 
@@ -388,5 +412,8 @@ __all__ = [
     "MiniGridDoorKey16x16Adapter",
     "MiniGridLavaGapAdapter",
     "MiniGridDynamicObstaclesAdapter",
+    "MiniGridBlockedUnlockPickupAdapter",
+    "MiniGridMultiRoomAdapter",
+    "MiniGridObstructedMazeAdapter",
     "MINIGRID_ADAPTERS",
 ]

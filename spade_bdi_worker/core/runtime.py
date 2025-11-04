@@ -3,28 +3,39 @@
 from __future__ import annotations
 
 import copy
+import json
 import logging
-from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Union
+import os
+import subprocess
 import time
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence, Union
 
 if TYPE_CHECKING:
     from ..adapters import AdapterType
 
+
+from gym_gui.config.paths import VAR_TRAINER_DIR, ensure_var_directories
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_WORKER_RUNTIME_EVENT,
+    LOG_WORKER_RUNTIME_JSON_SANITIZED,
+    LOG_WORKER_RUNTIME_WARNING,
+)
+from gym_gui.core.schema import BaseStepSchema, resolve_schema_for_game
+from gym_gui.core.spaces.vector_metadata import extract_vector_step_details
+from gym_gui.validations.validations_telemetry import ValidationService
 
 from ..algorithms import create_agent, create_runtime
 from ..policies import PolicyStorage
 from .config import PolicyStrategy, RunConfig
 from .telemetry_worker import TelemetryEmitter
 from .tensorboard_logger import TensorboardLogger
-from gym_gui.logging_config.helpers import LogConstantMixin
-from gym_gui.logging_config.log_constants import (
-    LOG_WORKER_RUNTIME_EVENT,
-    LOG_WORKER_RUNTIME_JSON_SANITIZED,
-)
-from gym_gui.core.schema import BaseStepSchema, resolve_schema_for_game
-from gym_gui.core.spaces.vector_metadata import extract_vector_step_details
-from gym_gui.validations.validations_telemetry import ValidationService
+
+try:  # Optional dependency for analytics.
+    import wandb
+except Exception:  # pragma: no cover - wandb optional
+    wandb = None
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -124,6 +135,16 @@ class HeadlessTrainer(LogConstantMixin):
         if schema_json is None and self._schema is not None:
             schema_json = self._schema.as_json_schema()
         self._schema_definition = schema_json
+
+        # Optional W&B tracking
+        self._wandb_enabled = bool(self.config.extra.get("track_wandb"))
+        self._wandb_project = self.config.extra.get("wandb_project_name")
+        self._wandb_entity = self.config.extra.get("wandb_entity")
+        self._wandb_run_name = self.config.extra.get("wandb_run_name")
+        self._wandb_api_key = self.config.extra.get("wandb_api_key")
+        self._wandb_run = None
+        self._wandb_run_path: Optional[str] = None
+        self._wandb_logged_steps = 0
         
         self.log_constant(
             LOG_WORKER_RUNTIME_EVENT,
@@ -163,6 +184,8 @@ class HeadlessTrainer(LogConstantMixin):
                 path=str(self._tensorboard.log_dir),
                 worker_id=self.config.worker_id,  # type: ignore[call-arg]
             )
+
+        self._maybe_start_wandb(config_payload)
 
         try:
             summaries: list[EpisodeMetrics] = []
@@ -207,6 +230,8 @@ class HeadlessTrainer(LogConstantMixin):
                         success=summary.success,
                     )
 
+                self._log_wandb_episode(episode_number, summary)
+
             if self._should_save:
                 metadata = {
                     "run_id": self.config.run_id,
@@ -249,8 +274,201 @@ class HeadlessTrainer(LogConstantMixin):
             )
             return 1
         finally:
+            self._finalize_wandb(summaries)
+            self._write_analytics_manifest()
             if self._tensorboard:
                 self._tensorboard.close()
+
+    def _maybe_start_wandb(self, config_payload: Dict[str, Any]) -> None:
+        if not self._wandb_enabled:
+            return
+        if wandb is None:
+            self.log_constant(
+                LOG_WORKER_RUNTIME_WARNING,
+                message="wandb is not installed; disabling wandb tracking",
+                extra={"run_id": self.config.run_id},
+            )
+            self._wandb_enabled = False
+            return
+        api_key = self._wandb_api_key or os.environ.get("WANDB_API_KEY")
+        if api_key:
+            if not self._attempt_wandb_cli_login(api_key):
+                try:
+                    wandb.login(key=api_key, relogin=True)
+                except Exception as exc:  # pragma: no cover
+                    self.log_constant(
+                        LOG_WORKER_RUNTIME_WARNING,
+                        message="wandb login failed; disabling tracking",
+                        extra={"error": str(exc), "run_id": self.config.run_id},
+                    )
+                    self._wandb_enabled = False
+                    return
+
+        project = self._wandb_project or os.environ.get("WANDB_PROJECT") or "spade-bdi"
+        entity = self._wandb_entity or os.environ.get("WANDB_ENTITY")
+        run_name = self._wandb_run_name or f"{self.config.game_id}-{self.config.agent_id}-{self.config.run_id[-6:]}"
+        config_fields = {
+            "game_id": self.config.game_id,
+            "algorithm": self.config.extra.get("algorithm"),
+            "learning_rate": self.config.extra.get("learning_rate"),
+            "gamma": self.config.extra.get("gamma"),
+            "epsilon_decay": self.config.extra.get("epsilon_decay"),
+            "max_episodes": self.config.max_episodes,
+            "seed": self.config.seed,
+        }
+        config_fields = {k: v for k, v in config_fields.items() if v is not None}
+        try:
+            self._wandb_run = wandb.init(
+                project=project,
+                entity=entity,
+                name=run_name,
+                config=config_fields,
+                notes=str(self.config.extra.get("notes") or ""),
+                tags=["spade-bdi", self.config.game_id],
+                reinit=True,
+            )
+            if self._wandb_run is not None:
+                resolved_entity = self._wandb_run.entity or entity or ""
+                resolved_project = self._wandb_run.project or project
+                self._wandb_run_path = "/".join(
+                    part for part in (resolved_entity, resolved_project, f"runs/{self._wandb_run.id}") if part
+                )
+                self.log_constant(
+                    LOG_WORKER_RUNTIME_EVENT,
+                    message="wandb run initialised",
+                    extra={
+                        "run_id": self.config.run_id,
+                        "wandb_project": resolved_project,
+                        "wandb_entity": resolved_entity,
+                        "wandb_run_id": self._wandb_run.id,
+                    },
+                )
+        except Exception as exc:
+            self.log_constant(
+                LOG_WORKER_RUNTIME_WARNING,
+                message="Failed to initialise wandb run; disabling",
+                extra={"error": str(exc), "run_id": self.config.run_id},
+            )
+            self._wandb_enabled = False
+            self._wandb_run = None
+            self._wandb_run_path = None
+
+    def _log_wandb_episode(self, episode_number: int, summary: EpisodeMetrics) -> None:
+        if not self._wandb_enabled or self._wandb_run is None:
+            return
+        try:
+            self._wandb_logged_steps += 1
+            self._wandb_run.log(
+                {
+                    "episode": episode_number,
+                    "reward": summary.total_reward,
+                    "steps": summary.steps,
+                    "success": summary.success,
+                },
+                step=self._wandb_logged_steps,
+            )
+        except Exception as exc:  # pragma: no cover
+            self.log_constant(
+                LOG_WORKER_RUNTIME_WARNING,
+                message="Failed to log wandb episode metrics",
+                extra={"error": str(exc), "run_id": self.config.run_id},
+            )
+
+    def _finalize_wandb(self, summaries: Sequence[EpisodeMetrics]) -> None:
+        if not self._wandb_enabled or self._wandb_run is None:
+            return
+        try:
+            if summaries:
+                avg_reward = sum(m.total_reward for m in summaries) / len(summaries)
+                avg_steps = sum(m.steps for m in summaries) / len(summaries)
+                self._wandb_run.log(
+                    {
+                        "final/avg_reward": avg_reward,
+                        "final/avg_steps": avg_steps,
+                        "final/episodes": len(summaries),
+                    },
+                    step=self._wandb_logged_steps + 1,
+                )
+        except Exception as exc:  # pragma: no cover
+            self.log_constant(
+                LOG_WORKER_RUNTIME_WARNING,
+                message="Failed to log final wandb metrics",
+                extra={"error": str(exc), "run_id": self.config.run_id},
+            )
+        finally:
+            try:
+                run_path = self._wandb_run_path
+                self._wandb_run.finish()
+                if run_path:
+                    self.emitter.artifact(
+                        self.config.run_id,
+                        kind="wandb",
+                        path=run_path,
+                        worker_id=self.config.worker_id,
+                    )
+            except Exception as exc:  # pragma: no cover
+                self.log_constant(
+                    LOG_WORKER_RUNTIME_WARNING,
+                    message="Failed to finish wandb run",
+                    extra={"error": str(exc), "run_id": self.config.run_id},
+                )
+            finally:
+                self._wandb_run = None
+
+    def _write_analytics_manifest(self) -> None:
+        ensure_var_directories()
+        run_dir = (VAR_TRAINER_DIR / "runs" / self.config.run_id).resolve()
+        run_dir.mkdir(parents=True, exist_ok=True)
+        manifest = {
+            "tensorboard_dir": str(self._tensorboard.log_dir) if self._tensorboard else None,
+            "wandb_run_path": self._wandb_run_path,
+        }
+        manifest_path = run_dir / "analytics.json"
+        try:
+            manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
+        except Exception as exc:  # pragma: no cover
+            self.log_constant(
+                LOG_WORKER_RUNTIME_WARNING,
+                message="Failed to write analytics manifest",
+                extra={"error": str(exc), "run_id": self.config.run_id, "path": str(manifest_path)},
+            )
+
+    def _attempt_wandb_cli_login(self, api_key: str) -> bool:
+        """Attempt to authenticate with the wandb CLI."""
+        try:
+            result = subprocess.run(
+                ["wandb", "login", "--relogin", "--key", api_key],
+                capture_output=True,
+                text=True,
+                check=True,
+                env={**os.environ, "WANDB_API_KEY": api_key},
+                timeout=15,
+            )
+            self.log_constant(
+                LOG_WORKER_RUNTIME_EVENT,
+                message="wandb CLI login succeeded",
+                extra={"stdout": result.stdout.strip(), "run_id": self.config.run_id},
+            )
+            return True
+        except FileNotFoundError:
+            self.log_constant(
+                LOG_WORKER_RUNTIME_WARNING,
+                message="wandb CLI not found; falling back to python API",
+                extra={"run_id": self.config.run_id},
+            )
+            return False
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
+            self.log_constant(
+                LOG_WORKER_RUNTIME_WARNING,
+                message="wandb CLI login failed",
+                extra={
+                    "return_code": getattr(exc, "returncode", None),
+                    "stdout": getattr(exc, "stdout", "") or "",
+                    "stderr": getattr(exc, "stderr", "") or "",
+                    "run_id": self.config.run_id,
+                },
+            )
+            return False
 
     # ------------------------------------------------------------------
     def _run_episode(self, episode_index: int, episode_number: int, episode_seed: int) -> EpisodeMetrics:

@@ -38,6 +38,24 @@ class GameId(StrEnum):
     LUNAR_LANDER = "LunarLander-v3"
     CAR_RACING = "CarRacing-v3"
     BIPEDAL_WALKER = "BipedalWalker-v3"
+    CART_POLE = "CartPole-v1"
+    ACROBOT = "Acrobot-v1"
+    MOUNTAIN_CAR = "MountainCar-v0"
+    PONG_NO_FRAMESKIP = "PongNoFrameskip-v4"
+    BREAKOUT_NO_FRAMESKIP = "BreakoutNoFrameskip-v4"
+    PROCGEN_COINRUN = "procgen:procgen-coinrun-v0"
+    PROCGEN_MAZE = "procgen:procgen-maze-v0"
+    ANT = "Ant-v5"
+    HALF_CHEETAH = "HalfCheetah-v5"
+    HOPPER = "Hopper-v5"
+    HUMANOID = "Humanoid-v5"
+    HUMANOID_STANDUP = "HumanoidStandup-v5"
+    INVERTED_DOUBLE_PENDULUM = "InvertedDoublePendulum-v5"
+    INVERTED_PENDULUM = "InvertedPendulum-v5"
+    PUSHER = "Pusher-v5"
+    REACHER = "Reacher-v5"
+    SWIMMER = "Swimmer-v5"
+    WALKER2D = "Walker2d-v5"
     MINIGRID_EMPTY_5x5 = "MiniGrid-Empty-5x5-v0"
     MINIGRID_EMPTY_RANDOM_5x5 = "MiniGrid-Empty-Random-5x5-v0"
     MINIGRID_EMPTY_6x6 = "MiniGrid-Empty-6x6-v0"
@@ -57,6 +75,12 @@ class GameId(StrEnum):
     MINIGRID_DYNAMIC_OBSTACLES_RANDOM_6X6 = "MiniGrid-Dynamic-Obstacles-Random-6x6-v0"
     MINIGRID_DYNAMIC_OBSTACLES_8X8 = "MiniGrid-Dynamic-Obstacles-8x8-v0"
     MINIGRID_DYNAMIC_OBSTACLES_16X16 = "MiniGrid-Dynamic-Obstacles-16x16-v0"
+    MINIGRID_BLOCKED_UNLOCK_PICKUP = "MiniGrid-BlockedUnlockPickup-v0"
+    MINIGRID_MULTIROOM_N2_S4 = "MiniGrid-MultiRoom-N2-S4-v0"
+    MINIGRID_MULTIROOM_N4_S5 = "MiniGrid-MultiRoom-N4-S5-v0"
+    MINIGRID_MULTIROOM_N6 = "MiniGrid-MultiRoom-N6-v0"
+    MINIGRID_OBSTRUCTED_MAZE_1DLHB = "MiniGrid-ObstructedMaze-1Dlhb-v0"
+    MINIGRID_OBSTRUCTED_MAZE_FULL = "MiniGrid-ObstructedMaze-Full-v0"
 
 
 def get_game_display_name(game_id: GameId) -> str:
@@ -79,6 +103,36 @@ def get_game_display_name(game_id: GameId) -> str:
         return f"Gym-ToyText-{value}"
     elif game_id in (GameId.LUNAR_LANDER, GameId.CAR_RACING, GameId.BIPEDAL_WALKER):
         return f"Gym-Box2D-{value}"
+    elif game_id in (
+        GameId.CART_POLE,
+        GameId.ACROBOT,
+        GameId.MOUNTAIN_CAR,
+    ):
+        return f"Gym-ClassicControl-{value}"
+    elif game_id in (
+        GameId.PONG_NO_FRAMESKIP,
+        GameId.BREAKOUT_NO_FRAMESKIP,
+    ):
+        return f"Gym-Atari-{value}"
+    elif game_id in (
+        GameId.PROCGEN_COINRUN,
+        GameId.PROCGEN_MAZE,
+    ):
+        return f"Procgen-{value}"
+    elif game_id in (
+        GameId.ANT,
+        GameId.HALF_CHEETAH,
+        GameId.HOPPER,
+        GameId.HUMANOID,
+        GameId.HUMANOID_STANDUP,
+        GameId.INVERTED_DOUBLE_PENDULUM,
+        GameId.INVERTED_PENDULUM,
+        GameId.PUSHER,
+        GameId.REACHER,
+        GameId.SWIMMER,
+        GameId.WALKER2D,
+    ):
+        return f"Gym-MuJoCo-{value}"
     else:
         return f"Gym-{value}"
 
@@ -137,6 +191,24 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.LUNAR_LANDER: EnvironmentFamily.BOX2D,
     GameId.CAR_RACING: EnvironmentFamily.BOX2D,
     GameId.BIPEDAL_WALKER: EnvironmentFamily.BOX2D,
+    GameId.CART_POLE: EnvironmentFamily.CLASSIC_CONTROL,
+    GameId.ACROBOT: EnvironmentFamily.CLASSIC_CONTROL,
+    GameId.MOUNTAIN_CAR: EnvironmentFamily.CLASSIC_CONTROL,
+    GameId.PONG_NO_FRAMESKIP: EnvironmentFamily.ATARI,
+    GameId.BREAKOUT_NO_FRAMESKIP: EnvironmentFamily.ATARI,
+    GameId.PROCGEN_COINRUN: EnvironmentFamily.OTHER,
+    GameId.PROCGEN_MAZE: EnvironmentFamily.OTHER,
+    GameId.ANT: EnvironmentFamily.MUJOCO,
+    GameId.HALF_CHEETAH: EnvironmentFamily.MUJOCO,
+    GameId.HOPPER: EnvironmentFamily.MUJOCO,
+    GameId.HUMANOID: EnvironmentFamily.MUJOCO,
+    GameId.HUMANOID_STANDUP: EnvironmentFamily.MUJOCO,
+    GameId.INVERTED_DOUBLE_PENDULUM: EnvironmentFamily.MUJOCO,
+    GameId.INVERTED_PENDULUM: EnvironmentFamily.MUJOCO,
+    GameId.PUSHER: EnvironmentFamily.MUJOCO,
+    GameId.REACHER: EnvironmentFamily.MUJOCO,
+    GameId.SWIMMER: EnvironmentFamily.MUJOCO,
+    GameId.WALKER2D: EnvironmentFamily.MUJOCO,
     GameId.MINIGRID_EMPTY_5x5: EnvironmentFamily.MINIGRID,
     GameId.MINIGRID_EMPTY_RANDOM_5x5: EnvironmentFamily.MINIGRID,
     GameId.MINIGRID_EMPTY_6x6: EnvironmentFamily.MINIGRID,
@@ -162,6 +234,24 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.LUNAR_LANDER: RenderMode.RGB_ARRAY,
     GameId.CAR_RACING: RenderMode.RGB_ARRAY,
     GameId.BIPEDAL_WALKER: RenderMode.RGB_ARRAY,
+    GameId.CART_POLE: RenderMode.RGB_ARRAY,
+    GameId.ACROBOT: RenderMode.RGB_ARRAY,
+    GameId.MOUNTAIN_CAR: RenderMode.RGB_ARRAY,
+    GameId.PONG_NO_FRAMESKIP: RenderMode.RGB_ARRAY,
+    GameId.BREAKOUT_NO_FRAMESKIP: RenderMode.RGB_ARRAY,
+    GameId.PROCGEN_COINRUN: RenderMode.RGB_ARRAY,
+    GameId.PROCGEN_MAZE: RenderMode.RGB_ARRAY,
+    GameId.ANT: RenderMode.RGB_ARRAY,
+    GameId.HALF_CHEETAH: RenderMode.RGB_ARRAY,
+    GameId.HOPPER: RenderMode.RGB_ARRAY,
+    GameId.HUMANOID: RenderMode.RGB_ARRAY,
+    GameId.HUMANOID_STANDUP: RenderMode.RGB_ARRAY,
+    GameId.INVERTED_DOUBLE_PENDULUM: RenderMode.RGB_ARRAY,
+    GameId.INVERTED_PENDULUM: RenderMode.RGB_ARRAY,
+    GameId.PUSHER: RenderMode.RGB_ARRAY,
+    GameId.REACHER: RenderMode.RGB_ARRAY,
+    GameId.SWIMMER: RenderMode.RGB_ARRAY,
+    GameId.WALKER2D: RenderMode.RGB_ARRAY,
     GameId.MINIGRID_EMPTY_5x5: RenderMode.RGB_ARRAY,
     GameId.MINIGRID_EMPTY_RANDOM_5x5: RenderMode.RGB_ARRAY,
     GameId.MINIGRID_EMPTY_6x6: RenderMode.RGB_ARRAY,
@@ -240,6 +330,24 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
         ControlMode.MULTI_AGENT_COOP,
         ControlMode.MULTI_AGENT_COMPETITIVE,
     ),
+    GameId.CART_POLE: (ControlMode.AGENT_ONLY,),
+    GameId.ACROBOT: (ControlMode.AGENT_ONLY,),
+    GameId.MOUNTAIN_CAR: (ControlMode.AGENT_ONLY,),
+    GameId.PONG_NO_FRAMESKIP: (ControlMode.AGENT_ONLY,),
+    GameId.BREAKOUT_NO_FRAMESKIP: (ControlMode.AGENT_ONLY,),
+    GameId.PROCGEN_COINRUN: (ControlMode.AGENT_ONLY,),
+    GameId.PROCGEN_MAZE: (ControlMode.AGENT_ONLY,),
+    GameId.ANT: (ControlMode.AGENT_ONLY,),
+    GameId.HALF_CHEETAH: (ControlMode.AGENT_ONLY,),
+    GameId.HOPPER: (ControlMode.AGENT_ONLY,),
+    GameId.HUMANOID: (ControlMode.AGENT_ONLY,),
+    GameId.HUMANOID_STANDUP: (ControlMode.AGENT_ONLY,),
+    GameId.INVERTED_DOUBLE_PENDULUM: (ControlMode.AGENT_ONLY,),
+    GameId.INVERTED_PENDULUM: (ControlMode.AGENT_ONLY,),
+    GameId.PUSHER: (ControlMode.AGENT_ONLY,),
+    GameId.REACHER: (ControlMode.AGENT_ONLY,),
+    GameId.SWIMMER: (ControlMode.AGENT_ONLY,),
+    GameId.WALKER2D: (ControlMode.AGENT_ONLY,),
     GameId.MINIGRID_EMPTY_5x5: (
         ControlMode.HUMAN_ONLY,
         ControlMode.AGENT_ONLY,

@@ -14,7 +14,7 @@ def _export_from(module_name: str) -> None:
         __all__.append(name)
 
 
-for _submodule in ("ToyText", "Box2D"):
+for _submodule in ("ToyText", "Box2D", "MuJuCo"):
     _export_from(_submodule)
 
 del _export_from, _submodule

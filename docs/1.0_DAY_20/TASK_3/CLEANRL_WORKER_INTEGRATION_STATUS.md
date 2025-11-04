@@ -50,17 +50,76 @@ Document the current state of the `cleanrl_worker` integration, confirm which fo
 
 ## Immediate Next Actions
 
-1. Add an end-to-end trainer integration test (`pytest gym_gui/tests/test_trainer_cleanrl_worker.py`) that exercises the telemetry proxy and manifest ingestion.
-2. Wire the CleanRL worker to call `RegisterWorker` directly (bypassing the telemetry proxy handshake) and capture session capabilities.
-3. Design the lightweight metric bridge so analytics-first workers can stream headline numbers to the GUI without full telemetry.
-4. Draft operator runbooks (dependencies, ROM/W&B access, troubleshooting) and link them from Task 1.
-5. Scope checkpoint/resume hooks once CleanRL exposes stable CLI flags.
+1. Design the lightweight metric bridge so analytics-first workers can stream headline numbers to the GUI without full telemetry.
+2. Draft operator runbooks (dependencies, ROM/W&B access, troubleshooting) and link them from Task 1.
+3. Scope checkpoint/resume hooks once CleanRL exposes stable CLI flags.
 
 This document will be updated after each milestone with the commands executed and pytest results to maintain traceability.
 
-## Validation (2025-11-03)
+## Update — Direct Handshake & Trainer Proxy Coverage (2025-11-03)
 
-- `source .venv/bin/activate && pytest cleanrl_worker/tests` → ✅ 9 passed (config parsing, runtime execution path with mocked subprocess, CLI entry point).
-- `source .venv/bin/activate && pytest gym_gui/tests/test_cleanrl_train_form.py gym_gui/tests/test_worker_presenter_and_tabs.py` → ✅ 31 passed (train form payload, presenter registry integration, analytics tab wiring).
+### Summary of Modifications
 
-CleanRL runs now execute via the shim, emit lifecycle events/heartbeats, and write manifests that the GUI renders through TensorBoard/W&B tabs.
+- Authored `gym_gui/tests/test_trainer_cleanrl_worker.py`, an integration-focused suite that stubs a CleanRL worker process and asserts:
+  - The telemetry proxy issues a `RegisterWorker` request before streaming.
+  - RunStep/RunEpisode JSONL payloads are forwarded into the gRPC client.
+  - Analytics manifests spawn TensorBoard and W&B tabs via `AnalyticsTabManager`.
+- Enhanced `cleanrl_worker/MOSAIC_CLEANRL_WORKER/runtime.py` so the CleanRL worker performs its own gRPC `RegisterWorker` handshake (schema metadata, capability flags, session token retention) before launching the algorithm subprocess.
+- Extended `cleanrl_worker/tests/test_runtime.py` with a handshake regression test that validates schema defaults and session token capture while keeping the existing dry-run and subprocess stubs intact.
+
+### Updated Roadmap
+
+- ✅ **Complete:** End-to-end trainer proxy test (`gym_gui/tests/test_trainer_cleanrl_worker.py`).
+- ✅ **Complete:** Worker-initiated `RegisterWorker` handshake in `CleanRLWorkerRuntime`.
+- 🚧 **Pending:** Lightweight metric bridge, operator runbooks, checkpoint/resume hooks.
+
+### Validation (2025-11-03)
+
+- `source .venv/bin/activate && pytest gym_gui/tests/test_trainer_cleanrl_worker.py` → ✅ 2 passed (proxy handshake + analytics tab coverage).
+- `source .venv/bin/activate && pytest cleanrl_worker/tests/test_runtime.py` → ✅ 5 passed (runtime handshake, dry-run summary, manifest write).
+- `source .venv/bin/activate && pytest cleanrl_worker/tests` → ✅ 9 passed overall (config parsing, CLI, runtime).
+- `source .venv/bin/activate && pytest gym_gui/tests/test_cleanrl_train_form.py gym_gui/tests/test_worker_presenter_and_tabs.py` → ✅ 31 passed (form payload, presenter registry integration, analytics tab wiring).
+
+CleanRL runs now execute via the shim, emit lifecycle events/heartbeats, perform the MOSAIC handshake directly, and write manifests that the GUI renders through TensorBoard/W&B tabs.
+
+## Update — MuJoCo Documentation & Catalog Hooks (2025-11-03)
+
+### Summary of Modifications
+
+- Authored `gym_gui/game_docs/Gymnasium/MuJuCo/__init__.py` with HTML blurbs for eleven MuJoCo benchmarks (Ant, HalfCheetah, Hopper, Walker2d, Humanoid, HumanoidStandup, Inverted{Pendulum,DoublePendulum}, Reacher, Pusher, Swimmer) plus a shared requirements footer covering `pip install gymnasium[mujoco]`, engine installation, and the absence of human controls.
+- Wired the new snippets into `gym_gui/game_docs/__init__.py` and `gym_gui/game_docs/game_info.py`, ensuring the Game Info panel surfaces MuJoCo context alongside existing ToyText/Box2D/MiniGrid entries.
+- Extended `gym_gui/core/enums.GameId` to include the MuJoCo suite, mapped them to the `EnvironmentFamily.MUJOCO`, defaulted render mode to RGB, and limited control modes to `AGENT_ONLY` so the UI avoids advertising unsupported human play.
+- Updated the CleanRL train form (`gym_gui/ui/widgets/cleanrl_train_form.py`) so operators can pick MuJoCo environments directly from the dropdown without memorising IDs.
+
+### Validation (2025-11-03)
+
+- `source .venv/bin/activate && pytest gym_gui/tests/test_cleanrl_train_form.py` → ✅ 2 passed (form still serialises configs after expanding the environment list).
+- `source .venv/bin/activate && pytest gym_gui/tests/test_worker_presenter_and_tabs.py` → ✅ 29 passed (analytics presenter registry unaffected by the new GameIds and docs linkage).
+
+MuJoCo environments now appear in the CleanRL workflow with contextual documentation, while the enums/family maps keep idle-tick logic and agent-only constraints intact.
+
+## Update — CLI Overrides & Dynamic Catalog (2025-11-03)
+
+### Summary of Modifications
+
+- Added a general CLI override path in `CleanRLWorkerRuntime.build_cleanrl_args`; any extra fields (e.g., `cuda`, `capture_video`, `wandb_project_name`) now flow directly into Tyro arguments. This allows GPU toggles and metadata updates without cracking open the runtime again.
+- Backfilled unit coverage in `cleanrl_worker/tests/test_runtime.py` to assert that overrides produce `--cuda=false`, `--capture-video=true`, and other flags alongside the existing tensorboard/W&B knobs.
+- Replaced the static environment dropdown in the CleanRL train form with a dynamic list sourced from `GameId` + family metadata. Newly added MuJoCo and classic-control IDs appear automatically, and operator defaults can still fall back to custom entries when needed.
+- Extended `GameId` to cover CartPole, Acrobot, MountainCar, Atari (Pong/Breakout), and Procgen CoinRun/Maze so the catalog stays in sync with the worker’s supported benchmarks.
+- Added an explicit GPU toggle to the CleanRL train form; it writes `extras["cuda"]` into the worker config so the runtime emits `--cuda=true/false`. The form honours the same field when auto-generating environment manifests.
+- Introduced optional W&B override fields (project, entity, run name, API key) in the CleanRL train form. These hydrate CleanRL CLI flags and the worker environment (`WANDB_API_KEY`) so operators can switch projects or credential scopes per run without touching `.env`.
+- Documented the clean pass-through of additional extras. The runtime now handles at least the following operational knobs without code changes:
+  - `cuda` → `--cuda=<bool>`
+  - `capture_video` → `--capture-video=<bool>`
+  - `wandb_project_name` / `wandb_entity` → `--wandb-project-name=<value>` / `--wandb-entity=<value>`
+  - `tensorboard_dir`, `track_wandb`, and structured `algo_params` (unchanged behaviour)
+  - Any numeric/string/boolean sequence extras (e.g., `total_frames`, `num_envs`) surfaced from future UI updates
+
+### Validation (2025-11-03)
+
+- `source .venv/bin/activate && pytest cleanrl_worker/tests` → ✅ 4 passed (CLI summary, arg building with overrides, dry-run summary).
+- `source .venv/bin/activate && pytest gym_gui/tests/test_cleanrl_train_form.py` → ✅ 2 passed (dynamic dropdown + config serialization).
+
+Operators can now flip GPU usage, capture settings, project metadata, and W&B credentials via the CleanRL form, with all fields flowing through to the worker CLI and environment overrides.
+
+Operators can now flip GPU usage, capture settings, and project names via extras, and the UI automatically reflects new `GameId` entries without manual widget edits.

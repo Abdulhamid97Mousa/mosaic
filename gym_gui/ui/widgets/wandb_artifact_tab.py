@@ -40,6 +40,7 @@ class WandbArtifactTab(QtWidgets.QWidget, LogConstantMixin):
         base_url: Optional[str] = None,
         defaults: WandbDefaults = DEFAULT_WANDB,
         parent: Optional[QtWidgets.QWidget] = None,
+        status_message: Optional[str] = None,
     ) -> None:
         super().__init__(parent)
         self._logger = _LOGGER
@@ -51,13 +52,14 @@ class WandbArtifactTab(QtWidgets.QWidget, LogConstantMixin):
         self._run_url = build_wandb_run_url(self._run_path, base_url=self._base_url)
         self._web_view: Optional[QWebEngineView] = None  # type: ignore[assignment]
         self._url_field: Optional[QtWidgets.QLineEdit] = None
+        self._status_area: Optional[QtWidgets.QPlainTextEdit] = None
 
         self.statusChanged.connect(self._handle_status_changed)
-        self._setup_ui()
+        self._setup_ui(initial_status=status_message)
         self._emit_status("initialized", success=True)
 
     # ------------------------------------------------------------------
-    def _setup_ui(self) -> None:
+    def _setup_ui(self, *, initial_status: Optional[str]) -> None:
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(12, 12, 12, 12)
         layout.setSpacing(8)
@@ -105,6 +107,17 @@ class WandbArtifactTab(QtWidgets.QWidget, LogConstantMixin):
         info.setTextFormat(QtCore.Qt.TextFormat.RichText)
         layout.addWidget(info)
 
+        status_area = QtWidgets.QPlainTextEdit(self)
+        status_area.setPlaceholderText(
+            "W&B connection log (e.g., paste `wandb login` output or API key status here)."
+        )
+        status_area.setReadOnly(False)
+        status_area.setVisible(True)
+        if initial_status:
+            status_area.setPlainText(initial_status)
+        layout.addWidget(status_area)
+        self._status_area = status_area
+
         if WEB_ENGINE_AVAILABLE:
             placeholder = QtWidgets.QLabel(
                 "Embedded view will appear here when launched."
@@ -133,6 +146,16 @@ class WandbArtifactTab(QtWidgets.QWidget, LogConstantMixin):
         self._run_path = run_path.strip()
         self.refresh()
 
+    def set_status_text(self, message: str) -> None:
+        """Replace the status text contents displayed beneath the metadata."""
+        if self._status_area is not None:
+            self._status_area.setPlainText(message)
+
+    def append_status_line(self, message: str) -> None:
+        """Append a log line to the status area."""
+        if self._status_area is not None:
+            self._status_area.appendPlainText(message)
+
     # ------------------------------------------------------------------
     def _emit_status(self, message: str, *, success: bool) -> None:
         code = LOG_UI_RENDER_TABS_WANDB_STATUS if success else LOG_UI_RENDER_TABS_WANDB_WARNING
@@ -159,8 +182,12 @@ class WandbArtifactTab(QtWidgets.QWidget, LogConstantMixin):
         )
 
     def _copy_to_clipboard(self, value: str) -> None:
-        QtWidgets.QApplication.clipboard().setText(value)
-        self._emit_status("copied_url", success=True)
+        clipboard = QtWidgets.QApplication.clipboard()
+        if clipboard is not None:
+            clipboard.setText(value)
+            self._emit_status("copied_url", success=True)
+        else:
+            self._emit_status("clipboard_unavailable", success=False)
 
     def _open_in_browser(self) -> None:
         try:

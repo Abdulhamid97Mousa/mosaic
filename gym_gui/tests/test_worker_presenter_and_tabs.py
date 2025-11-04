@@ -5,7 +5,8 @@ Tests cover:
 2. WorkerPresenter protocol compliance
 3. SpadeBdiWorkerPresenter - train request building, tab creation, metadata extraction
 4. TabFactory - tab instantiation, environment detection, conditional creation
-5. Integration with main_window.py - registry usage in UI tab creation
+5. Analytics tabs wiring (TensorBoard + W&B)
+6. Integration with main_window.py - registry usage in UI tab creation
 """
 
 import unittest
@@ -14,6 +15,7 @@ import json
 from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 from typing import Any
+import os
 
 from gym_gui.ui.presenters.workers.registry import (
     WorkerPresenter,
@@ -28,6 +30,12 @@ from gym_gui.ui.presenters.workers import (
 )
 from gym_gui.ui.widgets.spade_bdi_worker_tabs.factory import TabFactory
 from gym_gui.core.enums import GameId
+from gym_gui.ui.panels.analytics_tabs import AnalyticsTabManager
+from gym_gui.ui.widgets.tensorboard_artifact_tab import TensorboardArtifactTab
+from gym_gui.ui.widgets.wandb_artifact_tab import WandbArtifactTab
+from qtpy import QtWidgets
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
 class TestWorkerPresenterRegistry(unittest.TestCase):
@@ -542,6 +550,69 @@ class TestRegistryIntegration(unittest.TestCase):
             self.assertEqual(p1.id, "spade_bdi_worker")
         if p2 is not None:
             self.assertEqual(p2.id, "future_worker")
+
+
+class _RecordingRenderTabs:
+    """Minimal stand-in for RenderTabs that records dynamic tab additions."""
+
+    def __init__(self) -> None:
+        self._agent_tabs: dict[str, dict[str, QtWidgets.QWidget]] = {}
+
+    def add_dynamic_tab(self, run_id: str, name: str, widget: QtWidgets.QWidget) -> None:
+        self._agent_tabs.setdefault(run_id, {})[name] = widget
+
+
+class TestAnalyticsTabManager(unittest.TestCase):
+    """Validate TensorBoard and W&B tabs are created with expected widgets."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._qt_app = QtWidgets.QApplication.instance()
+        if cls._qt_app is None:
+            cls._qt_app = QtWidgets.QApplication([])
+
+    def setUp(self) -> None:
+        self.render_tabs = _RecordingRenderTabs()
+        self.parent = QtWidgets.QWidget()
+        self.manager = AnalyticsTabManager(self.render_tabs, self.parent)
+
+    def tearDown(self) -> None:
+        self.parent.deleteLater()
+
+    def test_tensorboard_tab_added(self) -> None:
+        metadata = {
+            "artifacts": {
+                "tensorboard": {
+                    "enabled": True,
+                    "log_dir": "/tmp/tb-demo",
+                }
+            }
+        }
+
+        self.manager.ensure_tensorboard_tab("run-tb", "agent-1", metadata)
+
+        agent_tabs = self.render_tabs._agent_tabs.get("run-tb", {})
+        self.assertIn("TensorBoard-Agent-agent-1", agent_tabs)
+        widget = agent_tabs["TensorBoard-Agent-agent-1"]
+        self.assertIsInstance(widget, TensorboardArtifactTab)
+
+    def test_wandb_tab_added(self) -> None:
+        metadata = {
+            "artifacts": {
+                "wandb": {
+                    "enabled": True,
+                    "run_path": "abdulhamid97mousa/MOSAIC/runs/test123",
+                }
+            }
+        }
+
+        self.manager.ensure_wandb_tab("run-wandb", "agent-2", metadata)
+
+        agent_tabs = self.render_tabs._agent_tabs.get("run-wandb", {})
+        self.assertIn("WAB-Agent-agent-2", agent_tabs)
+        widget = agent_tabs["WAB-Agent-agent-2"]
+        self.assertIsInstance(widget, WandbArtifactTab)
+        widget.append_status_line("wandb login succeeded")
 
 
 if __name__ == "__main__":
