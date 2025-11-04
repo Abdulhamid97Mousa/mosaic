@@ -1,19 +1,43 @@
 """Documentation for MiniGrid Empty Room environments."""
 from __future__ import annotations
 
-MINIGRID_EMPTY_HTML = (
-    "<h3>MiniGrid Empty Room Family</h3>"
-    "<p>Empty rooms with a green goal tile. No obstacles — ideal for debugging observation pipelines, testing sparse reward handling, and validating agent navigation. "
-    "The <strong>Random</strong> variants randomize agent starting position each episode.</p>"
-    "<h4>Variants</h4>"
-    "<ul>"
-    "<li><strong>5x5</strong> — Tiny room (fixed start)</li>"
-    "<li><strong>5x5-Random</strong> — Tiny room (random start)</li>"
-    "<li><strong>6x6</strong> — Small room (fixed start)</li>"
-    "<li><strong>6x6-Random</strong> — Small room (random start)</li>"
-    "<li><strong>8x8</strong> — Medium room (fixed start)</li>"
-    "<li><strong>16x16</strong> — Large room for exploration experiments (fixed start)</li>"
-    "</ul>"
+
+def get_empty_html(env_id: str) -> str:
+    """Generate Empty Room HTML documentation for a specific variant."""
+    size = "8×8"
+    start_type = "fixed start"
+    
+    if "5x5" in env_id:
+        size = "5×5"
+        desc = "Tiny room"
+    elif "6x6" in env_id:
+        size = "6×6"
+        desc = "Small room"
+    elif "16x16" in env_id:
+        size = "16×16"
+        desc = "Large room for exploration experiments"
+    else:  # 8x8
+        size = "8×8"
+        desc = "Medium room"
+    
+    if "Random" in env_id:
+        start_type = "random start"
+        desc += " with randomized agent starting position each episode"
+    else:
+        desc += " with fixed starting position"
+    
+    return (
+        f"<h2>{env_id}</h2>"
+        f"<p>{desc}. Empty room with a green goal tile — no obstacles. Ideal for debugging observation pipelines, testing sparse reward handling, and validating agent navigation.</p>"
+        "<h4>Available Variants</h4>"
+        "<ul>"
+        "<li><strong>MiniGrid-Empty-5x5-v0</strong>: 5×5 grid (fixed start)</li>"
+        "<li><strong>MiniGrid-Empty-Random-5x5-v0</strong>: 5×5 grid (random start)</li>"
+        "<li><strong>MiniGrid-Empty-6x6-v0</strong>: 6×6 grid (fixed start)</li>"
+        "<li><strong>MiniGrid-Empty-Random-6x6-v0</strong>: 6×6 grid (random start)</li>"
+        "<li><strong>MiniGrid-Empty-8x8-v0</strong>: 8×8 grid (fixed start)</li>"
+        "<li><strong>MiniGrid-Empty-16x16-v0</strong>: 16×16 grid (fixed start)</li>"
+        "</ul>"
     "<h4>Observation</h4>"
     "<p>Dict observation with <code>image</code> (RGB, 7×7×3), <code>direction</code> (0=right,1=down,2=left,3=up) and <code>mission</code> text. The GUI flattens this to a uint8 vector while keeping the RGB frame for rendering.</p>"
     "<h4>Rewards</h4>"
@@ -38,6 +62,10 @@ MINIGRID_EMPTY_HTML = (
     "</ul>"
     "<p><strong>Keyboard:</strong> ←/A, →/D, ↑/W, Space/G (pick up), H (drop), E/Enter (toggle), Q (done).</p>"
     "<p>See the docs: <a href=\"https://minigrid.farama.org/environments/minigrid/EmptyEnv/\">MiniGrid Empty Room</a></p>"
-)
+    )
 
-__all__ = ["MINIGRID_EMPTY_HTML"]
+
+# For backward compatibility
+MINIGRID_EMPTY_HTML = get_empty_html("MiniGrid-Empty-8x8-v0")
+
+__all__ = ["MINIGRID_EMPTY_HTML", "get_empty_html"]

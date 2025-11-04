@@ -67,7 +67,7 @@ class TestSpadeBdiAnalyticsTabs:
         self.manager.ensure_wandb_tab("run-sb-wab", "spade-agent", metadata)
 
         tab_map = self.render_tabs._agent_tabs.get("run-sb-wab", {})
-        assert "WAB-Agent-spade-agent" in tab_map
-        widget = tab_map["WAB-Agent-spade-agent"]
+        assert "WANDB-Agent-spade-agent" in tab_map
+        widget = tab_map["WANDB-Agent-spade-agent"]
         assert isinstance(widget, WandbArtifactTab)
         widget.append_status_line("wandb login succeeded for SPADE-BDI")

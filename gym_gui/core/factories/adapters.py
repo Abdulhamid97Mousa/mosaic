@@ -89,8 +89,19 @@ def create_adapter(
     )
     from gym_gui.core.adapters.minigrid import (
         MiniGridAdapter,
-        MiniGridDoorKeyAdapter,
-        MiniGridLavaGapAdapter,
+        MiniGridEmpty5x5Adapter,
+        MiniGridEmptyRandom5x5Adapter,
+        MiniGridEmpty6x6Adapter,
+        MiniGridEmptyRandom6x6Adapter,
+        MiniGridEmpty8x8Adapter,
+        MiniGridEmpty16x16Adapter,
+        MiniGridDoorKey5x5Adapter,
+        MiniGridDoorKey6x6Adapter,
+        MiniGridDoorKey8x8Adapter,
+        MiniGridDoorKey16x16Adapter,
+        MiniGridLavaGapS5Adapter,
+        MiniGridLavaGapS6Adapter,
+        MiniGridLavaGapS7Adapter,
     )
     from gym_gui.core.adapters.box2d import (
         BipedalWalkerAdapter,
@@ -116,12 +127,8 @@ def create_adapter(
             adapter = CarRacingAdapter(context, config=game_config)
         elif adapter_cls is BipedalWalkerAdapter and isinstance(game_config, BipedalWalkerConfig):
             adapter = BipedalWalkerAdapter(context, config=game_config)
-        elif adapter_cls is MiniGridAdapter and isinstance(game_config, MiniGridConfig):
-            adapter = MiniGridAdapter(context, config=game_config)
-        elif adapter_cls is MiniGridDoorKeyAdapter and isinstance(game_config, MiniGridConfig):
-            adapter = MiniGridDoorKeyAdapter(context, config=game_config)
-        elif adapter_cls is MiniGridLavaGapAdapter and isinstance(game_config, MiniGridConfig):
-            adapter = MiniGridLavaGapAdapter(context, config=game_config)
+        elif issubclass(adapter_cls, MiniGridAdapter) and isinstance(game_config, MiniGridConfig):
+            adapter = adapter_cls(context, config=game_config)
         else:
             adapter = adapter_cls(context)
     else:

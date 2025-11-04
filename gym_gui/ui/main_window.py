@@ -1299,8 +1299,17 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         worker_config = worker_meta.get("config", {}) if isinstance(worker_meta, dict) else {}
         agent_id_key = worker_meta.get("agent_id") or worker_config.get("agent_id") or "default"
         self._run_metadata[(run_id, agent_id_key)] = metadata
-        self._analytics_tabs.ensure_tensorboard_tab(run_id, agent_id_key, metadata)
-        self._analytics_tabs.ensure_wandb_tab(run_id, agent_id_key, metadata)
+
+        tb_ready = self._analytics_tabs.ensure_tensorboard_tab(run_id, agent_id_key, metadata)
+        wb_ready = self._analytics_tabs.ensure_wandb_tab(run_id, agent_id_key, metadata)
+
+        if not wb_ready:
+            # Schedule retries so that W&B manifest written after initialization triggers the tab.
+            self._analytics_tabs.load_and_create_tabs(run_id, agent_id_key)
+
+        if not tb_ready:
+            # TensorBoard manifests usually exist up front; if they do not, reuse the same retry path.
+            self._analytics_tabs.load_and_create_tabs(run_id, agent_id_key)
 
         # Subscribe to telemetry
         # NOTE: Do NOT call _create_agent_tabs_for() here!
@@ -1584,8 +1593,34 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 if len(parts) >= 2:
                     agent_id = parts[1]
                     agent_ids_with_tabs.add(agent_id)
-        
-        self.log_constant( 
+
+        if not agent_ids_with_tabs:
+            # Analytics-only runs (Fast Path) may never instantiate live tabs. Fall back to
+            # metadata captured at submission time so we can surface analytics tabs.
+            for (meta_run_id, meta_agent_id), _metadata in self._run_metadata.items():
+                if meta_run_id != run_id:
+                    continue
+                if not meta_agent_id:
+                    continue
+                agent_ids_with_tabs.add(meta_agent_id)
+
+            if agent_ids_with_tabs:
+                self.log_constant(
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message="_on_training_finished: using metadata agent ids",
+                    extra={"run_id": run_id, "agent_ids": list(agent_ids_with_tabs)},
+                )
+            else:
+                # Guarantee downstream logic executes at least once; analytics tabs will use
+                # "default" which matches legacy emitter behaviour.
+                agent_ids_with_tabs.add("default")
+                self.log_constant(
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message="_on_training_finished: no agent tabs or metadata; defaulting",
+                    extra={"run_id": run_id},
+                )
+
+        self.log_constant(
             LOG_UI_MAINWINDOW_TRACE,
             message="_on_training_finished: extracted agent IDs",
             extra={"run_id": run_id, "agent_ids": list(agent_ids_with_tabs)},
@@ -1603,9 +1638,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 extra={"run_id": run_id, "agent_id": agent_id, "replay_tab_name": replay_tab_name},
             )
 
-            metadata = self._run_metadata.get((run_id, agent_id))
-            self._analytics_tabs.ensure_tensorboard_tab(run_id, agent_id, metadata)
-            self._analytics_tabs.ensure_wandb_tab(run_id, agent_id, metadata)
+            # Load analytics.json from disk and create/refresh analytics tabs (TensorBoard, W&B)
+            self._analytics_tabs.load_and_create_tabs(run_id, agent_id)
 
             # Check if replay tab already exists
             if replay_tab_name in agent_tabs:

@@ -79,8 +79,16 @@ class GameId(StrEnum):
     MINIGRID_MULTIROOM_N2_S4 = "MiniGrid-MultiRoom-N2-S4-v0"
     MINIGRID_MULTIROOM_N4_S5 = "MiniGrid-MultiRoom-N4-S5-v0"
     MINIGRID_MULTIROOM_N6 = "MiniGrid-MultiRoom-N6-v0"
-    MINIGRID_OBSTRUCTED_MAZE_1DLHB = "MiniGrid-ObstructedMaze-1Dlhb-v0"
-    MINIGRID_OBSTRUCTED_MAZE_FULL = "MiniGrid-ObstructedMaze-Full-v0"
+    MINIGRID_OBSTRUCTED_MAZE_1DLHB = "MiniGrid-ObstructedMaze-1Dlhb-v1"
+    MINIGRID_OBSTRUCTED_MAZE_FULL = "MiniGrid-ObstructedMaze-Full-v1"
+    MINIGRID_LAVA_CROSSING_S9N1 = "MiniGrid-LavaCrossingS9N1-v0"
+    MINIGRID_LAVA_CROSSING_S9N2 = "MiniGrid-LavaCrossingS9N2-v0"
+    MINIGRID_LAVA_CROSSING_S9N3 = "MiniGrid-LavaCrossingS9N3-v0"
+    MINIGRID_LAVA_CROSSING_S11N5 = "MiniGrid-LavaCrossingS11N5-v0"
+    MINIGRID_SIMPLE_CROSSING_S9N1 = "MiniGrid-SimpleCrossingS9N1-v0"
+    MINIGRID_SIMPLE_CROSSING_S9N2 = "MiniGrid-SimpleCrossingS9N2-v0"
+    MINIGRID_SIMPLE_CROSSING_S9N3 = "MiniGrid-SimpleCrossingS9N3-v0"
+    MINIGRID_SIMPLE_CROSSING_S11N5 = "MiniGrid-SimpleCrossingS11N5-v0"
 
 
 def get_game_display_name(game_id: GameId) -> str:
@@ -222,6 +230,14 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.MINIGRID_LAVAGAP_S5: EnvironmentFamily.MINIGRID,
     GameId.MINIGRID_LAVAGAP_S6: EnvironmentFamily.MINIGRID,
     GameId.MINIGRID_LAVAGAP_S7: EnvironmentFamily.MINIGRID,
+    GameId.MINIGRID_LAVA_CROSSING_S9N1: EnvironmentFamily.MINIGRID,
+    GameId.MINIGRID_LAVA_CROSSING_S9N2: EnvironmentFamily.MINIGRID,
+    GameId.MINIGRID_LAVA_CROSSING_S9N3: EnvironmentFamily.MINIGRID,
+    GameId.MINIGRID_LAVA_CROSSING_S11N5: EnvironmentFamily.MINIGRID,
+    GameId.MINIGRID_SIMPLE_CROSSING_S9N1: EnvironmentFamily.MINIGRID,
+    GameId.MINIGRID_SIMPLE_CROSSING_S9N2: EnvironmentFamily.MINIGRID,
+    GameId.MINIGRID_SIMPLE_CROSSING_S9N3: EnvironmentFamily.MINIGRID,
+    GameId.MINIGRID_SIMPLE_CROSSING_S11N5: EnvironmentFamily.MINIGRID,
 }
 
 
@@ -265,6 +281,14 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.MINIGRID_LAVAGAP_S5: RenderMode.RGB_ARRAY,
     GameId.MINIGRID_LAVAGAP_S6: RenderMode.RGB_ARRAY,
     GameId.MINIGRID_LAVAGAP_S7: RenderMode.RGB_ARRAY,
+    GameId.MINIGRID_LAVA_CROSSING_S9N1: RenderMode.RGB_ARRAY,
+    GameId.MINIGRID_LAVA_CROSSING_S9N2: RenderMode.RGB_ARRAY,
+    GameId.MINIGRID_LAVA_CROSSING_S9N3: RenderMode.RGB_ARRAY,
+    GameId.MINIGRID_LAVA_CROSSING_S11N5: RenderMode.RGB_ARRAY,
+    GameId.MINIGRID_SIMPLE_CROSSING_S9N1: RenderMode.RGB_ARRAY,
+    GameId.MINIGRID_SIMPLE_CROSSING_S9N2: RenderMode.RGB_ARRAY,
+    GameId.MINIGRID_SIMPLE_CROSSING_S9N3: RenderMode.RGB_ARRAY,
+    GameId.MINIGRID_SIMPLE_CROSSING_S11N5: RenderMode.RGB_ARRAY,
 }
 
 
@@ -445,6 +469,70 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
         ControlMode.MULTI_AGENT_COMPETITIVE,
     ),
     GameId.MINIGRID_LAVAGAP_S7: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+        ControlMode.MULTI_AGENT_COOP,
+        ControlMode.MULTI_AGENT_COMPETITIVE,
+    ),
+    GameId.MINIGRID_LAVA_CROSSING_S9N1: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+        ControlMode.MULTI_AGENT_COOP,
+        ControlMode.MULTI_AGENT_COMPETITIVE,
+    ),
+    GameId.MINIGRID_LAVA_CROSSING_S9N2: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+        ControlMode.MULTI_AGENT_COOP,
+        ControlMode.MULTI_AGENT_COMPETITIVE,
+    ),
+    GameId.MINIGRID_LAVA_CROSSING_S9N3: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+        ControlMode.MULTI_AGENT_COOP,
+        ControlMode.MULTI_AGENT_COMPETITIVE,
+    ),
+    GameId.MINIGRID_LAVA_CROSSING_S11N5: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+        ControlMode.MULTI_AGENT_COOP,
+        ControlMode.MULTI_AGENT_COMPETITIVE,
+    ),
+    GameId.MINIGRID_SIMPLE_CROSSING_S9N1: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+        ControlMode.MULTI_AGENT_COOP,
+        ControlMode.MULTI_AGENT_COMPETITIVE,
+    ),
+    GameId.MINIGRID_SIMPLE_CROSSING_S9N2: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+        ControlMode.MULTI_AGENT_COOP,
+        ControlMode.MULTI_AGENT_COMPETITIVE,
+    ),
+    GameId.MINIGRID_SIMPLE_CROSSING_S9N3: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+        ControlMode.MULTI_AGENT_COOP,
+        ControlMode.MULTI_AGENT_COMPETITIVE,
+    ),
+    GameId.MINIGRID_SIMPLE_CROSSING_S11N5: (
         ControlMode.HUMAN_ONLY,
         ControlMode.AGENT_ONLY,
         ControlMode.HYBRID_TURN_BASED,

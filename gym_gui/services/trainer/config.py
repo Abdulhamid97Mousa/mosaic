@@ -13,7 +13,7 @@ from jsonschema import Draft202012Validator, ValidationError
 from ulid import ULID
 
 from gym_gui.constants import TRAINER_DEFAULTS
-from gym_gui.config.paths import VAR_TENSORBOARD_DIR
+from gym_gui.config.paths import VAR_TENSORBOARD_DIR, VAR_WANDB_DIR
 from gym_gui.utils import json_serialization
 
 
@@ -245,6 +245,10 @@ def validate_train_run_config(raw: Mapping[str, Any]) -> TrainRunConfig:
     run_id = existing_run_id or str(ULID())
     tensorboard_relative = f"var/trainer/runs/{run_id}/tensorboard"
     tensorboard_absolute = (VAR_TENSORBOARD_DIR / run_id / "tensorboard").resolve()
+    
+    # W&B manifest file path (worker will write run_path here after wandb.init())
+    wandb_manifest_file = (VAR_WANDB_DIR / run_id / "wandb.json").resolve()
+    wandb_relative = f"var/trainer/runs/{run_id}/wandb.json"
 
     # CRITICAL: Update worker config with the correct ULID-based run_id
     # The UI builds config with run_name, but we need to use the ULID-based run_id
@@ -266,6 +270,23 @@ def validate_train_run_config(raw: Mapping[str, Any]) -> TrainRunConfig:
         tensorboard_meta["relative_path"] = tensorboard_relative
         tensorboard_meta.setdefault("enabled", True)
         tensorboard_meta["log_dir"] = str(tensorboard_absolute)
+        
+        # Initialize W&B metadata with manifest file path (like TensorBoard)
+        wandb_meta = artifacts_meta.get("wandb")
+        if not isinstance(wandb_meta, MutableMapping):
+            wandb_meta = {}
+            artifacts_meta["wandb"] = wandb_meta
+        
+        # Set enabled based on whether track_wandb flag is present in worker extra config
+        worker_extra = worker_config.get("extra", {}) if isinstance(worker_config, Mapping) else {}
+        track_wandb = bool(worker_extra.get("track_wandb", False))
+        wandb_meta.setdefault("enabled", track_wandb)
+        
+        # Point to manifest file location (worker will write run_path here after wandb.init())
+        wandb_meta["manifest_file"] = str(wandb_manifest_file)
+        wandb_meta["relative_path"] = wandb_relative
+        wandb_meta.setdefault("run_path", "")  # Will be read from manifest file
+        
         metadata_payload["artifacts"] = artifacts_meta
 
     metadata = TrainerRunMetadata(run_id=run_id, digest=digest, submitted_at=submitted)

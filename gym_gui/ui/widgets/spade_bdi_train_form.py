@@ -228,7 +228,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._tensorboard_checkbox.setEnabled(False)
         analytics_layout.addWidget(self._tensorboard_checkbox)
 
-        self._wandb_checkbox = QtWidgets.QCheckBox("Export Weights && Biases run")
+        self._wandb_checkbox = QtWidgets.QCheckBox("Export WANDB artifacts")
         self._wandb_checkbox.setEnabled(False)
         self._wandb_checkbox.toggled.connect(self._on_wandb_checkbox_toggled)
         analytics_layout.addWidget(self._wandb_checkbox)
@@ -780,7 +780,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 hint.setText("Select analytics to export after the run completes (fast training only).")
                 hint.setStyleSheet("color: #2e7d32; font-size: 10px;")
             else:
-                hint.setText("Enable Fast Training to export TensorBoard and W&B analytics.")
+                hint.setText("Enable Fast Training to export TensorBoard and WANDB analytics.")
                 hint.setStyleSheet("color: #777777; font-size: 10px;")
 
     def _on_wandb_checkbox_toggled(self, checked: bool) -> None:

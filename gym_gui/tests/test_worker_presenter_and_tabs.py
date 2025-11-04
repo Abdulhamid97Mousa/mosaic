@@ -609,8 +609,8 @@ class TestAnalyticsTabManager(unittest.TestCase):
         self.manager.ensure_wandb_tab("run-wandb", "agent-2", metadata)
 
         agent_tabs = self.render_tabs._agent_tabs.get("run-wandb", {})
-        self.assertIn("WAB-Agent-agent-2", agent_tabs)
-        widget = agent_tabs["WAB-Agent-agent-2"]
+        self.assertIn("WANDB-Agent-agent-2", agent_tabs)
+        widget = agent_tabs["WANDB-Agent-agent-2"]
         self.assertIsInstance(widget, WandbArtifactTab)
         widget.append_status_line("wandb login succeeded")
 

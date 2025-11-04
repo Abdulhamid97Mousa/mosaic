@@ -321,10 +321,40 @@ class MiniGridAdapter(EnvironmentAdapter[np.ndarray, int]):
         return metrics
 
 
-class MiniGridDoorKeyAdapter(MiniGridAdapter):
-    """Adapter specialising defaults for MiniGrid-DoorKey-8x8-v0."""
+class MiniGridEmpty5x5Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-Empty-5x5-v0."""
 
-    DEFAULT_ENV_ID = GameId.MINIGRID_DOORKEY_8x8.value
+    DEFAULT_ENV_ID = GameId.MINIGRID_EMPTY_5x5.value
+
+
+class MiniGridEmptyRandom5x5Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-Empty-Random-5x5-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_EMPTY_RANDOM_5x5.value
+
+
+class MiniGridEmpty6x6Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-Empty-6x6-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_EMPTY_6x6.value
+
+
+class MiniGridEmptyRandom6x6Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-Empty-Random-6x6-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_EMPTY_RANDOM_6x6.value
+
+
+class MiniGridEmpty8x8Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-Empty-8x8-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_EMPTY_8x8.value
+
+
+class MiniGridEmpty16x16Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-Empty-16x16-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_EMPTY_16x16.value
 
 
 class MiniGridDoorKey5x5Adapter(MiniGridAdapter):
@@ -339,19 +369,67 @@ class MiniGridDoorKey6x6Adapter(MiniGridAdapter):
     DEFAULT_ENV_ID = GameId.MINIGRID_DOORKEY_6x6.value
 
 
+class MiniGridDoorKey8x8Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-DoorKey-8x8-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_DOORKEY_8x8.value
+
+
 class MiniGridDoorKey16x16Adapter(MiniGridAdapter):
     """Adapter specialising defaults for MiniGrid-DoorKey-16x16-v0."""
 
     DEFAULT_ENV_ID = GameId.MINIGRID_DOORKEY_16x16.value
 
 
-class MiniGridLavaGapAdapter(MiniGridAdapter):
+class MiniGridLavaGapS5Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-LavaGapS5-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_LAVAGAP_S5.value
+
+
+class MiniGridLavaGapS6Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-LavaGapS6-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_LAVAGAP_S6.value
+
+
+class MiniGridLavaGapS7Adapter(MiniGridAdapter):
     """Adapter specialising defaults for MiniGrid-LavaGapS7-v0."""
 
     DEFAULT_ENV_ID = GameId.MINIGRID_LAVAGAP_S7.value
 
 
-class MiniGridDynamicObstaclesAdapter(MiniGridAdapter):
+class MiniGridDynamicObstacles5x5Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-Dynamic-Obstacles-5x5-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_DYNAMIC_OBSTACLES_5X5.value
+
+
+class MiniGridDynamicObstaclesRandom5x5Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-Dynamic-Obstacles-Random-5x5-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_DYNAMIC_OBSTACLES_RANDOM_5X5.value
+
+
+class MiniGridDynamicObstacles6x6Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-Dynamic-Obstacles-6x6-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_DYNAMIC_OBSTACLES_6X6.value
+
+
+class MiniGridDynamicObstaclesRandom6x6Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-Dynamic-Obstacles-Random-6x6-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_DYNAMIC_OBSTACLES_RANDOM_6X6.value
+
+
+class MiniGridDynamicObstacles8x8Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-Dynamic-Obstacles-8x8-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_DYNAMIC_OBSTACLES_8X8.value
+
+
+class MiniGridDynamicObstacles16x16Adapter(MiniGridAdapter):
     """Adapter specialising defaults for MiniGrid-Dynamic-Obstacles-16x16-v0."""
 
     DEFAULT_ENV_ID = GameId.MINIGRID_DYNAMIC_OBSTACLES_16X16.value
@@ -375,45 +453,122 @@ class MiniGridObstructedMazeAdapter(MiniGridAdapter):
     DEFAULT_ENV_ID = GameId.MINIGRID_OBSTRUCTED_MAZE_FULL.value
 
 
+class MiniGridLavaCrossingS9N1Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-LavaCrossingS9N1-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_LAVA_CROSSING_S9N1.value
+
+
+class MiniGridLavaCrossingS9N2Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-LavaCrossingS9N2-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_LAVA_CROSSING_S9N2.value
+
+
+class MiniGridLavaCrossingS9N3Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-LavaCrossingS9N3-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_LAVA_CROSSING_S9N3.value
+
+
+class MiniGridLavaCrossingS11N5Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-LavaCrossingS11N5-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_LAVA_CROSSING_S11N5.value
+
+
+class MiniGridSimpleCrossingS9N1Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-SimpleCrossingS9N1-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_SIMPLE_CROSSING_S9N1.value
+
+
+class MiniGridSimpleCrossingS9N2Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-SimpleCrossingS9N2-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_SIMPLE_CROSSING_S9N2.value
+
+
+class MiniGridSimpleCrossingS9N3Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-SimpleCrossingS9N3-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_SIMPLE_CROSSING_S9N3.value
+
+
+class MiniGridSimpleCrossingS11N5Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-SimpleCrossingS11N5-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_SIMPLE_CROSSING_S11N5.value
+
+
 MINIGRID_ADAPTERS: dict[GameId, type[MiniGridAdapter]] = {
-    GameId.MINIGRID_EMPTY_5x5: MiniGridAdapter,
-    GameId.MINIGRID_EMPTY_RANDOM_5x5: MiniGridAdapter,
-    GameId.MINIGRID_EMPTY_6x6: MiniGridAdapter,
-    GameId.MINIGRID_EMPTY_RANDOM_6x6: MiniGridAdapter,
-    GameId.MINIGRID_EMPTY_8x8: MiniGridAdapter,
-    GameId.MINIGRID_EMPTY_16x16: MiniGridAdapter,
+    GameId.MINIGRID_EMPTY_5x5: MiniGridEmpty5x5Adapter,
+    GameId.MINIGRID_EMPTY_RANDOM_5x5: MiniGridEmptyRandom5x5Adapter,
+    GameId.MINIGRID_EMPTY_6x6: MiniGridEmpty6x6Adapter,
+    GameId.MINIGRID_EMPTY_RANDOM_6x6: MiniGridEmptyRandom6x6Adapter,
+    GameId.MINIGRID_EMPTY_8x8: MiniGridEmpty8x8Adapter,
+    GameId.MINIGRID_EMPTY_16x16: MiniGridEmpty16x16Adapter,
     GameId.MINIGRID_DOORKEY_5x5: MiniGridDoorKey5x5Adapter,
     GameId.MINIGRID_DOORKEY_6x6: MiniGridDoorKey6x6Adapter,
-    GameId.MINIGRID_DOORKEY_8x8: MiniGridDoorKeyAdapter,
+    GameId.MINIGRID_DOORKEY_8x8: MiniGridDoorKey8x8Adapter,
     GameId.MINIGRID_DOORKEY_16x16: MiniGridDoorKey16x16Adapter,
-    GameId.MINIGRID_LAVAGAP_S5: MiniGridLavaGapAdapter,
-    GameId.MINIGRID_LAVAGAP_S6: MiniGridLavaGapAdapter,
-    GameId.MINIGRID_LAVAGAP_S7: MiniGridLavaGapAdapter,
-    GameId.MINIGRID_DYNAMIC_OBSTACLES_5X5: MiniGridDynamicObstaclesAdapter,
-    GameId.MINIGRID_DYNAMIC_OBSTACLES_RANDOM_5X5: MiniGridDynamicObstaclesAdapter,
-    GameId.MINIGRID_DYNAMIC_OBSTACLES_6X6: MiniGridDynamicObstaclesAdapter,
-    GameId.MINIGRID_DYNAMIC_OBSTACLES_RANDOM_6X6: MiniGridDynamicObstaclesAdapter,
-    GameId.MINIGRID_DYNAMIC_OBSTACLES_8X8: MiniGridDynamicObstaclesAdapter,
-    GameId.MINIGRID_DYNAMIC_OBSTACLES_16X16: MiniGridDynamicObstaclesAdapter,
+    GameId.MINIGRID_LAVAGAP_S5: MiniGridLavaGapS5Adapter,
+    GameId.MINIGRID_LAVAGAP_S6: MiniGridLavaGapS6Adapter,
+    GameId.MINIGRID_LAVAGAP_S7: MiniGridLavaGapS7Adapter,
+    GameId.MINIGRID_DYNAMIC_OBSTACLES_5X5: MiniGridDynamicObstacles5x5Adapter,
+    GameId.MINIGRID_DYNAMIC_OBSTACLES_RANDOM_5X5: MiniGridDynamicObstaclesRandom5x5Adapter,
+    GameId.MINIGRID_DYNAMIC_OBSTACLES_6X6: MiniGridDynamicObstacles6x6Adapter,
+    GameId.MINIGRID_DYNAMIC_OBSTACLES_RANDOM_6X6: MiniGridDynamicObstaclesRandom6x6Adapter,
+    GameId.MINIGRID_DYNAMIC_OBSTACLES_8X8: MiniGridDynamicObstacles8x8Adapter,
+    GameId.MINIGRID_DYNAMIC_OBSTACLES_16X16: MiniGridDynamicObstacles16x16Adapter,
     GameId.MINIGRID_BLOCKED_UNLOCK_PICKUP: MiniGridBlockedUnlockPickupAdapter,
     GameId.MINIGRID_MULTIROOM_N2_S4: MiniGridMultiRoomAdapter,
     GameId.MINIGRID_MULTIROOM_N4_S5: MiniGridMultiRoomAdapter,
     GameId.MINIGRID_MULTIROOM_N6: MiniGridMultiRoomAdapter,
     GameId.MINIGRID_OBSTRUCTED_MAZE_1DLHB: MiniGridObstructedMazeAdapter,
     GameId.MINIGRID_OBSTRUCTED_MAZE_FULL: MiniGridObstructedMazeAdapter,
+    GameId.MINIGRID_LAVA_CROSSING_S9N1: MiniGridLavaCrossingS9N1Adapter,
+    GameId.MINIGRID_LAVA_CROSSING_S9N2: MiniGridLavaCrossingS9N2Adapter,
+    GameId.MINIGRID_LAVA_CROSSING_S9N3: MiniGridLavaCrossingS9N3Adapter,
+    GameId.MINIGRID_LAVA_CROSSING_S11N5: MiniGridLavaCrossingS11N5Adapter,
+    GameId.MINIGRID_SIMPLE_CROSSING_S9N1: MiniGridSimpleCrossingS9N1Adapter,
+    GameId.MINIGRID_SIMPLE_CROSSING_S9N2: MiniGridSimpleCrossingS9N2Adapter,
+    GameId.MINIGRID_SIMPLE_CROSSING_S9N3: MiniGridSimpleCrossingS9N3Adapter,
+    GameId.MINIGRID_SIMPLE_CROSSING_S11N5: MiniGridSimpleCrossingS11N5Adapter,
 }
 
 
 __all__ = [
     "MiniGridAdapter",
+    "MiniGridEmpty5x5Adapter",
+    "MiniGridEmptyRandom5x5Adapter",
+    "MiniGridEmpty6x6Adapter",
+    "MiniGridEmptyRandom6x6Adapter",
+    "MiniGridEmpty8x8Adapter",
+    "MiniGridEmpty16x16Adapter",
     "MiniGridDoorKey5x5Adapter",
     "MiniGridDoorKey6x6Adapter",
-    "MiniGridDoorKeyAdapter",
+    "MiniGridDoorKey8x8Adapter",
     "MiniGridDoorKey16x16Adapter",
-    "MiniGridLavaGapAdapter",
-    "MiniGridDynamicObstaclesAdapter",
+    "MiniGridLavaGapS5Adapter",
+    "MiniGridLavaGapS6Adapter",
+    "MiniGridLavaGapS7Adapter",
+    "MiniGridDynamicObstacles5x5Adapter",
+    "MiniGridDynamicObstaclesRandom5x5Adapter",
+    "MiniGridDynamicObstacles6x6Adapter",
+    "MiniGridDynamicObstaclesRandom6x6Adapter",
+    "MiniGridDynamicObstacles8x8Adapter",
+    "MiniGridDynamicObstacles16x16Adapter",
     "MiniGridBlockedUnlockPickupAdapter",
     "MiniGridMultiRoomAdapter",
     "MiniGridObstructedMazeAdapter",
+    "MiniGridLavaCrossingS9N1Adapter",
+    "MiniGridLavaCrossingS9N2Adapter",
+    "MiniGridLavaCrossingS9N3Adapter",
+    "MiniGridLavaCrossingS11N5Adapter",
+    "MiniGridSimpleCrossingS9N1Adapter",
+    "MiniGridSimpleCrossingS9N2Adapter",
+    "MiniGridSimpleCrossingS9N3Adapter",
+    "MiniGridSimpleCrossingS11N5Adapter",
     "MINIGRID_ADAPTERS",
 ]

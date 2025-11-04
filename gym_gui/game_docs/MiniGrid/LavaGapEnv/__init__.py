@@ -1,16 +1,32 @@
 """Documentation for MiniGrid Lava Gap environments."""
 from __future__ import annotations
 
-MINIGRID_LAVAGAP_HTML = (
-    "<h3>MiniGrid Lava Gap Family</h3>"
-    "<p>The agent must reach the green goal square at the opposite corner of the room, passing through a narrow gap in a vertical strip of deadly lava. "
-    "Touching the lava terminates the episode with zero reward. This environment is useful for studying safety and safe exploration.</p>"
-    "<h4>Variants</h4>"
-    "<ul>"
-    "<li><strong>S5</strong> — 5×5 grid with narrow lava gap</li>"
-    "<li><strong>S6</strong> — 6×6 grid with narrow lava gap</li>"
-    "<li><strong>S7</strong> — 7×7 grid with narrow lava gap (standard size)</li>"
-    "</ul>"
+
+def get_lavagap_html(env_id: str) -> str:
+    """Generate Lava Gap HTML documentation for a specific variant."""
+    size = "7×7"
+    desc = "standard benchmark"
+    
+    if "S5" in env_id:
+        size = "5×5"
+        desc = "compact challenge"
+    elif "S6" in env_id:
+        size = "6×6"
+        desc = "intermediate difficulty"
+    else:  # S7
+        size = "7×7"
+        desc = "standard benchmark"
+    
+    return (
+        f"<h2>{env_id}</h2>"
+        f"<p>The agent must reach the green goal square at the opposite corner of a <strong>{size}</strong> room, passing through a narrow gap in a vertical strip of deadly lava. "
+        f"Touching the lava terminates the episode with zero reward. This {desc} is useful for studying safety and safe exploration.</p>"
+        "<h4>Available Variants</h4>"
+        "<ul>"
+        "<li><strong>MiniGrid-LavaGapS5-v0</strong>: 5×5 grid with narrow lava gap</li>"
+        "<li><strong>MiniGrid-LavaGapS6-v0</strong>: 6×6 grid with narrow lava gap</li>"
+        "<li><strong>MiniGrid-LavaGapS7-v0</strong>: 7×7 grid with narrow lava gap (standard)</li>"
+        "</ul>"
     "<h4>Mission</h4>"
     "<p>Depending on the obstacle_type parameter:</p>"
     "<ul>"
@@ -45,6 +61,10 @@ MINIGRID_LAVAGAP_HTML = (
     "<li>Truncation: max_episode_steps timeout</li>"
     "</ul>"
     "<p>See the docs: <a href=\"https://minigrid.farama.org/environments/minigrid/LavaGapEnv/\">MiniGrid Lava Gap</a></p>"
-)
+    )
 
-__all__ = ["MINIGRID_LAVAGAP_HTML"]
+
+# For backward compatibility
+MINIGRID_LAVAGAP_HTML = get_lavagap_html("MiniGrid-LavaGapS7-v0")
+
+__all__ = ["MINIGRID_LAVAGAP_HTML", "get_lavagap_html"]

@@ -363,6 +363,15 @@ class HeadlessTrainer(LogConstantMixin):
                         "wandb_run_id": self._wandb_run.id,
                     },
                 )
+                # Write manifest file and emit artifact event (mirrors TensorBoard pattern)
+                manifest_path = self._write_wandb_manifest()
+                if manifest_path:
+                    self.emitter.artifact(
+                        self.config.run_id,
+                        kind="wandb",
+                        path=str(manifest_path),
+                        worker_id=self.config.worker_id,  # type: ignore[call-arg]
+                    )
         except Exception as exc:
             self.log_constant(
                 LOG_WORKER_RUNTIME_WARNING,
@@ -393,6 +402,49 @@ class HeadlessTrainer(LogConstantMixin):
                 message="Failed to log wandb episode metrics",
                 extra={"error": str(exc), "run_id": self.config.run_id},
             )
+
+    def _write_wandb_manifest(self) -> Optional[str]:
+        """Write wandb.json manifest file containing run_path (mirrors TensorBoard pattern).
+        
+        Returns:
+            Path to manifest file if successfully written, None otherwise.
+        """
+        if not self._wandb_run_path:
+            return None
+        
+        try:
+            from pathlib import Path
+            
+            run_root = (VAR_TRAINER_DIR / "runs" / self.config.run_id).resolve()
+            manifest_file = run_root / "wandb.json"
+            manifest_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            manifest_data = {
+                "run_path": self._wandb_run_path,
+                "run_id": self.config.run_id,
+                "agent_id": self.config.agent_id,
+                "game_id": self.config.game_id,
+            }
+            
+            manifest_file.write_text(json.dumps(manifest_data, indent=2), encoding="utf-8")
+            
+            self.log_constant(
+                LOG_WORKER_RUNTIME_EVENT,
+                message="W&B manifest file written",
+                extra={
+                    "run_id": self.config.run_id,
+                    "manifest_file": str(manifest_file),
+                    "run_path": self._wandb_run_path,
+                },
+            )
+            return str(manifest_file)
+        except Exception as exc:
+            self.log_constant(
+                LOG_WORKER_RUNTIME_WARNING,
+                message="Failed to write W&B manifest file",
+                extra={"error": str(exc), "run_id": self.config.run_id},
+            )
+            return None
 
     def _finalize_wandb(self, summaries: Sequence[EpisodeMetrics]) -> None:
         if not self._wandb_enabled or self._wandb_run is None:
@@ -439,10 +491,22 @@ class HeadlessTrainer(LogConstantMixin):
         ensure_var_directories()
         run_dir = (VAR_TRAINER_DIR / "runs" / self.config.run_id).resolve()
         run_dir.mkdir(parents=True, exist_ok=True)
+        
+        # Build nested structure matching GUI expectations
         manifest = {
-            "tensorboard_dir": str(self._tensorboard.log_dir) if self._tensorboard else None,
-            "wandb_run_path": self._wandb_run_path,
+            "artifacts": {
+                "tensorboard": {
+                    "enabled": self._tensorboard is not None,
+                    "log_dir": str(self._tensorboard.log_dir) if self._tensorboard else None,
+                    "relative_path": f"var/trainer/runs/{self.config.run_id}/tensorboard" if self._tensorboard else None,
+                },
+                "wandb": {
+                    "enabled": self._wandb_enabled and self._wandb_run_path is not None,
+                    "run_path": self._wandb_run_path,
+                },
+            }
         }
+        
         manifest_path = run_dir / "analytics.json"
         try:
             manifest_path.write_text(json.dumps(manifest, indent=2), encoding="utf-8")
