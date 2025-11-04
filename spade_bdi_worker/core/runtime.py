@@ -6,7 +6,6 @@ import copy
 import json
 import logging
 import os
-import subprocess
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence, Union
@@ -291,18 +290,35 @@ class HeadlessTrainer(LogConstantMixin):
             self._wandb_enabled = False
             return
         api_key = self._wandb_api_key or os.environ.get("WANDB_API_KEY")
-        if api_key:
-            if not self._attempt_wandb_cli_login(api_key):
-                try:
-                    wandb.login(key=api_key, relogin=True)
-                except Exception as exc:  # pragma: no cover
-                    self.log_constant(
-                        LOG_WORKER_RUNTIME_WARNING,
-                        message="wandb login failed; disabling tracking",
-                        extra={"error": str(exc), "run_id": self.config.run_id},
-                    )
-                    self._wandb_enabled = False
-                    return
+        wandb_email = self.config.extra.get("wandb_email") or os.environ.get("WANDB_EMAIL")
+        if wandb_email:
+            os.environ["WANDB_EMAIL"] = str(wandb_email)
+        run_root = (VAR_TRAINER_DIR / "runs" / self.config.run_id).resolve()
+        wandb_root = run_root / "wandb"
+        wandb_cache = wandb_root / "cache"
+        wandb_config_dir = wandb_root / "config"
+        for path in (wandb_root, wandb_cache, wandb_config_dir):
+            path.mkdir(parents=True, exist_ok=True)
+
+        os.environ.setdefault("WANDB_DIR", str(wandb_root))
+        os.environ.setdefault("WANDB_CACHE_DIR", str(wandb_cache))
+        os.environ.setdefault("WANDB_CONFIG_DIR", str(wandb_config_dir))
+        os.environ.setdefault("WANDB_NETRC_PATH", str(wandb_root / "netrc"))
+        os.environ.setdefault("WANDB_START_METHOD", "thread")
+        os.environ.setdefault("WANDB__SERVICE", "disabled")
+        try:
+            if api_key:
+                wandb.login(key=api_key, relogin=True)
+            else:
+                wandb.login(relogin=True)
+        except Exception as exc:  # pragma: no cover
+            self.log_constant(
+                LOG_WORKER_RUNTIME_WARNING,
+                message="wandb login failed; disabling tracking",
+                extra={"error": str(exc), "run_id": self.config.run_id},
+            )
+            self._wandb_enabled = False
+            return
 
         project = self._wandb_project or os.environ.get("WANDB_PROJECT") or "spade-bdi"
         entity = self._wandb_entity or os.environ.get("WANDB_ENTITY")
@@ -318,6 +334,7 @@ class HeadlessTrainer(LogConstantMixin):
         }
         config_fields = {k: v for k, v in config_fields.items() if v is not None}
         try:
+            settings = wandb.Settings(start_method="thread")
             self._wandb_run = wandb.init(
                 project=project,
                 entity=entity,
@@ -325,14 +342,17 @@ class HeadlessTrainer(LogConstantMixin):
                 config=config_fields,
                 notes=str(self.config.extra.get("notes") or ""),
                 tags=["spade-bdi", self.config.game_id],
+                settings=settings,
                 reinit=True,
             )
             if self._wandb_run is not None:
                 resolved_entity = self._wandb_run.entity or entity or ""
                 resolved_project = self._wandb_run.project or project
-                self._wandb_run_path = "/".join(
-                    part for part in (resolved_entity, resolved_project, f"runs/{self._wandb_run.id}") if part
-                )
+                run_identifier = self._wandb_run.id or self._wandb_run.name or run_name
+                parts = [resolved_project, f"runs/{run_identifier}"]
+                if resolved_entity:
+                    parts.insert(0, resolved_entity)
+                self._wandb_run_path = "/".join(parts)
                 self.log_constant(
                     LOG_WORKER_RUNTIME_EVENT,
                     message="wandb run initialised",
@@ -433,42 +453,6 @@ class HeadlessTrainer(LogConstantMixin):
                 extra={"error": str(exc), "run_id": self.config.run_id, "path": str(manifest_path)},
             )
 
-    def _attempt_wandb_cli_login(self, api_key: str) -> bool:
-        """Attempt to authenticate with the wandb CLI."""
-        try:
-            result = subprocess.run(
-                ["wandb", "login", "--relogin", "--key", api_key],
-                capture_output=True,
-                text=True,
-                check=True,
-                env={**os.environ, "WANDB_API_KEY": api_key},
-                timeout=15,
-            )
-            self.log_constant(
-                LOG_WORKER_RUNTIME_EVENT,
-                message="wandb CLI login succeeded",
-                extra={"stdout": result.stdout.strip(), "run_id": self.config.run_id},
-            )
-            return True
-        except FileNotFoundError:
-            self.log_constant(
-                LOG_WORKER_RUNTIME_WARNING,
-                message="wandb CLI not found; falling back to python API",
-                extra={"run_id": self.config.run_id},
-            )
-            return False
-        except (subprocess.CalledProcessError, subprocess.TimeoutExpired) as exc:
-            self.log_constant(
-                LOG_WORKER_RUNTIME_WARNING,
-                message="wandb CLI login failed",
-                extra={
-                    "return_code": getattr(exc, "returncode", None),
-                    "stdout": getattr(exc, "stdout", "") or "",
-                    "stderr": getattr(exc, "stderr", "") or "",
-                    "run_id": self.config.run_id,
-                },
-            )
-            return False
 
     # ------------------------------------------------------------------
     def _run_episode(self, episode_index: int, episode_number: int, episode_seed: int) -> EpisodeMetrics:

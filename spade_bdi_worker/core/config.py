@@ -87,6 +87,17 @@ class RunConfig:
         headless = bool(data.pop("headless", True))
         step_delay = float(data.pop("step_delay", DEFAULT_STEP_DELAY_S))
 
+        # Merge any nested "extra" payload into the remaining data so callers can
+        # look up fields directly from ``RunConfig.extra``. The UI currently nests
+        # worker extras under ``extra.extra`` which meant flags such as
+        # ``track_wandb`` never surfaced at runtime, disabling analytics wiring.
+        nested_extra = data.pop("extra", {})
+        if isinstance(nested_extra, dict):
+            # Only populate keys that are not already present in the outer dict so
+            # explicit overrides (e.g. telemetry buffer sizes) continue to win.
+            for key, value in nested_extra.items():
+                data.setdefault(key, value)
+
         return cls(
             run_id=run_id,
             game_id=game_id,
