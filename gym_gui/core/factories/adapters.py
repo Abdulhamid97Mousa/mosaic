@@ -12,11 +12,14 @@ from gym_gui.config.game_configs import (
     BipedalWalkerConfig,
     FrozenLakeConfig,
     LunarLanderConfig,
+    MiniGridConfig,
     TaxiConfig,
+    BlackjackConfig,
 )
 from gym_gui.core.adapters.base import AdapterContext, EnvironmentAdapter
 from gym_gui.core.adapters.toy_text import TOY_TEXT_ADAPTERS
 from gym_gui.core.adapters.box2d import BOX2D_ADAPTERS
+from gym_gui.core.adapters.minigrid import MINIGRID_ADAPTERS
 from gym_gui.core.enums import GameId
 
 AdapterT = TypeVar("AdapterT", bound=EnvironmentAdapter)
@@ -37,6 +40,7 @@ def _registry() -> Mapping[GameId, type[EnvironmentAdapter]]:
     return {
         **TOY_TEXT_ADAPTERS,
         **BOX2D_ADAPTERS,
+        **MINIGRID_ADAPTERS,
     }
 
 
@@ -63,9 +67,11 @@ def create_adapter(
         FrozenLakeConfig
         | TaxiConfig
         | CliffWalkingConfig
+        | BlackjackConfig
         | LunarLanderConfig
         | CarRacingConfig
         | BipedalWalkerConfig
+        | MiniGridConfig
         | None
     ) = None,
 ) -> EnvironmentAdapter:
@@ -79,6 +85,23 @@ def create_adapter(
         FrozenLakeAdapter,
         FrozenLakeV2Adapter,
         TaxiAdapter,
+        BlackjackAdapter,
+    )
+    from gym_gui.core.adapters.minigrid import (
+        MiniGridAdapter,
+        MiniGridEmpty5x5Adapter,
+        MiniGridEmptyRandom5x5Adapter,
+        MiniGridEmpty6x6Adapter,
+        MiniGridEmptyRandom6x6Adapter,
+        MiniGridEmpty8x8Adapter,
+        MiniGridEmpty16x16Adapter,
+        MiniGridDoorKey5x5Adapter,
+        MiniGridDoorKey6x6Adapter,
+        MiniGridDoorKey8x8Adapter,
+        MiniGridDoorKey16x16Adapter,
+        MiniGridLavaGapS5Adapter,
+        MiniGridLavaGapS6Adapter,
+        MiniGridLavaGapS7Adapter,
     )
     from gym_gui.core.adapters.box2d import (
         BipedalWalkerAdapter,
@@ -96,12 +119,16 @@ def create_adapter(
             adapter = TaxiAdapter(context, game_config=game_config)
         elif adapter_cls is CliffWalkingAdapter and isinstance(game_config, CliffWalkingConfig):
             adapter = CliffWalkingAdapter(context, game_config=game_config)
+        elif adapter_cls is BlackjackAdapter and isinstance(game_config, BlackjackConfig):
+            adapter = BlackjackAdapter(context, game_config=game_config)
         elif adapter_cls is LunarLanderAdapter and isinstance(game_config, LunarLanderConfig):
             adapter = LunarLanderAdapter(context, config=game_config)
         elif adapter_cls is CarRacingAdapter and isinstance(game_config, CarRacingConfig):
             adapter = CarRacingAdapter(context, config=game_config)
         elif adapter_cls is BipedalWalkerAdapter and isinstance(game_config, BipedalWalkerConfig):
             adapter = BipedalWalkerAdapter(context, config=game_config)
+        elif issubclass(adapter_cls, MiniGridAdapter) and isinstance(game_config, MiniGridConfig):
+            adapter = adapter_cls(context, config=game_config)
         else:
             adapter = adapter_cls(context)
     else:

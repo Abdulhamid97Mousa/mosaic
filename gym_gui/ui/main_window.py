@@ -23,10 +23,16 @@ from gym_gui.config.game_configs import (
     FrozenLakeConfig,
     LunarLanderConfig,
     TaxiConfig,
+    DEFAULT_MINIGRID_EMPTY_5x5_CONFIG,
+    DEFAULT_MINIGRID_DOORKEY_5x5_CONFIG,
+    DEFAULT_MINIGRID_DOORKEY_6x6_CONFIG,
+    DEFAULT_MINIGRID_DOORKEY_8x8_CONFIG,
+    DEFAULT_MINIGRID_DOORKEY_16x16_CONFIG,
+    DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG,
 )
-from gym_gui.constants import UI_DEFAULTS
+from gym_gui.constants import UI_DEFAULTS, TRAINER_DEFAULTS
 from gym_gui.config.game_config_builder import GameConfigBuilder
-from gym_gui.config.paths import VAR_ROOT, VAR_TRAINER_DIR
+from gym_gui.config.paths import VAR_TRAINER_DIR
 from gym_gui.config.settings import Settings
 from gym_gui.core.enums import ControlMode, GameId
 from gym_gui.core.factories.adapters import available_games
@@ -44,6 +50,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_UI_WORKER_TABS_ERROR,
     LOG_UI_WORKER_TABS_INFO,
 )
+from gym_gui.constants import DEFAULT_RENDER_DELAY_MS
 from gym_gui.logging_config.logger import list_known_components
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.ui.logging_bridge import LogRecordPayload, QtLogHandler
@@ -51,7 +58,7 @@ from gym_gui.ui.presenters.main_window_presenter import MainWindowPresenter, Mai
 from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWidget
 from gym_gui.ui.indicators.busy_indicator import modal_busy_indicator
 from gym_gui.ui.widgets.render_tabs import RenderTabs
-from gym_gui.game_docs.game_info import get_game_info
+from gym_gui.game_docs import get_game_info
 from gym_gui.services.actor import ActorService
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
@@ -65,13 +72,22 @@ from gym_gui.ui.presenters.workers import (
 from gym_gui.ui.widgets.spade_bdi_worker_tabs import (
     AgentReplayTab,
 )
-from gym_gui.ui.widgets.tensorboard_artifact_tab import TensorboardArtifactTab
+from gym_gui.ui.panels.analytics_tabs import AnalyticsTabManager
 from gym_gui.ui.forms import get_worker_form_factory
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from gym_gui.ui.widgets.spade_bdi_train_form import SpadeBdiTrainForm
     from gym_gui.ui.widgets.spade_bdi_policy_selection_form import SpadeBdiPolicySelectionForm
 from gym_gui.services.trainer.signals import get_trainer_signals
+
+TRAINER_SUBMIT_DEADLINE_MULTIPLIER = 6
+
+
+def _training_submit_deadline_seconds() -> float:
+    """Return the gRPC deadline used for SubmitRun requests."""
+
+    return TRAINER_DEFAULTS.client.deadline_s * TRAINER_SUBMIT_DEADLINE_MULTIPLIER
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -139,6 +155,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._run_watch_subscription = None
         self._selected_policy_path: Optional[Path] = None
         self._run_metadata: Dict[tuple[str, str], Dict[str, Any]] = {}
+        self._trainer_daemon_ready: bool = False
+        self._trainer_poll_failures: int = 0
+        self._trainer_poll_quiet_logged: bool = False
         
         # Get live telemetry controller from service locator
         live_controller = locator.resolve(LiveTelemetryController)
@@ -163,6 +182,12 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             lunar_lander_config=LunarLanderConfig(),
             car_racing_config=CarRacingConfig.from_env(),
             bipedal_walker_config=BipedalWalkerConfig.from_env(),
+            minigrid_empty_config=DEFAULT_MINIGRID_EMPTY_5x5_CONFIG,
+            minigrid_doorkey_5x5_config=DEFAULT_MINIGRID_DOORKEY_5x5_CONFIG,
+            minigrid_doorkey_6x6_config=DEFAULT_MINIGRID_DOORKEY_6x6_CONFIG,
+            minigrid_doorkey_8x8_config=DEFAULT_MINIGRID_DOORKEY_8x8_CONFIG,
+            minigrid_doorkey_16x16_config=DEFAULT_MINIGRID_DOORKEY_16x16_CONFIG,
+            minigrid_lavagap_config=DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG,
             default_seed=settings.default_seed,
             allow_seed_reuse=settings.allow_seed_reuse,
             actors=actor_descriptors,
@@ -282,6 +307,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._render_group,
             telemetry_service=self._telemetry_service,
         )
+        self._analytics_tabs = AnalyticsTabManager(self._render_tabs, self)
         render_layout.addWidget(self._render_tabs)
         right_panel.addWidget(self._render_group)
 
@@ -1101,7 +1127,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._status_bar.showMessage("Submitting training run...", 3000)
 
             # Submit returns a Future
-            future = runner.submit_run(config_json)
+            future = runner.submit_run(config_json, deadline=_training_submit_deadline_seconds())
             self.log_constant( 
                 LOG_UI_MAINWINDOW_TRACE,
                 message="_submit_training_config: submit_run() called, future created",
@@ -1114,7 +1140,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     message="_submit_training_config: on_done callback called",
                 )
                 try:
-                    response = fut.result(timeout=3.0)
+                    response = fut.result()
                     self.log_constant( 
                         LOG_UI_MAINWINDOW_TRACE,
                         message=f"_submit_training_config: Got response with run_id={response.run_id}",
@@ -1273,7 +1299,17 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         worker_config = worker_meta.get("config", {}) if isinstance(worker_meta, dict) else {}
         agent_id_key = worker_meta.get("agent_id") or worker_config.get("agent_id") or "default"
         self._run_metadata[(run_id, agent_id_key)] = metadata
-        self._maybe_add_tensorboard_tab(run_id, agent_id_key, metadata)
+
+        tb_ready = self._analytics_tabs.ensure_tensorboard_tab(run_id, agent_id_key, metadata)
+        wb_ready = self._analytics_tabs.ensure_wandb_tab(run_id, agent_id_key, metadata)
+
+        if not wb_ready:
+            # Schedule retries so that WANDB manifest written after initialization triggers the tab.
+            self._analytics_tabs.load_and_create_tabs(run_id, agent_id_key)
+
+        if not tb_ready:
+            # TensorBoard manifests usually exist up front; if they do not, reuse the same retry path.
+            self._analytics_tabs.load_and_create_tabs(run_id, agent_id_key)
 
         # Subscribe to telemetry
         # NOTE: Do NOT call _create_agent_tabs_for() here!
@@ -1517,7 +1553,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                             message="Backfilled tensorboard artifacts into existing metadata",
                             extra={"run_id": run_id, "agent_id": agent_id},
                         )
-                self._maybe_add_tensorboard_tab(run_id, agent_id, self._run_metadata.get(key))
+                meta_payload = self._run_metadata.get(key)
+                self._analytics_tabs.ensure_tensorboard_tab(run_id, agent_id, meta_payload)
+                self._analytics_tabs.ensure_wandb_tab(run_id, agent_id, meta_payload)
                 continue
 
             self._run_metadata[key] = metadata
@@ -1526,70 +1564,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 message="Backfilled run metadata from trainer config",
                 extra={"run_id": run_id, "agent_id": agent_id, "path": str(config_path)},
             )
-            self._maybe_add_tensorboard_tab(run_id, agent_id, metadata)
-
-    def _maybe_add_tensorboard_tab(self, run_id: str, agent_id: str, metadata: dict | None) -> None:
-        """Create or refresh the TensorBoard artifact tab when metadata provides a log path."""
-        if not metadata:
-            return
-
-        artifacts = metadata.get("artifacts") if isinstance(metadata, dict) else None
-        if not isinstance(artifacts, dict):
-            return
-
-        tensorboard_meta = artifacts.get("tensorboard")
-        if not isinstance(tensorboard_meta, dict):
-            return
-
-        if tensorboard_meta.get("enabled", True) is False:
-            return
-
-        resolved_path: Path | None = None
-        log_dir = tensorboard_meta.get("log_dir")
-        relative_path = tensorboard_meta.get("relative_path")
-        if isinstance(log_dir, str) and log_dir.strip():
-            resolved_path = Path(log_dir).expanduser()
-        elif isinstance(relative_path, str) and relative_path.strip():
-            resolved_path = (VAR_ROOT.parent / relative_path).resolve()
-
-        if resolved_path is None:
-            return
-
-        tab_name = f"TensorBoard-Agent-{agent_id}"
-        existing_tabs = self._render_tabs._agent_tabs.get(run_id, {})
-        existing_widget = existing_tabs.get(tab_name)
-        if existing_widget is not None:
-            setter = getattr(existing_widget, "set_log_dir", None)
-            if callable(setter):
-                setter(resolved_path)
-            refresher = getattr(existing_widget, "refresh", None)
-            if callable(refresher):
-                refresher()
-            return
-
-        try:
-            tab = TensorboardArtifactTab(run_id, agent_id, resolved_path, parent=self)
-            self._render_tabs.add_dynamic_tab(run_id, tab_name, tab)
-            self.log_constant(
-                LOG_UI_MAINWINDOW_INFO,
-                message="Created TensorBoard artifact tab",
-                extra={
-                    "run_id": run_id,
-                    "agent_id": agent_id,
-                    "log_dir": str(resolved_path),
-                },
-            )
-        except Exception as exc:
-            self.log_constant(
-                LOG_UI_MAINWINDOW_WARNING,
-                message="Failed to create TensorBoard artifact tab",
-                extra={
-                    "run_id": run_id,
-                    "agent_id": agent_id,
-                    "error": str(exc),
-                },
-                exc_info=exc,
-            )
+            self._analytics_tabs.ensure_tensorboard_tab(run_id, agent_id, metadata)
+            self._analytics_tabs.ensure_wandb_tab(run_id, agent_id, metadata)
 
     def _on_training_finished(self, run_id: str, outcome: str, failure_reason: str) -> None:
         """Handle training_finished signal - create/refresh replay tabs for all agents in this run."""
@@ -1617,8 +1593,34 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 if len(parts) >= 2:
                     agent_id = parts[1]
                     agent_ids_with_tabs.add(agent_id)
-        
-        self.log_constant( 
+
+        if not agent_ids_with_tabs:
+            # Analytics-only runs (Fast Path) may never instantiate live tabs. Fall back to
+            # metadata captured at submission time so we can surface analytics tabs.
+            for (meta_run_id, meta_agent_id), _metadata in self._run_metadata.items():
+                if meta_run_id != run_id:
+                    continue
+                if not meta_agent_id:
+                    continue
+                agent_ids_with_tabs.add(meta_agent_id)
+
+            if agent_ids_with_tabs:
+                self.log_constant(
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message="_on_training_finished: using metadata agent ids",
+                    extra={"run_id": run_id, "agent_ids": list(agent_ids_with_tabs)},
+                )
+            else:
+                # Guarantee downstream logic executes at least once; analytics tabs will use
+                # "default" which matches legacy emitter behaviour.
+                agent_ids_with_tabs.add("default")
+                self.log_constant(
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message="_on_training_finished: no agent tabs or metadata; defaulting",
+                    extra={"run_id": run_id},
+                )
+
+        self.log_constant(
             LOG_UI_MAINWINDOW_TRACE,
             message="_on_training_finished: extracted agent IDs",
             extra={"run_id": run_id, "agent_ids": list(agent_ids_with_tabs)},
@@ -1636,8 +1638,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 extra={"run_id": run_id, "agent_id": agent_id, "replay_tab_name": replay_tab_name},
             )
 
-            metadata = self._run_metadata.get((run_id, agent_id))
-            self._maybe_add_tensorboard_tab(run_id, agent_id, metadata)
+            # Load analytics.json from disk and create/refresh analytics tabs (TensorBoard, WANDB)
+            self._analytics_tabs.load_and_create_tabs(run_id, agent_id)
 
             # Check if replay tab already exists
             if replay_tab_name in agent_tabs:
@@ -1773,21 +1775,50 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 return
             
             # List runs that should have tabs (active or recently completed)
-            self.log_constant( 
-                LOG_UI_MAINWINDOW_TRACE,
-                message="Polling daemon for active training runs...",
+            if self._trainer_daemon_ready:
+                self.log_constant( 
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message="Polling daemon for active training runs...",
+                )
+            future = runner.list_runs(
+                statuses=[
+                    RunStatus.INIT,
+                    RunStatus.HANDSHAKE,
+                    RunStatus.READY,
+                    RunStatus.EXECUTING,
+                    RunStatus.PAUSED,
+                    RunStatus.FAULTED,
+                    RunStatus.TERMINATED,
+                ],
+                deadline=3.0,
             )
-            future = runner.list_runs(statuses=[RunStatus.PENDING, RunStatus.DISPATCHING, RunStatus.RUNNING, RunStatus.COMPLETED], deadline=3.0)
             
             def on_done(fut):
                 try:
                     response = fut.result(timeout=1.0)
                 except Exception as exc:
-                    self.log_constant( 
-                        LOG_UI_MAINWINDOW_TRACE,
-                        message=f"Run poll failed: {exc}",
-                    )
+                    self._trainer_poll_failures += 1
+                    if self._trainer_daemon_ready:
+                        self.log_constant( 
+                            LOG_UI_MAINWINDOW_TRACE,
+                            message=f"Run poll failed: {exc}",
+                        )
+                    else:
+                        if not self._trainer_poll_quiet_logged:
+                            self.log_constant(
+                                LOG_UI_MAINWINDOW_TRACE,
+                                message="Trainer daemon not yet reachable; suppressing poll failures until it responds",
+                            )
+                            self._trainer_poll_quiet_logged = True
                     return
+                self._trainer_daemon_ready = True
+                if self._trainer_poll_failures and self._trainer_poll_quiet_logged:
+                    self.log_constant(
+                        LOG_UI_MAINWINDOW_TRACE,
+                        message="Trainer daemon responded; resuming poll logging",
+                    )
+                self._trainer_poll_failures = 0
+                self._trainer_poll_quiet_logged = False
                 self.log_constant( 
                     LOG_UI_MAINWINDOW_TRACE,
                     message=f"Received {len(response.runs)} active runs from daemon",
@@ -1880,7 +1911,15 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             )
             return
 
-        statuses = [RunStatus.DISPATCHING, RunStatus.RUNNING]
+        statuses = [
+            RunStatus.INIT,
+            RunStatus.HANDSHAKE,
+            RunStatus.READY,
+            RunStatus.EXECUTING,
+            RunStatus.PAUSED,
+            RunStatus.FAULTED,
+            RunStatus.TERMINATED,
+        ]
         subscription = runner.watch_runs(statuses=statuses, since_seq=0)
         self._run_watch_subscription = subscription
 
@@ -2042,4 +2081,3 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
 
 __all__ = ["MainWindow"]
-from gym_gui.constants import DEFAULT_RENDER_DELAY_MS

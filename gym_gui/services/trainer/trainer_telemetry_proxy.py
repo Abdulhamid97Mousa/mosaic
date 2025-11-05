@@ -243,6 +243,49 @@ async def run_proxy(
 
     stub = trainer_pb2_grpc.TrainerServiceStub(channel)
 
+    # Perform capability handshake before streaming telemetry
+    resolved_worker_id = worker_id or f"proxy-{os.getpid()}"
+    try:
+        response = await stub.RegisterWorker(
+            trainer_pb2.RegisterWorkerRequest(
+                run_id=run_id,
+                worker_id=resolved_worker_id,
+                worker_kind="telemetry_proxy",
+                proto_version="MOSAIC/1.0",
+                schema_id="jsonl.telemetry",
+                schema_version=1,
+                supports_pause=False,
+                supports_checkpoint=False,
+            )
+        )
+        session_token = response.session_token
+        _LOGGER.info(
+            "RegisterWorker accepted",
+            extra={
+                "run_id": run_id,
+                "worker_id": resolved_worker_id,
+                "session_token": session_token,
+                "accepted_version": response.accepted_version,
+            },
+        )
+    except grpc.aio.AioRpcError as exc:
+        _LOGGER.error(
+            "RegisterWorker failed",
+            extra={
+                "run_id": run_id,
+                "worker_id": resolved_worker_id,
+                "code": exc.code().name,
+                "details": exc.details(),
+            },
+        )
+        await channel.close()
+        # Ensure worker process is terminated since handshake failed
+        with contextlib.suppress(ProcessLookupError):
+            if proc.returncode is None:
+                proc.terminate()
+        await proc.wait()
+        return int(proc.returncode or 1)
+
     # Queues feeding client-streaming RPCs
     step_q: asyncio.Queue[Optional[trainer_pb2.RunStep]] = asyncio.Queue(maxsize=max_queue)
     ep_q: asyncio.Queue[Optional[trainer_pb2.RunEpisode]] = asyncio.Queue(maxsize=max_queue)

@@ -11,7 +11,7 @@
 flowchart LR
     HumanTab["Human Control Tab"] --> EnvGroup[Environment Form]
     HumanTab --> ConfigGroup[Game Configuration]
-    HumanTab --> ModeGroup[Control Mode (read-only)]
+    HumanTab --> ModeGroup["Control Mode (read-only)"]
     HumanTab --> FlowGroup[Game Control Flow]
     HumanTab --> StatusGroup[Live Status]
 
@@ -19,7 +19,7 @@ flowchart LR
     SingleTab --> WorkerGroup[Worker Integration]
     SingleTab --> TrainGroup[Headless Training]
 
-    MultiTab["Multi-Agent Tab"] --> Placeholder[Multi-agent presets (TODO)]
+    MultiTab["Multi-Agent Tab"] --> Placeholder["Multi-agent presets (TODO)"]
 
     Tabs[QTabWidget] --> HumanTab
     Tabs --> SingleTab

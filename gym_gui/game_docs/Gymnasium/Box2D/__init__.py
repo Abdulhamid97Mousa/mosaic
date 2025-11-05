@@ -1,0 +1,98 @@
+"""Documentation for Gymnasium Box2D environments."""
+from __future__ import annotations
+
+LUNAR_LANDER_HTML = (
+    "<h3>LunarLander-v3</h3>"
+    "<p>Control a lunar lander and guide it to a safe landing pad with minimal fuel usage.</p>"
+    "<h4>Observation</h4>"
+    "<p>A continuous 8-dimensional vector encoding position, velocity, angle, angular velocity, and leg contacts.</p>"
+    "<h4>Action space</h4>"
+    "<ul>"
+    "<li>Discrete: 0 = do nothing, 1 = fire left engine, 2 = fire main engine, 3 = fire right engine</li>"
+    "</ul>"
+    "<h4>Rewards</h4>"
+    "<ul>"
+    "<li>+100 to +140 for a successful landing, scaled by closeness to the target pad</li>"
+    "<li>-100 or more for crashing or flying away</li>"
+    "<li>-0.3 per frame using main engine, -0.03 per frame using side thrusters</li>"
+    "</ul>"
+    "<h4>Episode end</h4>"
+    "<ul>"
+    "<li>Termination: lander comes to rest or crashes</li>"
+    "<li>Truncation: default time limit 1000 steps</li>"
+    "</ul>"
+    "<h4>Keyboard (human controls)</h4>"
+    "<p>Use the keyboard to mirror the discrete action space:</p>"
+    "<ul>"
+    "<li>Idle / cut thrust (0) → Spacebar or S</li>"
+    "<li>Fire left engine (1) → Left arrow or A</li>"
+    "<li>Fire main engine (2) → Up arrow or W</li>"
+    "<li>Fire right engine (3) → Right arrow or D</li>"
+    "</ul>"
+    "<p>See the docs: <a href=\"https://gymnasium.farama.org/environments/box2d/lunar_lander/\">LunarLander (Gymnasium)</a></p>"
+)
+
+
+CAR_RACING_HTML = (
+    "<h3>CarRacing-v3</h3>"
+    "<p>Drive a car around a procedurally generated track using continuous steering, gas, and brake controls.</p>"
+    "<h4>Observation</h4>"
+    "<p>96×96 RGB image rendered from an overhead camera.</p>"
+    "<h4>Action space</h4>"
+    "<ul>"
+    "<li>Continuous: steering ∈ [-1, 1], gas ∈ [0, 1], brake ∈ [0, 1]</li>"
+    "</ul>"
+    "<h4>Rewards</h4>"
+    "<ul>"
+    "<li>+1000 / N for each visited track tile (N = total tiles)</li>"
+    "<li>-0.1 per frame for engine load</li>"
+    "</ul>"
+    "<h4>Episode end</h4>"
+    "<ul>"
+    "<li>Termination: car drives off the track for too long</li>"
+    "<li>Truncation: default time limit 1000 steps</li>"
+    "</ul>"
+    "<h4>Keyboard (human controls)</h4>"
+    "<p>The Qt shell maps a small set of presets to the continuous action space:</p>"
+    "<ul>"
+    "<li>Space → coast (no throttle, no steering)</li>"
+    "<li>Up / W → accelerate forward</li>"
+    "<li>Down / S → brake</li>"
+    "<li>Left / A → steer left with gentle throttle</li>"
+    "<li>Right / D → steer right with gentle throttle</li>"
+    "</ul>"
+    "<p>See the docs: <a href=\"https://gymnasium.farama.org/environments/box2d/car_racing/\">CarRacing (Gymnasium)</a></p>"
+)
+
+
+BIPEDAL_WALKER_HTML = (
+    "<h3>BipedalWalker-v3</h3>"
+    "<p>Control a two-legged robot to walk across uneven terrain without falling.</p>"
+    "<h4>Observation</h4>"
+    "<p>24-dimensional vector representing hull angle/velocity, joint angles, joint speeds, and lidar rangefinder data.</p>"
+    "<h4>Action space</h4>"
+    "<ul>"
+    "<li>Continuous torques for four motors (two hips and two knees) with values in [-1, 1]</li>"
+    "</ul>"
+    "<h4>Rewards</h4>"
+    "<ul>"
+    "<li>+300 for a successful traversal</li>"
+    "<li>-100 for falling</li>"
+    "<li>Small penalties for motor torque usage</li>"
+    "</ul>"
+    "<h4>Episode end</h4>"
+    "<ul>"
+    "<li>Termination: robot falls or reaches the goal</li>"
+    "<li>Truncation: default time limit 1600 steps</li>"
+    "</ul>"
+    "<h4>Human control</h4>"
+    "<p>The environment expects four continuous torque values, usually provided by an automated agent."
+    " Manual control is not available inside the Qt shell today.</p>"
+    "<p>See the docs: <a href=\"https://gymnasium.farama.org/environments/box2d/bipedal_walker/\">BipedalWalker (Gymnasium)</a></p>"
+)
+
+__all__ = [
+    "LUNAR_LANDER_HTML",
+    "CAR_RACING_HTML",
+    "BIPEDAL_WALKER_HTML",
+]

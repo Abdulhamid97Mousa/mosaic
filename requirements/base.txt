@@ -4,14 +4,14 @@
 
 # Environment configuration
 python-dotenv==1.1.1
-
+dotenv==0.9.9
 # Qt GUI framework
 PyQt6==6.9.1
 PyQt6-Qt6==6.9.2
 PyQt6-sip==13.10.2
 PyQt6-WebEngine==6.9.0
 qtpy==2.4.3
-
+qasync==0.9.5
 # Core dependencies
 packaging==25.0
 PyYAML>=6.0

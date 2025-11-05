@@ -8,13 +8,15 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 import os
-from typing import Any, Dict
+from typing import Any, Dict, TypeAlias
 
 from gym_gui.constants.constants_game import (
     CLIFF_WALKING_DEFAULTS,
     FROZEN_LAKE_DEFAULTS,
     FROZEN_LAKE_V2_DEFAULTS,
+    BLACKJACK_DEFAULTS,
 )
+from gym_gui.core.enums import GameId
 
 
 def _clamp(value: float, low: float, high: float) -> float:
@@ -122,6 +124,25 @@ class CliffWalkingConfig:
     def to_gym_kwargs(self) -> Dict[str, Any]:
         """Convert to Gymnasium environment kwargs."""
         return {"is_slippery": self.is_slippery}
+
+
+@dataclass(frozen=True)
+class BlackjackConfig:
+    """Configuration for Blackjack environment."""
+    
+    natural: bool = False
+    """If True, give an additional reward for starting with a natural blackjack
+    (ace and ten, sum is 21). Natural gives 1.5 reward instead of 1.0."""
+    
+    sab: bool = False
+    """If True, follow the exact rules from Sutton and Barto's book.
+    When sab=True, the natural parameter is ignored. If the player achieves
+    a natural blackjack and the dealer does not, the player wins (+1 reward).
+    If both get a natural, it's a draw (0 reward)."""
+    
+    def to_gym_kwargs(self) -> Dict[str, Any]:
+        """Convert to Gymnasium environment kwargs."""
+        return {"natural": self.natural, "sab": self.sab}
 
 
 @dataclass(frozen=True)
@@ -285,6 +306,54 @@ class BipedalWalkerConfig:
         return steps, seconds
 
 
+@dataclass(frozen=True)
+class MiniGridConfig:
+    """Configuration payload for MiniGrid environments."""
+
+    env_id: str = GameId.MINIGRID_EMPTY_5x5.value
+    """Gymnasium environment identifier (e.g., ``MiniGrid-Empty-5x5-v0``)."""
+
+    partial_observation: bool = True
+    """Apply :class:`RGBImgPartialObsWrapper` to expose agent-centric views."""
+
+    image_observation: bool = True
+    """Convert observations to RGB image arrays using :class:`ImgObsWrapper`."""
+
+    reward_multiplier: float = 10.0
+    """Scalar applied to environment rewards (aligned with xuance baseline)."""
+
+    agent_view_size: int | None = None
+    """Optional override for agent view size (MiniGrid default is 7)."""
+
+    max_episode_steps: int | None = None
+    """Override max episode steps; ``None`` preserves environment default."""
+
+    seed: int | None = None
+    """Default seed forwarded to :meth:`gymnasium.Env.reset`."""
+
+    render_mode: str = "rgb_array"
+    """Render mode requested during environment creation."""
+
+    def to_gym_kwargs(self) -> Dict[str, Any]:
+        kwargs: Dict[str, Any] = {"render_mode": self.render_mode}
+        if self.agent_view_size is not None:
+            kwargs["agent_view_size"] = int(self.agent_view_size)
+        if self.max_episode_steps is not None and self.max_episode_steps > 0:
+            kwargs["max_episode_steps"] = int(self.max_episode_steps)
+        return kwargs
+
+
+GameConfig: TypeAlias = (
+    FrozenLakeConfig
+    | TaxiConfig
+    | CliffWalkingConfig
+    | LunarLanderConfig
+    | CarRacingConfig
+    | BipedalWalkerConfig
+    | MiniGridConfig
+)
+
+
 # Default configurations for each game
 DEFAULT_FROZEN_LAKE_CONFIG = FrozenLakeConfig(
     is_slippery=FROZEN_LAKE_DEFAULTS.slippery,
@@ -312,23 +381,66 @@ DEFAULT_TAXI_CONFIG = TaxiConfig(is_raining=False, fickle_passenger=False)
 DEFAULT_CLIFF_WALKING_CONFIG = CliffWalkingConfig(
     is_slippery=CLIFF_WALKING_DEFAULTS.slippery
 )
+DEFAULT_BLACKJACK_CONFIG = BlackjackConfig()
 DEFAULT_LUNAR_LANDER_CONFIG = LunarLanderConfig()
 DEFAULT_CAR_RACING_CONFIG = CarRacingConfig.from_env()
 DEFAULT_BIPEDAL_WALKER_CONFIG = BipedalWalkerConfig.from_env()
+DEFAULT_MINIGRID_EMPTY_5x5_CONFIG = MiniGridConfig(env_id=GameId.MINIGRID_EMPTY_5x5.value)
+DEFAULT_MINIGRID_EMPTY_RANDOM_5x5_CONFIG = MiniGridConfig(env_id=GameId.MINIGRID_EMPTY_RANDOM_5x5.value)
+DEFAULT_MINIGRID_EMPTY_6x6_CONFIG = MiniGridConfig(env_id=GameId.MINIGRID_EMPTY_6x6.value)
+DEFAULT_MINIGRID_EMPTY_RANDOM_6x6_CONFIG = MiniGridConfig(env_id=GameId.MINIGRID_EMPTY_RANDOM_6x6.value)
+DEFAULT_MINIGRID_EMPTY_8x8_CONFIG = MiniGridConfig(env_id=GameId.MINIGRID_EMPTY_8x8.value)
+DEFAULT_MINIGRID_EMPTY_16x16_CONFIG = MiniGridConfig(env_id=GameId.MINIGRID_EMPTY_16x16.value)
+DEFAULT_MINIGRID_DOORKEY_5x5_CONFIG = MiniGridConfig(
+    env_id=GameId.MINIGRID_DOORKEY_5x5.value,
+    agent_view_size=5,
+)
+DEFAULT_MINIGRID_DOORKEY_6x6_CONFIG = MiniGridConfig(
+    env_id=GameId.MINIGRID_DOORKEY_6x6.value,
+    agent_view_size=7,
+)
+DEFAULT_MINIGRID_DOORKEY_8x8_CONFIG = MiniGridConfig(
+    env_id=GameId.MINIGRID_DOORKEY_8x8.value,
+    agent_view_size=7,
+)
+DEFAULT_MINIGRID_DOORKEY_16x16_CONFIG = MiniGridConfig(
+    env_id=GameId.MINIGRID_DOORKEY_16x16.value,
+    agent_view_size=9,
+)
+DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG = MiniGridConfig(
+    env_id=GameId.MINIGRID_LAVAGAP_S7.value,
+    agent_view_size=7,
+    partial_observation=True,
+)
 
 
 __all__ = [
     "FrozenLakeConfig",
     "TaxiConfig",
     "CliffWalkingConfig",
+    "BlackjackConfig",
     "LunarLanderConfig",
     "CarRacingConfig",
     "BipedalWalkerConfig",
+    "MiniGridConfig",
+    "GameConfig",
     "DEFAULT_FROZEN_LAKE_CONFIG",
     "DEFAULT_FROZEN_LAKE_V2_CONFIG",
     "DEFAULT_TAXI_CONFIG",
     "DEFAULT_CLIFF_WALKING_CONFIG",
+    "DEFAULT_BLACKJACK_CONFIG",
     "DEFAULT_LUNAR_LANDER_CONFIG",
     "DEFAULT_CAR_RACING_CONFIG",
     "DEFAULT_BIPEDAL_WALKER_CONFIG",
+    "DEFAULT_MINIGRID_EMPTY_5x5_CONFIG",
+    "DEFAULT_MINIGRID_EMPTY_RANDOM_5x5_CONFIG",
+    "DEFAULT_MINIGRID_EMPTY_6x6_CONFIG",
+    "DEFAULT_MINIGRID_EMPTY_RANDOM_6x6_CONFIG",
+    "DEFAULT_MINIGRID_EMPTY_8x8_CONFIG",
+    "DEFAULT_MINIGRID_EMPTY_16x16_CONFIG",
+    "DEFAULT_MINIGRID_DOORKEY_5x5_CONFIG",
+    "DEFAULT_MINIGRID_DOORKEY_6x6_CONFIG",
+    "DEFAULT_MINIGRID_DOORKEY_8x8_CONFIG",
+    "DEFAULT_MINIGRID_DOORKEY_16x16_CONFIG",
+    "DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG",
 ]

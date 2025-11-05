@@ -9,7 +9,9 @@ from gym_gui.config.game_configs import (
     CarRacingConfig,
     CliffWalkingConfig,
     FrozenLakeConfig,
+    GameConfig,
     LunarLanderConfig,
+    MiniGridConfig,
     TaxiConfig,
 )
 from gym_gui.core.enums import GameId
@@ -22,15 +24,7 @@ class GameConfigBuilder:
     def build_config(
         game_id: GameId,
         overrides: Dict[str, Any],
-    ) -> (
-        FrozenLakeConfig
-        | TaxiConfig
-        | CliffWalkingConfig
-        | LunarLanderConfig
-        | CarRacingConfig
-        | BipedalWalkerConfig
-        | None
-    ):
+    ) -> GameConfig | None:
         """Build game configuration from control panel overrides."""
         if game_id == GameId.FROZEN_LAKE:
             is_slippery = bool(overrides.get("is_slippery", True))
@@ -186,7 +180,49 @@ class GameConfigBuilder:
                 max_episode_steps=max_steps,
                 max_episode_seconds=max_seconds,
             )
-        
+
+        elif game_id in (
+            GameId.MINIGRID_EMPTY_5x5,
+            GameId.MINIGRID_EMPTY_RANDOM_5x5,
+            GameId.MINIGRID_EMPTY_6x6,
+            GameId.MINIGRID_EMPTY_RANDOM_6x6,
+            GameId.MINIGRID_EMPTY_8x8,
+            GameId.MINIGRID_EMPTY_16x16,
+            GameId.MINIGRID_DOORKEY_5x5,
+            GameId.MINIGRID_DOORKEY_6x6,
+            GameId.MINIGRID_DOORKEY_8x8,
+            GameId.MINIGRID_DOORKEY_16x16,
+            GameId.MINIGRID_LAVAGAP_S7,
+        ):
+            partial = bool(overrides.get("partial_observation", True))
+            image_obs = bool(overrides.get("image_observation", True))
+            reward_multiplier = overrides.get("reward_multiplier", 10.0)
+            try:
+                reward_multiplier_value = float(reward_multiplier)
+            except (TypeError, ValueError):
+                reward_multiplier_value = 10.0
+            agent_view_size = overrides.get("agent_view_size")
+            agent_view_value: int | None = None
+            if isinstance(agent_view_size, (int, float)) and int(agent_view_size) > 0:
+                agent_view_value = int(agent_view_size)
+            max_steps_override = overrides.get("max_episode_steps")
+            max_steps_value: int | None = None
+            if isinstance(max_steps_override, (int, float)) and int(max_steps_override) > 0:
+                max_steps_value = int(max_steps_override)
+            seed_override = overrides.get("seed")
+            seed_value: int | None = None
+            if isinstance(seed_override, (int, float)):
+                seed_value = int(seed_override)
+            return MiniGridConfig(
+                env_id=game_id.value,
+                partial_observation=partial,
+                image_observation=image_obs,
+                reward_multiplier=reward_multiplier_value,
+                agent_view_size=agent_view_value,
+                max_episode_steps=max_steps_value,
+                seed=seed_value,
+            )
+
         return None
 
 

@@ -5,29 +5,39 @@ Tests cover:
 2. WorkerPresenter protocol compliance
 3. SpadeBdiWorkerPresenter - train request building, tab creation, metadata extraction
 4. TabFactory - tab instantiation, environment detection, conditional creation
-5. Integration with main_window.py - registry usage in UI tab creation
+5. Analytics tabs wiring (TensorBoard + WANDB)
+6. Integration with main_window.py - registry usage in UI tab creation
 """
 
 import unittest
 import tempfile
 import json
 from pathlib import Path
+from unittest import mock
 from unittest.mock import Mock, patch, MagicMock
 from typing import Any
+import os
 
 from gym_gui.ui.presenters.workers.registry import (
     WorkerPresenter,
     WorkerPresenterRegistry,
 )
-from gym_gui.ui.presenters.workers.spade_bdi_worker_presenter import (
-    SpadeBdiWorkerPresenter,
-)
+from gym_gui.ui.presenters.workers.spade_bdi_worker_presenter import SpadeBdiWorkerPresenter
+from gym_gui.ui.presenters.workers.cleanrl_worker_presenter import CleanRlWorkerPresenter
 from gym_gui.ui.presenters.workers import (
     get_worker_presenter_registry,
-    SpadeBdiWorkerPresenter as ExportedPresenter,
+    SpadeBdiWorkerPresenter as ExportedSpadePresenter,
+    CleanRlWorkerPresenter as ExportedCleanPresenter,
 )
 from gym_gui.ui.widgets.spade_bdi_worker_tabs.factory import TabFactory
 from gym_gui.core.enums import GameId
+from gym_gui.ui.panels.analytics_tabs import AnalyticsTabManager
+from gym_gui.ui.panels import analytics_tabs
+from gym_gui.ui.widgets.tensorboard_artifact_tab import TensorboardArtifactTab
+from gym_gui.ui.widgets.wandb_artifact_tab import WandbArtifactTab
+from qtpy import QtWidgets
+
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
 class TestWorkerPresenterRegistry(unittest.TestCase):
@@ -99,6 +109,19 @@ class TestGlobalRegistry(unittest.TestCase):
         self.assertIsNotNone(presenter)
         if presenter is not None:
             self.assertEqual(presenter.id, "spade_bdi_worker")
+        exported = ExportedSpadePresenter()
+        self.assertEqual(exported.id, "spade_bdi_worker")
+
+    def test_global_registry_has_cleanrl_presenter(self) -> None:
+        """Test that the global registry has CleanRL presenter registered."""
+        registry = get_worker_presenter_registry()
+        self.assertTrue("cleanrl_worker" in registry)
+        presenter = registry.get("cleanrl_worker")
+        self.assertIsNotNone(presenter)
+        if presenter is not None:
+            self.assertEqual(presenter.id, "cleanrl_worker")
+        exported = ExportedCleanPresenter()
+        self.assertEqual(exported.id, "cleanrl_worker")
 
 class TestSpadeBdiWorkerPresenterBasics(unittest.TestCase):
     """Test SpadeBdiWorkerPresenter basic properties and protocol compliance."""
@@ -478,6 +501,17 @@ class TestWorkerPresenterProtocolCompliance(unittest.TestCase):
         # For protocols with runtime_checkable, we can verify adherence
         self.assertIsInstance(presenter, WorkerPresenter)
 
+    def test_cleanrl_presenter_protocol(self) -> None:
+        """Test that CleanRL presenter satisfies protocol requirements."""
+        presenter = CleanRlWorkerPresenter()
+        self.assertEqual(presenter.id, "cleanrl_worker")
+        self.assertTrue(callable(presenter.build_train_request))
+        self.assertTrue(callable(presenter.create_tabs))
+        self.assertIsInstance(presenter, WorkerPresenter)
+        with self.assertRaises(NotImplementedError):
+            presenter.build_train_request(policy_path=None, current_game=None)
+        self.assertEqual(presenter.create_tabs("run", "agent", {}, None), [])
+
 
 class TestRegistryIntegration(unittest.TestCase):
     """Integration tests for registry usage patterns."""
@@ -518,6 +552,102 @@ class TestRegistryIntegration(unittest.TestCase):
             self.assertEqual(p1.id, "spade_bdi_worker")
         if p2 is not None:
             self.assertEqual(p2.id, "future_worker")
+
+
+class _RecordingRenderTabs:
+    """Minimal stand-in for RenderTabs that records dynamic tab additions."""
+
+    def __init__(self) -> None:
+        self._agent_tabs: dict[str, dict[str, QtWidgets.QWidget]] = {}
+
+    def add_dynamic_tab(self, run_id: str, name: str, widget: QtWidgets.QWidget) -> None:
+        self._agent_tabs.setdefault(run_id, {})[name] = widget
+
+
+class TestAnalyticsTabManager(unittest.TestCase):
+    """Validate TensorBoard and WANDB tabs are created with expected widgets."""
+
+    @classmethod
+    def setUpClass(cls) -> None:
+        cls._qt_app = QtWidgets.QApplication.instance()
+        if cls._qt_app is None:
+            cls._qt_app = QtWidgets.QApplication([])
+
+    def setUp(self) -> None:
+        self.render_tabs = _RecordingRenderTabs()
+        self.parent = QtWidgets.QWidget()
+        self.manager = AnalyticsTabManager(self.render_tabs, self.parent)
+
+    def tearDown(self) -> None:
+        self.parent.deleteLater()
+
+    def test_tensorboard_tab_added(self) -> None:
+        metadata = {
+            "artifacts": {
+                "tensorboard": {
+                    "enabled": True,
+                    "log_dir": "/tmp/tb-demo",
+                }
+            }
+        }
+
+        self.manager.ensure_tensorboard_tab("run-tb", "agent-1", metadata)
+
+        agent_tabs = self.render_tabs._agent_tabs.get("run-tb", {})
+        self.assertIn("TensorBoard-Agent-agent-1", agent_tabs)
+        widget = agent_tabs["TensorBoard-Agent-agent-1"]
+        self.assertIsInstance(widget, TensorboardArtifactTab)
+
+    def test_wandb_tab_added(self) -> None:
+        metadata = {
+            "artifacts": {
+                "wandb": {
+                    "enabled": True,
+                    "run_path": "abdulhamid97mousa/MOSAIC/runs/test123",
+                }
+            }
+        }
+
+        self.manager.ensure_wandb_tab("run-wandb", "agent-2", metadata)
+
+        agent_tabs = self.render_tabs._agent_tabs.get("run-wandb", {})
+        self.assertIn("WANDB-Agent-agent-2", agent_tabs)
+        widget = agent_tabs["WANDB-Agent-agent-2"]
+        self.assertIsInstance(widget, WandbArtifactTab)
+        # Type assertion after isinstance check
+        assert isinstance(widget, WandbArtifactTab)
+        widget.append_status_line("wandb login succeeded")
+
+    def test_load_and_create_tabs_reads_manifest(self) -> None:
+        run_id = "run-manifest"
+        agent_id = "agent-3"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            runs_root = Path(tmpdir) / "trainer"
+            run_dir = runs_root / "runs" / run_id
+            run_dir.mkdir(parents=True)
+            (run_dir / "tensorboard").mkdir(parents=True)
+
+            analytics_payload = {
+                "artifacts": {
+                    "tensorboard": {
+                        "enabled": True,
+                        "log_dir": str(run_dir / "tensorboard"),
+                    },
+                    "wandb": {
+                        "enabled": True,
+                        "run_path": "entity/project/runs/xyz",
+                    },
+                }
+            }
+            (run_dir / "analytics.json").write_text(json.dumps(analytics_payload), encoding="utf-8")
+
+            with mock.patch.object(analytics_tabs, "VAR_TRAINER_DIR", runs_root):
+                self.manager.load_and_create_tabs(run_id, agent_id)
+
+        agent_tabs = self.render_tabs._agent_tabs.get(run_id, {})
+        self.assertIn("TensorBoard-Agent-agent-3", agent_tabs)
+        self.assertIn("WANDB-Agent-agent-3", agent_tabs)
 
 
 if __name__ == "__main__":

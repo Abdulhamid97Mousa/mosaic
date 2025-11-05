@@ -251,12 +251,13 @@ class TrainerClient(LogConstantMixin):
 
 def _status_to_proto(status: RunStatus) -> int:
     mapping = {
-    RunStatus.PENDING: trainer_pb2.RunStatus.RUN_STATUS_PENDING,
-    RunStatus.DISPATCHING: trainer_pb2.RunStatus.RUN_STATUS_DISPATCHING,
-    RunStatus.RUNNING: trainer_pb2.RunStatus.RUN_STATUS_RUNNING,
-    RunStatus.COMPLETED: trainer_pb2.RunStatus.RUN_STATUS_COMPLETED,
-    RunStatus.FAILED: trainer_pb2.RunStatus.RUN_STATUS_FAILED,
-    RunStatus.CANCELLED: trainer_pb2.RunStatus.RUN_STATUS_CANCELLED,
+        RunStatus.INIT: trainer_pb2.RunStatus.RUN_STATUS_INIT,
+        RunStatus.HANDSHAKE: trainer_pb2.RunStatus.RUN_STATUS_HSHK,
+        RunStatus.READY: trainer_pb2.RunStatus.RUN_STATUS_RDY,
+        RunStatus.EXECUTING: trainer_pb2.RunStatus.RUN_STATUS_EXEC,
+        RunStatus.PAUSED: trainer_pb2.RunStatus.RUN_STATUS_PAUSE,
+        RunStatus.FAULTED: trainer_pb2.RunStatus.RUN_STATUS_FAULT,
+        RunStatus.TERMINATED: trainer_pb2.RunStatus.RUN_STATUS_TERM,
     }
     return mapping[status]
 

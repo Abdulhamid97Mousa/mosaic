@@ -96,3 +96,7 @@
 [submodule "ray"]
   path = ray
   url = https://github.com/ray-project/ray.git
+
+[submodule "xuance"]
+  path = xuance
+  url = https://github.com/agi-brain/xuance.git

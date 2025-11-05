@@ -22,41 +22,31 @@ _LOGGER = logging.getLogger(__name__)
 
 
 class RunStatus(str, Enum):
-    PENDING = "pending"
-    DISPATCHING = "dispatching"
-    RUNNING = "running"
-    COMPLETED = "completed"
-    FAILED = "failed"
-    CANCELLED = "cancelled"
+    """Lifecycle states for the MOSAIC trainer FSM."""
+
+    INIT = "init"
+    HANDSHAKE = "handshake"
+    READY = "ready"
+    EXECUTING = "executing"
+    PAUSED = "paused"
+    FAULTED = "faulted"
+    TERMINATED = "terminated"
 
     @classmethod
     def from_proto(cls, proto_value: int) -> "RunStatus":
-        """Convert protobuf status integer to RunStatus enum.
-        
-        Args:
-            proto_value: Protobuf enum value (0-6):
-                0 = UNSPECIFIED (maps to PENDING)
-                1 = PENDING
-                2 = DISPATCHING
-                3 = RUNNING
-                4 = COMPLETED
-                5 = FAILED
-                6 = CANCELLED
-        
-        Returns:
-            RunStatus enum value (defaults to PENDING if unknown)
-        """
-        # Protobuf enum values match the order above
+        """Convert protobuf status integer to RunStatus enum (defaults to INIT)."""
+
         _PROTO_TO_ENUM = {
-            0: cls.PENDING,  # UNSPECIFIED → default to PENDING
-            1: cls.PENDING,
-            2: cls.DISPATCHING,
-            3: cls.RUNNING,
-            4: cls.COMPLETED,
-            5: cls.FAILED,
-            6: cls.CANCELLED,
+            0: cls.INIT,        # RUN_STATUS_UNSPECIFIED → treat as INIT
+            1: cls.INIT,        # RUN_STATUS_INIT
+            2: cls.HANDSHAKE,   # RUN_STATUS_HSHK
+            3: cls.READY,       # RUN_STATUS_RDY
+            4: cls.EXECUTING,   # RUN_STATUS_EXEC
+            5: cls.PAUSED,      # RUN_STATUS_PAUSE
+            6: cls.FAULTED,     # RUN_STATUS_FAULT
+            7: cls.TERMINATED,  # RUN_STATUS_TERM
         }
-        return _PROTO_TO_ENUM.get(proto_value, cls.PENDING)
+        return _PROTO_TO_ENUM.get(proto_value, cls.INIT)
 
 
 @dataclass(slots=True)
@@ -177,27 +167,21 @@ class RunRegistry:
         failure_reason = payload.get("failure_reason")
 
         try:
-            # Map outcome to RunStatus
-            if outcome == "succeeded":
-                status = RunStatus.COMPLETED
-            elif outcome == "failed":
-                status = RunStatus.FAILED
-            elif outcome == "canceled":
-                status = RunStatus.CANCELLED
-            else:
-                status = RunStatus.COMPLETED
-
-            # Update registry with outcome
+            # Persist outcome while driving FSM to TERMINATED.
             self.update_run_outcome(
                 run_id=run_id,
-                status=status,
+                status=RunStatus.TERMINATED,
                 outcome=outcome,
                 failure_reason=failure_reason,
             )
 
             _LOGGER.info(
                 "Updated run outcome from RUN_COMPLETED event",
-                extra={"run_id": run_id, "outcome": outcome, "status": status.value},
+                extra={
+                    "run_id": run_id,
+                    "outcome": outcome,
+                    "status": RunStatus.TERMINATED.value,
+                },
             )
         except Exception as e:
             _LOGGER.exception(
@@ -253,6 +237,7 @@ class RunRegistry:
             )
             self._migrate_gpu_slots_table(conn)
             self._ensure_gpu_slots_json_column(conn)
+            self._migrate_status_values(conn)
             # Seed GPU slots up to 8 to match schema limits.
             existing = conn.execute("SELECT COUNT(*) FROM gpu_slots").fetchone()[0]
             if existing == 0:
@@ -295,6 +280,48 @@ class RunRegistry:
         has_column = any(column[1] == "gpu_slots_json" for column in columns)
         if not has_column:
             conn.execute("ALTER TABLE runs ADD COLUMN gpu_slots_json TEXT NOT NULL DEFAULT '[]'")
+
+    def _migrate_status_values(self, conn: sqlite3.Connection) -> None:
+        """Normalize legacy run status values to the FSM vocabulary."""
+
+        legacy_to_modern = {
+            "pending": RunStatus.INIT.value,
+            "dispatching": RunStatus.HANDSHAKE.value,
+            "running": RunStatus.EXECUTING.value,
+            "completed": RunStatus.TERMINATED.value,
+            "failed": RunStatus.TERMINATED.value,
+            "cancelled": RunStatus.TERMINATED.value,
+        }
+
+        try:
+            rows = conn.execute(
+                "SELECT run_id, status FROM runs WHERE status IN ({})".format(
+                    ",".join("?" for _ in legacy_to_modern)
+                ),
+                tuple(legacy_to_modern.keys()),
+            ).fetchall()
+        except sqlite3.OperationalError:
+            # Table may not exist yet on first bootstrap.
+            return
+
+        updated = 0
+        for row in rows:
+            run_id = row["run_id"] if isinstance(row, sqlite3.Row) else row[0]
+            current_raw = row["status"] if isinstance(row, sqlite3.Row) else row[1]
+            current = str(current_raw or "").lower()
+            new_value = legacy_to_modern.get(current)
+            if new_value and new_value != current:
+                conn.execute(
+                    "UPDATE runs SET status = ? WHERE run_id = ?",
+                    (new_value, run_id),
+                )
+                updated += 1
+
+        if updated:
+            _LOGGER.info(
+                "Migrated run status values to FSM vocabulary",
+                extra={"updated": updated},
+            )
 
     def _log_database_schema(self, conn: sqlite3.Connection) -> None:
         """Log database initialization with complete schema details."""
@@ -404,7 +431,7 @@ class RunRegistry:
                             INSERT INTO runs(run_id, status, config_json, digest, created_at, updated_at, gpu_slots_json)
                             VALUES(?, ?, ?, ?, ?, ?, ?)
                             """,
-                            (run_id, RunStatus.PENDING.value, config_json, digest, now, now, "[]"),
+                            (run_id, RunStatus.INIT.value, config_json, digest, now, now, "[]"),
                         )
                         _LOGGER.info(
                             "Registered new training run",
@@ -450,7 +477,7 @@ class RunRegistry:
 
         Args:
             run_id: The run identifier.
-            status: The new status (COMPLETED, FAILED, CANCELLED).
+            status: The new FSM state (typically :class:`RunStatus.TERMINATED`).
             outcome: The outcome string (success, failure, cancelled).
             failure_reason: Optional reason for failure.
         """
@@ -539,10 +566,20 @@ class RunRegistry:
                     loaded = []
                 if isinstance(loaded, list):
                     gpu_slots = [int(slot) for slot in loaded]
+            status_raw = str(row["status"] or "")
+            try:
+                status_value = RunStatus(status_raw)
+            except ValueError:
+                _LOGGER.warning(
+                    "Unknown run status encountered during load; defaulting to INIT",
+                    extra={"run_id": row["run_id"], "status": status_raw},
+                )
+                status_value = RunStatus.INIT
+
             records.append(
                 RunRecord(
                     run_id=row["run_id"],
-                    status=RunStatus(row["status"]),
+                    status=status_value,
                     digest=row["digest"],
                     created_at=datetime.fromisoformat(row["created_at"]),
                     updated_at=datetime.fromisoformat(row["updated_at"]),
@@ -573,9 +610,19 @@ class RunRegistry:
                 loaded = []
             if isinstance(loaded, list):
                 gpu_slots = [int(slot) for slot in loaded]
+        status_raw = str(row["status"] or "")
+        try:
+            status_value = RunStatus(status_raw)
+        except ValueError:
+            _LOGGER.warning(
+                "Unknown run status encountered during get_run; defaulting to INIT",
+                extra={"run_id": row["run_id"], "status": status_raw},
+            )
+            status_value = RunStatus.INIT
+
         return RunRecord(
             run_id=row["run_id"],
-            status=RunStatus(row["status"]),
+            status=status_value,
             digest=row["digest"],
             created_at=datetime.fromisoformat(row["created_at"]),
             updated_at=datetime.fromisoformat(row["updated_at"]),

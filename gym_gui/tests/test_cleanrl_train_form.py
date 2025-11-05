@@ -1,0 +1,116 @@
+"""Tests for CleanRL training form."""
+
+from __future__ import annotations
+
+import os
+from typing import Dict, Any
+
+import pytest
+from qtpy import QtWidgets
+
+from gym_gui.core.enums import GameId
+from gym_gui.ui.widgets.cleanrl_train_form import CleanRlTrainForm
+
+# Ensure Qt renders offscreen in CI environments
+os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+
+@pytest.fixture(scope="module")
+def qt_app():
+    app = QtWidgets.QApplication.instance()
+    if app is None:
+        app = QtWidgets.QApplication([])
+    yield app
+
+
+def _base_form(qt_app) -> CleanRlTrainForm:
+    form = CleanRlTrainForm(default_game=GameId.FROZEN_LAKE_V2)
+    index = form._algo_combo.findText("ppo")
+    if index >= 0:
+        form._algo_combo.setCurrentIndex(index)
+    form._custom_env_checkbox.setChecked(False)
+    env_index = form._env_combo.findData("CartPole-v1")
+    assert env_index >= 0
+    form._env_combo.setCurrentIndex(env_index)
+    form._timesteps_spin.setValue(4096)
+    form._seed_spin.setValue(123)
+    form._agent_id_input.setText("agent-cleanrl-test")
+    form._worker_id_input.setText("cleanrl-test-worker")
+    form._tensorboard_checkbox.setChecked(True)
+    form._track_wandb_checkbox.setChecked(False)
+    form._notes_edit.setPlainText("integration-test")
+    return form
+
+
+def test_get_config_includes_worker_metadata(qt_app) -> None:
+    form = _base_form(qt_app)
+    config = form.get_config()
+
+    assert isinstance(config, dict)
+    metadata = config.get("metadata", {})
+    worker_meta: Dict[str, Any] = metadata.get("worker", {})
+    assert worker_meta.get("module") == "cleanrl_worker.cli"
+    assert worker_meta.get("worker_id") == "cleanrl-test-worker"
+    assert worker_meta.get("config", {}).get("algo") == "ppo"
+    assert worker_meta.get("config", {}).get("env_id") == "CartPole-v1"
+    assert worker_meta.get("config", {}).get("seed") == 123
+    assert worker_meta.get("arguments") == ["--dry-run", "--emit-summary"]
+
+    extras = worker_meta.get("config", {}).get("extras", {})
+    assert extras.get("cuda") is True
+    assert extras.get("tensorboard_dir") == "tensorboard"
+    assert extras.get("notes") == "integration-test"
+    assert "algo_params" in extras
+
+    artifacts = metadata.get("artifacts", {})
+    tensorboard_meta = artifacts.get("tensorboard", {})
+    assert tensorboard_meta.get("enabled") is True
+    assert tensorboard_meta.get("relative_path").endswith("tensorboard")
+    wandb_meta = artifacts.get("wandb", {})
+    assert wandb_meta.get("enabled") is False
+
+    form.deleteLater()
+
+
+def test_disable_dry_run_removes_arguments(qt_app) -> None:
+    form = _base_form(qt_app)
+    form._dry_run_checkbox.setChecked(False)
+
+    config = form.get_config()
+    worker_meta = config["metadata"]["worker"]
+    assert worker_meta.get("arguments") == []
+
+    form.deleteLater()
+
+
+def test_wandb_fields_populate_extras_and_environment(qt_app) -> None:
+    form = _base_form(qt_app)
+    form._track_wandb_checkbox.setChecked(True)
+    form._wandb_project_input.setText("MOSAIC")
+    form._wandb_entity_input.setText("abdulhamid97mousa")
+    form._wandb_run_name_input.setText("demo-run")
+    form._wandb_api_key_input.setText("test-key-123")
+
+    config = form.get_config()
+    metadata = config["metadata"]
+    worker_meta = metadata["worker"]
+    extras = worker_meta["config"].get("extras", {})
+    assert extras.get("track_wandb") is True
+    assert extras.get("wandb_project_name") == "MOSAIC"
+    assert extras.get("wandb_entity") == "abdulhamid97mousa"
+    assert extras.get("wandb_run_name") == "demo-run"
+    env_overrides = config["environment"]
+    assert env_overrides.get("WANDB_API_KEY") == "test-key-123"
+
+    form.deleteLater()
+
+
+def test_disable_gpu_sets_cuda_false(qt_app) -> None:
+    form = _base_form(qt_app)
+    form._use_gpu_checkbox.setChecked(False)
+
+    config = form.get_config()
+    extras = config["metadata"]["worker"]["config"].get("extras", {})
+    assert extras.get("cuda") is False
+
+    form.deleteLater()

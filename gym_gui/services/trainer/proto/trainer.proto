@@ -23,6 +23,12 @@ service TrainerService {
   // Worker heartbeat hook to keep the run marked as healthy.
   rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
 
+  // Worker capability handshake that must succeed before telemetry streams start.
+  rpc RegisterWorker(RegisterWorkerRequest) returns (RegisterWorkerResponse);
+
+  // Bidirectional control-plane stream for credit grants and pause/resume flow.
+  rpc ControlStream(stream ControlEvent) returns (stream ControlEvent);
+
   // Lightweight daemon heartbeat so the GUI can report liveness.
   rpc GetHealth(HealthCheckRequest) returns (HealthCheckResponse);
 
@@ -55,14 +61,41 @@ message CancelRunRequest {
 
 message CancelRunResponse {}
 
+message RegisterWorkerRequest {
+  string run_id = 1;
+  string worker_id = 2;
+  string worker_kind = 3;       // "cleanrl" | "spade-bdi" | "llm-agent"
+  string proto_version = 4;     // e.g., "MOSIAC/1.0"
+  string schema_id = 5;         // e.g., "telemetry.step.grid"
+  uint32 schema_version = 6;
+  bool supports_pause = 7;
+  bool supports_checkpoint = 8;
+}
+
+message RegisterWorkerResponse {
+  string accepted_version = 1;
+  string session_token = 2;     // use for subsequent streams
+}
+
+message ControlEvent {
+  string run_id = 1;
+  oneof event {
+    uint32 grant_steps = 10;     // add credits
+    bool pause = 11;             // soft pause
+    bool resume = 12;
+    uint32 max_rate_hz = 13;     // optional soft rate cap
+  }
+}
+
 enum RunStatus {
   RUN_STATUS_UNSPECIFIED = 0;
-  RUN_STATUS_PENDING = 1;
-  RUN_STATUS_DISPATCHING = 2;
-  RUN_STATUS_RUNNING = 3;
-  RUN_STATUS_COMPLETED = 4;
-  RUN_STATUS_FAILED = 5;
-  RUN_STATUS_CANCELLED = 6;
+  RUN_STATUS_INIT = 1;
+  RUN_STATUS_HSHK = 2;
+  RUN_STATUS_RDY = 3;
+  RUN_STATUS_EXEC = 4;
+  RUN_STATUS_PAUSE = 5;
+  RUN_STATUS_FAULT = 6;
+  RUN_STATUS_TERM = 7;
 }
 
 message RunRecord {

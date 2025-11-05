@@ -3,7 +3,7 @@
 import grpc
 import warnings
 
-import trainer_pb2 as trainer__pb2
+from gym_gui.services.trainer.proto import trainer_pb2 as gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2
 
 GRPC_GENERATED_VERSION = '1.67.1'
 GRPC_VERSION = grpc.__version__
@@ -18,7 +18,7 @@ except ImportError:
 if _version_not_supported:
     raise RuntimeError(
         f'The grpc package installed is at version {GRPC_VERSION},'
-        + f' but the generated code in trainer_pb2_grpc.py depends on'
+        + f' but the generated code in gym_gui/services/trainer/proto/trainer_pb2_grpc.py depends on'
         + f' grpcio>={GRPC_GENERATED_VERSION}.'
         + f' Please upgrade your grpc module to grpcio>={GRPC_GENERATED_VERSION}'
         + f' or downgrade your generated code using grpcio-tools<={GRPC_VERSION}.'
@@ -37,53 +37,63 @@ class TrainerServiceStub(object):
         """
         self.SubmitRun = channel.unary_unary(
                 '/gymgui.trainer.TrainerService/SubmitRun',
-                request_serializer=trainer__pb2.SubmitRunRequest.SerializeToString,
-                response_deserializer=trainer__pb2.SubmitRunResponse.FromString,
+                request_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.SubmitRunRequest.SerializeToString,
+                response_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.SubmitRunResponse.FromString,
                 _registered_method=True)
         self.CancelRun = channel.unary_unary(
                 '/gymgui.trainer.TrainerService/CancelRun',
-                request_serializer=trainer__pb2.CancelRunRequest.SerializeToString,
-                response_deserializer=trainer__pb2.CancelRunResponse.FromString,
+                request_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.CancelRunRequest.SerializeToString,
+                response_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.CancelRunResponse.FromString,
                 _registered_method=True)
         self.ListRuns = channel.unary_unary(
                 '/gymgui.trainer.TrainerService/ListRuns',
-                request_serializer=trainer__pb2.ListRunsRequest.SerializeToString,
-                response_deserializer=trainer__pb2.ListRunsResponse.FromString,
+                request_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.ListRunsRequest.SerializeToString,
+                response_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.ListRunsResponse.FromString,
                 _registered_method=True)
         self.WatchRuns = channel.unary_stream(
                 '/gymgui.trainer.TrainerService/WatchRuns',
-                request_serializer=trainer__pb2.WatchRunsRequest.SerializeToString,
-                response_deserializer=trainer__pb2.RunRecord.FromString,
+                request_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.WatchRunsRequest.SerializeToString,
+                response_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RunRecord.FromString,
                 _registered_method=True)
         self.Heartbeat = channel.unary_unary(
                 '/gymgui.trainer.TrainerService/Heartbeat',
-                request_serializer=trainer__pb2.HeartbeatRequest.SerializeToString,
-                response_deserializer=trainer__pb2.HeartbeatResponse.FromString,
+                request_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.HeartbeatRequest.SerializeToString,
+                response_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.HeartbeatResponse.FromString,
+                _registered_method=True)
+        self.RegisterWorker = channel.unary_unary(
+                '/gymgui.trainer.TrainerService/RegisterWorker',
+                request_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RegisterWorkerRequest.SerializeToString,
+                response_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RegisterWorkerResponse.FromString,
+                _registered_method=True)
+        self.ControlStream = channel.stream_stream(
+                '/gymgui.trainer.TrainerService/ControlStream',
+                request_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.ControlEvent.SerializeToString,
+                response_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.ControlEvent.FromString,
                 _registered_method=True)
         self.GetHealth = channel.unary_unary(
                 '/gymgui.trainer.TrainerService/GetHealth',
-                request_serializer=trainer__pb2.HealthCheckRequest.SerializeToString,
-                response_deserializer=trainer__pb2.HealthCheckResponse.FromString,
+                request_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.HealthCheckRequest.SerializeToString,
+                response_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.HealthCheckResponse.FromString,
                 _registered_method=True)
         self.StreamRunSteps = channel.unary_stream(
                 '/gymgui.trainer.TrainerService/StreamRunSteps',
-                request_serializer=trainer__pb2.StreamStepsRequest.SerializeToString,
-                response_deserializer=trainer__pb2.RunStep.FromString,
+                request_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.StreamStepsRequest.SerializeToString,
+                response_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RunStep.FromString,
                 _registered_method=True)
         self.StreamRunEpisodes = channel.unary_stream(
                 '/gymgui.trainer.TrainerService/StreamRunEpisodes',
-                request_serializer=trainer__pb2.StreamEpisodesRequest.SerializeToString,
-                response_deserializer=trainer__pb2.RunEpisode.FromString,
+                request_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.StreamEpisodesRequest.SerializeToString,
+                response_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RunEpisode.FromString,
                 _registered_method=True)
         self.PublishRunSteps = channel.stream_unary(
                 '/gymgui.trainer.TrainerService/PublishRunSteps',
-                request_serializer=trainer__pb2.RunStep.SerializeToString,
-                response_deserializer=trainer__pb2.PublishTelemetryResponse.FromString,
+                request_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RunStep.SerializeToString,
+                response_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.PublishTelemetryResponse.FromString,
                 _registered_method=True)
         self.PublishRunEpisodes = channel.stream_unary(
                 '/gymgui.trainer.TrainerService/PublishRunEpisodes',
-                request_serializer=trainer__pb2.RunEpisode.SerializeToString,
-                response_deserializer=trainer__pb2.PublishTelemetryResponse.FromString,
+                request_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RunEpisode.SerializeToString,
+                response_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.PublishTelemetryResponse.FromString,
                 _registered_method=True)
 
 
@@ -121,6 +131,20 @@ class TrainerServiceServicer(object):
 
     def Heartbeat(self, request, context):
         """Worker heartbeat hook to keep the run marked as healthy.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def RegisterWorker(self, request, context):
+        """Worker capability handshake that must succeed before telemetry streams start.
+        """
+        context.set_code(grpc.StatusCode.UNIMPLEMENTED)
+        context.set_details('Method not implemented!')
+        raise NotImplementedError('Method not implemented!')
+
+    def ControlStream(self, request_iterator, context):
+        """Bidirectional control-plane stream for credit grants and pause/resume flow.
         """
         context.set_code(grpc.StatusCode.UNIMPLEMENTED)
         context.set_details('Method not implemented!')
@@ -166,53 +190,63 @@ def add_TrainerServiceServicer_to_server(servicer, server):
     rpc_method_handlers = {
             'SubmitRun': grpc.unary_unary_rpc_method_handler(
                     servicer.SubmitRun,
-                    request_deserializer=trainer__pb2.SubmitRunRequest.FromString,
-                    response_serializer=trainer__pb2.SubmitRunResponse.SerializeToString,
+                    request_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.SubmitRunRequest.FromString,
+                    response_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.SubmitRunResponse.SerializeToString,
             ),
             'CancelRun': grpc.unary_unary_rpc_method_handler(
                     servicer.CancelRun,
-                    request_deserializer=trainer__pb2.CancelRunRequest.FromString,
-                    response_serializer=trainer__pb2.CancelRunResponse.SerializeToString,
+                    request_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.CancelRunRequest.FromString,
+                    response_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.CancelRunResponse.SerializeToString,
             ),
             'ListRuns': grpc.unary_unary_rpc_method_handler(
                     servicer.ListRuns,
-                    request_deserializer=trainer__pb2.ListRunsRequest.FromString,
-                    response_serializer=trainer__pb2.ListRunsResponse.SerializeToString,
+                    request_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.ListRunsRequest.FromString,
+                    response_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.ListRunsResponse.SerializeToString,
             ),
             'WatchRuns': grpc.unary_stream_rpc_method_handler(
                     servicer.WatchRuns,
-                    request_deserializer=trainer__pb2.WatchRunsRequest.FromString,
-                    response_serializer=trainer__pb2.RunRecord.SerializeToString,
+                    request_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.WatchRunsRequest.FromString,
+                    response_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RunRecord.SerializeToString,
             ),
             'Heartbeat': grpc.unary_unary_rpc_method_handler(
                     servicer.Heartbeat,
-                    request_deserializer=trainer__pb2.HeartbeatRequest.FromString,
-                    response_serializer=trainer__pb2.HeartbeatResponse.SerializeToString,
+                    request_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.HeartbeatRequest.FromString,
+                    response_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.HeartbeatResponse.SerializeToString,
+            ),
+            'RegisterWorker': grpc.unary_unary_rpc_method_handler(
+                    servicer.RegisterWorker,
+                    request_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RegisterWorkerRequest.FromString,
+                    response_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RegisterWorkerResponse.SerializeToString,
+            ),
+            'ControlStream': grpc.stream_stream_rpc_method_handler(
+                    servicer.ControlStream,
+                    request_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.ControlEvent.FromString,
+                    response_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.ControlEvent.SerializeToString,
             ),
             'GetHealth': grpc.unary_unary_rpc_method_handler(
                     servicer.GetHealth,
-                    request_deserializer=trainer__pb2.HealthCheckRequest.FromString,
-                    response_serializer=trainer__pb2.HealthCheckResponse.SerializeToString,
+                    request_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.HealthCheckRequest.FromString,
+                    response_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.HealthCheckResponse.SerializeToString,
             ),
             'StreamRunSteps': grpc.unary_stream_rpc_method_handler(
                     servicer.StreamRunSteps,
-                    request_deserializer=trainer__pb2.StreamStepsRequest.FromString,
-                    response_serializer=trainer__pb2.RunStep.SerializeToString,
+                    request_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.StreamStepsRequest.FromString,
+                    response_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RunStep.SerializeToString,
             ),
             'StreamRunEpisodes': grpc.unary_stream_rpc_method_handler(
                     servicer.StreamRunEpisodes,
-                    request_deserializer=trainer__pb2.StreamEpisodesRequest.FromString,
-                    response_serializer=trainer__pb2.RunEpisode.SerializeToString,
+                    request_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.StreamEpisodesRequest.FromString,
+                    response_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RunEpisode.SerializeToString,
             ),
             'PublishRunSteps': grpc.stream_unary_rpc_method_handler(
                     servicer.PublishRunSteps,
-                    request_deserializer=trainer__pb2.RunStep.FromString,
-                    response_serializer=trainer__pb2.PublishTelemetryResponse.SerializeToString,
+                    request_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RunStep.FromString,
+                    response_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.PublishTelemetryResponse.SerializeToString,
             ),
             'PublishRunEpisodes': grpc.stream_unary_rpc_method_handler(
                     servicer.PublishRunEpisodes,
-                    request_deserializer=trainer__pb2.RunEpisode.FromString,
-                    response_serializer=trainer__pb2.PublishTelemetryResponse.SerializeToString,
+                    request_deserializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RunEpisode.FromString,
+                    response_serializer=gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.PublishTelemetryResponse.SerializeToString,
             ),
     }
     generic_handler = grpc.method_handlers_generic_handler(
@@ -241,8 +275,8 @@ class TrainerService(object):
             request,
             target,
             '/gymgui.trainer.TrainerService/SubmitRun',
-            trainer__pb2.SubmitRunRequest.SerializeToString,
-            trainer__pb2.SubmitRunResponse.FromString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.SubmitRunRequest.SerializeToString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.SubmitRunResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -268,8 +302,8 @@ class TrainerService(object):
             request,
             target,
             '/gymgui.trainer.TrainerService/CancelRun',
-            trainer__pb2.CancelRunRequest.SerializeToString,
-            trainer__pb2.CancelRunResponse.FromString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.CancelRunRequest.SerializeToString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.CancelRunResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -295,8 +329,8 @@ class TrainerService(object):
             request,
             target,
             '/gymgui.trainer.TrainerService/ListRuns',
-            trainer__pb2.ListRunsRequest.SerializeToString,
-            trainer__pb2.ListRunsResponse.FromString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.ListRunsRequest.SerializeToString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.ListRunsResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -322,8 +356,8 @@ class TrainerService(object):
             request,
             target,
             '/gymgui.trainer.TrainerService/WatchRuns',
-            trainer__pb2.WatchRunsRequest.SerializeToString,
-            trainer__pb2.RunRecord.FromString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.WatchRunsRequest.SerializeToString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RunRecord.FromString,
             options,
             channel_credentials,
             insecure,
@@ -349,8 +383,62 @@ class TrainerService(object):
             request,
             target,
             '/gymgui.trainer.TrainerService/Heartbeat',
-            trainer__pb2.HeartbeatRequest.SerializeToString,
-            trainer__pb2.HeartbeatResponse.FromString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.HeartbeatRequest.SerializeToString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.HeartbeatResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def RegisterWorker(request,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.unary_unary(
+            request,
+            target,
+            '/gymgui.trainer.TrainerService/RegisterWorker',
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RegisterWorkerRequest.SerializeToString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RegisterWorkerResponse.FromString,
+            options,
+            channel_credentials,
+            insecure,
+            call_credentials,
+            compression,
+            wait_for_ready,
+            timeout,
+            metadata,
+            _registered_method=True)
+
+    @staticmethod
+    def ControlStream(request_iterator,
+            target,
+            options=(),
+            channel_credentials=None,
+            call_credentials=None,
+            insecure=False,
+            compression=None,
+            wait_for_ready=None,
+            timeout=None,
+            metadata=None):
+        return grpc.experimental.stream_stream(
+            request_iterator,
+            target,
+            '/gymgui.trainer.TrainerService/ControlStream',
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.ControlEvent.SerializeToString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.ControlEvent.FromString,
             options,
             channel_credentials,
             insecure,
@@ -376,8 +464,8 @@ class TrainerService(object):
             request,
             target,
             '/gymgui.trainer.TrainerService/GetHealth',
-            trainer__pb2.HealthCheckRequest.SerializeToString,
-            trainer__pb2.HealthCheckResponse.FromString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.HealthCheckRequest.SerializeToString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.HealthCheckResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -403,8 +491,8 @@ class TrainerService(object):
             request,
             target,
             '/gymgui.trainer.TrainerService/StreamRunSteps',
-            trainer__pb2.StreamStepsRequest.SerializeToString,
-            trainer__pb2.RunStep.FromString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.StreamStepsRequest.SerializeToString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RunStep.FromString,
             options,
             channel_credentials,
             insecure,
@@ -430,8 +518,8 @@ class TrainerService(object):
             request,
             target,
             '/gymgui.trainer.TrainerService/StreamRunEpisodes',
-            trainer__pb2.StreamEpisodesRequest.SerializeToString,
-            trainer__pb2.RunEpisode.FromString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.StreamEpisodesRequest.SerializeToString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RunEpisode.FromString,
             options,
             channel_credentials,
             insecure,
@@ -457,8 +545,8 @@ class TrainerService(object):
             request_iterator,
             target,
             '/gymgui.trainer.TrainerService/PublishRunSteps',
-            trainer__pb2.RunStep.SerializeToString,
-            trainer__pb2.PublishTelemetryResponse.FromString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RunStep.SerializeToString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.PublishTelemetryResponse.FromString,
             options,
             channel_credentials,
             insecure,
@@ -484,8 +572,8 @@ class TrainerService(object):
             request_iterator,
             target,
             '/gymgui.trainer.TrainerService/PublishRunEpisodes',
-            trainer__pb2.RunEpisode.SerializeToString,
-            trainer__pb2.PublishTelemetryResponse.FromString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.RunEpisode.SerializeToString,
+            gym__gui_dot_services_dot_trainer_dot_proto_dot_trainer__pb2.PublishTelemetryResponse.FromString,
             options,
             channel_credentials,
             insecure,

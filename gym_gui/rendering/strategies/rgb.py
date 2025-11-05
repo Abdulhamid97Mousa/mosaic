@@ -24,14 +24,17 @@ class RgbRendererStrategy(RendererStrategy):
         return self._view
 
     def render(self, payload: Mapping[str, object], *, context: RendererContext | None = None) -> None:
+        # Support both "rgb" (new) and "frame" (legacy) keys for backward compatibility
         frame = payload.get("rgb")
+        if frame is None:
+            frame = payload.get("frame")
         if frame is None:
             self.reset()
             return
         self._view.render_frame(frame, tooltip_payload=payload)
 
     def supports(self, payload: Mapping[str, object]) -> bool:
-        return "rgb" in payload
+        return "rgb" in payload or "frame" in payload
 
     def reset(self) -> None:
         self._view.reset()

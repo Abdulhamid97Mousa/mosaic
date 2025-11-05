@@ -77,12 +77,21 @@ TAXI_DEFAULTS = ToyTextDefaults(
     slippery=False,
 )
 
+BLACKJACK_DEFAULTS = ToyTextDefaults(
+    grid_height=1,
+    grid_width=1,
+    start=(0, 0),
+    goal=(0, 0),
+    slippery=False,
+)
+
 
 TOY_TEXT_DEFAULTS: Mapping[GameId, ToyTextDefaults] = {
     GameId.FROZEN_LAKE: FROZEN_LAKE_DEFAULTS,
     GameId.FROZEN_LAKE_V2: FROZEN_LAKE_V2_DEFAULTS,
     GameId.CLIFF_WALKING: CLIFF_WALKING_DEFAULTS,
     GameId.TAXI: TAXI_DEFAULTS,
+    GameId.BLACKJACK: BLACKJACK_DEFAULTS,
 }
 
 __all__ = [
@@ -92,4 +101,5 @@ __all__ = [
     "FROZEN_LAKE_V2_DEFAULTS",
     "CLIFF_WALKING_DEFAULTS",
     "TAXI_DEFAULTS",
+    "BLACKJACK_DEFAULTS",
 ]

@@ -17,6 +17,7 @@ VAR_TMP_DIR = VAR_ROOT / "tmp"
 VAR_LOGS_DIR = VAR_ROOT / "logs"
 VAR_TRAINER_DIR = VAR_ROOT / "trainer"
 VAR_TENSORBOARD_DIR = VAR_TRAINER_DIR / "runs"
+VAR_WANDB_DIR = VAR_TRAINER_DIR / "runs"  # WANDB manifests stored per-run like TensorBoard
 VAR_TRAINER_DB = VAR_TRAINER_DIR / "trainer.sqlite"
 VAR_DATA_DIR = VAR_ROOT / "data"
 
@@ -34,6 +35,7 @@ def ensure_var_directories() -> None:
         VAR_LOGS_DIR,
         VAR_TRAINER_DIR,
         VAR_TENSORBOARD_DIR,
+        VAR_WANDB_DIR,
         VAR_DATA_DIR,
     ):
         path.mkdir(parents=True, exist_ok=True)
@@ -49,6 +51,7 @@ __all__ = [
     "VAR_TRAINER_DIR",
     "VAR_TRAINER_DB",
     "VAR_TENSORBOARD_DIR",
+    "VAR_WANDB_DIR",
     "VAR_DATA_DIR",
     "ensure_var_directories",
 ]

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """Qt session controller that bridges Gym adapters to the GUI."""
 
-from dataclasses import dataclass, replace, asdict, is_dataclass
+from dataclasses import dataclass, asdict, is_dataclass
 import hashlib
 import logging
 from datetime import datetime
@@ -19,7 +19,9 @@ from gym_gui.config.game_configs import (
     CarRacingConfig,
     BipedalWalkerConfig,
     FrozenLakeConfig,
+    GameConfig,
     LunarLanderConfig,
+    MiniGridConfig,
     TaxiConfig,
 )
 from gym_gui.config.settings import Settings
@@ -151,15 +153,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._last_seed = 0
         self._next_seed = max(1, settings.default_seed)
         self._current_seed = self._next_seed
-        self._game_config: (
-            FrozenLakeConfig
-            | TaxiConfig
-            | CliffWalkingConfig
-            | LunarLanderConfig
-            | CarRacingConfig
-            | BipedalWalkerConfig
-            | None
-        ) = None
+        self._game_config: GameConfig | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -222,25 +216,18 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         *,
         seed: int | None = None,
         settings_overrides: dict[str, Any] | None = None,
-        game_config: (
-            FrozenLakeConfig
-            | TaxiConfig
-            | CliffWalkingConfig
-            | LunarLanderConfig
-            | CarRacingConfig
-            | BipedalWalkerConfig
-            | None
-        ) = None,
+        game_config: GameConfig | None = None,
     ) -> None:
         self.stop_auto_play()
         self._dispose_adapter()
         if settings_overrides is not None:
             self._settings_overrides = settings_overrides
-        effective_settings = (
-            replace(self._settings, **self._settings_overrides)
-            if self._settings_overrides
-            else self._settings
-        )
+        if self._settings_overrides:
+            merged_settings = asdict(self._settings)
+            merged_settings.update(self._settings_overrides)
+            effective_settings = Settings(**merged_settings)
+        else:
+            effective_settings = self._settings
         self._effective_settings = effective_settings
         context = AdapterContext(
             settings=effective_settings,

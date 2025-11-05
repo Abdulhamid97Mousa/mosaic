@@ -35,3 +35,25 @@ def test_run_config_respects_live_rendering_flag():
     assert ui_config["live_rendering_enabled"] is False
     assert config.max_episodes == 5
     assert config.worker_id is None
+
+
+def test_run_config_merges_nested_extra_flags():
+    payload = {
+        "run_id": "01K8NESTEDRUN00000000000000",
+        "game_id": "FrozenLake-v1",
+        "seed": 1,
+        "max_episodes": 1,
+        "max_steps_per_episode": 10,
+        "policy_strategy": "train_and_save",
+        "extra": {
+            "track_wandb": True,
+            "wandb_project_name": "MOSAIC",
+            "wandb_entity": "abdulhamid-m-mousa-beijing-institute-of-technology",
+        },
+    }
+
+    config = RunConfig.from_dict(payload)
+
+    assert config.extra["track_wandb"] is True
+    assert config.extra["wandb_project_name"] == "MOSAIC"
+    assert config.extra["wandb_entity"].startswith("abdulhamid")
