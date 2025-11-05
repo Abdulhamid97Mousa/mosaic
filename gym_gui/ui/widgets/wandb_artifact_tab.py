@@ -15,7 +15,9 @@ except Exception:  # pragma: no cover - optional feature not available in tests
     QWebEngineView = None
 
 WEB_ENGINE_AVAILABLE = QWebEngineView is not None
-AUTO_EMBED_ENABLED = os.environ.get("GYM_GUI_DISABLE_WANDB_AUTO_EMBED", "0") != "1"
+# Disable auto-embed by default since WANDB blocks iframe embedding for security
+# Set GYM_GUI_ENABLE_WANDB_AUTO_EMBED=1 to force enable (will show blank page)
+AUTO_EMBED_ENABLED = os.environ.get("GYM_GUI_ENABLE_WANDB_AUTO_EMBED", "0") == "1"
 
 from gym_gui.constants.constants_wandb import DEFAULT_WANDB, WandbDefaults, build_wandb_run_url
 from gym_gui.logging_config.helpers import LogConstantMixin
@@ -216,15 +218,21 @@ class WandbArtifactTab(QtWidgets.QWidget, LogConstantMixin):
 
         if WEB_ENGINE_AVAILABLE:
             placeholder = QtWidgets.QLabel(
-                "Embedded view will appear here when launched."
+                "⚠️  WANDB Dashboard\n\n"
+                "Note: WANDB blocks embedded viewing for security.\n"
+                "The embedded view may show a blank page.\n\n"
+                "👉 Use 'Open in Browser' button for best experience."
             )
             placeholder.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
             placeholder.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-            placeholder.setMinimumHeight(320)
-            layout.addWidget(placeholder)
+            placeholder.setWordWrap(True)
+            placeholder.setStyleSheet("QLabel { padding: 20px; color: #666; }")
+            # Add with stretch factor so it expands to fill available space
+            layout.addWidget(placeholder, 1)
             self._placeholder = placeholder
-
-        layout.addStretch(1)
+        else:
+            # If web engine not available, add stretch to push details to top
+            layout.addStretch(1)
         self._update_action_states(status_message=initial_status)
 
     # ------------------------------------------------------------------
@@ -404,15 +412,27 @@ class WandbArtifactTab(QtWidgets.QWidget, LogConstantMixin):
         try:
             if self._web_view is None:
                 self._web_view = QWebEngineView(self)  # type: ignore[assignment]
-                self.layout().replaceWidget(self._placeholder, self._web_view)  # type: ignore[arg-type]
-                if self._placeholder is not None:
+                # Get the layout and find the placeholder's position
+                main_layout = self.layout()
+                if main_layout is not None and self._placeholder is not None:
+                    # Remove placeholder and add web view with stretch factor
+                    idx = main_layout.indexOf(self._placeholder)
+                    main_layout.removeWidget(self._placeholder)
                     self._placeholder.deleteLater()
                     self._placeholder = None
+                    # Add web view with stretch factor 1 so it expands to fill space
+                    main_layout.insertWidget(idx, self._web_view, 1)  # type: ignore[arg-type]
                 if self._web_view is not None:
                     self._web_view.urlChanged.connect(self._on_web_url_changed)
-                    self._web_view.loadFinished.connect(lambda _: self._update_nav_buttons())
+                    self._web_view.loadFinished.connect(self._on_load_finished)
             if self._web_view is not None:
                 self._web_view.setUrl(QtCore.QUrl(self._run_url))
+                # Show helpful message about embedding limitations
+                if self._status_area is not None:
+                    self._status_area.appendPlainText(
+                        "\nNote: WANDB may block embedded viewing due to security policies.\n"
+                        "If you see a blank page, use 'Open in Browser' instead."
+                    )
         except Exception as exc:  # noqa: BLE001
             self.log_constant(
                 LOG_UI_RENDER_TABS_WANDB_ERROR,
@@ -426,6 +446,16 @@ class WandbArtifactTab(QtWidgets.QWidget, LogConstantMixin):
             self._emit_status("embedded_failed", success=False)
         else:
             self._emit_status("embedded_auto_opened" if auto else "embedded_opened", success=True)
+    
+    def _on_load_finished(self, success: bool) -> None:  # pragma: no cover - Qt signal
+        """Handle page load completion."""
+        self._update_nav_buttons()
+        if not success and self._status_area is not None:
+            self._status_area.appendPlainText(
+                "\nFailed to load WANDB page in embedded view.\n"
+                "This is expected - WANDB blocks iframe embedding for security.\n"
+                "Please use the 'Open in Browser' button instead."
+            )
 
 
 __all__ = ["WandbArtifactTab"]

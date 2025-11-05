@@ -486,22 +486,64 @@ class AnalyticsTabManager(LogConstantMixin):
         if entity and project:
             return entity, project
 
+        # Final fallback: Try OS environment variables
+        import os
+        if entity is None:
+            entity = (
+                os.environ.get("WANDB_ENTITY")
+                or os.environ.get("WANDB_ENTITY_NAME")
+                or os.environ.get("WANDB_USERNAME")
+            )
+        if project is None:
+            project = (
+                os.environ.get("WANDB_PROJECT")
+                or os.environ.get("WANDB_PROJECT_NAME")
+            )
+
         return entity, project
 
     def _discover_wandb_slug(self, run_id: str) -> str:
+        """Discover WANDB run slug from the wandb directory structure.
+        
+        WANDB creates directories like: wandb/run-20251105_085314-sc26ki0p/
+        We need to extract the slug (sc26ki0p) from the directory name.
+        """
         wandb_root = VAR_TRAINER_DIR / "runs" / run_id / "wandb"
         if not wandb_root.exists():
             return ""
 
-        candidates = sorted(
-            wandb_root.rglob("run-*.wandb"),
-            key=lambda path: path.stat().st_mtime,
-            reverse=True,
-        )
-        for candidate in candidates:
-            slug = candidate.stem.split("-")[-1]
-            if slug:
-                return slug
+        # Look for run-* directories (not .wandb files)
+        try:
+            wandb_subdirs = list(wandb_root.glob("wandb/run-*"))
+            if wandb_subdirs:
+                # Sort by modification time, newest first
+                candidates = sorted(
+                    [p for p in wandb_subdirs if p.is_dir()],
+                    key=lambda path: path.stat().st_mtime,
+                    reverse=True,
+                )
+                for candidate in candidates:
+                    # Extract slug from directory name: run-20251105_085314-sc26ki0p -> sc26ki0p
+                    dir_name = candidate.name
+                    if dir_name.startswith("run-") and "-" in dir_name:
+                        parts = dir_name.split("-")
+                        if len(parts) >= 3:
+                            slug = parts[-1]  # Get the last part after the final dash
+                            if slug:
+                                self._logger.debug(
+                                    "Discovered WANDB slug from directory: %s -> %s",
+                                    dir_name,
+                                    slug,
+                                )
+                                return slug
+        except Exception as exc:
+            self._logger.warning(
+                "Failed to discover WANDB slug for run %s: %s",
+                run_id,
+                exc,
+                exc_info=exc,
+            )
+        
         return ""
 
 

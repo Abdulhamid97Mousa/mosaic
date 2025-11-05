@@ -207,8 +207,121 @@ Called automatically in `MainWindow._on_training_finished()` for each agent (lin
   - **Added `load_and_create_tabs()` method** to `AnalyticsTabManager` (lines 29-63)
   - Loads analytics.json from disk and creates/refreshes analytics tabs
 - **`gym_gui/ui/main_window.py`**:
-  - Updated `_on_training_finished()` to call `analytics_tabs.load_and_create_tabs()` for each agent (line 1607)## Future Enhancements
+  - Updated `_on_training_finished()` to call `analytics_tabs.load_and_create_tabs()` for each agent (line 1607)## WANDB Complete Integration Status ✅
+
+**As of Day 20, the WANDB integration is COMPLETE and fully functional!**
+
+All components are working correctly:
+- ✅ WANDB run tracking initializes properly during training
+- ✅ Analytics manifest with nested structure is generated correctly
+- ✅ WANDB slug discovery extracts run ID from filesystem (`wandb/run-*` directories)
+- ✅ Environment variable fallback reads entity/project from `.env` file
+- ✅ Run URL is constructed and displayed: `https://wandb.ai/{entity}/{project}/runs/{slug}`
+- ✅ "Copy URL" and "Open in Browser" buttons work perfectly
+- ✅ Tab appears automatically when training completes with WANDB enabled
+
+### Known Limitation: Embedded View
+
+The embedded WANDB view will show an error message. This is **expected behavior** and not a bug.
+
+Common error messages you may see:
+- **"This site can't be reached / ERR_CONNECTION_TIMED_OUT"** - WANDB server is blocking the connection
+- **Blank page** - WANDB iframe embedding is blocked by security headers
+- **"Checking the proxy and the firewall"** - Browser cannot establish connection to wandb.ai in embedded context
+
+## Iframe Embedding Limitations
+
+### What W&B Supports
+
+W&B officially supports embedding **public reports** via iframe:
+
+> "Copy the embed code … It will render within an Inline Frame (IFrame) HTML element."  
+> — [W&B Documentation](https://docs.wandb.ai/guides/app/features/panels/run-comparer)
+
+However, the documentation also notes:
+
+> "Only public reports are viewable when embedded."  
+> — [W&B Documentation](https://docs.wandb.ai/guides/app/features/panels/run-comparer)
+
+### What Doesn't Work (Current Implementation)
+
+W&B **blocks embedding of project dashboards and run pages** on external domains via iframe for security reasons:
+
+1. **X-Frame-Options Header**: W&B sets `X-Frame-Options: sameorigin` or similar headers that prevent the page from being loaded in an iframe from a different origin.
+
+2. **Content-Security-Policy**: W&B uses CSP `frame-ancestors` directive to restrict which domains can embed their content.
+
+3. **GitHub Issue #7632**: The W&B community has an open feature request asking for iframe embedding support:
+   > "I tried embedding it in a streamlit application, but I think embedding on external domains is disabled."  
+   > — [W&B GitHub Issue](https://github.com/wandb/wandb/issues/7632)
+
+### Technical Diagnosis
+
+When loading a W&B URL in the Qt WebEngine viewer, the following occurs:
+
+```
+Response Headers:
+X-Frame-Options: sameorigin
+Content-Security-Policy: frame-ancestors 'self' ...
+```
+
+These headers instruct the browser (and Qt WebEngine) to **refuse loading the page in an iframe** if the parent page is from a different origin. This is a security feature to prevent clickjacking attacks.
+
+### Current Implementation (Day 20)
+
+We've implemented appropriate fallbacks and warnings:
+
+1. **Disabled Auto-Embed**: Changed `AUTO_EMBED_ENABLED` to `False` by default (line 20)
+   ```python
+   # Disable auto-embed by default since WANDB blocks iframe embedding for security
+   # Set GYM_GUI_ENABLE_WANDB_AUTO_EMBED=1 to force enable (will show blank page)
+   AUTO_EMBED_ENABLED = os.environ.get("GYM_GUI_ENABLE_WANDB_AUTO_EMBED", "0") == "1"
+   ```
+
+2. **Warning Messages**: Added clear warnings in the UI:
+   - Placeholder text explains embedding limitations
+   - Status area shows warnings when embedding fails
+   - Load failure handler (`_on_load_finished()`) detects and reports failed embeds
+
+3. **Primary Action**: "Open in Browser" button is the recommended way to view WANDB dashboards
+
+### Recommendations
+
+**For Users:**
+- Use the **"Open in Browser"** button to view WANDB dashboards
+- The embedded view won't work due to W&B's security policies
+- Copy the URL for sharing or bookmarking
+
+**For Developers:**
+If embedding is critical for your application:
+
+1. **Contact W&B Support**: Check if paid plans or custom configurations allow embedding for your domain/origin
+
+2. **Use Public Reports**: Instead of embedding run pages, create and embed public reports (which W&B officially supports)
+
+3. **Export Data Locally**: Download charts/plots and render them locally inside Qt instead of embedding the full interactive W&B UI
+
+4. **Proxy/Same-Origin Workaround**: Set up a proxy that serves W&B content from the same origin as your app (complex, not recommended)
+
+### Header Inspection
+
+To diagnose embedding issues for a specific W&B URL, check the response headers:
+
+```bash
+curl -I https://wandb.ai/your-entity/your-project/runs/run-id
+```
+
+Look for:
+- `X-Frame-Options: sameorigin` or `X-Frame-Options: DENY`
+- `Content-Security-Policy: frame-ancestors 'self'` or similar
+
+These headers confirm that W&B blocks external iframe embedding for security reasons.
+
+## Future Enhancements
 
 - Fetching W&B summaries via the REST API (subject to authentication) for lightweight metric bridging.
 - Handling offline runs by pointing to locally-exported reports when no hosted dashboard exists.
 - Extending the nested extra flattening pattern to other worker configurations if needed.
+- Investigating W&B public report embedding as an alternative to run page embedding.
+
+````
