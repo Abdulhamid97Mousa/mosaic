@@ -91,7 +91,7 @@ class BDITrainer(HeadlessTrainer):
             config_payload,
             worker_id=self.config.worker_id,
         )
-        self._maybe_start_wandb(config_payload)
+        self._initialize_wandb_if_enabled(config_payload)
 
         try:
             # Start BDI agent

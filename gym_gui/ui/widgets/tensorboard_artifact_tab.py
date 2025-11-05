@@ -29,6 +29,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_UI_RENDER_TABS_TRACE,
     LOG_UI_RENDER_TABS_WARNING,
     LOG_UI_RENDER_TABS_TENSORBOARD_STATUS,
+    LOG_UI_TENSORBOARD_KILL_WARNING,
     LOG_UI_RENDER_TABS_TENSORBOARD_WAITING,
 )
 
@@ -523,6 +524,12 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
             DEFAULT_TENSORBOARD.server_host,
         ]
         try:
+            # nosemgrep: python.lang.security.audit.subprocess-shell-true.subprocess-shell-true
+            # Safe: Command built from trusted constants and validated internal data:
+            # - cli_executable: hardcoded constant "tensorboard"
+            # - logdir: internal Path object from config
+            # - port: validated integer from port scanner
+            # - host: hardcoded constant
             process = subprocess.Popen(
                 command,
                 stdout=subprocess.DEVNULL,
@@ -674,8 +681,18 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
         except Exception:  # pragma: no cover - defensive
             try:
                 self._tensorboard_process.kill()
-            except Exception:
-                pass
+            except Exception as exc:
+                self.log_constant(
+                    LOG_UI_TENSORBOARD_KILL_WARNING,
+                    message="Failed to kill TensorBoard process during cleanup",
+                    extra={
+                        "run_id": self._run_id,
+                        "agent_id": self._agent_id,
+                        "error": str(exc),
+                        "error_type": type(exc).__name__,
+                    },
+                    exc_info=exc,
+                )
         finally:
             self._tensorboard_process = None
             self.log_constant(

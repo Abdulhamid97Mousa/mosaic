@@ -65,6 +65,9 @@ _TOY_TEXT_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
         _mapping(("Key_1", "Key_Q"), 0),      # STICK (stop taking cards) - 1 or Q
         _mapping(("Key_2", "Key_E"), 1),      # HIT (take another card) - 2 or E
     ),
+}
+
+_MINIG_GRID_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
     GameId.MINIGRID_EMPTY_5x5: (
         _mapping(("Key_Left", "Key_A"), 0),    # turn left
         _mapping(("Key_Right", "Key_D"), 1),   # turn right
@@ -212,6 +215,48 @@ _TOY_TEXT_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
         _mapping(("Key_Right", "Key_D"), 1),
         _mapping(("Key_Up", "Key_W"), 2),
     ),
+    # LavaCrossing environments - 3 actions only (turn left, turn right, move forward)
+    GameId.MINIGRID_LAVA_CROSSING_S9N1: (
+        _mapping(("Key_Left", "Key_A"), 0),    # turn left
+        _mapping(("Key_Right", "Key_D"), 1),   # turn right
+        _mapping(("Key_Up", "Key_W"), 2),      # move forward
+    ),
+    GameId.MINIGRID_LAVA_CROSSING_S9N2: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+    ),
+    GameId.MINIGRID_LAVA_CROSSING_S9N3: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+    ),
+    GameId.MINIGRID_LAVA_CROSSING_S11N5: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+    ),
+    # SimpleCrossing environments - 3 actions only (turn left, turn right, move forward)
+    GameId.MINIGRID_SIMPLE_CROSSING_S9N1: (
+        _mapping(("Key_Left", "Key_A"), 0),    # turn left
+        _mapping(("Key_Right", "Key_D"), 1),   # turn right
+        _mapping(("Key_Up", "Key_W"), 2),      # move forward
+    ),
+    GameId.MINIGRID_SIMPLE_CROSSING_S9N2: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+    ),
+    GameId.MINIGRID_SIMPLE_CROSSING_S9N3: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+    ),
+    GameId.MINIGRID_SIMPLE_CROSSING_S11N5: (
+        _mapping(("Key_Left", "Key_A"), 0),
+        _mapping(("Key_Right", "Key_D"), 1),
+        _mapping(("Key_Up", "Key_W"), 2),
+    ),
     GameId.MINIGRID_BLOCKED_UNLOCK_PICKUP: (
         _mapping(("Key_Left", "Key_A"), 0),
         _mapping(("Key_Right", "Key_D"), 1),
@@ -310,7 +355,9 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
             return
 
         try:
-            mappings = _TOY_TEXT_MAPPINGS.get(game_id)
+            mappings = _TOY_TEXT_MAPPINGS.get(game_id) 
+            if mappings is None:
+                mappings = _MINIG_GRID_MAPPINGS.get(game_id)
             if mappings is None:
                 mappings = _BOX_2D_MAPPINGS.get(game_id)
             if mappings is None and isinstance(action_space, spaces.Discrete):

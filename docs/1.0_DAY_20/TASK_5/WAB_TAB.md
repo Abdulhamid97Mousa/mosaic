@@ -9,6 +9,7 @@ The **WANDB tab** is the Weights & Biases ("W&B") analytics surface embedded ins
 ## Lifecycle
 
 1. **Manifest creation** – Both `cleanrl_worker/runtime.py` and `spade_bdi_worker/core/runtime.py` write `analytics.json` with fields such as:
+
    ```json
    {
      "tensorboard_dir": "var/trainer/runs/<run_id>/tensorboard",
@@ -16,6 +17,7 @@ The **WANDB tab** is the Weights & Biases ("W&B") analytics surface embedded ins
      "optuna_db_path": null
    }
    ```
+
 2. **GUI detection** – On training completion, `AnalyticsTabManager.ensure_wandb_tab` reads the manifest and, if `wandb_run_path` is a non-empty string, adds/refreshes the corresponding WAB tab.
 3. **Tab creation** – The tab is constructed by `gym_gui.ui.widgets.wandb_artifact_tab.WandbArtifactTab`, providing:
    - A copyable W&B run URL (`https://wandb.ai/<run_path>` by default).
@@ -171,6 +173,7 @@ manifest = {
 **2. GUI Analytics Loading** (`gym_gui/ui/panels/analytics_tabs.py`, lines 29-90):
 
 Added `load_and_create_tabs()` method to `AnalyticsTabManager` that:
+
 - Loads `var/trainer/runs/{run_id}/analytics.json` from disk when training finishes
 - Implements **retry mechanism** with QTimer to handle race conditions:
   - Worker writes analytics.json in `finally` block before process exits
@@ -188,6 +191,7 @@ def load_and_create_tabs(self, run_id: str, agent_id: str, max_retries: int = 3,
 Called automatically in `MainWindow._on_training_finished()` for each agent (line 1607).
 
 **Why Retry Logic is Needed:**
+
 - TensorBoard tabs appear immediately because path is pre-populated in training config
 - W&B `run_path` is only known after W&B SDK initialization, written to analytics.json
 - Race condition: signal emitted when process exits, but file write may still be buffering
@@ -198,7 +202,8 @@ Called automatically in `MainWindow._on_training_finished()` for each agent (lin
 ## Modified Files Summary (Day 20)
 
 - **`spade_bdi_worker/core/config.py`**: Added nested extra flattening logic (+11 lines, lines 90-100)
-- **`spade_bdi_worker/core/runtime.py`**: 
+- **`spade_bdi_worker/core/runtime.py`**:
+
   - Now correctly reads `track_wandb`, `wandb_project_name`, `wandb_entity` from flattened `config.extra`
   - **Fixed analytics.json structure** to nested format (lines 438-465)
 - **`spade_bdi_worker/tests/test_run_config_live_render.py`**: Added test case for nested extra configuration
@@ -212,6 +217,7 @@ Called automatically in `MainWindow._on_training_finished()` for each agent (lin
 **As of Day 20, the WANDB integration is COMPLETE and fully functional!**
 
 All components are working correctly:
+
 - ✅ WANDB run tracking initializes properly during training
 - ✅ Analytics manifest with nested structure is generated correctly
 - ✅ WANDB slug discovery extracts run ID from filesystem (`wandb/run-*` directories)
@@ -225,6 +231,7 @@ All components are working correctly:
 The embedded WANDB view will show an error message. This is **expected behavior** and not a bug.
 
 Common error messages you may see:
+
 - **"This site can't be reached / ERR_CONNECTION_TIMED_OUT"** - WANDB server is blocking the connection
 - **Blank page** - WANDB iframe embedding is blocked by security headers
 - **"Checking the proxy and the firewall"** - Browser cannot establish connection to wandb.ai in embedded context
@@ -259,7 +266,7 @@ W&B **blocks embedding of project dashboards and run pages** on external domains
 
 When loading a W&B URL in the Qt WebEngine viewer, the following occurs:
 
-```
+```bash
 Response Headers:
 X-Frame-Options: sameorigin
 Content-Security-Policy: frame-ancestors 'self' ...
@@ -272,6 +279,7 @@ These headers instruct the browser (and Qt WebEngine) to **refuse loading the pa
 We've implemented appropriate fallbacks and warnings:
 
 1. **Disabled Auto-Embed**: Changed `AUTO_EMBED_ENABLED` to `False` by default (line 20)
+
    ```python
    # Disable auto-embed by default since WANDB blocks iframe embedding for security
    # Set GYM_GUI_ENABLE_WANDB_AUTO_EMBED=1 to force enable (will show blank page)
@@ -288,6 +296,7 @@ We've implemented appropriate fallbacks and warnings:
 ### Recommendations
 
 **For Users:**
+
 - Use the **"Open in Browser"** button to view WANDB dashboards
 - The embedded view won't work due to W&B's security policies
 - Copy the URL for sharing or bookmarking
@@ -312,6 +321,7 @@ curl -I https://wandb.ai/your-entity/your-project/runs/run-id
 ```
 
 Look for:
+
 - `X-Frame-Options: sameorigin` or `X-Frame-Options: DENY`
 - `Content-Security-Policy: frame-ancestors 'self'` or similar
 
@@ -323,5 +333,3 @@ These headers confirm that W&B blocks external iframe embedding for security rea
 - Handling offline runs by pointing to locally-exported reports when no hosted dashboard exists.
 - Extending the nested extra flattening pattern to other worker configurations if needed.
 - Investigating W&B public report embedding as an alternative to run page embedding.
-
-````

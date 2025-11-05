@@ -15,6 +15,7 @@ from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
     LOG_TRAINER_CLIENT_LOOP_NONFATAL,
     LOG_TRAINER_CLIENT_LOOP_ERROR,
+    LOG_TRAINER_CLIENT_SHUTDOWN_WARNING,
 )
 
 
@@ -76,8 +77,17 @@ class TrainerClientRunner(LogConstantMixin):
     def shutdown(self) -> None:
         try:
             asyncio.run_coroutine_threadsafe(self._client.close(), self._loop).result(timeout=1)
-        except Exception:  # pragma: no cover - best effort cleanup
-            pass
+        except Exception as exc:  # pragma: no cover - best effort cleanup
+            # Log but don't raise - shutdown should be tolerant of cleanup failures
+            self.log_constant(
+                LOG_TRAINER_CLIENT_SHUTDOWN_WARNING,
+                message="Failed to close trainer client cleanly during shutdown",
+                extra={
+                    "error": str(exc),
+                    "error_type": type(exc).__name__,
+                },
+                exc_info=exc,
+            )
         self._loop.call_soon_threadsafe(self._loop.stop)
         self._thread.join(timeout=2)
         self._loop.close()

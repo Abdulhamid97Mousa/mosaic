@@ -2,6 +2,7 @@ from __future__ import annotations
 
 """Presenter that coordinates the main window widgets and controllers."""
 
+import logging
 from dataclasses import dataclass
 from typing import Callable, Optional
 
@@ -9,7 +10,11 @@ from qtpy import QtCore
 
 from gym_gui.controllers.human_input import HumanInputController
 from gym_gui.controllers.session import SessionController
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import LOG_UI_PRESENTER_SIGNAL_CONNECTION_WARNING
 from gym_gui.ui.widgets.control_panel import ControlPanelWidget
+
+_LOGGER = logging.getLogger(__name__)
 
 
 @dataclass(slots=True)
@@ -25,7 +30,7 @@ class MainWindowView:
     game_info_setter: Callable[[str], None] | None = None
 
 
-class MainWindowPresenter(QtCore.QObject):
+class MainWindowPresenter(QtCore.QObject, LogConstantMixin):
     """Owns controllers and mediates between the session and UI widgets."""
 
     def __init__(
@@ -38,6 +43,7 @@ class MainWindowPresenter(QtCore.QObject):
         self._session = session
         self._human_input = human_input
         self._view: MainWindowView | None = None
+        self._logger = _LOGGER
 
     # ------------------------------------------------------------------
     # Lifecycle
@@ -49,9 +55,18 @@ class MainWindowPresenter(QtCore.QObject):
         # Listen for UI-driven game changes so presenter can update game info
         try:
             view.control_panel.game_changed.connect(lambda gid: self._handle_game_changed(gid.value if gid is not None else None))
-        except Exception:
-            # If control_panel signal isn't available for some reason, ignore
-            pass
+        except Exception as exc:
+            self.log_constant(
+                LOG_UI_PRESENTER_SIGNAL_CONNECTION_WARNING,
+                message="Control panel game_changed signal connection failed",
+                extra={
+                    "signal": "game_changed",
+                    "widget": "control_panel",
+                    "error": str(exc),
+                    "error_type": type(exc).__name__,
+                },
+                exc_info=exc,
+            )
         self._wire_session_signals()
 
     def unbind_view(self) -> None:

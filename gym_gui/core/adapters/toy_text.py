@@ -44,6 +44,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_ADAPTER_HOLE_PLACEMENT,
     LOG_ADAPTER_GOAL_OVERRIDE,
     LOG_ADAPTER_RENDER_PAYLOAD,
+    LOG_ADAPTER_RENDERING_WARNING,
 )
 
 _TOY_TEXT_DATA_DIR = (VAR_DATA_DIR / "toy_text").resolve()
@@ -312,8 +313,17 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
                                 holes.append({"row": int(r), "col": int(c)})
                             elif cell_char == 'G':
                                 goal = {"row": int(r), "col": int(c)}
-                except Exception:
-                    pass
+                except Exception as exc:
+                    self.log_constant(
+                        LOG_ADAPTER_RENDERING_WARNING,
+                        message="Failed to extract FrozenLake grid metadata during rendering",
+                        extra={
+                            "game_id": self.id,
+                            "error": str(exc),
+                            "error_type": type(exc).__name__,
+                        },
+                        exc_info=exc,
+                    )
 
                 if holes:
                     payload["holes"] = holes
@@ -328,6 +338,8 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
             state = getattr(unwrapped, "s", None)
             decode = getattr(unwrapped, "decode", None)
             if state is not None and callable(decode):
+                # pylint: disable=not-callable
+                # Safe: decode callability verified in conditional above
                 raw_decoded = decode(int(state))
                 decoded = _ensure_sequence(raw_decoded)
                 if len(decoded) >= 4:
@@ -380,6 +392,8 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
                 decode = getattr(unwrapped, "decode", None)
                 if state is None or not callable(decode):
                     return None
+                # pylint: disable=not-callable
+                # Safe: decode callability verified in conditional above
                 raw_decoded = decode(int(state))
                 decoded = _ensure_sequence(raw_decoded)
                 if len(decoded) < 2:
@@ -402,8 +416,17 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
                     try:
                         height = height or len(desc)
                         width = width or (len(desc[0]) if height else None)
-                    except Exception:
-                        pass
+                    except Exception as exc:
+                        self.log_constant(
+                            LOG_ADAPTER_RENDERING_WARNING,
+                            message="Failed to extract grid dimensions from env.desc during rendering",
+                            extra={
+                                "game_id": self.id,
+                                "error": str(exc),
+                                "error_type": type(exc).__name__,
+                            },
+                            exc_info=exc,
+                        )
                 if (width is None or height is None) and hasattr(unwrapped, "shape"):
                     shape = getattr(unwrapped, "shape")
                     if shape and len(shape) >= 2:

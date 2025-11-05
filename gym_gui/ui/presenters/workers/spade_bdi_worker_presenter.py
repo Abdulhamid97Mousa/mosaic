@@ -13,11 +13,16 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Optional
 import json
+import logging
 
 from gym_gui.core.schema import resolve_schema_for_game
+from gym_gui.logging_config.helpers import log_constant
+from gym_gui.logging_config.log_constants import LOG_WORKER_CONFIG_READ_WARNING
 from gym_gui.validations.validations_telemetry import ValidationService
 
 from gym_gui.ui.widgets.spade_bdi_worker_tabs import TabFactory
+
+_LOGGER = logging.getLogger(__name__)
 
 
 class SpadeBdiWorkerPresenter:
@@ -246,8 +251,18 @@ class SpadeBdiWorkerPresenter:
                 payload = json.load(f)
                 if isinstance(payload, dict):
                     return payload.get("metadata", {}) if isinstance(payload.get("metadata"), dict) else {}
-        except (json.JSONDecodeError, IOError):
-            pass
+        except (json.JSONDecodeError, IOError) as exc:
+            log_constant(
+                _LOGGER,
+                LOG_WORKER_CONFIG_READ_WARNING,
+                message="Failed to read policy metadata from file",
+                extra={
+                    "policy_path": str(policy_path),
+                    "error": str(exc),
+                    "error_type": type(exc).__name__,
+                },
+                exc_info=exc,
+            )
         return {}
 
     @staticmethod
