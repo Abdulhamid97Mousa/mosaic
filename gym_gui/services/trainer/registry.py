@@ -294,10 +294,13 @@ class RunRegistry:
         }
 
         try:
+            # Build placeholders from count of keys - safe, not user input
+            placeholders = ",".join("?" for _ in legacy_to_modern)
+            # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
+            # Safe: placeholders built from hardcoded dict keys count, all values parameterized
+            query = f"SELECT run_id, status FROM runs WHERE status IN ({placeholders})"
             rows = conn.execute(
-                "SELECT run_id, status FROM runs WHERE status IN ({})".format(
-                    ",".join("?" for _ in legacy_to_modern)
-                ),
+                query,
                 tuple(legacy_to_modern.keys()),
             ).fetchall()
         except sqlite3.OperationalError:
@@ -341,7 +344,18 @@ class RunRegistry:
 
             # Log schema for each table
             for table_name in tables:
-                # Use double quotes for safe identifier quoting in SQLite
+                # Validate table name against alphanumeric + underscore to prevent SQL injection
+                # (even though table_name comes from sqlite_master, satisfy static analysis)
+                if not table_name.replace("_", "").isalnum():
+                    _LOGGER.warning(
+                        "Skipping table with non-alphanumeric name during schema logging",
+                        extra={"table_name": table_name}
+                    )
+                    continue
+                
+                # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
+                # Safe: table_name validated as alphanumeric above, comes from sqlite_master
+                # SQLite PRAGMA doesn't support parameterized queries
                 cursor = conn.execute(f'PRAGMA table_info("{table_name}")')
                 columns = cursor.fetchall()
                 column_info = [
@@ -355,8 +369,9 @@ class RunRegistry:
                     for col in columns
                 ]
 
-                # Get row count
-                # Use double quotes for safe identifier quoting in SQLite
+                # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
+                # Safe: table_name validated as alphanumeric above, comes from sqlite_master
+                # Table identifiers cannot be parameterized in SQL
                 row_count = conn.execute(f'SELECT COUNT(*) FROM "{table_name}"').fetchone()[0]
 
                 # Format column schema for logging
@@ -533,18 +548,24 @@ class RunRegistry:
         return str(config_json) if config_json is not None else None
 
     def load_runs(self, statuses: Optional[Iterable[RunStatus]] = None) -> list[RunRecord]:
-        query = "SELECT run_id, status, digest, created_at, updated_at, last_heartbeat, gpu_slot, failure_reason, gpu_slots_json, finished_at, outcome FROM runs"
+        base_query = "SELECT run_id, status, digest, created_at, updated_at, last_heartbeat, gpu_slot, failure_reason, gpu_slots_json, finished_at, outcome FROM runs"
         params: tuple[object, ...] = ()
         status_list = list(statuses) if statuses else []
+        
         if status_list:
+            # Build placeholders safely - count-based, not user input
             placeholders = ",".join("?" for _ in status_list)
-            query += f" WHERE status IN ({placeholders})"
+            # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
+            # Safe: placeholders built from count, not user input. All values parameterized via tuple.
+            # status.value comes from RunStatus enum (trusted), not external input
+            query = base_query + f" WHERE status IN ({placeholders})"
             params = tuple(status.value for status in status_list)
             _LOGGER.debug(
                 "Loading runs with status filter",
                 extra={"statuses": [s.value for s in status_list], "query": query[:100]}
             )
         else:
+            query = base_query
             _LOGGER.debug("Loading all runs (no status filter)")
         
         with self._lock, self._connect() as conn:
@@ -696,15 +717,25 @@ class RunRegistry:
         # FULL: Wait for writers to finish before checkpoint
         # RESTART: Full checkpoint + reset WAL for new snapshot
         # TRUNCATE: Restart + truncate the -wal file
-        allowed_modes = {"PASSIVE", "FULL", "RESTART", "TRUNCATE"}
-        if mode.upper() not in allowed_modes:
-            raise ValueError(f"Invalid checkpoint mode: {mode}. Must be one of {allowed_modes}")
+        # Use a whitelist mapping to avoid SQL injection concerns
+        mode_normalized = mode.upper()
+        allowed_modes = {
+            "PASSIVE": "PRAGMA wal_checkpoint(PASSIVE)",
+            "FULL": "PRAGMA wal_checkpoint(FULL)",
+            "RESTART": "PRAGMA wal_checkpoint(RESTART)",
+            "TRUNCATE": "PRAGMA wal_checkpoint(TRUNCATE)",
+        }
+        
+        if mode_normalized not in allowed_modes:
+            raise ValueError(f"Invalid checkpoint mode: {mode}. Must be one of {allowed_modes.keys()}")
+        
+        # Use pre-constructed SQL from whitelist dictionary to satisfy static analysis
+        sql_statement = allowed_modes[mode_normalized]
         
         with self._lock, self._connect() as conn:
             # The PRAGMA returns a single row with three integers:
             # (busy, log_size, checkpointed)
-            # Use uppercase to safely construct the PRAGMA statement
-            row = conn.execute(f"PRAGMA wal_checkpoint({mode.upper()})").fetchone()
+            row = conn.execute(sql_statement).fetchone()
 
         if row is None:
             # This case should be unlikely, but handle it defensively.

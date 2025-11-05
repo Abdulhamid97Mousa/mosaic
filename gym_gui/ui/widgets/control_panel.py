@@ -340,6 +340,10 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._game_combo.clear()
         for game in games_tuple:
             self._game_combo.addItem(get_game_display_name(game), game)
+        # Ensure scrollbar is visible after populating items
+        combo_view = self._game_combo.view()
+        if combo_view is not None and isinstance(combo_view, QtWidgets.QAbstractItemView):
+            combo_view.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)  # type: ignore[attr-defined]
         self._game_combo.blockSignals(False)
 
         if not games_tuple:
@@ -584,6 +588,9 @@ class ControlPanelWidget(QtWidgets.QWidget):
         layout.addWidget(QtWidgets.QLabel("Environment", group), 0, 0)
         self._game_combo = QtWidgets.QComboBox(group)
         self._game_combo.setSizeAdjustPolicy(QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self._game_combo.setMaxVisibleItems(10)  # Show only 10 items with scrollbar
+        # Force the combobox to use a scrollable list view
+        self._game_combo.setStyleSheet("QComboBox { combobox-popup: 0; }")
         layout.addWidget(self._game_combo, 0, 1, 1, 2)
 
         layout.addWidget(QtWidgets.QLabel("Seed", group), 1, 0)

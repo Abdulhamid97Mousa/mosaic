@@ -766,8 +766,27 @@ class TelemetrySQLiteStore(LogConstantMixin):
             mode: Checkpoint mode (PASSIVE, FULL, RESTART, TRUNCATE).
                   TRUNCATE is recommended for background checkpoints.
         """
+        # Use whitelist mapping to avoid SQL injection concerns
+        mode_normalized = mode.upper()
+        allowed_modes = {
+            "PASSIVE": "PRAGMA wal_checkpoint(PASSIVE)",
+            "FULL": "PRAGMA wal_checkpoint(FULL)",
+            "RESTART": "PRAGMA wal_checkpoint(RESTART)",
+            "TRUNCATE": "PRAGMA wal_checkpoint(TRUNCATE)",
+        }
+        
+        if mode_normalized not in allowed_modes:
+            self.log_constant(
+                LOG_SERVICE_SQLITE_WRITE_ERROR,
+                extra={"context": "wal_checkpoint_invalid_mode", "mode": mode},
+            )
+            return
+        
+        # Use pre-constructed SQL from whitelist dictionary to satisfy static analysis
+        sql_statement = allowed_modes[mode_normalized]
+        
         try:
-            self._conn.execute(f"PRAGMA wal_checkpoint({mode})")
+            self._conn.execute(sql_statement)
             self.log_constant(
                 LOG_SERVICE_SQLITE_DEBUG,
                 message="wal_checkpoint_completed",

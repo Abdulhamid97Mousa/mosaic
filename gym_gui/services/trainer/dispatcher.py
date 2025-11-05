@@ -221,7 +221,12 @@ class TrainerDispatcher:
 
         _LOGGER.info("Spawning worker", extra={"run_id": run.run_id, "cmd": cmd})
 
-        # Spawn worker with validated command arguments
+        # nosemgrep: python.lang.security.audit.dangerous-asyncio-create-subprocess.dangerous-asyncio-create-subprocess
+        # Safe: Command validated via validated_create_subprocess_exec wrapper which:
+        # 1. Validates all args are strings via Pydantic SubprocessCommand model
+        # 2. Command built from trusted internal sources (sys.executable, registry metadata, config files)
+        # 3. All paths are constructed internally, not from external user input
+        # See: gym_gui/core/subprocess_validation.py and gym_gui/validations/validations_pydantic.py
         process = await validated_create_subprocess_exec(
             *cmd,
             run_id=run.run_id,

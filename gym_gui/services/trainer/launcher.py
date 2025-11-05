@@ -17,6 +17,8 @@ from typing import IO, Optional
 from gym_gui.config.paths import VAR_LOGS_DIR, ensure_var_directories
 from gym_gui.constants import TRAINER_DEFAULTS
 from gym_gui.core.subprocess_validation import validated_popen
+from gym_gui.logging_config.helpers import log_constant
+from gym_gui.logging_config.log_constants import LOG_TRAINER_LAUNCHER_LOG_FLUSH_WARNING
 
 
 CLIENT_DEFAULTS = TRAINER_DEFAULTS.client
@@ -66,8 +68,18 @@ class TrainerDaemonHandle:
         if self._log_file and not self._log_file.closed:
             try:
                 self._log_file.flush()
-            except Exception:
-                pass
+            except Exception as exc:
+                log_constant(
+                    LOGGER,
+                    LOG_TRAINER_LAUNCHER_LOG_FLUSH_WARNING,
+                    message="Failed to flush trainer daemon log file during cleanup",
+                    extra={
+                        "log_path": str(self.log_path) if self.log_path else None,
+                        "error": str(exc),
+                        "error_type": type(exc).__name__,
+                    },
+                    exc_info=exc,
+                )
             self._log_file.close()
 
 

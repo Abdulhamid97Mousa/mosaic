@@ -49,6 +49,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_UI_WORKER_TABS_WARNING,
     LOG_UI_WORKER_TABS_ERROR,
     LOG_UI_WORKER_TABS_INFO,
+    LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING,
 )
 from gym_gui.constants import DEFAULT_RENDER_DELAY_MS
 from gym_gui.logging_config.logger import list_known_components
@@ -1977,8 +1978,16 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         if self._run_watch_subscription is not None:
             try:
                 self._run_watch_subscription.close()
-            except Exception:
-                pass
+            except Exception as exc:
+                self.log_constant(
+                    LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING,
+                    message="Failed to close run watch subscription during shutdown",
+                    extra={
+                        "error": str(exc),
+                        "error_type": type(exc).__name__,
+                    },
+                    exc_info=exc,
+                )
             self._run_watch_subscription = None
         if self._run_watch_thread is not None:
             self._run_watch_thread.join(timeout=2.0)

@@ -812,6 +812,15 @@ LOG_TRAINER_CLIENT_LOOP_ERROR = _constant(
     tags=_tags("trainer", "client", "loop", "error"),
 )
 
+LOG_TRAINER_CLIENT_SHUTDOWN_WARNING = _constant(
+    "LOG656",
+    "WARNING",
+    "Trainer client shutdown cleanup failed",
+    component="Service",
+    subcomponent="TrainerClient",
+    tags=_tags("trainer", "client", "shutdown", "cleanup"),
+)
+
 LOG_SERVICE_FRAME_INFO = _constant(
     "LOG660",
     "INFO",
@@ -1261,6 +1270,60 @@ LOG_UI_WORKER_TABS_ERROR = _constant(
     component="UI",
     subcomponent="WorkerTabs",
     tags=_tags("ui", "worker", "error"),
+)
+
+LOG_UI_PRESENTER_SIGNAL_CONNECTION_WARNING = _constant(
+    "LOG744",
+    "WARNING",
+    "UI presenter signal connection failed",
+    component="UI",
+    subcomponent="Presenter",
+    tags=_tags("ui", "presenter", "signal", "warning"),
+)
+
+LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING = _constant(
+    "LOG745",
+    "WARNING",
+    "Main window shutdown cleanup failed",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("ui", "main_window", "shutdown", "cleanup"),
+)
+
+LOG_UI_TENSORBOARD_KILL_WARNING = _constant(
+    "LOG746",
+    "WARNING",
+    "TensorBoard process kill failed",
+    component="UI",
+    subcomponent="TensorBoardTab",
+    tags=_tags("ui", "tensorboard", "process", "kill", "warning"),
+)
+
+LOG_ADAPTER_RENDERING_WARNING = _constant(
+    "LOG747",
+    "WARNING",
+    "Environment adapter rendering failed",
+    component="Adapter",
+    subcomponent="Rendering",
+    tags=_tags("adapter", "rendering", "warning"),
+)
+
+LOG_TRAINER_LAUNCHER_LOG_FLUSH_WARNING = _constant(
+    "LOG748",
+    "WARNING",
+    "Trainer launcher log file flush failed",
+    component="Service",
+    subcomponent="TrainerLauncher",
+    tags=_tags("trainer", "launcher", "log", "flush", "warning"),
+)
+
+LOG_WORKER_CONFIG_READ_WARNING = _constant(
+    "LOG749",
+    "WARNING",
+    "Worker config file read failed",
+    component="Worker",
+    subcomponent="Presenter",
+    tags=_tags("worker", "presenter", "config", "read", "warning"),
 )
 
 
@@ -1715,6 +1778,7 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_TRAINER_CLIENT_CONNECTION_TIMEOUT,
     LOG_TRAINER_CLIENT_LOOP_NONFATAL,
     LOG_TRAINER_CLIENT_LOOP_ERROR,
+    LOG_TRAINER_CLIENT_SHUTDOWN_WARNING,
     LOG_SERVICE_FRAME_INFO,
     LOG_SERVICE_FRAME_WARNING,
     LOG_SERVICE_FRAME_ERROR,
@@ -1764,6 +1828,12 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_UI_WORKER_TABS_INFO,
     LOG_UI_WORKER_TABS_WARNING,
     LOG_UI_WORKER_TABS_ERROR,
+    LOG_UI_PRESENTER_SIGNAL_CONNECTION_WARNING,
+    LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING,
+    LOG_UI_TENSORBOARD_KILL_WARNING,
+    LOG_ADAPTER_RENDERING_WARNING,
+    LOG_TRAINER_LAUNCHER_LOG_FLUSH_WARNING,
+    LOG_WORKER_CONFIG_READ_WARNING,
     LOG_UTIL_QT_RESEED_SKIPPED,
     LOG_UTIL_QT_STATE_CAPTURE_FAILED,
     LOG_UTIL_SEED_CALLBACK_FAILED,
@@ -1884,6 +1954,7 @@ __all__ = (
     "LOG_TRAINER_CLIENT_CONNECTION_TIMEOUT",
     "LOG_TRAINER_CLIENT_LOOP_NONFATAL",
     "LOG_TRAINER_CLIENT_LOOP_ERROR",
+    "LOG_TRAINER_CLIENT_SHUTDOWN_WARNING",
     "LOG_SERVICE_FRAME_INFO",
     "LOG_SERVICE_FRAME_WARNING",
     "LOG_SERVICE_FRAME_ERROR",
@@ -1929,6 +2000,12 @@ __all__ = (
     "LOG_UI_WORKER_TABS_INFO",
     "LOG_UI_WORKER_TABS_WARNING",
     "LOG_UI_WORKER_TABS_ERROR",
+    "LOG_UI_PRESENTER_SIGNAL_CONNECTION_WARNING",
+    "LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING",
+    "LOG_UI_TENSORBOARD_KILL_WARNING",
+    "LOG_ADAPTER_RENDERING_WARNING",
+    "LOG_TRAINER_LAUNCHER_LOG_FLUSH_WARNING",
+    "LOG_WORKER_CONFIG_READ_WARNING",
     "LOG_UTIL_QT_RESEED_SKIPPED",
     "LOG_UTIL_QT_STATE_CAPTURE_FAILED",
     "LOG_UTIL_SEED_CALLBACK_FAILED",
