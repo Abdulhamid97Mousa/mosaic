@@ -322,6 +322,8 @@ class HeadlessTrainer(LogConstantMixin):
 
         project = self._wandb_project or os.environ.get("WANDB_PROJECT") or "spade-bdi"
         entity = self._wandb_entity or os.environ.get("WANDB_ENTITY")
+        self._wandb_project = project
+        self._wandb_entity = entity
         run_name = self._wandb_run_name or f"{self.config.game_id}-{self.config.agent_id}-{self.config.run_id[-6:]}"
         config_fields = {
             "game_id": self.config.game_id,
@@ -348,6 +350,8 @@ class HeadlessTrainer(LogConstantMixin):
             if self._wandb_run is not None:
                 resolved_entity = self._wandb_run.entity or entity or ""
                 resolved_project = self._wandb_run.project or project
+                self._wandb_entity = resolved_entity or self._wandb_entity
+                self._wandb_project = resolved_project or self._wandb_project
                 run_identifier = self._wandb_run.id or self._wandb_run.name or run_name
                 parts = [resolved_project, f"runs/{run_identifier}"]
                 if resolved_entity:
@@ -413,21 +417,20 @@ class HeadlessTrainer(LogConstantMixin):
             return None
         
         try:
-            from pathlib import Path
-            
             run_root = (VAR_TRAINER_DIR / "runs" / self.config.run_id).resolve()
             manifest_file = run_root / "wandb.json"
             manifest_file.parent.mkdir(parents=True, exist_ok=True)
-            
             manifest_data = {
                 "run_path": self._wandb_run_path,
                 "run_id": self.config.run_id,
                 "agent_id": self.config.agent_id,
                 "game_id": self.config.game_id,
+                "entity": self._wandb_entity,
+                "project": self._wandb_project,
             }
-            
+
             manifest_file.write_text(json.dumps(manifest_data, indent=2), encoding="utf-8")
-            
+
             self.log_constant(
                 LOG_WORKER_RUNTIME_EVENT,
                 message="W&B manifest file written",
@@ -503,6 +506,8 @@ class HeadlessTrainer(LogConstantMixin):
                 "wandb": {
                     "enabled": self._wandb_enabled and self._wandb_run_path is not None,
                     "run_path": self._wandb_run_path,
+                    "entity": self._wandb_entity,
+                    "project": self._wandb_project,
                 },
             }
         }

@@ -6,7 +6,7 @@ These tests focus on two critical pieces of the CleanRL integration:
    output from the worker process, performs the gRPC `RegisterWorker` handshake,
    and streams RunStep/RunEpisode payloads into the trainer service.
 2. Analytics manifest ingestion via `AnalyticsTabManager`, ensuring that metadata
-   emitted by the CleanRL worker yields the expected TensorBoard and W&B tabs.
+   emitted by the CleanRL worker yields the expected TensorBoard and WANDB tabs.
 """
 
 from __future__ import annotations
@@ -189,7 +189,7 @@ class _RecordingRenderTabs:
 
 
 def test_analytics_tab_manager_creates_tensorboard_and_wandb_tabs(qt_app: QtWidgets.QApplication, tmp_path: Any) -> None:
-    """Verify manifest-style metadata yields TensorBoard and W&B tabs."""
+    """Verify manifest-style metadata yields TensorBoard and WANDB tabs."""
 
     run_id = "cleanrl-run-analytics"
     agent_id = "agent-42"

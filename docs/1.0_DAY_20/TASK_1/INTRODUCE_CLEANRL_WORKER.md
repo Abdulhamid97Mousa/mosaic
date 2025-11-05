@@ -13,7 +13,7 @@ The implementation must keep the SPADE-BDI path intact, honour the JSON run-conf
 - Add a first-class package entry point `cleanrl_worker/cli.py` that accepts `--config`, `--algo`, `--env-id`, resource flags, and analytics toggles. The CLI loads the JSON config written by the trainer, resolves the requested CleanRL script under `cleanrl_worker/cleanrl/`, and launches the training loop.
 - Normalise runtime concerns inside `cleanrl_worker/runtime.py`:
   - translate config payloads into tyro/argparse arguments expected by each algorithm script,
-  - set up telemetry/analytics emitters (TensorBoard, W&B, stdout lifecycle events),
+  - set up telemetry/analytics emitters (TensorBoard, WANDB, stdout lifecycle events),
   - publish a handshake to the trainer via `TrainerService.RegisterWorker` before the main loop starts, storing the returned `session_token`.
 - Implement `cleanrl_worker/telemetry.py` to emit minimal JSONL lifecycle events (`run_started`, `heartbeat`, `run_completed`, `run_failed`). Per-step telemetry stays disabled; analytics assets remain the primary output channel.
 
@@ -28,7 +28,7 @@ The implementation must keep the SPADE-BDI path intact, honour the JSON run-conf
 
 - Keep the worker catalog authoritative: `gym_gui/ui/workers/catalog.py` lists `CleanRL Worker` as analytics-first (`requires_live_telemetry=False`, `provides_fast_analytics=True`).
 - Presenter work (Day 14 refactor) ensures analytics workers call `bootstrap_analytics_tabs()` instead of `bootstrap_live_tabs()`. Update the train dialog to surface CleanRL algorithm/extra selections and to document the absence of live telemetry.
-- Live telemetry widgets remain disabled for CleanRL runs; instead, add TensorBoard/W&B/Optuna tabs that read manifests produced after each run.
+- Live telemetry widgets remain disabled for CleanRL runs; instead, add TensorBoard/WANDB/Optuna tabs that read manifests produced after each run.
 
 #### CleanRL Train Form Decoupling Plan
 
@@ -101,7 +101,7 @@ CleanRL runs continue to use the standard JSON payload persisted by the trainer.
 2. **Dispatcher spawn** — `TrainerDispatcher._dispatch_run` reserves resources, writes the worker config, and spawns `python -m cleanrl_worker.cli --config <path> --grpc --grpc-target 127.0.0.1:50055`.
 3. **Handshake** — TODO: wire `cleanrl_worker.cli` into the trainer client so the worker performs `RegisterWorker` before emitting lifecycle events. Until then, the telemetry proxy performs the handshake on behalf of analytics runs.
 4. **Training loop** — The runtime imports the requested CleanRL script, builds tyro arguments, starts TensorBoard logging, and periodically emits lifecycle JSONL messages (`run_started`, `heartbeat`, `run_completed`/`run_failed`). These events feed the telemetry proxy so the daemon can update the FSM to `EXEC` and `TERM`.
-5. **Analytics ingestion** — On process exit, the worker persists a manifest describing TensorBoard/W&B/Optuna artifacts under `var/trainer/runs/<run_id>/analytics.json`. The GUI analytics tabs use this manifest to render dashboards.
+5. **Analytics ingestion** — On process exit, the worker persists a manifest describing TensorBoard/WANDB/Optuna artifacts under `var/trainer/runs/<run_id>/analytics.json`. The GUI analytics tabs use this manifest to render dashboards.
 6. **Cleanup** — The dispatcher releases GPU/CPU slots, updates `RunRegistry`, and archives worker stdout/stderr under `var/logs/trainer/<run_id>/`.
 
 ## Implementation Checklist

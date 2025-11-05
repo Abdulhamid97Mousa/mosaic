@@ -123,3 +123,65 @@ MuJoCo environments now appear in the CleanRL workflow with contextual documenta
 Operators can now flip GPU usage, capture settings, project metadata, and W&B credentials via the CleanRL form, with all fields flowing through to the worker CLI and environment overrides.
 
 Operators can now flip GPU usage, capture settings, and project names via extras, and the UI automatically reflects new `GameId` entries without manual widget edits.
+
+## Update — Operator Guide & Flag Reference (2025-11-04)
+
+### UI Controls → Runtime / CLI Mapping
+
+| UI control | Trainer payload field(s) | CleanRL CLI flag(s) / env | Notes |
+| --- | --- | --- | --- |
+| Algorithm dropdown | `metadata.worker.module` (resolved via registry) | _module selection_ | `cleanrl_worker.runtime.DEFAULT_ALGO_REGISTRY` maps the label to the canonical module (e.g., `ppo` → `cleanrl.ppo`). |
+| Environment dropdown/custom | `config.env_id` | `--env-id=<id>` | Catalog pulls from `GameId`; custom toggle lets operators paste non-catalog IDs. |
+| Total Timesteps | `config.total_timesteps` | `--total-timesteps=<int>` | Default step of 2,048 for quick smoke tests. |
+| Seed | `config.seed` (only when >0) | `--seed=<int>` | Leave at 0 to let CleanRL randomise. |
+| Agent ID | `config.agent_id` + `metadata.ui.agent_id` + `extras.agent_id` | propagated as metadata | Keeps telemetry/run manifests consistent with SPADE naming. |
+| Worker ID override | `config.worker_id` + `metadata.ui.worker_id` | propagated as metadata | Displayed in the run list and used during direct `RegisterWorker`. |
+| GPU toggle | `extras.cuda` | `--cuda=true/false` | Default is on; disable when running on CPU-only hosts. |
+| TensorBoard checkbox | `extras.tensorboard_dir="tensorboard"` | `--tensorboard-dir=<abs path>` | Runtime resolves the relative path inside `var/trainer/runs/<run_id>/tensorboard` and enables the GUI tab. |
+| Track W&B checkbox | `extras.track_wandb=true` | `--track` + env `TRACK_WANDB=1` | Enables manifest entry for W&B and requests login-less API usage when a key is supplied. |
+| W&B Project | `extras.wandb_project_name` | `--wandb-project-name=<value>` | Optional – falls back to CleanRL defaults if left blank. |
+| W&B Entity | `extras.wandb_entity` | `--wandb-entity=<value>` | Set to `abdulhamid-m-mousa-beijing-institute-of-technology` for the current workspace. |
+| W&B Run Name | `extras.wandb_run_name` | `--wandb-run-name=<value>` | Lets operators reuse the same run naming scheme across workers. |
+| W&B API Key | `environment.WANDB_API_KEY` | exported before launch | Overrides `.env`; stored only in the trainer payload (not persisted to disk). |
+| W&B Email | `extras.wandb_email` + `environment.WANDB_EMAIL` | exported before launch | Helps identify the operator account in wandb run metadata. |
+| Notes | `extras.notes` | analytics manifest only | Rendered inside the Analytics panel for quick operator annotations. |
+| Dry Run toggle | `metadata.worker.arguments += ["--dry-run", "--emit-summary"]` | `--dry-run --emit-summary` | Use this path to confirm CLI compatibility without launching the algorithm. |
+| Algorithm Parameters (per algo) | `extras.algo_params` | `--<param>=<value>` | The runtime fans out dict entries into CLI flags; defaults come from `_ALGO_PARAM_SPECS`. |
+
+Current algorithm parameter presets (see `gym_gui/ui/widgets/cleanrl_train_form.py`):
+
+- `ppo` — `learning_rate`, `num_envs`, `num_steps`
+- `ppo_atari` — `learning_rate`, `total_frames`
+- `dqn` — `learning_rate`, `batch_size`, `buffer_size`
+
+Any manual edits in the UI flow through to the CleanRL Tyro parser, so operators can tune horizon, learning rate, or replay sizes without rebuilding the worker.
+
+### MuJoCo Coverage & Requirements
+
+- **Environments exposed in the catalog:** Ant, HalfCheetah, Hopper, Walker2d, Humanoid, HumanoidStandup, InvertedPendulum, InvertedDoublePendulum, Reacher, Pusher, Swimmer (all `*-v5`).
+- **Documentation:** curated blurbs live under `docs/1.0_DAY_19/TASK_2/mujoco_contrarian_analysis.md` and `gym_gui/game_docs/Gymnasium/MuJuCo/`; the Game Info panel now links to these entries.
+- **Dependencies:** ensure `pip install gymnasium[mujoco]` has been executed inside `.venv`, MuJoCo engine binaries are installed, and set `MUJOCO_GL=egl` (already committed to `.env`).
+- **Usage recommendation:** the GUI presents these environments in agent-only mode to avoid implying keyboard control; CleanRL worker remains the primary consumer.
+
+### Weights & Biases Setup (Headless-Friendly)
+
+1. Run `source .venv/bin/activate && wandb login --relogin --key <API_KEY>` once per operator account to populate `~/.netrc`. Use the same key that is stored in `.env` (`WANDB_API_KEY`).
+2. In the CleanRL (or SPADE-BDI) train form, tick “Track Weights & Biases” and fill **Project**, **Entity**, optional **Run Name**, and (if necessary) override **API Key**/**Email**. Leaving the key blank defers to the global login.
+3. When a run starts, the runtime exports `WANDB_API_KEY`, `WANDB_EMAIL`, and `TRACK_WANDB=1`. If the key is valid, the Analytics pane will materialise a `Weights & Biases` tab with the embedded web session (`wandb_artifact_tab.py`).
+4. If the GUI reports `Invalid TrainRunConfig: 'artifacts' is a required property`, double-check that at least one analytics toggle (TensorBoard or W&B) was enabled; the form always emits the block now, so stale configs should be deleted from `var/trainer/configs/`.
+
+### Launch Checklist for Operators
+
+1. **Prepare dependencies** — `.venv/bin/python -m pip install -r requirements.txt` (ensure the optional `gymnasium[mujoco]` and `wandb` extras are present).
+2. **Set environment** — keep `.env` up to date (`MUJOCO_GL=egl`, `WANDB_API_KEY`, optional `WANDB_EMAIL`). Source it before launching the GUI (`set -a; source .env; set +a`).
+3. **Open the GUI** — run `python -m gym_gui` (or the project launcher script) and choose **CleanRL Worker** from the Workers dropdown.
+4. **Configure the form** — pick the algorithm, environment, timesteps, and fill Agent/Worker IDs plus analytics toggles as described above. Adjust algorithm parameters in the “Algorithm Parameters” box as required by the experiment.
+5. **Dry run first** — leave “Dry run only” checked to validate CLI arguments, then relaunch without dry run once verification succeeds.
+6. **Monitor analytics** — after execution starts, TensorBoard artifacts appear under `var/trainer/runs/<run_id>/tensorboard`. The W&B tab will embed the project at `https://wandb.ai/<entity>/<project>/runs/<run>` once the SDK confirms authentication.
+7. **Troubleshoot** — consult `var/trainer/runs/<run_id>/logs/cleanrl.stderr.log` for CleanRL errors, and `var/logs/trainer_daemon.log` for handshake or analytics manifest issues. Deadline errors in the GUI typically mean the worker blocked on W&B authentication; confirm step 1 above.
+
+### Follow-on Work (Tracked)
+
+- Headless W&B login: evaluate using `wandb.sdk.wandb_login.use_api_key` inside the worker runtime to remove the CLI dependency on `~/.netrc`.
+- Lightweight metric bridge: still pending (see Immediate Next Actions above) so headline metrics can render even if TensorBoard/W&B are disabled.
+- Checkpoint/resume hooks: waiting on upstream CleanRL CLI support; runtime already surfaces `supports_checkpoint` extras for when flags land.

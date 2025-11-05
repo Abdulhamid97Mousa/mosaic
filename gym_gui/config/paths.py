@@ -17,7 +17,7 @@ VAR_TMP_DIR = VAR_ROOT / "tmp"
 VAR_LOGS_DIR = VAR_ROOT / "logs"
 VAR_TRAINER_DIR = VAR_ROOT / "trainer"
 VAR_TENSORBOARD_DIR = VAR_TRAINER_DIR / "runs"
-VAR_WANDB_DIR = VAR_TRAINER_DIR / "runs"  # W&B manifests stored per-run like TensorBoard
+VAR_WANDB_DIR = VAR_TRAINER_DIR / "runs"  # WANDB manifests stored per-run like TensorBoard
 VAR_TRAINER_DB = VAR_TRAINER_DIR / "trainer.sqlite"
 VAR_DATA_DIR = VAR_ROOT / "data"
 

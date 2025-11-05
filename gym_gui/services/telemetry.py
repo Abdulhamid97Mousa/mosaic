@@ -101,7 +101,7 @@ class TelemetryService(LogConstantMixin):
 
         self._step_history.append(record)
         if self._storage:
-            storage_record = EpisodeRecord(
+            storage_record = EpisodeRecord(  # type: ignore[call-arg]
                 episode_id=record.episode_id,
                 step_index=record.step_index,
                 observation=record.observation,

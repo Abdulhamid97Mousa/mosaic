@@ -246,7 +246,7 @@ def validate_train_run_config(raw: Mapping[str, Any]) -> TrainRunConfig:
     tensorboard_relative = f"var/trainer/runs/{run_id}/tensorboard"
     tensorboard_absolute = (VAR_TENSORBOARD_DIR / run_id / "tensorboard").resolve()
     
-    # W&B manifest file path (worker will write run_path here after wandb.init())
+    # WANDB manifest file path (worker will write run_path here after wandb.init())
     wandb_manifest_file = (VAR_WANDB_DIR / run_id / "wandb.json").resolve()
     wandb_relative = f"var/trainer/runs/{run_id}/wandb.json"
 
@@ -271,7 +271,7 @@ def validate_train_run_config(raw: Mapping[str, Any]) -> TrainRunConfig:
         tensorboard_meta.setdefault("enabled", True)
         tensorboard_meta["log_dir"] = str(tensorboard_absolute)
         
-        # Initialize W&B metadata with manifest file path (like TensorBoard)
+        # Initialize WANDB metadata with manifest file path (like TensorBoard)
         wandb_meta = artifacts_meta.get("wandb")
         if not isinstance(wandb_meta, MutableMapping):
             wandb_meta = {}

@@ -5,7 +5,7 @@ Tests cover:
 2. WorkerPresenter protocol compliance
 3. SpadeBdiWorkerPresenter - train request building, tab creation, metadata extraction
 4. TabFactory - tab instantiation, environment detection, conditional creation
-5. Analytics tabs wiring (TensorBoard + W&B)
+5. Analytics tabs wiring (TensorBoard + WANDB)
 6. Integration with main_window.py - registry usage in UI tab creation
 """
 
@@ -13,6 +13,7 @@ import unittest
 import tempfile
 import json
 from pathlib import Path
+from unittest import mock
 from unittest.mock import Mock, patch, MagicMock
 from typing import Any
 import os
@@ -31,6 +32,7 @@ from gym_gui.ui.presenters.workers import (
 from gym_gui.ui.widgets.spade_bdi_worker_tabs.factory import TabFactory
 from gym_gui.core.enums import GameId
 from gym_gui.ui.panels.analytics_tabs import AnalyticsTabManager
+from gym_gui.ui.panels import analytics_tabs
 from gym_gui.ui.widgets.tensorboard_artifact_tab import TensorboardArtifactTab
 from gym_gui.ui.widgets.wandb_artifact_tab import WandbArtifactTab
 from qtpy import QtWidgets
@@ -563,7 +565,7 @@ class _RecordingRenderTabs:
 
 
 class TestAnalyticsTabManager(unittest.TestCase):
-    """Validate TensorBoard and W&B tabs are created with expected widgets."""
+    """Validate TensorBoard and WANDB tabs are created with expected widgets."""
 
     @classmethod
     def setUpClass(cls) -> None:
@@ -612,7 +614,40 @@ class TestAnalyticsTabManager(unittest.TestCase):
         self.assertIn("WANDB-Agent-agent-2", agent_tabs)
         widget = agent_tabs["WANDB-Agent-agent-2"]
         self.assertIsInstance(widget, WandbArtifactTab)
+        # Type assertion after isinstance check
+        assert isinstance(widget, WandbArtifactTab)
         widget.append_status_line("wandb login succeeded")
+
+    def test_load_and_create_tabs_reads_manifest(self) -> None:
+        run_id = "run-manifest"
+        agent_id = "agent-3"
+
+        with tempfile.TemporaryDirectory() as tmpdir:
+            runs_root = Path(tmpdir) / "trainer"
+            run_dir = runs_root / "runs" / run_id
+            run_dir.mkdir(parents=True)
+            (run_dir / "tensorboard").mkdir(parents=True)
+
+            analytics_payload = {
+                "artifacts": {
+                    "tensorboard": {
+                        "enabled": True,
+                        "log_dir": str(run_dir / "tensorboard"),
+                    },
+                    "wandb": {
+                        "enabled": True,
+                        "run_path": "entity/project/runs/xyz",
+                    },
+                }
+            }
+            (run_dir / "analytics.json").write_text(json.dumps(analytics_payload), encoding="utf-8")
+
+            with mock.patch.object(analytics_tabs, "VAR_TRAINER_DIR", runs_root):
+                self.manager.load_and_create_tabs(run_id, agent_id)
+
+        agent_tabs = self.render_tabs._agent_tabs.get(run_id, {})
+        self.assertIn("TensorBoard-Agent-agent-3", agent_tabs)
+        self.assertIn("WANDB-Agent-agent-3", agent_tabs)
 
 
 if __name__ == "__main__":

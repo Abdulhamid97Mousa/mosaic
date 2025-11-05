@@ -219,7 +219,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         analytics_layout.setSpacing(4)
 
         self._analytics_hint_label = QtWidgets.QLabel(
-            "Enable Fast Training to export TensorBoard and W&B analytics after the run completes."
+            "Enable Fast Training to export TensorBoard and WANDB analytics after the run completes."
         )
         self._analytics_hint_label.setStyleSheet("color: #777777; font-size: 10px;")
         analytics_layout.addWidget(self._analytics_hint_label)
@@ -253,12 +253,12 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._wandb_api_key_input.setPlaceholderText("Optional API key override")
         self._wandb_api_key_input.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self._wandb_api_key_input.setEnabled(False)
-        wandb_form.addRow("W&B API Key", self._wandb_api_key_input)
+        wandb_form.addRow("WANDB API Key", self._wandb_api_key_input)
 
         self._wandb_email_input = QtWidgets.QLineEdit()
-        self._wandb_email_input.setPlaceholderText("Optional W&B account email")
+        self._wandb_email_input.setPlaceholderText("Optional WANDB account email")
         self._wandb_email_input.setEnabled(False)
-        wandb_form.addRow("W&B Email", self._wandb_email_input)
+        wandb_form.addRow("WANDB Email", self._wandb_email_input)
 
         analytics_layout.addLayout(wandb_form)
 

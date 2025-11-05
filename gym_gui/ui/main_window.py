@@ -1304,7 +1304,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         wb_ready = self._analytics_tabs.ensure_wandb_tab(run_id, agent_id_key, metadata)
 
         if not wb_ready:
-            # Schedule retries so that W&B manifest written after initialization triggers the tab.
+            # Schedule retries so that WANDB manifest written after initialization triggers the tab.
             self._analytics_tabs.load_and_create_tabs(run_id, agent_id_key)
 
         if not tb_ready:
@@ -1638,7 +1638,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 extra={"run_id": run_id, "agent_id": agent_id, "replay_tab_name": replay_tab_name},
             )
 
-            # Load analytics.json from disk and create/refresh analytics tabs (TensorBoard, W&B)
+            # Load analytics.json from disk and create/refresh analytics tabs (TensorBoard, WANDB)
             self._analytics_tabs.load_and_create_tabs(run_id, agent_id)
 
             # Check if replay tab already exists

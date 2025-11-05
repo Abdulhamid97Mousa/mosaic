@@ -1,4 +1,4 @@
-"""Helpers for creating analytics tabs (TensorBoard, W&B) in the main window."""
+"""Helpers for creating analytics tabs (TensorBoard, WANDB) in the main window."""
 
 from __future__ import annotations
 
@@ -6,6 +6,7 @@ import json
 import logging
 from pathlib import Path
 from typing import Any, Mapping, Optional
+import yaml
 
 from qtpy import QtCore
 
@@ -23,7 +24,7 @@ from gym_gui.ui.widgets.wandb_artifact_tab import WandbArtifactTab
 
 
 class AnalyticsTabManager(LogConstantMixin):
-    """Create analytics tabs (TensorBoard, W&B) for completed runs."""
+    """Create analytics tabs (TensorBoard, WANDB) for completed runs."""
 
     def __init__(self, render_tabs, parent) -> None:
         self._logger = logging.getLogger(__name__)
@@ -48,12 +49,16 @@ class AnalyticsTabManager(LogConstantMixin):
 
         analytics_file = VAR_TRAINER_DIR / "runs" / run_id / "analytics.json"
         if not analytics_file.exists():
-            self._logger.debug(
-                "Analytics manifest not found for run %s at %s (attempt %s/%s)",
-                run_id,
-                analytics_file,
-                attempt + 1,
-                max_retries + 1,
+            self.log_constant(
+                LOG_UI_RENDER_TABS_WANDB_WARNING,
+                message="Analytics manifest not yet available",
+                extra={
+                    "run_id": run_id,
+                    "agent_id": agent_id,
+                    "attempt": attempt + 1,
+                    "max_attempts": max_retries + 1,
+                    "path": str(analytics_file),
+                },
             )
             self._schedule_retry(run_id, agent_id, attempt, max_retries, retry_delay_ms)
             return
@@ -78,10 +83,37 @@ class AnalyticsTabManager(LogConstantMixin):
             return
 
         # Create/refresh tabs with the loaded analytics data
-        self.ensure_tensorboard_tab(run_id, agent_id, analytics_data)
+        tensorboard_ready = self.ensure_tensorboard_tab(run_id, agent_id, analytics_data)
         wandb_ready = self.ensure_wandb_tab(run_id, agent_id, analytics_data)
 
+        self.log_constant(
+            LOG_UI_RENDER_TABS_TENSORBOARD_STATUS if tensorboard_ready else LOG_UI_RENDER_TABS_TENSORBOARD_WAITING,
+            message="TensorBoard analytics readiness",
+            extra={
+                "run_id": run_id,
+                "agent_id": agent_id,
+                "ready": tensorboard_ready,
+                "attempt": attempt + 1,
+                "max_attempts": max_retries + 1,
+            },
+        )
+        self.log_constant(
+            LOG_UI_RENDER_TABS_WANDB_STATUS if wandb_ready else LOG_UI_RENDER_TABS_WANDB_WARNING,
+            message="WANDB analytics readiness",
+            extra={
+                "run_id": run_id,
+                "agent_id": agent_id,
+                "ready": wandb_ready,
+                "attempt": attempt + 1,
+                "max_attempts": max_retries + 1,
+            },
+        )
+
         if not wandb_ready:
+            self._schedule_retry(run_id, agent_id, attempt, max_retries, retry_delay_ms)
+
+        elif not tensorboard_ready:
+            # TensorBoard path missing but WANDB ready; continue retrying for TensorBoard only.
             self._schedule_retry(run_id, agent_id, attempt, max_retries, retry_delay_ms)
 
     # ------------------------------------------------------------------
@@ -95,6 +127,18 @@ class AnalyticsTabManager(LogConstantMixin):
     ) -> None:
         if attempt >= max_retries:
             return
+
+        self.log_constant(
+            LOG_UI_RENDER_TABS_WANDB_WARNING,
+            message="Scheduling analytics tab retry",
+            extra={
+                "run_id": run_id,
+                "agent_id": agent_id,
+                "next_attempt": attempt + 2,
+                "max_attempts": max_retries + 1,
+                "delay_ms": retry_delay_ms,
+            },
+        )
 
         QtCore.QTimer.singleShot(
             retry_delay_ms,
@@ -113,17 +157,37 @@ class AnalyticsTabManager(LogConstantMixin):
     ) -> bool:
         """Create or refresh the TensorBoard tab if metadata provides a log directory."""
         if not metadata:
+            self.log_constant(
+                LOG_UI_RENDER_TABS_TENSORBOARD_WAITING,
+                message="TensorBoard metadata missing",
+                extra={"run_id": run_id, "agent_id": agent_id},
+            )
             return False
 
         artifacts = metadata.get("artifacts") if isinstance(metadata, Mapping) else None
         if not isinstance(artifacts, Mapping):
+            self.log_constant(
+                LOG_UI_RENDER_TABS_TENSORBOARD_WAITING,
+                message="TensorBoard artifacts missing",
+                extra={"run_id": run_id, "agent_id": agent_id},
+            )
             return False
 
         tensorboard_meta = artifacts.get("tensorboard")
         if not isinstance(tensorboard_meta, Mapping):
+            self.log_constant(
+                LOG_UI_RENDER_TABS_TENSORBOARD_WAITING,
+                message="TensorBoard metadata missing",
+                extra={"run_id": run_id, "agent_id": agent_id},
+            )
             return False
 
         if tensorboard_meta.get("enabled", True) is False:
+            self.log_constant(
+                LOG_UI_RENDER_TABS_TENSORBOARD_WAITING,
+                message="TensorBoard disabled",
+                extra={"run_id": run_id, "agent_id": agent_id},
+            )
             return False
 
         resolved_path: Optional[Path] = None
@@ -139,6 +203,12 @@ class AnalyticsTabManager(LogConstantMixin):
                 LOG_UI_RENDER_TABS_TENSORBOARD_WAITING,
                 extra={"run_id": run_id, "agent_id": agent_id},
             )
+            self._logger.debug(
+                "TensorBoard log dir not ready yet: run=%s agent=%s meta=%s",
+                run_id,
+                agent_id,
+                tensorboard_meta,
+            )
             return False
 
         tab_name = f"TensorBoard-Agent-{agent_id}"
@@ -151,6 +221,12 @@ class AnalyticsTabManager(LogConstantMixin):
             refresher = getattr(existing_widget, "refresh", None)
             if callable(refresher):
                 refresher()
+            self._logger.debug(
+                "TensorBoard tab refreshed for run=%s agent=%s path=%s",
+                run_id,
+                agent_id,
+                resolved_path,
+            )
             return True
 
         tab = TensorboardArtifactTab(run_id, agent_id, resolved_path, parent=self._parent)
@@ -163,73 +239,92 @@ class AnalyticsTabManager(LogConstantMixin):
                 "log_dir": str(resolved_path),
             },
         )
+        self._logger.info(
+            "Created TensorBoard tab: run=%s agent=%s path=%s",
+            run_id,
+            agent_id,
+            resolved_path,
+        )
         return True
 
     def ensure_wandb_tab(
         self, run_id: str, agent_id: str, metadata: Optional[Mapping[str, Any]]
     ) -> bool:
-        """Create or refresh the W&B tab when metadata includes a run path."""
+        """Create or refresh the WANDB tab when metadata includes a run path."""
         if not metadata:
+            self.log_constant(
+                LOG_UI_RENDER_TABS_WANDB_WARNING,
+                message="WANDB metadata missing",
+                extra={"run_id": run_id, "agent_id": agent_id},
+            )
             return False
 
         artifacts = metadata.get("artifacts") if isinstance(metadata, Mapping) else None
         if not isinstance(artifacts, Mapping):
+            self.log_constant(
+                LOG_UI_RENDER_TABS_WANDB_WARNING,
+                message="WANDB artifacts missing",
+                extra={"run_id": run_id, "agent_id": agent_id},
+            )
             return False
 
         wandb_meta = artifacts.get("wandb")
         if not isinstance(wandb_meta, Mapping):
+            self.log_constant(
+                LOG_UI_RENDER_TABS_WANDB_WARNING,
+                message="WANDB metadata missing",
+                extra={"run_id": run_id, "agent_id": agent_id},
+            )
+            return False
+
+        if wandb_meta.get("enabled", True) is False:
+            self.log_constant(
+                LOG_UI_RENDER_TABS_WANDB_WARNING,
+                message="WANDB disabled for run",
+                extra={"run_id": run_id, "agent_id": agent_id},
+            )
             return False
 
         run_path = wandb_meta.get("run_path")
+        manifest_file = wandb_meta.get("manifest_file") if isinstance(wandb_meta.get("manifest_file"), str) else None
+        entity_hint = wandb_meta.get("entity") if isinstance(wandb_meta.get("entity"), str) else None
+        project_hint = wandb_meta.get("project") if isinstance(wandb_meta.get("project"), str) else None
 
-        # If run_path is not in metadata, try reading from manifest file (like TensorBoard pattern)
-        if not isinstance(run_path, str) or not run_path.strip():
-            manifest_file = wandb_meta.get("manifest_file")
-            if isinstance(manifest_file, str):
-                try:
-                    manifest_path = Path(manifest_file)
-                    if manifest_path.exists():
-                        import json
-                        manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
-                        run_path = manifest_data.get("run_path", "")
-                        self.log_constant(
-                            LOG_UI_RENDER_TABS_WANDB_STATUS,
-                            message="Read run_path from manifest file",
-                            extra={"run_id": run_id, "agent_id": agent_id, "run_path": run_path},
-                        )
-                    else:
-                        self.log_constant(
-                            LOG_UI_RENDER_TABS_WANDB_WARNING,
-                            message="Manifest file not found, W&B tab will appear when manifest is written",
-                            extra={"run_id": run_id, "agent_id": agent_id, "manifest_file": manifest_file},
-                        )
-                        return False
-                except Exception as e:
-                    self.log_constant(
-                        LOG_UI_RENDER_TABS_WANDB_WARNING,
-                        message="Failed to read W&B manifest file",
-                        extra={"run_id": run_id, "agent_id": agent_id, "error": str(e)},
-                        exc_info=e,
-                    )
-                    return False
-
-        if not isinstance(run_path, str) or not run_path.strip():
-            return False
+        run_path, resolved_entity, resolved_project = self._resolve_wandb_run_path(
+            run_id=run_id,
+            agent_id=agent_id,
+            metadata=metadata,
+            manifest_file=manifest_file,
+            current_run_path=run_path if isinstance(run_path, str) else "",
+            entity_hint=entity_hint,
+            project_hint=project_hint,
+        )
 
         tab_name = f"WANDB-Agent-{agent_id}"
         existing_tabs = self._render_tabs._agent_tabs.get(run_id, {})
         existing_widget = existing_tabs.get(tab_name)
         if existing_widget is not None:
+            identity_setter = getattr(existing_widget, "set_wandb_identity", None)
+            if callable(identity_setter):
+                identity_setter(resolved_entity, resolved_project)
             setter = getattr(existing_widget, "set_run_path", None)
-            if callable(setter):
+            if callable(setter) and run_path:
                 setter(run_path)
                 refresher = getattr(existing_widget, "refresh", None)
                 if callable(refresher):
                     refresher()
-            return True
+                self._logger.debug(
+                    "WANDB tab refreshed for run=%s agent=%s with run_path=%s",
+                    run_id,
+                    agent_id,
+                    run_path,
+                )
+                return True
+            return False
 
         try:
-            tab = WandbArtifactTab(run_id, agent_id, run_path, parent=self._parent)
+            status_message = None if run_path else "Waiting for WANDB run metadata to become available..."
+            tab = WandbArtifactTab(run_id, agent_id, run_path or None, parent=self._parent, status_message=status_message)
         except Exception as exc:  # noqa: BLE001
             self.log_constant(
                 LOG_UI_RENDER_TABS_WANDB_ERROR,
@@ -243,15 +338,173 @@ class AnalyticsTabManager(LogConstantMixin):
             return False
 
         self._render_tabs.add_dynamic_tab(run_id, tab_name, tab)
+        tab.set_wandb_identity(resolved_entity, resolved_project)
+        if run_path:
+            self.log_constant(
+                LOG_UI_RENDER_TABS_WANDB_STATUS,
+                extra={
+                    "run_id": run_id,
+                    "agent_id": agent_id,
+                    "run_path": run_path,
+                    "entity": resolved_entity,
+                    "project": resolved_project,
+                },
+            )
+            self._logger.info(
+                "Created WANDB tab: run=%s agent=%s run_path=%s",
+                run_id,
+                agent_id,
+                run_path,
+            )
+            return True
+
         self.log_constant(
-            LOG_UI_RENDER_TABS_WANDB_STATUS,
+            LOG_UI_RENDER_TABS_WANDB_WARNING,
+            message="Created placeholder WANDB tab; awaiting run_path",
             extra={
                 "run_id": run_id,
                 "agent_id": agent_id,
-                "run_path": run_path,
+                "entity": resolved_entity,
+                "project": resolved_project,
             },
         )
-        return True
+        return False
+
+    def _resolve_wandb_run_path(
+        self,
+        *,
+        run_id: str,
+        agent_id: str,
+        metadata: Optional[Mapping[str, Any]],
+        manifest_file: Optional[str],
+        current_run_path: str,
+        entity_hint: Optional[str],
+        project_hint: Optional[str],
+    ) -> tuple[str, Optional[str], Optional[str]]:
+        run_path = (current_run_path or "").strip()
+        entity, project = self._resolve_wandb_identity(metadata, run_id, entity_hint, project_hint)
+        if run_path:
+            return run_path, entity, project
+
+        if manifest_file:
+            try:
+                manifest_path = Path(manifest_file)
+                if manifest_path.exists():
+                    manifest_data = json.loads(manifest_path.read_text(encoding="utf-8"))
+                    run_path = (manifest_data.get("run_path") or "").strip()
+                    entity = entity or manifest_data.get("entity")
+                    project = project or manifest_data.get("project")
+                    if run_path:
+                        self.log_constant(
+                            LOG_UI_RENDER_TABS_WANDB_STATUS,
+                            message="Read run_path from wandb manifest",
+                            extra={"run_id": run_id, "agent_id": agent_id, "run_path": run_path},
+                        )
+                        return run_path, entity, project
+                else:
+                    self.log_constant(
+                        LOG_UI_RENDER_TABS_WANDB_WARNING,
+                        message="WANDB manifest not found yet; awaiting run_path",
+                        extra={"run_id": run_id, "agent_id": agent_id, "manifest_file": manifest_file},
+                    )
+            except Exception as exc:  # pragma: no cover
+                self.log_constant(
+                    LOG_UI_RENDER_TABS_WANDB_WARNING,
+                    message="Failed to read WANDB manifest file",
+                    extra={"run_id": run_id, "agent_id": agent_id, "manifest_file": manifest_file, "error": str(exc)},
+                    exc_info=exc,
+                )
+
+        slug = self._discover_wandb_slug(run_id)
+        if slug and entity and project:
+            run_path = f"{entity}/{project}/runs/{slug}"
+            self.log_constant(
+                LOG_UI_RENDER_TABS_WANDB_STATUS,
+                message="Discovered run_path from WANDB files",
+                extra={"run_id": run_id, "agent_id": agent_id, "run_path": run_path},
+            )
+            return run_path, entity, project
+
+        return "", entity, project
+
+    def _resolve_wandb_identity(
+        self,
+        metadata: Optional[Mapping[str, Any]],
+        run_id: str,
+        entity_hint: Optional[str],
+        project_hint: Optional[str],
+    ) -> tuple[Optional[str], Optional[str]]:
+        entity = entity_hint.strip() if isinstance(entity_hint, str) and entity_hint.strip() else None
+        project = project_hint.strip() if isinstance(project_hint, str) and project_hint.strip() else None
+
+        def _update_from(extra: Mapping[str, Any]) -> None:
+            nonlocal entity, project
+            if entity is None:
+                candidate = extra.get("wandb_entity") or extra.get("wandb_username")
+                if isinstance(candidate, str) and candidate.strip():
+                    entity = candidate.strip()
+            if project is None:
+                candidate = extra.get("wandb_project_name")
+                if isinstance(candidate, str) and candidate.strip():
+                    project = candidate.strip()
+
+        if isinstance(metadata, Mapping):
+            worker_meta = metadata.get("worker")
+            if isinstance(worker_meta, Mapping):
+                worker_config = worker_meta.get("config")
+                if isinstance(worker_config, Mapping):
+                    extra = worker_config.get("extra")
+                    if isinstance(extra, Mapping):
+                        _update_from(extra)
+            environment_meta = metadata.get("environment")
+            if isinstance(environment_meta, Mapping):
+                env_entity = environment_meta.get("WANDB_ENTITY") or environment_meta.get("WANDB_USERNAME")
+                env_project = environment_meta.get("WANDB_PROJECT") or environment_meta.get("WANDB_PROJECT_NAME")
+                if isinstance(env_entity, str) and env_entity.strip():
+                    entity = entity or env_entity.strip()
+                if isinstance(env_project, str) and env_project.strip():
+                    project = project or env_project.strip()
+
+        if entity and project:
+            return entity, project
+
+        config_path = VAR_TRAINER_DIR / "configs" / f"config-{run_id}.json"
+        if config_path.exists():
+            try:
+                config_payload = json.loads(config_path.read_text(encoding="utf-8"))
+                extra = (
+                    config_payload.get("metadata", {})
+                    .get("worker", {})
+                    .get("config", {})
+                    .get("extra", {})
+                )
+                if isinstance(extra, Mapping):
+                    _update_from(extra)
+            except Exception:  # pragma: no cover
+                pass
+
+        if entity and project:
+            return entity, project
+
+        return entity, project
+
+    def _discover_wandb_slug(self, run_id: str) -> str:
+        wandb_root = VAR_TRAINER_DIR / "runs" / run_id / "wandb"
+        if not wandb_root.exists():
+            return ""
+
+        candidates = sorted(
+            wandb_root.rglob("run-*.wandb"),
+            key=lambda path: path.stat().st_mtime,
+            reverse=True,
+        )
+        for candidate in candidates:
+            slug = candidate.stem.split("-")[-1]
+            if slug:
+                return slug
+        return ""
+
+
 
 
 __all__ = ["AnalyticsTabManager"]
