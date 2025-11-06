@@ -20,6 +20,7 @@ tensorboard>=2.11.0
 wandb>=0.22.3
 tyro>=0.5.0
 tenacity>=8.0.0
+moviepy>=1.0.3
 
 # Optional extras can be included via separate files:
 # -r cleanrl_extras_atari.txt  (for Atari environments)

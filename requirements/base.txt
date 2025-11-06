@@ -32,6 +32,7 @@ Pillow==10.4.0
 
 gymnasium[box2d]
 gymnasium[mujoco]
+gymnasium[atari]
 gymnasium
 minigrid>=2,<3.0.0
 

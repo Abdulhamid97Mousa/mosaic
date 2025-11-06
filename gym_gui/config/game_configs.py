@@ -334,6 +334,10 @@ class MiniGridConfig:
     render_mode: str = "rgb_array"
     """Render mode requested during environment creation."""
 
+    append_direction: bool = True
+    """When True, append the agent's direction to the flattened observation
+    vector (image.flatten() + [direction]). Matches xuance baseline behaviour."""
+
     def to_gym_kwargs(self) -> Dict[str, Any]:
         kwargs: Dict[str, Any] = {"render_mode": self.render_mode}
         if self.agent_view_size is not None:
@@ -414,6 +418,53 @@ DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG = MiniGridConfig(
 )
 
 
+# ---------------------------------------------------------------------------
+# ALE (Atari) configuration
+# ---------------------------------------------------------------------------
+
+@dataclass(frozen=True)
+class ALEConfig:
+    """Configuration payload for ALE Atari environments.
+
+    Mirrors common ALE kwargs used by Gymnasium:
+    - obs_type: "rgb" | "ram" | "grayscale"
+    - frameskip: int or (min, max) tuple
+    - repeat_action_probability: float (aka stickiness / RAP)
+    - difficulty, mode: integers selecting game flavour
+    - full_action_space: request full 18-action set when True
+    - render_mode: rendering mode (default "rgb_array")
+    - seed: default seed used by adapter reset when caller omits one
+    - env_id: Gymnasium environment id
+    """
+
+    env_id: str = GameId.ADVENTURE_V4.value
+    obs_type: str = "rgb"
+    frameskip: int | tuple[int, int] | None = None
+    repeat_action_probability: float | None = None
+    difficulty: int | None = None
+    mode: int | None = None
+    full_action_space: bool = False
+    render_mode: str = "rgb_array"
+    seed: int | None = None
+
+    def to_gym_kwargs(self) -> Dict[str, Any]:
+        kwargs: Dict[str, Any] = {
+            "render_mode": self.render_mode,
+            "obs_type": self.obs_type,
+        }
+        if self.frameskip is not None:
+            kwargs["frameskip"] = self.frameskip
+        if self.repeat_action_probability is not None:
+            kwargs["repeat_action_probability"] = float(self.repeat_action_probability)
+        if self.difficulty is not None:
+            kwargs["difficulty"] = int(self.difficulty)
+        if self.mode is not None:
+            kwargs["mode"] = int(self.mode)
+        if self.full_action_space:
+            kwargs["full_action_space"] = True
+        return kwargs
+
+
 __all__ = [
     "FrozenLakeConfig",
     "TaxiConfig",
@@ -423,6 +474,7 @@ __all__ = [
     "CarRacingConfig",
     "BipedalWalkerConfig",
     "MiniGridConfig",
+    "ALEConfig",
     "GameConfig",
     "DEFAULT_FROZEN_LAKE_CONFIG",
     "DEFAULT_FROZEN_LAKE_V2_CONFIG",

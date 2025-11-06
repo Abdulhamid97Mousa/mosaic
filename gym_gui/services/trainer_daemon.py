@@ -88,9 +88,9 @@ class _LockFile:
         self._path.parent.mkdir(parents=True, exist_ok=True)
         fd = os.open(self._path, os.O_RDWR | os.O_CREAT, 0o664)
         try:
-            if fcntl:  # POSIX
+            if fcntl is not None:  # POSIX
                 fcntl.flock(fd, fcntl.LOCK_EX | fcntl.LOCK_NB)
-            elif msvcrt:  # Windows
+            elif msvcrt is not None:  # Windows
                 msvcrt.locking(fd, msvcrt.LK_NBLCK, 1)  # type: ignore[attr-defined]
         except (IOError, BlockingIOError) as exc:
             os.close(fd)
@@ -103,9 +103,9 @@ class _LockFile:
         if self._fd is None:
             return
         try:
-            if fcntl:  # POSIX
+            if fcntl is not None:  # POSIX
                 fcntl.flock(self._fd, fcntl.LOCK_UN)
-            elif msvcrt:  # Windows
+            elif msvcrt is not None:  # Windows
                 msvcrt.locking(self._fd, msvcrt.LK_UNLCK, 1)  # type: ignore[attr-defined]
         finally:
             os.close(self._fd)

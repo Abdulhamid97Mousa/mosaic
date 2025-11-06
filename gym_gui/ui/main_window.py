@@ -8,6 +8,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
 import json
 import threading
+import grpc
 
 from PyQt6.QtCore import pyqtSlot, pyqtSignal  # type: ignore[attr-defined]
 from qtpy import QtCore, QtGui, QtWidgets  # type: ignore[attr-defined]
@@ -44,6 +45,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_UI_MAINWINDOW_INFO,
     LOG_UI_MAINWINDOW_WARNING,
     LOG_UI_MAINWINDOW_ERROR,
+    LOG_UI_MAINWINDOW_INVALID_CONFIG,
     LOG_TELEMETRY_SUBSCRIBE_ERROR,
     LOG_LIVE_CONTROLLER_RUN_COMPLETED,
     LOG_UI_WORKER_TABS_WARNING,
@@ -1148,12 +1150,23 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                         extra={"run_id": str(response.run_id)},
                     )
                 except Exception as error:
-                    self.log_constant( 
-                        LOG_UI_MAINWINDOW_ERROR,
-                        message="_submit_training_config: on_done got exception",
-                        extra={"exception": type(error).__name__},
-                        exc_info=error,
-                    )
+                    if isinstance(error, grpc.aio.AioRpcError) and error.code() == grpc.StatusCode.INVALID_ARGUMENT:
+                        self.log_constant( 
+                            LOG_UI_MAINWINDOW_INVALID_CONFIG,
+                            message="Trainer rejected training config",
+                            extra={
+                                "exception": type(error).__name__,
+                                "details": error.details() if hasattr(error, "details") else "",
+                            },
+                            exc_info=error,
+                        )
+                    else:
+                        self.log_constant( 
+                            LOG_UI_MAINWINDOW_ERROR,
+                            message="_submit_training_config: on_done got exception",
+                            extra={"exception": type(error).__name__},
+                            exc_info=error,
+                        )
                     QtCore.QTimer.singleShot(0, lambda: self._on_training_submit_failed(error))
                     return
                 run_id = str(response.run_id)

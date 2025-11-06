@@ -5,6 +5,7 @@ from __future__ import annotations
 import json
 import logging
 from datetime import datetime, timezone
+import os
 import re
 from typing import Any, Dict, Optional
 
@@ -259,6 +260,21 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._wandb_email_input.setPlaceholderText("Optional WANDB account email")
         self._wandb_email_input.setEnabled(False)
         wandb_form.addRow("WANDB Email", self._wandb_email_input)
+
+        self._wandb_use_vpn_checkbox = QtWidgets.QCheckBox("Route WANDB traffic through VPN proxy")
+        self._wandb_use_vpn_checkbox.setEnabled(False)
+        self._wandb_use_vpn_checkbox.toggled.connect(self._on_wandb_vpn_checkbox_toggled)
+        wandb_form.addRow("Use WANDB VPN", self._wandb_use_vpn_checkbox)
+
+        self._wandb_http_proxy_input = QtWidgets.QLineEdit()
+        self._wandb_http_proxy_input.setPlaceholderText("Optional HTTP proxy (e.g. http://127.0.0.1:7890)")
+        self._wandb_http_proxy_input.setEnabled(False)
+        wandb_form.addRow("WANDB HTTP Proxy", self._wandb_http_proxy_input)
+
+        self._wandb_https_proxy_input = QtWidgets.QLineEdit()
+        self._wandb_https_proxy_input.setPlaceholderText("Optional HTTPS proxy (e.g. https://127.0.0.1:7890)")
+        self._wandb_https_proxy_input.setEnabled(False)
+        wandb_form.addRow("WANDB HTTPS Proxy", self._wandb_https_proxy_input)
 
         analytics_layout.addLayout(wandb_form)
 
@@ -769,10 +785,23 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             getattr(self, "_wandb_api_key_input", None),
             getattr(self, "_wandb_email_input", None),
         )
+        wandb_proxy_fields = (
+            getattr(self, "_wandb_http_proxy_input", None),
+            getattr(self, "_wandb_https_proxy_input", None),
+        )
+        vpn_checkbox = getattr(self, "_wandb_use_vpn_checkbox", None)
         wandb_active = enabled and isinstance(wandb_checkbox, QtWidgets.QCheckBox) and wandb_checkbox.isChecked()
         for field in wandb_fields:
             if isinstance(field, QtWidgets.QLineEdit):
                 field.setEnabled(wandb_active)
+        if isinstance(vpn_checkbox, QtWidgets.QCheckBox):
+            vpn_checkbox.setEnabled(wandb_active)
+            if not wandb_active:
+                vpn_checkbox.setChecked(False)
+        wandb_vpn_active = wandb_active and isinstance(vpn_checkbox, QtWidgets.QCheckBox) and vpn_checkbox.isChecked()
+        for field in wandb_proxy_fields:
+            if isinstance(field, QtWidgets.QLineEdit):
+                field.setEnabled(wandb_vpn_active)
 
         hint = getattr(self, "_analytics_hint_label", None)
         if hint is not None:
@@ -784,6 +813,10 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 hint.setStyleSheet("color: #777777; font-size: 10px;")
 
     def _on_wandb_checkbox_toggled(self, checked: bool) -> None:
+        _ = checked
+        self._update_analytics_controls()
+
+    def _on_wandb_vpn_checkbox_toggled(self, checked: bool) -> None:
         _ = checked
         self._update_analytics_controls()
 
@@ -1073,6 +1106,9 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         wandb_run_name = ""
         wandb_api_key = ""
         wandb_email = ""
+        wandb_http_proxy = ""
+        wandb_https_proxy = ""
+        wandb_use_vpn_proxy = False
         if isinstance(getattr(self, "_wandb_project_input", None), QtWidgets.QLineEdit):
             wandb_project = self._wandb_project_input.text().strip()
         if isinstance(getattr(self, "_wandb_entity_input", None), QtWidgets.QLineEdit):
@@ -1083,6 +1119,20 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             wandb_api_key = self._wandb_api_key_input.text().strip()
         if isinstance(getattr(self, "_wandb_email_input", None), QtWidgets.QLineEdit):
             wandb_email = self._wandb_email_input.text().strip()
+        if isinstance(getattr(self, "_wandb_use_vpn_checkbox", None), QtWidgets.QCheckBox):
+            wandb_use_vpn_proxy = self._wandb_use_vpn_checkbox.isChecked()
+        raw_http_proxy = ""
+        raw_https_proxy = ""
+        if isinstance(getattr(self, "_wandb_http_proxy_input", None), QtWidgets.QLineEdit):
+            raw_http_proxy = self._wandb_http_proxy_input.text().strip()
+        if isinstance(getattr(self, "_wandb_https_proxy_input", None), QtWidgets.QLineEdit):
+            raw_https_proxy = self._wandb_https_proxy_input.text().strip()
+        if wandb_use_vpn_proxy:
+            wandb_http_proxy = raw_http_proxy or os.environ.get("WANDB_VPN_HTTP_PROXY", "").strip()
+            wandb_https_proxy = raw_https_proxy or os.environ.get("WANDB_VPN_HTTPS_PROXY", "").strip()
+        else:
+            wandb_http_proxy = ""
+            wandb_https_proxy = ""
 
         # Get training telemetry throttle from slider
         # This controls how fast telemetry data is collected and written to database
@@ -1200,6 +1250,14 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             environment["WANDB_API_KEY"] = wandb_api_key
         if wandb_email:
             environment["WANDB_EMAIL"] = wandb_email
+        if wandb_use_vpn_proxy and wandb_http_proxy:
+            environment["WANDB_HTTP_PROXY"] = wandb_http_proxy
+            environment["HTTP_PROXY"] = wandb_http_proxy
+            environment["http_proxy"] = wandb_http_proxy
+        if wandb_use_vpn_proxy and wandb_https_proxy:
+            environment["WANDB_HTTPS_PROXY"] = wandb_https_proxy
+            environment["HTTPS_PROXY"] = wandb_https_proxy
+            environment["https_proxy"] = wandb_https_proxy
 
         # Add BDI-specific environment variables if enabled
         if bdi_enabled:
@@ -1274,11 +1332,14 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                         "disable_telemetry": fast_training_mode,
                         "track_tensorboard": tensorboard_enabled,
                         "track_wandb": wandb_enabled,
+                        "wandb_use_vpn_proxy": wandb_use_vpn_proxy,
                         **({"wandb_project_name": wandb_project} if wandb_project else {}),
                         **({"wandb_entity": wandb_entity} if wandb_entity else {}),
                         **({"wandb_run_name": wandb_run_name} if wandb_run_name else {}),
                         **({"wandb_email": wandb_email} if wandb_email else {}),
                         **({"wandb_api_key": wandb_api_key} if wandb_api_key else {}),
+                        **({"wandb_http_proxy": wandb_http_proxy} if wandb_use_vpn_proxy and wandb_http_proxy else {}),
+                        **({"wandb_https_proxy": wandb_https_proxy} if wandb_use_vpn_proxy and wandb_https_proxy else {}),
                     },
                     "path_config": {
                         "ui_only": ui_path_settings,
@@ -1298,6 +1359,9 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             "wandb": {
                 "enabled": wandb_enabled,
                 "run_path": None,
+                "use_vpn_proxy": wandb_use_vpn_proxy,
+                "http_proxy": wandb_http_proxy or None,
+                "https_proxy": wandb_https_proxy or None,
             },
         }
 

@@ -336,6 +336,87 @@ _BOX_2D_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
     ),
 }
 
+# ALE (Atari) Adventure mappings (Discrete(18))
+_ALE_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
+    # Minimal but explicit mapping for core and diagonal moves, plus fire variants via letter keys.
+    GameId.ADVENTURE_V4: (
+        _mapping(("Key_0",), 0),               # NOOP
+        _mapping(("Key_Space",), 1),          # FIRE
+        _mapping(("Key_Up", "Key_W"), 2),    # UP
+        _mapping(("Key_Right", "Key_D"), 3), # RIGHT
+        _mapping(("Key_Left", "Key_A"), 4),  # LEFT
+        _mapping(("Key_Down", "Key_S"), 5),  # DOWN
+        _mapping(("Key_E",), 6),               # UPRIGHT
+        _mapping(("Key_Q",), 7),               # UPLEFT
+        _mapping(("Key_C",), 8),               # DOWNRIGHT
+        _mapping(("Key_Z",), 9),               # DOWNLEFT
+        _mapping(("Key_I",), 10),              # UPFIRE
+        _mapping(("Key_L",), 11),              # RIGHTFIRE
+        _mapping(("Key_J",), 12),              # LEFTFIRE
+        _mapping(("Key_K",), 13),              # DOWNFIRE
+        _mapping(("Key_O",), 14),              # UPRIGHTFIRE
+        _mapping(("Key_U",), 15),              # UPLEFTFIRE
+        _mapping(("Key_M",), 16),              # DOWNRIGHTFIRE
+        _mapping(("Key_N",), 17),              # DOWNLEFTFIRE
+    ),
+    GameId.ALE_ADVENTURE_V5: (
+        _mapping(("Key_0",), 0),               # NOOP
+        _mapping(("Key_Space",), 1),          # FIRE
+        _mapping(("Key_Up", "Key_W"), 2),    # UP
+        _mapping(("Key_Right", "Key_D"), 3), # RIGHT
+        _mapping(("Key_Left", "Key_A"), 4),  # LEFT
+        _mapping(("Key_Down", "Key_S"), 5),  # DOWN
+        _mapping(("Key_E",), 6),               # UPRIGHT
+        _mapping(("Key_Q",), 7),               # UPLEFT
+        _mapping(("Key_C",), 8),               # DOWNRIGHT
+        _mapping(("Key_Z",), 9),               # DOWNLEFT
+        _mapping(("Key_I",), 10),              # UPFIRE
+        _mapping(("Key_L",), 11),              # RIGHTFIRE
+        _mapping(("Key_J",), 12),              # LEFTFIRE
+        _mapping(("Key_K",), 13),              # DOWNFIRE
+        _mapping(("Key_O",), 14),              # UPRIGHTFIRE
+        _mapping(("Key_U",), 15),              # UPLEFTFIRE
+        _mapping(("Key_M",), 16),              # DOWNRIGHTFIRE
+        _mapping(("Key_N",), 17),              # DOWNLEFTFIRE
+    ),
+    # AirRaid uses Discrete(6) by default; map core actions and fire variants
+    GameId.AIR_RAID_V4: (
+        _mapping(("Key_0",), 0),               # NOOP
+        _mapping(("Key_Space",), 1),          # FIRE
+        _mapping(("Key_Right", "Key_D"), 2), # RIGHT
+        _mapping(("Key_Left", "Key_A"), 3),  # LEFT
+        _mapping(("Key_L",), 4),              # RIGHTFIRE
+        _mapping(("Key_J",), 5),              # LEFTFIRE
+    ),
+    GameId.ALE_AIR_RAID_V5: (
+        _mapping(("Key_0",), 0),               # NOOP
+        _mapping(("Key_Space",), 1),          # FIRE
+        _mapping(("Key_Right", "Key_D"), 2), # RIGHT
+        _mapping(("Key_Left", "Key_A"), 3),  # LEFT
+        _mapping(("Key_L",), 4),              # RIGHTFIRE
+        _mapping(("Key_J",), 5),              # LEFTFIRE
+    ),
+    # Assault uses Discrete(7): NOOP, FIRE, UP, RIGHT, LEFT, RIGHTFIRE, LEFTFIRE
+    GameId.ASSAULT_V4: (
+        _mapping(("Key_0",), 0),               # NOOP
+        _mapping(("Key_Space",), 1),          # FIRE
+        _mapping(("Key_Up", "Key_W"), 2),    # UP
+        _mapping(("Key_Right", "Key_D"), 3), # RIGHT
+        _mapping(("Key_Left", "Key_A"), 4),  # LEFT
+        _mapping(("Key_L",), 5),              # RIGHTFIRE
+        _mapping(("Key_J",), 6),              # LEFTFIRE
+    ),
+    GameId.ALE_ASSAULT_V5: (
+        _mapping(("Key_0",), 0),               # NOOP
+        _mapping(("Key_Space",), 1),          # FIRE
+        _mapping(("Key_Up", "Key_W"), 2),    # UP
+        _mapping(("Key_Right", "Key_D"), 3), # RIGHT
+        _mapping(("Key_Left", "Key_A"), 4),  # LEFT
+        _mapping(("Key_L",), 5),              # RIGHTFIRE
+        _mapping(("Key_J",), 6),              # LEFTFIRE
+    ),
+}
+
 
 class HumanInputController(QtCore.QObject, LogConstantMixin):
     """Registers keyboard shortcuts and forwards them to the session controller."""
@@ -355,11 +436,13 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
             return
 
         try:
-            mappings = _TOY_TEXT_MAPPINGS.get(game_id) 
+            mappings = _TOY_TEXT_MAPPINGS.get(game_id)
             if mappings is None:
                 mappings = _MINIG_GRID_MAPPINGS.get(game_id)
             if mappings is None:
                 mappings = _BOX_2D_MAPPINGS.get(game_id)
+            if mappings is None:
+                mappings = _ALE_MAPPINGS.get(game_id)
             if mappings is None and isinstance(action_space, spaces.Discrete):
                 mappings = self._fallback_mappings(action_space)
 

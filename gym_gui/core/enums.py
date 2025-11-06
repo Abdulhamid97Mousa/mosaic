@@ -22,6 +22,7 @@ class EnvironmentFamily(StrEnum):
     BOX2D = "box2d"
     CLASSIC_CONTROL = "classic_control"
     ATARI = "atari"
+    ALE = "ale"
     MUJOCO = "mujoco"
     MINIGRID = "minigrid"
     OTHER = "other"
@@ -43,6 +44,12 @@ class GameId(StrEnum):
     MOUNTAIN_CAR = "MountainCar-v0"
     PONG_NO_FRAMESKIP = "PongNoFrameskip-v4"
     BREAKOUT_NO_FRAMESKIP = "BreakoutNoFrameskip-v4"
+    ADVENTURE_V4 = "Adventure-v4"
+    ALE_ADVENTURE_V5 = "ALE/Adventure-v5"
+    AIR_RAID_V4 = "AirRaid-v4"
+    ALE_AIR_RAID_V5 = "ALE/AirRaid-v5"
+    ASSAULT_V4 = "Assault-v4"
+    ALE_ASSAULT_V5 = "ALE/Assault-v5"
     PROCGEN_COINRUN = "procgen:procgen-coinrun-v0"
     PROCGEN_MAZE = "procgen:procgen-maze-v0"
     ANT = "Ant-v5"
@@ -104,6 +111,9 @@ def get_game_display_name(game_id: GameId) -> str:
     # MiniGrid is a separate library, not part of Gym - keep as-is
     if value.startswith("MiniGrid-"):
         return value
+    # ALE is a separate namespace (Atari via ALE) - keep as-is
+    if value.startswith("ALE/"):
+        return value
     
     # Determine Gym family based on enum
     if game_id in (GameId.FROZEN_LAKE, GameId.FROZEN_LAKE_V2, GameId.CLIFF_WALKING, 
@@ -122,6 +132,13 @@ def get_game_display_name(game_id: GameId) -> str:
         GameId.BREAKOUT_NO_FRAMESKIP,
     ):
         return f"Gym-Atari-{value}"
+    elif game_id in (
+        GameId.ADVENTURE_V4,
+        GameId.AIR_RAID_V4,
+        GameId.ASSAULT_V4,
+    ):
+        # Legacy non-namespaced Atari environments
+        return f"Atari-{value}"
     elif game_id in (
         GameId.PROCGEN_COINRUN,
         GameId.PROCGEN_MAZE,
@@ -204,6 +221,12 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.MOUNTAIN_CAR: EnvironmentFamily.CLASSIC_CONTROL,
     GameId.PONG_NO_FRAMESKIP: EnvironmentFamily.ATARI,
     GameId.BREAKOUT_NO_FRAMESKIP: EnvironmentFamily.ATARI,
+    GameId.ADVENTURE_V4: EnvironmentFamily.ALE,
+    GameId.ALE_ADVENTURE_V5: EnvironmentFamily.ALE,
+    GameId.AIR_RAID_V4: EnvironmentFamily.ALE,
+    GameId.ALE_AIR_RAID_V5: EnvironmentFamily.ALE,
+    GameId.ASSAULT_V4: EnvironmentFamily.ALE,
+    GameId.ALE_ASSAULT_V5: EnvironmentFamily.ALE,
     GameId.PROCGEN_COINRUN: EnvironmentFamily.OTHER,
     GameId.PROCGEN_MAZE: EnvironmentFamily.OTHER,
     GameId.ANT: EnvironmentFamily.MUJOCO,
@@ -255,6 +278,12 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.MOUNTAIN_CAR: RenderMode.RGB_ARRAY,
     GameId.PONG_NO_FRAMESKIP: RenderMode.RGB_ARRAY,
     GameId.BREAKOUT_NO_FRAMESKIP: RenderMode.RGB_ARRAY,
+    GameId.ADVENTURE_V4: RenderMode.RGB_ARRAY,
+    GameId.ALE_ADVENTURE_V5: RenderMode.RGB_ARRAY,
+    GameId.AIR_RAID_V4: RenderMode.RGB_ARRAY,
+    GameId.ALE_AIR_RAID_V5: RenderMode.RGB_ARRAY,
+    GameId.ASSAULT_V4: RenderMode.RGB_ARRAY,
+    GameId.ALE_ASSAULT_V5: RenderMode.RGB_ARRAY,
     GameId.PROCGEN_COINRUN: RenderMode.RGB_ARRAY,
     GameId.PROCGEN_MAZE: RenderMode.RGB_ARRAY,
     GameId.ANT: RenderMode.RGB_ARRAY,
@@ -359,6 +388,42 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
     GameId.MOUNTAIN_CAR: (ControlMode.AGENT_ONLY,),
     GameId.PONG_NO_FRAMESKIP: (ControlMode.AGENT_ONLY,),
     GameId.BREAKOUT_NO_FRAMESKIP: (ControlMode.AGENT_ONLY,),
+    GameId.ADVENTURE_V4: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+    ),
+    GameId.ALE_ADVENTURE_V5: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+    ),
+    GameId.AIR_RAID_V4: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+    ),
+    GameId.ALE_AIR_RAID_V5: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+    ),
+    GameId.ASSAULT_V4: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+    ),
+    GameId.ALE_ASSAULT_V5: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+    ),
     GameId.PROCGEN_COINRUN: (ControlMode.AGENT_ONLY,),
     GameId.PROCGEN_MAZE: (ControlMode.AGENT_ONLY,),
     GameId.ANT: (ControlMode.AGENT_ONLY,),
