@@ -501,6 +501,26 @@ LOG_ENV_MINIGRID_RENDER_WARNING = _constant(
 )
 
 
+# ALE adapter specific constants
+LOG_ADAPTER_ALE_NAMESPACE_IMPORT_FAILED = _constant(
+    "LOG522",
+    "WARNING",
+    "ALE optional namespace import failed; environments may not be auto-registered",
+    component="Adapter",
+    subcomponent="ALE",
+    tags=_tags("ale", "import", "namespace", "warning"),
+)
+
+LOG_ADAPTER_ALE_METADATA_PROBE_FAILED = _constant(
+    "LOG523",
+    "DEBUG",
+    "ALE metadata probe failed; continuing without optional metrics",
+    component="Adapter",
+    subcomponent="ALE",
+    tags=_tags("ale", "metadata", "probe"),
+)
+
+
 # ---------------------------------------------------------------------------
 # Service and telemetry constants (LOG601–LOG650)
 # ---------------------------------------------------------------------------
@@ -857,6 +877,52 @@ LOG_SERVICE_FRAME_DEBUG = _constant(
     tags=_tags("service", "frame", "storage", "debug"),
 )
 
+# Session (JSONL recorder / normalization) constants
+LOG_SERVICE_SESSION_NUMPY_SCALAR_COERCE_FAILED = _constant(
+    "LOG672",
+    "DEBUG",
+    "Session JSON normalization: numpy scalar coerce failed",
+    component="Service",
+    subcomponent="Session",
+    tags=_tags("session", "json", "numpy", "coerce"),
+)
+
+LOG_SERVICE_SESSION_NDARRAY_SUMMARY_FAILED = _constant(
+    "LOG673",
+    "WARNING",
+    "Session JSON normalization: ndarray summary failed; falling back",
+    component="Service",
+    subcomponent="Session",
+    tags=_tags("session", "json", "ndarray", "summary"),
+)
+
+LOG_SERVICE_SESSION_LAZYFRAMES_SUMMARY_FAILED = _constant(
+    "LOG674",
+    "WARNING",
+    "Session JSON normalization: LazyFrames summary failed; falling back",
+    component="Service",
+    subcomponent="Session",
+    tags=_tags("session", "json", "lazyframes", "summary"),
+)
+
+LOG_SERVICE_SESSION_TOLIST_COERCE_FAILED = _constant(
+    "LOG675",
+    "DEBUG",
+    "Session JSON normalization: tolist() coerce failed",
+    component="Service",
+    subcomponent="Session",
+    tags=_tags("session", "json", "tolist", "coerce"),
+)
+
+LOG_SERVICE_SESSION_ITERABLE_COERCE_FAILED = _constant(
+    "LOG676",
+    "DEBUG",
+    "Session JSON normalization: iterable coerce failed",
+    component="Service",
+    subcomponent="Session",
+    tags=_tags("session", "json", "iterable", "coerce"),
+)
+
 LOG_SERVICE_VALIDATION_DEBUG = _constant(
     "LOG664",
     "DEBUG",
@@ -1008,6 +1074,15 @@ LOG_UI_MAINWINDOW_ERROR = _constant(
     tags=_tags("ui", "mainwindow", "error"),
 )
 
+LOG_UI_MAINWINDOW_INVALID_CONFIG = _constant(
+    "LOG705",
+    "ERROR",
+    "UI main window invalid training configuration",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("ui", "mainwindow", "config", "invalid"),
+)
+
 LOG_UI_LIVE_TAB_TRACE = _constant(
     "LOG710",
     "DEBUG",
@@ -1123,6 +1198,24 @@ LOG_UI_RENDER_TABS_WANDB_ERROR = _constant(
     component="UI",
     subcomponent="RenderTabs",
     tags=_tags("ui", "wandb", "error"),
+)
+
+LOG_UI_RENDER_TABS_WANDB_PROXY_APPLIED = _constant(
+    "LOG729",
+    "INFO",
+    "Weights & Biases VPN proxy applied",
+    component="UI",
+    subcomponent="RenderTabs",
+    tags=_tags("ui", "wandb", "proxy", "vpn"),
+)
+
+LOG_UI_RENDER_TABS_WANDB_PROXY_SKIPPED = _constant(
+    "LOG72A",
+    "DEBUG",
+    "Weights & Biases VPN proxy not applied",
+    component="UI",
+    subcomponent="RenderTabs",
+    tags=_tags("ui", "wandb", "proxy", "vpn"),
 )
 
 LOG_UI_RENDER_TABS_DELETE_REQUESTED = _constant(
@@ -1355,6 +1448,16 @@ LOG_UTIL_SEED_CALLBACK_FAILED = _constant(
     component="Utility",
     subcomponent="Seeding",
     tags=_tags("utility", "seeding", "callback", "error"),
+)
+
+# JSON serialization helpers
+LOG_UTIL_JSON_NUMPY_SCALAR_COERCE_FAILED = _constant(
+    "LOG804",
+    "DEBUG",
+    "Safe JSON: numpy scalar coerce failed; using fallback",
+    component="Utility",
+    subcomponent="Serialization",
+    tags=_tags("utility", "json", "numpy", "coerce"),
 )
 
 
@@ -1744,6 +1847,8 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_ENV_MINIGRID_STEP,
     LOG_ENV_MINIGRID_ERROR,
     LOG_ENV_MINIGRID_RENDER_WARNING,
+    LOG_ADAPTER_ALE_NAMESPACE_IMPORT_FAILED,
+    LOG_ADAPTER_ALE_METADATA_PROBE_FAILED,
     LOG_SERVICE_TELEMETRY_STEP_REJECTED,
     LOG_SERVICE_TELEMETRY_ASYNC_ERROR,
     LOG_SERVICE_DB_SINK_INITIALIZED,
@@ -1783,6 +1888,11 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_SERVICE_FRAME_WARNING,
     LOG_SERVICE_FRAME_ERROR,
     LOG_SERVICE_FRAME_DEBUG,
+    LOG_SERVICE_SESSION_NUMPY_SCALAR_COERCE_FAILED,
+    LOG_SERVICE_SESSION_NDARRAY_SUMMARY_FAILED,
+    LOG_SERVICE_SESSION_LAZYFRAMES_SUMMARY_FAILED,
+    LOG_SERVICE_SESSION_TOLIST_COERCE_FAILED,
+    LOG_SERVICE_SESSION_ITERABLE_COERCE_FAILED,
     LOG_SERVICE_VALIDATION_DEBUG,
     LOG_SERVICE_VALIDATION_WARNING,
     LOG_SERVICE_VALIDATION_ERROR,
@@ -1837,6 +1947,7 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_UTIL_QT_RESEED_SKIPPED,
     LOG_UTIL_QT_STATE_CAPTURE_FAILED,
     LOG_UTIL_SEED_CALLBACK_FAILED,
+    LOG_UTIL_JSON_NUMPY_SCALAR_COERCE_FAILED,
     LOG_WORKER_RUNTIME_EVENT,
     LOG_WORKER_RUNTIME_WARNING,
     LOG_WORKER_RUNTIME_ERROR,
@@ -1920,6 +2031,8 @@ __all__ = (
     "LOG_ENV_MINIGRID_STEP",
     "LOG_ENV_MINIGRID_ERROR",
     "LOG_ENV_MINIGRID_RENDER_WARNING",
+    "LOG_ADAPTER_ALE_NAMESPACE_IMPORT_FAILED",
+    "LOG_ADAPTER_ALE_METADATA_PROBE_FAILED",
     "LOG_SERVICE_TELEMETRY_STEP_REJECTED",
     "LOG_SERVICE_TELEMETRY_ASYNC_ERROR",
     "LOG_SERVICE_DB_SINK_INITIALIZED",
@@ -1959,6 +2072,11 @@ __all__ = (
     "LOG_SERVICE_FRAME_WARNING",
     "LOG_SERVICE_FRAME_ERROR",
     "LOG_SERVICE_FRAME_DEBUG",
+    "LOG_SERVICE_SESSION_NUMPY_SCALAR_COERCE_FAILED",
+    "LOG_SERVICE_SESSION_NDARRAY_SUMMARY_FAILED",
+    "LOG_SERVICE_SESSION_LAZYFRAMES_SUMMARY_FAILED",
+    "LOG_SERVICE_SESSION_TOLIST_COERCE_FAILED",
+    "LOG_SERVICE_SESSION_ITERABLE_COERCE_FAILED",
     "LOG_SERVICE_VALIDATION_DEBUG",
     "LOG_SERVICE_VALIDATION_WARNING",
     "LOG_SERVICE_VALIDATION_ERROR",
@@ -1971,6 +2089,7 @@ __all__ = (
     "LOG_UI_MAINWINDOW_INFO",
     "LOG_UI_MAINWINDOW_WARNING",
     "LOG_UI_MAINWINDOW_ERROR",
+    "LOG_UI_MAINWINDOW_INVALID_CONFIG",
     "LOG_UI_LIVE_TAB_TRACE",
     "LOG_UI_LIVE_TAB_INFO",
     "LOG_UI_LIVE_TAB_WARNING",
@@ -1984,6 +2103,8 @@ __all__ = (
     "LOG_UI_RENDER_TABS_WANDB_STATUS",
     "LOG_UI_RENDER_TABS_WANDB_WARNING",
     "LOG_UI_RENDER_TABS_WANDB_ERROR",
+    "LOG_UI_RENDER_TABS_WANDB_PROXY_APPLIED",
+    "LOG_UI_RENDER_TABS_WANDB_PROXY_SKIPPED",
     "LOG_UI_RENDER_TABS_DELETE_REQUESTED",
     "LOG_UI_RENDER_TABS_EVENT_FOR_DELETED_RUN",
     "LOG_UI_RENDER_TABS_TAB_ADDED",
@@ -2009,6 +2130,7 @@ __all__ = (
     "LOG_UTIL_QT_RESEED_SKIPPED",
     "LOG_UTIL_QT_STATE_CAPTURE_FAILED",
     "LOG_UTIL_SEED_CALLBACK_FAILED",
+    "LOG_UTIL_JSON_NUMPY_SCALAR_COERCE_FAILED",
     "LOG_WORKER_RUNTIME_EVENT",
     "LOG_WORKER_RUNTIME_WARNING",
     "LOG_WORKER_RUNTIME_ERROR",

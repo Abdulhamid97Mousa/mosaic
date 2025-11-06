@@ -2,29 +2,40 @@
 
 ## Overview
 
-The **WANDB tab** is the Weights & Biases ("W&B") analytics surface embedded inside the GUI. After a CleanRL run completes, the worker emits a manifest (`var/trainer/runs/<run_id>/analytics.json`) that can include the key `wandb_run_path`. When present, the GUI's `AnalyticsTabManager` instantiates a tab titled **`WANDB-Agent-{agent_id}`** for each agent with W&B data.
+The **WANDB tab** is the Weights & Biases ("W&B") analytics surface embedded inside the GUI. As soon as a run is dispatched, the GUI seeds the metadata needed to materialize a tab titled **`WANDB-Agent-{agent_id}`** and then keeps polling until a concrete run path becomes available. The orchestration is split across:
 
-- In the SPADE-BDI Train Form, the analytics checkboxes are unlocked only when **Fast Training (Disable Telemetry)** is enabled, preventing live-telemetry runs from incurring analytics overhead by accident.
+- `gym_gui/services/trainer/config.py:245` which pre-populates `metadata.artifacts.wandb` with `enabled`, `manifest_file`, and `relative_path` entries so the UI knows where to look for W&B state.
+- `gym_gui/ui/main_window.py:1240` where the GUI immediately calls `AnalyticsTabManager.ensure_wandb_tab()` with the submission metadata and schedules retries when the run path is still missing.
+- `gym_gui/ui/panels/analytics_tabs.py:250` where the tab manager resolves the final URL from three sources (metadata, `wandb.json`, on-disk slug discovery).
+
+In the SPADE-BDI Train Form the analytics checkboxes are unlocked only when **Fast Training (Disable Telemetry)** is enabled, preventing live-telemetry runs from incurring analytics overhead by accident.
 
 ## Lifecycle
 
-1. **Manifest creation** – Both `cleanrl_worker/runtime.py` and `spade_bdi_worker/core/runtime.py` write `analytics.json` with fields such as:
+1. **UI seeding** – During submission the trainer normalizes the run metadata and records where W&B artifacts will be emitted (`gym_gui/services/trainer/config.py:245-289`). The GUI persists this metadata per `(run_id, agent_id)`.
+2. **Initial tab attempt** – When the GUI observes a training run (either immediately after submission or via auto-subscribe) it calls `AnalyticsTabManager.ensure_wandb_tab()` with the metadata (`gym_gui/ui/main_window.py:1240-1313`, `gym_gui/ui/main_window.py:1484-1563`). If a run path is already present the tab is created immediately; otherwise a placeholder tab is registered.
+3. **Proactive artifact polling** – If the run path is still empty, the tab manager now attaches a 500 ms `QTimer` probe that keeps re-running `ensure_wandb_tab()` while the worker is active. The probe reads `wandb.json` as soon as it appears and falls back to slug discovery under `wandb/run-*` directories (`gym_gui/ui/panels/analytics_tabs.py:156-213`, `gym_gui/ui/panels/analytics_tabs.py:250-371`, `gym_gui/ui/panels/analytics_tabs.py:505-547`).
+4. **W&B manifest emission** – Once `wandb.init()` succeeds the worker writes `var/trainer/runs/<run_id>/wandb.json` with the resolved run path and emits an artifact event (`spade_bdi_worker/core/runtime.py:340-445`). The next probe (or any subsequent `ensure_wandb_tab()` invocation) picks up the manifest and refreshes the tab.
+5. **Final analytics manifest** – When the worker finishes it writes `analytics.json` with nested artifact metadata (`spade_bdi_worker/core/runtime.py:494-535`). `_on_training_finished()` still reloads this file to pick up any final URLs or TensorBoard paths (`gym_gui/ui/main_window.py:1571-1643`).
 
-   ```json
-   {
-     "tensorboard_dir": "var/trainer/runs/<run_id>/tensorboard",
-     "wandb_run_path": "entity/project/runs/<run_key>",
-     "optuna_db_path": null
-   }
-   ```
+The legacy CleanRL worker still emits the flat manifest shown below; the GUI's W&B polling logic relies on the nested form produced by the SPADE-BDI worker.
 
-2. **GUI detection** – On training completion, `AnalyticsTabManager.ensure_wandb_tab` reads the manifest and, if `wandb_run_path` is a non-empty string, adds/refreshes the corresponding WAB tab.
-3. **Tab creation** – The tab is constructed by `gym_gui.ui.widgets.wandb_artifact_tab.WandbArtifactTab`, providing:
-   - A copyable W&B run URL (`https://wandb.ai/<run_path>` by default).
-   - "Open in Browser" action (launches via `QtGui.QDesktopServices`).
-   - "Open Embedded View" (when Qt WebEngine is available).
-   - Status logging via `LOG_UI_RENDER_TABS_WANDB_*` constants.
-   - Clipboard null-safety check to handle platforms where clipboard may be unavailable.
+```json
+{
+  "tensorboard_dir": "var/trainer/runs/<run_id>/tensorboard",
+  "wandb_run_path": "entity/project/runs/<run_key>",
+  "optuna_db_path": null
+}
+```
+
+When the nested payload is available the GUI prioritizes it for both TensorBoard and W&B tabs.
+
+**Tab creation** – The tab is constructed by `gym_gui.ui.widgets.wandb_artifact_tab.WandbArtifactTab`, providing:
+- A copyable W&B run URL (`https://wandb.ai/<run_path>` by default).
+- "Open in Browser" action (launches via `QtGui.QDesktopServices`).
+- "Open Embedded View" (when Qt WebEngine is available).
+- Status logging via `LOG_UI_RENDER_TABS_WANDB_*` constants.
+- Clipboard null-safety check to handle platforms where clipboard may be unavailable.
 
 ## Worker Configuration & Analytics Support
 
@@ -67,15 +78,28 @@ self._wandb_entity = self.config.extra.get("wandb_entity")
 
 ### Analytics Manifest Generation
 
-Both CleanRL and SPADE-BDI workers emit `analytics.json` at the end of training with the `wandb_run_path` field populated when W&B tracking is enabled. The manifest structure:
+`spade_bdi_worker/core/runtime.py:494-535` writes the nested analytics manifest immediately after the run exits. The W&B payload mirrors the schema consumed by `AnalyticsTabManager.ensure_wandb_tab()`:
 
 ```json
 {
-  "tensorboard_dir": "var/trainer/runs/<run_id>/tensorboard",
-  "wandb_run_path": "<entity>/<project>/runs/<run_key>",
-  "optuna_db_path": null
+  "artifacts": {
+    "tensorboard": {
+      "enabled": true,
+      "log_dir": "var/trainer/runs/<run_id>/tensorboard",
+      "relative_path": "var/trainer/runs/<run_id>/tensorboard"
+    },
+    "wandb": {
+      "enabled": true,
+      "run_path": "<entity>/<project>/runs/<slug>",
+      "entity": "<entity>",
+      "project": "<project>",
+      "manifest_file": "var/trainer/runs/<run_id>/wandb.json"
+    }
+  }
 }
 ```
+
+The legacy CleanRL pipeline still emits the flat `wandb_run_path` field; those builds rely on the slug and manifest fallbacks described above until their manifest is upgraded.
 
 ## Authentication Requirements
 
@@ -212,19 +236,18 @@ Called automatically in `MainWindow._on_training_finished()` for each agent (lin
   - **Added `load_and_create_tabs()` method** to `AnalyticsTabManager` (lines 29-63)
   - Loads analytics.json from disk and creates/refreshes analytics tabs
 - **`gym_gui/ui/main_window.py`**:
-  - Updated `_on_training_finished()` to call `analytics_tabs.load_and_create_tabs()` for each agent (line 1607)## WANDB Complete Integration Status ✅
+  - Updated `_on_training_finished()` to call `analytics_tabs.load_and_create_tabs()` for each agent (line 1607)
 
-**As of Day 20, the WANDB integration is COMPLETE and fully functional!**
+## WANDB Integration Status ✅
 
-All components are working correctly:
+**As of Day 20, WANDB integration now surfaces tabs during the run thanks to the proactive polling loop.**
 
-- ✅ WANDB run tracking initializes properly during training
-- ✅ Analytics manifest with nested structure is generated correctly
-- ✅ WANDB slug discovery extracts run ID from filesystem (`wandb/run-*` directories)
-- ✅ Environment variable fallback reads entity/project from `.env` file
-- ✅ Run URL is constructed and displayed: `https://wandb.ai/{entity}/{project}/runs/{slug}`
-- ✅ "Copy URL" and "Open in Browser" buttons work perfectly
-- ✅ Tab appears automatically when training completes with WANDB enabled
+- ✅ WANDB run tracking initializes properly during training.
+- ✅ `wandb.json` manifests include the resolved run path and are consumed by the GUI (`spade_bdi_worker/core/runtime.py:340-445`).
+- ✅ `AnalyticsTabManager` polls `wandb.json`/`wandb/run-*` every 500 ms until a URL is available, so tabs appear shortly after W&B boots instead of waiting for job completion (`gym_gui/ui/panels/analytics_tabs.py:156-213`, `gym_gui/ui/panels/analytics_tabs.py:250-371`).
+- ✅ Analytics manifest uses the nested structure the GUI expects (`spade_bdi_worker/core/runtime.py:494-535`).
+- ✅ URL identity falls back to metadata/environment/`.env` fields when the manifest is incomplete (`gym_gui/ui/panels/analytics_tabs.py:430-504`).
+- ✅ "Copy URL" and "Open in Browser" buttons work once the run path is available.
 
 ### Known Limitation: Embedded View
 
@@ -327,9 +350,23 @@ Look for:
 
 These headers confirm that W&B blocks external iframe embedding for security reasons.
 
+## Proactive Slug Detection
+
+- `AnalyticsTabManager` keeps a per-run probe that replays `ensure_wandb_tab()` every 500 ms until a run path is published (`gym_gui/ui/panels/analytics_tabs.py:156-213`).
+- Probes read the `wandb.json` manifest as soon as the worker writes it and fall back to scanning `wandb/run-*` directories for the slug (`gym_gui/ui/panels/analytics_tabs.py:250-427`, `gym_gui/ui/panels/analytics_tabs.py:505-547`).
+- When the run path is discovered the probe stops itself, preventing unnecessary filesystem churn for completed runs.
+
 ## Future Enhancements
 
 - Fetching W&B summaries via the REST API (subject to authentication) for lightweight metric bridging.
 - Handling offline runs by pointing to locally-exported reports when no hosted dashboard exists.
 - Extending the nested extra flattening pattern to other worker configurations if needed.
 - Investigating W&B public report embedding as an alternative to run page embedding.
+
+## Proxy Configuration Support
+
+- SPADE-BDI fast-path analytics exposes HTTP/HTTPS proxy inputs that flow into both the worker environment and `config.extra` (`gym_gui/ui/widgets/spade_bdi_train_form.py:236-271`, `gym_gui/ui/widgets/spade_bdi_train_form.py:1197-1309`).
+- CleanRL worker configuration mirrors the same fields so both pipelines can run through a VPN-protected proxy when launching W&B (`gym_gui/ui/widgets/cleanrl_train_form.py:234-262`, `gym_gui/ui/widgets/cleanrl_train_form.py:380-472`).
+- The GUI sets `WANDB_HTTP_PROXY`, `WANDB_HTTPS_PROXY`, and corresponding lowercase/uppercase `http(s)_proxy` variables so Qt WebEngine, the Python runtime, and W&B all honor the proxy settings during browser launches and REST calls.
+- If the VPN checkbox is enabled but the proxy fields are left blank, the GUI falls back to the `.env` defaults (`WANDB_VPN_HTTP_PROXY`, `WANDB_VPN_HTTPS_PROXY`) so existing tunnel settings remain reusable without copy/paste.
+- Embedded WANDB views apply the proxy immediately via `QNetworkProxy.setApplicationProxy`, matching Qt’s recommended pattern for process-wide HTTP tunneling.

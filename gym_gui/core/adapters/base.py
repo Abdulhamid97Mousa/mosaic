@@ -134,6 +134,9 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT], LogConstantMixin):
         self._env: gym.Env[Any, Any] | None = None
         self._space_signature: Mapping[str, Any] | None = None
         self._vector_metadata: Mapping[str, Any] | None = None
+        # Episode accounting aligned with xuance wrappers
+        self._episode_step: int = 0
+        self._episode_return: float = 0.0
 
     # ------------------------------------------------------------------
     # Lifecycle hooks
@@ -168,6 +171,22 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT], LogConstantMixin):
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None) -> AdapterStep[ObservationT]:
         env = self._require_env()
         observation, info = env.reset(seed=seed, options=options)
+        # Reset episode counters and mirror xuance-style info keys
+        self._episode_step = 0
+        self._episode_return = 0.0
+        try:
+            info = dict(info) if isinstance(info, Mapping) else {}
+            info["episode_step"] = self._episode_step
+        except Exception as exc:  # pragma: no cover - defensive
+            # Surface unexpected info-shape/coercion issues for observability
+            self.log_constant(
+                LOG_ADAPTER_STATE_INVALID,
+                exc_info=exc,
+                extra={
+                    "env_id": self.id,
+                    "context": "episode_info_reset",
+                },
+            )
         self.log_constant(
             LOG_ADAPTER_ENV_RESET,
             extra={
@@ -181,6 +200,29 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT], LogConstantMixin):
     def step(self, action: ActionT) -> AdapterStep[ObservationT]:
         env = self._require_env()
         observation, reward, terminated, truncated, info = env.step(action)
+        # Update episode counters and mirror xuance-style info keys
+        try:
+            r = float(reward) if isinstance(reward, (int, float)) else 0.0
+        except Exception:
+            r = 0.0
+        self._episode_step += 1
+        self._episode_return += r
+        try:
+            info = dict(info) if isinstance(info, Mapping) else {}
+            info["episode_step"] = self._episode_step
+            info["episode_score"] = self._episode_return
+        except Exception as exc:  # pragma: no cover - defensive
+            # Surface unexpected info-shape/coercion issues for observability
+            self.log_constant(
+                LOG_ADAPTER_STATE_INVALID,
+                exc_info=exc,
+                extra={
+                    "env_id": self.id,
+                    "context": "episode_info_step",
+                    "episode_step": self._episode_step,
+                    "episode_return": self._episode_return,
+                },
+            )
         self.log_constant(
             LOG_ADAPTER_STEP_SUMMARY,
             extra={

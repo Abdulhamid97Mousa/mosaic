@@ -283,12 +283,14 @@ class MiniGridAdapter(EnvironmentAdapter[np.ndarray, int]):
         else:
             image = np.asarray(observation, dtype=np.uint8)
 
-        flat = np.concatenate(
-            (
-                image.reshape(-1).astype(np.uint8, copy=False),
-                np.array([int(direction or 0)], dtype=np.uint8),
-            )
-        ).astype(np.uint8, copy=False)
+        flat = image.reshape(-1).astype(np.uint8, copy=False)
+        if getattr(self._config, "append_direction", True):
+            flat = np.concatenate(
+                (
+                    flat,
+                    np.array([int(direction or 0)], dtype=np.uint8),
+                )
+            ).astype(np.uint8, copy=False)
         raw = {
             "image": image,
             "direction": int(direction or 0),

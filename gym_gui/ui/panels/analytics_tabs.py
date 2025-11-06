@@ -30,6 +30,7 @@ class AnalyticsTabManager(LogConstantMixin):
         self._logger = logging.getLogger(__name__)
         self._render_tabs = render_tabs
         self._parent = parent
+        self._wandb_probes: dict[tuple[str, str], dict[str, Any]] = {}
 
     # ------------------------------------------------------------------
     def load_and_create_tabs(
@@ -152,6 +153,81 @@ class AnalyticsTabManager(LogConstantMixin):
         )
 
     # ------------------------------------------------------------------
+    def _schedule_wandb_probe(
+        self,
+        run_id: str,
+        agent_id: str,
+        metadata: Mapping[str, Any],
+        *,
+        interval_ms: int = 500,
+        max_attempts: int = 600,
+    ) -> None:
+        """Poll for wandb artifacts while the run is still active."""
+
+        key = (run_id, agent_id)
+        state = self._wandb_probes.get(key)
+        if state is not None:
+            state["metadata"] = metadata
+            return
+
+        timer = QtCore.QTimer(self._parent)
+        timer.setSingleShot(True)
+
+        self._wandb_probes[key] = {
+            "metadata": metadata,
+            "interval": max(100, interval_ms),
+            "max_attempts": max_attempts,
+            "attempts": 0,
+            "timer": timer,
+        }
+
+        def _on_timeout(run_id: str = run_id, agent_id: str = agent_id) -> None:
+            self._handle_wandb_probe(run_id, agent_id)
+
+        timer.timeout.connect(_on_timeout)
+        timer.start(interval_ms)
+
+    # ------------------------------------------------------------------
+    def _handle_wandb_probe(self, run_id: str, agent_id: str) -> None:
+        key = (run_id, agent_id)
+        state = self._wandb_probes.get(key)
+        if not state:
+            return
+
+        timer: QtCore.QTimer = state["timer"]
+        metadata = state.get("metadata")
+        if not isinstance(metadata, Mapping):
+            self._clear_wandb_probe(run_id, agent_id)
+            return
+
+        state["attempts"] += 1
+        ready = self.ensure_wandb_tab(run_id, agent_id, metadata)
+        if ready:
+            self._clear_wandb_probe(run_id, agent_id)
+            return
+
+        if state["attempts"] >= state.get("max_attempts", 600):
+            self._clear_wandb_probe(run_id, agent_id)
+            return
+
+        timer.start(state.get("interval", 500))
+
+    # ------------------------------------------------------------------
+    def _clear_wandb_probe(self, run_id: str, agent_id: str) -> None:
+        key = (run_id, agent_id)
+        state = self._wandb_probes.pop(key, None)
+        if not state:
+            return
+
+        timer = state.get("timer")
+        if isinstance(timer, QtCore.QTimer):
+            try:
+                timer.stop()
+            except RuntimeError:
+                pass
+            timer.deleteLater()
+
+    # ------------------------------------------------------------------
     def ensure_tensorboard_tab(
         self, run_id: str, agent_id: str, metadata: Optional[Mapping[str, Any]]
     ) -> bool:
@@ -252,6 +328,7 @@ class AnalyticsTabManager(LogConstantMixin):
     ) -> bool:
         """Create or refresh the WANDB tab when metadata includes a run path."""
         if not metadata:
+            self._clear_wandb_probe(run_id, agent_id)
             self.log_constant(
                 LOG_UI_RENDER_TABS_WANDB_WARNING,
                 message="WANDB metadata missing",
@@ -261,6 +338,7 @@ class AnalyticsTabManager(LogConstantMixin):
 
         artifacts = metadata.get("artifacts") if isinstance(metadata, Mapping) else None
         if not isinstance(artifacts, Mapping):
+            self._clear_wandb_probe(run_id, agent_id)
             self.log_constant(
                 LOG_UI_RENDER_TABS_WANDB_WARNING,
                 message="WANDB artifacts missing",
@@ -270,6 +348,7 @@ class AnalyticsTabManager(LogConstantMixin):
 
         wandb_meta = artifacts.get("wandb")
         if not isinstance(wandb_meta, Mapping):
+            self._clear_wandb_probe(run_id, agent_id)
             self.log_constant(
                 LOG_UI_RENDER_TABS_WANDB_WARNING,
                 message="WANDB metadata missing",
@@ -278,6 +357,7 @@ class AnalyticsTabManager(LogConstantMixin):
             return False
 
         if wandb_meta.get("enabled", True) is False:
+            self._clear_wandb_probe(run_id, agent_id)
             self.log_constant(
                 LOG_UI_RENDER_TABS_WANDB_WARNING,
                 message="WANDB disabled for run",
@@ -300,13 +380,19 @@ class AnalyticsTabManager(LogConstantMixin):
             project_hint=project_hint,
         )
 
+        use_vpn_proxy, http_proxy, https_proxy = self._resolve_wandb_proxy_settings(metadata, wandb_meta)
+
         tab_name = f"WANDB-Agent-{agent_id}"
+        metadata_mapping = metadata if isinstance(metadata, Mapping) else None
         existing_tabs = self._render_tabs._agent_tabs.get(run_id, {})
         existing_widget = existing_tabs.get(tab_name)
         if existing_widget is not None:
             identity_setter = getattr(existing_widget, "set_wandb_identity", None)
             if callable(identity_setter):
                 identity_setter(resolved_entity, resolved_project)
+            proxy_setter = getattr(existing_widget, "set_proxy_settings", None)
+            if callable(proxy_setter):
+                proxy_setter(use_vpn_proxy, http_proxy, https_proxy)
             setter = getattr(existing_widget, "set_run_path", None)
             if callable(setter) and run_path:
                 setter(run_path)
@@ -319,7 +405,10 @@ class AnalyticsTabManager(LogConstantMixin):
                     agent_id,
                     run_path,
                 )
+                self._clear_wandb_probe(run_id, agent_id)
                 return True
+            if metadata_mapping is not None:
+                self._schedule_wandb_probe(run_id, agent_id, metadata_mapping)
             return False
 
         try:
@@ -339,6 +428,9 @@ class AnalyticsTabManager(LogConstantMixin):
 
         self._render_tabs.add_dynamic_tab(run_id, tab_name, tab)
         tab.set_wandb_identity(resolved_entity, resolved_project)
+        proxy_setter = getattr(tab, "set_proxy_settings", None)
+        if callable(proxy_setter):
+            proxy_setter(use_vpn_proxy, http_proxy, https_proxy)
         if run_path:
             self.log_constant(
                 LOG_UI_RENDER_TABS_WANDB_STATUS,
@@ -356,6 +448,7 @@ class AnalyticsTabManager(LogConstantMixin):
                 agent_id,
                 run_path,
             )
+            self._clear_wandb_probe(run_id, agent_id)
             return True
 
         self.log_constant(
@@ -368,6 +461,8 @@ class AnalyticsTabManager(LogConstantMixin):
                 "project": resolved_project,
             },
         )
+        if metadata_mapping is not None:
+            self._schedule_wandb_probe(run_id, agent_id, metadata_mapping)
         return False
 
     def _resolve_wandb_run_path(
@@ -501,6 +596,36 @@ class AnalyticsTabManager(LogConstantMixin):
             )
 
         return entity, project
+
+    def _resolve_wandb_proxy_settings(
+        self,
+        metadata: Optional[Mapping[str, Any]],
+        wandb_meta: Mapping[str, Any],
+    ) -> tuple[bool, Optional[str], Optional[str]]:
+        def _normalize(value: Any) -> Optional[str]:
+            if isinstance(value, str) and value.strip():
+                return value.strip()
+            return None
+
+        use_vpn = bool(wandb_meta.get("use_vpn_proxy"))
+        http_proxy = _normalize(wandb_meta.get("http_proxy"))
+        https_proxy = _normalize(wandb_meta.get("https_proxy"))
+
+        if isinstance(metadata, Mapping):
+            worker_meta = metadata.get("worker")
+            if isinstance(worker_meta, Mapping):
+                worker_config = worker_meta.get("config")
+                if isinstance(worker_config, Mapping):
+                    extras = worker_config.get("extra") or worker_config.get("extras")
+                    if isinstance(extras, Mapping):
+                        if not use_vpn and extras.get("wandb_use_vpn_proxy"):
+                            use_vpn = True
+                        if http_proxy is None:
+                            http_proxy = _normalize(extras.get("wandb_http_proxy"))
+                        if https_proxy is None:
+                            https_proxy = _normalize(extras.get("wandb_https_proxy"))
+
+        return use_vpn, http_proxy, https_proxy
 
     def _discover_wandb_slug(self, run_id: str) -> str:
         """Discover WANDB run slug from the wandb directory structure.

@@ -36,6 +36,14 @@ from gym_gui.core.adapters import (
 	MiniGridSimpleCrossingS9N3Adapter,
 	MiniGridSimpleCrossingS11N5Adapter,
 	MINIGRID_ADAPTERS,
+	ALEAdapter,
+	AdventureV4Adapter,
+	AdventureV5Adapter,
+	ALE_ADAPTERS,
+	AirRaidV4Adapter,
+	AirRaidV5Adapter,
+  AssaultV4Adapter,
+  AssaultV5Adapter,
 )
 
 __all__ = [
@@ -74,4 +82,12 @@ __all__ = [
 	"MiniGridSimpleCrossingS9N3Adapter",
 	"MiniGridSimpleCrossingS11N5Adapter",
 	"MINIGRID_ADAPTERS",
+	"ALEAdapter",
+	"AdventureV4Adapter",
+	"AdventureV5Adapter",
+	"AirRaidV4Adapter",
+	"AirRaidV5Adapter",
+  "AssaultV4Adapter",
+  "AssaultV5Adapter",
+	"ALE_ADAPTERS",
 ]

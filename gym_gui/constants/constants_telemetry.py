@@ -34,7 +34,7 @@ LIVE_CONTROL_QUEUE_SIZE = 32
 # Note: Hub buffer is shared across all runs and agents. For long training runs with
 # many episodes, you may need to increase this. Consider: episodes * max_steps_per_episode
 TELEMETRY_HUB_MAX_QUEUE = 4096
-TELEMETRY_HUB_BUFFER_SIZE = 10000  # Increased from 2048 to handle longer training runs
+TELEMETRY_HUB_BUFFER_SIZE = 100000  # Increased from 2048 to handle longer training runs
 
 # Durable sink defaults
 DB_SINK_BATCH_SIZE = 128

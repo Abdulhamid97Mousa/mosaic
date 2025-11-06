@@ -13,6 +13,7 @@ from gym_gui.config.game_configs import (
     FrozenLakeConfig,
     LunarLanderConfig,
     MiniGridConfig,
+    ALEConfig,
     TaxiConfig,
     BlackjackConfig,
 )
@@ -20,6 +21,7 @@ from gym_gui.core.adapters.base import AdapterContext, EnvironmentAdapter
 from gym_gui.core.adapters.toy_text import TOY_TEXT_ADAPTERS
 from gym_gui.core.adapters.box2d import BOX2D_ADAPTERS
 from gym_gui.core.adapters.minigrid import MINIGRID_ADAPTERS
+from gym_gui.core.adapters.ale import ALE_ADAPTERS, ALEAdapter
 from gym_gui.core.enums import GameId
 
 AdapterT = TypeVar("AdapterT", bound=EnvironmentAdapter)
@@ -41,6 +43,7 @@ def _registry() -> Mapping[GameId, type[EnvironmentAdapter]]:
         **TOY_TEXT_ADAPTERS,
         **BOX2D_ADAPTERS,
         **MINIGRID_ADAPTERS,
+        **ALE_ADAPTERS,
     }
 
 
@@ -72,6 +75,7 @@ def create_adapter(
         | CarRacingConfig
         | BipedalWalkerConfig
         | MiniGridConfig
+        | ALEConfig
         | None
     ) = None,
 ) -> EnvironmentAdapter:
@@ -108,6 +112,10 @@ def create_adapter(
         CarRacingAdapter,
         LunarLanderAdapter,
     )
+    from gym_gui.core.adapters.ale import (
+        AdventureV4Adapter,
+        AdventureV5Adapter,
+    )
     
     # Pass game config to appropriate adapter constructor
     if game_config is not None:
@@ -128,6 +136,8 @@ def create_adapter(
         elif adapter_cls is BipedalWalkerAdapter and isinstance(game_config, BipedalWalkerConfig):
             adapter = BipedalWalkerAdapter(context, config=game_config)
         elif issubclass(adapter_cls, MiniGridAdapter) and isinstance(game_config, MiniGridConfig):
+            adapter = adapter_cls(context, config=game_config)
+        elif issubclass(adapter_cls, ALEAdapter) and isinstance(game_config, ALEConfig):
             adapter = adapter_cls(context, config=game_config)
         else:
             adapter = adapter_cls(context)

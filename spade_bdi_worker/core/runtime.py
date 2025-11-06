@@ -6,6 +6,7 @@ import copy
 import json
 import logging
 import os
+from pathlib import Path
 import time
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Dict, Mapping, Optional, Sequence, Union
@@ -95,7 +96,7 @@ class HeadlessTrainer(LogConstantMixin):
             PolicyStrategy.EVAL,
         )
 
-        self._maybe_load_policy()
+        self._load_policy_if_exists()
         self._telemetry_disabled = bool(self.config.extra.get("disable_telemetry"))
         self._tensorboard: Optional[TensorboardLogger] = None
         try:
@@ -135,7 +136,7 @@ class HeadlessTrainer(LogConstantMixin):
             schema_json = self._schema.as_json_schema()
         self._schema_definition = schema_json
 
-        # Optional W&B tracking
+        # Optional WANDB tracking
         self._wandb_enabled = bool(self.config.extra.get("track_wandb"))
         self._wandb_project = self.config.extra.get("wandb_project_name")
         self._wandb_entity = self.config.extra.get("wandb_entity")
@@ -184,7 +185,7 @@ class HeadlessTrainer(LogConstantMixin):
                 worker_id=self.config.worker_id,  # type: ignore[call-arg]
             )
 
-        self._maybe_start_wandb(config_payload)
+        self._initialize_wandb_if_enabled(config_payload)
 
         try:
             summaries: list[EpisodeMetrics] = []
@@ -278,7 +279,7 @@ class HeadlessTrainer(LogConstantMixin):
             if self._tensorboard:
                 self._tensorboard.close()
 
-    def _maybe_start_wandb(self, config_payload: Dict[str, Any]) -> None:
+    def _initialize_wandb_if_enabled(self, config_payload: Dict[str, Any]) -> None:
         if not self._wandb_enabled:
             return
         if wandb is None:
@@ -421,19 +422,19 @@ class HeadlessTrainer(LogConstantMixin):
             manifest_file = run_root / "wandb.json"
             manifest_file.parent.mkdir(parents=True, exist_ok=True)
             manifest_data = {
-                "run_path": self._wandb_run_path,
-                "run_id": self.config.run_id,
-                "agent_id": self.config.agent_id,
-                "game_id": self.config.game_id,
-                "entity": self._wandb_entity,
-                "project": self._wandb_project,
-            }
-
+                    "run_path": self._wandb_run_path,
+                    "run_id": self.config.run_id,
+                    "agent_id": self.config.agent_id,
+                    "game_id": self.config.game_id,
+                    "entity": self._wandb_entity,
+                    "project": self._wandb_project,
+                }
+            
             manifest_file.write_text(json.dumps(manifest_data, indent=2), encoding="utf-8")
-
+            
             self.log_constant(
                 LOG_WORKER_RUNTIME_EVENT,
-                message="W&B manifest file written",
+                message="WANDB manifest file written",
                 extra={
                     "run_id": self.config.run_id,
                     "manifest_file": str(manifest_file),
@@ -444,7 +445,7 @@ class HeadlessTrainer(LogConstantMixin):
         except Exception as exc:
             self.log_constant(
                 LOG_WORKER_RUNTIME_WARNING,
-                message="Failed to write W&B manifest file",
+                message="Failed to write WANDB manifest file",
                 extra={"error": str(exc), "run_id": self.config.run_id},
             )
             return None
@@ -808,7 +809,7 @@ class HeadlessTrainer(LogConstantMixin):
             "goal": {"row": int(goal_row), "col": int(goal_col)},
         }
 
-    def _maybe_load_policy(self) -> None:
+    def _load_policy_if_exists(self) -> None:
         snapshot = self.policy_store.load()
         if snapshot is None:
             if self._require_existing:

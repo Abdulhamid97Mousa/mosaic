@@ -11,6 +11,7 @@ from gym_gui.config.game_configs import (
     CliffWalkingConfig,
     CarRacingConfig,
     BipedalWalkerConfig,
+    ALEConfig,
     FrozenLakeConfig,
     LunarLanderConfig,
     MiniGridConfig,
@@ -39,6 +40,11 @@ from gym_gui.ui.environments.single_agent_env.minigrid.config_panel import (
     ControlCallbacks as MinigridControlCallbacks,
     build_minigrid_controls,
     resolve_default_config as resolve_minigrid_default_config,
+)
+from gym_gui.ui.environments.single_agent_env.ale import (
+    ALE_GAME_IDS,
+    ControlCallbacks as ALEControlCallbacks,
+    build_ale_controls,
 )
 from gym_gui.ui.workers import WorkerDefinition, get_worker_catalog
 
@@ -547,12 +553,30 @@ class ControlPanelWidget(QtWidgets.QWidget):
         human_layout.setContentsMargins(0, 0, 0, 0)
         human_layout.setSpacing(12)
         human_layout.addWidget(self._create_environment_group(self._human_tab))
-        human_layout.addWidget(self._create_config_group(self._human_tab))
+        # Wrap Game Configuration in a scroll area to ensure full visibility in Human mode
+        cfg_group = self._create_config_group(self._human_tab)
+        self._config_scroll = QtWidgets.QScrollArea(self._human_tab)
+        self._config_scroll.setWidgetResizable(True)
+        self._config_scroll.setStyleSheet("QScrollArea { border: none; }")
+        self._config_scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        self._config_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)  # type: ignore[attr-defined]
+        self._config_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)  # type: ignore[attr-defined]
+        # Ensure the scroll area prefers to expand vertically
+        sp = self._config_scroll.sizePolicy()
+        sp.setVerticalPolicy(QtWidgets.QSizePolicy.Policy.Expanding)
+        sp.setHorizontalPolicy(QtWidgets.QSizePolicy.Policy.Preferred)
+        self._config_scroll.setSizePolicy(sp)
+        self._config_scroll.setWidget(cfg_group)
+        human_layout.addWidget(self._config_scroll)
         human_layout.addWidget(self._create_mode_group(self._human_tab))
         self._control_buttons_widget = self._create_control_group(self._human_tab)
         human_layout.addWidget(self._control_buttons_widget)
         human_layout.addWidget(self._create_status_group(self._human_tab))
-        human_layout.addStretch(1)
+        # Give the Game Configuration scroll area more room compared to trailing groups
+        # so that it remains visible and scrollable on smaller screens.
+        # Indices (after adds): 0=env, 1=config_scroll, 2=mode, 3=control, 4=status, 5=stretch
+        human_layout.setStretch(1, 1)
+        human_layout.addStretch(0)
         human_index = self._tab_widget.addTab(self._human_tab, "Human Control")
         self._tab_to_mode[human_index] = ControlMode.HUMAN_ONLY
 
@@ -1203,6 +1227,20 @@ class ControlPanelWidget(QtWidgets.QWidget):
                 defaults=defaults,
                 callbacks=callbacks,
             )
+        elif self._current_game is not None and self._current_game in ALE_GAME_IDS:
+            current_game = self._current_game
+            overrides = self._game_overrides.setdefault(current_game, {})
+            callbacks = ALEControlCallbacks(on_change=self._on_ale_config_changed)
+            # Provide a lightweight defaults object consistent with current selection
+            defaults = ALEConfig(env_id=current_game.value)
+            build_ale_controls(
+                parent=self._config_group,
+                layout=self._config_layout,
+                game_id=current_game,
+                overrides=overrides,
+                defaults=defaults,
+                callbacks=callbacks,
+            )
         elif self._current_game == GameId.FROZEN_LAKE_V2:
             overrides = self._game_overrides.setdefault(GameId.FROZEN_LAKE_V2, {})
             build_frozenlake_v2_controls(
@@ -1263,3 +1301,10 @@ class ControlPanelWidget(QtWidgets.QWidget):
             )
             label.setWordWrap(True)
             self._config_layout.addRow("", label)
+
+    def _on_ale_config_changed(self, param_name: str, value: object) -> None:
+        current_game = self._current_game
+        if current_game is None:
+            return
+        overrides = self._game_overrides.setdefault(current_game, {})
+        overrides[param_name] = value

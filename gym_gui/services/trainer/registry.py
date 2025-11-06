@@ -11,7 +11,7 @@ import logging
 import sqlite3
 import threading
 from threading import RLock
-from typing import Iterable, Optional, cast
+from typing import Iterable, Optional
 
 from gym_gui.config.paths import VAR_TRAINER_DB, ensure_var_directories
 from gym_gui.telemetry.events import Topic, TelemetryEvent

@@ -46,6 +46,16 @@ from .minigrid import (
     MiniGridSimpleCrossingS11N5Adapter,
     MINIGRID_ADAPTERS,
 )
+from .ale import (
+    ALEAdapter,
+    AdventureV4Adapter,
+    AdventureV5Adapter,
+    AirRaidV4Adapter,
+    AirRaidV5Adapter,
+    AssaultV4Adapter,
+    AssaultV5Adapter,
+    ALE_ADAPTERS,
+)
 
 __all__ = [
     "AdapterContext",
@@ -86,4 +96,12 @@ __all__ = [
     "MiniGridSimpleCrossingS9N3Adapter",
     "MiniGridSimpleCrossingS11N5Adapter",
     "MINIGRID_ADAPTERS",
+    "ALEAdapter",
+    "AdventureV4Adapter",
+    "AdventureV5Adapter",
+    "AirRaidV4Adapter",
+    "AirRaidV5Adapter",
+    "AssaultV4Adapter",
+    "AssaultV5Adapter",
+    "ALE_ADAPTERS",
 ]

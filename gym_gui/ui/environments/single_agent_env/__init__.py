@@ -21,6 +21,13 @@ from .minigrid import (
     resolve_default_config,
 )
 
+# Re-export ALE helpers (Atari via ALE)
+from .ale import (
+    ALE_GAME_IDS,
+    ControlCallbacks as ALEControlCallbacks,
+    build_ale_controls,
+)
+
 __all__ = [
     # Gym family
     "TOY_TEXT_FAMILY",
@@ -37,4 +44,8 @@ __all__ = [
     "ControlCallbacks",
     "build_minigrid_controls",
     "resolve_default_config",
+    # ALE family
+    "ALE_GAME_IDS",
+    "ALEControlCallbacks",
+    "build_ale_controls",
 ]

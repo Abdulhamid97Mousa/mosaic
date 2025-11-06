@@ -14,6 +14,11 @@ try:  # Optional dependency for embedded browser support
 except Exception:  # pragma: no cover - optional feature not available in tests
     QWebEngineView = None
 
+try:
+    from qtpy.QtNetwork import QNetworkProxy  # type: ignore[attr-defined]
+except Exception:  # pragma: no cover - optional feature not available in tests
+    QNetworkProxy = None
+
 WEB_ENGINE_AVAILABLE = QWebEngineView is not None
 # Disable auto-embed by default since WANDB blocks iframe embedding for security
 # Set GYM_GUI_ENABLE_WANDB_AUTO_EMBED=1 to force enable (will show blank page)
@@ -25,6 +30,8 @@ from gym_gui.logging_config.log_constants import (
     LOG_UI_RENDER_TABS_WANDB_ERROR,
     LOG_UI_RENDER_TABS_WANDB_STATUS,
     LOG_UI_RENDER_TABS_WANDB_WARNING,
+    LOG_UI_RENDER_TABS_WANDB_PROXY_APPLIED,
+    LOG_UI_RENDER_TABS_WANDB_PROXY_SKIPPED,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -75,6 +82,9 @@ class WandbArtifactTab(QtWidgets.QWidget, LogConstantMixin):
         self._entity: Optional[str] = None
         self._project: Optional[str] = None
         self._auto_embedded = False
+        self._use_vpn_proxy = False
+        self._http_proxy: Optional[str] = None
+        self._https_proxy: Optional[str] = None
 
         self.statusChanged.connect(self._handle_status_changed)
         self._setup_ui(initial_status=status_message)
@@ -107,7 +117,7 @@ class WandbArtifactTab(QtWidgets.QWidget, LogConstantMixin):
         self._details_container = details_container
 
         header = QtWidgets.QLabel(
-            f"Weights & Biases metrics for run <b>{self._run_id[:12]}…</b> "
+            f"WANDB metrics for run <b>{self._run_id[:12]}…</b> "
             f"(agent <b>{self._agent_id}</b>)"
         )
         header.setTextFormat(QtCore.Qt.TextFormat.RichText)
@@ -258,6 +268,25 @@ class WandbArtifactTab(QtWidgets.QWidget, LogConstantMixin):
             self._open_embedded(auto=True)
             self._auto_embedded = True
 
+    def set_proxy_settings(
+        self,
+        use_vpn_proxy: bool,
+        http_proxy: Optional[str],
+        https_proxy: Optional[str],
+    ) -> None:
+        normalized_http = (http_proxy.strip() if isinstance(http_proxy, str) else None) or None
+        normalized_https = (https_proxy.strip() if isinstance(https_proxy, str) else None) or None
+        changed = (
+            self._use_vpn_proxy != bool(use_vpn_proxy)
+            or self._http_proxy != normalized_http
+            or self._https_proxy != normalized_https
+        )
+        self._use_vpn_proxy = bool(use_vpn_proxy)
+        self._http_proxy = normalized_http
+        self._https_proxy = normalized_https
+        if changed:
+            self._apply_proxy_settings()
+
     def has_run_path(self) -> bool:
         return bool(self._run_path)
 
@@ -370,6 +399,90 @@ class WandbArtifactTab(QtWidgets.QWidget, LogConstantMixin):
             },
         )
 
+    def _apply_proxy_settings(self) -> None:
+        if QNetworkProxy is None:
+            self.log_constant(
+                LOG_UI_RENDER_TABS_WANDB_PROXY_SKIPPED,
+                extra={
+                    "run_id": self._run_id,
+                    "agent_id": self._agent_id,
+                    "reason": "qt_network_proxy_unavailable",
+                },
+            )
+            return
+        if self._use_vpn_proxy and (self._https_proxy or self._http_proxy):
+            proxy_url = self._https_proxy or self._http_proxy
+            if not proxy_url:
+                self.log_constant(
+                    LOG_UI_RENDER_TABS_WANDB_PROXY_SKIPPED,
+                    extra={
+                        "run_id": self._run_id,
+                        "agent_id": self._agent_id,
+                        "reason": "proxy_url_missing",
+                    },
+                )
+                return
+            qurl = QtCore.QUrl(proxy_url)
+            if not qurl.scheme():
+                qurl = QtCore.QUrl(f"http://{proxy_url}")
+            if not qurl.isValid() or not qurl.host():
+                self.log_constant(
+                    LOG_UI_RENDER_TABS_WANDB_PROXY_SKIPPED,
+                    extra={
+                        "run_id": self._run_id,
+                        "agent_id": self._agent_id,
+                        "reason": "proxy_url_invalid",
+                        "proxy_url": proxy_url,
+                    },
+                )
+                return
+            proxy = QNetworkProxy(QNetworkProxy.ProxyType.HttpProxy)
+            proxy.setHostName(qurl.host())
+            if qurl.port() > 0:
+                proxy.setPort(qurl.port())
+            if qurl.userName():
+                setter = getattr(proxy, "setUserName", None) or getattr(proxy, "setUser", None)
+                if callable(setter):
+                    setter(qurl.userName())
+            if qurl.password():
+                setter = getattr(proxy, "setPassword", None)
+                if callable(setter):
+                    setter(qurl.password())
+            QNetworkProxy.setApplicationProxy(proxy)
+            self.log_constant(
+                LOG_UI_RENDER_TABS_WANDB_PROXY_APPLIED,
+                extra={
+                    "run_id": self._run_id,
+                    "agent_id": self._agent_id,
+                    "http_proxy": self._http_proxy,
+                    "https_proxy": self._https_proxy,
+                },
+            )
+        else:
+            QNetworkProxy.setApplicationProxy(QNetworkProxy(QNetworkProxy.ProxyType.DefaultProxy))
+            self.log_constant(
+                LOG_UI_RENDER_TABS_WANDB_PROXY_SKIPPED,
+                extra={
+                    "run_id": self._run_id,
+                    "agent_id": self._agent_id,
+                    "reason": "proxy_disabled",
+                },
+            )
+
+    def _build_proxy_env_vars(self) -> dict[str, str]:
+        if not self._use_vpn_proxy:
+            return {}
+        env: dict[str, str] = {}
+        if self._http_proxy:
+            env["HTTP_PROXY"] = self._http_proxy
+            env["http_proxy"] = self._http_proxy
+            env["WANDB_HTTP_PROXY"] = self._http_proxy
+        if self._https_proxy:
+            env["HTTPS_PROXY"] = self._https_proxy
+            env["https_proxy"] = self._https_proxy
+            env["WANDB_HTTPS_PROXY"] = self._https_proxy
+        return env
+
     def _copy_to_clipboard(self, value: str) -> None:
         clipboard = QtWidgets.QApplication.clipboard()
         if not value:
@@ -385,7 +498,14 @@ class WandbArtifactTab(QtWidgets.QWidget, LogConstantMixin):
         if not self._run_url:
             self._emit_status("open_browser_waiting_for_run_path", success=False)
             return
+        overrides = self._build_proxy_env_vars()
+        original: dict[str, Optional[str]] = {}
+        keys = list(overrides.keys())
+        for key in keys:
+            original[key] = os.environ.get(key)
         try:
+            for key, value in overrides.items():
+                os.environ[key] = value
             QtGui.QDesktopServices.openUrl(QtCore.QUrl(self._run_url))
         except Exception as exc:  # noqa: BLE001
             self.log_constant(
@@ -400,6 +520,12 @@ class WandbArtifactTab(QtWidgets.QWidget, LogConstantMixin):
             self._emit_status("open_browser_failed", success=False)
         else:
             self._emit_status("open_browser", success=True)
+        finally:
+            for key, value in original.items():
+                if value is None:
+                    os.environ.pop(key, None)
+                else:
+                    os.environ[key] = value
 
     def _open_embedded(self, *, auto: bool = False) -> None:
         if not WEB_ENGINE_AVAILABLE:
@@ -409,6 +535,7 @@ class WandbArtifactTab(QtWidgets.QWidget, LogConstantMixin):
             if not auto:
                 self._emit_status("embedded_waiting_for_run_path", success=False)
             return
+        self._apply_proxy_settings()
         try:
             if self._web_view is None:
                 self._web_view = QWebEngineView(self)  # type: ignore[assignment]

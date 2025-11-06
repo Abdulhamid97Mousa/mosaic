@@ -58,7 +58,7 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
             worker_id="cleanrl_worker",
             display_name="CleanRL Worker",
             description=(
-                "Launches CleanRL reference algorithms and surfaces TensorBoard/Weights & Biases "
+                "Launches CleanRL reference algorithms and surfaces TensorBoard/WANDB "
                 "artifacts via the Fast Analytics Path."
             ),
             supports_training=True,
