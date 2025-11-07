@@ -1,0 +1,186 @@
+/*
+   Jason Command Line Interpreter build file
+*/
+
+defaultTasks 'build'
+
+apply plugin: 'java-library'
+apply plugin: 'maven-publish'
+
+version "${jasonVersion}"
+group   "${groupId}"
+
+sourceSets {
+    main {
+        java {
+            srcDir 'src/main/java'
+        }
+        resources {
+            srcDir 'src/resources'
+        }
+    }
+}
+
+repositories {
+    mavenCentral()
+
+    maven { url "https://raw.githubusercontent.com/jacamo-lang/mvn-repo/master" }
+    maven { url 'https://repo.gradle.org/gradle/libs-releases' }
+}
+
+dependencies {
+    api project(':jason-interpreter')
+
+    api 'info.picocli:picocli-shell-jline3:4.7.0'
+    api 'org.jline:jline:3.22.0'
+    api 'org.fusesource.jansi:jansi:2.4.0'
+
+    api 'org.gradle:gradle-tooling-api:8.10'
+    //testImplementation group: 'junit', name: 'junit', version: '4.12'
+
+    implementation 'org.slf4j:slf4j-nop:1.7.21' // to avoid warning msgs of SLF4J
+}
+
+jar {
+    archiveBaseName = "jason-cli"
+    manifest {
+        attributes 'Main-Class': 'jason.cli.JasonCLI',
+                   'Specification-Title': 'Jason CLI',
+                   'Specification-Version': "${jasonVersion}",
+                   'Implementation-Version': new Date().toString()
+    }
+}
+
+//// copy dep jars into build directory (maybe useful for running without the management of gradle)
+//task copyJarsToBuild (dependsOn: jar) {
+//    inputs.files configurations.runtimeClasspath.files
+//    //inputs.dir   'src/main/resources/scripts'
+//    outputs.dir  'build/libs'
+//    //outputs.dir  'build/scripts'
+//    doLast {
+//        copy {
+//            from configurations.runtimeClasspath
+//            into 'build/libs'
+//        }
+////        copy {
+////            from 'src/main/resources/scripts'
+////            into 'build/scripts'
+////            include '**'
+////            filter {
+////                String line -> line.replaceAll("JasonREL=[0-9]+\\.[0-9]+", "JasonREL="+project.version)
+////            }
+////            filter {
+////                String line -> line.replaceAll("JadeJar", file(configurations.compileClasspath.find { it.name.startsWith("jade-") }).name)
+////            }
+////        }
+//    }
+//}
+
+task run (type: JavaExec, dependsOn: 'build') {
+    mainClass = 'jason.cli.JasonCLI'
+    standardInput = System.in
+    classpath sourceSets.main.runtimeClasspath
+}
+
+task uberJar(type: Jar, dependsOn: ['classes', ':jason-interpreter:jar']) {
+    group "build"
+    description 'creates a single runnable jar file with all dependencies'
+    duplicatesStrategy 'exclude'
+
+    manifest {
+        attributes 'Main-Class': 'jason.cli.JasonCLI',
+                   'Specification-Title': 'Jason CLI',
+                   'Specification-Version': "${jasonVersion}",
+                   'Implementation-Version': new Date().toString()
+    }
+    archiveBaseName = "jason-cli-all"
+    destinationDirectory = file('build/bin')
+    from { configurations.runtimeClasspath.collect { it.isDirectory() ? it : zipTree(it) } }
+    with jar
+}
+
+task createBin (type: JavaExec, dependsOn: 'uberJar') {
+    mainClass = 'jason.cli.tools.CreateJasonCLIBin'
+    args = [ 'build/bin/jason', 'build/bin/jason-cli-all-' + "${jasonVersion}" + '.jar']
+    standardInput = System.in
+    classpath sourceSets.main.runtimeClasspath
+    doLast {
+        copy {
+            from 'src/main/resources/scripts/jason.sh'
+            into 'build/bin'
+        }
+    }
+}
+
+
+/* // replaced by the above task (that does not reply in a shell script)
+task createBin (dependsOn: ['uberJar']) {
+    group "build"
+    def wdir = 'build/bin'
+    doFirst {
+        exec {
+            commandLine '../../src/main/resources/scripts/create-bin.sh', 'jason-cli-all-' + "${jasonVersion}" + '.jar'
+            workingDir wdir
+        }
+    }
+    doLast {
+        //delete fileTree(wdir) { include 'jason-cli-all-*' }
+        //delete fileTree(wdir) { include '*.sh' }
+//        copy {
+//            from wdir
+//            into 'build/jason-' + "${jasonVersion}"
+//        }
+        copy {
+            from 'src/main/resources/scripts/jason.sh'
+            into wdir
+        }
+    }
+}
+*/
+
+artifacts {
+    archives jar
+}
+
+publishing {
+    publications {
+        maven(MavenPublication) {
+            from components.java
+            artifactId 'jason-cli'
+        }
+    }
+}
+
+task publishMavenGitHub(dependsOn: [ 'build', 'publishToMavenLocal']) {
+    group = "publishing"
+    doLast {
+        def wdir = System.getProperty("user.home")+'/.m2/repository/io/github/jason-lang/jason-cli'
+        def rdir = project.projectDir.absolutePath+'/../../jacamo-mvn-repo'
+        exec {
+            commandLine 'git', 'pull'
+            workingDir rdir
+        }
+        copy {
+            from wdir
+            into rdir + '/io/github/jason-lang/jason-cli'
+        }
+        exec {
+            commandLine 'git', 'add', '*'
+            workingDir rdir
+        }
+        exec {
+            commandLine 'git', 'commit', '-a', '-m', 'new version of jason-cli '+project.version
+            workingDir rdir
+        }
+        exec {
+            commandLine 'git', 'push'
+            workingDir rdir
+        }
+    }
+}
+
+//task release (type: Zip, dependsOn: 'createBin') {
+//    def wdir = 'build/jason-' + "${jasonVersion}"
+//    from wdir
+//    archiveBaseName = 'jason-bin-'+ "${jasonVersion}"
+//}

@@ -1,0 +1,104 @@
+/*
+   Project <PROJECT_NAME>
+
+   Gradle build file for Jason Application
+   <DATE>
+*/
+
+plugins {
+    id 'com.gradleup.shadow' version '8.3.3'
+    id 'java'
+}
+
+defaultTasks 'run'
+
+// set version of group for your project
+//version '1.0'
+//group   'io.github.jason-lang'
+
+repositories {
+    mavenCentral()
+    maven { url "https://raw.githubusercontent.com/jacamo-lang/mvn-repo/master" }
+    //maven { url "https://jade.tilab.com/maven/" }
+}
+
+dependencies {
+    implementation 'io.github.jason-lang:jason-interpreter:<VERSION>'
+
+    // to use locally installed jars:
+    implementation fileTree(dir: 'lib', include: '*.jar')
+}
+
+sourceSets {
+    main {
+        java {
+            srcDir 'src/java'
+            srcDir 'src/env'
+            srcDir '.' // some old jason apps store .java files in project root
+        }
+        resources {
+            srcDir 'src/resources'
+        }
+    }
+}
+
+task run (type: JavaExec, dependsOn: 'classes') {
+    group = 'Jason'
+    description 'runs the application'
+    mainClass = 'jason.infra.local.RunLocalMAS'
+    args = ['<PROJECT-FILE>']
+	// options:
+	//     args = ['<PROJECT-FILE>', '--debug', '--no-net', '--empty-mas']
+	//     args = ['<PROJECT-FILE>', '--log-conf', 'l.p'] // to use file l.p to configure logging
+    classpath sourceSets.main.runtimeClasspath
+}
+
+task runJade (type: JavaExec, dependsOn: 'classes') {
+    group = 'Jason'
+    description 'runs the application with Jade infrastructure'
+    mainClass = 'jason.infra.jade.RunJadeMAS'
+    args = [ '<PROJECT-FILE>', '-gui' ]
+    // options:
+    //     args = ['<PROJECT-FILE>', '-gui', '-sniffer' ]
+    // and all usual JADE options for jade.Boot
+    classpath sourceSets.main.runtimeClasspath
+}
+
+shadowJar {
+    doFirst {
+        copy {
+            from '<PROJECT-FILE>'
+            rename '<PROJECT-FILE>','default.mas2j'
+            into project.projectDir.absolutePath + '/'
+        }
+    }
+    archiveFileName = "jason-${project.name}-all.jar" // the name must start with jacamo so that jacamo...jar is found in the classpath
+    from (project.projectDir.absolutePath + '/src') {
+        include '**/*.asl'
+        include '**/*.xml'
+        include '**/*.sai'
+        include '**/*.ptl'
+        include '**/*.jcm'
+        include '*.properties'
+        exclude 'test'
+    }
+    from (project.buildDir.absolutePath + '/classes') {
+        include '**/*'
+    }
+    from (project.buildDir.absolutePath + '/jcm') {
+        include '**/*'
+    }
+    from (project.projectDir.absolutePath + '/') {
+        include '*.properties'
+        include 'default.mas2j'
+    }
+
+    manifest {
+        attributes 'Main-Class': 'jason.infra.local.RunLocalMAS'
+    }
+
+    doLast {
+        println("You can run your application with: java -jar build/libs/jason-${project.name}-all.jar")
+    }
+}
+

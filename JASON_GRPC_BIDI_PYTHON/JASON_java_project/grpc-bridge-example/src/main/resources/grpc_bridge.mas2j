@@ -1,0 +1,12 @@
+MAS grpc_bridge {
+
+    infrastructure: Local
+
+    environment: org.jason.grpc.bridge.GrpcBridgeEnvironment("localhost:50051")
+
+    agents:
+        python_link;
+
+    // Tell the runner where to find .asl agent source files
+    aslSourcePath: "src/main/resources";
+}

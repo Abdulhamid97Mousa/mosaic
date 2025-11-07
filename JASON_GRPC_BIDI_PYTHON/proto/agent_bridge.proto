@@ -1,0 +1,63 @@
+syntax = "proto3";
+
+package agentbridge;
+
+option java_multiple_files = true;
+option java_package = "org.jason.grpc.proto";
+option java_outer_classname = "AgentBridgeProto";
+
+// Service bridging JASON (Java) with Python logic.
+// Existing unary RPCs preserved; new streaming endpoint added for future scalability.
+service AgentBridge {
+  // Java/Jason pushes new percepts that Python can react to.
+  rpc PushPercept (Percept) returns (Ack);
+
+  // Java/Jason asks Python for the next action suggestion.
+  rpc RequestAction (ActionRequest) returns (ActionResponse);
+
+  // Optional: server can continuously stream actions for a given context.
+  rpc StreamActions (ActionRequest) returns (stream ActionResponse);
+}
+
+// Percept sent from Java to Python for processing.
+message Percept {
+  string agent = 1;      // Agent identifier (should be validated for length/charset).
+  string payload = 2;    // Arbitrary percept content (escape/sanitize application-side before interpretation).
+}
+
+// Acknowledgement of a percept; include detail for diagnostics.
+message Ack {
+  bool ok = 1;
+  string detail = 2;     // Optional human-readable detail.
+}
+
+// Action request context from Java; Python evaluates and responds.
+message ActionRequest {
+  string agent = 1;      // Agent identifier.
+  string context = 2;    // Serialized context (could evolve to structured fields later).
+}
+
+// Structured metadata entry (key/value) for richer semantics.
+message MetaEntry {
+  string key = 1;
+  string value = 2;
+}
+
+// Status of an action response.
+enum ActionStatus {
+  ACTION_STATUS_UNSPECIFIED = 0;
+  ACTION_STATUS_OK          = 1;
+  ACTION_STATUS_ERROR       = 2;
+  ACTION_STATUS_PARTIAL     = 3;
+}
+
+// Response containing an action suggestion plus metadata.
+// Backward compatibility: legacy 'metadata' retained; new structured 'meta' & 'status' added.
+message ActionResponse {
+  string action = 1;                // Suggested action (escaped before embedding into AgentSpeak literal).
+  string metadata = 2;              // Legacy free-form metadata string.
+  repeated MetaEntry meta = 3;      // Structured metadata entries.
+  ActionStatus status = 4;          // Status of the action computation.
+  string error_detail = 5;          // Populated when status=ACTION_STATUS_ERROR.
+}
+

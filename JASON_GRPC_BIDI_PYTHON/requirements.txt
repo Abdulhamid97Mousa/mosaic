@@ -1,0 +1,4 @@
+# gRPC for trainer communication
+grpcio==1.67.1
+grpcio-tools==1.67.1
+protobuf==5.27.2
