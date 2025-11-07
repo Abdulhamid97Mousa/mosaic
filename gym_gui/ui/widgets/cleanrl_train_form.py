@@ -3,13 +3,16 @@
 from __future__ import annotations
 
 import copy
+import json
 import os
 import sys
+from pathlib import Path
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Sequence
 
 from qtpy import QtCore, QtGui, QtWidgets
+import logging
 
 from gym_gui.core.enums import (
     EnvironmentFamily,
@@ -17,18 +20,90 @@ from gym_gui.core.enums import (
     ENVIRONMENT_FAMILY_BY_GAME,
 )
 from gym_gui.validations.validation_cleanrl_worker_form import run_cleanrl_dry_run
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_UI_TRAIN_FORM_TRACE,
+    LOG_UI_TRAIN_FORM_INFO,
+    LOG_UI_TRAIN_FORM_ERROR,
+    LOG_UI_TRAIN_FORM_UI_PATH,
+    LOG_UI_TRAIN_FORM_TELEMETRY_PATH,
+)
 from gym_gui.Algo_docs.cleanrl_worker import get_algo_doc
 
 
-_DEFAULT_ALGOS: tuple[str, ...] = (
+REPO_ROOT = Path(__file__).resolve().parents[3]
+_LEGACY_ALGOS: tuple[str, ...] = (
     "ppo",
     "ppo_continuous_action",
     "ppo_atari",
-    "dqn",
-    "c51",
-    "ppg_procgen",
+    "ppo_atari_multigpu",
+    "ppo_atari_lstm",
+    "ppo_atari_envpool",
+    "ppo_atari_envpool_xla_jax",
+    "ppo_atari_envpool_xla_jax_scan",
+    "ppo_procgen",
+    "ppo_pettingzoo_ma_atari",
     "ppo_rnd_envpool",
+    "ppg_procgen",
+    "pqn",
+    "pqn_atari_envpool",
+    "pqn_atari_envpool_lstm",
+    "rpo_continuous_action",
+    "dqn",
+    "dqn_atari",
+    "dqn_atari_jax",
+    "dqn_jax",
+    "rainbow_atari",
+    "c51",
+    "c51_atari",
+    "c51_atari_jax",
+    "c51_jax",
+    "ddpg_continuous_action",
+    "ddpg_continuous_action_jax",
+    "td3_continuous_action",
+    "td3_continuous_action_jax",
+    "sac_continuous_action",
+    "sac_atari",
+    "qdagger_dqn_atari_impalacnn",
+    "qdagger_dqn_atari_jax_impalacnn",
 )
+
+
+def _load_cleanrl_schemas() -> tuple[dict[str, Any], Optional[str]]:
+    schema_root = REPO_ROOT / "metadata" / "cleanrl"
+    if not schema_root.exists():
+        return {}, None
+
+    candidates: list[tuple[str, Path]] = []
+    for entry in schema_root.iterdir():
+        if not entry.is_dir():
+            continue
+        schema_file = entry / "schemas.json"
+        if schema_file.exists():
+            candidates.append((entry.name, schema_file))
+
+    candidates.sort(key=lambda item: item[0], reverse=True)
+    if not candidates:
+        fallback = schema_root / "schemas.json"
+        if fallback.exists():
+            candidates.append(("latest", fallback))
+
+    for _, schema_file in candidates:
+        try:
+            data = json.loads(schema_file.read_text())
+        except Exception:
+            continue
+        return data.get("algorithms", {}), data.get("cleanrl_version")
+
+    return {}, None
+
+
+_CLEANRL_SCHEMAS, _CLEANRL_SCHEMA_VERSION = _load_cleanrl_schemas()
+
+if _CLEANRL_SCHEMAS:
+    _DEFAULT_ALGOS = tuple(sorted(set(_LEGACY_ALGOS) | set(_CLEANRL_SCHEMAS.keys())))
+else:
+    _DEFAULT_ALGOS = _LEGACY_ALGOS
 
 
 @dataclass(frozen=True)
@@ -58,6 +133,25 @@ _ALGO_PARAM_SPECS: dict[str, tuple[_AlgoParamSpec, ...]] = {
         _AlgoParamSpec("buffer_size", "Replay Buffer", 100_000, int, "Maximum replay buffer size"),
         _AlgoParamSpec("capture_video", "Capture Video", False, bool, "Record evaluation videos (first environment only)"),
     ),
+}
+
+_SCHEMA_EXCLUDED_FIELDS: set[str] = {
+    "exp_name",
+    "track",
+    "seed",
+    "total_timesteps",
+    "cuda",
+    "wandb_project_name",
+    "wandb_project",
+    "wandb_entity",
+    "wandb_entity_name",
+    "wandb_api_key",
+    "wandb_email",
+    "wandb_mode",
+    "wandb_run_name",
+    "batch_size",
+    "minibatch_size",
+    "num_iterations",
 }
 
 
@@ -164,13 +258,13 @@ class _FormState:
     agent_id: Optional[str]
     worker_id: Optional[str]
     use_gpu: bool
+    capture_video: bool
     track_tensorboard: bool
     track_wandb: bool
     wandb_project: Optional[str]
     wandb_entity: Optional[str]
     wandb_run_name: Optional[str]
     wandb_api_key: Optional[str]
-    wandb_email: Optional[str]
     wandb_http_proxy: Optional[str]
     wandb_https_proxy: Optional[str]
     use_wandb_vpn: bool
@@ -179,12 +273,16 @@ class _FormState:
     algo_params: Dict[str, Any]
 
 
-class CleanRlTrainForm(QtWidgets.QDialog):
+_LOGGER = logging.getLogger("gym_gui.ui.cleanrl_train_form")
+
+
+class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
     """Minimal training configuration dialog for CleanRL worker."""
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None, *, default_game: Optional[GameId] = None) -> None:
         super().__init__(parent)
-        self.setWindowTitle("CleanRL Worker – Configure Training Run")
+        self._logger = _LOGGER
+        self.setWindowTitle("CleanRl Agent Train Form")
         self.setModal(True)
         self.resize(720, 420)
 
@@ -194,62 +292,137 @@ class CleanRlTrainForm(QtWidgets.QDialog):
         layout = QtWidgets.QVBoxLayout(self)
         layout.setSpacing(12)
 
+        scroll = QtWidgets.QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
+        layout.addWidget(scroll, 1)
+
+        form_panel = QtWidgets.QWidget(scroll)
+        form_layout = QtWidgets.QVBoxLayout(form_panel)
+        form_layout.setSpacing(12)
+        form_layout.setContentsMargins(0, 0, 0, 0)
+        scroll.setWidget(form_panel)
+
         intro = QtWidgets.QLabel(
-            "Configure a CleanRL training run. Fields in the left column control the "
-            "algorithm and rollout parameters, while the right column manages analytics "
-            "exports and descriptive metadata."
+            "Configure a CleanRL training run. The table below keeps core inputs aligned so you "
+            "can see how algorithm, environment, and validation settings relate at a glance."
         )
         intro.setWordWrap(True)
-        layout.addWidget(intro)
+        form_layout.addWidget(intro)
 
-        columns_widget = QtWidgets.QWidget(self)
-        columns_layout = QtWidgets.QHBoxLayout(columns_widget)
-        columns_layout.setContentsMargins(0, 0, 0, 0)
-        columns_layout.setSpacing(16)
+        table_widget = QtWidgets.QWidget(self)
+        table_layout = QtWidgets.QGridLayout(table_widget)
+        table_layout.setContentsMargins(0, 0, 0, 0)
+        table_layout.setHorizontalSpacing(12)
+        table_layout.setVerticalSpacing(8)
 
-        left_container = QtWidgets.QWidget(columns_widget)
-        left_column = QtWidgets.QVBoxLayout(left_container)
-        left_column.setContentsMargins(0, 0, 0, 0)
-        left_column.setSpacing(8)
-
-        right_container = QtWidgets.QWidget(columns_widget)
-        right_column = QtWidgets.QVBoxLayout(right_container)
-        right_column.setContentsMargins(0, 0, 0, 0)
-        right_column.setSpacing(8)
-
-        columns_layout.addWidget(left_container, 1)
-        columns_layout.addWidget(right_container, 1)
-        layout.addWidget(columns_widget)
+        def _inline_field(title: str, body: QtWidgets.QWidget) -> QtWidgets.QWidget:
+            container = QtWidgets.QWidget(self)
+            h_layout = QtWidgets.QHBoxLayout(container)
+            h_layout.setContentsMargins(0, 0, 0, 0)
+            h_layout.setSpacing(6)
+            label = QtWidgets.QLabel(f"{title}:", container)
+            label.setAlignment(QtCore.Qt.AlignmentFlag.AlignRight | QtCore.Qt.AlignmentFlag.AlignVCenter)
+            label.setMinimumWidth(110)
+            h_layout.addWidget(label)
+            h_layout.addWidget(body, 1)
+            return container
 
         self._algo_combo = QtWidgets.QComboBox(self)
+        algo_view = QtWidgets.QListView(self._algo_combo)
+        algo_view.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        algo_view.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        algo_view.setUniformItemSizes(True)
+        self._algo_combo.setView(algo_view)
+        self._algo_combo.setMaxVisibleItems(10)
         for algo in _DEFAULT_ALGOS:
             self._algo_combo.addItem(algo)
         self._algo_combo.setToolTip("Select the CleanRL algorithm entry point to invoke.")
-        left_column.addWidget(self._labeled("Algorithm", self._algo_combo))
 
-        env_widget = QtWidgets.QWidget(self)
-        env_layout = QtWidgets.QHBoxLayout(env_widget)
-        env_layout.setContentsMargins(0, 0, 0, 0)
         self._env_combo = QtWidgets.QComboBox(self)
+        self._env_combo.setSizeAdjustPolicy(QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToContents)
+        env_view = QtWidgets.QListView(self._env_combo)
+        env_view.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        env_view.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        env_view.setUniformItemSizes(True)
+        self._env_combo.setView(env_view)
+        self._env_combo.setStyleSheet("QComboBox { combobox-popup: 0; }")
+        self._env_combo.setMaxVisibleItems(10)
         for label, env_id in _ENVIRONMENT_CHOICES:
             self._env_combo.addItem(label, env_id)
-        env_layout.addWidget(self._env_combo, 1)
-        self._custom_env_checkbox = QtWidgets.QCheckBox("Custom", self)
-        self._custom_env_checkbox.setToolTip("Toggle to supply a Gymnasium environment id manually.")
-        env_layout.addWidget(self._custom_env_checkbox)
-        self._env_custom_input = QtWidgets.QLineEdit(self)
-        self._env_custom_input.setPlaceholderText("e.g. procgen:procgen-bossfight-v0")
-        self._env_custom_input.setEnabled(False)
-        env_layout.addWidget(self._env_custom_input, 1)
-        self._custom_env_checkbox.toggled.connect(self._on_custom_env_toggled)
+
         if default_game is not None:
             index = self._env_combo.findData(default_game.value)
             if index >= 0:
                 self._env_combo.setCurrentIndex(index)
-            else:
-                self._custom_env_checkbox.setChecked(True)
-                self._env_custom_input.setText(default_game.value)
-        left_column.addWidget(self._labeled("Environment", env_widget))
+        if self._env_combo.currentIndex() < 0 and self._env_combo.count() > 0:
+            self._env_combo.setCurrentIndex(0)
+
+        table_layout.addWidget(_inline_field("Algorithm", self._algo_combo), 0, 0)
+        table_layout.addWidget(_inline_field("Environment", self._env_combo), 0, 1, 1, 2)
+
+        self._seed_spin = QtWidgets.QSpinBox(self)
+        self._seed_spin.setRange(0, 1_000_000_000)
+        self._seed_spin.setValue(1)
+        self._seed_spin.setToolTip("Algorithm seed forwarded to CleanRL (use 0 to leave the seed unspecified).")
+        self._agent_id_input = QtWidgets.QLineEdit(self)
+        self._agent_id_input.setPlaceholderText("Optional agent identifier")
+        self._agent_id_input.setToolTip("Label used in analytics manifests and WANDB/TensorBoard tabs.")
+        self._worker_id_input = QtWidgets.QLineEdit(self)
+        self._worker_id_input.setPlaceholderText("Optional worker override (e.g. cleanrl-gpu-01)")
+        self._worker_id_input.setToolTip("Override the worker id reported to the trainer daemon.")
+
+        table_layout.addWidget(_inline_field("Seed (optional)", self._seed_spin), 1, 0)
+        table_layout.addWidget(_inline_field("Agent ID", self._agent_id_input), 1, 1)
+        table_layout.addWidget(_inline_field("Worker ID", self._worker_id_input), 1, 2)
+
+        self._use_gpu_checkbox = QtWidgets.QCheckBox("Enable CUDA (GPU)", self)
+        self._use_gpu_checkbox.setChecked(True)
+        self._use_gpu_checkbox.setToolTip("Toggle CleanRL's --cuda flag; disable if the host lacks a GPU.")
+        self._dry_run_checkbox = QtWidgets.QCheckBox("Validate the form (skip launch)", self)
+        self._dry_run_checkbox.setToolTip(
+            "When enabled the dialog performs the dry-run check but does not launch the training run."
+        )
+        self._dry_run_checkbox.setChecked(True)
+
+        self._capture_video_slot = QtWidgets.QVBoxLayout()
+        self._capture_video_slot.setContentsMargins(0, 0, 0, 0)
+        self._capture_video_slot.setSpacing(4)
+        self._capture_video_placeholder_label = QtWidgets.QLabel(
+            "Capture video toggle becomes available once the algorithm loads.", self
+        )
+        self._capture_video_placeholder_label.setWordWrap(True)
+        self._capture_video_slot.addWidget(self._capture_video_placeholder_label)
+        capture_video_container = QtWidgets.QWidget(self)
+        capture_video_layout = QtWidgets.QVBoxLayout(capture_video_container)
+        capture_video_layout.setContentsMargins(0, 0, 0, 0)
+        capture_video_layout.setSpacing(4)
+        capture_video_layout.addLayout(self._capture_video_slot)
+        capture_video_layout.addStretch(1)
+
+        table_layout.addWidget(_inline_field("GPU", self._use_gpu_checkbox), 2, 0)
+        table_layout.addWidget(_inline_field("Validate", self._dry_run_checkbox), 2, 1)
+        table_layout.addWidget(_inline_field("Capture Video", capture_video_container), 2, 2)
+        table_layout.setColumnStretch(0, 1)
+        table_layout.setColumnStretch(1, 1)
+        table_layout.setColumnStretch(2, 1)
+
+        form_layout.addWidget(table_widget)
+
+        content_widget = QtWidgets.QWidget(self)
+        content_layout = QtWidgets.QHBoxLayout(content_widget)
+        content_layout.setContentsMargins(0, 0, 0, 0)
+        content_layout.setSpacing(16)
+        left_panel = QtWidgets.QWidget(content_widget)
+        left_column = QtWidgets.QVBoxLayout(left_panel)
+        left_column.setContentsMargins(0, 0, 0, 0)
+        left_column.setSpacing(12)
+        right_panel = QtWidgets.QWidget(content_widget)
+        right_column = QtWidgets.QVBoxLayout(right_panel)
+        right_column.setContentsMargins(0, 0, 0, 0)
+        right_column.setSpacing(12)
+        content_layout.addWidget(left_panel, 1)
+        content_layout.addWidget(right_panel, 1)
 
         self._timesteps_spin = QtWidgets.QSpinBox(self)
         self._timesteps_spin.setRange(1_024, 1_000_000_000)
@@ -257,34 +430,6 @@ class CleanRlTrainForm(QtWidgets.QDialog):
         self._timesteps_spin.setValue(2048)
         self._timesteps_spin.setToolTip("Total timesteps (or frames) CleanRL will train before exiting.")
         left_column.addWidget(self._labeled("Total Timesteps", self._timesteps_spin))
-
-        self._seed_spin = QtWidgets.QSpinBox(self)
-        self._seed_spin.setRange(0, 1_000_000_000)
-        self._seed_spin.setValue(1)
-        self._seed_spin.setToolTip("Algorithm seed forwarded to CleanRL (use 0 to leave the seed unspecified).")
-        left_column.addWidget(self._labeled("Seed (optional)", self._seed_spin))
-
-        self._agent_id_input = QtWidgets.QLineEdit(self)
-        self._agent_id_input.setPlaceholderText("Optional agent identifier")
-        self._agent_id_input.setToolTip("Label used in analytics manifests and WANDB/TensorBoard tabs.")
-        left_column.addWidget(self._labeled("Agent ID", self._agent_id_input))
-
-        self._worker_id_input = QtWidgets.QLineEdit(self)
-        self._worker_id_input.setPlaceholderText("Optional worker override (e.g. cleanrl-gpu-01)")
-        self._worker_id_input.setToolTip("Override the worker id reported to the trainer daemon.")
-        left_column.addWidget(self._labeled("Worker ID", self._worker_id_input))
-
-        self._use_gpu_checkbox = QtWidgets.QCheckBox("Enable CUDA (GPU)", self)
-        self._use_gpu_checkbox.setChecked(True)
-        self._use_gpu_checkbox.setToolTip("Toggle CleanRL's --cuda flag; disable if the host lacks a GPU.")
-        left_column.addWidget(self._labeled("GPU", self._use_gpu_checkbox))
-
-        self._dry_run_checkbox = QtWidgets.QCheckBox("Validate only (skip training)", self)
-        self._dry_run_checkbox.setToolTip(
-            "When enabled the dialog performs the dry-run check but does not launch the training run."
-        )
-        self._dry_run_checkbox.setChecked(True)
-        left_column.addWidget(self._dry_run_checkbox)
 
         help_box = QtWidgets.QGroupBox("Algorithm Notes", self)
         help_layout = QtWidgets.QVBoxLayout(help_box)
@@ -296,18 +441,31 @@ class CleanRlTrainForm(QtWidgets.QDialog):
         self._algo_help_text.setWordWrapMode(QtGui.QTextOption.WrapMode.WordWrap)
         help_layout.addWidget(self._algo_help_text)
         left_column.addWidget(help_box)
-        left_column.addStretch(1)
 
-        self._tensorboard_checkbox = QtWidgets.QCheckBox("Track TensorBoard", self)
+        analytics_group = QtWidgets.QGroupBox("Analytics & Tracking", self)
+        analytics_layout = QtWidgets.QVBoxLayout(analytics_group)
+        analytics_layout.setContentsMargins(8, 8, 8, 8)
+        analytics_layout.setSpacing(6)
+        self._analytics_hint_label = QtWidgets.QLabel(
+            "Select analytics to export after the run completes (fast training only).",
+            analytics_group,
+        )
+        self._analytics_hint_label.setStyleSheet("color: #777777; font-size: 11px;")
+        self._analytics_hint_label.setWordWrap(True)
+        analytics_layout.addWidget(self._analytics_hint_label)
+
+        self._tensorboard_checkbox = QtWidgets.QCheckBox("Export TensorBoard artifacts", self)
         self._tensorboard_checkbox.setToolTip(
             "Write TensorBoard event files to var/trainer/runs/<run_id>/tensorboard."
         )
-        right_column.addWidget(self._tensorboard_checkbox)
+        analytics_layout.addWidget(self._tensorboard_checkbox)
 
-        self._track_wandb_checkbox = QtWidgets.QCheckBox("Track WANDB", self)
+        self._track_wandb_checkbox = QtWidgets.QCheckBox("Export WANDB artifacts", self)
         self._track_wandb_checkbox.setToolTip("Requires wandb login on the trainer host.")
         self._track_wandb_checkbox.toggled.connect(self._on_track_wandb_toggled)
-        right_column.addWidget(self._track_wandb_checkbox)
+        analytics_layout.addWidget(self._track_wandb_checkbox)
+
+        right_column.addWidget(analytics_group)
 
         wandb_container = QtWidgets.QWidget(self)
         wandb_layout = QtWidgets.QFormLayout(wandb_container)
@@ -327,9 +485,6 @@ class CleanRlTrainForm(QtWidgets.QDialog):
         self._wandb_api_key_input.setPlaceholderText("Optional API key override")
         self._wandb_api_key_input.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         wandb_layout.addRow("WANDB API Key", self._wandb_api_key_input)
-        self._wandb_email_input = QtWidgets.QLineEdit(self)
-        self._wandb_email_input.setPlaceholderText("Optional WANDB account email")
-        wandb_layout.addRow("WANDB Email", self._wandb_email_input)
         self._wandb_use_vpn_checkbox = QtWidgets.QCheckBox("Route WANDB traffic through VPN proxy", self)
         self._wandb_use_vpn_checkbox.toggled.connect(self._on_wandb_vpn_toggled)
         wandb_layout.addRow("Use WANDB VPN", self._wandb_use_vpn_checkbox)
@@ -345,15 +500,29 @@ class CleanRlTrainForm(QtWidgets.QDialog):
         self._notes_edit.setPlaceholderText("Optional notes for analytics manifests and logs.")
         self._notes_edit.setToolTip("Notes appear alongside analytics artifacts for later reference.")
         right_column.addWidget(self._labeled("Notes", self._notes_edit))
-
         right_column.addStretch(1)
 
         self._update_wandb_controls()
 
+        # Trace form open event for analytics with structured code
+        self.log_constant(
+            LOG_UI_TRAIN_FORM_INFO,
+            message="CleanRlTrainForm opened",
+            extra={"default_game": getattr(default_game, "value", None)},
+        )
+
         self._algo_param_group = QtWidgets.QGroupBox("Algorithm Parameters", self)
-        self._algo_param_form = QtWidgets.QFormLayout(self._algo_param_group)
-        layout.addWidget(self._algo_param_group)
+        self._algo_param_layout = QtWidgets.QGridLayout(self._algo_param_group)
+        self._algo_param_layout.setContentsMargins(12, 12, 12, 12)
+        self._algo_param_layout.setHorizontalSpacing(12)
+        self._algo_param_layout.setVerticalSpacing(10)
+        self._algo_env_widget: Optional[QtWidgets.QLineEdit] = None
+        left_column.addWidget(self._algo_param_group)
+        left_column.addStretch(1)
+        form_layout.addWidget(content_widget)
+        form_layout.addStretch(1)
         self._algo_param_inputs: Dict[str, QtWidgets.QWidget] = {}
+        self._env_combo.currentIndexChanged.connect(self._sync_env_param)
         self._algo_combo.currentTextChanged.connect(self._on_algorithm_changed)
         self._on_algorithm_changed(self._algo_combo.currentText())
 
@@ -381,6 +550,150 @@ class CleanRlTrainForm(QtWidgets.QDialog):
         form_layout.addRow(label, widget)
         return container
 
+    def _clear_layout(self, layout: QtWidgets.QLayout) -> None:
+        while layout.count():
+            item = layout.takeAt(0)
+            if item is None:
+                # Defensive: takeAt can return None; skip to satisfy static analysis.
+                continue
+            child_layout = item.layout()
+            if child_layout is not None:
+                self._clear_layout(child_layout)
+            widget = item.widget()
+            if widget is not None:
+                widget.setParent(None)
+
+    def _reset_capture_video_slot(self, widget: Optional[QtWidgets.QWidget]) -> None:
+        if not hasattr(self, "_capture_video_slot"):
+            return
+        self._clear_layout(self._capture_video_slot)
+        if widget is not None:
+            self._capture_video_slot.addWidget(widget)
+        elif hasattr(self, "_capture_video_placeholder_label"):
+            self._capture_video_slot.addWidget(self._capture_video_placeholder_label)
+
+    @staticmethod
+    def _format_label(name: str) -> str:
+        return name.replace("_", " ").title()
+
+    def _wrap_with_label(self, label: str, widget: QtWidgets.QWidget) -> QtWidgets.QWidget:
+        container = QtWidgets.QWidget(self)
+        layout = QtWidgets.QVBoxLayout(container)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(4)
+        title = QtWidgets.QLabel(label, container)
+        title.setStyleSheet("font-weight: 600;")
+        layout.addWidget(title)
+        layout.addWidget(widget)
+        return container
+
+    def _create_widget_from_schema_field(self, spec: Dict[str, Any]) -> Optional[QtWidgets.QWidget]:
+        name = spec.get("name") or spec.get("key") or spec.get("id")
+        field_type = spec.get("type")
+        default = spec.get("default")
+        tooltip = spec.get("help") or ""
+
+        if field_type == "bool":
+            checkbox = QtWidgets.QCheckBox(self)
+            checkbox.setChecked(bool(default))
+            if tooltip:
+                checkbox.setToolTip(tooltip)
+            return checkbox
+
+        if field_type == "int":
+            spin = QtWidgets.QSpinBox(self)
+            spin.setRange(-1_000_000_000, 1_000_000_000)
+            if isinstance(default, int):
+                spin.setValue(default)
+            if tooltip:
+                spin.setToolTip(tooltip)
+            return spin
+
+        if field_type == "float":
+            spin = QtWidgets.QDoubleSpinBox(self)
+            spin.setDecimals(6)
+            spin.setRange(-1e9, 1e9)
+            if isinstance(default, (int, float)):
+                spin.setValue(float(default))
+            if tooltip:
+                spin.setToolTip(tooltip)
+            return spin
+
+        if field_type == "str":
+            line = QtWidgets.QLineEdit(self)
+            if isinstance(default, str):
+                line.setText(default)
+            if tooltip:
+                line.setToolTip(tooltip)
+            if name == "env_id":
+                line.setReadOnly(True)
+                line.setPlaceholderText("Syncs with Environment selector")
+                self._algo_env_widget = line
+                self._sync_env_param()
+            return line
+
+        return None
+
+    def _populate_params_from_schema(self, fields: Sequence[Dict[str, Any]]) -> bool:
+        added = False
+        columns = 2
+        row = col = 0
+
+        for field in fields:
+            name = field.get("name")
+            if not isinstance(name, str):
+                continue
+            if field.get("runtime_only") or name in _SCHEMA_EXCLUDED_FIELDS:
+                continue
+
+            if name == "capture_video":
+                checkbox = QtWidgets.QCheckBox(self)
+                checkbox.setChecked(bool(field.get("default")))
+                checkbox.setToolTip(field.get("help") or "")
+                self._algo_param_inputs[name] = checkbox
+                self._capture_video_checkbox = checkbox
+                self._reset_capture_video_slot(checkbox)
+                continue
+
+            widget = self._create_widget_from_schema_field(field)
+            if widget is None:
+                continue
+
+            self._algo_param_inputs[name] = widget
+            container = self._wrap_with_label(self._format_label(name), widget)
+            self._algo_param_layout.addWidget(container, row, col)
+            col += 1
+            if col >= columns:
+                col = 0
+                row += 1
+            added = True
+
+        if not added:
+            self._reset_capture_video_slot(None)
+
+        return added
+
+    def _sync_env_param(self) -> None:
+        if self._algo_env_widget is None:
+            return
+        env_data = self._env_combo.currentData()
+        value = str(env_data) if env_data is not None else ""
+        blocked = self._algo_env_widget.blockSignals(True)
+        self._algo_env_widget.setText(value)
+        self._algo_env_widget.blockSignals(blocked)
+
+    def _apply_schema_defaults(self, algo: str) -> None:
+        schema_entry = _CLEANRL_SCHEMAS.get(algo)
+        if not schema_entry:
+            return
+        defaults = {field.get("name"): field.get("default") for field in schema_entry.get("fields", [])}
+        seed_default = defaults.get("seed")
+        if isinstance(seed_default, int) and seed_default >= 0:
+            self._seed_spin.setValue(seed_default)
+        timesteps_default = defaults.get("total_timesteps")
+        if isinstance(timesteps_default, int) and timesteps_default > 0:
+            self._timesteps_spin.setValue(timesteps_default)
+
     def _update_wandb_controls(self) -> None:
         track_enabled = self._track_wandb_checkbox.isChecked()
         base_fields = (
@@ -388,7 +701,6 @@ class CleanRlTrainForm(QtWidgets.QDialog):
             self._wandb_entity_input,
             self._wandb_run_name_input,
             self._wandb_api_key_input,
-            self._wandb_email_input,
         )
         for field in base_fields:
             field.setEnabled(track_enabled)
@@ -409,10 +721,8 @@ class CleanRlTrainForm(QtWidgets.QDialog):
 
     def _collect_state(self) -> _FormState:
         algo = self._algo_combo.currentText().strip()
-        if self._custom_env_checkbox.isChecked():
-            env_id = self._env_custom_input.text().strip()
-        else:
-            env_id = str(self._env_combo.currentData())
+        env_data = self._env_combo.currentData()
+        env_id = str(env_data) if env_data is not None else ""
         seed_value = int(self._seed_spin.value())
         selected_seed: Optional[int] = seed_value if seed_value > 0 else None
         notes = self._notes_edit.toPlainText().strip() or None
@@ -422,15 +732,16 @@ class CleanRlTrainForm(QtWidgets.QDialog):
         wandb_entity = self._wandb_entity_input.text().strip() or None
         wandb_run_name = self._wandb_run_name_input.text().strip() or None
         wandb_api_key = self._wandb_api_key_input.text().strip() or None
-        wandb_email = self._wandb_email_input.text().strip() or None
         use_wandb_vpn = self._wandb_use_vpn_checkbox.isChecked()
         raw_http_proxy = self._wandb_http_proxy_input.text().strip()
         raw_https_proxy = self._wandb_https_proxy_input.text().strip()
         wandb_http_proxy = None
         wandb_https_proxy = None
         if use_wandb_vpn:
-            wandb_http_proxy = raw_http_proxy or os.environ.get("WANDB_VPN_HTTP_PROXY", "").strip() or None
-            wandb_https_proxy = raw_https_proxy or os.environ.get("WANDB_VPN_HTTPS_PROXY", "").strip() or None
+            fallback_http = os.environ.get("WANDB_VPN_HTTP_PROXY", "").strip()
+            fallback_https = os.environ.get("WANDB_VPN_HTTPS_PROXY", "").strip()
+            wandb_http_proxy = raw_http_proxy or fallback_http or None
+            wandb_https_proxy = raw_https_proxy or fallback_https or None
 
         algo_params: Dict[str, Any] = {}
         for key, widget in self._algo_param_inputs.items():
@@ -443,6 +754,12 @@ class CleanRlTrainForm(QtWidgets.QDialog):
             elif isinstance(widget, QtWidgets.QLineEdit):
                 algo_params[key] = widget.text().strip()
 
+        capture_video_widget = getattr(self, "_capture_video_checkbox", None)
+        capture_video_enabled = (
+            bool(capture_video_widget.isChecked())
+            if isinstance(capture_video_widget, QtWidgets.QCheckBox)
+            else False
+        )
         return _FormState(
             algo=algo,
             env_id=env_id,
@@ -451,13 +768,13 @@ class CleanRlTrainForm(QtWidgets.QDialog):
             agent_id=agent_id_value or None,
             worker_id=worker_id_value,
             use_gpu=self._use_gpu_checkbox.isChecked(),
+            capture_video=capture_video_enabled,
             track_tensorboard=self._tensorboard_checkbox.isChecked(),
             track_wandb=self._track_wandb_checkbox.isChecked(),
             wandb_project=wandb_project,
             wandb_entity=wandb_entity,
             wandb_run_name=wandb_run_name,
             wandb_api_key=wandb_api_key,
-            wandb_email=wandb_email,
             wandb_http_proxy=wandb_http_proxy,
             wandb_https_proxy=wandb_https_proxy,
             use_wandb_vpn=use_wandb_vpn,
@@ -480,8 +797,6 @@ class CleanRlTrainForm(QtWidgets.QDialog):
             extras["wandb_entity"] = state.wandb_entity
         if state.wandb_run_name:
             extras["wandb_run_name"] = state.wandb_run_name
-        if state.wandb_email:
-            extras["wandb_email"] = state.wandb_email
         if state.use_wandb_vpn:
             extras["wandb_use_vpn_proxy"] = True
         if state.wandb_api_key:
@@ -556,11 +871,11 @@ class CleanRlTrainForm(QtWidgets.QDialog):
             "CLEANRL_AGENT_ID": state.agent_id or "cleanrl_agent",
             "TRACK_TENSORBOARD": "1" if state.track_tensorboard else "0",
             "TRACK_WANDB": "1" if state.track_wandb else "0",
+            "WANDB_MODE": "online" if state.track_wandb else "offline",
+            "WANDB_DISABLE_GYM": "true",
         }
         if state.wandb_api_key:
             environment["WANDB_API_KEY"] = state.wandb_api_key
-        if state.wandb_email:
-            environment["WANDB_EMAIL"] = state.wandb_email
         if state.use_wandb_vpn and state.wandb_http_proxy:
             environment.update(
                 {
@@ -596,6 +911,28 @@ class CleanRlTrainForm(QtWidgets.QDialog):
             },
         }
 
+        # Emit UI/telemetry path summaries using structured log constants so callers can
+        # filter by code (e.g., LOG734 / LOG735) when inspecting logs.
+        self.log_constant(
+            LOG_UI_TRAIN_FORM_UI_PATH,
+            extra={
+                "run_name": run_id,
+                "cuda": state.use_gpu,
+                "track_tensorboard": state.track_tensorboard,
+                "track_wandb": state.track_wandb,
+                "agent_id": state.agent_id or "cleanrl_agent",
+            },
+        )
+        self.log_constant(
+            LOG_UI_TRAIN_FORM_TELEMETRY_PATH,
+            extra={
+                "run_name": run_id,
+                "env_id": state.env_id,
+                "total_timesteps": state.total_timesteps,
+                "has_algo_params": bool(state.algo_params),
+            },
+        )
+
         return config
 
     def _run_validation(
@@ -607,6 +944,12 @@ class CleanRlTrainForm(QtWidgets.QDialog):
     ) -> tuple[bool, Optional[Dict[str, Any]]]:
         config = self._build_config(state, run_id=run_id)
         self._validation_status_label.setText("Running CleanRL dry-run validation…")
+        # Structured trace before invoking validator
+        self.log_constant(
+            LOG_UI_TRAIN_FORM_TRACE,
+            message="Starting CleanRL dry-run",
+            extra={"run_id": run_id, "algo": state.algo, "env_id": state.env_id},
+        )
         self._validation_status_label.setStyleSheet("color: #1565c0;")
         QtWidgets.QApplication.setOverrideCursor(QtCore.Qt.CursorShape.WaitCursor)
         try:
@@ -629,11 +972,23 @@ class CleanRlTrainForm(QtWidgets.QDialog):
         if success:
             self._validation_status_label.setText("✔ Dry-run validation succeeded.")
             self._validation_status_label.setStyleSheet("color: #2e7d32;")
+            # Emit success info for downstream listeners that filter by code
+            self.log_constant(
+                LOG_UI_TRAIN_FORM_INFO,
+                message="CleanRL dry-run validation succeeded",
+            )
         else:
             self._validation_status_label.setText(
                 "✖ Dry-run validation failed. Check the details returned by cleanrl_worker."
             )
             self._validation_status_label.setStyleSheet("color: #c62828;")
+            # Emit error with structured code to enable catch-by-code workflows
+            snippet = (output or "").strip()
+            self.log_constant(
+                LOG_UI_TRAIN_FORM_ERROR,
+                message="CleanRL dry-run validation failed",
+                extra={"output": snippet[:1000]},
+            )
 
     def _append_validation_notes(self, success: bool, output: str) -> None:
         status = "SUCCESS" if success else "FAILED"
@@ -648,6 +1003,7 @@ class CleanRlTrainForm(QtWidgets.QDialog):
 
     def _on_algorithm_changed(self, algo: str) -> None:
         self._rebuild_algo_params(algo)
+        self._apply_schema_defaults(algo)
         self._algo_help_text.setHtml(get_algo_doc(algo))
 
     def _handle_accept(self) -> None:
@@ -664,13 +1020,6 @@ class CleanRlTrainForm(QtWidgets.QDialog):
                 self,
                 "Environment Required",
                 "Specify a Gymnasium environment id (e.g. CartPole-v1).",
-            )
-            return
-        if self._custom_env_checkbox.isChecked() and not state.env_id:
-            QtWidgets.QMessageBox.warning(
-                self,
-                "Custom Environment",
-                "Provide an environment id when using custom mode.",
             )
             return
         run_id = _generate_run_id("cleanrl", state.algo)
@@ -707,57 +1056,85 @@ class CleanRlTrainForm(QtWidgets.QDialog):
         state = self._collect_state()
         return self._build_config(state)
 
-    def _on_custom_env_toggled(self, checked: bool) -> None:
-        self._env_combo.setEnabled(not checked)
-        self._env_custom_input.setEnabled(checked)
-        if not checked:
-            self._env_custom_input.clear()
-
     def _rebuild_algo_params(self, algo: str) -> None:
-        while self._algo_param_form.rowCount():
-            self._algo_param_form.removeRow(0)
+        self._clear_layout(self._algo_param_layout)
         self._algo_param_inputs.clear()
+        self._algo_env_widget = None
+        schema_entry = _CLEANRL_SCHEMAS.get(algo)
+        if schema_entry and self._populate_params_from_schema(schema_entry.get("fields", [])):
+            self._algo_param_group.setVisible(bool(self._algo_param_inputs))
+            return
 
         specs = _ALGO_PARAM_SPECS.get(algo, ())
+        capture_widget: Optional[QtWidgets.QWidget] = None
         if not specs:
             self._algo_param_group.setVisible(False)
+            self._reset_capture_video_slot(None)
             return
 
         self._algo_param_group.setVisible(True)
 
+        entries: list[tuple[str, QtWidgets.QWidget, bool]] = []
         for spec in specs:
+            widget: QtWidgets.QWidget
             if spec.field_type is int:
                 spin = QtWidgets.QSpinBox(self)
                 spin.setRange(-1_000_000_000, 1_000_000_000)
                 spin.setValue(int(spec.default))
                 if spec.tooltip:
                     spin.setToolTip(spec.tooltip)
-                self._algo_param_form.addRow(spec.label + ":", spin)
-                self._algo_param_inputs[spec.key] = spin
+                widget = spin
             elif spec.field_type is float:
                 spin = QtWidgets.QDoubleSpinBox(self)
                 spin.setDecimals(6)
                 spin.setRange(-1e9, 1e9)
-                spin.setSingleStep(abs(spec.default) / 10 if isinstance(spec.default, (int, float)) and spec.default else 0.1)
+                spin.setSingleStep(
+                    abs(spec.default) / 10 if isinstance(spec.default, (int, float)) and spec.default else 0.1
+                )
                 spin.setValue(float(spec.default))
                 if spec.tooltip:
                     spin.setToolTip(spec.tooltip)
-                self._algo_param_form.addRow(spec.label + ":", spin)
-                self._algo_param_inputs[spec.key] = spin
+                widget = spin
             elif spec.field_type is bool:
                 checkbox = QtWidgets.QCheckBox(spec.label, self)
                 checkbox.setChecked(bool(spec.default))
                 if spec.tooltip:
                     checkbox.setToolTip(spec.tooltip)
-                self._algo_param_form.addRow("", checkbox)
-                self._algo_param_inputs[spec.key] = checkbox
+                widget = checkbox
             else:
                 line = QtWidgets.QLineEdit(self)
                 line.setText(str(spec.default))
                 if spec.tooltip:
                     line.setToolTip(spec.tooltip)
-                self._algo_param_form.addRow(spec.label + ":", line)
-                self._algo_param_inputs[spec.key] = line
+                widget = line
+
+            self._algo_param_inputs[spec.key] = widget
+            if spec.key == "capture_video":
+                capture_widget = widget
+                continue
+
+            entries.append((spec.label, widget, isinstance(widget, QtWidgets.QCheckBox)))
+
+        columns = 2
+        for idx, (label, widget, is_checkbox) in enumerate(entries):
+            cell = QtWidgets.QWidget(self._algo_param_group)
+            cell_layout = QtWidgets.QVBoxLayout(cell)
+            cell_layout.setContentsMargins(0, 0, 0, 0)
+            cell_layout.setSpacing(2)
+            if not is_checkbox:
+                label_widget = QtWidgets.QLabel(label, cell)
+                label_widget.setStyleSheet("font-weight: 600;")
+                cell_layout.addWidget(label_widget)
+            cell_layout.addWidget(widget)
+            row = idx // columns
+            col = idx % columns
+            self._algo_param_layout.addWidget(cell, row, col)
+
+        for col_idx in range(columns):
+            self._algo_param_layout.setColumnStretch(col_idx, 1)
+
+        self._capture_video_checkbox = capture_widget
+        self._reset_capture_video_slot(capture_widget)
 
 
 __all__ = ["CleanRlTrainForm"]

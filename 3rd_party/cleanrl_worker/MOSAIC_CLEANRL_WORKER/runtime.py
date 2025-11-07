@@ -33,15 +33,43 @@ AlgoRegistry = Mapping[str, str]
 
 
 DEFAULT_ALGO_REGISTRY: AlgoRegistry = {
-    # Classic control + Atari
+    # PPO family
     "ppo": "cleanrl.ppo",
     "ppo_continuous_action": "cleanrl.ppo_continuous_action",
     "ppo_atari": "cleanrl.ppo_atari",
-    "dqn": "cleanrl.dqn",
-    "c51": "cleanrl.c51",
-    # Procgen / EnvPool variants
-    "ppg_procgen": "cleanrl.ppg_procgen",
+    "ppo_atari_multigpu": "cleanrl.ppo_atari_multigpu",
+    "ppo_atari_lstm": "cleanrl.ppo_atari_lstm",
+    "ppo_atari_envpool": "cleanrl.ppo_atari_envpool",
+    "ppo_atari_envpool_xla_jax": "cleanrl.ppo_atari_envpool_xla_jax",
+    "ppo_atari_envpool_xla_jax_scan": "cleanrl.ppo_atari_envpool_xla_jax_scan",
+    "ppo_procgen": "cleanrl.ppo_procgen",
     "ppo_rnd_envpool": "cleanrl.ppo_rnd_envpool",
+    "ppo_pettingzoo_ma_atari": "cleanrl.ppo_pettingzoo_ma_atari",
+    # Policy optimization variants
+    "ppg_procgen": "cleanrl.ppg_procgen",
+    "pqn": "cleanrl.pqn",
+    "pqn_atari_envpool": "cleanrl.pqn_atari_envpool",
+    "pqn_atari_envpool_lstm": "cleanrl.pqn_atari_envpool_lstm",
+    "rpo_continuous_action": "cleanrl.rpo_continuous_action",
+    # Q-learning family
+    "dqn": "cleanrl.dqn",
+    "dqn_atari": "cleanrl.dqn_atari",
+    "dqn_atari_jax": "cleanrl.dqn_atari_jax",
+    "dqn_jax": "cleanrl.dqn_jax",
+    "rainbow_atari": "cleanrl.rainbow_atari",
+    "qdagger_dqn_atari_impalacnn": "cleanrl.qdagger_dqn_atari_impalacnn",
+    "qdagger_dqn_atari_jax_impalacnn": "cleanrl.qdagger_dqn_atari_jax_impalacnn",
+    "c51": "cleanrl.c51",
+    "c51_jax": "cleanrl.c51_jax",
+    "c51_atari": "cleanrl.c51_atari",
+    "c51_atari_jax": "cleanrl.c51_atari_jax",
+    # Continuous control
+    "ddpg_continuous_action": "cleanrl.ddpg_continuous_action",
+    "ddpg_continuous_action_jax": "cleanrl.ddpg_continuous_action_jax",
+    "td3_continuous_action": "cleanrl.td3_continuous_action",
+    "td3_continuous_action_jax": "cleanrl.td3_continuous_action_jax",
+    "sac_continuous_action": "cleanrl.sac_continuous_action",
+    "sac_atari": "cleanrl.sac_atari",
 }
 
 
@@ -261,7 +289,7 @@ class CleanRLWorkerRuntime:
                         f"RegisterWorker handshake failed ({code}): {detail}"
                     ) from exc
 
-        self._session_token = response.session_token
+        self._session_token = getattr(response, "session_token", None)
 
     def run(self, emitter: Optional[LifecycleEmitter] = None) -> RuntimeSummary:
         """Execute (or dry-run) the configured CleanRL algorithm."""
@@ -300,12 +328,16 @@ class CleanRLWorkerRuntime:
 
         env = os.environ.copy()
         env.setdefault("PYTHONUNBUFFERED", "1")
+
+        pythonpath_entries = []
+        site_dir = Path(__file__).resolve().parent
+        pythonpath_entries.append(str(site_dir))
         repo_path = str(REPO_ROOT)
-        existing_pythonpath = env.get("PYTHONPATH", "")
+        pythonpath_entries.append(repo_path)
+        existing_pythonpath = env.get("PYTHONPATH")
         if existing_pythonpath:
-            env["PYTHONPATH"] = f"{repo_path}{os.pathsep}{existing_pythonpath}"
-        else:
-            env["PYTHONPATH"] = repo_path
+            pythonpath_entries.append(existing_pythonpath)
+        env["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
 
         extras: Dict[str, Any] = dict(self._config.extras)
         tb_path: Optional[Path] = None
@@ -327,6 +359,17 @@ class CleanRLWorkerRuntime:
 
         stdout_path = logs_dir / "cleanrl.stdout.log"
         stderr_path = logs_dir / "cleanrl.stderr.log"
+
+        capture_flag = extras.get("algo_params", {}).get("capture_video") if extras.get("algo_params") else None
+        if capture_flag:
+            # Only the CleanRL CLI flag controls recording; the global MOSAIC_CAPTURE_VIDEO
+            # shim stays disabled to avoid duplicate video artifacts. We still ensure the
+            # videos directory exists so downstream analytics can surface files written by
+            # CleanRL (which uses cwd/videos/<run_name>/...).
+            (run_dir / "videos").mkdir(parents=True, exist_ok=True)
+        else:
+            env.pop("MOSAIC_CAPTURE_VIDEO", None)
+            env.pop("MOSAIC_VIDEOS_DIR", None)
 
         if tensorboard_dir and isinstance(tensorboard_dir, str):
             env["CLEANRL_TENSORBOARD_DIR"] = str(tb_path)
@@ -351,6 +394,7 @@ class CleanRLWorkerRuntime:
             env.setdefault("WANDB_SKIP_SERVICE", "1")
             env.setdefault("WANDB_DISABLE_SERVICE", "true")
             env.setdefault("WANDB_DISABLE_GYM", "true")
+            env.setdefault("WANDB_MODE", "online")
 
         # Resolve WANDB proxies, preferring VPN vars if present, then extras and generic fallbacks.
         http_proxy, https_proxy = _resolve_wandb_proxies(extras, os.environ)
@@ -365,6 +409,14 @@ class CleanRLWorkerRuntime:
         if isinstance(wandb_email, str) and wandb_email:
             env.setdefault("WANDB_EMAIL", wandb_email)
 
+        wandb_entity = extras.get("wandb_entity")
+        if isinstance(wandb_entity, str) and wandb_entity:
+            env.setdefault("WANDB_ENTITY", wandb_entity)
+
+        wandb_project = extras.get("wandb_project_name") or extras.get("wandb_project")
+        if isinstance(wandb_project, str) and wandb_project:
+            env.setdefault("WANDB_PROJECT", wandb_project)
+
         wandb_api_key = extras.get("wandb_api_key")
         if isinstance(wandb_api_key, str) and wandb_api_key:
             env.setdefault("WANDB_API_KEY", wandb_api_key)
@@ -375,6 +427,8 @@ class CleanRLWorkerRuntime:
                     "WANDB preflight login failed; forcing offline mode for this run",
                 )
                 env.setdefault("WANDB_MODE", "offline")
+        else:
+            env.setdefault("WANDB_MODE", "offline")
 
         with stdout_path.open("w", encoding="utf-8", buffering=1) as out, stderr_path.open(
             "w", encoding="utf-8", buffering=1
@@ -511,7 +565,7 @@ def _preflight_wandb_login(env: Mapping[str, str]) -> bool:
     try:
         import wandb
     except Exception as exc:  # pragma: no cover - wandb optional
-        LOGGER.warning("W&B SDK unavailable during preflight: %s", exc)
+        LOGGER.warning("WANDB SDK unavailable during preflight: %s", exc)
         return False
 
     api_key = env.get("WANDB_API_KEY") or os.environ.get("WANDB_API_KEY")
@@ -524,7 +578,7 @@ def _preflight_wandb_login(env: Mapping[str, str]) -> bool:
             else:
                 result = wandb.login(relogin=True)
         except Exception as exc:  # pragma: no cover - network/proxy issues
-            LOGGER.warning("W&B login failed during preflight: %s", exc)
+            LOGGER.warning("WANDB login failed during preflight: %s", exc)
             return False
         finally:
             try:
