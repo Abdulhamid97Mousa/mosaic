@@ -5,6 +5,7 @@ import json
 import grpc
 
 from gym_gui.services.bootstrap import bootstrap_default_services
+from gym_gui.config.settings import reload_settings
 from gym_gui.services.jason_bridge import JasonBridgeServer
 from gym_gui.services.jason_supervisor import JasonSupervisorService
 from gym_gui.services.service_locator import get_service_locator
@@ -17,6 +18,8 @@ def _ensure_server() -> JasonBridgeServer:
     os.environ["JASON_BRIDGE_ENABLED"] = "1"
     # Skip spawning external trainer daemon during tests
     os.environ["GYM_GUI_SKIP_TRAINER_DAEMON"] = "1"
+    # Refresh settings cache after env changes
+    reload_settings()
     bootstrap_default_services()
     locator = get_service_locator()
     server = locator.require(JasonBridgeServer)

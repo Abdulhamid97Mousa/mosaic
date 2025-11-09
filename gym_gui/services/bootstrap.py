@@ -38,6 +38,7 @@ from gym_gui.controllers.live_telemetry_controllers import LiveTelemetryControll
 from gym_gui.services.jason_supervisor import JasonSupervisorService
 from gym_gui.validations.validations_telemetry import ValidationService
 from gym_gui.services.jason_bridge import JasonBridgeServer
+from gym_gui.config.settings import get_settings
 
 
 def bootstrap_default_services() -> ServiceLocator:
@@ -176,16 +177,20 @@ def bootstrap_default_services() -> ServiceLocator:
     locator.register("live_telemetry_controller", live_controller)
     locator.register("trainer_daemon_handle", daemon_handle)
 
-    # Optionally start Jason bridge server when enabled via env var.
-    # This is a lightweight control-plane gRPC server for Jason.
-    try:
-        if os.getenv("JASON_BRIDGE_ENABLED") == "1":
-            bridge_server = JasonBridgeServer()
+    # Optionally start Jason bridge server using typed settings (preferred over raw env).
+    # Environment variables still populate settings via get_settings().
+    settings = get_settings()
+    if settings.jason_bridge_enabled:
+        try:
+            bridge_server = JasonBridgeServer(
+                host=settings.jason_bridge_host,
+                port=settings.jason_bridge_port,
+            )
             bridge_server.start()
             locator.register(JasonBridgeServer, bridge_server)
             locator.register("jason_bridge_server", bridge_server)
-    except Exception:  # pragma: no cover - do not crash bootstrap on failures
-        logging.getLogger(__name__).exception("Failed to start JasonBridgeServer")
+        except Exception:  # pragma: no cover - do not crash bootstrap on failures
+            logging.getLogger(__name__).exception("Failed to start JasonBridgeServer")
 
     return locator
 

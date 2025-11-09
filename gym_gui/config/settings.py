@@ -71,6 +71,10 @@ class Settings:
     agent_ids: tuple[str, ...] = field(default_factory=tuple)
     default_seed: int = 1
     allow_seed_reuse: bool = False
+    # Jason Bridge (Jason ↔ gym_gui gRPC) configuration
+    jason_bridge_enabled: bool = False
+    jason_bridge_host: str = "127.0.0.1"
+    jason_bridge_port: int = 50555
 
     @property
     def video_dir(self) -> Path | None:
@@ -120,6 +124,17 @@ def get_settings() -> Settings:
         default=defaults.allow_seed_reuse,
     )
 
+    # Jason Bridge settings (env-overridable)
+    jason_bridge_enabled = _normalize_bool(
+        os.getenv("JASON_BRIDGE_ENABLED"), default=defaults.jason_bridge_enabled
+    )
+    jason_bridge_host = os.getenv("JASON_BRIDGE_HOST", defaults.jason_bridge_host)
+    jb_port_raw = os.getenv("JASON_BRIDGE_PORT")
+    try:
+        jason_bridge_port = int(jb_port_raw) if jb_port_raw is not None else defaults.jason_bridge_port
+    except (TypeError, ValueError):
+        jason_bridge_port = defaults.jason_bridge_port
+
     return Settings(
         qt_api=qt_api,
         gym_default_env=gym_default_env,
@@ -131,6 +146,9 @@ def get_settings() -> Settings:
         agent_ids=agent_ids,
         default_seed=max(1, default_seed),
         allow_seed_reuse=allow_seed_reuse,
+        jason_bridge_enabled=jason_bridge_enabled,
+        jason_bridge_host=jason_bridge_host,
+        jason_bridge_port=jason_bridge_port,
     )
 
 
