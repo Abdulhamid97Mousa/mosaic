@@ -15,6 +15,8 @@ from gym_gui.services.jason_supervisor.proto import supervisor_pb2  # type: igno
 def _ensure_server() -> JasonBridgeServer:
     # Force env so bootstrap starts server
     os.environ["JASON_BRIDGE_ENABLED"] = "1"
+    # Skip spawning external trainer daemon during tests
+    os.environ["GYM_GUI_SKIP_TRAINER_DAEMON"] = "1"
     bootstrap_default_services()
     locator = get_service_locator()
     server = locator.require(JasonBridgeServer)

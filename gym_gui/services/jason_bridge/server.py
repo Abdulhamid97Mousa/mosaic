@@ -9,13 +9,17 @@ Provides RPCs:
   - GetSupervisorStatus: returns snapshot of supervisor state.
 
 The server is opt-in; enable by setting env var JASON_BRIDGE_ENABLED=1.
+
+Authoritative stubs: gym_gui/services/jason_bridge/{bridge_pb2, bridge_pb2_grpc}.
+If you see nested duplicates under this package path, they were produced by a
+misconfigured protoc invocation and are tombstoned to prevent accidental import.
 """
 
 import json
 import logging
 import os
 from concurrent import futures
-from typing import Optional
+from typing import Optional, Any
 
 import grpc
 from google.protobuf import timestamp_pb2
@@ -98,19 +102,18 @@ def _unregister_inprocess_server(target: str) -> None:
     _INPROCESS_SERVERS.pop(target, None)
 
 # Load dependent descriptor FIRST to avoid descriptor pool import errors.
-from gym_gui.services.jason_supervisor.proto import supervisor_pb2 as supervisor_pb2  # type: ignore
+from gym_gui.services.jason_supervisor.proto import supervisor_pb2 as supervisor_pb2  
 # Import local generated stubs (bridge) without sys.modules alias hacks
-from . import bridge_pb2, bridge_pb2_grpc  # type: ignore
+from . import bridge_pb2, bridge_pb2_grpc  
 
-
-class JasonBridgeServicer(bridge_pb2_grpc.JasonBridgeServicer, LogConstantMixin):  # type: ignore
+class JasonBridgeServicer(bridge_pb2_grpc.JasonBridgeServicer, LogConstantMixin):  
     def __init__(self, supervisor: JasonSupervisorService) -> None:
         self._supervisor = supervisor
         self._logger = logging.getLogger("gym_gui.jason_bridge")
-        self._percepts_buffer: list[bridge_pb2.JasonPercept] = []
+        self._percepts_buffer: list[Any] = []
 
     # ---------------- RPCs -----------------
-    def PushPercept(self, request: bridge_pb2.JasonPercept, context: grpc.ServicerContext):  # type: ignore
+    def PushPercept(self, request: Any, context: grpc.ServicerContext):  
         self._percepts_buffer.append(request)
         # Future: convert into telemetry event
         self.log_constant(
@@ -123,7 +126,7 @@ class JasonBridgeServicer(bridge_pb2_grpc.JasonBridgeServicer, LogConstantMixin)
         )
 
     def ApplyControlUpdate(
-        self, request: supervisor_pb2.SupervisorControlUpdate, context: grpc.ServicerContext
+        self, request: Any, context: grpc.ServicerContext
     ):  # type: ignore
         # Decode params_json
         try:
@@ -144,7 +147,7 @@ class JasonBridgeServicer(bridge_pb2_grpc.JasonBridgeServicer, LogConstantMixin)
                 "source": request.source or "jason_supervisor",
                 "params": params,
                 # credits placeholder: allow by default
-                "available_credits":  self._supervisor._defaults.min_available_credits,  # pylint: disable=protected-access
+                "available_credits":  self._supervisor._defaults.min_available_credits,  
             }
         )
         if accepted:
@@ -161,13 +164,12 @@ class JasonBridgeServicer(bridge_pb2_grpc.JasonBridgeServicer, LogConstantMixin)
             accepted=accepted, message=("ok" if accepted else "rejected")
         )
 
-    def RequestAction(self, request: bridge_pb2.ActionRequest, context: grpc.ServicerContext):  # type: ignore
-        # Placeholder: no action synthesis yet
-        return bridge_pb2.ActionResponse(available=False, action_token="", message="not_implemented")
+    def RequestAction(self, request: Any, context: grpc.ServicerContext): 
+        return bridge_pb2.ActionResponse(available=False, action_token="", message="not_implemented")  # type: ignore[attr-defined]
 
-    def GetSupervisorStatus(self, request: bridge_pb2.Empty, context: grpc.ServicerContext):  # type: ignore
+    def GetSupervisorStatus(self, request: Any, context: grpc.ServicerContext): 
         snap = self._supervisor.snapshot()
-        return bridge_pb2.SupervisorStatus(
+        return bridge_pb2.SupervisorStatus(  # type: ignore[attr-defined]
             active=snap["active"],
             safety_on=snap["safety_on"],
             last_action=snap["last_action"],

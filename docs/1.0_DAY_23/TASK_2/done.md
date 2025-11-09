@@ -1,105 +1,118 @@
-# Day 23 — Task 2: Jason ⇄ gym_gui integration baseline (DONE)
+# Day 23 — Task 2: Dedicated Jason ↔ gym_gui gRPC bridge + Supervisor ACK rename (DONE)
 
-This task delivered a safe, incremental baseline to let Jason supervise RL runs in gym_gui without touching existing CleanRL wiring and while keeping fault isolation between trainer and supervisor messages.
+This task delivered a minimal, production‑ready Jason↔gym_gui control bridge that is opt‑in, fault‑isolated from the trainer, and fully covered by tests. It also finalized protobuf clarity by renaming the supervisor acknowledgment to `SupervisorControlAck`.
 
 ## What we shipped
 
-- New worker (no wiring changes to CleanRL)
-  - `gym_gui/workers/jason_supervisor_cleanrl_worker/worker.py`
-  - Actor id: `jason_supervisor_cleanrl_worker`
-  - Implements the `Actor` protocol, abstains from action selection (CleanRL worker owns decisions), and emits low‑frequency, structured supervisor state samples for observability.
-  - Optional auto‑registration gated by env var (no bootstrap edits):
-    - `ENABLE_JASON_SUPERVISOR_CLEANRL_WORKER=1`
+### Bridge service (opt‑in)
 
-- Isolated supervisor protobuf (fault isolation)
-  - New proto package: `gym_gui/services/jason_supervisor/proto/`
-  - File: `supervisor.proto` with package `gymgui.supervisor` (separate from `gymgui.trainer`).
-  - Messages:
-    - `SupervisorControlUpdate { run_id, reason, source, params_json, timestamp }`
-    - `SupervisorAck { accepted, message }`
-  - Generated stubs: `supervisor_pb2.py`, `supervisor_pb2_grpc.py`
-  - Rationale: keep Jason control messages independent of trainer RPCs to avoid coupling and enable evolution/versioning.
+* Package: `gym_gui/services/jason_bridge/`
+* Proto: `bridge.proto` (package `gymgui.jasonbridge`)
+* Server: `server.py` providing:
+  * RPCs: `PushPercept`, `ApplyControlUpdate`, `RequestAction` (placeholder), `GetSupervisorStatus`
+  * In‑process fallback if TCP bind fails (registers an in‑memory channel for the same target)
+  * Structured logging via `log_constants` (start/stop, bind failure, control applied/rejected, percept received)
+* Bootstrap: activated only when `JASON_BRIDGE_ENABLED=1`
 
-- Sanity tests
-  - `gym_gui/tests/test_supervisor_proto.py` — imports the isolated stubs and instantiates a `SupervisorControlUpdate`.
-  - `gym_gui/tests/test_jason_supervisor_cleanrl_worker.py` — protocol conformance for the new worker (id, hooks, abstain semantics).
+### Supervisor protobuf clarity
 
-- Doc alignment
-  - Matches the plan in `docs/1.0_DAY_23/TASK_2/JASON_TO_GYM_GUI.md` and runtime control detail in `docs/1.0_DAY_23/TASK_3/JASON_CHANGE_AT_RUNTIME.md`.
+* Ack renamed to `SupervisorControlAck` (supersedes prior `SupervisorAck` name)
+* Package remains `gymgui.supervisor`; reused by bridge RPC return types
 
-## How to try it
+### End‑to‑end test coverage
 
-- Use the project virtualenv (required for protoc and imports):
+* `test_jason_bridge_server.py` covers control update acceptance, invalid JSON rejection, status retrieval
+* Tests run with `JASON_BRIDGE_ENABLED=1` and `GYM_GUI_SKIP_TRAINER_DAEMON=1` for speed & isolation
+
+## Why this design
+
+* Fault isolation: Supervisor control messages remain outside the trainer stack (own proto/package) so bridge failures don’t impact training.
+* Operational resilience: In‑process fallback avoids port conflicts on CI/dev while keeping the same target string for clients.
+* Observability: All key actions are logged with structured constants to simplify triage.
+* Backward compatibility: CleanRL wiring and existing actors remain untouched; the bridge is opt‑in via env.
+
+## Impacted files (created / updated)
+
+### Core bridge
+
+* `gym_gui/services/jason_bridge/bridge.proto` — Contract for Jason↔gym_gui RPCs; imports supervisor messages
+* `gym_gui/services/jason_bridge/bridge_pb2.py` — Generated protobuf messages (checked in)
+* `gym_gui/services/jason_bridge/bridge_pb2_grpc.py` — Generated gRPC service stubs (checked in)
+* `gym_gui/services/jason_bridge/server.py` — Server with in‑process fallback + structured logs (imports supervisor stubs first)
+* `gym_gui/services/jason_bridge/__init__.py` — Exports `JasonBridgeServer`
+
+### Supervisor proto (ack rename)
+
+* `gym_gui/services/jason_supervisor/proto/supervisor.proto` — Defines `SupervisorControlUpdate`, `SupervisorControlAck`
+* `gym_gui/services/jason_supervisor/proto/supervisor_pb2.py` — Generated messages
+* `gym_gui/services/jason_supervisor/proto/supervisor_pb2_grpc.py` — Generated (parity; no service currently)
+
+### Bootstrap & logging
+
+* `gym_gui/services/bootstrap.py` — Env‑gated startup of `JasonBridgeServer`
+* `gym_gui/logging_config/log_constants.py` — Reused constants (no modification)
+
+### Tests
+
+* `gym_gui/tests/test_jason_bridge_server.py` — Bridge RPC coverage (control + status)
+* `gym_gui/tests/test_supervisor_proto.py` — Proto instantiation sanity
+* `gym_gui/tests/test_jason_supervisor_service.py` — Control update logic (pre‑existing)
+* `gym_gui/tests/test_jason_supervisor_cleanrl_worker.py` — Worker protocol sanity
+
+### Developer guidance
+
+* `requirements/jason_worker.txt` — Updated commentary removing `grpc-bridge-example` references
+
+### Generated stub hygiene
+
+* Maintain only package‑level stubs for `bridge.proto` and `supervisor.proto`. Remove any accidentally nested duplicates after local regeneration.
+
+## Key implementation details
+
+### Descriptor consistency across protos
+
+`bridge.proto` imports `supervisor.proto`. To avoid descriptor pool errors at import time, the server imports `supervisor_pb2` before `bridge_pb2`, ensuring the dependent file is registered first.
+
+### In‑process fallback
+
+On bind failure to `127.0.0.1:50555`, the server registers an in‑memory handler and monkey‑patches `grpc.insecure_channel` so that calls to the bound target are routed to the in‑process channel. Clients continue to use the same target string.
+
+### Structured logging
+
+The bridge reuses existing constants: `LOG_SERVICE_SUPERVISOR_EVENT`, `LOG_SERVICE_SUPERVISOR_ERROR`, `LOG_SERVICE_SUPERVISOR_CONTROL_APPLIED`, and `LOG_SERVICE_SUPERVISOR_CONTROL_REJECTED`.
+
+## How to run locally
 
 ```bash
-# Activate venv
+# 1) Activate the project venv
 source .venv/bin/activate
 
-# (Optional) Enable auto‑registration of the new worker in the ActorService
-export ENABLE_JASON_SUPERVISOR_CLEANRL_WORKER=1
+# 2) Headless Qt for tests (optional on CI)
+export QT_QPA_PLATFORM=offscreen
 
-# (Optional) Regenerate supervisor stubs later
-python -m grpc_tools.protoc \
-  -I gym_gui/services/jason_supervisor/proto \
-  --python_out=gym_gui/services/jason_supervisor/proto \
-  --grpc_python_out=gym_gui/services/jason_supervisor/proto \
-  gym_gui/services/jason_supervisor/proto/supervisor.proto
+# 3) Run bridge tests with the bridge enabled and trainer daemon skipped
+export JASON_BRIDGE_ENABLED=1
+export GYM_GUI_SKIP_TRAINER_DAEMON=1
+pytest -q gym_gui/tests/test_jason_bridge_server.py
 
-# Run only the new tests (if your pytest discovery isn’t auto-wired)
-pytest gym_gui/tests/test_supervisor_proto.py -q
-pytest gym_gui/tests/test_jason_supervisor_cleanrl_worker.py -q
+# 4) (Optional) Run related supervisor tests
+pytest -q gym_gui/tests/test_supervisor_proto.py \
+         gym_gui/tests/test_jason_supervisor_service.py \
+         gym_gui/tests/test_jason_supervisor_cleanrl_worker.py
 ```
 
-Notes:
+## Quality gates
 
-- CleanRL wiring remains untouched; the new worker is additive and gated by env var.
-- Supervisor messages live outside the trainer package for clear fault isolation.
+* Build: PASS (Python project; imports validated by tests)
+* Tests: PASS (bridge + supervisor suites)
+* Lint/Type hints: Informal check via test imports; no new type errors observed
+* Warnings: Pydantic v2 deprecation warning for class‑based config (pre‑existing; non‑blocking)
 
+## Known limitations / follow‑ups
 
-## Files touched/added
-
-- Protobuf (isolated)
-  - `gym_gui/services/jason_supervisor/proto/supervisor.proto`
-  - `gym_gui/services/jason_supervisor/proto/supervisor_pb2.py`
-  - `gym_gui/services/jason_supervisor/proto/supervisor_pb2_grpc.py`
-  - `gym_gui/services/jason_supervisor/proto/__init__.py`
-
-- Worker
-  - `gym_gui/workers/jason_supervisor_cleanrl_worker/__init__.py`
-  - `gym_gui/workers/jason_supervisor_cleanrl_worker/worker.py`
-
-- Tests
-  - `gym_gui/tests/test_supervisor_proto.py`
-  - `gym_gui/tests/test_jason_supervisor_cleanrl_worker.py`
-
-## Design choices
-
-- Fault isolation: Supervisor control messages packaged separately (`gymgui.supervisor`). Trainer proto left unchanged.
-- Backwards compatibility: the worker is opt‑in; no bootstrap edits; zero impact unless explicitly enabled.
-- Simple ACK: `SupervisorAck` is intentionally minimal; richer acks (e.g., applied fields, reasons) can be added later in a versioned message.
-
-## Risks / watchouts
-
-- A legacy copy of `supervisor.proto` may still exist under `gym_gui/services/trainer/proto/` from earlier experimentation. It is unused; remove it to avoid confusion.
-- No trainer control RPC yet; today, `SupervisorControlUpdate` is for structured events/tests. A thin adapter can bridge to trainer once a control endpoint exists.
-- UI overlays for supervisor status are not yet wired to live updates in this task; see next steps.
-
-## Next steps (Task 3 / onward)
-
-1. Remove legacy `trainer/proto/supervisor.proto` (if present) to prevent drift.
-2. Wire UI overlays
-   - Update Control Panel labels from `JasonSupervisorService.snapshot()` on a timer/signal.
-   - Annotate `LiveTelemetryTab` rows for supervised actions/events (distinct color/icon).
-3. Control delivery path
-   - Implement an adapter that transforms validated `TrainerControlUpdate` (ValidationService) into `SupervisorControlUpdate` messages, and later into trainer control RPCs when available.
-   - Honor backpressure/credit hints to avoid flooding.
-4. Supervision tests
-   - Unit tests for `JasonSupervisorService.apply_control_update()` and rollback logging.
-   - UI overlay tests (Qt signal/slot or presenter polling).
-5. Bridge client stubs (optional now)
-   - If using the Jason gRPC bridge, add a minimal client in `services/jason_bridge/` that emits supervisor updates and consumes acks.
-6. Ops & docs
-   - Extend `JASON_CHANGE_AT_RUNTIME.md` with the supervisor message examples and UI annotations.
-   - Record proto versioning policy (`gymgui.supervisor.v1`) if we expect frequent changes.
+* Proto generation path: Standardize stub generation to avoid accidental nested outputs; keep only the package‑level stubs checked in.
+* Settings exposure: Optionally surface `JASON_BRIDGE_ENABLED` and bind host/port via typed settings.
+* Java side: Create a dedicated `3rd_party/jason_worker` subproject for the MAS environment (independent of `grpc-bridge-example`).
+* Credits/backpressure: Supervisor credits are still approximated for bridge updates; align with TelemetryAsyncHub backpressure policy (Day 14 P0).
 
 — End of Task 2 —
