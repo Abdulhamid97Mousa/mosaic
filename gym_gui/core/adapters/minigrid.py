@@ -503,6 +503,18 @@ class MiniGridSimpleCrossingS11N5Adapter(MiniGridAdapter):
     DEFAULT_ENV_ID = GameId.MINIGRID_SIMPLE_CROSSING_S11N5.value
 
 
+class MiniGridRedBlueDoors6x6Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-RedBlueDoors-6x6-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_REDBLUE_DOORS_6x6.value
+
+
+class MiniGridRedBlueDoors8x8Adapter(MiniGridAdapter):
+    """Adapter specialising defaults for MiniGrid-RedBlueDoors-8x8-v0."""
+
+    DEFAULT_ENV_ID = GameId.MINIGRID_REDBLUE_DOORS_8x8.value
+
+
 MINIGRID_ADAPTERS: dict[GameId, type[MiniGridAdapter]] = {
     GameId.MINIGRID_EMPTY_5x5: MiniGridEmpty5x5Adapter,
     GameId.MINIGRID_EMPTY_RANDOM_5x5: MiniGridEmptyRandom5x5Adapter,
@@ -537,6 +549,8 @@ MINIGRID_ADAPTERS: dict[GameId, type[MiniGridAdapter]] = {
     GameId.MINIGRID_SIMPLE_CROSSING_S9N2: MiniGridSimpleCrossingS9N2Adapter,
     GameId.MINIGRID_SIMPLE_CROSSING_S9N3: MiniGridSimpleCrossingS9N3Adapter,
     GameId.MINIGRID_SIMPLE_CROSSING_S11N5: MiniGridSimpleCrossingS11N5Adapter,
+    GameId.MINIGRID_REDBLUE_DOORS_6x6: MiniGridRedBlueDoors6x6Adapter,
+    GameId.MINIGRID_REDBLUE_DOORS_8x8: MiniGridRedBlueDoors8x8Adapter,
 }
 
 
@@ -572,5 +586,7 @@ __all__ = [
     "MiniGridSimpleCrossingS9N2Adapter",
     "MiniGridSimpleCrossingS9N3Adapter",
     "MiniGridSimpleCrossingS11N5Adapter",
+    "MiniGridRedBlueDoors6x6Adapter",
+    "MiniGridRedBlueDoors8x8Adapter",
     "MINIGRID_ADAPTERS",
 ]

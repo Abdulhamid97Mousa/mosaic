@@ -841,6 +841,15 @@ LOG_TRAINER_CLIENT_SHUTDOWN_WARNING = _constant(
     tags=_tags("trainer", "client", "shutdown", "cleanup"),
 )
 
+LOG_TRAINER_WORKER_IMPORT_ERROR = _constant(
+    "LOG657",
+    "ERROR",
+    "CleanRL worker module not importable; PYTHONPATH missing vendored packages (MuJoCo/telemetry workers blocked)",
+    component="Service",
+    subcomponent="TrainerDispatcher",
+    tags=_tags("trainer", "worker", "pythonpath", "dependency"),
+)
+
 LOG_SERVICE_FRAME_INFO = _constant(
     "LOG660",
     "INFO",

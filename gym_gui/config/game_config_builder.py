@@ -193,6 +193,8 @@ class GameConfigBuilder:
             GameId.MINIGRID_DOORKEY_8x8,
             GameId.MINIGRID_DOORKEY_16x16,
             GameId.MINIGRID_LAVAGAP_S7,
+            GameId.MINIGRID_REDBLUE_DOORS_6x6,
+            GameId.MINIGRID_REDBLUE_DOORS_8x8,
         ):
             partial = bool(overrides.get("partial_observation", True))
             image_obs = bool(overrides.get("image_observation", True))

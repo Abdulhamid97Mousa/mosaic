@@ -38,7 +38,7 @@ stateDiagram-v2
 | Pipeline Stage (spec) | Implementation Anchor |
 | --- | --- |
 | **Worker emits JSONL telemetry to stdout** | SPADE/Headless workers stream `{"type": "step" …}` via their adapter layers (see `spade_bdi_worker/core/runtime.py` and `gym_gui/workers/headless_worker.py`). |
-| **Telemetry proxy tails stdout and upgrades to protobuf** | `gym_gui/services/trainer/trainer_telemetry_proxy.py` (`JsonlTailer`, `_mk_runstep`, `_publish_steps`). This sidecar spawns the worker and pushes messages into `PublishRunSteps/PublishRunEpisodes`. |
+| **Telemetry proxy tails stdout and upgrades to protobuf** | `gym_gui/services/trainer/trainer_telemetry_proxy.py` (`JsonlTailer`, `_make_runstep`, `_publish_steps`). This sidecar spawns the worker and pushes messages into `PublishRunSteps/PublishRunEpisodes`. |
 | **Daemon ingests client streams over gRPC** | `gym_gui/services/trainer/service.py` (`TrainerService.PublishRunSteps`, `.PublishRunEpisodes`). Messages are persisted via `_persist_step/_persist_episode` into `TelemetrySQLiteStore` and relayed to the in-memory broadcaster. |
 | **Run-state FSM and resource lifecycle** | `gym_gui/services/trainer/dispatcher.py` drives `RunStatus` transitions exposed by `RunRegistry` (`registry.py`). Methods `_dispatch_run`, `_monitor_loop`, `_heartbeat_loop` mirror INIT→RUNNING→FAULT/HALT semantics mentioned in the spec. |
 | **Live fan-out to GUI and other consumers** | `RunTelemetryBroadcaster` (in `service.py`) multiplexes steps/episodes; `TelemetryAsyncHub` in `gym_gui/services/trainer/streams.py` subscribes via `TrainerClient.stream_run_steps()` and emits Qt signals for UI widgets. |
@@ -49,7 +49,7 @@ stateDiagram-v2
 
 - **Spawn & Handshake:** The dispatcher spawns workers via `_dispatch_run`, optionally wrapping them in the telemetry proxy (`trainer_telemetry_proxy.py`). A true capability handshake is still aspirational—today the daemon assumes the worker matches `worker_meta` embedded in the submitted config (`dispatcher.py`, lines around 250–360).
 - **Command Dispatch & Correlation IDs:** GUI presenters use `TrainerClientRunner` to submit runs and observe status via `watch_runs`. Each run carries a digest and `run_id`, acting as the correlation handle for subsequent telemetry.
-- **Telemetry Streaming:** JSONL output is parsed by `_mk_runstep/_mk_runepisode` and converted to `trainer_pb2.RunStep/RunEpisode`. These are consumed by `RunTelemetryBroadcaster` and `TelemetryAsyncHub`, which deliver updates to Qt widgets (e.g., `gym_gui/ui/widgets/live_telemetry_tab.py`).
+- **Telemetry Streaming:** JSONL output is parsed by `_make_runstep/_make_runepisode` and converted to `trainer_pb2.RunStep/RunEpisode`. These are consumed by `RunTelemetryBroadcaster` and `TelemetryAsyncHub`, which deliver updates to Qt widgets (e.g., `gym_gui/ui/widgets/live_telemetry_tab.py`).
 - **Fault Handling:** Heartbeat gaps promote runs to `FAILED`, freeing GPU slots through `GPUAllocator.release_many`. Recovery hooks exist via `_terminate_worker` plus the ability to re-dispatch the run, though automated checkpoint rollback is still TODO.
 
 ## November 2025 FSM Rollout – Code Changes
@@ -109,7 +109,7 @@ sequenceDiagram
 
 ### Telemetry Proxy
 
-- `trainer_telemetry_proxy.py` is the concrete “telemetry proxy” from the memo: it tails worker stdout using `JsonlTailer`, marshals JSON into protobuf with `_mk_runstep/_mk_runepisode`, and pumps async queues into the gRPC client (`_publish_steps`, `_publish_episodes`).
+- `trainer_telemetry_proxy.py` is the concrete “telemetry proxy” from the memo: it tails worker stdout using `JsonlTailer`, marshals JSON into protobuf with `_make_runstep/_make_runepisode`, and pumps async queues into the gRPC client (`_publish_steps`, `_publish_episodes`).
 - Queue backpressure is applied locally (`asyncio.Queue(maxsize=max_queue)` with drop-oldest fallback), matching the “JSONL → typed messages” translation in the pipeline.
 
 ### Dispatcher & Session FSM
@@ -155,7 +155,7 @@ sequenceDiagram
 
 1. **Introduce Worker Capability RPC**: Add a `RegisterWorkerCapabilities` unary RPC in `trainer.proto`; capture supported commands and telemetry schema before dispatching runs.
 2. **Close the Credit Loop**: Extend `TelemetryAsyncHub` to emit control messages back through the RunBus (or a new gRPC stream) so `trainer_telemetry_proxy` can pause/resume worker emission.
-3. **Schema Hardening**: Replace JSON fields in `RunStep`/`RunEpisode` with typed message sub-structures—then update `_mk_runstep` and `_persist_step` accordingly.
+3. **Schema Hardening**: Replace JSON fields in `RunStep`/`RunEpisode` with typed message sub-structures—then update `_make_runstep` and `_persist_step` accordingly.
 4. **Checkpoint APIs**: Model `RESET/PAUSE/RESUME` transitions explicitly in the dispatcher, with hooks for workers to report checkpoint availability and restoration status.
 
 These steps would tighten the correspondence between MOSAIC’s designed IPC guarantees and the executable code now in the repository.

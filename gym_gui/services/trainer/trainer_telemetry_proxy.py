@@ -65,7 +65,7 @@ def _coerce_str(x: Any) -> str:
     return str(x)
 
 
-def _mk_runstep(
+def _make_runstep(
     ev: Dict[str, Any],
     run_id: str,
     default_agent: str,
@@ -128,7 +128,7 @@ def _mk_runstep(
     return msg
 
 
-def _mk_runepisode(
+def _make_runepisode(
     ev: Dict[str, Any],
     run_id: str,
     default_agent: str,
@@ -304,7 +304,7 @@ async def run_proxy(
             typ = str(ev.get("type", "")).lower()
             if typ == "step":
                 try:
-                    step_msg = _mk_runstep(ev, run_id, agent_id, worker_id)
+                    step_msg = _make_runstep(ev, run_id, agent_id, worker_id)
                     step_q.put_nowait(step_msg)
                     step_count += 1
                     if step_count <= 5:
@@ -327,7 +327,7 @@ async def run_proxy(
                     )
             elif typ == "episode":
                 try:
-                    ep_msg = _mk_runepisode(ev, run_id, agent_id, worker_id)
+                    ep_msg = _make_runepisode(ev, run_id, agent_id, worker_id)
                     ep_q.put_nowait(ep_msg)
                     episode_count += 1
                     if episode_count <= 3:

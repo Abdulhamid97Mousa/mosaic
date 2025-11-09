@@ -70,6 +70,9 @@ class ControlPanelConfig:
     default_seed: int
     allow_seed_reuse: bool
     actors: tuple[ActorDescriptor, ...]
+    # Optional configs for additional MiniGrid variants
+    minigrid_redbluedoors_6x6_config: MiniGridConfig | None = None
+    minigrid_redbluedoors_8x8_config: MiniGridConfig | None = None
     default_actor_id: Optional[str] = None
     workers: Tuple[WorkerDefinition, ...] = tuple()
 
@@ -120,6 +123,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
                 minigrid_doorkey_8x8_config=config.minigrid_doorkey_8x8_config,
                 minigrid_doorkey_16x16_config=config.minigrid_doorkey_16x16_config,
                 minigrid_lavagap_config=config.minigrid_lavagap_config,
+                minigrid_redbluedoors_6x6_config=config.minigrid_redbluedoors_6x6_config,
+                minigrid_redbluedoors_8x8_config=config.minigrid_redbluedoors_8x8_config,
                 default_seed=config.default_seed,
                 allow_seed_reuse=config.allow_seed_reuse,
                 actors=config.actors,
@@ -139,6 +144,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
             GameId.MINIGRID_DOORKEY_8x8: config.minigrid_doorkey_8x8_config,
             GameId.MINIGRID_DOORKEY_16x16: config.minigrid_doorkey_16x16_config,
             GameId.MINIGRID_LAVAGAP_S7: config.minigrid_lavagap_config,
+            **({GameId.MINIGRID_REDBLUE_DOORS_6x6: config.minigrid_redbluedoors_6x6_config} if config.minigrid_redbluedoors_6x6_config else {}),
+            **({GameId.MINIGRID_REDBLUE_DOORS_8x8: config.minigrid_redbluedoors_8x8_config} if config.minigrid_redbluedoors_8x8_config else {}),
         }
         self._game_overrides: Dict[GameId, Dict[str, object]] = {
             GameId.FROZEN_LAKE: {
@@ -230,6 +237,26 @@ class ControlPanelWidget(QtWidgets.QWidget):
                 "max_episode_steps": config.minigrid_lavagap_config.max_episode_steps,
                 "seed": config.minigrid_lavagap_config.seed,
             },
+            **({
+                GameId.MINIGRID_REDBLUE_DOORS_6x6: {
+                    "partial_observation": config.minigrid_redbluedoors_6x6_config.partial_observation,
+                    "image_observation": config.minigrid_redbluedoors_6x6_config.image_observation,
+                    "reward_multiplier": config.minigrid_redbluedoors_6x6_config.reward_multiplier,
+                    "agent_view_size": config.minigrid_redbluedoors_6x6_config.agent_view_size,
+                    "max_episode_steps": config.minigrid_redbluedoors_6x6_config.max_episode_steps,
+                    "seed": config.minigrid_redbluedoors_6x6_config.seed,
+                }
+            } if config.minigrid_redbluedoors_6x6_config else {}),
+            **({
+                GameId.MINIGRID_REDBLUE_DOORS_8x8: {
+                    "partial_observation": config.minigrid_redbluedoors_8x8_config.partial_observation,
+                    "image_observation": config.minigrid_redbluedoors_8x8_config.image_observation,
+                    "reward_multiplier": config.minigrid_redbluedoors_8x8_config.reward_multiplier,
+                    "agent_view_size": config.minigrid_redbluedoors_8x8_config.agent_view_size,
+                    "max_episode_steps": config.minigrid_redbluedoors_8x8_config.max_episode_steps,
+                    "seed": config.minigrid_redbluedoors_8x8_config.seed,
+                }
+            } if config.minigrid_redbluedoors_8x8_config else {}),
         }
 
         self._current_game: Optional[GameId] = None
@@ -326,6 +353,22 @@ class ControlPanelWidget(QtWidgets.QWidget):
                 "agent_view_size": config.minigrid_lavagap_config.agent_view_size,
                 "max_episode_steps": config.minigrid_lavagap_config.max_episode_steps,
                 "seed": config.minigrid_lavagap_config.seed,
+            },
+            GameId.MINIGRID_REDBLUE_DOORS_6x6: {
+                "partial_observation": config.minigrid_redbluedoors_6x6_config.partial_observation if config.minigrid_redbluedoors_6x6_config else True,
+                "image_observation": config.minigrid_redbluedoors_6x6_config.image_observation if config.minigrid_redbluedoors_6x6_config else True,
+                "reward_multiplier": config.minigrid_redbluedoors_6x6_config.reward_multiplier if config.minigrid_redbluedoors_6x6_config else 10.0,
+                "agent_view_size": config.minigrid_redbluedoors_6x6_config.agent_view_size if config.minigrid_redbluedoors_6x6_config else None,
+                "max_episode_steps": config.minigrid_redbluedoors_6x6_config.max_episode_steps if config.minigrid_redbluedoors_6x6_config else None,
+                "seed": config.minigrid_redbluedoors_6x6_config.seed if config.minigrid_redbluedoors_6x6_config else None,
+            },
+            GameId.MINIGRID_REDBLUE_DOORS_8x8: {
+                "partial_observation": config.minigrid_redbluedoors_8x8_config.partial_observation if config.minigrid_redbluedoors_8x8_config else True,
+                "image_observation": config.minigrid_redbluedoors_8x8_config.image_observation if config.minigrid_redbluedoors_8x8_config else True,
+                "reward_multiplier": config.minigrid_redbluedoors_8x8_config.reward_multiplier if config.minigrid_redbluedoors_8x8_config else 10.0,
+                "agent_view_size": config.minigrid_redbluedoors_8x8_config.agent_view_size if config.minigrid_redbluedoors_8x8_config else None,
+                "max_episode_steps": config.minigrid_redbluedoors_8x8_config.max_episode_steps if config.minigrid_redbluedoors_8x8_config else None,
+                "seed": config.minigrid_redbluedoors_8x8_config.seed if config.minigrid_redbluedoors_8x8_config else None,
             },
         }
 

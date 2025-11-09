@@ -8,7 +8,7 @@ Source of truth: `gym_gui/services/trainer/proto/trainer.proto`
 
 | Tag | Field | Type | Current Producer | Notes |
 |-----|-------|------|------------------|-------|
-| 1 | `run_id` | string | `trainer_telemetry_proxy._mk_runstep` | Required on ingress; daemon rejects streams without it. |
+| 1 | `run_id` | string | `trainer_telemetry_proxy._make_runstep` | Required on ingress; daemon rejects streams without it. |
 | 2 | `episode_index` | uint64 | Telemetry proxy (`metadata.episode_index` fallback to `episode`) | 0-based; worker_id folds into episode_id later. |
 | 3 | `step_index` | uint64 | Telemetry proxy | Monotonic within episode. |
 | 4 | `action_json` | string | Telemetry proxy (`_coerce_str`) | JSON/text; daemon re-coerces to `int`. |

@@ -65,7 +65,7 @@ message RegisterWorkerRequest {
   string run_id = 1;
   string worker_id = 2;
   string worker_kind = 3;       // "cleanrl" | "spade-bdi" | "llm-agent"
-  string proto_version = 4;     // e.g., "MOSIAC/1.0"
+  string proto_version = 4;     // e.g., "MOSAIC/1.0"
   string schema_id = 5;         // e.g., "telemetry.step.grid"
   uint32 schema_version = 6;
   bool supports_pause = 7;

@@ -46,6 +46,8 @@ from gym_gui.game_docs.MiniGrid import (
     get_obstructed_maze_html,
     MINIGRID_CROSSING_HTML,
     get_crossing_html,
+    MINIGRID_REDBLUEDOORS_HTML,
+    get_redbluedoors_html,
 )
 from gym_gui.game_docs.ALE import (
     ADVENTURE_HTML,
@@ -128,6 +130,13 @@ GAME_INFO.update({gid: MINIGRID_MULTIROOM_HTML for gid in _MINIGRID_MULTIROOM_VA
 GAME_INFO[GameId.MINIGRID_OBSTRUCTED_MAZE_1DLHB] = MINIGRID_OBSTRUCTED_MAZE_HTML
 GAME_INFO[GameId.MINIGRID_OBSTRUCTED_MAZE_FULL] = MINIGRID_OBSTRUCTED_MAZE_HTML
 
+# RedBlueDoors variants
+_MINIGRID_REDBLUEDOORS_VARIANTS = (
+    GameId.MINIGRID_REDBLUE_DOORS_6x6,
+    GameId.MINIGRID_REDBLUE_DOORS_8x8,
+)
+GAME_INFO.update({gid: MINIGRID_REDBLUEDOORS_HTML for gid in _MINIGRID_REDBLUEDOORS_VARIANTS})
+
 # ALE mappings
 GAME_INFO[GameId.ADVENTURE_V4] = ADVENTURE_HTML
 GAME_INFO[GameId.ALE_ADVENTURE_V5] = ADVENTURE_HTML
@@ -177,6 +186,10 @@ def get_game_info(game_id: GameId) -> str:
                    GameId.MINIGRID_SIMPLE_CROSSING_S9N1, GameId.MINIGRID_SIMPLE_CROSSING_S9N2,
                    GameId.MINIGRID_SIMPLE_CROSSING_S9N3, GameId.MINIGRID_SIMPLE_CROSSING_S11N5):
         return get_crossing_html(game_id.value)
+    
+    # Handle RedBlueDoors variants dynamically
+    if game_id in (GameId.MINIGRID_REDBLUE_DOORS_6x6, GameId.MINIGRID_REDBLUE_DOORS_8x8):
+        return get_redbluedoors_html(game_id.value)
     
     return GAME_INFO.get(game_id, _DEFAULT_DOC)
 

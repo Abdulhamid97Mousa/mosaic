@@ -55,6 +55,9 @@ spadeBDI_RL
 cleanrl
 ray
 
+# Allow generated metadata committed under metadata/cleanrl
+!metadata
+
 var/records/*
 var/telemetry/*
 var/cache/*
@@ -65,9 +68,20 @@ var/policies/*
 var/trainer.sqlite
 var/trainer.pid
 var/trainer.lock
+var/trainer/
+var/data/*
 
+JASON_GRPC_BIDI_PYTHON/.jdks
+JASON_GRPC_BIDI_PYTHON/JASON_java_project/.gradle
+JASON_GRPC_BIDI_PYTHON/JASON_java_project/examples
+JASON_GRPC_BIDI_PYTHON/JASON_java_project/demos
+JASON_GRPC_BIDI_PYTHON/JASON_java_project/doc
+JASON_GRPC_BIDI_PYTHON/JASON_java_project/jason-interpreter/build/tmp
 
+# JASON_GRPC_BIDI_PYTHON
 .cursorignore
 
 #Ignore cursor AI rules
 .cursor/rules/codacy.mdc
+
+.fake

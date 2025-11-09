@@ -104,6 +104,64 @@ try:  # pragma: no cover - gym optional
 except Exception:  # pragma: no cover - gym optional
     pass
 
+try:  # pragma: no cover - gym optional
+    import gymnasium as gym
+    from gymnasium.wrappers import TransformObservation as _OrigTransformObservation
+
+    class _MosaicTransformObservation(_OrigTransformObservation):
+        def __init__(self, env, func, *, observation_space=None):
+            obs_space = observation_space or getattr(env, "observation_space", None)
+            if obs_space is None:
+                raise ValueError("TransformObservation requires an observation_space")
+            super().__init__(env, func, observation_space=obs_space)
+
+    gym.wrappers.TransformObservation = _MosaicTransformObservation
+except Exception:  # pragma: no cover - gym optional
+    pass
+
+try:  # pragma: no cover - torch optional
+    import torch
+
+    _ORIG_TORCH_SAVE = torch.save
+
+    def _mosaic_torch_save(obj, f, *args, **kwargs):
+        if isinstance(f, (str, Path)):
+            Path(f).expanduser().resolve().parent.mkdir(parents=True, exist_ok=True)
+        return _ORIG_TORCH_SAVE(obj, f, *args, **kwargs)
+
+    torch.save = _mosaic_torch_save
+except Exception:  # pragma: no cover - torch optional
+    pass
+
+try:  # pragma: no cover - cleanrl optional
+    import os
+    from cleanrl_utils.evals import ppo_eval as _ppo_eval
+
+    _ORIG_PPO_EVALUATE = _ppo_eval.evaluate
+
+    def _mosaic_ppo_evaluate(model_path, make_env, env_id, eval_episodes, run_name, Model, *, device="cpu", capture_video=True, gamma=0.99):
+        override = os.getenv("MOSAIC_CLEANRL_EVAL_EPISODES")
+        if override is not None:
+            try:
+                eval_episodes = int(override)
+            except ValueError:
+                pass
+        return _ORIG_PPO_EVALUATE(
+            model_path,
+            make_env,
+            env_id,
+            eval_episodes,
+            run_name,
+            Model,
+            device=device,
+            capture_video=capture_video,
+            gamma=gamma,
+        )
+
+    _ppo_eval.evaluate = _mosaic_ppo_evaluate
+except Exception:  # pragma: no cover - cleanrl optional
+    pass
+
 # --- TensorBoard log redirection ----------------------------------------
 try:  # pragma: no cover - tensorboard optional
     from torch.utils import tensorboard as _tb_pkg
