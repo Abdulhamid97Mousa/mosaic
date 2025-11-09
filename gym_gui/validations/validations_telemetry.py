@@ -16,6 +16,7 @@ from gym_gui.core.schema import schema_registry
 from gym_gui.validations.validations_pydantic import (
     TelemetryEventBase,
     TrainingConfig,
+    TrainerControlUpdate,
     validate_telemetry_event,
 )
 
@@ -104,6 +105,44 @@ class ValidationService(LogConstantMixin):
             return None
 
     # ------------------------------------------------------------------
+    # Supervisor control updates
+    # ------------------------------------------------------------------
+    def validate_trainer_control_update(self, update_data: Dict[str, Any]) -> Optional[TrainerControlUpdate]:
+        """Validate a supervisor-issued control update for a trainer run.
+
+        Returns the parsed model or None when invalid (unless strict_mode).
+        """
+        try:
+            update = TrainerControlUpdate(**update_data)
+            self.log_constant(
+                LOG_SERVICE_VALIDATION_DEBUG,
+                message="trainer_control_update_valid",
+                extra={"run_id": update.run_id, "source": update.source},
+            )
+            return update
+        except ValidationError as exc:
+            error_msg = f"Control update validation error: {exc}"
+            self._validation_errors.append(error_msg)
+            self.log_constant(
+                LOG_SERVICE_VALIDATION_ERROR,
+                message=error_msg,
+                extra={"phase": "trainer_control_update"},
+            )
+            if self.strict_mode:
+                raise
+            return None
+        except Exception as exc:  # pragma: no cover - unexpected path
+            error_msg = f"Unexpected control update validation error: {exc}"
+            self._validation_errors.append(error_msg)
+            self.log_constant(
+                LOG_SERVICE_VALIDATION_ERROR,
+                message=error_msg,
+                extra={"phase": "trainer_control_update", "error_type": type(exc).__name__},
+                exc_info=exc,
+            )
+            if self.strict_mode:
+                raise
+            return None
     # Lightweight step validation
     # ------------------------------------------------------------------
     def validate_step_data(

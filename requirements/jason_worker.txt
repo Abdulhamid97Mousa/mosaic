@@ -1,3 +1,26 @@
-export JAVA_HOME=/home/hamid/Desktop/Projects/GUI_BDI_RL/JASON_GRPC_BIDI_PYTHON/.jdks/jdk-21.0.5+11
+# Jason Worker Dependencies
+# -----------------------------------------------------------------------------
+# This requirements file lists Python dependencies needed when enabling the
+# Jason supervisory / agent integration. The Java Jason project now lives at:
+#   3rd_party/jason_worker
+# We DO NOT rely on the old grpc-bridge-example subproject; instead we build
+# the core Jason components (jason-cli, jason-interpreter) directly.
+#
+# Python side currently reuses the base dependencies (grpcio, protobuf, etc.)
+# for the bridge server; no extra packages are required beyond base.
+# -----------------------------------------------------------------------------
 
-export PATH=$JAVA_HOME/bin:$PATH && ./gradlew :grpc-bridge-example:build
+# Include base GUI + shared libs
+-r base.txt
+
+# -----------------------------------------------------------------------------
+# Java build instructions (NOT executed by pip; for developer reference only):
+#   export JASON_HOME="$(pwd)/3rd_party/jason_worker"
+#   cd 3rd_party/jason_worker
+#   ./gradlew config :jason-cli:build :jason-interpreter:build
+# This produces the CLI script under jason_worker/bin and core interpreter jars.
+# -----------------------------------------------------------------------------
+
+# (Removed legacy line) Previous use of `:grpc-bridge-example:build` has been
+# deprecated; the dedicated Python<->Jason bridge will communicate without that
+# example subproject.

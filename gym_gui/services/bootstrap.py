@@ -35,6 +35,9 @@ from gym_gui.constants import (
     HEALTH_MONITOR_HEARTBEAT_INTERVAL_S,
 )
 from gym_gui.controllers.live_telemetry_controllers import LiveTelemetryController
+from gym_gui.services.jason_supervisor import JasonSupervisorService
+from gym_gui.validations.validations_telemetry import ValidationService
+from gym_gui.services.jason_bridge import JasonBridgeServer
 
 
 def bootstrap_default_services() -> ServiceLocator:
@@ -76,13 +79,13 @@ def bootstrap_default_services() -> ServiceLocator:
         policy_label="BDI planner + RL policy",
         backend_label="In-process Python actor",
     )
-    actors.register_actor(
-        LLMMultiStepAgent(),
-        display_name="LLM Multi-Step Agent",
-        description="Delegates decisions to an integrated language model pipeline.",
-        policy_label="LLM planning with tool calls",
-        backend_label="External language model service",
-    )
+    # actors.register_actor(
+    #     LLMMultiStepAgent(),
+    #     display_name="LLM Multi-Step Agent",
+    #     description="Delegates decisions to an integrated language model pipeline.",
+    #     policy_label="LLM planning with tool calls",
+    #     backend_label="External language model service",
+    # )
     actors.register_actor(
         CleanRLWorkerActor(),
         display_name="CleanRL Worker",
@@ -90,6 +93,14 @@ def bootstrap_default_services() -> ServiceLocator:
         policy_label="External CleanRL policy",
         backend_label="Trainer-managed worker",
     )
+
+    # Jason Supervisor service (lightweight state + control validation)
+    supervisor_validator = ValidationService(strict_mode=False)
+    supervisor_service = JasonSupervisorService(validator=supervisor_validator)
+    # Activate by default (UI can toggle later)
+    supervisor_service.set_active(True)
+    locator.register(JasonSupervisorService, supervisor_service)
+    locator.register("supervisor_service", supervisor_service)
 
     action_mapper: ContinuousActionMapper = create_default_action_mapper()
     renderer_registry: RendererRegistry = create_default_renderer_registry()
@@ -164,6 +175,17 @@ def bootstrap_default_services() -> ServiceLocator:
     locator.register("telemetry_hub", telemetry_hub)
     locator.register("live_telemetry_controller", live_controller)
     locator.register("trainer_daemon_handle", daemon_handle)
+
+    # Optionally start Jason bridge server when enabled via env var.
+    # This is a lightweight control-plane gRPC server for Jason.
+    try:
+        if os.getenv("JASON_BRIDGE_ENABLED") == "1":
+            bridge_server = JasonBridgeServer()
+            bridge_server.start()
+            locator.register(JasonBridgeServer, bridge_server)
+            locator.register("jason_bridge_server", bridge_server)
+    except Exception:  # pragma: no cover - do not crash bootstrap on failures
+        logging.getLogger(__name__).exception("Failed to start JasonBridgeServer")
 
     return locator
 

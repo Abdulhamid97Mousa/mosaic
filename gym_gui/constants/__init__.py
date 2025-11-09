@@ -238,6 +238,12 @@ from gym_gui.constants.constants_wandb import (
     build_wandb_run_url,
 )
 
+# Supervisor (Jason) Defaults
+from gym_gui.constants.constants_jason_supervisor import (
+    SupervisorDefaults,
+    DEFAULT_SUPERVISOR,
+)
+
 # ================================================================
 # Pre-existing Constants (game_constants.py)
 # ================================================================
@@ -370,6 +376,9 @@ __all__: list[str] = [
     "DEFAULT_WANDB",
     "WandbDefaults",
     "build_wandb_run_url",
+    # Supervisor
+    "SupervisorDefaults",
+    "DEFAULT_SUPERVISOR",
     # Game (will be extended if game_constants has __all__)
 ]
 

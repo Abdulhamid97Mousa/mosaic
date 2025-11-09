@@ -130,7 +130,8 @@ class TestRedBlueDoorsLogging:
         try:
             adapter.load()
             _ = adapter.reset(seed=1)
-            boot_codes = [r.log_code for r in caplog.records if hasattr(r, "log_code")]
+            boot_codes = [getattr(r, "log_code", None) for r in caplog.records]
+            boot_codes = [c for c in boot_codes if c is not None]
             assert LOG_ENV_MINIGRID_BOOT.code in boot_codes
         finally:
             adapter.close()

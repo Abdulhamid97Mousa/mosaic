@@ -524,6 +524,68 @@ LOG_ADAPTER_ALE_METADATA_PROBE_FAILED = _constant(
 # ---------------------------------------------------------------------------
 # Service and telemetry constants (LOG601–LOG650)
 # ---------------------------------------------------------------------------
+LOG_SERVICE_SUPERVISOR_EVENT = _constant(
+    "LOG680A",
+    "INFO",
+    "Supervisor event",
+    component="Service",
+    subcomponent="Supervisor",
+    tags=_tags("supervisor", "event"),
+)
+
+LOG_SERVICE_SUPERVISOR_WARNING = _constant(
+    "LOG680B",
+    "WARNING",
+    "Supervisor warning",
+    component="Service",
+    subcomponent="Supervisor",
+    tags=_tags("supervisor", "warning"),
+)
+
+LOG_SERVICE_SUPERVISOR_ERROR = _constant(
+    "LOG680C",
+    "ERROR",
+    "Supervisor error",
+    component="Service",
+    subcomponent="Supervisor",
+    tags=_tags("supervisor", "error"),
+)
+
+LOG_SERVICE_SUPERVISOR_CONTROL_APPLIED = _constant(
+    "LOG680D",
+    "INFO",
+    "Supervisor applied control update",
+    component="Service",
+    subcomponent="Supervisor",
+    tags=_tags("supervisor", "control", "applied"),
+)
+
+LOG_SERVICE_SUPERVISOR_CONTROL_REJECTED = _constant(
+    "LOG680E",
+    "WARNING",
+    "Supervisor control update rejected",
+    component="Service",
+    subcomponent="Supervisor",
+    tags=_tags("supervisor", "control", "rejected"),
+)
+
+LOG_SERVICE_SUPERVISOR_ROLLBACK = _constant(
+    "LOG680F",
+    "INFO",
+    "Supervisor rollback executed",
+    component="Service",
+    subcomponent="Supervisor",
+    tags=_tags("supervisor", "rollback"),
+)
+
+LOG_SERVICE_SUPERVISOR_SAFETY_STATE = _constant(
+    "LOG680G",
+    "INFO",
+    "Supervisor safety state changed",
+    component="Service",
+    subcomponent="Supervisor",
+    tags=_tags("supervisor", "safety", "state"),
+)
 LOG_SERVICE_TELEMETRY_STEP_REJECTED = _constant(
     "LOG601",
     "WARNING",
@@ -1884,6 +1946,13 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_SERVICE_TELEMETRY_HUB_SUBSCRIBED,
     LOG_SERVICE_TELEMETRY_HUB_TRACE,
     LOG_SERVICE_TELEMETRY_HUB_ERROR,
+    LOG_SERVICE_SUPERVISOR_EVENT,
+    LOG_SERVICE_SUPERVISOR_WARNING,
+    LOG_SERVICE_SUPERVISOR_ERROR,
+    LOG_SERVICE_SUPERVISOR_CONTROL_APPLIED,
+    LOG_SERVICE_SUPERVISOR_CONTROL_REJECTED,
+    LOG_SERVICE_SUPERVISOR_ROLLBACK,
+    LOG_SERVICE_SUPERVISOR_SAFETY_STATE,
     LOG_RENDER_REGULATOR_NOT_STARTED,
     LOG_RENDER_DROPPED_FRAME,
     LOG_DAEMON_START,
@@ -2068,6 +2137,13 @@ __all__ = (
     "LOG_SERVICE_TELEMETRY_HUB_SUBSCRIBED",
     "LOG_SERVICE_TELEMETRY_HUB_TRACE",
     "LOG_SERVICE_TELEMETRY_HUB_ERROR",
+    "LOG_SERVICE_SUPERVISOR_EVENT",
+    "LOG_SERVICE_SUPERVISOR_WARNING",
+    "LOG_SERVICE_SUPERVISOR_ERROR",
+    "LOG_SERVICE_SUPERVISOR_CONTROL_APPLIED",
+    "LOG_SERVICE_SUPERVISOR_CONTROL_REJECTED",
+    "LOG_SERVICE_SUPERVISOR_ROLLBACK",
+    "LOG_SERVICE_SUPERVISOR_SAFETY_STATE",
     "LOG_RENDER_REGULATOR_NOT_STARTED",
     "LOG_RENDER_DROPPED_FRAME",
     "LOG_DAEMON_START",
