@@ -75,12 +75,12 @@ var/trainer.lock
 var/trainer/
 var/data/*
 
-JASON_GRPC_BIDI_PYTHON/.jdks
-JASON_GRPC_BIDI_PYTHON/JASON_java_project/.gradle
-JASON_GRPC_BIDI_PYTHON/JASON_java_project/examples
-JASON_GRPC_BIDI_PYTHON/JASON_java_project/demos
-JASON_GRPC_BIDI_PYTHON/JASON_java_project/doc
-JASON_GRPC_BIDI_PYTHON/JASON_java_project/jason-interpreter/build/tmp
+
+3rd_party/jason_worker/.gradle
+3rd/JASON_java_project/examples
+3rd/JASON_java_project/demos
+3rd/JASON_java_project/doc
+3rd/JASON_java_project/jason-interpreter/build/tmp
 
 # JASON_GRPC_BIDI_PYTHON
 .cursorignore
