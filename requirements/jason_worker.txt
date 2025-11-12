@@ -24,3 +24,56 @@
 # (Removed legacy line) Previous use of `:grpc-bridge-example:build` has been
 # deprecated; the dedicated Python<->Jason bridge will communicate without that
 # example subproject.
+
+
+
+#-----------  JASON_GRPC_BIDI_PYTHON  PROJECT-------------------------------
+# This is the dedicated Jason gRPC bidirectional bridge project, which will be used to establish comminication between Python server and Jason agents.
+# It lives at: 3rd_party/jason_worker/JASON_GRPC_BIDI_PYTHON 
+
+# OR you can use the example here  /home/hamid/Desktop/Projects/GUI_BDI_RL/JASON_GRPC_BIDI_PYTHON/JASON_java_project
+
+
+# Installation 
+# We downloaded Temurin JDK 21 for the Jason gRPC bridge builds. 
+# curl -L -o temurin21.tar.gz \
+#   https://github.com/adoptium/temurin21-binaries/releases/download/jdk-21.0.5%2B11/OpenJDK21U-jdk_x64_linux_hotspot_21.0.5_11.tar.gz &&
+# tar -xzf temurin21.tar.gz &&
+# rm temurin21.tar.gz
+
+# Run Jason gRPC Bridge
+
+# Prereqs: Python 3.11 (used by the repo’s .venv), Gradle (wrapper included), and Temurin JDK 21 extracted under jdk-21.0.5+11 (see codex-tui.log for the curl command if you need to recreate it).
+
+# Install Python side:
+# cd JASON_GRPC_BIDI_PYTHON
+# python -m venv .venv
+# source .venv/bin/activate
+# python -m pip install -r requirements.txt
+# ./tools/generate_python_protos.sh   # regenerates Python stubs if proto changed
+# python python_project/server.py --host 127.0.0.1 --port 50051
+
+# The demo server logs actions to stdout; leave it running.
+# Build & launch Jason MAS (new shell):
+
+# cd JASON_GRPC_BIDI_PYTHON/JASON_java_project
+# export JAVA_HOME=../.jdks/jdk-21.0.5+11
+# export PATH="$JAVA_HOME/bin:$PATH"
+# ./gradlew :grpc-bridge-example:build
+# ./gradlew :grpc-bridge-example:run   
+
+# You should see [GrpcBridgeEnvironment] Connected to AgentBridge… followed by AgentSpeak logs showing the Python server’s responses.
+
+# One-click demo: run_bridge_demo.sh automates the steps above (creates/installs the venv, regenerates protos, starts the Python server, runs the Gradle demo, then shuts the server down). Use bash run_bridge_demo.sh when you want the full pipeline without manual setup.
+
+# Cleanup: Stop the Java run task with Ctrl+C and terminate the Python server shell when finished. The script writes the Python server log to /tmp/py_bridge_server.log if you use it.
+
+
+# for more details look into 
+# 1. /home/hamid/Desktop/Projects/GUI_BDI_RL/JASON_GRPC_BIDI_PYTHON/docs/JASON_GRPC_BIDI_PYTHON.drawio
+# 2. /home/hamid/Desktop/Projects/GUI_BDI_RL/JASON_GRPC_BIDI_PYTHON/docs/README.md
+# 3. /home/hamid/Desktop/Projects/GUI_BDI_RL/JASON_GRPC_BIDI_PYTHON/docs/GRPC_JASON_BRIDGE.md
+
+
+# for more general overview of the JASON and MOSAIC integration look into: 
+# /home/hamid/Desktop/Projects/GUI_BDI_RL/JASON_GRPC_BIDI_PYTHON/docs/GRPC_JASON_BRIDGE.md
