@@ -417,6 +417,16 @@ DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG = MiniGridConfig(
     partial_observation=True,
 )
 
+# RedBlueDoors environments
+DEFAULT_MINIGRID_REDBLUE_DOORS_6x6_CONFIG = MiniGridConfig(
+    env_id=GameId.MINIGRID_REDBLUE_DOORS_6x6.value,
+    agent_view_size=7,
+)
+DEFAULT_MINIGRID_REDBLUE_DOORS_8x8_CONFIG = MiniGridConfig(
+    env_id=GameId.MINIGRID_REDBLUE_DOORS_8x8.value,
+    agent_view_size=7,
+)
+
 
 # ---------------------------------------------------------------------------
 # ALE (Atari) configuration
@@ -495,4 +505,6 @@ __all__ = [
     "DEFAULT_MINIGRID_DOORKEY_8x8_CONFIG",
     "DEFAULT_MINIGRID_DOORKEY_16x16_CONFIG",
     "DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG",
+    "DEFAULT_MINIGRID_REDBLUE_DOORS_6x6_CONFIG",
+    "DEFAULT_MINIGRID_REDBLUE_DOORS_8x8_CONFIG",
 ]

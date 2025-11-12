@@ -96,6 +96,8 @@ class GameId(StrEnum):
     MINIGRID_SIMPLE_CROSSING_S9N2 = "MiniGrid-SimpleCrossingS9N2-v0"
     MINIGRID_SIMPLE_CROSSING_S9N3 = "MiniGrid-SimpleCrossingS9N3-v0"
     MINIGRID_SIMPLE_CROSSING_S11N5 = "MiniGrid-SimpleCrossingS11N5-v0"
+    MINIGRID_REDBLUE_DOORS_6x6 = "MiniGrid-RedBlueDoors-6x6-v0"
+    MINIGRID_REDBLUE_DOORS_8x8 = "MiniGrid-RedBlueDoors-8x8-v0"
 
 
 def get_game_display_name(game_id: GameId) -> str:
@@ -261,6 +263,8 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.MINIGRID_SIMPLE_CROSSING_S9N2: EnvironmentFamily.MINIGRID,
     GameId.MINIGRID_SIMPLE_CROSSING_S9N3: EnvironmentFamily.MINIGRID,
     GameId.MINIGRID_SIMPLE_CROSSING_S11N5: EnvironmentFamily.MINIGRID,
+    GameId.MINIGRID_REDBLUE_DOORS_6x6: EnvironmentFamily.MINIGRID,
+    GameId.MINIGRID_REDBLUE_DOORS_8x8: EnvironmentFamily.MINIGRID,
 }
 
 
@@ -318,6 +322,8 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.MINIGRID_SIMPLE_CROSSING_S9N2: RenderMode.RGB_ARRAY,
     GameId.MINIGRID_SIMPLE_CROSSING_S9N3: RenderMode.RGB_ARRAY,
     GameId.MINIGRID_SIMPLE_CROSSING_S11N5: RenderMode.RGB_ARRAY,
+    GameId.MINIGRID_REDBLUE_DOORS_6x6: RenderMode.RGB_ARRAY,
+    GameId.MINIGRID_REDBLUE_DOORS_8x8: RenderMode.RGB_ARRAY,
 }
 
 
@@ -598,6 +604,22 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
         ControlMode.MULTI_AGENT_COMPETITIVE,
     ),
     GameId.MINIGRID_SIMPLE_CROSSING_S11N5: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+        ControlMode.MULTI_AGENT_COOP,
+        ControlMode.MULTI_AGENT_COMPETITIVE,
+    ),
+    GameId.MINIGRID_REDBLUE_DOORS_6x6: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+        ControlMode.MULTI_AGENT_COOP,
+        ControlMode.MULTI_AGENT_COMPETITIVE,
+    ),
+    GameId.MINIGRID_REDBLUE_DOORS_8x8: (
         ControlMode.HUMAN_ONLY,
         ControlMode.AGENT_ONLY,
         ControlMode.HYBRID_TURN_BASED,

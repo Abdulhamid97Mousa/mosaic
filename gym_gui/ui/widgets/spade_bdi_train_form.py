@@ -63,7 +63,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
     ) -> None:
         super().__init__(parent)
         self._logger = _LOGGER
-        self.setWindowTitle("Agent Train Form")
+        self.setWindowTitle("Spade Bdi Agent Train Form")
         # Set larger initial size to accommodate two-column layout
         # Dialog will resize dynamically when game configuration changes
         self.resize(800, 600)
@@ -100,15 +100,15 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         
         # Two-column container
         two_col_container = QtWidgets.QWidget()
-        two_col_layout = QtWidgets.QHBoxLayout(two_col_container)
-        two_col_layout.setSpacing(20)
+        two_col_layout = QtWidgets.QGridLayout(two_col_container)
+        two_col_layout.setSpacing(12)
         two_col_layout.setContentsMargins(0, 0, 0, 0)
 
         # ============ LEFT COLUMN ============
         left_layout = QtWidgets.QFormLayout()
         left_layout.setSpacing(8)
-        left_widget = QtWidgets.QWidget()
-        left_widget.setLayout(left_layout)
+        left_group = QtWidgets.QGroupBox("BDI Agent Settings (SPADE XMPP Container)")
+        left_group.setLayout(left_layout)
 
         # Game selection
         self._game_combo = QtWidgets.QComboBox(self)
@@ -177,8 +177,8 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         # ============ RIGHT COLUMN ============
         right_layout = QtWidgets.QFormLayout()
         right_layout.setSpacing(8)
-        right_widget = QtWidgets.QWidget()
-        right_widget.setLayout(right_layout)
+        right_group = QtWidgets.QGroupBox("Advanced Options")
+        right_group.setLayout(right_layout)
 
         # Toggle: disable live rendering (telemetry only)
         self._disable_live_render_checkbox = QtWidgets.QCheckBox(
@@ -220,7 +220,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         analytics_layout.setSpacing(4)
 
         self._analytics_hint_label = QtWidgets.QLabel(
-            "Enable Fast Training to export TensorBoard and WANDB analytics after the run completes."
+            "Select analytics to export after the run completes (fast training only)."
         )
         self._analytics_hint_label.setStyleSheet("color: #777777; font-size: 10px;")
         analytics_layout.addWidget(self._analytics_hint_label)
@@ -238,17 +238,17 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._wandb_project_input = QtWidgets.QLineEdit()
         self._wandb_project_input.setPlaceholderText("e.g. MOSAIC")
         self._wandb_project_input.setEnabled(False)
-        wandb_form.addRow("W&&B Project", self._wandb_project_input)
+        wandb_form.addRow("WANDB Project", self._wandb_project_input)
 
         self._wandb_entity_input = QtWidgets.QLineEdit()
         self._wandb_entity_input.setPlaceholderText("e.g. abdulhamid97mousa")
         self._wandb_entity_input.setEnabled(False)
-        wandb_form.addRow("W&&B Entity", self._wandb_entity_input)
+        wandb_form.addRow("WANDB Entity", self._wandb_entity_input)
 
         self._wandb_run_name_input = QtWidgets.QLineEdit()
         self._wandb_run_name_input.setPlaceholderText("Optional run name")
         self._wandb_run_name_input.setEnabled(False)
-        wandb_form.addRow("W&&B Run Name", self._wandb_run_name_input)
+        wandb_form.addRow("WANDB Run Name", self._wandb_run_name_input)
 
         self._wandb_api_key_input = QtWidgets.QLineEdit()
         self._wandb_api_key_input.setPlaceholderText("Optional API key override")
@@ -256,10 +256,6 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._wandb_api_key_input.setEnabled(False)
         wandb_form.addRow("WANDB API Key", self._wandb_api_key_input)
 
-        self._wandb_email_input = QtWidgets.QLineEdit()
-        self._wandb_email_input.setPlaceholderText("Optional WANDB account email")
-        self._wandb_email_input.setEnabled(False)
-        wandb_form.addRow("WANDB Email", self._wandb_email_input)
 
         self._wandb_use_vpn_checkbox = QtWidgets.QCheckBox("Route WANDB traffic through VPN proxy")
         self._wandb_use_vpn_checkbox.setEnabled(False)
@@ -278,7 +274,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
 
         analytics_layout.addLayout(wandb_form)
 
-        right_layout.addRow("Analytics Export:", analytics_widget)
+        right_layout.addRow("Analytics & Tracking:", analytics_widget)
 
         # SLIDER 1: Training Telemetry Throttle (controls data collection speed)
         telemetry_throttle_layout = QtWidgets.QHBoxLayout()
@@ -416,9 +412,21 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
 
         right_layout.addRow("Episode Buffer:", episode_buffer_layout)
 
-        # Add left and right columns to the two-column container
-        two_col_layout.addWidget(left_widget, 1)
-        two_col_layout.addWidget(right_widget, 1)
+        # Add header row and column content to the container (table-like layout)
+        header_style = "font-weight: 600; padding: 2px;"
+        left_header = QtWidgets.QLabel("BDI Agent Settings (SPADE XMPP Container)")
+        left_header.setStyleSheet(header_style)
+        left_header.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        right_header = QtWidgets.QLabel("Advanced Options")
+        right_header.setStyleSheet(header_style)
+        right_header.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+
+        two_col_layout.addWidget(left_header, 0, 0)
+        two_col_layout.addWidget(right_header, 0, 1)
+        two_col_layout.addWidget(left_group, 1, 0)
+        two_col_layout.addWidget(right_group, 1, 1)
+        two_col_layout.setColumnStretch(0, 1)
+        two_col_layout.setColumnStretch(1, 1)
         
         scroll_layout.addWidget(two_col_container)
         scroll_layout.addStretch()
@@ -783,7 +791,6 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             getattr(self, "_wandb_entity_input", None),
             getattr(self, "_wandb_run_name_input", None),
             getattr(self, "_wandb_api_key_input", None),
-            getattr(self, "_wandb_email_input", None),
         )
         wandb_proxy_fields = (
             getattr(self, "_wandb_http_proxy_input", None),
@@ -1105,7 +1112,6 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         wandb_entity = ""
         wandb_run_name = ""
         wandb_api_key = ""
-        wandb_email = ""
         wandb_http_proxy = ""
         wandb_https_proxy = ""
         wandb_use_vpn_proxy = False
@@ -1117,8 +1123,6 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
             wandb_run_name = self._wandb_run_name_input.text().strip()
         if isinstance(getattr(self, "_wandb_api_key_input", None), QtWidgets.QLineEdit):
             wandb_api_key = self._wandb_api_key_input.text().strip()
-        if isinstance(getattr(self, "_wandb_email_input", None), QtWidgets.QLineEdit):
-            wandb_email = self._wandb_email_input.text().strip()
         if isinstance(getattr(self, "_wandb_use_vpn_checkbox", None), QtWidgets.QCheckBox):
             wandb_use_vpn_proxy = self._wandb_use_vpn_checkbox.isChecked()
         raw_http_proxy = ""
@@ -1248,8 +1252,6 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
         }
         if wandb_api_key:
             environment["WANDB_API_KEY"] = wandb_api_key
-        if wandb_email:
-            environment["WANDB_EMAIL"] = wandb_email
         if wandb_use_vpn_proxy and wandb_http_proxy:
             environment["WANDB_HTTP_PROXY"] = wandb_http_proxy
             environment["HTTP_PROXY"] = wandb_http_proxy
@@ -1336,7 +1338,6 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
                         **({"wandb_project_name": wandb_project} if wandb_project else {}),
                         **({"wandb_entity": wandb_entity} if wandb_entity else {}),
                         **({"wandb_run_name": wandb_run_name} if wandb_run_name else {}),
-                        **({"wandb_email": wandb_email} if wandb_email else {}),
                         **({"wandb_api_key": wandb_api_key} if wandb_api_key else {}),
                         **({"wandb_http_proxy": wandb_http_proxy} if wandb_use_vpn_proxy and wandb_http_proxy else {}),
                         **({"wandb_https_proxy": wandb_https_proxy} if wandb_use_vpn_proxy and wandb_https_proxy else {}),

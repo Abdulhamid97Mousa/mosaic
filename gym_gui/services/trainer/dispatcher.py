@@ -13,6 +13,7 @@ from pathlib import Path
 import signal
 import re
 from typing import Any, Callable, Optional
+import importlib.util
 
 from gym_gui.services.trainer import RunRecord, RunRegistry, RunStatus
 from gym_gui.config.paths import VAR_TRAINER_DIR
@@ -20,7 +21,10 @@ from gym_gui.services.trainer.gpu import GPUAllocator
 from gym_gui.core.subprocess_validation import validated_create_subprocess_exec
 from gym_gui.core.agent_config import get_agent_config
 from gym_gui.logging_config.helpers import log_constant
-from gym_gui.logging_config.log_constants import get_constant_by_code
+from gym_gui.logging_config.log_constants import (
+    get_constant_by_code,
+    LOG_TRAINER_WORKER_IMPORT_ERROR,
+)
 
 _LOGGER = logging.getLogger("gym_gui.trainer.dispatcher")
 
@@ -329,6 +333,8 @@ class TrainerDispatcher:
                 worker_cmd = [script]
 
             if worker_cmd is not None:
+                if module and module.startswith("cleanrl_worker"):
+                    self._ensure_cleanrl_worker_available(run.run_id, module)
                 if config_path is not None and "--config" not in args:
                     args.extend(["--config", str(config_path)])
                 if use_grpc:
@@ -452,6 +458,23 @@ class TrainerDispatcher:
             extra={"run_id": run.run_id, "proxy_cmd": proxy_cmd, "worker_cmd": worker_cmd},
         )
         return proxy_cmd + worker_cmd
+
+    def _ensure_cleanrl_worker_available(self, run_id: str, module: str) -> None:
+        """Log a structured error if cleanrl_worker cannot be imported."""
+
+        if importlib.util.find_spec("cleanrl_worker") is not None:
+            return
+
+        extra = {
+            "run_id": run_id,
+            "module": module,
+            "pythonpath": os.environ.get("PYTHONPATH", ""),
+        }
+        log_constant(_LOGGER, LOG_TRAINER_WORKER_IMPORT_ERROR, extra=extra)
+        raise RuntimeError(
+            "cleanrl_worker module not importable. Ensure PYTHONPATH includes "
+            "3rd_party/cleanrl_worker before launching the trainer."
+        )
 
     def _build_worker_env(self, run: RunRecord) -> dict[str, str]:
         """Build environment variables for the worker subprocess."""

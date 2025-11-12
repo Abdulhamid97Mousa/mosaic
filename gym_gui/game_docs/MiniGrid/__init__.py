@@ -9,6 +9,7 @@ from .BlockedUnlockPickupEnv import MINIGRID_BLOCKED_UNLOCK_PICKUP_HTML
 from .MultiRoomEnv import MINIGRID_MULTIROOM_HTML, get_multiroom_html
 from .ObstructedMazeEnv import MINIGRID_OBSTRUCTED_MAZE_HTML, get_obstructed_maze_html
 from .CrossingEnv import MINIGRID_CROSSING_HTML, get_crossing_html
+from .RedBlueDoorEnv import MINIGRID_REDBLUEDOORS_HTML, get_redbluedoors_html
 
 __all__ = [
     "MINIGRID_EMPTY_HTML",
@@ -26,4 +27,6 @@ __all__ = [
     "get_obstructed_maze_html",
     "MINIGRID_CROSSING_HTML",
     "get_crossing_html",
+    "MINIGRID_REDBLUEDOORS_HTML",
+    "get_redbluedoors_html",
 ]

@@ -19,6 +19,8 @@ from gym_gui.config.game_configs import (
     DEFAULT_MINIGRID_DOORKEY_8x8_CONFIG,
     DEFAULT_MINIGRID_DOORKEY_16x16_CONFIG,
     DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG,
+    DEFAULT_MINIGRID_REDBLUE_DOORS_6x6_CONFIG,
+    DEFAULT_MINIGRID_REDBLUE_DOORS_8x8_CONFIG,
 )
 from gym_gui.core.factories.adapters import available_games
 from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWidget
@@ -67,6 +69,8 @@ class ControlPanelContainer(QtWidgets.QWidget):
             minigrid_doorkey_8x8_config=DEFAULT_MINIGRID_DOORKEY_8x8_CONFIG,
             minigrid_doorkey_16x16_config=DEFAULT_MINIGRID_DOORKEY_16x16_CONFIG,
             minigrid_lavagap_config=DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG,
+            minigrid_redbluedoors_6x6_config=DEFAULT_MINIGRID_REDBLUE_DOORS_6x6_CONFIG,
+            minigrid_redbluedoors_8x8_config=DEFAULT_MINIGRID_REDBLUE_DOORS_8x8_CONFIG,
             default_seed=settings.default_seed,
             allow_seed_reuse=settings.allow_seed_reuse,
             actors=actor_descriptors,

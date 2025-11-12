@@ -24,6 +24,8 @@ from gym_gui.logging_config.log_constants import LOG_TRAINER_LAUNCHER_LOG_FLUSH_
 CLIENT_DEFAULTS = TRAINER_DEFAULTS.client
 DAEMON_DEFAULTS = TRAINER_DEFAULTS.daemon
 
+SKIP_TRAINER_DAEMON_ENV = "GYM_GUI_SKIP_TRAINER_DAEMON"
+
 LOGGER = logging.getLogger("gym_gui.trainer.launcher")
 
 
@@ -94,6 +96,13 @@ def ensure_trainer_daemon_running(
     Returns a handle that can be used to terminate the daemon on shutdown.
     Raises ``TrainerDaemonLaunchError`` if the daemon cannot be reached.
     """
+
+    if os.getenv(SKIP_TRAINER_DAEMON_ENV) == "1":
+        LOGGER.warning(
+            "Skipping trainer daemon launch because %s=1",
+            SKIP_TRAINER_DAEMON_ENV,
+        )
+        return TrainerDaemonHandle(reused=True, process=None, log_path=None, _log_file=None)
 
     host, port = _split_target(target)
     if _is_port_open(host, port, timeout=DAEMON_DEFAULTS.port_probe_timeout_s):

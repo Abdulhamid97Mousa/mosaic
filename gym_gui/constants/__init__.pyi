@@ -94,6 +94,10 @@ from .constants_trainer import (
     TrainerRetryDefaults,
     TrainRunSchemaDefaults,
 )
+from .constants_jason_supervisor import (
+    SupervisorDefaults,
+    DEFAULT_SUPERVISOR,
+)
 from .constants_game import (
     FROZEN_LAKE_DEFAULTS,
     FROZEN_LAKE_V2_DEFAULTS,
@@ -201,4 +205,7 @@ __all__ = [
     "TAXI_DEFAULTS",
     "TOY_TEXT_DEFAULTS",
     "ToyTextDefaults",
+    # Supervisor (Jason)
+    "SupervisorDefaults",
+    "DEFAULT_SUPERVISOR",
 ]

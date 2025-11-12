@@ -1,0 +1,25 @@
+syntax = "proto3";
+
+package gymgui.supervisor;
+
+import "google/protobuf/timestamp.proto";
+
+option cc_enable_arenas = true;
+
+// Minimal control-plane update emitted by a Supervisor (e.g., Jason Supervisor)
+// to suggest safe, validated parameter adjustments during a run.
+message SupervisorControlUpdate {
+  string run_id = 1;                  // Correlates with active run
+  string reason = 2;                  // Human-readable reason (e.g., "plateau_reanneal")
+  string source = 3;                  // E.g., "jason_supervisor"
+  string params_json = 4;             // JSON map of parameter deltas (e.g., {"epsilon":0.05})
+  google.protobuf.Timestamp timestamp = 5; // When the decision was made
+}
+
+// Lightweight acknowledgement that a control update was accepted/rejected
+// by the receiver (daemon/worker). Semantics are intentionally minimal here.
+// Renamed for clarity: acknowledgement of applying a supervisor control update.
+message SupervisorControlAck {
+  bool accepted = 1;
+  string message = 2;                  // Optional diagnostic or rejection reason
+}

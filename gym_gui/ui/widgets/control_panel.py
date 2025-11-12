@@ -47,6 +47,8 @@ from gym_gui.ui.environments.single_agent_env.ale import (
     build_ale_controls,
 )
 from gym_gui.ui.workers import WorkerDefinition, get_worker_catalog
+from gym_gui.services.service_locator import get_service_locator
+from gym_gui.services.jason_supervisor import JasonSupervisorService
 
 
 @dataclass(frozen=True)
@@ -70,6 +72,9 @@ class ControlPanelConfig:
     default_seed: int
     allow_seed_reuse: bool
     actors: tuple[ActorDescriptor, ...]
+    # Optional configs for additional MiniGrid variants
+    minigrid_redbluedoors_6x6_config: MiniGridConfig | None = None
+    minigrid_redbluedoors_8x8_config: MiniGridConfig | None = None
     default_actor_id: Optional[str] = None
     workers: Tuple[WorkerDefinition, ...] = tuple()
 
@@ -120,6 +125,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
                 minigrid_doorkey_8x8_config=config.minigrid_doorkey_8x8_config,
                 minigrid_doorkey_16x16_config=config.minigrid_doorkey_16x16_config,
                 minigrid_lavagap_config=config.minigrid_lavagap_config,
+                minigrid_redbluedoors_6x6_config=config.minigrid_redbluedoors_6x6_config,
+                minigrid_redbluedoors_8x8_config=config.minigrid_redbluedoors_8x8_config,
                 default_seed=config.default_seed,
                 allow_seed_reuse=config.allow_seed_reuse,
                 actors=config.actors,
@@ -139,6 +146,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
             GameId.MINIGRID_DOORKEY_8x8: config.minigrid_doorkey_8x8_config,
             GameId.MINIGRID_DOORKEY_16x16: config.minigrid_doorkey_16x16_config,
             GameId.MINIGRID_LAVAGAP_S7: config.minigrid_lavagap_config,
+            **({GameId.MINIGRID_REDBLUE_DOORS_6x6: config.minigrid_redbluedoors_6x6_config} if config.minigrid_redbluedoors_6x6_config else {}),
+            **({GameId.MINIGRID_REDBLUE_DOORS_8x8: config.minigrid_redbluedoors_8x8_config} if config.minigrid_redbluedoors_8x8_config else {}),
         }
         self._game_overrides: Dict[GameId, Dict[str, object]] = {
             GameId.FROZEN_LAKE: {
@@ -230,6 +239,26 @@ class ControlPanelWidget(QtWidgets.QWidget):
                 "max_episode_steps": config.minigrid_lavagap_config.max_episode_steps,
                 "seed": config.minigrid_lavagap_config.seed,
             },
+            **({
+                GameId.MINIGRID_REDBLUE_DOORS_6x6: {
+                    "partial_observation": config.minigrid_redbluedoors_6x6_config.partial_observation,
+                    "image_observation": config.minigrid_redbluedoors_6x6_config.image_observation,
+                    "reward_multiplier": config.minigrid_redbluedoors_6x6_config.reward_multiplier,
+                    "agent_view_size": config.minigrid_redbluedoors_6x6_config.agent_view_size,
+                    "max_episode_steps": config.minigrid_redbluedoors_6x6_config.max_episode_steps,
+                    "seed": config.minigrid_redbluedoors_6x6_config.seed,
+                }
+            } if config.minigrid_redbluedoors_6x6_config else {}),
+            **({
+                GameId.MINIGRID_REDBLUE_DOORS_8x8: {
+                    "partial_observation": config.minigrid_redbluedoors_8x8_config.partial_observation,
+                    "image_observation": config.minigrid_redbluedoors_8x8_config.image_observation,
+                    "reward_multiplier": config.minigrid_redbluedoors_8x8_config.reward_multiplier,
+                    "agent_view_size": config.minigrid_redbluedoors_8x8_config.agent_view_size,
+                    "max_episode_steps": config.minigrid_redbluedoors_8x8_config.max_episode_steps,
+                    "seed": config.minigrid_redbluedoors_8x8_config.seed,
+                }
+            } if config.minigrid_redbluedoors_8x8_config else {}),
         }
 
         self._current_game: Optional[GameId] = None
@@ -327,6 +356,22 @@ class ControlPanelWidget(QtWidgets.QWidget):
                 "max_episode_steps": config.minigrid_lavagap_config.max_episode_steps,
                 "seed": config.minigrid_lavagap_config.seed,
             },
+            GameId.MINIGRID_REDBLUE_DOORS_6x6: {
+                "partial_observation": config.minigrid_redbluedoors_6x6_config.partial_observation if config.minigrid_redbluedoors_6x6_config else True,
+                "image_observation": config.minigrid_redbluedoors_6x6_config.image_observation if config.minigrid_redbluedoors_6x6_config else True,
+                "reward_multiplier": config.minigrid_redbluedoors_6x6_config.reward_multiplier if config.minigrid_redbluedoors_6x6_config else 10.0,
+                "agent_view_size": config.minigrid_redbluedoors_6x6_config.agent_view_size if config.minigrid_redbluedoors_6x6_config else None,
+                "max_episode_steps": config.minigrid_redbluedoors_6x6_config.max_episode_steps if config.minigrid_redbluedoors_6x6_config else None,
+                "seed": config.minigrid_redbluedoors_6x6_config.seed if config.minigrid_redbluedoors_6x6_config else None,
+            },
+            GameId.MINIGRID_REDBLUE_DOORS_8x8: {
+                "partial_observation": config.minigrid_redbluedoors_8x8_config.partial_observation if config.minigrid_redbluedoors_8x8_config else True,
+                "image_observation": config.minigrid_redbluedoors_8x8_config.image_observation if config.minigrid_redbluedoors_8x8_config else True,
+                "reward_multiplier": config.minigrid_redbluedoors_8x8_config.reward_multiplier if config.minigrid_redbluedoors_8x8_config else 10.0,
+                "agent_view_size": config.minigrid_redbluedoors_8x8_config.agent_view_size if config.minigrid_redbluedoors_8x8_config else None,
+                "max_episode_steps": config.minigrid_redbluedoors_8x8_config.max_episode_steps if config.minigrid_redbluedoors_8x8_config else None,
+                "seed": config.minigrid_redbluedoors_8x8_config.seed if config.minigrid_redbluedoors_8x8_config else None,
+            },
         }
 
         self._current_worker_id: Optional[str] = None
@@ -336,6 +381,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._update_control_states()
         self._populate_actor_combo()
         self._populate_worker_combo()
+        # Start lightweight polling of JasonSupervisorService to populate overlay labels
+        self._init_supervisor_polling()
 
     # ------------------------------------------------------------------
     # Public API
@@ -755,6 +802,9 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._session_time_label = QtWidgets.QLabel("00:00:00", self._status_group)
         self._active_time_label = QtWidgets.QLabel("—", self._status_group)
         self._outcome_time_label = QtWidgets.QLabel("—", self._status_group)
+        # Supervisor overlays (lightweight status)
+        self._supervisor_label = QtWidgets.QLabel("—", self._status_group)
+        self._safety_mode_label = QtWidgets.QLabel("—", self._status_group)
 
         fields = [
             ("Step", self._step_label),
@@ -767,6 +817,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
             ("Session Uptime", self._session_time_label),
             ("Active Play Time", self._active_time_label),
             ("Outcome Time", self._outcome_time_label),
+            ("Supervisor", self._supervisor_label),
+            ("Safety", self._safety_mode_label),
         ]
 
         midpoint = (len(fields) + 1) // 2
@@ -1308,3 +1360,60 @@ class ControlPanelWidget(QtWidgets.QWidget):
             return
         overrides = self._game_overrides.setdefault(current_game, {})
         overrides[param_name] = value
+
+    # ------------------------------------------------------------------
+    # Supervisor overlay polling
+    # ------------------------------------------------------------------
+    def _init_supervisor_polling(self) -> None:
+        """Initialize periodic polling of the JasonSupervisorService.
+
+        Polling cadence kept at 1s for minimal overhead. Uses tooltips for
+        detailed action history while keeping labels concise. Safe no-op if
+        service missing or already initialized.
+        """
+        # Avoid double init
+        if getattr(self, "_supervisor_timer", None):  # pragma: no cover - defensive
+            return
+        self._supervisor_timer = QtCore.QTimer(self)
+        self._supervisor_timer.setInterval(1000)  # 1 second cadence
+        self._supervisor_timer.timeout.connect(self._update_supervisor_labels)
+        self._update_supervisor_labels()  # prime immediately
+        self._supervisor_timer.start()
+
+    def _update_supervisor_labels(self) -> None:
+        """Fetch supervisor snapshot and update status labels.
+
+        Labels:
+        - Supervisor: Active (N) / Inactive
+        - Safety: ON / OFF
+        Detailed info (last_action, actions_emitted) exposed via tooltip.
+        """
+        try:
+            locator = get_service_locator()
+            svc = locator.resolve(JasonSupervisorService)
+            if svc is None:
+                self._supervisor_label.setText("Unavailable")
+                self._supervisor_label.setToolTip("Jason Supervisor service not registered.")
+                self._safety_mode_label.setText("—")
+                self._safety_mode_label.setToolTip("Safety unknown")
+                return
+            snap = svc.snapshot()
+            active = bool(snap.get("active"))
+            safety_on = bool(snap.get("safety_on"))
+            last_action = snap.get("last_action") or "—"
+            actions = int(snap.get("actions_emitted", 0))
+            if active:
+                self._supervisor_label.setText(f"Active ({actions})")
+                self._supervisor_label.setToolTip(
+                    f"Supervisor active\nLast Action: {last_action}\nTotal Actions: {actions}"
+                )
+            else:
+                self._supervisor_label.setText("Inactive")
+                self._supervisor_label.setToolTip("Supervisor inactive – no control actions applied.")
+            self._safety_mode_label.setText("ON" if safety_on else "OFF")
+            self._safety_mode_label.setToolTip(
+                "Safety guardrails enabled" if safety_on else "Safety guardrails disabled"
+            )
+        except Exception:  # pragma: no cover - defensive
+            # Never raise from UI polling; leave previous values intact
+            pass

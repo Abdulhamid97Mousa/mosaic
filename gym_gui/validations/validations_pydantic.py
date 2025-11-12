@@ -166,6 +166,56 @@ class TrainingConfig(BaseModel):
         return value
 
 
+class TrainerControlUpdate(BaseModel):
+    """Structured supervisor control update for trainer parameters.
+
+    This model intentionally stays generic to allow diverse knobs with
+    bounded ranges. Unknown keys are allowed to enable gradual adoption.
+    """
+
+    run_id: str = Field(..., description="Target run identifier")
+    reason: str = Field(..., description="Human-readable reason for the change")
+    source: str = Field(default="jason_supervisor", description="Origin tag of the control")
+    params: Dict[str, Any] = Field(default_factory=dict, description="Parameter overrides")
+
+    class Config:
+        extra = "allow"
+
+    @field_validator("run_id")
+    @classmethod
+    def validate_run_id(cls, value: str) -> str:
+        if not value or not value.strip():
+            raise ValueError("run_id must be non-empty")
+        return value.strip()
+
+    @field_validator("params")
+    @classmethod
+    def validate_params(cls, value: Dict[str, Any]) -> Dict[str, Any]:
+        # Bounds checking for common knobs (epsilon, per alpha/beta, lr_mult, tau)
+        if not isinstance(value, dict):
+            raise ValueError("params must be a mapping")
+        # Optional best-effort validation without hard failures
+        try:
+            eps = value.get("epsilon")
+            if eps is not None and not (0.0 <= float(eps) <= 1.0):
+                raise ValueError("epsilon must be within [0, 1]")
+            alpha = value.get("per_alpha")
+            if alpha is not None and not (0.0 <= float(alpha) <= 1.0):
+                raise ValueError("per_alpha must be within [0, 1]")
+            beta = value.get("per_beta")
+            if beta is not None and not (0.0 <= float(beta) <= 1.0):
+                raise ValueError("per_beta must be within [0, 1]")
+            tau = value.get("tau")
+            if tau is not None and not (0.0 < float(tau) <= 1.0):
+                raise ValueError("tau must be within (0, 1]")
+            lr_mult = value.get("lr_multiplier")
+            if lr_mult is not None and not (0.0 < float(lr_mult) <= 10.0):
+                raise ValueError("lr_multiplier must be within (0, 10]")
+        except (TypeError, ValueError) as exc:
+            raise ValueError(str(exc))
+        return value
+
+
 def validate_telemetry_event(event_data: Dict[str, Any]) -> TelemetryEventBase:
     """Validate and parse a telemetry event from raw data."""
 
@@ -193,5 +243,6 @@ __all__ = [
     "ArtifactEvent",
     "SubprocessCommand",
     "TrainingConfig",
+    "TrainerControlUpdate",
     "validate_telemetry_event",
 ]

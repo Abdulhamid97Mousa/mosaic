@@ -19,7 +19,7 @@ from gym_gui.logging_config.log_constants import (
 )
 
 
-def _make_adapter(**overrides: object) -> MiniGridAdapter:
+def _make_adapter(**overrides) -> MiniGridAdapter:
     config = MiniGridConfig(env_id=GameId.MINIGRID_EMPTY_5x5.value, **overrides)
     context = AdapterContext(settings=None, control_mode=ControlMode.AGENT_ONLY)
     adapter = MiniGridAdapter(context, config=config)
@@ -31,7 +31,8 @@ def test_minigrid_adapter_boot_logs_and_seed(caplog: pytest.LogCaptureFixture) -
     caplog.set_level(logging.INFO, logger="gym_gui.core.adapters.base")
     adapter = _make_adapter(partial_observation=True, image_observation=True)
     try:
-        boot_codes = [record.log_code for record in caplog.records if hasattr(record, "log_code")]
+        boot_codes = [getattr(record, "log_code", None) for record in caplog.records]
+        boot_codes = [c for c in boot_codes if c is not None]
         assert LOG_ENV_MINIGRID_BOOT.code in boot_codes
 
         first = adapter.reset(seed=123)
@@ -65,7 +66,8 @@ def test_minigrid_adapter_step_metadata(caplog: pytest.LogCaptureFixture) -> Non
         if step.state.metrics:
             assert "direction" in step.state.metrics
 
-        step_codes = [record.log_code for record in caplog.records if hasattr(record, "log_code")]
+        step_codes = [getattr(record, "log_code", None) for record in caplog.records]
+        step_codes = [c for c in step_codes if c is not None]
         assert LOG_ENV_MINIGRID_STEP.code in step_codes
 
         render_payload = step.render_payload
