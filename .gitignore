@@ -53,7 +53,11 @@ gym_gui/services/trainer/proto/trainer_pb2.pyi
 
 spadeBDI_RL
 cleanrl
+chatbdi
+coach
+xuance
 ray
+3rd_party/JASON_GRPC_BRIDGE_PYTHON
 
 # Allow generated metadata committed under metadata/cleanrl
 !metadata
