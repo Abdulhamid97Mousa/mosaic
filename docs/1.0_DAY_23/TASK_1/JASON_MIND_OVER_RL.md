@@ -1,12 +1,16 @@
 # JASON Mind Over RL
+
 **Day 23 – Design Note**  
 *(Grounded in the official Jason project (`jason-lang`) and our repository’s gRPC bridge folder `JASON_GRPC_BIDI_PYTHON`.)*
 
 ## 1. Purpose
+
 This document captures how to layer a Jason (AgentSpeak) BDI agent “mind” above reinforcement learning (RL) and environment orchestration inside `gym_gui`. It explains the Jason reasoning cycle, then maps beliefs, desires, and intentions to telemetry, adapters, and trainer services in this codebase. The goal: enable explainable, plan-driven oversight and goal management while retaining RL for continuous control or skill execution.
 
 ## 2. Why “Mind Over RL”?
+
 RL excels at micro-level action optimization; it is weak at explicit goal decomposition, reactive recovery logic, or human-auditable intent. Jason gives:
+
 * Explicit goal lifecycle (achievement / maintenance / recovery).
 * Transparent plan library & trigger semantics.
 * Message-based multi-agent coordination.
@@ -15,6 +19,7 @@ RL excels at micro-level action optimization; it is weak at explicit goal decomp
 Result: RL works as a set of embodied skills; Jason supervises which high-level goals to pursue and when to switch, suspend, or recover.
 
 ## 3. Jason Reasoning Cycle (Condensed)
+
 | Phase | Action |
 |-------|--------|
 | Perception | Gather new percepts / messages → belief revision. |
@@ -29,6 +34,7 @@ Result: RL works as a set of embodied skills; Jason supervises which high-level 
 | Completion / Failure | Pop plan or emit failure event (-!g) for recovery plans. |
 
 ## 4. BDI Mapping to This Repository
+
 | BDI Concept | Repo Integration |
 |-------------|------------------|
 | Beliefs | Derived from environment state via adapters (`gym_gui/core/adapters/*`) & telemetry hub (reward, episode step, object presence). |
@@ -39,12 +45,15 @@ Result: RL works as a set of embodied skills; Jason supervises which high-level 
 | Messages | Multi-agent coordination (e.g., negotiation of resource use) using Jason’s `.send`. |
 
 ## 5. gRPC Bridge Overview
+
 Folder: `JASON_GRPC_BIDI_PYTHON/JASON_java_project/grpc-bridge-example` (see scripts + Gradle build). The bridge enables:
+
 1. Jason agent → Python: Action request / policy directive.
 2. Python → Jason agent: Percepts (state snapshots, reward deltas, termination flags).
 3. Optional: Embedding RL skill invocation as internal Jason action (.rl_skill(Name, Args)).
 
 ### Message Contract (Conceptual)
+
 ```text
 JasonAction {
 	intention_id: string
@@ -62,6 +71,7 @@ EnvPercept {
 ```
 
 ## 6. Integration Patterns
+
 | Pattern | Description | When to Use |
 |---------|-------------|-------------|
 | High-Level Goal Dispatch | Jason selects next macro goal; RL handles primitive action loop. | Long episodes with changing objectives. |
@@ -71,6 +81,7 @@ EnvPercept {
 | Recovery Escalation | Failure event (-!g) triggers fallback RL policy (robustness). | Uncertain dynamics / hazards. |
 
 ## 7. Example AgentSpeak Fragment (Hybrid)
+
 ```asl
 // Belief seeds (ingested from Python bridge)
 +at(sector_a).
@@ -94,6 +105,7 @@ EnvPercept {
 *`.rl_skill`* is a proposed internal action stub you would implement to forward a skill invocation over gRPC; success or failure updates beliefs (`reached_all/1`).
 
 ## 8. Data Flow (Mermaid Sequence)
+
 ```mermaid
 sequenceDiagram
 	participant Jason
@@ -114,15 +126,19 @@ sequenceDiagram
 ```
 
 ## 9. Telemetry & Backpressure Hooks
+
 Leverage existing `TelemetryAsyncHub` and buffer limits. Each Bridge emission can consume credit; if credits exhausted, Jason may:
+
 1. Suspend intention (deferring new macro goals).
 2. Emit control event `+!slow_mode` to throttle RL step frequency.
 3. Switch to summarised percepts (down-sampled observation keys).
 
 ## 10. Failure & Recovery Design
+
 Use `-!goal` triggered plans for structured fallback: e.g., switch to safe navigation skill, request assistance (`.send(peer, help, lost)`), or pivot to alternative macro objective.
 
 ## 11. Performance Considerations
+
 | Concern | Mitigation |
 |---------|------------|
 | Latency bridging | Batch percepts; compress numeric vectors. |
@@ -131,6 +147,7 @@ Use `-!goal` triggered plans for structured fallback: e.g., switch to safe navig
 | Multi-agent chat storm | Rate-limit `.send` using belief counters / cooldown facts. |
 
 ## 12. Extensibility Roadmap
+
 Step | Action | Outcome
 -----|--------|--------
 1 | Define internal `.rl_skill(Name, Args)` action in bridge | Plan bodies can trigger RL skills
@@ -140,7 +157,9 @@ Step | Action | Outcome
 5 | Integrate LLM plan suggester (out-of-band, human-reviewed) | Faster plan authoring
 
 ## 13. LLM Synergy (Responsible Use)
+
 Workflow:
+
 1. Prompt LLM with current belief vocabulary & mission template.
 2. Generate candidate plans (with trigger/context/body separated).
 3. Validate logically (no unsafe infinite recursion, correct predicates).
@@ -150,6 +169,7 @@ Workflow:
 LLM output is *not* executed directly—Jason enforces structured semantics and safety.
 
 ## 14. Quick Start (Jason Side)
+
 ```bash
 # Build CLI (inside JASON_java_project or original jason repo)
 ./gradlew config
@@ -163,6 +183,7 @@ jason examples/domestic-robot/DomesticRobot.mas2j
 Then wire Python process to supply percepts from a `gym_gui` adapter and accept macro actions.
 
 ## 15. Glossary
+
 | Term | Meaning |
 |------|---------|
 | Belief | Fact in agent’s knowledge base (e.g., `at(sector_a)`). |
@@ -175,16 +196,19 @@ Then wire Python process to supply percepts from a `gym_gui` adapter and accept 
 | Percept | External input translating environment → beliefs. |
 
 ## 16. Comparison With LLM “Reasoning” (Condensed)
+
 Jason: symbolic, explicit state, deterministic selection functions.  
 LLM: statistical next-token prediction; implicit latent “world model”.  
 Hybrid: LLM drafts; Jason executes & supervises.
 
 ## 17. Safety & Auditability
+
 * All belief mutations logged (align with Day-14 telemetry guardrails).  
 * Intention switches emitted as control telemetry events for UI replay.  
 * Recovery triggers annotated with cause (e.g., `failure(navigate_waypoints, obstacle_blocked)`).
 
 ## 18. Minimal Pseudo-Code Bridge Loop
+
 ```python
 while True:
 		obs, reward, terminated, truncated, info = env.step(policy_action)
@@ -205,6 +229,7 @@ while True:
 ```
 
 ## 19. Next Steps
+
 1. Prototype `.rl_skill` internal action handler.  
 2. Implement belief translator for a selected MiniGrid variant (e.g., RedBlueDoors).  
 3. Add intention telemetry panel (mirrors existing run bus).  
@@ -212,6 +237,7 @@ while True:
 5. Explore LLM-assisted plan generation under human review.
 
 ## 20. Attribution & Sources
+
 Concepts summarized from the *Jason* open-source project (`jason-lang`), its interpreter semantics for AgentSpeak, and standard BDI literature. This document paraphrases rather than copies upstream text to respect licensing.
 
 ---

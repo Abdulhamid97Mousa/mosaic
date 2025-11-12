@@ -155,6 +155,11 @@ flowchart LR
     CW1[runtime.py]
     CW2[telemetry.py]
     CW3[MOSAIC_CLEANRL_WORKER]
+    CWA[JasonSupervisorCleanRLWorkerActor]
+  end
+  subgraph JASON Supervisor
+    JSTAB[GUI Supervisor Tab]
+    JSVC[JasonSupervisorService]
   end
   subgraph SPADE-BDI Worker
     SB1[runtime.py]
@@ -169,6 +174,10 @@ flowchart LR
   S1 -->|persist telemetry| DB
   S1 -->|broadcast events / telemetry| B1
   S1 -->|events| BUS
+  JSVC -->|control updates| S1
+  G1 -->|status poll| JSTAB
+  JSTAB -->|apply config| JSVC
+  CWA -->|snapshot poll| JSVC
 
   %% Worker stdout JSONL to proxy
   CW1 -->|stdout JSONL| P1
@@ -184,6 +193,15 @@ flowchart LR
 
 CleanRL nodes map to `cleanrl_worker/runtime.py`, `cleanrl_worker/telemetry.py`, and `cleanrl_worker/MOSAIC_CLEANRL_WORKER/`.
 SPADE‑BDI nodes map to `spade_bdi_worker/core/runtime.py`, `spade_bdi_worker/core/telemetry_worker.py`, and `spade_bdi_worker/core/tensorboard_logger.py`.
+`JASON Supervisor` now denotes the dedicated GUI tab and `JasonSupervisorService`, showing how the UI applies config, the CleanRL supervisor actor polls for snapshots, and the service emits control updates to the daemon.
+
+- Key data paths in the codebase:
+
+- `gym_gui/ui/widgets/control_panel.py` (supervisor tab) posts form values through `JasonSupervisorService.set_config()` and keeps the status labels fresh via `_update_supervisor_labels()`.
+- `gym_gui/services/jason_supervisor/service.py` validates each control update (credit guard + `ValidationService.validate_trainer_control_update`) before persisting state for the GUI and bridge.
+- `gym_gui/services/jason_bridge/server.py` exposes `ApplyControlUpdate` / `GetSupervisorStatus`, wiring external Jason agents into the supervisor service without touching the trainer internals.
+- `gym_gui/workers/jason_supervisor_cleanrl_worker/worker.py` samples `JasonSupervisorService.snapshot()` on step/episode hooks so CleanRL runs can surface supervisor metadata.
+- `gym_gui/services/trainer/trainer_telemetry_proxy.py` and the worker stdout feeds keep the telemetry plane pushing into `TrainerService`, which then broadcasts to the GUI and persists in SQLite.
 
 ## ER diagram (proto data model)
 
