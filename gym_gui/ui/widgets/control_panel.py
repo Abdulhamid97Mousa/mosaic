@@ -499,6 +499,18 @@ class ControlPanelWidget(QtWidgets.QWidget):
     def set_turn(self, turn: str) -> None:
         self._turn_label.setText(turn)
 
+    def set_fps(self, fps: float | None) -> None:
+        if fps is None or fps <= 0:
+            self._fps_label.setText("—")
+        else:
+            self._fps_label.setText(f"{fps:.1f}")
+
+    def fastlane_only_enabled(self) -> bool:
+        return self._fastlane_only_checkbox.isChecked()
+
+    def set_fastlane_only(self, enabled: bool) -> None:
+        self._fastlane_only_checkbox.setChecked(enabled)
+
     def set_mode(self, mode: ControlMode) -> None:
         index = self._mode_combo.findData(mode)
         if index < 0:
@@ -802,6 +814,10 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._session_time_label = QtWidgets.QLabel("00:00:00", self._status_group)
         self._active_time_label = QtWidgets.QLabel("—", self._status_group)
         self._outcome_time_label = QtWidgets.QLabel("—", self._status_group)
+        self._fps_label = QtWidgets.QLabel("—", self._status_group)
+        self._fastlane_only_checkbox = QtWidgets.QCheckBox("Fast Lane Only", self._status_group)
+        self._fastlane_only_checkbox.setToolTip("Skip telemetry persistence and run only on the fast lane (no replay)")
+        self._fastlane_only_checkbox.setChecked(True)
         # Supervisor overlays (lightweight status)
         self._supervisor_label = QtWidgets.QLabel("—", self._status_group)
         self._safety_mode_label = QtWidgets.QLabel("—", self._status_group)
@@ -817,6 +833,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
             ("Session Uptime", self._session_time_label),
             ("Active Play Time", self._active_time_label),
             ("Outcome Time", self._outcome_time_label),
+            ("Live FPS", self._fps_label),
+            ("Fast Lane", self._fastlane_only_checkbox),
             ("Supervisor", self._supervisor_label),
             ("Safety", self._safety_mode_label),
         ]

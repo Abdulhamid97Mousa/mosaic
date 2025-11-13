@@ -10,6 +10,8 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
+from .fastlane import is_fastlane_enabled, maybe_wrap_env
+
 # --- WANDB defaults -------------------------------------------------------
 os.environ.setdefault("WANDB_START_METHOD", "thread")
 os.environ.setdefault("WANDB__SERVICE", "disabled")
@@ -43,6 +45,8 @@ except Exception:  # pragma: no cover - wandb optional
     pass
 
 # --- Gymnasium RecordVideo helper ----------------------------------------
+_FASTLANE_ACTIVE = is_fastlane_enabled()
+
 try:  # pragma: no cover - gym optional
     import gymnasium as gym
     from gymnasium.wrappers import RecordVideo
@@ -82,22 +86,26 @@ try:  # pragma: no cover - gym optional
         RecordVideo.path = property(_get_path, _set_path)  # type: ignore[attr-defined]
 
     def _wrapped_make(env_id, *args, **kwargs):
-        env = _ORIG_MAKE(env_id, *args, **kwargs)
-        if os.getenv("MOSAIC_CAPTURE_VIDEO") != "1":
-            return env
+        render_kwargs = dict(kwargs)
+        env = None
+        if _FASTLANE_ACTIVE and "render_mode" not in render_kwargs:
+            try:
+                env = _ORIG_MAKE(env_id, *args, render_mode="rgb_array", **render_kwargs)
+            except TypeError:
+                env = _ORIG_MAKE(env_id, *args, **render_kwargs)
+        else:
+            env = _ORIG_MAKE(env_id, *args, **render_kwargs)
 
-        if isinstance(env, RecordVideo):
-            return env
+        if os.getenv("MOSAIC_CAPTURE_VIDEO") == "1" and not isinstance(env, RecordVideo):
+            render_mode = getattr(env, "render_mode", None)
+            if render_mode in _RGB_MODES:
+                video_dir = os.getenv("MOSAIC_VIDEOS_DIR", "videos")
+                try:
+                    env = RecordVideo(env, video_folder=video_dir)
+                except Exception:
+                    pass
 
-        render_mode = getattr(env, "render_mode", None)
-        if render_mode not in _RGB_MODES:
-            return env
-
-        video_dir = os.getenv("MOSAIC_VIDEOS_DIR", "videos")
-        try:
-            env = RecordVideo(env, video_folder=video_dir)
-        except Exception:
-            return env
+        env = maybe_wrap_env(env)
         return env
 
     gym.make = _wrapped_make

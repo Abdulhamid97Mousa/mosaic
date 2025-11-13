@@ -61,6 +61,9 @@ class TelemetrySQLiteStore(LogConstantMixin):
         )
         self._conn.execute("PRAGMA journal_mode=WAL")
         self._conn.execute("PRAGMA synchronous=NORMAL")
+        self._conn.execute("PRAGMA temp_store=MEMORY")
+        # Negative cache_size value means kibibytes; -131072 ~= 512 MiB cache budget
+        self._conn.execute("PRAGMA cache_size=-131072")
         self._conn.isolation_level = None  # Use explicit transactions
 
         self._queue: "queue.Queue[tuple[str, Any]]" = queue.Queue()

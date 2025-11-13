@@ -71,6 +71,7 @@ from gym_gui.services.trainer import TrainerClient, TrainerClientRunner, RunStat
 from gym_gui.services.trainer.streams import TelemetryAsyncHub
 from gym_gui.services.trainer.client_runner import TrainerWatchStopped
 from gym_gui.ui.widgets.live_telemetry_tab import LiveTelemetryTab
+from gym_gui.ui.widgets.fastlane_tab import FastLaneTab
 from gym_gui.ui.presenters.workers import (
     get_worker_presenter_registry,
 )
@@ -140,6 +141,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._game_started = False
         self._game_paused = False
         self._awaiting_human = False
+        self._latest_fps: float | None = None
         self._human_input = HumanInputController(self, self._session)
         locator = get_service_locator()
         telemetry_service = locator.resolve(TelemetryService)
@@ -160,6 +162,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._run_watch_subscription = None
         self._selected_policy_path: Optional[Path] = None
         self._run_metadata: Dict[tuple[str, str], Dict[str, Any]] = {}
+        self._fastlane_tabs_open: set[tuple[str, str]] = set()
         self._trainer_daemon_ready: bool = False
         self._trainer_poll_failures: int = 0
         self._trainer_poll_quiet_logged: bool = False
@@ -228,6 +231,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._time_refresh_timer.timeout.connect(self._refresh_time_labels)
         self._time_refresh_timer.start()
         self._refresh_time_labels()
+        self._session.set_slow_lane_enabled(not self._control_panel.fastlane_only_enabled())
+        self._render_tabs.set_human_replay_enabled(not self._control_panel.fastlane_only_enabled())
         QtCore.QTimer.singleShot(0, self._render_tabs.refresh_replays)
         
         # Poll for new training runs and auto-subscribe
@@ -427,6 +432,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._control_panel.continue_game_requested.connect(self._on_continue_game)
         self._control_panel.terminate_game_requested.connect(self._on_terminate_game)
         self._control_panel.agent_step_requested.connect(self._session.perform_agent_step)
+        self._control_panel._fastlane_only_checkbox.toggled.connect(self._on_fastlane_only_toggled)
         self._control_panel.game_changed.connect(self._on_game_changed)
         self._control_panel.control_mode_changed.connect(self._on_mode_changed)
         self._control_panel.actor_changed.connect(self._on_actor_changed)
@@ -447,6 +453,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._session.step_processed.connect(self._on_step_processed)
         self._session.episode_finished.connect(self._on_episode_finished)
         self._session.status_message.connect(self._on_status_message)
+        self._session.fps_updated.connect(self._on_fps_updated)
         # Note: awaiting_human is handled by MainWindowPresenter, not directly here
         self._session.turn_changed.connect(self._on_turn_changed)
         self._session.error_occurred.connect(self._on_error)
@@ -502,6 +509,14 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._status_bar.showMessage(f"Mode set to {label}")
         self._human_input.update_for_mode(mode)
 
+    def _on_fastlane_only_toggled(self, enabled: bool) -> None:
+        self._session.set_slow_lane_enabled(not enabled)
+        self._render_tabs.set_human_replay_enabled(not enabled)
+        if enabled:
+            self._status_bar.showMessage("Fast lane only: telemetry persistence disabled")
+        else:
+            self._status_bar.showMessage("Slow lane re-enabled")
+
     def _on_actor_changed(self, actor_id: str) -> None:
         """Handle active actor selection from the control panel."""
         try:
@@ -545,6 +560,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._session.reset_environment(seed=seed)
             self._episode_finished = False
             status = f"Loaded new episode with seed {seed}. Game started"
+
+        self._session.set_slow_lane_enabled(not self._control_panel.fastlane_only_enabled())
 
         self._session.start_game()
         self._game_started = True
@@ -838,10 +855,12 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._game_started = False
         self._game_paused = False
         self._awaiting_human = False
+        self._latest_fps = None
         self._human_input.configure(self._session.game_id, self._session.action_space)
         self._control_panel.set_auto_running(False)
         self._control_panel.set_game_started(False)  # Reset game state on new load
         self._control_panel.set_game_paused(False)
+        self._control_panel.set_fps(None)
         self._update_input_state()
         self._refresh_time_labels()
         
@@ -892,6 +911,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         )
         
         self._render_tabs.display_payload(render_payload)
+
+    def _on_fps_updated(self, fps: float) -> None:
+        self._latest_fps = fps if fps > 0 else None
+        self._control_panel.set_fps(self._latest_fps)
 
     def _on_episode_finished(self, finished: bool) -> None:
         self._episode_finished = finished
@@ -1318,6 +1341,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         agent_id_key = worker_meta.get("agent_id") or worker_config.get("agent_id") or "default"
         self._run_metadata[(run_id, agent_id_key)] = metadata
 
+        # Attempt to provision FastLane tab immediately (fastlane-only runs may never emit telemetry)
+        self._maybe_open_fastlane_tab(run_id, agent_id_key)
+
         tb_ready = self._analytics_tabs.ensure_tensorboard_tab(run_id, agent_id_key, metadata)
         wb_ready = self._analytics_tabs.ensure_wandb_tab(run_id, agent_id_key, metadata)
 
@@ -1404,6 +1430,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             message="Created live telemetry tab",
             extra={"run_id": run_id, "agent_id": agent_id, "title": tab_title, "game_id": game_id_str},
         )
+
+        self._maybe_open_fastlane_tab(run_id, agent_id)
 
     # NOTE: Removed _on_live_step_received and _on_live_episode_received
     # The LiveTelemetryController now owns all routing (tab creation and step/episode delivery).
@@ -1497,6 +1525,96 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 extra={"run_id": run_id, "agent_id": agent_id, "error": str(e)},
                 exc_info=e,
             )
+
+    def _resolve_run_metadata(self, run_id: str, agent_id: str) -> Optional[Dict[str, Any]]:
+        meta = self._run_metadata.get((run_id, agent_id))
+        if meta is not None:
+            return meta
+        for (stored_run_id, _stored_agent), stored_meta in self._run_metadata.items():
+            if stored_run_id == run_id:
+                return stored_meta
+        return None
+
+    def _maybe_open_fastlane_tab(self, run_id: str, agent_id: str) -> None:
+        metadata = self._resolve_run_metadata(run_id, agent_id)
+        if not metadata:
+            _LOGGER.debug(
+                "FastLane tab skipped; metadata missing",
+                extra={"run_id": run_id, "agent_id": agent_id},
+            )
+            return
+        if not self._metadata_supports_fastlane(metadata):
+            _LOGGER.debug(
+                "FastLane tab skipped; metadata does not signal fastlane",
+                extra={"run_id": run_id, "agent_id": agent_id},
+            )
+            return
+
+        canonical_agent_id = self._canonical_agent_id(metadata, agent_id)
+        key = (run_id, canonical_agent_id)
+        if key in self._fastlane_tabs_open:
+            _LOGGER.debug(
+                "FastLane tab already open",
+                extra={"run_id": run_id, "agent_id": canonical_agent_id},
+            )
+            return
+
+        tab = FastLaneTab(run_id, canonical_agent_id, parent=self._render_tabs)
+        title = f"CleanRL-Live-{canonical_agent_id or 'agent'}"
+        self._render_tabs.add_dynamic_tab(run_id, title, tab)
+        self._fastlane_tabs_open.add(key)
+        _LOGGER.info(
+            "FastLane tab opened",
+            extra={"run_id": run_id, "agent_id": canonical_agent_id, "title": title},
+        )
+
+    def _canonical_agent_id(self, metadata: Dict[str, Any], fallback: str) -> str:
+        worker_meta = metadata.get("worker") if isinstance(metadata, dict) else None
+        if isinstance(worker_meta, dict):
+            meta_agent = worker_meta.get("agent_id")
+            if isinstance(meta_agent, str) and meta_agent.strip():
+                return meta_agent.strip()
+            worker_config = worker_meta.get("config")
+            if isinstance(worker_config, dict):
+                config_agent = worker_config.get("agent_id")
+                if isinstance(config_agent, str) and config_agent.strip():
+                    return config_agent.strip()
+        return fallback
+
+    def _metadata_supports_fastlane(self, metadata: Dict[str, Any]) -> bool:
+        """Return True if the run metadata indicates FastLane visuals are available."""
+
+        def _is_truthy(value: Any) -> bool:
+            if isinstance(value, bool):
+                return value
+            if isinstance(value, (int, float)):
+                return value != 0
+            if isinstance(value, str):
+                return value.strip().lower() in {"1", "true", "yes", "on"}
+            return False
+
+        ui_meta = metadata.get("ui") if isinstance(metadata, dict) else None
+        if isinstance(ui_meta, dict) and _is_truthy(ui_meta.get("fastlane_only")):
+            return True
+
+        worker_meta = metadata.get("worker") if isinstance(metadata, dict) else None
+        if not isinstance(worker_meta, dict):
+            return False
+
+        module_name = str(worker_meta.get("module") or "").lower()
+        worker_kind = str(worker_meta.get("worker_kind") or "").lower()
+        worker_identifier = str(worker_meta.get("worker_id") or "").lower()
+        if "cleanrl_worker" in module_name or worker_kind == "cleanrl" or worker_identifier == "cleanrl_worker":
+            return True
+
+        worker_config = worker_meta.get("config")
+        if isinstance(worker_config, dict):
+            extras = worker_config.get("extras")
+            if isinstance(extras, dict):
+                if _is_truthy(extras.get("fastlane_only")) or _is_truthy(extras.get("fastlane_enabled")):
+                    return True
+
+        return False
 
     def _backfill_run_metadata_from_disk(self, run_id: str) -> None:
         """Load run metadata for previously scheduled runs discovered outside the submission flow."""
@@ -1751,6 +1869,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             message="Run completed signal received",
             extra={"run_id": run_id},
         )
+
+        self._fastlane_tabs_open = {key for key in self._fastlane_tabs_open if key[0] != run_id}
 
         # Unsubscribe from telemetry (stops new events from arriving)
         if self._live_controller:

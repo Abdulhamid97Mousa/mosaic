@@ -15,12 +15,18 @@ import json
 import os
 import sys
 import logging
+from multiprocessing import shared_memory
 from typing import Any, AsyncIterator, Dict, Optional
+from time import perf_counter
 
 import grpc
 
 from gym_gui.services.trainer.proto import trainer_pb2, trainer_pb2_grpc
 from gym_gui.core.subprocess_validation import validated_create_subprocess_exec
+from gym_gui.fastlane import FastLaneConfig, FastLaneWriter, FastLaneMetrics
+from gym_gui.fastlane.buffer import create_fastlane_name
+
+import numpy as np
 
 _LOGGER = logging.getLogger("gym_gui.trainer.telemetry_proxy")
 
@@ -63,6 +69,39 @@ def _coerce_str(x: Any) -> str:
     if isinstance(x, (dict, list, bool, int, float)):
         return json.dumps(x, separators=(",", ":"))
     return str(x)
+
+
+def _ensure_payload_dict(value: Any) -> Dict[str, Any] | None:
+    if value is None:
+        return None
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except json.JSONDecodeError:
+            return None
+    if isinstance(value, dict):
+        return value
+    return None
+
+
+def _extract_frame_from_payload(payload: Dict[str, Any]) -> tuple[bytes, int, int, int] | None:
+    if payload is None:
+        return None
+    rgb = payload.get("rgb") or payload.get("RGB")
+    if rgb is None:
+        return None
+    if np is None:
+        return None
+    try:
+        arr = np.asarray(rgb, dtype=np.uint8)
+    except Exception:
+        return None
+    if arr.ndim != 3:
+        return None
+    height, width, channels = arr.shape
+    if channels not in (1, 3, 4):
+        return None
+    return arr.tobytes(), width, height, channels
 
 
 def _make_runstep(
@@ -126,6 +165,23 @@ def _make_runstep(
     if isinstance(ts_ns, (int, float, str)) and str(ts_ns).replace('.', '').replace('-', '').isdigit():
         msg.timestamp.CopyFrom(_ts_from_unix_ns(int(float(ts_ns))))
     return msg
+
+
+def _compute_fastlane_metrics(ev: Dict[str, Any], last_ts: Optional[float]) -> tuple[FastLaneMetrics, float]:
+    reward = float(ev.get("reward", 0.0))
+    rolling = float(ev.get("total_reward", ev.get("episode_return", 0.0)))
+    now = perf_counter()
+    if last_ts is None:
+        rate = 0.0
+    else:
+        delta = now - last_ts
+        rate = (1.0 / delta) if delta > 0 else 0.0
+    metrics = FastLaneMetrics(
+        last_reward=reward,
+        rolling_return=rolling,
+        step_rate_hz=rate,
+    )
+    return metrics, now
 
 
 def _make_runepisode(
@@ -291,10 +347,45 @@ async def run_proxy(
     ep_q: asyncio.Queue[Optional[trainer_pb2.RunEpisode]] = asyncio.Queue(maxsize=max_queue)
     step_count = 0
     episode_count = 0
+    fastlane_writer: FastLaneWriter | None = None
+    fastlane_last_ts: float | None = None
 
     # Tasks to publish streams
     steps_task = asyncio.create_task(_publish_steps(stub, step_q), name="publish-steps")
     eps_task = asyncio.create_task(_publish_episodes(stub, ep_q), name="publish-episodes")
+
+    def _publish_fastlane(ev: Dict[str, Any]) -> None:
+        nonlocal fastlane_writer, fastlane_last_ts
+        payload = ev.get("render_payload")
+        payload_dict = _ensure_payload_dict(payload)
+        if payload_dict is None:
+            return
+        frame = _extract_frame_from_payload(payload_dict)
+        if frame is None:
+            return
+        frame_bytes, width, height, channels = frame
+        if fastlane_writer is None:
+            config = FastLaneConfig(
+                width=width,
+                height=height,
+                channels=channels,
+                pixel_format="RGB" if channels == 3 else "RGBA",
+            )
+            try:
+                fastlane_writer = FastLaneWriter.create(run_id, config)
+            except FileExistsError:
+                try:
+                    shm = shared_memory.SharedMemory(name=create_fastlane_name(run_id), create=False)
+                except FileNotFoundError:
+                    return
+                fastlane_writer = FastLaneWriter(shm, config)
+        if fastlane_writer is None:
+            return
+        metrics, fastlane_last_ts = _compute_fastlane_metrics(ev, fastlane_last_ts)
+        try:
+            fastlane_writer.publish(frame_bytes, metrics=metrics)
+        except Exception as exc:  # pragma: no cover - best effort
+            _LOGGER.debug("Fast lane publish failed", exc_info=exc)
 
     async def read_worker() -> None:
         """Tail worker stdout and enqueue parsed events."""
@@ -307,6 +398,7 @@ async def run_proxy(
                     step_msg = _make_runstep(ev, run_id, agent_id, worker_id)
                     step_q.put_nowait(step_msg)
                     step_count += 1
+                    _publish_fastlane(ev)
                     if step_count <= 5:
                         _LOGGER.debug(
                             "Proxy enqueued step",
@@ -388,6 +480,10 @@ async def run_proxy(
             t.cancel()
             with contextlib.suppress(asyncio.CancelledError):
                 await t
+
+    if fastlane_writer is not None:
+        fastlane_writer.close()
+        fastlane_writer.unlink()
 
     return int(rc)
 

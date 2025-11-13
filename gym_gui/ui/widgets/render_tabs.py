@@ -441,6 +441,14 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
             host.set_current_game(self._current_game)
         return host
 
+    def set_human_replay_enabled(self, enabled: bool) -> None:
+        if 0 <= self._replay_tab_index < self.count():
+            self.setTabEnabled(self._replay_tab_index, enabled)
+            tip = "Review episodes from manual gameplay sessions only"
+            if not enabled:
+                tip += " (disabled in Fast Lane only mode)"
+            self.setTabToolTip(self._replay_tab_index, tip)
+
     def _update_game_from_payload(self, payload: Mapping[str, object]) -> None:
         raw_game = payload.get("game_id")
         if raw_game is None:

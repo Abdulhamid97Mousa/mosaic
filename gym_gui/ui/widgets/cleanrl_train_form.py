@@ -271,6 +271,8 @@ class _FormState:
     notes: Optional[str]
     validate_only: bool
     algo_params: Dict[str, Any]
+    fastlane_only: bool
+    fastlane_slot: int
 
 
 _LOGGER = logging.getLogger("gym_gui.ui.cleanrl_train_form")
@@ -403,6 +405,19 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
         table_layout.addWidget(_inline_field("GPU", self._use_gpu_checkbox), 2, 0)
         table_layout.addWidget(_inline_field("Validate", self._dry_run_checkbox), 2, 1)
         table_layout.addWidget(_inline_field("Capture Video", capture_video_container), 2, 2)
+
+        self._fastlane_checkbox = QtWidgets.QCheckBox("Fast Lane Only (skip telemetry persistence)", self)
+        self._fastlane_checkbox.setChecked(True)
+        self._fastlane_checkbox.setToolTip("Disables the slow lane (gRPC/SQLite) so only the shared-memory fast lane runs.")
+        self._fastlane_slot_spin = QtWidgets.QSpinBox(self)
+        self._fastlane_slot_spin.setRange(0, 64)
+        self._fastlane_slot_spin.setValue(0)
+        self._fastlane_slot_spin.setToolTip(
+            "Select which CleanRL vectorized environment index feeds the FastLane stream (0 targets the first env)."
+        )
+        table_layout.addWidget(_inline_field("Telemetry Mode", self._fastlane_checkbox), 3, 0)
+        table_layout.addWidget(_inline_field("Fast Lane Slot", self._fastlane_slot_spin), 3, 1)
+
         table_layout.setColumnStretch(0, 1)
         table_layout.setColumnStretch(1, 1)
         table_layout.setColumnStretch(2, 1)
@@ -760,6 +775,8 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
             if isinstance(capture_video_widget, QtWidgets.QCheckBox)
             else False
         )
+        fastlane_only = bool(self._fastlane_checkbox.isChecked())
+        fastlane_slot = int(self._fastlane_slot_spin.value())
         return _FormState(
             algo=algo,
             env_id=env_id,
@@ -781,6 +798,8 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
             notes=notes,
             validate_only=self._dry_run_checkbox.isChecked(),
             algo_params=algo_params,
+            fastlane_only=fastlane_only,
+            fastlane_slot=fastlane_slot,
         )
 
     def _build_config(self, state: _FormState, *, run_id: Optional[str] = None) -> Dict[str, Any]:
@@ -809,6 +828,8 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
             extras["notes"] = state.notes
         if state.algo_params:
             extras["algo_params"] = state.algo_params
+        extras["fastlane_only"] = bool(state.fastlane_only)
+        extras["fastlane_slot"] = int(state.fastlane_slot)
 
         worker_config: Dict[str, Any] = {
             "run_id": run_id,
@@ -836,6 +857,8 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 "algo": state.algo,
                 "env_id": state.env_id,
                 "dry_run": state.validate_only,
+                "fastlane_only": state.fastlane_only,
+                "fastlane_slot": int(state.fastlane_slot),
             },
             "worker": {
                 "worker_id": state.worker_id or "cleanrl_worker",
@@ -873,6 +896,8 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
             "TRACK_WANDB": "1" if state.track_wandb else "0",
             "WANDB_MODE": "online" if state.track_wandb else "offline",
             "WANDB_DISABLE_GYM": "true",
+            "GYM_GUI_FASTLANE_ONLY": "1" if state.fastlane_only else "0",
+            "GYM_GUI_FASTLANE_SLOT": str(state.fastlane_slot),
         }
         if state.wandb_api_key:
             environment["WANDB_API_KEY"] = state.wandb_api_key

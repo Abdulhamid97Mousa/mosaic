@@ -145,6 +145,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._effective_settings: Settings = settings
         locator = get_service_locator()
         self._telemetry = locator.resolve(TelemetryService)
+        self._slow_lane_enabled: bool = False
         self._actor_service = locator.resolve(ActorService)
         self._frame_storage = locator.resolve(FrameStorageService)
         self._storage_service = locator.resolve(StorageRecorderService)
@@ -174,6 +175,9 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._auto_timer.setInterval(interval)
         self._user_idle_interval = interval
         self._update_idle_timer()
+
+    def set_slow_lane_enabled(self, enabled: bool) -> None:
+        self._slow_lane_enabled = bool(enabled)
 
     def start_game(self) -> None:
         """Mark the game as started and enable input controls."""
@@ -938,7 +942,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             space_signature=space_signature,
             vector_metadata=combined_vector_metadata,
         )
-        if self._telemetry is not None:
+        if self._telemetry is not None and self._slow_lane_enabled:
             self._telemetry.record_step(record)
         return record
 
@@ -980,10 +984,18 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             interval = interaction.idle_interval_ms()
             if interval is not None:
                 return interval
+        family = None
+        if self._game_id is not None:
+            try:
+                family = ENVIRONMENT_FAMILY_BY_GAME.get(self._game_id)
+            except Exception:
+                family = None
+        if family in (EnvironmentFamily.ATARI, EnvironmentFamily.ALE):
+            return 16  # ~60 FPS fallback for Atari/ALE
         return self._compute_idle_interval()
 
     def _set_idle_interval(self, interval: int) -> None:
-        clamped = max(30, int(interval))
+        clamped = max(10, int(interval))
         if clamped != self._current_idle_interval:
             self._idle_timer.setInterval(clamped)
             self._current_idle_interval = clamped
