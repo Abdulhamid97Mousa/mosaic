@@ -89,6 +89,8 @@ _RESERVED_EXTRA_KEYS: frozenset[str] = frozenset(
         "wandb_https_proxy",
         "wandb_use_vpn_proxy",
         "agent_id",
+        "fastlane_only",
+        "fastlane_slot",
     }
 )
 

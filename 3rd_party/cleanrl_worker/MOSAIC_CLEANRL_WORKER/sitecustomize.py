@@ -10,7 +10,13 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from .fastlane import is_fastlane_enabled, maybe_wrap_env
+try:  # pragma: no cover - handle import context differences
+    from .fastlane import is_fastlane_enabled, maybe_wrap_env  # type: ignore[attr-defined]
+except ImportError:  # pragma: no cover - fallback when package context missing
+    from cleanrl_worker.MOSAIC_CLEANRL_WORKER.fastlane import (  # type: ignore
+        is_fastlane_enabled,
+        maybe_wrap_env,
+    )
 
 # --- WANDB defaults -------------------------------------------------------
 os.environ.setdefault("WANDB_START_METHOD", "thread")

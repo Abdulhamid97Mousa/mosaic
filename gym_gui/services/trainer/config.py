@@ -290,6 +290,12 @@ def validate_train_run_config(raw: Mapping[str, Any]) -> TrainRunConfig:
         metadata_payload["artifacts"] = artifacts_meta
 
     metadata = TrainerRunMetadata(run_id=run_id, digest=digest, submitted_at=submitted)
+
+    environment = canonical.get("environment")
+    if isinstance(environment, MutableMapping):
+        if "CLEANRL_RUN_ID" in environment:
+            environment["CLEANRL_RUN_ID"] = run_id
+
     return TrainRunConfig(payload=canonical, metadata=metadata)
 
 

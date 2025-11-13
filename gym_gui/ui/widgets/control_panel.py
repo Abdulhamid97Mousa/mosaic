@@ -47,6 +47,7 @@ from gym_gui.ui.environments.single_agent_env.ale import (
     build_ale_controls,
 )
 from gym_gui.ui.workers import WorkerDefinition, get_worker_catalog
+from gym_gui.ui.widgets.cleanrl_train_form import get_cleanrl_environment_choices
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.jason_supervisor import JasonSupervisorService
 
@@ -375,6 +376,10 @@ class ControlPanelWidget(QtWidgets.QWidget):
         }
 
         self._current_worker_id: Optional[str] = None
+        self._cleanrl_env_combo: Optional[QtWidgets.QComboBox] = None
+        self._cleanrl_env_container: Optional[QtWidgets.QWidget] = None
+        self._cleanrl_env_label: Optional[QtWidgets.QLabel] = None
+        self._selected_cleanrl_env_id: Optional[str] = None
         self._build_ui()
         self._apply_current_mode_selection()
         self._connect_signals()
@@ -545,6 +550,11 @@ class ControlPanelWidget(QtWidgets.QWidget):
 
     def current_game(self) -> Optional[GameId]:
         return self._current_game
+
+    def cleanrl_environment_id(self) -> Optional[str]:
+        """Return the currently selected CleanRL environment id (Agent-only tab)."""
+
+        return self._selected_cleanrl_env_id
 
     def get_overrides(self, game_id: GameId) -> Dict[str, object]:
         return dict(self._game_overrides.get(game_id, {}))
@@ -737,6 +747,29 @@ class ControlPanelWidget(QtWidgets.QWidget):
     def _create_training_group(self, parent: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
         group = QtWidgets.QGroupBox("Headless Training", parent)
         layout = QtWidgets.QVBoxLayout(group)
+
+        cleanrl_widget = QtWidgets.QWidget(group)
+        cleanrl_layout = QtWidgets.QHBoxLayout(cleanrl_widget)
+        cleanrl_layout.setContentsMargins(0, 0, 0, 0)
+        cleanrl_layout.setSpacing(6)
+        env_label = QtWidgets.QLabel("CleanRL Environment:", cleanrl_widget)
+        cleanrl_layout.addWidget(env_label)
+        env_combo = QtWidgets.QComboBox(cleanrl_widget)
+        for label, env_id in get_cleanrl_environment_choices():
+            env_combo.addItem(label, env_id)
+        env_combo.currentIndexChanged.connect(self._on_cleanrl_env_changed)
+        if env_combo.count() > 0:
+            env_combo.setCurrentIndex(0)
+            current = env_combo.currentData()
+            self._selected_cleanrl_env_id = str(current) if isinstance(current, str) else None
+        env_combo.setEnabled(False)
+        cleanrl_layout.addWidget(env_combo, 1)
+        cleanrl_widget.setVisible(False)
+        layout.addWidget(cleanrl_widget)
+        self._cleanrl_env_combo = env_combo
+        self._cleanrl_env_container = cleanrl_widget
+        self._cleanrl_env_label = env_label
+
         self._configure_agent_button = QtWidgets.QPushButton("🚀 Configure Agent…", group)
         self._configure_agent_button.setToolTip(
             "Open the agent training form to configure the backend used for headless training."
@@ -1182,6 +1215,13 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._update_actor_description()
         self.actor_changed.emit(actor_id)
 
+    def _on_cleanrl_env_changed(self, index: int) -> None:
+        combo = self._cleanrl_env_combo
+        if combo is None:
+            return
+        env_id = combo.itemData(index)
+        self._selected_cleanrl_env_id = str(env_id) if isinstance(env_id, str) else None
+
     def _on_worker_selection_changed(self, index: int) -> None:
         worker_id = self._worker_combo.itemData(index)
         if not isinstance(worker_id, str):
@@ -1191,6 +1231,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._current_worker_id = worker_id
         self._update_worker_description()
         self._update_control_states()
+        self._sync_cleanrl_env_widget()
         if worker_id:
             self.worker_changed.emit(worker_id)
 
@@ -1229,6 +1270,13 @@ class ControlPanelWidget(QtWidgets.QWidget):
             if definition.worker_id == self._current_worker_id:
                 return definition
         return None
+
+    def _sync_cleanrl_env_widget(self) -> None:
+        if self._cleanrl_env_container is None or self._cleanrl_env_combo is None:
+            return
+        is_cleanrl = self._current_worker_id == "cleanrl_worker"
+        self._cleanrl_env_container.setVisible(is_cleanrl)
+        self._cleanrl_env_combo.setEnabled(is_cleanrl)
 
     def _update_worker_description(self) -> None:
         definition = self._current_worker_definition()

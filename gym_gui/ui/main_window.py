@@ -1035,11 +1035,18 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             return
 
         factory = get_worker_form_factory()
+        form_kwargs: dict[str, Any] = {
+            "parent": self,
+            "default_game": self._control_panel.current_game(),
+        }
+        if worker_id == "cleanrl_worker":
+            env_id = self._control_panel.cleanrl_environment_id()
+            if env_id:
+                form_kwargs["default_env_id"] = env_id
         try:
             dialog = factory.create_train_form(
                 worker_id,
-                parent=self,
-                default_game=self._control_panel.current_game(),
+                **form_kwargs,
             )
         except KeyError:
             QtWidgets.QMessageBox.warning(
@@ -1538,14 +1545,16 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
     def _maybe_open_fastlane_tab(self, run_id: str, agent_id: str) -> None:
         metadata = self._resolve_run_metadata(run_id, agent_id)
         if not metadata:
-            _LOGGER.debug(
-                "FastLane tab skipped; metadata missing",
+            self.log_constant(
+                LOG_UI_MAINWINDOW_TRACE,
+                message="FastLane tab skipped; metadata missing",
                 extra={"run_id": run_id, "agent_id": agent_id},
             )
             return
         if not self._metadata_supports_fastlane(metadata):
-            _LOGGER.debug(
-                "FastLane tab skipped; metadata does not signal fastlane",
+            self.log_constant(
+                LOG_UI_MAINWINDOW_TRACE,
+                message="FastLane tab skipped; metadata does not advertise fastlane",
                 extra={"run_id": run_id, "agent_id": agent_id},
             )
             return
@@ -1553,18 +1562,30 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         canonical_agent_id = self._canonical_agent_id(metadata, agent_id)
         key = (run_id, canonical_agent_id)
         if key in self._fastlane_tabs_open:
-            _LOGGER.debug(
-                "FastLane tab already open",
+            self.log_constant(
+                LOG_UI_MAINWINDOW_TRACE,
+                message="FastLane tab already tracked",
                 extra={"run_id": run_id, "agent_id": canonical_agent_id},
             )
             return
 
-        tab = FastLaneTab(run_id, canonical_agent_id, parent=self._render_tabs)
+        try:
+            tab = FastLaneTab(run_id, canonical_agent_id, parent=self._render_tabs)
+        except Exception as exc:
+            self.log_constant(
+                LOG_UI_MAINWINDOW_WARNING,
+                message="Failed to create FastLane tab",
+                extra={"run_id": run_id, "agent_id": canonical_agent_id},
+                exc_info=exc,
+            )
+            return
+
         title = f"CleanRL-Live-{canonical_agent_id or 'agent'}"
         self._render_tabs.add_dynamic_tab(run_id, title, tab)
         self._fastlane_tabs_open.add(key)
-        _LOGGER.info(
-            "FastLane tab opened",
+        self.log_constant(
+            LOG_UI_MAINWINDOW_INFO,
+            message="Opened FastLane tab",
             extra={"run_id": run_id, "agent_id": canonical_agent_id, "title": title},
         )
 

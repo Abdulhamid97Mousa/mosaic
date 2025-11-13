@@ -240,7 +240,13 @@ def _build_environment_choices() -> tuple[tuple[str, str], ...]:
     return tuple(choices)
 
 
-_ENVIRONMENT_CHOICES: tuple[tuple[str, str], ...] = _build_environment_choices()
+CLEANRL_ENVIRONMENT_CHOICES: tuple[tuple[str, str], ...] = _build_environment_choices()
+
+
+def get_cleanrl_environment_choices() -> tuple[tuple[str, str], ...]:
+    """Return the list of (label, env_id) tuples supported by CleanRL."""
+
+    return CLEANRL_ENVIRONMENT_CHOICES
 
 
 def _generate_run_id(prefix: str, algo: str) -> str:
@@ -281,7 +287,13 @@ _LOGGER = logging.getLogger("gym_gui.ui.cleanrl_train_form")
 class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
     """Minimal training configuration dialog for CleanRL worker."""
 
-    def __init__(self, parent: Optional[QtWidgets.QWidget] = None, *, default_game: Optional[GameId] = None) -> None:
+    def __init__(
+        self,
+        parent: Optional[QtWidgets.QWidget] = None,
+        *,
+        default_game: Optional[GameId] = None,
+        default_env_id: Optional[str] = None,
+    ) -> None:
         super().__init__(parent)
         self._logger = _LOGGER
         self.setWindowTitle("CleanRl Agent Train Form")
@@ -350,10 +362,15 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._env_combo.setView(env_view)
         self._env_combo.setStyleSheet("QComboBox { combobox-popup: 0; }")
         self._env_combo.setMaxVisibleItems(10)
-        for label, env_id in _ENVIRONMENT_CHOICES:
+        for label, env_id in CLEANRL_ENVIRONMENT_CHOICES:
             self._env_combo.addItem(label, env_id)
 
-        if default_game is not None:
+        if default_env_id:
+            idx = self._env_combo.findData(default_env_id)
+            if idx >= 0:
+                self._env_combo.setCurrentIndex(idx)
+
+        if self._env_combo.currentIndex() < 0 and default_game is not None:
             index = self._env_combo.findData(default_game.value)
             if index >= 0:
                 self._env_combo.setCurrentIndex(index)
@@ -889,6 +906,12 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
             "notes": state.notes,
         }
 
+        num_envs_value = state.algo_params.get("num_envs")
+        try:
+            num_envs_str = str(int(num_envs_value))
+        except (TypeError, ValueError):
+            num_envs_str = "1"
+
         environment: Dict[str, Any] = {
             "CLEANRL_RUN_ID": run_id,
             "CLEANRL_AGENT_ID": state.agent_id or "cleanrl_agent",
@@ -898,6 +921,7 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
             "WANDB_DISABLE_GYM": "true",
             "GYM_GUI_FASTLANE_ONLY": "1" if state.fastlane_only else "0",
             "GYM_GUI_FASTLANE_SLOT": str(state.fastlane_slot),
+            "CLEANRL_NUM_ENVS": num_envs_str,
         }
         if state.wandb_api_key:
             environment["WANDB_API_KEY"] = state.wandb_api_key
@@ -1162,7 +1186,7 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._reset_capture_video_slot(capture_widget)
 
 
-__all__ = ["CleanRlTrainForm"]
+__all__ = ["CleanRlTrainForm", "get_cleanrl_environment_choices"]
 
 
 # Late import to avoid circular registration at module import time.
