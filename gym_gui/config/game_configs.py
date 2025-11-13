@@ -443,7 +443,6 @@ class ALEConfig:
     - difficulty, mode: integers selecting game flavour
     - full_action_space: request full 18-action set when True
     - render_mode: rendering mode (default "rgb_array")
-    - seed: default seed used by adapter reset when caller omits one
     - env_id: Gymnasium environment id
     """
 
@@ -455,7 +454,6 @@ class ALEConfig:
     mode: int | None = None
     full_action_space: bool = False
     render_mode: str = "rgb_array"
-    seed: int | None = None
 
     def to_gym_kwargs(self) -> Dict[str, Any]:
         kwargs: Dict[str, Any] = {

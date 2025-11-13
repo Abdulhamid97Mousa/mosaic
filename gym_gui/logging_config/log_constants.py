@@ -667,6 +667,42 @@ LOG_SERVICE_DB_SINK_FATAL = _constant(
     tags=_tags("telemetry", "db", "error"),
 )
 
+LOG_SERVICE_DB_SINK_QUEUE_DEPTH = _constant(
+    "LOG931",
+    "DEBUG",
+    "Telemetry DB sink queue depth snapshot",
+    component="Service",
+    subcomponent="DBSink",
+    tags=_tags("telemetry", "db", "queue"),
+)
+
+LOG_SERVICE_DB_SINK_QUEUE_PRESSURE = _constant(
+    "LOG932",
+    "WARNING",
+    "Telemetry DB sink queue high-water mark",
+    component="Service",
+    subcomponent="DBSink",
+    tags=_tags("telemetry", "db", "queue", "pressure"),
+)
+
+LOG_SERVICE_DB_SINK_FLUSH_STATS = _constant(
+    "LOG933",
+    "DEBUG",
+    "Telemetry DB sink flush statistics",
+    component="Service",
+    subcomponent="DBSink",
+    tags=_tags("telemetry", "db", "flush"),
+)
+
+LOG_SERVICE_DB_SINK_FLUSH_LATENCY = _constant(
+    "LOG934",
+    "WARNING",
+    "Telemetry DB sink flush latency exceeded threshold",
+    component="Service",
+    subcomponent="DBSink",
+    tags=_tags("telemetry", "db", "flush", "latency"),
+)
+
 LOG_SERVICE_SQLITE_DEBUG = _constant(
     "LOG617",
     "DEBUG",
@@ -1929,6 +1965,10 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_SERVICE_DB_SINK_STOP_TIMEOUT,
     LOG_SERVICE_DB_SINK_LOOP_EXITED,
     LOG_SERVICE_DB_SINK_FATAL,
+    LOG_SERVICE_DB_SINK_QUEUE_DEPTH,
+    LOG_SERVICE_DB_SINK_QUEUE_PRESSURE,
+    LOG_SERVICE_DB_SINK_FLUSH_STATS,
+    LOG_SERVICE_DB_SINK_FLUSH_LATENCY,
     LOG_SERVICE_SQLITE_DEBUG,
     LOG_SERVICE_SQLITE_INFO,
     LOG_SERVICE_SQLITE_WARNING,
@@ -2120,6 +2160,10 @@ __all__ = (
     "LOG_SERVICE_DB_SINK_STOP_TIMEOUT",
     "LOG_SERVICE_DB_SINK_LOOP_EXITED",
     "LOG_SERVICE_DB_SINK_FATAL",
+    "LOG_SERVICE_DB_SINK_QUEUE_DEPTH",
+    "LOG_SERVICE_DB_SINK_QUEUE_PRESSURE",
+    "LOG_SERVICE_DB_SINK_FLUSH_STATS",
+    "LOG_SERVICE_DB_SINK_FLUSH_LATENCY",
     "LOG_SERVICE_SQLITE_DEBUG",
     "LOG_SERVICE_SQLITE_INFO",
     "LOG_SERVICE_SQLITE_WARNING",

@@ -104,7 +104,7 @@ def bootstrap_default_services() -> ServiceLocator:
     locator.register("supervisor_service", supervisor_service)
 
     action_mapper: ContinuousActionMapper = create_default_action_mapper()
-    renderer_registry: RendererRegistry = create_default_renderer_registry()
+    renderer_registry: RendererRegistry = create_default_renderer_registry()  # default strategies
     frame_storage: FrameStorageService = FrameStorageService()
 
     locator.register(StorageRecorderService, storage)
