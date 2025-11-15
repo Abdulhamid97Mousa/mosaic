@@ -1723,6 +1723,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             )
             self._analytics_tabs.ensure_tensorboard_tab(run_id, agent_id, metadata)
             self._analytics_tabs.ensure_wandb_tab(run_id, agent_id, metadata)
+            self._maybe_open_fastlane_tab(run_id, agent_id)
 
     def _on_training_finished(self, run_id: str, outcome: str, failure_reason: str) -> None:
         """Handle training_finished signal - create/refresh replay tabs for all agents in this run."""

@@ -36,6 +36,13 @@ flowchart LR
 2. Trainer proxy wiring (`gym_gui/services/trainer/streams.py`, `trainer_telemetry_proxy.py`).
 3. GUI consumer + Qt Quick view (`gym_gui/ui/fastlane_consumer.py`, `gym_gui/ui/renderers/fastlane_item.py`, `resources/qml/FastLaneView.qml`, `gym_gui/ui/widgets/fastlane_tab.py`, plus new fast-lane render tabs such as `CleanRL-Live-{agent_id}`).
 
+### Recent wiring fixes
+
+- **Run discovery + metadata backfill** now measures fast-lane readiness. When the daemon reports a new run, `_backfill_run_metadata_from_disk()` loads `var/trainer/configs/config-{run_id}.json`, caches `metadata`, and immediately calls `_maybe_open_fastlane_tab()` so the tab exists before the first frame arrives. This mirrors the Coach project’s “tab-first, frames-second” workflow.
+- **FastLane tab creation** logs every branch (metadata missing, fast-lane disabled, already tracked, success, or construction failure). Exceptions when instantiating `FastLaneTab` are caught and logged instead of silently killing the GUI.
+- **FastLane consumer** now copes with Qt6 differences. `QImage.bits()` can return `None` when the shared-memory ring unlinks during shutdown, so `_to_event()` guards against `None` and uses `sizeInBytes()` when available. This prevents the GUI from aborting when a run finishes or when other tabs (e.g., TensorBoard) grab focus.
+- **CleanRL worker integration** writes frames directly to the shared-memory ring (no slow-lane telemetry needed). Diagnostic `[FASTLANE] …` logs show when the wrapper activates, publishes frames, or closes the ring.
+
 ## Fast Lane UI Implementation Plan
 
 Preconditions: these components do not exist yet, so the fast-lane GUI must be added from scratch while matching conventions already in `gym_gui/ui/`.
@@ -62,11 +69,11 @@ Preconditions: these components do not exist yet, so the fast-lane GUI must be a
 
 1. **Hook lifecycle into `MainWindow`**
 
-   When `_handle_run_started` in `gym_gui/ui/main_window.py` receives a run, ensure the presenter’s `create_tabs()` results are registered so `_agent_tabs` tracks the new fast-lane widget. On `LiveTelemetryController.run_completed`, manual tab closure, and shutdown, call `FastLaneTab.cleanup()` so timers stop and shared-memory references release cleanly.
+   When `_handle_run_started` in `gym_gui/ui/main_window.py` receives a run, ensure the presenter’s `create_tabs()` results are registered so `_agent_tabs` tracks the new fast-lane widget. On `_backfill_run_metadata_from_disk()` we now invoke `_maybe_open_fastlane_tab()` immediately after caching metadata, so the FastLane tab is present even before telemetry. On `LiveTelemetryController.run_completed`, manual tab closure, and shutdown, call `FastLaneTab.cleanup()` so timers stop and shared-memory references release cleanly.
 
 1. **Testing and validation**
 
-   Add a focused unit test (e.g., `gym_gui/tests/test_fastlane_consumer.py`) that spins up a `FastLaneWriter`, publishes a frame, waits on `FastLaneConsumer.frame_ready`, and asserts width/height/metrics via `pytest-qt`’s `qtbot.waitSignal`. Create a smoke test that launches `FastLaneTab` under `QT_QPA_PLATFORM=offscreen`, loads a dummy `FastLaneView.qml`, injects a small `QImage`, and verifies no runtime exceptions.
+   Add targeted tests (e.g., `gym_gui/tests/test_fastlane_consumer.py`) that spin up a `FastLaneWriter`, publish frames, wait on `FastLaneConsumer.frame_ready`, and assert width/height/metrics via `pytest-qt`. A shim test (`gym_gui/tests/test_cleanrl_fastlane_wrapper.py`) now verifies the CleanRL worker’s wrapper publishes frames into shared memory; it skips automatically on sandboxes that forbid `/dev/shm`.
 
 ### Qt QML and Qt Quick integration notes
 

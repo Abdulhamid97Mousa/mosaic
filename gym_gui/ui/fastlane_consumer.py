@@ -58,7 +58,10 @@ class FastLaneConsumer(QtCore.QObject):
             stride = frame.width * 4
         image = QtGui.QImage(frame.width, frame.height, fmt)
         buffer = image.bits()
-        buffer.setsize(image.byteCount())
+        if buffer is None:
+            return FastLaneFrameEvent(image=image, hud_text="")
+        size = image.sizeInBytes() if hasattr(image, "sizeInBytes") else image.byteCount()  # Qt6 vs Qt5
+        buffer.setsize(size)
         buffer[: stride * frame.height] = frame.data[: stride * frame.height]
         metrics = frame.metrics
         hud = f"reward: {metrics.last_reward:.2f}\nreturn: {metrics.rolling_return:.2f}\nstep/sec: {metrics.step_rate_hz:.1f}"
