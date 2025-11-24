@@ -10,6 +10,7 @@ from pathlib import Path
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional, Sequence
+from collections import defaultdict
 
 from qtpy import QtCore, QtGui, QtWidgets
 import logging
@@ -29,6 +30,8 @@ from gym_gui.logging_config.log_constants import (
     LOG_UI_TRAIN_FORM_TELEMETRY_PATH,
 )
 from gym_gui.Algo_docs.cleanrl_worker import get_algo_doc
+from gym_gui.telemetry.semconv import VideoModes, VIDEO_MODE_DESCRIPTORS
+from gym_gui.fastlane.worker_helpers import apply_fastlane_environment
 
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -203,7 +206,7 @@ _PREFERRED_GAME_ORDER: Sequence[GameId] = (
 )
 
 
-def _format_family_label(family: EnvironmentFamily | None) -> str:
+def _format_cleanrl_family_label(family: EnvironmentFamily | None) -> str:
     if family is None:
         return "General"
     if family == EnvironmentFamily.OTHER:
@@ -229,7 +232,7 @@ def _build_environment_choices() -> tuple[tuple[str, str], ...]:
     choices: list[tuple[str, str]] = []
     for game in ordered:
         family = ENVIRONMENT_FAMILY_BY_GAME.get(game)
-        label = f"{game.value} ({_format_family_label(family)})"
+        label = f"{game.value} ({_format_cleanrl_family_label(family)})"
         # Special-case for Procgen and Atari where get_game_display_name already includes prefix
         if family == EnvironmentFamily.ATARI:
             label = f"{game.value} (Atari)"
@@ -243,10 +246,37 @@ def _build_environment_choices() -> tuple[tuple[str, str], ...]:
 CLEANRL_ENVIRONMENT_CHOICES: tuple[tuple[str, str], ...] = _build_environment_choices()
 
 
+def _env_family_from_env_id(env_id: str) -> EnvironmentFamily | None:
+    try:
+        game = GameId(env_id)
+    except ValueError:
+        return None
+    return ENVIRONMENT_FAMILY_BY_GAME.get(game)
+
+
+def _build_cleanrl_family_index() -> dict[EnvironmentFamily | None, list[tuple[str, str]]]:
+    mapping: dict[EnvironmentFamily | None, list[tuple[str, str]]] = defaultdict(list)
+    for label, env_id in CLEANRL_ENVIRONMENT_CHOICES:
+        family = _env_family_from_env_id(env_id)
+        mapping[family].append((label, env_id))
+    for family in mapping:
+        mapping[family].sort(key=lambda item: item[0])
+    return mapping
+
+
+CLEANRL_ENVIRONMENT_FAMILY_INDEX = _build_cleanrl_family_index()
+
+
 def get_cleanrl_environment_choices() -> tuple[tuple[str, str], ...]:
     """Return the list of (label, env_id) tuples supported by CleanRL."""
 
     return CLEANRL_ENVIRONMENT_CHOICES
+
+
+def get_cleanrl_environment_family_index() -> dict[EnvironmentFamily | None, list[tuple[str, str]]]:
+    """Return the CleanRL env choices grouped by EnvironmentFamily."""
+
+    return {family: list(options) for family, options in CLEANRL_ENVIRONMENT_FAMILY_INDEX.items()}
 
 
 def _generate_run_id(prefix: str, algo: str) -> str:
@@ -279,6 +309,8 @@ class _FormState:
     algo_params: Dict[str, Any]
     fastlane_only: bool
     fastlane_slot: int
+    fastlane_video_mode: str
+    fastlane_grid_limit: int
 
 
 _LOGGER = logging.getLogger("gym_gui.ui.cleanrl_train_form")
@@ -353,6 +385,11 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
             self._algo_combo.addItem(algo)
         self._algo_combo.setToolTip("Select the CleanRL algorithm entry point to invoke.")
 
+        self._env_family_combo = QtWidgets.QComboBox(self)
+        self._env_family_combo.setSizeAdjustPolicy(QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToContents)
+        self._env_family_combo.setMaxVisibleItems(10)
+        self._env_family_combo.setStyleSheet("QComboBox { combobox-popup: 0; }")
+
         self._env_combo = QtWidgets.QComboBox(self)
         self._env_combo.setSizeAdjustPolicy(QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToContents)
         env_view = QtWidgets.QListView(self._env_combo)
@@ -362,23 +399,15 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._env_combo.setView(env_view)
         self._env_combo.setStyleSheet("QComboBox { combobox-popup: 0; }")
         self._env_combo.setMaxVisibleItems(10)
-        for label, env_id in CLEANRL_ENVIRONMENT_CHOICES:
-            self._env_combo.addItem(label, env_id)
 
-        if default_env_id:
-            idx = self._env_combo.findData(default_env_id)
-            if idx >= 0:
-                self._env_combo.setCurrentIndex(idx)
-
-        if self._env_combo.currentIndex() < 0 and default_game is not None:
-            index = self._env_combo.findData(default_game.value)
-            if index >= 0:
-                self._env_combo.setCurrentIndex(index)
-        if self._env_combo.currentIndex() < 0 and self._env_combo.count() > 0:
-            self._env_combo.setCurrentIndex(0)
+        self._cleanrl_family_index = CLEANRL_ENVIRONMENT_FAMILY_INDEX
+        self._selected_cleanrl_family: Optional[EnvironmentFamily | None] = None
+        preferred_env = default_env_id or (default_game.value if default_game is not None else None)
+        self._populate_cleanrl_environment_selectors(preferred_env)
 
         table_layout.addWidget(_inline_field("Algorithm", self._algo_combo), 0, 0)
-        table_layout.addWidget(_inline_field("Environment", self._env_combo), 0, 1, 1, 2)
+        table_layout.addWidget(_inline_field("Env Family", self._env_family_combo), 0, 1)
+        table_layout.addWidget(_inline_field("Environment", self._env_combo), 0, 2)
 
         self._seed_spin = QtWidgets.QSpinBox(self)
         self._seed_spin.setRange(0, 1_000_000_000)
@@ -426,14 +455,28 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._fastlane_checkbox = QtWidgets.QCheckBox("Fast Lane Only (skip telemetry persistence)", self)
         self._fastlane_checkbox.setChecked(True)
         self._fastlane_checkbox.setToolTip("Disables the slow lane (gRPC/SQLite) so only the shared-memory fast lane runs.")
+        self._video_mode_combo = QtWidgets.QComboBox(self)
+        for descriptor in VIDEO_MODE_DESCRIPTORS.values():
+            self._video_mode_combo.addItem(descriptor.label, descriptor.name)
+        self._video_mode_combo.setCurrentIndex(
+            self._video_mode_combo.findData(VideoModes.SINGLE)
+        )
+        self._video_mode_combo.setToolTip("Choose how vectorized envs are rendered to Fast Lane.")
+        self._video_mode_combo.currentIndexChanged.connect(lambda _: self._update_video_mode_controls())
+        self._grid_limit_spin = QtWidgets.QSpinBox(self)
+        self._grid_limit_spin.setRange(1, 16)
+        self._grid_limit_spin.setValue(4)
+        self._grid_limit_spin.setToolTip("When using grid mode, stream this many env slots (starting from index 0).")
         self._fastlane_slot_spin = QtWidgets.QSpinBox(self)
         self._fastlane_slot_spin.setRange(0, 64)
         self._fastlane_slot_spin.setValue(0)
         self._fastlane_slot_spin.setToolTip(
-            "Select which CleanRL vectorized environment index feeds the FastLane stream (0 targets the first env)."
+            "Select which vectorized env index serves as the detailed probe when video mode is Single."
         )
         table_layout.addWidget(_inline_field("Telemetry Mode", self._fastlane_checkbox), 3, 0)
-        table_layout.addWidget(_inline_field("Fast Lane Slot", self._fastlane_slot_spin), 3, 1)
+        table_layout.addWidget(_inline_field("Video Mode", self._video_mode_combo), 3, 1)
+        table_layout.addWidget(_inline_field("Grid Env Limit", self._grid_limit_spin), 3, 2)
+        table_layout.addWidget(_inline_field("Probe Env (index)", self._fastlane_slot_spin), 4, 1)
 
         table_layout.setColumnStretch(0, 1)
         table_layout.setColumnStretch(1, 1)
@@ -535,6 +578,7 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
         right_column.addStretch(1)
 
         self._update_wandb_controls()
+        self._update_video_mode_controls()
 
         # Trace form open event for analytics with structured code
         self.log_constant(
@@ -554,6 +598,8 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
         form_layout.addWidget(content_widget)
         form_layout.addStretch(1)
         self._algo_param_inputs: Dict[str, QtWidgets.QWidget] = {}
+        self._num_env_widget: Optional[QtWidgets.QSpinBox] = None
+        self._env_family_combo.currentIndexChanged.connect(self._on_env_family_changed)
         self._env_combo.currentIndexChanged.connect(self._sync_env_param)
         self._algo_combo.currentTextChanged.connect(self._on_algorithm_changed)
         self._on_algorithm_changed(self._algo_combo.currentText())
@@ -692,6 +738,8 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 continue
 
             self._algo_param_inputs[name] = widget
+            if name == "num_envs":
+                self._register_num_env_widget(widget)
             container = self._wrap_with_label(self._format_label(name), widget)
             self._algo_param_layout.addWidget(container, row, col)
             col += 1
@@ -751,6 +799,127 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
         _ = checked
         self._update_wandb_controls()
 
+    def _update_video_mode_controls(self) -> None:
+        mode_data = self._video_mode_combo.currentData() if hasattr(self, "_video_mode_combo") else None
+        mode = mode_data if isinstance(mode_data, str) else VideoModes.SINGLE
+        show_grid = mode == VideoModes.GRID
+        show_probe = mode != VideoModes.GRID
+        self._grid_limit_spin.setEnabled(show_grid)
+        self._fastlane_slot_spin.setEnabled(show_probe)
+
+    def _register_num_env_widget(self, widget: QtWidgets.QWidget) -> None:
+        if isinstance(widget, QtWidgets.QSpinBox):
+            self._num_env_widget = widget
+            widget.valueChanged.connect(self._handle_num_envs_changed)
+            self._handle_num_envs_changed(widget.value())
+        else:
+            self._num_env_widget = None
+
+    def _set_video_mode(self, mode: str) -> None:
+        if not isinstance(mode, str):
+            return
+        index = self._video_mode_combo.findData(mode)
+        if index < 0 or self._video_mode_combo.currentIndex() == index:
+            self._update_video_mode_controls()
+            return
+        blocked = self._video_mode_combo.blockSignals(True)
+        self._video_mode_combo.setCurrentIndex(index)
+        self._video_mode_combo.blockSignals(blocked)
+        self._update_video_mode_controls()
+
+    def _set_grid_limit(self, limit: int) -> None:
+        bounded = max(1, min(int(limit), self._grid_limit_spin.maximum()))
+        blocked = self._grid_limit_spin.blockSignals(True)
+        self._grid_limit_spin.setValue(bounded)
+        self._grid_limit_spin.blockSignals(blocked)
+
+    def _set_probe_index(self, index: int) -> None:
+        bounded = max(self._fastlane_slot_spin.minimum(), min(int(index), self._fastlane_slot_spin.maximum()))
+        blocked = self._fastlane_slot_spin.blockSignals(True)
+        self._fastlane_slot_spin.setValue(bounded)
+        self._fastlane_slot_spin.blockSignals(blocked)
+
+    def _handle_num_envs_changed(self, value: int) -> None:
+        count = max(1, int(value))
+        if count <= 1:
+            self._set_grid_limit(1)
+            self._set_video_mode(VideoModes.SINGLE)
+            self._set_probe_index(0)
+            return
+
+        self._set_grid_limit(count)
+        current_slot = min(self._fastlane_slot_spin.value(), count - 1)
+        self._set_probe_index(current_slot)
+        self._set_video_mode(VideoModes.GRID)
+
+    def _populate_cleanrl_environment_selectors(self, preferred_env: Optional[str]) -> None:
+        family = self._family_for_env_id(preferred_env)
+        self._populate_cleanrl_family_combo(family)
+        self._rebuild_cleanrl_env_combo(family, preferred_env)
+
+    def _family_for_env_id(self, env_id: Optional[str]) -> EnvironmentFamily | None:
+        if env_id:
+            inferred = _env_family_from_env_id(env_id)
+            if inferred is not None:
+                return inferred
+        families = list(self._cleanrl_family_index.keys())
+        return families[0] if families else None
+
+    def _cleanrl_family_sort_key(self, family: EnvironmentFamily | None) -> tuple[str, str]:
+        if family is None:
+            return ("", "")
+        return (family.value, family.value)
+
+    def _populate_cleanrl_family_combo(self, preferred: Optional[EnvironmentFamily | None]) -> None:
+        if self._env_family_combo is None:
+            return
+        families = sorted(self._cleanrl_family_index.keys(), key=self._cleanrl_family_sort_key)
+        if not families:
+            self._env_family_combo.blockSignals(True)
+            self._env_family_combo.clear()
+            self._env_family_combo.blockSignals(False)
+            return
+        target = preferred if preferred in families else families[0]
+        self._selected_cleanrl_family = target
+        self._env_family_combo.blockSignals(True)
+        self._env_family_combo.clear()
+        for family in families:
+            self._env_family_combo.addItem(_format_cleanrl_family_label(family), family)
+        index = self._env_family_combo.findData(target)
+        if index < 0:
+            index = 0
+        self._env_family_combo.setCurrentIndex(index)
+        self._env_family_combo.blockSignals(False)
+
+    def _rebuild_cleanrl_env_combo(
+        self, family: EnvironmentFamily | None, preferred_env: Optional[str]
+    ) -> None:
+        options = self._cleanrl_family_index.get(family, [])
+        if not options:
+            self._env_combo.blockSignals(True)
+            self._env_combo.clear()
+            self._env_combo.blockSignals(False)
+            return
+        env_ids = [env_id for _, env_id in options]
+        target = preferred_env if preferred_env in env_ids else env_ids[0]
+        self._env_combo.blockSignals(True)
+        self._env_combo.clear()
+        for label, env_id in options:
+            self._env_combo.addItem(label, env_id)
+        self._env_combo.blockSignals(False)
+        index = self._env_combo.findData(target)
+        if index < 0:
+            index = 0
+        self._env_combo.setCurrentIndex(index)
+
+    def _on_env_family_changed(self, index: int) -> None:
+        data = self._env_family_combo.itemData(index)
+        family = data if isinstance(data, EnvironmentFamily) else None
+        if family == self._selected_cleanrl_family:
+            return
+        self._selected_cleanrl_family = family
+        self._rebuild_cleanrl_env_combo(family, None)
+
     def _collect_state(self) -> _FormState:
         algo = self._algo_combo.currentText().strip()
         env_data = self._env_combo.currentData()
@@ -794,6 +963,9 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
         )
         fastlane_only = bool(self._fastlane_checkbox.isChecked())
         fastlane_slot = int(self._fastlane_slot_spin.value())
+        video_mode_data = self._video_mode_combo.currentData()
+        video_mode = video_mode_data if isinstance(video_mode_data, str) else VideoModes.SINGLE
+        grid_limit = int(self._grid_limit_spin.value())
         return _FormState(
             algo=algo,
             env_id=env_id,
@@ -817,6 +989,8 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
             algo_params=algo_params,
             fastlane_only=fastlane_only,
             fastlane_slot=fastlane_slot,
+            fastlane_video_mode=video_mode,
+            fastlane_grid_limit=grid_limit,
         )
 
     def _build_config(self, state: _FormState, *, run_id: Optional[str] = None) -> Dict[str, Any]:
@@ -847,6 +1021,8 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
             extras["algo_params"] = state.algo_params
         extras["fastlane_only"] = bool(state.fastlane_only)
         extras["fastlane_slot"] = int(state.fastlane_slot)
+        extras["fastlane_video_mode"] = state.fastlane_video_mode
+        extras["fastlane_grid_limit"] = int(state.fastlane_grid_limit)
 
         worker_config: Dict[str, Any] = {
             "run_id": run_id,
@@ -876,6 +1052,8 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 "dry_run": state.validate_only,
                 "fastlane_only": state.fastlane_only,
                 "fastlane_slot": int(state.fastlane_slot),
+                "fastlane_video_mode": state.fastlane_video_mode,
+                "fastlane_grid_limit": int(state.fastlane_grid_limit),
             },
             "worker": {
                 "worker_id": state.worker_id or "cleanrl_worker",
@@ -907,10 +1085,15 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
         }
 
         num_envs_value = state.algo_params.get("num_envs")
-        try:
-            num_envs_str = str(int(num_envs_value))
-        except (TypeError, ValueError):
-            num_envs_str = "1"
+        num_envs_int = 1
+        if isinstance(num_envs_value, (int, float)):
+            try:
+                candidate = int(num_envs_value)
+                if candidate > 0:
+                    num_envs_int = candidate
+            except (TypeError, ValueError):
+                num_envs_int = 1
+        num_envs_str = str(num_envs_int)
 
         environment: Dict[str, Any] = {
             "CLEANRL_RUN_ID": run_id,
@@ -919,10 +1102,15 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
             "TRACK_WANDB": "1" if state.track_wandb else "0",
             "WANDB_MODE": "online" if state.track_wandb else "offline",
             "WANDB_DISABLE_GYM": "true",
-            "GYM_GUI_FASTLANE_ONLY": "1" if state.fastlane_only else "0",
-            "GYM_GUI_FASTLANE_SLOT": str(state.fastlane_slot),
             "CLEANRL_NUM_ENVS": num_envs_str,
         }
+        apply_fastlane_environment(
+            environment,
+            fastlane_only=state.fastlane_only,
+            fastlane_slot=int(state.fastlane_slot),
+            video_mode=state.fastlane_video_mode,
+            grid_limit=int(state.fastlane_grid_limit),
+        )
         if state.wandb_api_key:
             environment["WANDB_API_KEY"] = state.wandb_api_key
         if state.use_wandb_vpn and state.wandb_http_proxy:
@@ -1108,6 +1296,7 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
     def _rebuild_algo_params(self, algo: str) -> None:
         self._clear_layout(self._algo_param_layout)
         self._algo_param_inputs.clear()
+        self._num_env_widget = None
         self._algo_env_widget = None
         schema_entry = _CLEANRL_SCHEMAS.get(algo)
         if schema_entry and self._populate_params_from_schema(schema_entry.get("fields", [])):
@@ -1158,6 +1347,8 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 widget = line
 
             self._algo_param_inputs[spec.key] = widget
+            if spec.key == "num_envs":
+                self._register_num_env_widget(widget)
             if spec.key == "capture_video":
                 capture_widget = widget
                 continue
@@ -1186,7 +1377,11 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._reset_capture_video_slot(capture_widget)
 
 
-__all__ = ["CleanRlTrainForm", "get_cleanrl_environment_choices"]
+__all__ = [
+    "CleanRlTrainForm",
+    "get_cleanrl_environment_choices",
+    "get_cleanrl_environment_family_index",
+]
 
 
 # Late import to avoid circular registration at module import time.

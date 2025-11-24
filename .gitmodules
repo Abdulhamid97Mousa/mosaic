@@ -72,7 +72,6 @@
   path = openrlbenchmark
   url = https://github.com/openrlbenchmark/openrlbenchmark.git
 
-
 [submodule "fbs-tutorial"]
   path = fbs-tutorial
   url = https://github.com/mherrmann/fbs-tutorial.git 

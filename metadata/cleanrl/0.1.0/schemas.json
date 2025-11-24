@@ -1092,6 +1092,30 @@
           "type": "bool"
         },
         {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
           "default": "CartPole-v1",
           "help": "",
           "name": "env_id",
@@ -1252,7 +1276,7 @@
           "type": "int"
         }
       ],
-      "module": "cleanrl.ppo"
+      "module": "cleanrl_worker.MOSAIC_CLEANRL_WORKER.algorithms.ppo_with_save"
     },
     "ppo_atari": {
       "fields": [
@@ -3463,6 +3487,443 @@
         }
       ],
       "module": "cleanrl.td3_continuous_action"
+    },
+    "ppo_atari_envpool": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        }
+      ],
+      "module": "cleanrl.ppo_atari_envpool"
+    },
+    "ppo_atari_envpool_xla_jax": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        }
+      ],
+      "module": "cleanrl.ppo_atari_envpool_xla_jax"
+    },
+    "ppo_atari_envpool_xla_jax_scan": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        }
+      ],
+      "module": "cleanrl.ppo_atari_envpool_xla_jax_scan"
+    },
+    "ppo_procgen": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        }
+      ],
+      "module": "cleanrl.ppo_procgen"
+    },
+    "ppo_rnd_envpool": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        }
+      ],
+      "module": "cleanrl.ppo_rnd_envpool"
+    },
+    "ppo_pettingzoo_ma_atari": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        }
+      ],
+      "module": "cleanrl.ppo_pettingzoo_ma_atari"
+    },
+    "ppg_procgen": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        }
+      ],
+      "module": "cleanrl.ppg_procgen"
+    },
+    "pqn_atari_envpool": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        }
+      ],
+      "module": "cleanrl.pqn_atari_envpool"
+    },
+    "pqn_atari_envpool_lstm": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        }
+      ],
+      "module": "cleanrl.pqn_atari_envpool_lstm"
+    },
+    "dqn_atari_jax": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        }
+      ],
+      "module": "cleanrl.dqn_atari_jax"
+    },
+    "dqn_jax": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        }
+      ],
+      "module": "cleanrl.dqn_jax"
+    },
+    "qdagger_dqn_atari_impalacnn": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        }
+      ],
+      "module": "cleanrl.qdagger_dqn_atari_impalacnn"
+    },
+    "qdagger_dqn_atari_jax_impalacnn": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        }
+      ],
+      "module": "cleanrl.qdagger_dqn_atari_jax_impalacnn"
+    },
+    "c51_jax": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        }
+      ],
+      "module": "cleanrl.c51_jax"
+    },
+    "c51_atari_jax": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        }
+      ],
+      "module": "cleanrl.c51_atari_jax"
+    },
+    "ddpg_continuous_action_jax": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        }
+      ],
+      "module": "cleanrl.ddpg_continuous_action_jax"
+    },
+    "td3_continuous_action_jax": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        }
+      ],
+      "module": "cleanrl.td3_continuous_action_jax"
     }
   },
   "cleanrl_version": "0.1.0",

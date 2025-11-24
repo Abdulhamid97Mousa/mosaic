@@ -67,10 +67,13 @@ def _extract_worker_payload(payload: Mapping[str, Any]) -> Mapping[str, Any]:
 
 
 def _validate_required_fields(payload: Mapping[str, Any]) -> None:
-    required_fields = ("run_id", "algo", "env_id", "total_timesteps")
-    for field_name in required_fields:
+    run_fields = ("run_id", "algo", "env_id")
+    for field_name in run_fields:
         if not payload.get(field_name):
             raise ValueError(f"cleanrl_worker config missing required field '{field_name}'")
+
+    if "total_timesteps" not in payload:
+        raise ValueError("cleanrl_worker config missing required field 'total_timesteps'")
 
 
 def parse_worker_config(payload: Mapping[str, Any]) -> WorkerConfig:
@@ -85,11 +88,25 @@ def parse_worker_config(payload: Mapping[str, Any]) -> WorkerConfig:
     else:
         extras = {}
 
+    mode = extras.get("mode")
+    if mode == "policy_eval" and not extras.get("policy_path"):
+        raise ValueError("policy_eval mode requires a policy_path extra")
+
+    total_timesteps_value = payload.get("total_timesteps")
+    total_timesteps = int(total_timesteps_value or 0)
+
+    if total_timesteps <= 0:
+        eval_episodes = extras.get("eval_episodes")
+        try:
+            total_timesteps = max(1, int(eval_episodes)) if eval_episodes is not None else 1
+        except (TypeError, ValueError):
+            total_timesteps = 1
+
     return WorkerConfig(
         run_id=str(payload["run_id"]),
         algo=str(payload["algo"]),
         env_id=str(payload["env_id"]),
-        total_timesteps=int(payload["total_timesteps"]),
+        total_timesteps=total_timesteps,
         seed=int(payload["seed"]) if payload.get("seed") is not None else None,
         extras=extras,
         worker_id=str(payload["worker_id"]).strip() or None if payload.get("worker_id") else None,

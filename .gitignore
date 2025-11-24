@@ -89,3 +89,23 @@ var/data/*
 .cursor/rules/codacy.mdc
 
 .fake
+# gui_jason_grpc_cleanrl artifacts
+3rd_party/gui_jason_grpc_cleanrl/.venv/
+3rd_party/gui_jason_grpc_cleanrl/var/
+3rd_party/gui_jason_grpc_cleanrl/.pytest_cache/
+
+3rd_party/gui_jason_grpc_cleanrl/jason_worker/.gradle
+3rd_party/gui_jason_grpc_cleanrl/jason_worker/.jar
+3rd_party/gui_jason_grpc_cleanrl/jason_worker/build/
+3rd_party/gui_jason_grpc_cleanrl/jason_worker/dist/
+3rd_party/gui_jason_grpc_cleanrl/jason_worker/gradlew
+
+
+*.class
+*.jar
+build/
+dist/
+target/
+*.gradle
+.gradle/
+

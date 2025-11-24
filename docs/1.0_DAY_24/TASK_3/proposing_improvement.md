@@ -5,6 +5,7 @@
 - Keep the gRPC -> RunBus -> SQLite path for durability and replay.
 - Introduce a shared-memory fast lane so the GUI samples frames and HUD scalars directly at display cadence.
 - Use Qt Quick's scene graph (QQuickWindow/QQuickView) for high-FPS rendering instead of embedding other engines.
+- For the fully implemented walkthrough (with module references, failure modes, and instrumentation ideas), see `docs/1.0_DAY_28/TASK_1/README.md`.
 
 ## Goal
 

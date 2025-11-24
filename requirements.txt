@@ -33,3 +33,9 @@
 
 # Include base dependencies (GUI + shared libraries)
 -r requirements/base.txt
+
+# CleanRL worker stack
+-r requirements/cleanrl_worker.txt
+
+# Jason worker stack (bridge + MAS tooling)
+-r requirements/jason_worker.txt

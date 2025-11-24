@@ -7,6 +7,7 @@ import importlib.util
 import json
 import logging
 import os
+import re
 import subprocess
 import sys
 import time
@@ -16,17 +17,26 @@ from typing import Any, Dict, Mapping, Optional, Sequence, Iterator
 
 import grpc
 from gym_gui.config.paths import VAR_TRAINER_DIR, ensure_var_directories
+from gym_gui.telemetry.semconv import TelemetryEnv, VideoModes
+from . import fastlane as fastlane_module
 from gym_gui.services.trainer.proto import trainer_pb2, trainer_pb2_grpc
 
 from .analytics import build_manifest
 from .config import WorkerConfig
 from .telemetry import LifecycleEmitter
-from contextlib import contextmanager
+from contextlib import contextmanager, redirect_stdout, redirect_stderr
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
+_MODULE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_.]+$")
+_CMD_COMPONENT_PATTERN = re.compile(r"^[^\n\r\x00]*$")
 
 
 LOGGER = logging.getLogger(__name__)
+
+try:  # pragma: no cover - optional dependency
+    from torch.utils.tensorboard import SummaryWriter as _TensorBoardWriter
+except Exception:  # pragma: no cover - optional dependency
+    _TensorBoardWriter = None
 
 
 AlgoRegistry = Mapping[str, str]
@@ -34,7 +44,7 @@ AlgoRegistry = Mapping[str, str]
 
 DEFAULT_ALGO_REGISTRY: AlgoRegistry = {
     # PPO family
-    "ppo": "cleanrl.ppo",
+    "ppo": "cleanrl_worker.MOSAIC_CLEANRL_WORKER.algorithms.ppo_with_save",
     "ppo_continuous_action": "cleanrl.ppo_continuous_action",
     "ppo_atari": "cleanrl.ppo_atari",
     "ppo_atari_multigpu": "cleanrl.ppo_atari_multigpu",
@@ -91,6 +101,12 @@ _RESERVED_EXTRA_KEYS: frozenset[str] = frozenset(
         "agent_id",
         "fastlane_only",
         "fastlane_slot",
+        "fastlane_video_mode",
+        "fastlane_grid_limit",
+        "mode",
+        "policy_path",
+        "eval_capture_video",
+        "eval_episodes",
     }
 )
 
@@ -133,6 +149,17 @@ class CleanRLWorkerRuntime:
     def dry_run(self) -> bool:
         return self._dry_run
 
+    def _allowed_entry_modules(self) -> set[str]:
+        canonical = {str(value) for value in self._algo_registry.values()}
+        aliased = {f"cleanrl_worker.{value}" for value in canonical}
+        return canonical.union(aliased)
+
+    def _assert_whitelisted_module(self, module_name: str) -> None:
+        if not _MODULE_NAME_PATTERN.fullmatch(module_name):
+            raise ValueError(f"Refusing to import unexpected module name '{module_name}'")
+        if module_name not in self._allowed_entry_modules():
+            raise ValueError(f"Module '{module_name}' is not registered in the CleanRL registry")
+
     def resolve_entrypoint(self) -> tuple[str, str]:
         """Resolve the module and callable implementing the requested algorithm."""
 
@@ -161,11 +188,14 @@ class CleanRLWorkerRuntime:
                 f"(tried {', '.join(candidates)})"
             )
 
+        self._assert_whitelisted_module(resolved_name)
+
         return resolved_name, f"{resolved_name}.main"
 
     def _import_entrypoint(self, module_name: str):
         """Import module and fetch its main entrypoint."""
 
+        self._assert_whitelisted_module(module_name)
         module = importlib.import_module(module_name)
         entrypoint = getattr(module, "main", None)
         if entrypoint is None or not callable(entrypoint):
@@ -319,14 +349,21 @@ class CleanRLWorkerRuntime:
 
         self._register_with_trainer()
 
+        extras: Dict[str, Any] = dict(self._config.extras)
+        mode = str(extras.get("mode") or "train")
+        if mode == "policy_eval":
+            return self._run_policy_eval(module_name, run_dir, extras, emitter)
+
         args = self.build_cleanrl_args()
-        cmd = [
-            sys.executable,
-            "-m",
-            "cleanrl_worker.MOSAIC_CLEANRL_WORKER.launcher",
-            module_name,
-        ]
-        cmd.extend(args)
+        cmd = _sanitize_launch_command(
+            [
+                sys.executable,
+                "-m",
+                "cleanrl_worker.MOSAIC_CLEANRL_WORKER.launcher",
+                module_name,
+                *args,
+            ]
+        )
 
         env = os.environ.copy()
         env.setdefault("PYTHONUNBUFFERED", "1")
@@ -340,8 +377,6 @@ class CleanRLWorkerRuntime:
         if existing_pythonpath:
             pythonpath_entries.append(existing_pythonpath)
         env["PYTHONPATH"] = os.pathsep.join(pythonpath_entries)
-
-        extras: Dict[str, Any] = dict(self._config.extras)
         tb_path: Optional[Path] = None
         tensorboard_dir = extras.get("tensorboard_dir")
         if isinstance(tensorboard_dir, str) and tensorboard_dir:
@@ -478,10 +513,237 @@ class CleanRLWorkerRuntime:
             extras=extras,
         )
 
+    # ---------------------------------------------------------------------------
+    # Local helpers
+    # ---------------------------------------------------------------------------
+    def _run_policy_eval(
+        self,
+        module_name: str,
+        run_dir: Path,
+        extras: Dict[str, Any],
+        emitter: Optional[LifecycleEmitter],
+    ) -> RuntimeSummary:
+        logs_dir = run_dir / "logs"
+        logs_dir.mkdir(parents=True, exist_ok=True)
+        policy_path = extras.get("policy_path")
+        if not policy_path:
+            raise ValueError("Policy evaluation requested without policy_path extra")
+        policy_file = Path(policy_path).expanduser()
+        if not policy_file.exists():
+            LOGGER.warning("Policy checkpoint missing: %s", policy_file)
+            raise FileNotFoundError(policy_file)
 
-# ---------------------------------------------------------------------------
-# Local helpers
-# ---------------------------------------------------------------------------
+        stdout_path = logs_dir / "cleanrl.stdout.log"
+        stderr_path = logs_dir / "cleanrl.stderr.log"
+        videos_dir = run_dir / "videos"
+        videos_dir.mkdir(parents=True, exist_ok=True)
+
+        module = importlib.import_module(module_name)
+        evaluate_fn = self._resolve_eval_helper()
+        agent_cls = getattr(module, "Agent", None)
+        make_env = getattr(module, "make_env", None)
+        if evaluate_fn is None or agent_cls is None or make_env is None:
+            raise RuntimeError(
+                f"Algorithm '{self._config.algo}' does not expose evaluation helpers"
+            )
+
+        capture_video = bool(extras.get("eval_capture_video"))
+        eval_episodes = extras.get("eval_episodes", 5)
+        try:
+            eval_episodes = max(1, int(eval_episodes))
+        except (TypeError, ValueError):
+            eval_episodes = 5
+        device_name = "cuda" if extras.get("cuda") else "cpu"
+        gamma = extras.get("algo_params", {}).get("gamma", 0.99)
+        try:
+            gamma = float(gamma)
+        except (TypeError, ValueError):
+            gamma = 0.99
+
+        LOGGER.info(
+            "Policy evaluation starting | run_id=%s env=%s episodes=%s",
+            self._config.run_id,
+            self._config.env_id,
+            eval_episodes,
+        )
+
+        try:
+            import torch
+
+            device = torch.device("cuda") if device_name == "cuda" else torch.device("cpu")
+        except Exception:  # pragma: no cover - torch optional during tests
+            device = device_name
+
+        algo_params = extras.get("algo_params", {}) if isinstance(extras, dict) else {}
+
+        def _coerce_positive(value, fallback):
+            try:
+                return max(1, int(value))
+            except (TypeError, ValueError):
+                return fallback
+
+        num_envs = _coerce_positive(algo_params.get("num_envs"), 1)
+        grid_limit_value = extras.get("fastlane_grid_limit", num_envs)
+        grid_limit = _coerce_positive(grid_limit_value, num_envs)
+        fastlane_env = {
+            TelemetryEnv.FASTLANE_ONLY: "1" if extras.get("fastlane_only") else "0",
+            TelemetryEnv.FASTLANE_SLOT: str(extras.get("fastlane_slot", 0)),
+            TelemetryEnv.FASTLANE_VIDEO_MODE: extras.get("fastlane_video_mode", VideoModes.SINGLE),
+            TelemetryEnv.FASTLANE_GRID_LIMIT: str(grid_limit),
+        }
+        core_env = {
+            "CLEANRL_RUN_ID": self._config.run_id,
+            "CLEANRL_AGENT_ID": extras.get("agent_id", "cleanrl_eval"),
+            "CLEANRL_NUM_ENVS": str(num_envs),
+        }
+        env_updates = {
+            "MOSAIC_VIDEOS_DIR": str(videos_dir),
+            "MOSAIC_CAPTURE_VIDEO": "1" if capture_video else "0",
+            **fastlane_env,
+            **core_env,
+        }
+        returns: list[float] = []
+        with stdout_path.open("w", encoding="utf-8", buffering=1) as out, stderr_path.open(
+            "w", encoding="utf-8", buffering=1
+        ) as err, redirect_stdout(out), redirect_stderr(err):
+            with _temporary_environ(env_updates), _working_directory(run_dir):
+                fastlane_module.reload_fastlane_config()
+                try:
+                    import cleanrl_worker.MOSAIC_CLEANRL_WORKER.sitecustomize as sc  # noqa: WPS433
+
+                    importlib.reload(sc)
+                except Exception:  # pragma: no cover - defensive reload
+                    pass
+                raw_returns = evaluate_fn(
+                    str(policy_file),
+                    make_env,
+                    self._config.env_id,
+                    eval_episodes=eval_episodes,
+                    run_name=f"{self._config.run_id}-eval",
+                    Model=agent_cls,
+                    device=device,
+                    capture_video=capture_video,
+                    gamma=gamma,
+                )
+                returns = self._coerce_return_values(raw_returns)
+        fastlane_module.reload_fastlane_config()
+
+        avg = sum(returns) / len(returns) if returns else 0.0
+        self._write_eval_tensorboard(run_dir / "tensorboard", returns, avg)
+        LOGGER.info(
+            "Policy evaluation completed | run_id=%s episodes=%s avg_return=%.4f",
+            self._config.run_id,
+            len(returns),
+            avg,
+        )
+
+        manifest = build_manifest(run_dir, extras={"mode": "policy_eval", "returns": returns})
+        manifest_path = run_dir / "analytics.json"
+        manifest_path.write_text(json.dumps(manifest.to_dict(), indent=2), encoding="utf-8")
+
+        if emitter is not None:
+            emitter.heartbeat(
+                self._config.run_id,
+                {
+                    "status": "completed",
+                    "algo": self._config.algo,
+                    "env_id": self._config.env_id,
+                    "mode": "policy_eval",
+                },
+            )
+
+        return RuntimeSummary(
+            status="completed",
+            module=module_name,
+            callable="policy_eval",
+            config=asdict(self._config),
+            extras={**extras, "evaluation_returns": returns},
+        )
+
+    def _write_eval_tensorboard(self, log_dir: Path, returns: Sequence[float], avg: float) -> None:
+        if not returns or _TensorBoardWriter is None:
+            if not returns:
+                return
+            LOGGER.warning("TensorBoard SummaryWriter unavailable; skipping eval scalars")
+            return
+
+        log_dir.mkdir(parents=True, exist_ok=True)
+        try:
+            writer = _TensorBoardWriter(log_dir=str(log_dir))
+        except Exception as exc:  # pragma: no cover - io failure
+            LOGGER.warning("Unable to open TensorBoard writer: %s", exc)
+            return
+
+        with writer:
+            for idx, value in enumerate(returns):
+                writer.add_scalar("eval/episode_return", value, idx)
+            writer.add_scalar("eval/avg_return", avg, len(returns))
+            writer.flush()
+
+    def _resolve_eval_helper(self):
+        algo = self._config.algo
+        if algo not in self._algo_registry:
+            return None
+        module_candidates = [
+            f"cleanrl_worker.cleanrl_utils.evals.{algo}_eval",
+            f"cleanrl_utils.evals.{algo}_eval",
+        ]
+        if algo.startswith("ppo"):
+            module_candidates.append("cleanrl_worker.cleanrl_utils.evals.ppo_eval")
+            module_candidates.append("cleanrl_utils.evals.ppo_eval")
+        allowed_candidates = {name for name in module_candidates if _MODULE_NAME_PATTERN.fullmatch(name)}
+        for module_name in module_candidates:
+            if module_name not in allowed_candidates:
+                continue
+            try:
+                module = importlib.import_module(module_name)
+            except ImportError:
+                continue
+            evaluate = getattr(module, "evaluate", None)
+            if callable(evaluate):
+                return evaluate
+        return None
+
+    def _coerce_return_values(self, values: Any) -> list[float]:
+        if isinstance(values, (int, float)):
+            return [float(values)]
+        if isinstance(values, Sequence) and not isinstance(values, (str, bytes, bytearray)):
+            coerced: list[float] = []
+            for item in values:
+                try:
+                    coerced.append(float(item))
+                except (TypeError, ValueError):
+                    LOGGER.debug("Skipping non-numeric evaluation return: %s", item)
+            return coerced
+        return []
+
+
+@contextmanager
+def _temporary_environ(overrides: Dict[str, str]) -> Iterator[None]:
+    saved: dict[str, Optional[str]] = {k: os.environ.get(k) for k in overrides}
+    try:
+        for key, value in overrides.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+        yield
+    finally:
+        for key, value in saved.items():
+            if value is None:
+                os.environ.pop(key, None)
+            else:
+                os.environ[key] = value
+
+
+@contextmanager
+def _working_directory(path: Path) -> Iterator[None]:
+    current = Path.cwd()
+    try:
+        os.chdir(path)
+        yield
+    finally:
+        os.chdir(current)
 
 
 @contextmanager
@@ -607,3 +869,20 @@ def _temporary_env(overrides: Mapping[str, str]) -> Iterator[None]:
                 os.environ.pop(key, None)
             else:
                 os.environ[key] = value
+
+
+def _sanitize_launch_command(cmd: Sequence[Any]) -> list[str]:
+    """Ensure CLI components are strings without control characters."""
+
+    sanitized: list[str] = []
+    for index, component in enumerate(cmd):
+        if component is None:
+            raise ValueError(f"Command component at index {index} is None")
+        if not isinstance(component, str):
+            component = str(component)
+        if not _CMD_COMPONENT_PATTERN.fullmatch(component):
+            raise ValueError(
+                f"Command component at index {index} contains unsupported characters"
+            )
+        sanitized.append(component)
+    return sanitized

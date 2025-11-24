@@ -1325,6 +1325,15 @@ LOG_UI_RENDER_TABS_WANDB_PROXY_SKIPPED = _constant(
     tags=_tags("ui", "wandb", "proxy", "vpn"),
 )
 
+LOG_UI_RENDER_TABS_ARTIFACTS_MISSING = _constant(
+    "LOG72B",
+    "ERROR",
+    "Run artifacts directory missing",
+    component="UI",
+    subcomponent="RenderTabs",
+    tags=_tags("ui", "render", "runs", "missing"),
+)
+
 LOG_UI_RENDER_TABS_DELETE_REQUESTED = _constant(
     "LOG736",
     "INFO",
@@ -1436,6 +1445,33 @@ LOG_UI_TRAIN_FORM_TELEMETRY_PATH = _constant(
     tags=_tags("ui", "train_form", "telemetry_path"),
 )
 
+LOG_UI_POLICY_FORM_TRACE = _constant(
+    "LOG736",
+    "DEBUG",
+    "Policy form trace",
+    component="UI",
+    subcomponent="PolicyForm",
+    tags=_tags("ui", "policy_form", "trace"),
+)
+
+LOG_UI_POLICY_FORM_INFO = _constant(
+    "LOG737",
+    "INFO",
+    "Policy form event",
+    component="UI",
+    subcomponent="PolicyForm",
+    tags=_tags("ui", "policy_form"),
+)
+
+LOG_UI_POLICY_FORM_ERROR = _constant(
+    "LOG738",
+    "ERROR",
+    "Policy form error",
+    component="UI",
+    subcomponent="PolicyForm",
+    tags=_tags("ui", "policy_form", "error"),
+)
+
 LOG_UI_WORKER_TABS_TRACE = _constant(
     "LOG740",
     "DEBUG",
@@ -1524,6 +1560,82 @@ LOG_WORKER_CONFIG_READ_WARNING = _constant(
     component="Worker",
     subcomponent="Presenter",
     tags=_tags("worker", "presenter", "config", "read", "warning"),
+)
+
+
+# ---------------------------------------------------------------------------
+# Fast Lane / RunBus telemetry constants (LOG950–LOG959)
+# ---------------------------------------------------------------------------
+LOG_FASTLANE_CONNECTED = _constant(
+    "LOG950",
+    "INFO",
+    "Fast lane consumer connected",
+    component="UI",
+    subcomponent="FastLane",
+    tags=_tags("fastlane", "status", "connected"),
+)
+
+LOG_FASTLANE_UNAVAILABLE = _constant(
+    "LOG951",
+    "WARNING",
+    "Fast lane consumer unavailable",
+    component="UI",
+    subcomponent="FastLane",
+    tags=_tags("fastlane", "status", "warning"),
+)
+
+LOG_FASTLANE_QUEUE_DEPTH = _constant(
+    "LOG952",
+    "INFO",
+    "Fast lane queue depth snapshot",
+    component="UI",
+    subcomponent="FastLane",
+    tags=_tags("fastlane", "metrics", "queue_depth"),
+)
+
+LOG_FASTLANE_READER_LAG = _constant(
+    "LOG953",
+    "WARNING",
+    "Fast lane reader lag detected",
+    component="UI",
+    subcomponent="FastLane",
+    tags=_tags("fastlane", "lag", "warning"),
+)
+
+LOG_RUNBUS_UI_QUEUE_DEPTH = _constant(
+    "LOG954",
+    "INFO",
+    "RunBus UI queue depth snapshot",
+    component="Controller",
+    subcomponent="LiveTelemetry",
+    tags=_tags("runbus", "ui", "queue_depth"),
+)
+
+LOG_FASTLANE_HEADER_INVALID = _constant(
+    "LOG955",
+    "WARNING",
+    "Fast lane shared memory header invalid",
+    component="UI",
+    subcomponent="FastLane",
+    tags=_tags("fastlane", "header", "warning"),
+)
+
+LOG_FASTLANE_FRAME_READ_ERROR = _constant(
+    "LOG956",
+    "ERROR",
+    "Fast lane frame read failed",
+    component="UI",
+    subcomponent="FastLane",
+    tags=_tags("fastlane", "reader", "error"),
+)
+
+LOG_RUNBUS_DB_QUEUE_DEPTH = _constant(
+    "LOG957",
+    "INFO",
+    "RunBus durable queue depth snapshot",
+    component="Telemetry",
+    subcomponent="DBSink",
+    tags=_tags("runbus", "durable", "queue_depth"),
 )
 
 
@@ -1677,6 +1789,33 @@ LOG_WORKER_POLICY_ERROR = _constant(
     component="Worker",
     subcomponent="Policy",
     tags=_tags("worker", "policy", "error"),
+)
+
+LOG_WORKER_POLICY_EVAL_STARTED = _constant(
+    "LOG918",
+    "INFO",
+    "Worker policy evaluation started",
+    component="Worker",
+    subcomponent="Policy",
+    tags=_tags("worker", "policy", "eval", "start"),
+)
+
+LOG_WORKER_POLICY_EVAL_COMPLETED = _constant(
+    "LOG919",
+    "INFO",
+    "Worker policy evaluation completed",
+    component="Worker",
+    subcomponent="Policy",
+    tags=_tags("worker", "policy", "eval", "complete"),
+)
+
+LOG_WORKER_POLICY_LOAD_FAILED = _constant(
+    "LOG920",
+    "ERROR",
+    "Worker policy checkpoint missing",
+    component="Worker",
+    subcomponent="Policy",
+    tags=_tags("worker", "policy", "missing"),
 )
 
 LOG_WORKER_BDI_EVENT = _constant(
@@ -2040,6 +2179,9 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_UI_RENDER_TABS_WANDB_STATUS,
     LOG_UI_RENDER_TABS_WANDB_WARNING,
     LOG_UI_RENDER_TABS_WANDB_ERROR,
+    LOG_UI_RENDER_TABS_WANDB_PROXY_APPLIED,
+    LOG_UI_RENDER_TABS_WANDB_PROXY_SKIPPED,
+    LOG_UI_RENDER_TABS_ARTIFACTS_MISSING,
     LOG_UI_RENDER_TABS_DELETE_REQUESTED,
     LOG_UI_RENDER_TABS_EVENT_FOR_DELETED_RUN,
     LOG_UI_RENDER_TABS_TAB_ADDED,
@@ -2052,6 +2194,9 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_UI_TRAIN_FORM_ERROR,
     LOG_UI_TRAIN_FORM_UI_PATH,
     LOG_UI_TRAIN_FORM_TELEMETRY_PATH,
+    LOG_UI_POLICY_FORM_TRACE,
+    LOG_UI_POLICY_FORM_INFO,
+    LOG_UI_POLICY_FORM_ERROR,
     LOG_UI_WORKER_TABS_TRACE,
     LOG_UI_WORKER_TABS_INFO,
     LOG_UI_WORKER_TABS_WARNING,
@@ -2062,6 +2207,14 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_ADAPTER_RENDERING_WARNING,
     LOG_TRAINER_LAUNCHER_LOG_FLUSH_WARNING,
     LOG_WORKER_CONFIG_READ_WARNING,
+    LOG_FASTLANE_CONNECTED,
+    LOG_FASTLANE_UNAVAILABLE,
+    LOG_FASTLANE_QUEUE_DEPTH,
+    LOG_FASTLANE_READER_LAG,
+    LOG_RUNBUS_UI_QUEUE_DEPTH,
+    LOG_FASTLANE_HEADER_INVALID,
+    LOG_FASTLANE_FRAME_READ_ERROR,
+    LOG_RUNBUS_DB_QUEUE_DEPTH,
     LOG_UTIL_QT_RESEED_SKIPPED,
     LOG_UTIL_QT_STATE_CAPTURE_FAILED,
     LOG_UTIL_SEED_CALLBACK_FAILED,
@@ -2234,6 +2387,7 @@ __all__ = (
     "LOG_UI_RENDER_TABS_WANDB_ERROR",
     "LOG_UI_RENDER_TABS_WANDB_PROXY_APPLIED",
     "LOG_UI_RENDER_TABS_WANDB_PROXY_SKIPPED",
+    "LOG_UI_RENDER_TABS_ARTIFACTS_MISSING",
     "LOG_UI_RENDER_TABS_DELETE_REQUESTED",
     "LOG_UI_RENDER_TABS_EVENT_FOR_DELETED_RUN",
     "LOG_UI_RENDER_TABS_TAB_ADDED",
@@ -2246,6 +2400,9 @@ __all__ = (
     "LOG_UI_TRAIN_FORM_ERROR",
     "LOG_UI_TRAIN_FORM_UI_PATH",
     "LOG_UI_TRAIN_FORM_TELEMETRY_PATH",
+    "LOG_UI_POLICY_FORM_TRACE",
+    "LOG_UI_POLICY_FORM_INFO",
+    "LOG_UI_POLICY_FORM_ERROR",
     "LOG_UI_WORKER_TABS_TRACE",
     "LOG_UI_WORKER_TABS_INFO",
     "LOG_UI_WORKER_TABS_WARNING",
@@ -2256,6 +2413,14 @@ __all__ = (
     "LOG_ADAPTER_RENDERING_WARNING",
     "LOG_TRAINER_LAUNCHER_LOG_FLUSH_WARNING",
     "LOG_WORKER_CONFIG_READ_WARNING",
+    "LOG_FASTLANE_CONNECTED",
+    "LOG_FASTLANE_UNAVAILABLE",
+    "LOG_FASTLANE_QUEUE_DEPTH",
+    "LOG_FASTLANE_READER_LAG",
+    "LOG_RUNBUS_UI_QUEUE_DEPTH",
+    "LOG_FASTLANE_HEADER_INVALID",
+    "LOG_FASTLANE_FRAME_READ_ERROR",
+    "LOG_RUNBUS_DB_QUEUE_DEPTH",
     "LOG_UTIL_QT_RESEED_SKIPPED",
     "LOG_UTIL_QT_STATE_CAPTURE_FAILED",
     "LOG_UTIL_SEED_CALLBACK_FAILED",
@@ -2272,6 +2437,9 @@ __all__ = (
     "LOG_WORKER_POLICY_EVENT",
     "LOG_WORKER_POLICY_WARNING",
     "LOG_WORKER_POLICY_ERROR",
+    "LOG_WORKER_POLICY_EVAL_STARTED",
+    "LOG_WORKER_POLICY_EVAL_COMPLETED",
+    "LOG_WORKER_POLICY_LOAD_FAILED",
     "LOG_WORKER_BDI_EVENT",
     "LOG_WORKER_BDI_WARNING",
     "LOG_WORKER_BDI_ERROR",

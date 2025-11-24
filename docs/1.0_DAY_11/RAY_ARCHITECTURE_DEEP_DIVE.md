@@ -10,6 +10,8 @@ Ray handles **billions of events/second** across distributed systems. Its soluti
 
 **Key**: These paths are **completely independent**. Slow path never blocks fast path.
 
+➡️ For how this philosophy materialized in our Qt GUI (fast lane vs durable lane, RunBus queue sizing, and shared buffers), see the implementation brief in `docs/1.0_DAY_28/TASK_1/README.md`.
+
 ---
 
 ## Ray's Protobuf Architecture
@@ -244,5 +246,4 @@ Each subscriber:
 3. ⏭️ Implement Phase 1 fixes (queue size, async DB)
 4. ⏭️ Implement Phase 2 (RunBus with cursors)
 5. ⏭️ Add monitoring and health checks
-
 

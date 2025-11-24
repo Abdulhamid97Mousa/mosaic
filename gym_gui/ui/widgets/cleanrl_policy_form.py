@@ -1,0 +1,429 @@
+"""Dialog for loading trained CleanRL policies."""
+
+from __future__ import annotations
+
+import logging
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Any, Dict, Optional
+import sys
+
+from qtpy import QtCore, QtGui, QtWidgets
+
+from gym_gui.config.paths import VAR_TRAINER_DIR
+from gym_gui.core.enums import EnvironmentFamily, GameId
+from gym_gui.fastlane.worker_helpers import apply_fastlane_environment
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_UI_POLICY_FORM_TRACE,
+    LOG_UI_POLICY_FORM_INFO,
+    LOG_UI_POLICY_FORM_ERROR,
+)
+from gym_gui.telemetry.semconv import VideoModes, VIDEO_MODE_DESCRIPTORS
+from gym_gui.ui.widgets.cleanrl_train_form import (
+    CLEANRL_ENVIRONMENT_FAMILY_INDEX,
+    get_cleanrl_environment_family_index,
+)
+from gym_gui.ui.widgets.cleanrl_train_form import _generate_run_id as generate_run_id
+from gym_gui.ui.widgets.cleanrl_train_form import _format_cleanrl_family_label as format_family_label
+from gym_gui.workers.cleanrl_policy_metadata import (
+    CleanRlCheckpoint,
+    discover_policies,
+    load_metadata_for_policy,
+)
+
+
+_LOGGER = logging.getLogger(__name__)
+
+@dataclass
+class _PolicyState:
+    checkpoint: CleanRlCheckpoint
+    env_id: Optional[str]
+    family: Optional[EnvironmentFamily]
+    fastlane_only: bool
+    video_mode: str
+    grid_limit: int
+    eval_capture_video: bool
+    seed: Optional[int]
+
+
+class CleanRlPolicyForm(QtWidgets.QDialog, LogConstantMixin):
+    def __init__(
+        self,
+        parent: Optional[QtWidgets.QWidget] = None,
+        *,
+        current_game: Optional[GameId] = None,
+    ) -> None:
+        super().__init__(parent)
+        self._logger = _LOGGER
+        self.setWindowTitle("Load CleanRL Policy")
+        self.resize(840, 540)
+        self._current_game = current_game
+        self._checkpoints = discover_policies()
+        self._selected: Optional[CleanRlCheckpoint] = None
+        self._result_config: Optional[Dict[str, Any]] = None
+        self._build_ui()
+        self._populate_table()
+        if self._checkpoints:
+            self._table.selectRow(0)
+
+    # ------------------------------------------------------------------
+    def _build_ui(self) -> None:
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(12, 12, 12, 12)
+        layout.setSpacing(10)
+
+        runs_root = (VAR_TRAINER_DIR / "runs").resolve()
+        intro = QtWidgets.QLabel(self)
+        intro.setWordWrap(True)
+        intro.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        if self._checkpoints:
+            intro.setText(
+                f"Select a CleanRL checkpoint from <code>{runs_root}</code> or browse for an external model."
+            )
+        else:
+            intro.setText(
+                f"No CleanRL checkpoints found under <code>{runs_root}</code>."
+            )
+        layout.addWidget(intro)
+
+        self._table = QtWidgets.QTableWidget(self)
+        self._table.setColumnCount(5)
+        self._table.setHorizontalHeaderLabels(["Env", "Algo", "Seed", "Run", "Path"])
+        self._table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
+        self._table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
+        self._table.verticalHeader().setVisible(False)
+        self._table.horizontalHeader().setStretchLastSection(True)
+        self._table.itemSelectionChanged.connect(self._on_table_selection)
+        layout.addWidget(self._table, 2)
+
+        browse_layout = QtWidgets.QHBoxLayout()
+        self._path_label = QtWidgets.QLabel("No policy selected", self)
+        self._path_label.setTextInteractionFlags(QtCore.Qt.TextInteractionFlag.TextSelectableByMouse)
+        browse_layout.addWidget(self._path_label, 1)
+        browse_btn = QtWidgets.QPushButton("Browse…", self)
+        browse_btn.clicked.connect(self._on_browse)
+        browse_layout.addWidget(browse_btn)
+        layout.addLayout(browse_layout)
+
+        form_layout = QtWidgets.QGridLayout()
+        form_layout.setColumnStretch(1, 1)
+
+        # Environment overrides
+        self._override_env_checkbox = QtWidgets.QCheckBox("Override environment", self)
+        self._override_env_checkbox.stateChanged.connect(self._on_override_toggled)
+        form_layout.addWidget(self._override_env_checkbox, 0, 0, 1, 2)
+
+        self._family_combo = QtWidgets.QComboBox(self)
+        self._env_combo = QtWidgets.QComboBox(self)
+        form_layout.addWidget(QtWidgets.QLabel("Family", self), 1, 0)
+        form_layout.addWidget(self._family_combo, 1, 1)
+        form_layout.addWidget(QtWidgets.QLabel("Environment", self), 2, 0)
+        form_layout.addWidget(self._env_combo, 2, 1)
+        self._family_combo.currentIndexChanged.connect(self._on_family_changed)
+
+        # Telemetry controls
+        telemetry_group = QtWidgets.QGroupBox("Telemetry", self)
+        telemetry_layout = QtWidgets.QGridLayout(telemetry_group)
+        self._fastlane_only_checkbox = QtWidgets.QCheckBox("Fast Lane only (no durable path)", telemetry_group)
+        telemetry_layout.addWidget(self._fastlane_only_checkbox, 0, 0, 1, 2)
+        telemetry_layout.addWidget(QtWidgets.QLabel("Video Mode", telemetry_group), 1, 0)
+        self._video_mode_combo = QtWidgets.QComboBox(telemetry_group)
+        for mode, descriptor in VIDEO_MODE_DESCRIPTORS.items():
+            self._video_mode_combo.addItem(descriptor.label, mode)
+        telemetry_layout.addWidget(self._video_mode_combo, 1, 1)
+        telemetry_layout.addWidget(QtWidgets.QLabel("Grid Limit", telemetry_group), 2, 0)
+        self._grid_spin = QtWidgets.QSpinBox(telemetry_group)
+        self._grid_spin.setRange(1, 64)
+        telemetry_layout.addWidget(self._grid_spin, 2, 1)
+        self._video_mode_combo.currentIndexChanged.connect(self._sync_video_mode_controls)
+
+        self._eval_video_checkbox = QtWidgets.QCheckBox("Capture evaluation video", telemetry_group)
+        telemetry_layout.addWidget(self._eval_video_checkbox, 3, 0, 1, 2)
+
+        form_layout.addWidget(telemetry_group, 3, 0, 1, 2)
+
+        # Seed override
+        form_layout.addWidget(QtWidgets.QLabel("Seed", self), 4, 0)
+        self._seed_spin = QtWidgets.QSpinBox(self)
+        self._seed_spin.setRange(1, 2_147_483_647)
+        form_layout.addWidget(self._seed_spin, 4, 1)
+
+        form_layout.addWidget(QtWidgets.QLabel("Eval Episodes", self), 5, 0)
+        self._episode_spin = QtWidgets.QSpinBox(self)
+        self._episode_spin.setRange(1, 1_000_000)
+        self._episode_spin.setValue(50)
+        form_layout.addWidget(self._episode_spin, 5, 1)
+
+        layout.addLayout(form_layout)
+
+        self._button_box = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.StandardButton.Ok | QtWidgets.QDialogButtonBox.StandardButton.Cancel,
+            self,
+        )
+        self._button_box.accepted.connect(self._on_accept)
+        self._button_box.rejected.connect(self.reject)
+        self._ok_button = self._button_box.button(QtWidgets.QDialogButtonBox.StandardButton.Ok)
+        if self._ok_button is not None:
+            self._ok_button.setEnabled(False)
+        layout.addWidget(self._button_box)
+
+        self._populate_family_combo()
+        self._toggle_env_controls(False)
+
+    # ------------------------------------------------------------------
+    def _populate_table(self) -> None:
+        ordered = list(self._checkpoints)
+        if self._current_game is not None:
+            preferred = self._current_game.value
+            ordered.sort(key=lambda ckpt: 0 if ckpt.env_id == preferred else 1)
+        self._table.setRowCount(0)
+        for checkpoint in ordered:
+            row = self._table.rowCount()
+            self._table.insertRow(row)
+            values = [
+                checkpoint.env_id or "?",
+                checkpoint.algo or "?",
+                str(checkpoint.seed or "?"),
+                checkpoint.run_id,
+                str(checkpoint.policy_path),
+            ]
+            for col, text in enumerate(values):
+                item = QtWidgets.QTableWidgetItem(text)
+                item.setData(QtCore.Qt.ItemDataRole.UserRole, checkpoint)
+                self._table.setItem(row, col, item)
+
+    def _populate_family_combo(self, preferred: Optional[EnvironmentFamily] = None) -> None:
+        self._family_combo.blockSignals(True)
+        self._family_combo.clear()
+        for family in CLEANRL_ENVIRONMENT_FAMILY_INDEX:
+            self._family_combo.addItem(format_family_label(family), family)
+        index = 0
+        if preferred is not None:
+            idx = self._family_combo.findData(preferred)
+            if idx >= 0:
+                index = idx
+        self._family_combo.setCurrentIndex(index)
+        self._family_combo.blockSignals(False)
+        self._on_family_changed(index)
+
+    def _on_family_changed(self, index: int) -> None:
+        family = self._family_combo.itemData(index)
+        self._env_combo.blockSignals(True)
+        self._env_combo.clear()
+        options = get_cleanrl_environment_family_index().get(family, [])
+        for label, env_id in options:
+            self._env_combo.addItem(label, env_id)
+        self._env_combo.blockSignals(False)
+
+    def _toggle_env_controls(self, enabled: bool) -> None:
+        self._family_combo.setEnabled(enabled)
+        self._env_combo.setEnabled(enabled)
+
+    def _on_override_toggled(self, state: int) -> None:
+        self._toggle_env_controls(state == QtCore.Qt.CheckState.Checked)
+
+    def _on_table_selection(self) -> None:
+        selection = self._table.selectionModel()
+        if selection is None or not selection.hasSelection():
+            if self._ok_button is not None:
+                self._ok_button.setEnabled(False)
+            return
+        row = selection.selectedRows()[0].row()
+        item = self._table.item(row, 0)
+        checkpoint = item.data(QtCore.Qt.ItemDataRole.UserRole) if item is not None else None
+        if isinstance(checkpoint, CleanRlCheckpoint):
+            self._apply_checkpoint(checkpoint)
+
+    def _apply_checkpoint(self, checkpoint: CleanRlCheckpoint) -> None:
+        self._selected = checkpoint
+        self._path_label.setText(str(checkpoint.policy_path))
+        env_id = checkpoint.env_id
+        family = None
+        if env_id:
+            for fam, mappings in CLEANRL_ENVIRONMENT_FAMILY_INDEX.items():
+                if any(eid == env_id for _, eid in mappings):
+                    family = fam
+                    break
+        if family is not None:
+            self._populate_family_combo(family)
+            env_index = self._env_combo.findData(env_id)
+            if env_index >= 0:
+                self._env_combo.setCurrentIndex(env_index)
+            self._override_env_checkbox.setChecked(False)
+            self._toggle_env_controls(False)
+        else:
+            self._override_env_checkbox.setChecked(True)
+            self._toggle_env_controls(True)
+        self._fastlane_only_checkbox.setChecked(checkpoint.fastlane_only)
+        video_mode = checkpoint.fastlane_video_mode or VideoModes.SINGLE
+        idx = self._video_mode_combo.findData(video_mode)
+        if idx >= 0:
+            self._video_mode_combo.setCurrentIndex(idx)
+        grid_limit = checkpoint.fastlane_grid_limit or max(1, checkpoint.num_envs or 1)
+        self._grid_spin.setValue(max(1, grid_limit))
+        self._seed_spin.setValue(checkpoint.seed or 1)
+        self._eval_video_checkbox.setChecked(False)
+        if self._ok_button is not None:
+            self._ok_button.setEnabled(True)
+        self.log_constant(
+            LOG_UI_POLICY_FORM_TRACE,
+            extra={"policy_path": str(checkpoint.policy_path), "run_id": checkpoint.run_id},
+        )
+
+    def _sync_video_mode_controls(self) -> None:
+        mode = self._video_mode_combo.currentData()
+        if mode == VideoModes.SINGLE:
+            self._grid_spin.setValue(1)
+            self._grid_spin.setEnabled(False)
+        elif mode == VideoModes.GRID:
+            self._grid_spin.setEnabled(True)
+        else:
+            self._grid_spin.setEnabled(False)
+
+    def _on_browse(self) -> None:
+        path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Select CleanRL Model",
+            str(VAR_TRAINER_DIR / "runs"),
+            "CleanRL Models (*.cleanrl_model)",
+        )
+        if not path:
+            return
+        policy = Path(path)
+        metadata = load_metadata_for_policy(policy)
+        if metadata is None:
+            metadata = CleanRlCheckpoint(
+                policy_path=policy,
+                run_id=generate_run_id("cleanrl-eval", "manual"),
+                cleanrl_run_name=None,
+                env_id=None,
+                algo=None,
+                seed=None,
+                num_envs=None,
+                fastlane_only=True,
+                fastlane_video_mode=VideoModes.SINGLE,
+                fastlane_grid_limit=1,
+                config_path=None,
+            )
+        self._apply_checkpoint(metadata)
+
+    def _on_accept(self) -> None:
+        if self._selected is None:
+            return
+        env_id = self._env_combo.currentData()
+        if env_id is None:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Environment Required",
+                "Select or override the environment before running evaluation.",
+            )
+            return
+        metadata = self._selected
+        config = self._build_config(metadata, env_id=str(env_id))
+        self._result_config = config
+        self.log_constant(
+            LOG_UI_POLICY_FORM_INFO,
+            extra={"run_id": metadata.run_id, "policy_path": str(metadata.policy_path)},
+        )
+        self.accept()
+
+    def _build_config(self, checkpoint: CleanRlCheckpoint, *, env_id: str) -> Dict[str, Any]:
+        run_id = generate_run_id("cleanrl-eval", checkpoint.algo or "policy")
+        eval_episodes = int(self._episode_spin.value())
+        extras: Dict[str, Any] = {
+            "mode": "policy_eval",
+            "policy_path": str(checkpoint.policy_path),
+            "fastlane_only": self._fastlane_only_checkbox.isChecked(),
+            "fastlane_slot": 0,
+            "fastlane_video_mode": self._video_mode_combo.currentData(),
+            "fastlane_grid_limit": int(self._grid_spin.value()),
+            "eval_capture_video": self._eval_video_checkbox.isChecked(),
+            "eval_episodes": eval_episodes,
+        }
+        agent_id = "cleanrl_eval"
+        worker_config: Dict[str, Any] = {
+            "run_id": run_id,
+            "algo": checkpoint.algo or "ppo_continuous_action",
+            "env_id": env_id,
+            "total_timesteps": max(1, eval_episodes),
+            "extras": extras,
+        }
+        worker_config["agent_id"] = agent_id
+        seed_value = int(self._seed_spin.value())
+        if seed_value > 0:
+            worker_config["seed"] = seed_value
+
+        metadata = {
+            "ui": {
+                "worker_id": "cleanrl_worker",
+                "agent_id": agent_id,
+                "algo": worker_config["algo"],
+                "env_id": env_id,
+                "dry_run": False,
+                "fastlane_only": extras["fastlane_only"],
+                "fastlane_slot": 0,
+                "fastlane_video_mode": extras["fastlane_video_mode"],
+                "fastlane_grid_limit": extras["fastlane_grid_limit"],
+                "run_mode": "policy_eval",
+                "eval_episodes": eval_episodes,
+            },
+            "worker": {
+                "worker_id": "cleanrl_worker",
+                "module": "cleanrl_worker.cli",
+                "use_grpc": True,
+                "grpc_target": "127.0.0.1:50055",
+                "arguments": [],
+                "config": worker_config,
+            },
+        }
+
+        environment: Dict[str, Any] = {
+            "CLEANRL_RUN_ID": run_id,
+            "CLEANRL_AGENT_ID": agent_id,
+            "TRACK_TENSORBOARD": "0",
+            "TRACK_WANDB": "0",
+            "WANDB_MODE": "offline",
+            "WANDB_DISABLE_GYM": "true",
+            "CLEANRL_NUM_ENVS": str(checkpoint.num_envs or 1),
+        }
+        apply_fastlane_environment(
+            environment,
+            fastlane_only=extras["fastlane_only"],
+            fastlane_slot=0,
+            video_mode=extras["fastlane_video_mode"],
+            grid_limit=extras["fastlane_grid_limit"],
+        )
+
+        config: Dict[str, Any] = {
+            "run_name": run_id,
+            "entry_point": sys.executable,
+            "arguments": ["-m", "cleanrl_worker.cli"],
+            "environment": environment,
+            "resources": {
+                "cpus": 4,
+                "memory_mb": 2048,
+                "gpus": {"requested": 0, "mandatory": False},
+            },
+            "metadata": metadata,
+            "artifacts": {
+                "output_prefix": f"runs/{run_id}",
+                "persist_logs": True,
+                "keep_checkpoints": False,
+            },
+        }
+        return config
+
+    def get_config(self) -> Optional[Dict[str, Any]]:
+        return self._result_config
+
+
+# Late import to avoid cycles with the train form registrations.
+from gym_gui.ui.forms import get_worker_form_factory  # noqa: E402  # isort:skip
+
+_factory = get_worker_form_factory()
+if not _factory.has_policy_form("cleanrl_worker"):
+    _factory.register_policy_form(
+        "cleanrl_worker",
+        lambda parent=None, **kwargs: CleanRlPolicyForm(parent=parent, **kwargs),
+    )

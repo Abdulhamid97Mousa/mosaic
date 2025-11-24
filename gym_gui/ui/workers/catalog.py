@@ -62,7 +62,7 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
                 "artifacts via the Fast Analytics Path."
             ),
             supports_training=True,
-            supports_policy_load=False,
+            supports_policy_load=True,
             requires_live_telemetry=False,
             provides_fast_analytics=True,
         ),

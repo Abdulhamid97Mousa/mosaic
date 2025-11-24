@@ -4,9 +4,7 @@ from __future__ import annotations
 
 import os
 from pathlib import Path
-from typing import Mapping
-
-import pytest
+from typing import Any, Mapping
 
 from cleanrl_worker.config import WorkerConfig
 from cleanrl_worker.runtime import CleanRLWorkerRuntime
@@ -25,6 +23,20 @@ def _make_config(
         seed=42,
         extras=dict(extras or {}),
     )
+
+
+def test_allowed_entry_modules_includes_cleanrl_aliases() -> None:
+    runtime = CleanRLWorkerRuntime(
+        _make_config(),
+        use_grpc=False,
+        grpc_target="127.0.0.1:50055",
+        dry_run=True,
+    )
+
+    modules = runtime._allowed_entry_modules()
+
+    assert "cleanrl.ppo" in modules
+    assert "cleanrl_worker.cleanrl.ppo" in modules
 
 
 def test_build_cleanrl_args_includes_common_flags() -> None:
@@ -90,6 +102,31 @@ def test_build_cleanrl_args_respects_cli_overrides() -> None:
     assert "--wandb-project-name=test-project" in args
 
 
+def test_build_cleanrl_args_ignores_fastlane_extras() -> None:
+    config = _make_config(
+        extras={
+            "fastlane_only": True,
+            "fastlane_slot": 3,
+            "fastlane_video_mode": "grid",
+            "fastlane_grid_limit": 8,
+            "wandb_project_name": "fastlane-demo",
+        }
+    )
+    runtime = CleanRLWorkerRuntime(
+        config,
+        use_grpc=False,
+        grpc_target="127.0.0.1:50055",
+        dry_run=True,
+    )
+
+    args = runtime.build_cleanrl_args()
+    assert "--wandb-project-name=fastlane-demo" in args
+    assert all(not arg.startswith("--fastlane-only") for arg in args)
+    assert all(not arg.startswith("--fastlane-slot") for arg in args)
+    assert all(not arg.startswith("--fastlane-video-mode") for arg in args)
+    assert all(not arg.startswith("--fastlane-grid-limit") for arg in args)
+
+
 def test_run_uses_launcher_and_writes_logs(monkeypatch, tmp_path: Path) -> None:
     config = _make_config(extras={"tensorboard_dir": "tensorboard", "track_wandb": True})
     run_dir = tmp_path / "trainer"
@@ -114,7 +151,7 @@ def test_run_uses_launcher_and_writes_logs(monkeypatch, tmp_path: Path) -> None:
         lambda: None,
     )
 
-    launched: dict[str, object] = {}
+    launched: dict[str, Any] = {}
 
     class DummyProc:
         def __init__(self, cmd, cwd, stdout, stderr, env):
@@ -154,3 +191,41 @@ def test_run_uses_launcher_and_writes_logs(monkeypatch, tmp_path: Path) -> None:
     assert Path(wandb_dir).exists()
     assert "127.0.0.1" in launched["env"]["no_proxy"]
     assert "localhost" in launched["env"]["NO_PROXY"]
+
+
+def test_write_eval_tensorboard_emits_scalars(monkeypatch, tmp_path: Path) -> None:
+    runtime = CleanRLWorkerRuntime(
+        _make_config(),
+        use_grpc=False,
+        grpc_target="127.0.0.1:50055",
+        dry_run=True,
+    )
+
+    recorded: list[tuple[str, float, int]] = []
+
+    class DummyWriter:
+        def __init__(self, log_dir: str):
+            recorded.append(("init", 0.0, Path(log_dir).exists()))
+
+        def __enter__(self):
+            return self
+
+        def __exit__(self, exc_type, exc, tb):
+            return False
+
+        def add_scalar(self, tag: str, value: float, step: int) -> None:
+            recorded.append((tag, value, step))
+
+        def flush(self) -> None:
+            recorded.append(("flush", 0.0, -1))
+
+    monkeypatch.setattr(
+        "cleanrl_worker.MOSAIC_CLEANRL_WORKER.runtime._TensorBoardWriter",
+        DummyWriter,
+    )
+
+    runtime._write_eval_tensorboard(tmp_path / "tb", [1.0, 2.0], 1.5)
+
+    tags = [entry[0] for entry in recorded]
+    assert "eval/episode_return" in tags
+    assert "eval/avg_return" in tags

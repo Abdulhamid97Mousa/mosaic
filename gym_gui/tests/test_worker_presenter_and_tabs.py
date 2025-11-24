@@ -12,11 +12,14 @@ Tests cover:
 import unittest
 import tempfile
 import json
+import logging
 from pathlib import Path
 from unittest import mock
 from unittest.mock import Mock, patch, MagicMock
 from typing import Any
 import os
+
+import pytest
 
 from gym_gui.ui.presenters.workers.registry import (
     WorkerPresenter,
@@ -35,9 +38,18 @@ from gym_gui.ui.panels.analytics_tabs import AnalyticsTabManager
 from gym_gui.ui.panels import analytics_tabs
 from gym_gui.ui.widgets.tensorboard_artifact_tab import TensorboardArtifactTab
 from gym_gui.ui.widgets.wandb_artifact_tab import WandbArtifactTab
+from gym_gui.logging_config.log_constants import LOG_UI_RENDER_TABS_ARTIFACTS_MISSING
 from qtpy import QtWidgets
 
 os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+
+
+@pytest.fixture(scope="session")
+def _qt_app():
+    app = QtWidgets.QApplication.instance()
+    if app is None:
+        app = QtWidgets.QApplication([])
+    yield app
 
 
 class TestWorkerPresenterRegistry(unittest.TestCase):
@@ -652,3 +664,24 @@ class TestAnalyticsTabManager(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+@pytest.mark.usefixtures("_qt_app")
+def test_analytics_tabs_logs_missing_run_dir(monkeypatch, tmp_path, caplog):
+    render_tabs = _RecordingRenderTabs()
+    parent = QtWidgets.QWidget()
+    manager = AnalyticsTabManager(render_tabs, parent)
+
+    runs_root = tmp_path / "trainer"
+    runs_root.mkdir(parents=True)
+    monkeypatch.setattr(analytics_tabs, "VAR_TRAINER_DIR", runs_root)
+    monkeypatch.setattr(analytics_tabs, "VAR_ROOT", tmp_path / "varroot")
+
+    with caplog.at_level(logging.ERROR):
+        manager.load_and_create_tabs("missing-run", "agent-test")
+
+    parent.deleteLater()
+
+    matching = [record for record in caplog.records if LOG_UI_RENDER_TABS_ARTIFACTS_MISSING.code in record.message]
+    assert matching, "Missing artifacts log not emitted"
+    assert any(getattr(record, "run_id", None) == "missing-run" for record in matching)

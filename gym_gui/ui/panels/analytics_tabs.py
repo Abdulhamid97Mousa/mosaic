@@ -13,6 +13,7 @@ from qtpy import QtCore
 from gym_gui.config.paths import VAR_ROOT, VAR_TRAINER_DIR
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
+    LOG_UI_RENDER_TABS_ARTIFACTS_MISSING,
     LOG_UI_RENDER_TABS_TENSORBOARD_STATUS,
     LOG_UI_RENDER_TABS_TENSORBOARD_WAITING,
     LOG_UI_RENDER_TABS_WANDB_ERROR,
@@ -49,6 +50,27 @@ class AnalyticsTabManager(LogConstantMixin):
         """
 
         analytics_file = VAR_TRAINER_DIR / "runs" / run_id / "analytics.json"
+        run_dir = analytics_file.parent
+        if not run_dir.exists():
+            config_path = VAR_TRAINER_DIR / "configs" / f"config-{run_id}.json"
+            repo_root = VAR_ROOT.parent
+            third_party = repo_root / "3rd_party"
+            hint_cli = (
+                f"PYTHONPATH=\"{third_party}:$PYTHONPATH\" python -m cleanrl_worker.cli --config {config_path} "
+                "--grpc --grpc-target 127.0.0.1:50055"
+            )
+            self.log_constant(
+                LOG_UI_RENDER_TABS_ARTIFACTS_MISSING,
+                message="Run artifacts directory missing; worker appears not to have launched",
+                extra={
+                    "run_id": run_id,
+                    "agent_id": agent_id,
+                    "run_dir": str(run_dir),
+                    "config_path": str(config_path),
+                    "hint_cli": hint_cli,
+                },
+            )
+            return
         if not analytics_file.exists():
             self.log_constant(
                 LOG_UI_RENDER_TABS_WANDB_WARNING,

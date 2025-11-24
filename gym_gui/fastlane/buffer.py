@@ -238,14 +238,21 @@ class FastLaneReader(FastLaneBase):
         return cls(shm)
 
     def latest_frame(self) -> Optional[FastLaneFrame]:
+        capacity = self.capacity
+        if capacity <= 0:
+            # Writer has not finished initializing the header yet.
+            return None
+        slot_size = self.slot_size
+        if slot_size <= 0:
+            return None
         head = self.head
         if head == 0:
             return None
-        attempts = min(self.capacity, head)
+        attempts = min(capacity, head)
         for idx in range(attempts):
             seq_head = head - idx
-            slot_index = (seq_head - 1) % self.capacity
-            slot_offset = self._slot_offset + slot_index * self.slot_size
+            slot_index = (seq_head - 1) % capacity
+            slot_offset = self._slot_offset + slot_index * slot_size
             seq_addr = slot_offset
             payload_addr = slot_offset + _SLOT_META_SIZE
             seq1, payload_len, _reserved = _SLOT_META_STRUCT.unpack_from(self._mv, seq_addr)

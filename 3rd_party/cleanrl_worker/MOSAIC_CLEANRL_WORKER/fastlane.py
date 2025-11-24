@@ -17,11 +17,32 @@ import gymnasium as gym
 try:  # pragma: no cover - relies on repo layout
     from gym_gui.fastlane import FastLaneWriter, FastLaneConfig, FastLaneMetrics
     from gym_gui.fastlane.buffer import create_fastlane_name
+    from gym_gui.fastlane.tiling import tile_frames
+    from gym_gui.telemetry.semconv import VideoModes, TelemetryEnv
 except ImportError:  # pragma: no cover - best effort fallback
     FastLaneWriter = None  # type: ignore
     FastLaneConfig = None  # type: ignore
     FastLaneMetrics = None  # type: ignore
     create_fastlane_name = None  # type: ignore
+
+    class _VideoModes:
+        SINGLE = "single"
+        GRID = "grid"
+        OFF = "off"
+
+    class _TelemetryEnv:
+        FASTLANE_ONLY = "GYM_GUI_FASTLANE_ONLY"
+        FASTLANE_SLOT = "GYM_GUI_FASTLANE_SLOT"
+        FASTLANE_VIDEO_MODE = "GYM_GUI_FASTLANE_VIDEO_MODE"
+        FASTLANE_GRID_LIMIT = "GYM_GUI_FASTLANE_GRID_LIMIT"
+
+    VideoModes = _VideoModes()  # type: ignore
+    TelemetryEnv = _TelemetryEnv()  # type: ignore
+
+    def tile_frames(frames):
+        if not frames:
+            raise ValueError("tile_frames requires frames")
+        return frames[0]
 
 
 def _truthy(value: Any) -> bool:
@@ -48,6 +69,9 @@ class _FastLaneConfig:
     agent_id: str
     worker_id: str
     seed: int
+    total_envs: int
+    video_mode: str
+    grid_limit: int
 
 
 def _resolve_config() -> _FastLaneConfig:
@@ -73,17 +97,36 @@ def _resolve_config() -> _FastLaneConfig:
         seed = int(os.getenv("CLEANRL_SEED", "0"))
     except ValueError:
         seed = 0
-    return _FastLaneConfig(enabled=enabled, slot=slot, run_id=run_id, agent_id=agent_id, worker_id=worker_id, seed=seed)
+    video_mode = os.getenv(TelemetryEnv.FASTLANE_VIDEO_MODE, VideoModes.SINGLE)
+    if video_mode not in {VideoModes.SINGLE, VideoModes.GRID, VideoModes.OFF}:
+        video_mode = VideoModes.SINGLE
+    try:
+        grid_limit = int(os.getenv(TelemetryEnv.FASTLANE_GRID_LIMIT, "4"))
+    except ValueError:
+        grid_limit = 4
+    grid_limit = max(1, min(grid_limit, total_envs))
+    return _FastLaneConfig(
+        enabled=enabled,
+        slot=slot,
+        run_id=run_id,
+        agent_id=agent_id,
+        worker_id=worker_id,
+        seed=seed,
+        total_envs=total_envs,
+        video_mode=video_mode,
+        grid_limit=grid_limit,
+    )
 
 
 _CONFIG = _resolve_config()
 _ENV_SLOT_COUNTER = count()
+_GRID_COORDINATORS: dict[str, "_GridCoordinator"] = {}
 
 
 def maybe_wrap_env(env: Any) -> Any:
     """Attach the FastLane wrapper if fastlane streaming is enabled."""
 
-    if not _CONFIG.enabled:
+    if not _CONFIG.enabled or _CONFIG.video_mode == VideoModes.OFF:
         return env
     slot_index = next(_ENV_SLOT_COUNTER)
     return FastLaneTelemetryWrapper(env, _CONFIG, slot_index)
@@ -96,7 +139,15 @@ class FastLaneTelemetryWrapper(gym.Wrapper):
         super().__init__(env)
         self._config = config
         self._slot = slot_index
-        self._active = config.enabled and slot_index == config.slot
+        self._video_mode = config.video_mode
+        self._grid_limit = config.grid_limit
+        self._grid_coordinator = _get_grid_coordinator(config) if self._video_mode == VideoModes.GRID else None
+        if self._video_mode == VideoModes.GRID:
+            self._active = config.enabled and slot_index == 0
+            self._grid_contributor = slot_index < self._grid_limit
+        else:
+            self._active = config.enabled and slot_index == config.slot
+            self._grid_contributor = False
         self._episode_index = 0
         self._step_index = 0
         self._episode_return = 0.0
@@ -115,14 +166,21 @@ class FastLaneTelemetryWrapper(gym.Wrapper):
         result = self.env.reset(*args, **kwargs)
         self._step_index = 0
         self._episode_return = 0.0
+        if self._grid_coordinator is not None and self._slot == 0:
+            self._grid_coordinator.reset()
         return result
 
     def step(self, action: Any):  # type: ignore[override]
         obs, reward, terminated, truncated, info = self.env.step(action)
+        reward_f = float(reward)
+        if self._video_mode == VideoModes.GRID:
+            self._handle_grid_step(reward_f)
+        elif self._active:
+            self._emit_single_step(reward_f)
+
         if self._active:
-            self._emit_step(float(reward), bool(terminated), bool(truncated))
             self._step_index += 1
-            self._episode_return += float(reward)
+            self._episode_return += reward_f
             if terminated or truncated:
                 self._emit_episode()
                 self._episode_index += 1
@@ -132,26 +190,42 @@ class FastLaneTelemetryWrapper(gym.Wrapper):
 
     def close(self):  # type: ignore[override]
         self._close_writer()
+        if self._grid_coordinator is not None and self._slot == 0:
+            _GRID_COORDINATORS.pop(self._config.run_id, None)
         return super().close()
 
     # ------------------------------------------------------------------
-    def _emit_step(self, reward: float, terminated: bool, truncated: bool) -> None:
-        frame_payload = self._grab_frame()
-        now_ns = time.time_ns()
-        if self._throttle_interval_ns and self._last_emit_ns:
-            if now_ns - self._last_emit_ns < self._throttle_interval_ns:
-                frame_payload = None
-        if frame_payload is not None:
-            self._last_emit_ns = now_ns
-            self._publish_frame(frame_payload, reward)
-        else:
-            self._log_debug("FastLane frame skipped (throttled or render failed)", limit=5)
+    def _emit_single_step(self, reward: float) -> None:
+        frame_array = self._grab_frame()
+        if frame_array is None:
+            self._log_debug("FastLane frame skipped (render failed)", limit=5)
+            return
+        if self._should_throttle():
+            return
+        self._publish_array_frame(frame_array, reward)
+
+    def _handle_grid_step(self, reward: float) -> None:
+        if self._grid_coordinator is None or not self._grid_contributor:
+            return
+        frame_array = self._grab_frame()
+        if frame_array is None:
+            return
+        self._grid_coordinator.collect(self._slot, frame_array)
+        if not self._active:
+            return
+        result = self._grid_coordinator.compose_if_ready(reward)
+        if result is None:
+            return
+        composite, publisher_reward = result
+        if self._should_throttle():
+            return
+        self._publish_array_frame(composite, publisher_reward)
 
     def _emit_episode(self) -> None:
         # Metrics stream already tracks totals; no extra emission needed
         return None
 
-    def _grab_frame(self) -> Optional[tuple[bytes, int, int, int]]:
+    def _grab_frame(self) -> Optional[np.ndarray]:
         try:
             frame = self.env.render()
         except Exception:
@@ -180,12 +254,21 @@ class FastLaneTelemetryWrapper(gym.Wrapper):
             new_w = max(1, int(arr.shape[1] * scale))
             arr = _resize_nearest(arr, new_h, new_w)
         arr = np.ascontiguousarray(arr.astype(np.uint8, copy=False))
-        return (arr.tobytes(), arr.shape[1], arr.shape[0], arr.shape[2])
+        return arr
 
-    def _publish_frame(self, frame: tuple[bytes, int, int, int], reward: float) -> None:
+    def _should_throttle(self) -> bool:
+        now_ns = time.time_ns()
+        if self._throttle_interval_ns and self._last_emit_ns:
+            if now_ns - self._last_emit_ns < self._throttle_interval_ns:
+                return True
+        self._last_emit_ns = now_ns
+        return False
+
+    def _publish_array_frame(self, frame_array: np.ndarray, reward: float) -> None:
         if FastLaneWriter is None or FastLaneConfig is None or FastLaneMetrics is None:
             return
-        frame_bytes, width, height, channels = frame
+        height, width, channels = frame_array.shape
+        frame_bytes = frame_array.tobytes()
         writer = self._writer
         if writer is None:
             config = FastLaneConfig(
@@ -249,7 +332,59 @@ class FastLaneTelemetryWrapper(gym.Wrapper):
         print(f"[FASTLANE] {message}", file=sys.stderr, flush=True)
 
 
+class _GridCoordinator:
+    """Accumulates per-env frames and emits a composite when all arrive."""
+
+    def __init__(self, grid_limit: int) -> None:
+        self._grid_limit = max(1, grid_limit)
+        self._frames: dict[int, np.ndarray] = {}
+
+    def collect(self, slot: int, frame: np.ndarray) -> None:
+        if slot >= self._grid_limit:
+            return
+        self._frames[slot] = frame
+
+    def compose_if_ready(self, reward: float) -> Optional[tuple[np.ndarray, float]]:
+        if len(self._frames) < self._grid_limit:
+            return None
+        ordered: list[np.ndarray] = []
+        for idx in range(self._grid_limit):
+            frame = self._frames.get(idx)
+            if frame is None:
+                return None
+            ordered.append(frame)
+        self._frames.clear()
+        composite = tile_frames(ordered)
+        return composite, reward
+
+    def reset(self) -> None:
+        self._frames.clear()
+
+    @property
+    def grid_limit(self) -> int:
+        return self._grid_limit
+
+
+def _get_grid_coordinator(config: _FastLaneConfig) -> _GridCoordinator:
+    coord = _GRID_COORDINATORS.get(config.run_id)
+    if coord is None or coord.grid_limit != config.grid_limit:
+        coord = _GridCoordinator(config.grid_limit)
+        _GRID_COORDINATORS[config.run_id] = coord
+    return coord
+
+
 __all__ = ["is_fastlane_enabled", "maybe_wrap_env"]
+
+
+def reload_fastlane_config() -> _FastLaneConfig:
+    """Recompute FastLane config from environment variables."""
+
+    global _CONFIG
+    _CONFIG = _resolve_config()
+    return _CONFIG
+
+
+__all__.append("reload_fastlane_config")
 
 
 def _resize_nearest(arr: np.ndarray, new_h: int, new_w: int) -> np.ndarray:

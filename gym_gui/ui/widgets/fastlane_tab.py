@@ -11,14 +11,22 @@ from gym_gui.ui.renderers.fastlane_item import FastLaneItem  # ensures type regi
 class FastLaneTab(QtWidgets.QWidget):
     """Qt Quick-based view that renders frames from the fast lane."""
 
-    def __init__(self, run_id: str, agent_id: str, parent: QtWidgets.QWidget | None = None) -> None:
+    def __init__(
+        self,
+        run_id: str,
+        agent_id: str,
+        *,
+        mode_label: str | None = None,
+        parent: QtWidgets.QWidget | None = None,
+    ) -> None:
         super().__init__(parent)
         self._run_id = run_id
         self._agent_id = agent_id
+        self._mode_label = mode_label or "Fast lane"
         self._consumer = FastLaneConsumer(run_id, parent=self)
         self._consumer.frame_ready.connect(self._on_frame_ready)
         self._consumer.status_changed.connect(self._on_status_changed)
-        self._status_label = QtWidgets.QLabel("Fast lane: connecting…", self)
+        self._status_label = QtWidgets.QLabel(f"{self._mode_label}: connecting…", self)
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -35,7 +43,7 @@ class FastLaneTab(QtWidgets.QWidget):
         self._root_obj = self._quick.rootObject()
 
     def _on_status_changed(self, status: str) -> None:
-        self._status_label.setText(f"Fast lane: {status}")
+        self._status_label.setText(f"{self._mode_label}: {status}")
 
     def _on_frame_ready(self, event: FastLaneFrameEvent) -> None:
         if self._root_obj is None:

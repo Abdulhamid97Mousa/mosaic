@@ -3,6 +3,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional, Tuple
+from collections import defaultdict
 
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
@@ -24,7 +25,13 @@ from gym_gui.config.game_configs import (
     DEFAULT_MINIGRID_DOORKEY_16x16_CONFIG,
     DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG,
 )
-from gym_gui.core.enums import ControlMode, GameId, get_game_display_name
+from gym_gui.core.enums import (
+    ControlMode,
+    EnvironmentFamily,
+    GameId,
+    ENVIRONMENT_FAMILY_BY_GAME,
+    get_game_display_name,
+)
 from gym_gui.services.actor import ActorDescriptor
 from gym_gui.ui.environments.single_agent_env.gym import (
     build_bipedal_controls,
@@ -50,6 +57,11 @@ from gym_gui.ui.workers import WorkerDefinition, get_worker_catalog
 from gym_gui.ui.widgets.cleanrl_train_form import get_cleanrl_environment_choices
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.jason_supervisor import JasonSupervisorService
+from gym_gui.telemetry.semconv import (
+    TelemetryModes,
+    TELEMETRY_MODE_DESCRIPTORS,
+    TelemetryModeDescriptor,
+)
 
 
 @dataclass(frozen=True)
@@ -261,6 +273,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
                 }
             } if config.minigrid_redbluedoors_8x8_config else {}),
         }
+        self._current_telemetry_mode = TelemetryModes.FASTLANE_ONLY
 
         self._current_game: Optional[GameId] = None
         self._current_mode: ControlMode = self._load_mode_preference(config.default_mode)
@@ -376,10 +389,10 @@ class ControlPanelWidget(QtWidgets.QWidget):
         }
 
         self._current_worker_id: Optional[str] = None
-        self._cleanrl_env_combo: Optional[QtWidgets.QComboBox] = None
-        self._cleanrl_env_container: Optional[QtWidgets.QWidget] = None
-        self._cleanrl_env_label: Optional[QtWidgets.QLabel] = None
-        self._selected_cleanrl_env_id: Optional[str] = None
+        self._family_combo: Optional[QtWidgets.QComboBox] = None
+        self._family_to_games: dict[EnvironmentFamily, list[tuple[str, GameId]]] = {}
+        self._selected_family: Optional[EnvironmentFamily] = None
+        self._all_games: tuple[GameId, ...] = ()
         self._build_ui()
         self._apply_current_mode_selection()
         self._connect_signals()
@@ -393,28 +406,25 @@ class ControlPanelWidget(QtWidgets.QWidget):
     # Public API
     # ------------------------------------------------------------------
     def populate_games(self, games: Iterable[GameId], *, default: Optional[GameId] = None) -> None:
+        if self._family_combo is None or self._game_combo is None:
+            return
         games_tuple = tuple(games)
-        self._game_combo.blockSignals(True)
-        self._game_combo.clear()
-        for game in games_tuple:
-            self._game_combo.addItem(get_game_display_name(game), game)
-        # Ensure scrollbar is visible after populating items
-        combo_view = self._game_combo.view()
-        if combo_view is not None and isinstance(combo_view, QtWidgets.QAbstractItemView):
-            combo_view.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)  # type: ignore[attr-defined]
-        self._game_combo.blockSignals(False)
+        self._all_games = games_tuple
+        self._family_to_games = self._build_family_index(games_tuple)
 
         if not games_tuple:
+            self._family_combo.blockSignals(True)
+            self._family_combo.clear()
+            self._family_combo.blockSignals(False)
+            self._game_combo.blockSignals(True)
+            self._game_combo.clear()
+            self._game_combo.blockSignals(False)
             return
 
-        chosen = default if (default is not None and default in games_tuple) else games_tuple[0]
-        index = self._game_combo.findData(chosen)
-        if index < 0:
-            index = 0
-        self._game_combo.setCurrentIndex(index)
-        chosen_game = self._game_combo.itemData(index)
-        if isinstance(chosen_game, GameId):
-            self._emit_game_changed(chosen_game)
+        chosen_game = default if (default is not None and default in games_tuple) else games_tuple[0]
+        chosen_family = self._family_for_game(chosen_game)
+        self._populate_family_combo(chosen_family)
+        self._rebuild_game_combo(chosen_family, chosen_game)
 
     def current_actor(self) -> Optional[str]:
         return self._active_actor_id
@@ -511,10 +521,13 @@ class ControlPanelWidget(QtWidgets.QWidget):
             self._fps_label.setText(f"{fps:.1f}")
 
     def fastlane_only_enabled(self) -> bool:
-        return self._fastlane_only_checkbox.isChecked()
+        return self._current_telemetry_mode == TelemetryModes.FASTLANE_ONLY
 
     def set_fastlane_only(self, enabled: bool) -> None:
-        self._fastlane_only_checkbox.setChecked(enabled)
+        if enabled:
+            self._fastlane_only_checkbox.setChecked(True)
+        else:
+            self._dual_path_radio.setChecked(True)
 
     def set_mode(self, mode: ControlMode) -> None:
         index = self._mode_combo.findData(mode)
@@ -527,12 +540,9 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._emit_mode_changed(mode)
 
     def set_game(self, game: GameId) -> None:
-        index = self._game_combo.findData(game)
-        if index >= 0:
-            self._game_combo.blockSignals(True)
-            self._game_combo.setCurrentIndex(index)
-            self._game_combo.blockSignals(False)
-            self._emit_game_changed(game)
+        family = self._family_for_game(game)
+        self._populate_family_combo(family)
+        self._rebuild_game_combo(family, game)
 
     def override_slippery(self, enabled: bool) -> None:
         overrides = self._game_overrides.setdefault(GameId.FROZEN_LAKE, {})
@@ -553,8 +563,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
 
     def cleanrl_environment_id(self) -> Optional[str]:
         """Return the currently selected CleanRL environment id (Agent-only tab)."""
-
-        return self._selected_cleanrl_env_id
+        return None
 
     def get_overrides(self, game_id: GameId) -> Dict[str, object]:
         return dict(self._game_overrides.get(game_id, {}))
@@ -621,8 +630,10 @@ class ControlPanelWidget(QtWidgets.QWidget):
         human_layout = QtWidgets.QVBoxLayout(self._human_tab)
         human_layout.setContentsMargins(0, 0, 0, 0)
         human_layout.setSpacing(12)
-        human_layout.addWidget(self._create_environment_group(self._human_tab))
-        # Wrap Game Configuration in a scroll area to ensure full visibility in Human mode
+
+        environment_group = self._create_environment_group(self._human_tab)
+        human_layout.addWidget(environment_group)
+
         cfg_group = self._create_config_group(self._human_tab)
         self._config_scroll = QtWidgets.QScrollArea(self._human_tab)
         self._config_scroll.setWidgetResizable(True)
@@ -630,22 +641,19 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._config_scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         self._config_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)  # type: ignore[attr-defined]
         self._config_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)  # type: ignore[attr-defined]
-        # Ensure the scroll area prefers to expand vertically
         sp = self._config_scroll.sizePolicy()
         sp.setVerticalPolicy(QtWidgets.QSizePolicy.Policy.Expanding)
         sp.setHorizontalPolicy(QtWidgets.QSizePolicy.Policy.Preferred)
         self._config_scroll.setSizePolicy(sp)
         self._config_scroll.setWidget(cfg_group)
         human_layout.addWidget(self._config_scroll)
+
         human_layout.addWidget(self._create_mode_group(self._human_tab))
         self._control_buttons_widget = self._create_control_group(self._human_tab)
         human_layout.addWidget(self._control_buttons_widget)
+        human_layout.addWidget(self._create_telemetry_mode_group(self._human_tab))
         human_layout.addWidget(self._create_status_group(self._human_tab))
-        # Give the Game Configuration scroll area more room compared to trailing groups
-        # so that it remains visible and scrollable on smaller screens.
-        # Indices (after adds): 0=env, 1=config_scroll, 2=mode, 3=control, 4=status, 5=stretch
-        human_layout.setStretch(1, 1)
-        human_layout.addStretch(0)
+        human_layout.addStretch(1)
         human_index = self._tab_widget.addTab(self._human_tab, "Human Control")
         self._tab_to_mode[human_index] = ControlMode.HUMAN_ONLY
 
@@ -678,23 +686,27 @@ class ControlPanelWidget(QtWidgets.QWidget):
         layout = QtWidgets.QGridLayout(group)
         layout.setColumnStretch(1, 1)
 
-        layout.addWidget(QtWidgets.QLabel("Environment", group), 0, 0)
+        layout.addWidget(QtWidgets.QLabel("Family", group), 0, 0)
+        self._family_combo = QtWidgets.QComboBox(group)
+        self._family_combo.setMaxVisibleItems(10)
+        layout.addWidget(self._family_combo, 0, 1, 1, 2)
+
+        layout.addWidget(QtWidgets.QLabel("Environment", group), 1, 0)
         self._game_combo = QtWidgets.QComboBox(group)
         self._game_combo.setSizeAdjustPolicy(QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToContents)
-        self._game_combo.setMaxVisibleItems(10)  # Show only 10 items with scrollbar
-        # Force the combobox to use a scrollable list view
+        self._game_combo.setMaxVisibleItems(10)
         self._game_combo.setStyleSheet("QComboBox { combobox-popup: 0; }")
-        layout.addWidget(self._game_combo, 0, 1, 1, 2)
+        layout.addWidget(self._game_combo, 1, 1, 1, 2)
 
-        layout.addWidget(QtWidgets.QLabel("Seed", group), 1, 0)
+        layout.addWidget(QtWidgets.QLabel("Seed", group), 2, 0)
         self._seed_spin = QtWidgets.QSpinBox(group)
         self._seed_spin.setRange(1, 10_000_000)
         self._seed_spin.setValue(self._default_seed)
-        layout.addWidget(self._seed_spin, 1, 1)
+        layout.addWidget(self._seed_spin, 2, 1)
 
         self._seed_reuse_checkbox = QtWidgets.QCheckBox("Allow seed reuse", group)
         self._seed_reuse_checkbox.setChecked(self._allow_seed_reuse)
-        layout.addWidget(self._seed_reuse_checkbox, 1, 2)
+        layout.addWidget(self._seed_reuse_checkbox, 2, 2)
         if self._allow_seed_reuse:
             self._seed_spin.setToolTip("Seeds auto-increment by default. Adjust before loading to reuse a previous seed.")
         else:
@@ -702,8 +714,85 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._seed_reuse_checkbox.stateChanged.connect(self._on_seed_reuse_changed)
 
         self._load_button = QtWidgets.QPushButton("Load Environment", group)
-        layout.addWidget(self._load_button, 2, 0, 1, 3)
+        layout.addWidget(self._load_button, 3, 0, 1, 3)
         return group
+
+    def _format_family_label(self, family: EnvironmentFamily) -> str:
+        if family == EnvironmentFamily.OTHER:
+            return "Other"
+        return family.value.replace("_", " ").title()
+
+    def _family_for_game(self, game: Optional[GameId]) -> EnvironmentFamily:
+        if game is None:
+            return EnvironmentFamily.TOY_TEXT
+        return ENVIRONMENT_FAMILY_BY_GAME.get(game, EnvironmentFamily.OTHER)
+
+    def _build_family_index(
+        self, games: Iterable[GameId]
+    ) -> dict[EnvironmentFamily, list[tuple[str, GameId]]]:
+        mapping: dict[EnvironmentFamily, list[tuple[str, GameId]]] = defaultdict(list)
+        for game in games:
+            family = self._family_for_game(game)
+            mapping[family].append((get_game_display_name(game), game))
+        for family in mapping:
+            mapping[family].sort(key=lambda item: item[0])
+        return mapping
+
+    def _populate_family_combo(self, preferred: Optional[EnvironmentFamily]) -> None:
+        if self._family_combo is None:
+            return
+        families = sorted(self._family_to_games.keys(), key=lambda fam: fam.value)
+        if not families:
+            self._family_combo.blockSignals(True)
+            self._family_combo.clear()
+            self._family_combo.blockSignals(False)
+            return
+        target = preferred if preferred in families else families[0]
+        self._selected_family = target
+        self._family_combo.blockSignals(True)
+        self._family_combo.clear()
+        for family in families:
+            self._family_combo.addItem(self._format_family_label(family), family)
+        index = self._family_combo.findData(target)
+        if index < 0:
+            index = 0
+        self._family_combo.setCurrentIndex(index)
+        self._family_combo.blockSignals(False)
+
+    def _rebuild_game_combo(
+        self, family: EnvironmentFamily, selected: Optional[GameId] = None
+    ) -> None:
+        if self._game_combo is None:
+            return
+        games = self._family_to_games.get(family, [])
+        if not games:
+            self._game_combo.blockSignals(True)
+            self._game_combo.clear()
+            self._game_combo.blockSignals(False)
+            return
+        choices = [gid for _, gid in games]
+        target = selected if selected in choices else choices[0]
+        self._current_game = target
+        self._game_combo.blockSignals(True)
+        self._game_combo.clear()
+        for label, gid in games:
+            self._game_combo.addItem(label, gid)
+        self._game_combo.blockSignals(False)
+        index = self._game_combo.findData(target)
+        if index < 0:
+            index = 0
+        self._game_combo.setCurrentIndex(index)
+
+    def _on_family_changed(self, index: int) -> None:
+        if self._family_combo is None:
+            return
+        data = self._family_combo.itemData(index)
+        if not isinstance(data, EnvironmentFamily):
+            return
+        if data == self._selected_family:
+            return
+        self._selected_family = data
+        self._rebuild_game_combo(data, None)
 
     def _create_config_group(self, parent: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
         self._config_group = QtWidgets.QGroupBox("Game Configuration", parent)
@@ -721,6 +810,37 @@ class ControlPanelWidget(QtWidgets.QWidget):
             self._mode_combo.addItem(label, mode)
         layout.addWidget(self._mode_combo)
         return self._mode_group
+
+    def _create_telemetry_mode_group(self, parent: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
+        self._telemetry_mode_group = QtWidgets.QGroupBox("Telemetry Mode", parent)
+        group = self._telemetry_mode_group
+        layout = QtWidgets.QVBoxLayout(group)
+        description = QtWidgets.QLabel(
+            "Choose which telemetry path to use for this session. Fast Lane streams frames via shared memory; "
+            "Dual Path uses RunBus fast path + durable SQLite so replay remains available.",
+            group,
+        )
+        description.setWordWrap(True)
+        layout.addWidget(description)
+
+        self._telemetry_button_group = QtWidgets.QButtonGroup(group)
+
+        fastlane_desc = TELEMETRY_MODE_DESCRIPTORS[TelemetryModes.FASTLANE_ONLY]
+        self._fastlane_only_checkbox = QtWidgets.QRadioButton(fastlane_desc.label, group)
+        self._fastlane_only_checkbox.setToolTip(fastlane_desc.description)
+        self._telemetry_button_group.addButton(self._fastlane_only_checkbox)
+        layout.addWidget(self._fastlane_only_checkbox)
+
+        dual_path_desc = TELEMETRY_MODE_DESCRIPTORS[TelemetryModes.UI_AND_DB]
+        self._dual_path_radio = QtWidgets.QRadioButton(dual_path_desc.label, group)
+        self._dual_path_radio.setToolTip(dual_path_desc.description)
+        self._telemetry_button_group.addButton(self._dual_path_radio)
+        layout.addWidget(self._dual_path_radio)
+
+        self._fastlane_only_checkbox.setChecked(True)
+        self._fastlane_only_checkbox.toggled.connect(self._update_telemetry_status_label)
+        self._dual_path_radio.toggled.connect(self._update_telemetry_status_label)
+        return group
 
     def _create_actor_group(self, parent: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
         group = QtWidgets.QGroupBox("Active Actor", parent)
@@ -747,28 +867,6 @@ class ControlPanelWidget(QtWidgets.QWidget):
     def _create_training_group(self, parent: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
         group = QtWidgets.QGroupBox("Headless Training", parent)
         layout = QtWidgets.QVBoxLayout(group)
-
-        cleanrl_widget = QtWidgets.QWidget(group)
-        cleanrl_layout = QtWidgets.QHBoxLayout(cleanrl_widget)
-        cleanrl_layout.setContentsMargins(0, 0, 0, 0)
-        cleanrl_layout.setSpacing(6)
-        env_label = QtWidgets.QLabel("CleanRL Environment:", cleanrl_widget)
-        cleanrl_layout.addWidget(env_label)
-        env_combo = QtWidgets.QComboBox(cleanrl_widget)
-        for label, env_id in get_cleanrl_environment_choices():
-            env_combo.addItem(label, env_id)
-        env_combo.currentIndexChanged.connect(self._on_cleanrl_env_changed)
-        if env_combo.count() > 0:
-            env_combo.setCurrentIndex(0)
-            current = env_combo.currentData()
-            self._selected_cleanrl_env_id = str(current) if isinstance(current, str) else None
-        env_combo.setEnabled(False)
-        cleanrl_layout.addWidget(env_combo, 1)
-        cleanrl_widget.setVisible(False)
-        layout.addWidget(cleanrl_widget)
-        self._cleanrl_env_combo = env_combo
-        self._cleanrl_env_container = cleanrl_widget
-        self._cleanrl_env_label = env_label
 
         self._configure_agent_button = QtWidgets.QPushButton("🚀 Configure Agent…", group)
         self._configure_agent_button.setToolTip(
@@ -811,6 +909,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         layout.addWidget(self._trained_agent_button)
         return group
 
+
     def _create_control_group(self, parent: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
         group = QtWidgets.QGroupBox("Game Control Flow", parent)
         layout = QtWidgets.QVBoxLayout(group)
@@ -848,9 +947,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._active_time_label = QtWidgets.QLabel("—", self._status_group)
         self._outcome_time_label = QtWidgets.QLabel("—", self._status_group)
         self._fps_label = QtWidgets.QLabel("—", self._status_group)
-        self._fastlane_only_checkbox = QtWidgets.QCheckBox("Fast Lane Only", self._status_group)
-        self._fastlane_only_checkbox.setToolTip("Skip telemetry persistence and run only on the fast lane (no replay)")
-        self._fastlane_only_checkbox.setChecked(True)
+        self._telemetry_status_label = QtWidgets.QLabel("—", self._status_group)
         # Supervisor overlays (lightweight status)
         self._supervisor_label = QtWidgets.QLabel("—", self._status_group)
         self._safety_mode_label = QtWidgets.QLabel("—", self._status_group)
@@ -867,7 +964,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
             ("Active Play Time", self._active_time_label),
             ("Outcome Time", self._outcome_time_label),
             ("Live FPS", self._fps_label),
-            ("Fast Lane", self._fastlane_only_checkbox),
+            ("Telemetry Mode", self._telemetry_status_label),
             ("Supervisor", self._supervisor_label),
             ("Safety", self._safety_mode_label),
         ]
@@ -884,6 +981,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
 
         layout.setColumnStretch(1, 1)
         layout.setColumnStretch(3, 1)
+        self._update_telemetry_status_label()
         return self._status_group
 
     def _on_tab_changed(self, index: int) -> None:
@@ -900,6 +998,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
             self._status_group.setVisible(is_human_tab)
         if hasattr(self, "_control_buttons_widget") and self._control_buttons_widget is not None:
             self._control_buttons_widget.setVisible(is_human_tab)
+        if hasattr(self, "_telemetry_mode_group") and self._telemetry_mode_group is not None:
+            self._telemetry_mode_group.setVisible(is_human_tab)
 
     def _apply_mode_from_tab(self, mode: ControlMode) -> None:
         index = self._mode_combo.findData(mode)
@@ -916,6 +1016,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._emit_mode_changed(mode)
 
     def _connect_signals(self) -> None:
+        if self._family_combo is not None:
+            self._family_combo.currentIndexChanged.connect(self._on_family_changed)
         self._game_combo.currentIndexChanged.connect(self._on_game_changed)
         self._seed_spin.valueChanged.connect(lambda _: self._update_control_states())
         self._wire_mode_combo()
@@ -932,6 +1034,26 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._step_button.clicked.connect(self._on_step_clicked)
         self._reset_button.clicked.connect(self._on_reset_clicked)
         self._actor_combo.currentIndexChanged.connect(self._on_actor_selection_changed)
+
+    def _update_telemetry_status_label(self) -> None:
+        if not hasattr(self, "_telemetry_status_label"):
+            return
+        if self._fastlane_only_checkbox.isChecked():
+            self._current_telemetry_mode = TelemetryModes.FASTLANE_ONLY
+        elif getattr(self, "_dual_path_radio", None) is not None and self._dual_path_radio.isChecked():
+            self._current_telemetry_mode = TelemetryModes.UI_AND_DB
+        else:
+            self._current_telemetry_mode = TelemetryModes.DB_ONLY
+
+        descriptor = TELEMETRY_MODE_DESCRIPTORS.get(
+            self._current_telemetry_mode,
+            TelemetryModeDescriptor(
+                name=self._current_telemetry_mode,
+                label=self._current_telemetry_mode.replace("_", " ").title(),
+                description="",
+            ),
+        )
+        self._telemetry_status_label.setText(descriptor.label)
 
     def set_seed_value(self, seed: int) -> None:
         clamped = max(1, min(seed, self._seed_spin.maximum()))
@@ -1215,13 +1337,6 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._update_actor_description()
         self.actor_changed.emit(actor_id)
 
-    def _on_cleanrl_env_changed(self, index: int) -> None:
-        combo = self._cleanrl_env_combo
-        if combo is None:
-            return
-        env_id = combo.itemData(index)
-        self._selected_cleanrl_env_id = str(env_id) if isinstance(env_id, str) else None
-
     def _on_worker_selection_changed(self, index: int) -> None:
         worker_id = self._worker_combo.itemData(index)
         if not isinstance(worker_id, str):
@@ -1231,7 +1346,6 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._current_worker_id = worker_id
         self._update_worker_description()
         self._update_control_states()
-        self._sync_cleanrl_env_widget()
         if worker_id:
             self.worker_changed.emit(worker_id)
 
@@ -1270,13 +1384,6 @@ class ControlPanelWidget(QtWidgets.QWidget):
             if definition.worker_id == self._current_worker_id:
                 return definition
         return None
-
-    def _sync_cleanrl_env_widget(self) -> None:
-        if self._cleanrl_env_container is None or self._cleanrl_env_combo is None:
-            return
-        is_cleanrl = self._current_worker_id == "cleanrl_worker"
-        self._cleanrl_env_container.setVisible(is_cleanrl)
-        self._cleanrl_env_combo.setEnabled(is_cleanrl)
 
     def _update_worker_description(self) -> None:
         definition = self._current_worker_definition()

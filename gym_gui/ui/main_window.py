@@ -1000,6 +1000,20 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
             return
 
+        config_builder = getattr(dialog, "get_config", None)
+        if callable(config_builder):
+            config = config_builder()
+            if not config:
+                return
+            self.log_constant(
+                LOG_UI_MAINWINDOW_INFO,
+                message="CleanRL policy evaluation submitted",
+                extra={"worker_id": worker_id},
+            )
+            self._status_bar.showMessage("Launching evaluation run...", 5000)
+            self._submit_training_config(config)
+            return
+
         policy_path = getattr(dialog, "selected_path", None)
         if policy_path is None:
             return
@@ -1560,6 +1574,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             return
 
         canonical_agent_id = self._canonical_agent_id(metadata, agent_id)
+        run_mode = self._metadata_run_mode(metadata)
         key = (run_id, canonical_agent_id)
         if key in self._fastlane_tabs_open:
             self.log_constant(
@@ -1570,7 +1585,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             return
 
         try:
-            tab = FastLaneTab(run_id, canonical_agent_id, parent=self._render_tabs)
+            mode_label = "Fast lane (evaluation)" if run_mode == "policy_eval" else "Fast lane"
+            tab = FastLaneTab(run_id, canonical_agent_id, mode_label=mode_label, parent=self._render_tabs)
         except Exception as exc:
             self.log_constant(
                 LOG_UI_MAINWINDOW_WARNING,
@@ -1580,7 +1596,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             )
             return
 
-        title = f"CleanRL-Live-{canonical_agent_id or 'agent'}"
+        if run_mode == "policy_eval":
+            title = f"CleanRL-Eval-{canonical_agent_id or 'agent'}"
+        else:
+            title = f"CleanRL-Live-{canonical_agent_id or 'agent'}"
         self._render_tabs.add_dynamic_tab(run_id, title, tab)
         self._fastlane_tabs_open.add(key)
         self.log_constant(
@@ -1601,6 +1620,23 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 if isinstance(config_agent, str) and config_agent.strip():
                     return config_agent.strip()
         return fallback
+
+    def _metadata_run_mode(self, metadata: Dict[str, Any]) -> str:
+        ui_meta = metadata.get("ui") if isinstance(metadata, dict) else None
+        if isinstance(ui_meta, dict):
+            mode = ui_meta.get("run_mode")
+            if isinstance(mode, str) and mode.strip():
+                return mode.strip().lower()
+        worker_meta = metadata.get("worker") if isinstance(metadata, dict) else None
+        if isinstance(worker_meta, dict):
+            config = worker_meta.get("config")
+            if isinstance(config, dict):
+                extras = config.get("extras")
+                if isinstance(extras, dict):
+                    mode = extras.get("mode")
+                    if isinstance(mode, str) and mode.strip():
+                        return mode.strip().lower()
+        return "train"
 
     def _metadata_supports_fastlane(self, metadata: Dict[str, Any]) -> bool:
         """Return True if the run metadata indicates FastLane visuals are available."""
