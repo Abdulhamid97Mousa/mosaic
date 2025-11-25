@@ -60,7 +60,7 @@ def test_cleanrl_fastlane_wrapper_publishes_frames(monkeypatch, fastlane_slot):
     monkeypatch.setenv("CLEANRL_RUN_ID", run_id)
     monkeypatch.setenv("CLEANRL_AGENT_ID", "agent-99")
 
-    module = importlib.import_module("cleanrl_worker.MOSAIC_CLEANRL_WORKER.fastlane")
+    module = importlib.import_module("cleanrl_worker.fastlane")
     module = importlib.reload(module)
 
     env = _DummyEnv()
@@ -95,7 +95,7 @@ def test_fastlane_grid_mode_tiles_frames(monkeypatch):
     monkeypatch.setenv("CLEANRL_RUN_ID", run_id)
     monkeypatch.setenv("CLEANRL_AGENT_ID", "agent-grid")
 
-    module = importlib.import_module("cleanrl_worker.MOSAIC_CLEANRL_WORKER.fastlane")
+    module = importlib.import_module("cleanrl_worker.fastlane")
     module = importlib.reload(module)
 
     module._GRID_COORDINATORS.clear()

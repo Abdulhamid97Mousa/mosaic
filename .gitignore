@@ -41,7 +41,7 @@ gym_gui/var/config/*
 *_pb2.pyi
 *_pb2_grpc.py
 gym_gui/services/trainer/proto/trainer_pb2.pyi
-
+gym_gui.egg-info
 
 #
 .env
@@ -100,6 +100,7 @@ var/data/*
 3rd_party/gui_jason_grpc_cleanrl/jason_worker/dist/
 3rd_party/gui_jason_grpc_cleanrl/jason_worker/gradlew
 
+3rd_party/cleanrl_worker/mosaic_cleanrl.egg-info
 
 *.class
 *.jar

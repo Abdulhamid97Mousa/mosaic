@@ -22,15 +22,17 @@ The naming scheme is:
 If a run is obsolete you can archive/delete its `var/trainer/runs/<RUN>` folder once you are certain the trainer daemon is stopped.
 
 ## Launching the trained policy for evaluation today
-The GUI’s “📦 Load Trained Policy” button stays disabled for CleanRL because the worker catalog marks `supports_policy_load=False` and we never registered a `create_policy_form` for `cleanrl_worker`. Until that feature lands, evaluate the saved checkpoint via CleanRL’s own eval helper:
+The GUI now supports "📦 Load Trained Policy" for CleanRL via the policy form. To evaluate manually via CleanRL's own eval helper:
 
 ```bash
 cd /home/hamid/Desktop/Projects/GUI_BDI_RL
 source .venv/bin/activate
-PYTHONPATH="$PWD/3rd_party:$PYTHONPATH" \
-  python - <<'PY'
-from cleanrl_worker.cleanrl.ppo_continuous_action import Agent, make_env
-from cleanrl_worker.cleanrl_utils.evals.ppo_eval import evaluate
+# Packages installed in editable mode:
+#   pip install -e .                           # gym-gui
+#   pip install -e 3rd_party/cleanrl_worker    # cleanrl + cleanrl_worker
+python - <<'PY'
+from cleanrl.ppo_continuous_action import Agent, make_env
+from cleanrl_utils.evals.ppo_eval import evaluate
 MODEL = "var/trainer/runs/01KATF461V3681NE4E0T3TX33Z/runs/Walker2d-v5__ppo_continuous_action__1__1763972364/ppo_continuous_action.cleanrl_model"
 print("Evaluating", MODEL)
 evaluate(
@@ -69,9 +71,9 @@ CleanRL only looks at `capture_video` while the vectorized training envs are run
 | Worker catalog | `gym_gui/ui/workers/catalog.py` | Once the policy form ships, flip `supports_policy_load=True` for CleanRL so Control Panel enables the “Load Trained Policy” button in agent-only mode. |
 | Presenter | `gym_gui/ui/workers/cleanrl_presenter.py` (new) | Provide `build_train_request` + `build_policy_eval_request`. The presenter receives the auto-detected metadata (env/algo/seed) from the policy form, merges any overrides, and builds the trainer payload with extras `{"mode": "policy_eval", "policy_path": str(path), "eval_capture_video": checkbox, "fastlane_only": bool, "video_mode": ..., "grid_limit": ...}`. |
 | Main window hookup | `gym_gui/ui/main_window.py` | `_on_trained_agent_requested` asks the presenter for a policy config then calls `_submit_training_config`. Update log statements to use `LOG_UI_MAINWINDOW_INFO` / `LOG_WORKER_POLICY_EVENT` so runs are traceable. |
-| Worker config schema | `3rd_party/cleanrl_worker/MOSAIC_CLEANRL_WORKER/config.py` | Allow `extras.mode` and optional `extras.policy_path`. Raise `ValueError` if evaluation mode lacks a readable checkpoint. Persist the auto-detected env/algo metadata so the runtime doesn’t rely on manual input. |
-| Runtime behaviour | `3rd_party/cleanrl_worker/MOSAIC_CLEANRL_WORKER/runtime.py` | Branch on `mode`. For `policy_eval`: spin up envs, attach FastLane, load the checkpoint into the CleanRL agent class, call the appropriate `cleanrl_worker.cleanrl_utils.evals.*.evaluate` helper (it already streams to RecordVideo & prints episodic returns), and emit a lifecycle `run_completed` once evaluation finishes. No PPO training loop should execute. |
-| CLI passthrough | `3rd_party/cleanrl_worker/MOSAIC_CLEANRL_WORKER/cli.py` | No major change—`--config … --extras …` already handles custom extras; just document that policy configs set `mode` + `policy_path`. |
+| Worker config schema | `3rd_party/cleanrl_worker/cleanrl_worker/config.py` | Allow `extras.mode` and optional `extras.policy_path`. Raise `ValueError` if evaluation mode lacks a readable checkpoint. Persist the auto-detected env/algo metadata so the runtime doesn't rely on manual input. |
+| Runtime behaviour | `3rd_party/cleanrl_worker/cleanrl_worker/runtime.py` | Branch on `mode`. For `policy_eval`: spin up envs, attach FastLane, load the checkpoint into the CleanRL agent class, call the appropriate `cleanrl_utils.evals.*.evaluate` helper (it already streams to RecordVideo & prints episodic returns), and emit a lifecycle `run_completed` once evaluation finishes. No PPO training loop should execute. |
+| CLI passthrough | `3rd_party/cleanrl_worker/cleanrl_worker/cli.py` | No major change—`--config … --extras …` already handles custom extras; just document that policy configs set `mode` + `policy_path`. |
 | FastLane/HUD | `gym_gui/ui/fastlane_consumer.py` / `gym_gui/ui/widgets/fastlane_tab.py` | If `mode=policy_eval`, append “(Eval)” to HUD text and plot aggregated episodic returns in the Analytics tab so operators can differentiate training vs. replay. |
 | Docs | this note + `docs/1.0_DAY_28/TASK_1/telemetry_standardization_plan.md` + future “How to load CleanRL policies” page | Keep naming conventions + workflow documented.
 
@@ -110,8 +112,42 @@ CleanRL only looks at `capture_video` while the vectorized training envs are run
 
 **What changed:**
 
-- Added `cleanrl_worker/MOSAIC_CLEANRL_WORKER/algorithms/ppo_with_save.py`, a verbatim copy of upstream PPO with three extra args: `save_model`, `upload_model`, `hf_entity`. When `save_model=True` it writes `runs/<run>/<exp>.cleanrl_model`, runs the built-in `cleanrl_utils.evals.ppo_eval.evaluate`, logs `eval/episodic_return` scalars, and optionally pushes to Hugging Face if `upload_model` is on.
+- Added `3rd_party/cleanrl_worker/cleanrl_worker/algorithms/ppo_with_save.py`, a verbatim copy of upstream PPO with three extra args: `save_model`, `upload_model`, `hf_entity`. When `save_model=True` it writes `runs/<run>/<exp>.cleanrl_model`, runs the built-in `cleanrl_utils.evals.ppo_eval.evaluate`, logs `eval/episodic_return` scalars, and optionally pushes to Hugging Face if `upload_model` is on.
 - Pointed `DEFAULT_ALGO_REGISTRY['ppo']` at that wrapper so trainer payloads automatically launch the checkpoint-enabled version while other algorithms still use the stock modules.
 - Regenerated `metadata/cleanrl/0.1.0/schemas.json` so the PPO schema advertises the wrapper module and exposes the new toggles in the train form. Algorithms that truly lack `save_model` remain untouched to avoid tyro failures.
 
-**FastLane impact:** nothing changed in the telemetry plumbing—FastLane still streams from the PPO wrapper exactly as the original discrete script did, so “Fast lane: connected” appears as soon as the worker publishes frames. The only new artifact is the saved checkpoint and its evaluation metrics, which unlock the Load Trained Policy flow once we finish the policy form work above.
+**FastLane impact:** nothing changed in the telemetry plumbing—FastLane still streams from the PPO wrapper exactly as the original discrete script did, so "Fast lane: connected" appears as soon as the worker publishes frames. The only new artifact is the saved checkpoint and its evaluation metrics, which unlock the Load Trained Policy flow once we finish the policy form work above.
+
+### CleanRL evaluation registry
+
+- Added `3rd_party/cleanrl_worker/cleanrl_worker/eval_registry.py`. Each supported algorithm now has a declarative evaluation entry (agent class, env factory, CleanRL eval helper, and whether the factory accepts the extra `gamma` parameter). This removes the runtime signature introspection we were doing before.
+- `runtime._run_policy_eval` consults the registry first; if an entry exists, the worker uses those adapters and falls back to the legacy import path only when necessary. That guarantees that Load Trained Policy launches the right env/agent pair and keeps FastLane online.
+- Discrete PPO is the first client: its entry points to `ppo_with_save.Agent`, automatically adapts the four-argument `make_env` to the five-argument eval helper, and still reuses `cleanrl_utils.evals.ppo_eval.evaluate` for the actual rollouts.
+- `ppo_continuous_action` was added to the registry (2025-11-26) to support MuJoCo continuous action environments like Walker2d-v5, Swimmer-v5, Ant-v5, etc.
+
+## Nov 25 updates: policy evaluation loop + HUD
+
+### UI knobs
+- The CleanRL policy form now exposes **“Eval episodes per batch”** (defaults to 50) and a **“Repeat evaluation until stopped”** toggle. The spinner feeds `extras.eval_batch_size` (and `eval_episodes` for backwards compatibility); the checkbox sets `extras.eval_repeat` so operators can keep FastLane streaming until they manually cancel the run.
+- Metadata emitted by the form includes these values (`ui.eval_batch_size`, `ui.eval_repeat`) so presenters/tests can assert the intended behaviour.
+
+### Worker/runtime
+- `_run_policy_eval` now routes through `run_batched_evaluation()` which repeatedly calls the registered CleanRL `evaluate()` helper.
+  - Each batch writes TensorBoard scalars under `var/trainer/runs/<RUN_ID>/tensorboard_eval/` so the GUI can open a **TensorBoard-Agent-cleanrl_eval** tab without clobbering the original training logs.
+  - Batch summaries (episodes, avg/min/max, std, wall-clock duration) are appended to `<run_dir>/eval_summary.json` and streamed via `LifecycleEmitter` heartbeats.
+  - The analytics manifest is updated after every batch to reflect the new returns + tensorboard directory, which means the TensorBoard tab can load even while the evaluation job is still running.
+- Extras returned in `RuntimeSummary` now surface `tensorboard_dir`, `eval_batch_size`, and `eval_repeat` so downstream tooling (tests, docs, inspectors) can reason about evaluation runs.
+
+### FastLane HUD
+- `FastLaneTab` watches each run’s `eval_summary.json`. When `run_mode=policy_eval` it appends a one-line status (e.g., `eval batch 3 | episodes=50 avg=112.3 min=90.1 max=142.6`) under the live reward/return HUD so you can see aggregate results while the frames play.
+- New log constants `LOG_UI_FASTLANE_EVAL_SUMMARY_UPDATE` / `LOG_UI_FASTLANE_EVAL_SUMMARY_WARNING` record when the HUD picks up a new summary or fails to parse the file (e.g., during partial writes).
+
+### Practical workflow
+1. Open **Load CleanRL Policy…**, select a checkpoint, set *Eval episodes per batch* (e.g., 75) and optionally check *Repeat evaluation* if you want FastLane to loop indefinitely until you cancel the run.
+2. Submit the dialog – the trainer writes a policy-eval config, launches the worker, and immediately creates:
+   - `var/trainer/runs/<RUN_ID>/tensorboard_eval/` (TB scalars per batch),
+   - `var/trainer/runs/<RUN_ID>/eval_summary.json` (latest HUD stats),
+   - `var/trainer/runs/<RUN_ID>/videos/<RUN_ID>-eval/` (if “Capture evaluation video” is enabled).
+3. In the GUI you’ll see both the TensorBoard tab (pointing at `tensorboard_eval`) and the FastLane tab with the new HUD overlay showing the rolling summary from `eval_summary.json`.
+
+If you leave **Repeat evaluation** enabled, the worker keeps running batches until you cancel the run from the GUI or CLI. The manifest and HUD update after every batch so you still get telemetry even though the run never reaches “completed”.

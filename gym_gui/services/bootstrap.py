@@ -13,7 +13,6 @@ from gym_gui.services.actor import (
     BDIQAgent,
     CleanRLWorkerActor,
     HumanKeyboardActor,
-    LLMMultiStepAgent,
 )
 from gym_gui.services.frame_storage import FrameStorageService
 from gym_gui.services.service_locator import ServiceLocator, get_service_locator

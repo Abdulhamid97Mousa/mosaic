@@ -102,6 +102,10 @@ def test_policy_form_builds_config(monkeypatch, qt_app):
     form._grid_spin.setValue(4)
     form._seed_spin.setValue(42)
     form._episode_spin.setValue(75)
+    form._repeat_checkbox.setChecked(True)
+    form._gamma_spin.setValue(0.95)
+    form._max_steps_spin.setValue(123)
+    form._max_seconds_spin.setValue(12.5)
     form._fastlane_only_checkbox.setChecked(True)
     form._video_mode_combo.setCurrentIndex(form._video_mode_combo.findData(VideoModes.GRID))
     if form._ok_button is not None:
@@ -116,4 +120,17 @@ def test_policy_form_builds_config(monkeypatch, qt_app):
     assert extras["eval_capture_video"] is True
     assert worker["total_timesteps"] == 75
     assert extras["eval_episodes"] == 75
+    assert extras["eval_batch_size"] == 75
+    assert extras["eval_repeat"] is True
+    assert extras["tensorboard_dir"] == "tensorboard_eval"
+    assert extras["eval_gamma"] == 0.95
+    assert extras["eval_max_episode_steps"] == 123
+    assert extras["eval_max_episode_seconds"] == 12.5
+    artifacts = config["metadata"].get("artifacts", {})
+    tb_meta = artifacts.get("tensorboard")
+    assert tb_meta and tb_meta["relative_path"].endswith("tensorboard_eval")
+    ui_meta = config["metadata"].get("ui", {})
+    assert ui_meta.get("eval_gamma") == 0.95
+    assert ui_meta.get("eval_max_episode_steps") == 123
+    assert ui_meta.get("eval_max_episode_seconds") == 12.5
     form.deleteLater()

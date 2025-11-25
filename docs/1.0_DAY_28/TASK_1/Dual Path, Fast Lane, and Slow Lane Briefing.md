@@ -68,8 +68,8 @@ HUD values ride alongside the frame inside the shared-memory header (`FastLaneMe
 ### Worker emitters (CleanRL + proxies)
 
 - `gym_gui/services/trainer/trainer_telemetry_proxy.py` is the generic bridge: whenever a worker prints JSONL steps with `render_payload`, `_publish_fastlane` extracts RGB data and hands it to `FastLaneWriter`.
-- For CleanRL runs we additionally ship `3rd_party/cleanrl_worker/MOSAIC_CLEANRL_WORKER/fastlane.py`, which injects a `FastLaneEnvWrapper` around the chosen vectorized environment slot. It calls back into the shared `gym_gui.fastlane` helpers even when the GUI is not co-located with the worker.
-- `3rd_party/cleanrl_worker/MOSAIC_CLEANRL_WORKER/sitecustomize.py` flips the wrapper on whenever `FASTLANE=1` (or the train form sets “Fast Lane Only”), while `runtime.py` hands `fastlane_only` and `fastlane_slot` CLI args down to the worker so the correct env index feeds the ring buffer.
+- For CleanRL runs we additionally ship `3rd_party/cleanrl_worker/cleanrl_worker/fastlane.py`, which injects a `FastLaneEnvWrapper` around the chosen vectorized environment slot. It calls back into the shared `gym_gui.fastlane` helpers even when the GUI is not co-located with the worker.
+- `3rd_party/cleanrl_worker/cleanrl_worker/sitecustomize.py` flips the wrapper on whenever `FASTLANE=1` (or the train form sets "Fast Lane Only"), while `runtime.py` hands `fastlane_only` and `fastlane_slot` CLI args down to the worker so the correct env index feeds the ring buffer.
 
 Other workers can take the same approach: import `FastLaneWriter`, call `FastLaneWriter.create(run_id, config)` exactly once per run, and publish frames inside their training loop.
 

@@ -56,7 +56,7 @@ This note explains the naming/enforcement changes we just implemented (Control P
 - `gym_gui/ui/widgets/control_panel.py` – added the Environment Family filter and removed the redundant inline “CleanRL Environment” selector; only the CleanRL Agent Train Form now controls its environment list.
 - `gym_gui/ui/widgets/cleanrl_train_form.py` – now owns the family+environment picker plus telemetry video mode controls.
 - **Future linters/tests:** new files under `gym_gui/tests/` or `scripts/linting/` to ensure no rogue strings/log IDs slip in once the conventions are defined.
-- **Multi-env Fast Lane support:** `cleanrl_worker/MOSAIC_CLEANRL_WORKER/fastlane.py` now understands the `GYM_GUI_FASTLANE_VIDEO_MODE` / `GYM_GUI_FASTLANE_GRID_LIMIT` env vars. When the mode is `grid`, the first *N* vectorized envs feed a tiler (`gym_gui/fastlane/tiling.py`) and slot `0` streams the composite image. A new pytest (`test_fastlane_grid_mode_tiles_frames`) keeps this path exercised without needing shared memory at test time.
+- **Multi-env Fast Lane support:** `3rd_party/cleanrl_worker/cleanrl_worker/fastlane.py` now understands the `GYM_GUI_FASTLANE_VIDEO_MODE` / `GYM_GUI_FASTLANE_GRID_LIMIT` env vars. When the mode is `grid`, the first *N* vectorized envs feed a tiler (`gym_gui/fastlane/tiling.py`) and slot `0` streams the composite image. A new pytest (`test_fastlane_grid_mode_tiles_frames`) keeps this path exercised without needing shared memory at test time.
 
 ## Upcoming implementation plan (multi-env & environment selector)
 

@@ -243,8 +243,16 @@ def validate_train_run_config(raw: Mapping[str, Any]) -> TrainRunConfig:
 
     # Generate sortable run_id using ULID unless a valid ULID was already supplied.
     run_id = existing_run_id or str(ULID())
-    tensorboard_relative = f"var/trainer/runs/{run_id}/tensorboard"
-    tensorboard_absolute = (VAR_TENSORBOARD_DIR / run_id / "tensorboard").resolve()
+    worker_extras = {}
+    if isinstance(worker_config, Mapping):
+        worker_extras = worker_config.get("extras", {}) if isinstance(worker_config.get("extras"), Mapping) else {}
+    tensorboard_dirname = worker_extras.get("tensorboard_dir") if isinstance(worker_extras, Mapping) else None
+    if not isinstance(tensorboard_dirname, str) or not tensorboard_dirname.strip():
+        tensorboard_dirname = "tensorboard"
+    # relative_path should be just the dirname (e.g., "tensorboard"), not full path
+    # The GUI resolves it relative to VAR_TRAINER_DIR/runs/<run_id>/
+    tensorboard_relative = tensorboard_dirname
+    tensorboard_absolute = (VAR_TENSORBOARD_DIR / run_id / tensorboard_dirname).resolve()
     
     # WANDB manifest file path (worker will write run_path here after wandb.init())
     wandb_manifest_file = (VAR_WANDB_DIR / run_id / "wandb.json").resolve()
@@ -278,7 +286,7 @@ def validate_train_run_config(raw: Mapping[str, Any]) -> TrainRunConfig:
             artifacts_meta["wandb"] = wandb_meta
         
         # Set enabled based on whether track_wandb flag is present in worker extra config
-        worker_extra = worker_config.get("extra", {}) if isinstance(worker_config, Mapping) else {}
+        worker_extra = worker_config.get("extras", {}) if isinstance(worker_config, Mapping) else {}
         track_wandb = bool(worker_extra.get("track_wandb", False))
         wandb_meta.setdefault("enabled", track_wandb)
         

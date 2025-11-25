@@ -1276,7 +1276,7 @@
           "type": "int"
         }
       ],
-      "module": "cleanrl_worker.MOSAIC_CLEANRL_WORKER.algorithms.ppo_with_save"
+      "module": "cleanrl_worker.algorithms.ppo_with_save"
     },
     "ppo_atari": {
       "fields": [

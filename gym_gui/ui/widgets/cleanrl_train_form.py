@@ -305,7 +305,6 @@ class _FormState:
     wandb_https_proxy: Optional[str]
     use_wandb_vpn: bool
     notes: Optional[str]
-    validate_only: bool
     algo_params: Dict[str, Any]
     fastlane_only: bool
     fastlane_slot: int
@@ -427,11 +426,6 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._use_gpu_checkbox = QtWidgets.QCheckBox("Enable CUDA (GPU)", self)
         self._use_gpu_checkbox.setChecked(True)
         self._use_gpu_checkbox.setToolTip("Toggle CleanRL's --cuda flag; disable if the host lacks a GPU.")
-        self._dry_run_checkbox = QtWidgets.QCheckBox("Validate the form (skip launch)", self)
-        self._dry_run_checkbox.setToolTip(
-            "When enabled the dialog performs the dry-run check but does not launch the training run."
-        )
-        self._dry_run_checkbox.setChecked(True)
 
         self._capture_video_slot = QtWidgets.QVBoxLayout()
         self._capture_video_slot.setContentsMargins(0, 0, 0, 0)
@@ -449,12 +443,12 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
         capture_video_layout.addStretch(1)
 
         table_layout.addWidget(_inline_field("GPU", self._use_gpu_checkbox), 2, 0)
-        table_layout.addWidget(_inline_field("Validate", self._dry_run_checkbox), 2, 1)
-        table_layout.addWidget(_inline_field("Capture Video", capture_video_container), 2, 2)
+        table_layout.addWidget(_inline_field("Capture Video", capture_video_container), 2, 1)
 
         self._fastlane_checkbox = QtWidgets.QCheckBox("Fast Lane Only (skip telemetry persistence)", self)
         self._fastlane_checkbox.setChecked(True)
         self._fastlane_checkbox.setToolTip("Disables the slow lane (gRPC/SQLite) so only the shared-memory fast lane runs.")
+        self._fastlane_checkbox.toggled.connect(self._on_fastlane_toggled)
         self._video_mode_combo = QtWidgets.QComboBox(self)
         for descriptor in VIDEO_MODE_DESCRIPTORS.values():
             self._video_mode_combo.addItem(descriptor.label, descriptor.name)
@@ -799,7 +793,24 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
         _ = checked
         self._update_wandb_controls()
 
+    def _on_fastlane_toggled(self, checked: bool) -> None:
+        """Handle telemetry mode toggle - disable video controls when fastlane is off."""
+        _ = checked
+        self._update_video_mode_controls()
+
     def _update_video_mode_controls(self) -> None:
+        # Check if fastlane (telemetry mode) is enabled
+        fastlane_enabled = self._fastlane_checkbox.isChecked() if hasattr(self, "_fastlane_checkbox") else True
+
+        # If fastlane is disabled, disable all video-related controls
+        if not fastlane_enabled:
+            self._video_mode_combo.setEnabled(False)
+            self._grid_limit_spin.setEnabled(False)
+            self._fastlane_slot_spin.setEnabled(False)
+            return
+
+        # Fastlane is enabled - apply normal mode-based logic
+        self._video_mode_combo.setEnabled(True)
         mode_data = self._video_mode_combo.currentData() if hasattr(self, "_video_mode_combo") else None
         mode = mode_data if isinstance(mode_data, str) else VideoModes.SINGLE
         show_grid = mode == VideoModes.GRID
@@ -985,7 +996,6 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
             wandb_https_proxy=wandb_https_proxy,
             use_wandb_vpn=use_wandb_vpn,
             notes=notes,
-            validate_only=self._dry_run_checkbox.isChecked(),
             algo_params=algo_params,
             fastlane_only=fastlane_only,
             fastlane_slot=fastlane_slot,
@@ -1039,17 +1049,12 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
             worker_config["agent_id"] = state.agent_id
             worker_config.setdefault("extras", extras).setdefault("agent_id", state.agent_id)
 
-        arguments: list[str] = []
-        if state.validate_only:
-            arguments.extend(["--dry-run", "--emit-summary"])
-
         metadata = {
             "ui": {
                 "worker_id": state.worker_id or "cleanrl_worker",
                 "agent_id": state.agent_id or "cleanrl_agent",
                 "algo": state.algo,
                 "env_id": state.env_id,
-                "dry_run": state.validate_only,
                 "fastlane_only": state.fastlane_only,
                 "fastlane_slot": int(state.fastlane_slot),
                 "fastlane_video_mode": state.fastlane_video_mode,
@@ -1060,7 +1065,6 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 "module": "cleanrl_worker.cli",
                 "use_grpc": True,
                 "grpc_target": "127.0.0.1:50055",
-                "arguments": arguments,
                 "config": worker_config,
             },
         }
@@ -1260,12 +1264,8 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
             )
             return
         run_id = _generate_run_id("cleanrl", state.algo)
-        success, config = self._run_validation(state, run_id=run_id, persist_config=not state.validate_only)
+        success, config = self._run_validation(state, run_id=run_id, persist_config=True)
         if not success:
-            self._last_config = None
-            return
-
-        if state.validate_only:
             self._last_config = None
             return
 

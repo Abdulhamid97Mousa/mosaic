@@ -12,32 +12,36 @@ if [ -f .env ]; then
   set +a
 fi
 
-# Ensure vendored workers are always importable even if .env isn't sourced elsewhere.
-PY_PATH_ROOT="$ROOT_DIR"
-PY_PATHS=(
-  "$PY_PATH_ROOT"
-  "$PY_PATH_ROOT/3rd_party"
-  "$PY_PATH_ROOT/3rd_party/cleanrl_worker"
-  "$PY_PATH_ROOT/3rd_party/cleanrl_worker/cleanrl"
-)
-
-compose_pythonpath() {
-  local current=":${PYTHONPATH:-}:"
-  local updated="${PYTHONPATH:-}"
-  for path in "${PY_PATHS[@]}"; do
-    if [[ -n "$path" && $current != *:"$path":* ]]; then
-      if [[ -z "$updated" ]]; then
-        updated="$path"
-      else
-        updated="$path:$updated"
-      fi
-      current=":$updated:"
-    fi
-  done
-  echo "$updated"
-}
-
-export PYTHONPATH="$(compose_pythonpath)"
+# NOTE: PYTHONPATH manipulation is no longer needed when packages are installed
+# in editable mode. If you haven't installed the packages yet, run:
+#   pip install -e .
+#   pip install -e 3rd_party/cleanrl_worker
+#
+# If you still need PYTHONPATH for some reason (e.g., running outside venv),
+# uncomment the following block:
+# PY_PATH_ROOT="$ROOT_DIR"
+# PY_PATHS=(
+#   "$PY_PATH_ROOT"
+#   "$PY_PATH_ROOT/3rd_party"
+#   "$PY_PATH_ROOT/3rd_party/cleanrl_worker"
+#   "$PY_PATH_ROOT/3rd_party/cleanrl_worker/cleanrl"
+# )
+# compose_pythonpath() {
+#   local current=":${PYTHONPATH:-}:"
+#   local updated="${PYTHONPATH:-}"
+#   for path in "${PY_PATHS[@]}"; do
+#     if [[ -n "$path" && $current != *:"$path":* ]]; then
+#       if [[ -z "$updated" ]]; then
+#         updated="$path"
+#       else
+#         updated="$path:$updated"
+#       fi
+#       current=":$updated:"
+#     fi
+#   done
+#   echo "$updated"
+# }
+# export PYTHONPATH="$(compose_pythonpath)"
 
 if [ -f .venv/bin/activate ]; then
   source .venv/bin/activate

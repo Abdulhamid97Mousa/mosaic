@@ -1586,7 +1586,13 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         try:
             mode_label = "Fast lane (evaluation)" if run_mode == "policy_eval" else "Fast lane"
-            tab = FastLaneTab(run_id, canonical_agent_id, mode_label=mode_label, parent=self._render_tabs)
+            tab = FastLaneTab(
+                run_id,
+                canonical_agent_id,
+                mode_label=mode_label,
+                run_mode=run_mode,
+                parent=self._render_tabs,
+            )
         except Exception as exc:
             self.log_constant(
                 LOG_UI_MAINWINDOW_WARNING,

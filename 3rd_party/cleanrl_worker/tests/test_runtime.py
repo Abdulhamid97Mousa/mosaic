@@ -8,7 +8,7 @@ from typing import Any, Mapping
 
 from cleanrl_worker.config import WorkerConfig
 from cleanrl_worker.runtime import CleanRLWorkerRuntime
-from cleanrl_worker.MOSAIC_CLEANRL_WORKER.runtime import REPO_ROOT
+from cleanrl_worker.runtime import REPO_ROOT
 
 
 def _make_config(
@@ -35,8 +35,10 @@ def test_allowed_entry_modules_includes_cleanrl_aliases() -> None:
 
     modules = runtime._allowed_entry_modules()
 
-    assert "cleanrl.ppo" in modules
-    assert "cleanrl_worker.cleanrl.ppo" in modules
+    assert "cleanrl_worker.algorithms.ppo_with_save" in modules
+    assert (
+        "cleanrl_worker.cleanrl_worker.algorithms.ppo_with_save" in modules
+    )
 
 
 def test_build_cleanrl_args_includes_common_flags() -> None:
@@ -142,12 +144,12 @@ def test_run_uses_launcher_and_writes_logs(monkeypatch, tmp_path: Path) -> None:
         CleanRLWorkerRuntime, "_register_with_trainer", lambda self: None
     )
     monkeypatch.setattr(
-        "cleanrl_worker.MOSAIC_CLEANRL_WORKER.runtime.VAR_TRAINER_DIR",
+        "cleanrl_worker.runtime.VAR_TRAINER_DIR",
         run_dir,
         raising=False,
     )
     monkeypatch.setattr(
-        "cleanrl_worker.MOSAIC_CLEANRL_WORKER.runtime.ensure_var_directories",
+        "cleanrl_worker.runtime.ensure_var_directories",
         lambda: None,
     )
 
@@ -169,14 +171,18 @@ def test_run_uses_launcher_and_writes_logs(monkeypatch, tmp_path: Path) -> None:
             return 0
 
     monkeypatch.setattr(
-        "cleanrl_worker.MOSAIC_CLEANRL_WORKER.runtime.subprocess.Popen",
+        "cleanrl_worker.runtime.subprocess.Popen",
         DummyProc,
     )
 
     summary = runtime.run()
 
-    assert launched["cmd"][2] == "cleanrl_worker.MOSAIC_CLEANRL_WORKER.launcher"
-    assert launched["cmd"][3] in {"cleanrl.ppo", "cleanrl_worker.cleanrl.ppo"}
+    assert launched["cmd"][2] == "cleanrl_worker.launcher"
+    assert launched["cmd"][3] in {
+        "cleanrl_worker.algorithms.ppo_with_save",
+        "cleanrl.ppo",
+        "cleanrl_worker.cleanrl.ppo",
+    }
     assert all("--tensorboard-dir" not in arg for arg in launched["cmd"][4:])
     assert launched["cwd"] == (run_dir / "runs" / config.run_id).resolve()
     assert launched["stdout_path"].exists()
@@ -220,7 +226,7 @@ def test_write_eval_tensorboard_emits_scalars(monkeypatch, tmp_path: Path) -> No
             recorded.append(("flush", 0.0, -1))
 
     monkeypatch.setattr(
-        "cleanrl_worker.MOSAIC_CLEANRL_WORKER.runtime._TensorBoardWriter",
+        "cleanrl_worker.runtime._TensorBoardWriter",
         DummyWriter,
     )
 

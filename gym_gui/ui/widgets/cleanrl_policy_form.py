@@ -11,6 +11,7 @@ import sys
 from qtpy import QtCore, QtGui, QtWidgets
 
 from gym_gui.config.paths import VAR_TRAINER_DIR
+from gym_gui.config.cleanrl_eval_presets import get_eval_preset
 from gym_gui.core.enums import EnvironmentFamily, GameId
 from gym_gui.fastlane.worker_helpers import apply_fastlane_environment
 from gym_gui.logging_config.helpers import LogConstantMixin
@@ -121,6 +122,7 @@ class CleanRlPolicyForm(QtWidgets.QDialog, LogConstantMixin):
         form_layout.addWidget(QtWidgets.QLabel("Environment", self), 2, 0)
         form_layout.addWidget(self._env_combo, 2, 1)
         self._family_combo.currentIndexChanged.connect(self._on_family_changed)
+        self._env_combo.currentIndexChanged.connect(self._on_env_changed)
 
         # Telemetry controls
         telemetry_group = QtWidgets.QGroupBox("Telemetry", self)
@@ -149,11 +151,46 @@ class CleanRlPolicyForm(QtWidgets.QDialog, LogConstantMixin):
         self._seed_spin.setRange(1, 2_147_483_647)
         form_layout.addWidget(self._seed_spin, 4, 1)
 
-        form_layout.addWidget(QtWidgets.QLabel("Eval Episodes", self), 5, 0)
+        form_layout.addWidget(QtWidgets.QLabel("Eval episodes per batch", self), 5, 0)
         self._episode_spin = QtWidgets.QSpinBox(self)
         self._episode_spin.setRange(1, 1_000_000)
         self._episode_spin.setValue(50)
         form_layout.addWidget(self._episode_spin, 5, 1)
+
+        self._repeat_checkbox = QtWidgets.QCheckBox("Repeat evaluation until stopped", self)
+        form_layout.addWidget(self._repeat_checkbox, 6, 0, 1, 2)
+
+        advanced_group = QtWidgets.QGroupBox("Advanced Evaluation Controls", self)
+        advanced_layout = QtWidgets.QGridLayout(advanced_group)
+        advanced_layout.addWidget(QtWidgets.QLabel("Discount (gamma)", advanced_group), 0, 0)
+        self._gamma_spin = QtWidgets.QDoubleSpinBox(advanced_group)
+        self._gamma_spin.setDecimals(4)
+        self._gamma_spin.setRange(0.0, 0.9999)
+        self._gamma_spin.setSingleStep(0.01)
+        self._gamma_spin.setValue(0.99)
+        advanced_layout.addWidget(self._gamma_spin, 0, 1)
+
+        advanced_layout.addWidget(QtWidgets.QLabel("Max episode steps (0 = default)", advanced_group), 1, 0)
+        self._max_steps_spin = QtWidgets.QSpinBox(advanced_group)
+        self._max_steps_spin.setRange(0, 1_000_000)
+        self._max_steps_spin.setValue(0)
+        advanced_layout.addWidget(self._max_steps_spin, 1, 1)
+
+        advanced_layout.addWidget(QtWidgets.QLabel("Max episode seconds (0 = default)", advanced_group), 2, 0)
+        self._max_seconds_spin = QtWidgets.QDoubleSpinBox(advanced_group)
+        self._max_seconds_spin.setRange(0.0, 10_000.0)
+        self._max_seconds_spin.setDecimals(2)
+        self._max_seconds_spin.setSingleStep(1.0)
+        self._max_seconds_spin.setValue(0.0)
+        advanced_layout.addWidget(self._max_seconds_spin, 2, 1)
+
+        preset_hint = QtWidgets.QLabel(
+            "Presets load from metadata/cleanrl/eval_presets.json; adjust if needed.", advanced_group
+        )
+        preset_hint.setWordWrap(True)
+        advanced_layout.addWidget(preset_hint, 3, 0, 1, 2)
+
+        form_layout.addWidget(advanced_group, 7, 0, 1, 2)
 
         layout.addLayout(form_layout)
 
@@ -215,6 +252,12 @@ class CleanRlPolicyForm(QtWidgets.QDialog, LogConstantMixin):
         for label, env_id in options:
             self._env_combo.addItem(label, env_id)
         self._env_combo.blockSignals(False)
+        self._on_env_changed(self._env_combo.currentIndex())
+
+    def _on_env_changed(self, index: int) -> None:
+        env_id = self._env_combo.itemData(index)
+        if isinstance(env_id, str) and env_id:
+            self._apply_eval_presets(env_id)
 
     def _toggle_env_controls(self, enabled: bool) -> None:
         self._family_combo.setEnabled(enabled)
@@ -264,12 +307,39 @@ class CleanRlPolicyForm(QtWidgets.QDialog, LogConstantMixin):
         self._grid_spin.setValue(max(1, grid_limit))
         self._seed_spin.setValue(checkpoint.seed or 1)
         self._eval_video_checkbox.setChecked(False)
+        self._repeat_checkbox.setChecked(False)
+        self._apply_eval_presets(checkpoint.env_id)
         if self._ok_button is not None:
             self._ok_button.setEnabled(True)
         self.log_constant(
             LOG_UI_POLICY_FORM_TRACE,
             extra={"policy_path": str(checkpoint.policy_path), "run_id": checkpoint.run_id},
         )
+
+    def _apply_eval_presets(self, env_id: Optional[str]) -> None:
+        preset = get_eval_preset(env_id)
+        batch_size = preset.get("eval_batch_size")
+        if isinstance(batch_size, int) and batch_size > 0:
+            self._episode_spin.setValue(batch_size)
+        repeat = preset.get("eval_repeat")
+        if isinstance(repeat, bool):
+            self._repeat_checkbox.setChecked(repeat)
+        capture_video = preset.get("capture_video")
+        if isinstance(capture_video, bool):
+            self._eval_video_checkbox.setChecked(capture_video)
+        gamma = preset.get("gamma")
+        if isinstance(gamma, (int, float)):
+            self._gamma_spin.setValue(float(gamma))
+        max_steps = preset.get("max_episode_steps")
+        if isinstance(max_steps, (int, float)) and max_steps > 0:
+            self._max_steps_spin.setValue(int(max_steps))
+        else:
+            self._max_steps_spin.setValue(0)
+        max_seconds = preset.get("max_episode_seconds")
+        if isinstance(max_seconds, (int, float)) and max_seconds > 0:
+            self._max_seconds_spin.setValue(float(max_seconds))
+        else:
+            self._max_seconds_spin.setValue(0.0)
 
     def _sync_video_mode_controls(self) -> None:
         mode = self._video_mode_combo.currentData()
@@ -330,7 +400,8 @@ class CleanRlPolicyForm(QtWidgets.QDialog, LogConstantMixin):
 
     def _build_config(self, checkpoint: CleanRlCheckpoint, *, env_id: str) -> Dict[str, Any]:
         run_id = generate_run_id("cleanrl-eval", checkpoint.algo or "policy")
-        eval_episodes = int(self._episode_spin.value())
+        episodes_per_batch = int(self._episode_spin.value())
+        repeat_eval = self._repeat_checkbox.isChecked()
         extras: Dict[str, Any] = {
             "mode": "policy_eval",
             "policy_path": str(checkpoint.policy_path),
@@ -339,14 +410,20 @@ class CleanRlPolicyForm(QtWidgets.QDialog, LogConstantMixin):
             "fastlane_video_mode": self._video_mode_combo.currentData(),
             "fastlane_grid_limit": int(self._grid_spin.value()),
             "eval_capture_video": self._eval_video_checkbox.isChecked(),
-            "eval_episodes": eval_episodes,
+            "eval_episodes": episodes_per_batch,
+            "eval_batch_size": episodes_per_batch,
+            "eval_repeat": repeat_eval,
+            "tensorboard_dir": "tensorboard_eval",
+            "eval_gamma": float(self._gamma_spin.value()),
+            "eval_max_episode_steps": int(self._max_steps_spin.value()) if self._max_steps_spin.value() > 0 else None,
+            "eval_max_episode_seconds": float(self._max_seconds_spin.value()) if self._max_seconds_spin.value() > 0 else None,
         }
         agent_id = "cleanrl_eval"
         worker_config: Dict[str, Any] = {
             "run_id": run_id,
             "algo": checkpoint.algo or "ppo_continuous_action",
             "env_id": env_id,
-            "total_timesteps": max(1, eval_episodes),
+            "total_timesteps": max(1, episodes_per_batch),
             "extras": extras,
         }
         worker_config["agent_id"] = agent_id
@@ -366,7 +443,13 @@ class CleanRlPolicyForm(QtWidgets.QDialog, LogConstantMixin):
                 "fastlane_video_mode": extras["fastlane_video_mode"],
                 "fastlane_grid_limit": extras["fastlane_grid_limit"],
                 "run_mode": "policy_eval",
-                "eval_episodes": eval_episodes,
+                "eval_episodes": episodes_per_batch,
+                "eval_batch_size": episodes_per_batch,
+                "eval_repeat": repeat_eval,
+                "tensorboard_dir": extras["tensorboard_dir"],
+                "eval_gamma": extras["eval_gamma"],
+                "eval_max_episode_steps": extras["eval_max_episode_steps"],
+                "eval_max_episode_seconds": extras["eval_max_episode_seconds"],
             },
             "worker": {
                 "worker_id": "cleanrl_worker",
@@ -375,6 +458,20 @@ class CleanRlPolicyForm(QtWidgets.QDialog, LogConstantMixin):
                 "grpc_target": "127.0.0.1:50055",
                 "arguments": [],
                 "config": worker_config,
+            },
+        }
+
+        tensorboard_relpath = f"var/trainer/runs/{run_id}/{extras['tensorboard_dir']}"
+        tensorboard_abs = (VAR_TRAINER_DIR / "runs" / run_id / extras["tensorboard_dir"]).resolve()
+        metadata["artifacts"] = {
+            "tensorboard": {
+                "enabled": True,
+                "relative_path": tensorboard_relpath,
+                "log_dir": str(tensorboard_abs),
+            },
+            "wandb": {
+                "enabled": False,
+                "run_path": None,
             },
         }
 

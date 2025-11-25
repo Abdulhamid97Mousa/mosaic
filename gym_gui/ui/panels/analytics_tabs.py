@@ -288,13 +288,25 @@ class AnalyticsTabManager(LogConstantMixin):
             )
             return False
 
+        # Resolve the tensorboard path - prefer relative path for portability
         resolved_path: Optional[Path] = None
-        log_dir = tensorboard_meta.get("log_dir")
         relative_path = tensorboard_meta.get("relative_path")
-        if isinstance(log_dir, str) and log_dir.strip():
-            resolved_path = Path(log_dir).expanduser()
-        elif isinstance(relative_path, str) and relative_path.strip():
-            resolved_path = (VAR_ROOT.parent / relative_path).resolve()
+        log_dir = tensorboard_meta.get("log_dir")  # Legacy absolute path fallback
+        manifest_run_id = metadata.get("run_id") if isinstance(metadata, Mapping) else None
+
+        if isinstance(relative_path, str) and relative_path.strip():
+            rel_stripped = relative_path.strip()
+            # Check if relative_path is actually absolute (legacy format)
+            if rel_stripped.startswith("/"):
+                resolved_path = Path(rel_stripped)
+            else:
+                # Use run_id from manifest or fallback to passed run_id
+                effective_run_id = manifest_run_id if isinstance(manifest_run_id, str) else run_id
+                # Resolve relative to VAR_TRAINER_DIR/runs/<run_id>/
+                resolved_path = (VAR_TRAINER_DIR / "runs" / effective_run_id / rel_stripped).resolve()
+        elif isinstance(log_dir, str) and log_dir.strip():
+            # Fallback to legacy log_dir (absolute path)
+            resolved_path = Path(log_dir.strip()).expanduser()
 
         if resolved_path is None:
             self.log_constant(

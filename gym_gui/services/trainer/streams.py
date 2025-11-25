@@ -1,5 +1,3 @@
-# /home/hamid/Desktop/Projects/GUI_BDI_RL/gym_gui/services/trainer/streams.py
-
 import asyncio
 import errno
 from collections import deque

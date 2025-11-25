@@ -6,7 +6,7 @@ This note captures the outstanding terminology/architecture problems and the con
 
 | Name | Purpose | Where it lives & how it’s wired today | Why this split makes sense |
 | --- | --- | --- | --- |
-| **Fast lane** | Deliver the freshest RGB frame + HUD metrics straight from the worker to the GUI using shared memory, bypassing protobuf, gRPC, and SQLite. | Writer side: `trainer_telemetry_proxy.py` (and worker-specific helpers like `3rd_party/cleanrl_worker/MOSAIC_CLEANRL_WORKER/fastlane.py`) call `FastLaneWriter.publish()`. Reader side: `gym_gui/ui/fastlane_consumer.py` + `FastLaneTab` attach via `FastLaneReader` and paint through `gym_gui/ui/renderers/fastlane_item.py` and `ui/qml/FastLaneView.qml`. | Keeps render latency low even when telemetry persistence lags, mirrors the “hot path” designs in Coach/Unity/Isaac Sim, and lets operators run “fast-lane only” demos without touching the durable pipeline. |
+| **Fast lane** | Deliver the freshest RGB frame + HUD metrics straight from the worker to the GUI using shared memory, bypassing protobuf, gRPC, and SQLite. | Writer side: `trainer_telemetry_proxy.py` (and worker-specific helpers like `3rd_party/cleanrl_worker/cleanrl_worker/fastlane.py`) call `FastLaneWriter.publish()`. Reader side: `gym_gui/ui/fastlane_consumer.py` + `FastLaneTab` attach via `FastLaneReader` and paint through `gym_gui/ui/renderers/fastlane_item.py` and `ui/qml/FastLaneView.qml`. | Keeps render latency low even when telemetry persistence lags, mirrors the "hot path" designs in Coach/Unity/Isaac Sim, and lets operators run "fast-lane only" demos without touching the durable pipeline. |
 
 **Update (2025-11-24):** CleanRL workers now honor the `GYM_GUI_FASTLANE_VIDEO_MODE`/`GYM_GUI_FASTLANE_GRID_LIMIT` env vars. When operators pick **Grid (first N envs)** in the UI, the worker composites frames via `gym_gui/fastlane/tiling.py` and streams them through slot `0`, so the FastLane tab actually shows the requested number of envs. The table above already reflected the architectural intent; this update means the code finally matches it.
 | **Fast path (RunBus UI)** | Fan telemetry events into the Live Telemetry tab with minimal buffering. | `TrainerService.PublishRunSteps` publishes `TelemetryEvent`s → `RunBus` → `LiveTelemetryController` → `LiveTelemetryTab`. Queue sizes controlled via `RUNBUS_UI_PATH_QUEUE_SIZE`. | Gives the Qt tables/plots live-ish data while keeping them logically tied to the durable event stream (same StepRecord schema, seq IDs, credits). |
@@ -101,8 +101,8 @@ With that context, the remaining sections describe the issues getting in the way
 
 - **Why it matters:** CleanRL worker uses `fastlane_only`, `fastlane_slot`, and env var `FASTLANE=1`, but other workers (Coach, SPADE, Unreal) may invent different names, reintroducing terminology confusion.
 - **Where it appears today:**
-  - `3rd_party/cleanrl_worker/MOSAIC_CLEANRL_WORKER/fastlane.py` defines the wrapper.
-  - `3rd_party/cleanrl_worker/MOSAIC_CLEANRL_WORKER/runtime.py` wires CLI args.
+  - `3rd_party/cleanrl_worker/cleanrl_worker/fastlane.py` defines the wrapper.
+  - `3rd_party/cleanrl_worker/cleanrl_worker/runtime.py` wires CLI args.
   - No equivalent helpers exist under `coach/` or `spadeBDI_RL/` yet.
 - **What to change:**
   1. Extract a reusable helper (e.g., `gym_gui/fastlane/worker_helpers.py`) exporting `FASTLANE_ENABLED_ENV`, `FASTLANE_SLOT_ENV`, and wrapper utilities. Document them in the style guide.

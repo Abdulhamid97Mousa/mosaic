@@ -18,12 +18,6 @@ from gym_gui.config.game_configs import (
     MiniGridConfig,
     TaxiConfig,
     DEFAULT_FROZEN_LAKE_V2_CONFIG,
-    DEFAULT_MINIGRID_EMPTY_5x5_CONFIG,
-    DEFAULT_MINIGRID_DOORKEY_5x5_CONFIG,
-    DEFAULT_MINIGRID_DOORKEY_6x6_CONFIG,
-    DEFAULT_MINIGRID_DOORKEY_8x8_CONFIG,
-    DEFAULT_MINIGRID_DOORKEY_16x16_CONFIG,
-    DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG,
 )
 from gym_gui.core.enums import (
     ControlMode,
@@ -54,9 +48,6 @@ from gym_gui.ui.environments.single_agent_env.ale import (
     build_ale_controls,
 )
 from gym_gui.ui.workers import WorkerDefinition, get_worker_catalog
-from gym_gui.ui.widgets.cleanrl_train_form import get_cleanrl_environment_choices
-from gym_gui.services.service_locator import get_service_locator
-from gym_gui.services.jason_supervisor import JasonSupervisorService
 from gym_gui.telemetry.semconv import (
     TelemetryModes,
     TELEMETRY_MODE_DESCRIPTORS,
@@ -399,7 +390,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._update_control_states()
         self._populate_actor_combo()
         self._populate_worker_combo()
-        # Start lightweight polling of JasonSupervisorService to populate overlay labels
+        # Show static supervisor status since Jason integration is disabled
         self._init_supervisor_polling()
 
     # ------------------------------------------------------------------
@@ -1538,55 +1529,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
     # Supervisor overlay polling
     # ------------------------------------------------------------------
     def _init_supervisor_polling(self) -> None:
-        """Initialize periodic polling of the JasonSupervisorService.
-
-        Polling cadence kept at 1s for minimal overhead. Uses tooltips for
-        detailed action history while keeping labels concise. Safe no-op if
-        service missing or already initialized.
-        """
-        # Avoid double init
-        if getattr(self, "_supervisor_timer", None):  # pragma: no cover - defensive
-            return
-        self._supervisor_timer = QtCore.QTimer(self)
-        self._supervisor_timer.setInterval(1000)  # 1 second cadence
-        self._supervisor_timer.timeout.connect(self._update_supervisor_labels)
-        self._update_supervisor_labels()  # prime immediately
-        self._supervisor_timer.start()
-
-    def _update_supervisor_labels(self) -> None:
-        """Fetch supervisor snapshot and update status labels.
-
-        Labels:
-        - Supervisor: Active (N) / Inactive
-        - Safety: ON / OFF
-        Detailed info (last_action, actions_emitted) exposed via tooltip.
-        """
-        try:
-            locator = get_service_locator()
-            svc = locator.resolve(JasonSupervisorService)
-            if svc is None:
-                self._supervisor_label.setText("Unavailable")
-                self._supervisor_label.setToolTip("Jason Supervisor service not registered.")
-                self._safety_mode_label.setText("—")
-                self._safety_mode_label.setToolTip("Safety unknown")
-                return
-            snap = svc.snapshot()
-            active = bool(snap.get("active"))
-            safety_on = bool(snap.get("safety_on"))
-            last_action = snap.get("last_action") or "—"
-            actions = int(snap.get("actions_emitted", 0))
-            if active:
-                self._supervisor_label.setText(f"Active ({actions})")
-                self._supervisor_label.setToolTip(
-                    f"Supervisor active\nLast Action: {last_action}\nTotal Actions: {actions}"
-                )
-            else:
-                self._supervisor_label.setText("Inactive")
-                self._supervisor_label.setToolTip("Supervisor inactive – no control actions applied.")
-            self._safety_mode_label.setText("ON" if safety_on else "OFF")
-            self._safety_mode_label.setToolTip(
-                "Safety guardrails enabled" if safety_on else "Safety guardrails disabled"
-            )
-        except Exception:  # pragma: no cover - defensive
-            # Never raise from UI polling; leave previous values intact
-            pass
+        """Display static supervisor status noting the integration is disabled."""
+        self._supervisor_label.setText("Disabled")
+        self._supervisor_label.setToolTip("Jason Supervisor integration disabled.")
+        self._safety_mode_label.setText("—")
+        self._safety_mode_label.setToolTip("Safety control handled locally.")

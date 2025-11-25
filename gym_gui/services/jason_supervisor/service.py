@@ -8,20 +8,15 @@ speak to workers directly; translation to trainer-side mechanisms remains
 pluggable.
 """
 
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import Any, Dict, Optional
 import logging
 
 from gym_gui.constants import DEFAULT_SUPERVISOR, SupervisorDefaults
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
-    LOG_SERVICE_SUPERVISOR_EVENT,
-    LOG_SERVICE_SUPERVISOR_WARNING,
-    LOG_SERVICE_SUPERVISOR_ERROR,
-    LOG_SERVICE_SUPERVISOR_CONTROL_APPLIED,
-    LOG_SERVICE_SUPERVISOR_CONTROL_REJECTED,
-    LOG_SERVICE_SUPERVISOR_ROLLBACK,
-    LOG_SERVICE_SUPERVISOR_SAFETY_STATE,
+    LOG_SERVICE_JASON_WORKER_EVENT,
+    LOG_SERVICE_JASON_WORKER_WARNING,
 )
 from gym_gui.validations.validations_telemetry import ValidationService
 
@@ -65,7 +60,7 @@ class JasonSupervisorService(LogConstantMixin):
         if self._state.active != active:
             self._state.active = active
             self.log_constant(
-                LOG_SERVICE_SUPERVISOR_EVENT,
+                LOG_SERVICE_JASON_WORKER_EVENT,
                 message="active_changed",
                 extra={"active": active},
             )
@@ -77,7 +72,7 @@ class JasonSupervisorService(LogConstantMixin):
         if self._state.safety_on != enabled:
             self._state.safety_on = enabled
             self.log_constant(
-                LOG_SERVICE_SUPERVISOR_SAFETY_STATE,
+                LOG_SERVICE_JASON_WORKER_EVENT,
                 message="safety_changed",
                 extra={"safety_on": enabled},
             )
@@ -98,18 +93,18 @@ class JasonSupervisorService(LogConstantMixin):
         if model is None:
             self._state.last_error = "validation_failed"
             self.log_constant(
-                LOG_SERVICE_SUPERVISOR_CONTROL_REJECTED,
+                LOG_SERVICE_JASON_WORKER_WARNING,
                 extra={"reason": "validation_failed", "update_preview": list(update.keys())[:6]},
             )
             return False
 
         # Apply conservative credit/backpressure awareness via caller-provided hints
-        credits = int(update.get("available_credits", self._defaults.min_available_credits))
-        if credits < self._defaults.min_available_credits:
+        available_credits = int(update.get("available_credits", self._defaults.min_available_credits))
+        if available_credits < self._defaults.min_available_credits:
             self.log_constant(
-                LOG_SERVICE_SUPERVISOR_WARNING,
+                LOG_SERVICE_JASON_WORKER_WARNING,
                 message="insufficient_credits",
-                extra={"available_credits": credits},
+                extra={"available_credits": available_credits},
             )
             return False
 
@@ -117,7 +112,7 @@ class JasonSupervisorService(LogConstantMixin):
         self._state.last_action = model.reason or "control_update"
         self._state.actions_emitted += 1
         self.log_constant(
-            LOG_SERVICE_SUPERVISOR_CONTROL_APPLIED,
+            LOG_SERVICE_JASON_WORKER_EVENT,
             extra={
                 "run_id": model.run_id,
                 "source": model.source,
@@ -129,7 +124,7 @@ class JasonSupervisorService(LogConstantMixin):
     def record_rollback(self, *, reason: str) -> None:
         self._state.last_action = f"rollback: {reason}"
         self.log_constant(
-            LOG_SERVICE_SUPERVISOR_ROLLBACK,
+            LOG_SERVICE_JASON_WORKER_EVENT,
             extra={"reason": reason},
         )
 

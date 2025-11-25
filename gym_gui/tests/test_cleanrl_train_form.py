@@ -56,7 +56,8 @@ def test_get_config_includes_worker_metadata(qt_app) -> None:
     assert worker_meta.get("config", {}).get("algo") == "ppo"
     assert worker_meta.get("config", {}).get("env_id") == form._test_selected_env
     assert worker_meta.get("config", {}).get("seed") == 123
-    assert worker_meta.get("arguments") == ["--dry-run", "--emit-summary"]
+    # arguments key is no longer present (removed dry-run checkbox)
+    assert "arguments" not in worker_meta
 
     extras = worker_meta.get("config", {}).get("extras", {})
     assert extras.get("cuda") is True
@@ -70,17 +71,6 @@ def test_get_config_includes_worker_metadata(qt_app) -> None:
     assert tensorboard_meta.get("relative_path").endswith("tensorboard")
     wandb_meta = artifacts.get("wandb", {})
     assert wandb_meta.get("enabled") is False
-
-    form.deleteLater()
-
-
-def test_disable_dry_run_removes_arguments(qt_app) -> None:
-    form = _base_form(qt_app)
-    form._dry_run_checkbox.setChecked(False)
-
-    config = form.get_config()
-    worker_meta = config["metadata"]["worker"]
-    assert worker_meta.get("arguments") == []
 
     form.deleteLater()
 

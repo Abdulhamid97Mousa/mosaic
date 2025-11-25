@@ -1,0 +1,43 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mosaic-cleanrl"
+version = "0.1.0"
+description = "CleanRL integration for MOSAIC BDI-RL framework"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+# Dependencies are managed via the main project's requirements.txt
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+cleanrl-worker = "cleanrl_worker.cli:main"
+
+[tool.setuptools]
+# Expose both the original cleanrl packages AND our harness
+packages = [
+    # Original CleanRL packages (from cleanrl/ subdirectory)
+    "cleanrl",
+    "cleanrl_utils",
+    "cleanrl_utils.evals",
+    # Our integration harness
+    "cleanrl_worker",
+    "cleanrl_worker.eval",
+    "cleanrl_worker.algorithms",
+]
+
+[tool.setuptools.package-dir]
+# Map original CleanRL packages to cleanrl/ subdirectory
+"cleanrl" = "cleanrl/cleanrl"
+"cleanrl_utils" = "cleanrl/cleanrl_utils"
+"cleanrl_utils.evals" = "cleanrl/cleanrl_utils/evals"
+# Our harness is directly in cleanrl_worker/
+"cleanrl_worker" = "cleanrl_worker"
+"cleanrl_worker.eval" = "cleanrl_worker/eval"
+"cleanrl_worker.algorithms" = "cleanrl_worker/algorithms"

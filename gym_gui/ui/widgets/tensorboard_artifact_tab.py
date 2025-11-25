@@ -77,6 +77,26 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
         self._refresh_status()
 
     # ------------------------------------------------------------------
+    def set_log_dir(self, log_dir: Path | str) -> None:
+        """Update the TensorBoard log directory and refresh status."""
+
+        new_path = Path(log_dir)
+        if new_path == self._log_dir:
+            return
+        self._stop_tensorboard_process()
+        self._log_dir = new_path
+        self._cli_command = self._build_cli_command(self._log_dir)
+        if self._path_field is not None:
+            self._path_field.setText(str(self._log_dir))
+            self._path_field.setCursorPosition(0)
+        self._pending_launch = False
+        self._last_status = None
+        self._refresh_status()
+
+    def refresh(self) -> None:
+        self._refresh_status()
+
+    # ------------------------------------------------------------------
     def _setup_ui(self) -> None:
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)

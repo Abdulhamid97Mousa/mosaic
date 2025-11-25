@@ -524,67 +524,31 @@ LOG_ADAPTER_ALE_METADATA_PROBE_FAILED = _constant(
 # ---------------------------------------------------------------------------
 # Service and telemetry constants (LOG601–LOG650)
 # ---------------------------------------------------------------------------
-LOG_SERVICE_SUPERVISOR_EVENT = _constant(
+LOG_SERVICE_JASON_WORKER_EVENT = _constant(
     "LOG680A",
     "INFO",
-    "Supervisor event",
+    "Jason worker event",
     component="Service",
-    subcomponent="Supervisor",
-    tags=_tags("supervisor", "event"),
+    subcomponent="JasonWorker",
+    tags=_tags("jason_worker", "event"),
 )
 
-LOG_SERVICE_SUPERVISOR_WARNING = _constant(
+LOG_SERVICE_JASON_WORKER_WARNING = _constant(
     "LOG680B",
     "WARNING",
-    "Supervisor warning",
+    "Jason worker warning",
     component="Service",
-    subcomponent="Supervisor",
-    tags=_tags("supervisor", "warning"),
+    subcomponent="JasonWorker",
+    tags=_tags("jason_worker", "warning"),
 )
 
-LOG_SERVICE_SUPERVISOR_ERROR = _constant(
+LOG_SERVICE_JASON_WORKER_ERROR = _constant(
     "LOG680C",
     "ERROR",
-    "Supervisor error",
+    "Jason worker error",
     component="Service",
-    subcomponent="Supervisor",
-    tags=_tags("supervisor", "error"),
-)
-
-LOG_SERVICE_SUPERVISOR_CONTROL_APPLIED = _constant(
-    "LOG680D",
-    "INFO",
-    "Supervisor applied control update",
-    component="Service",
-    subcomponent="Supervisor",
-    tags=_tags("supervisor", "control", "applied"),
-)
-
-LOG_SERVICE_SUPERVISOR_CONTROL_REJECTED = _constant(
-    "LOG680E",
-    "WARNING",
-    "Supervisor control update rejected",
-    component="Service",
-    subcomponent="Supervisor",
-    tags=_tags("supervisor", "control", "rejected"),
-)
-
-LOG_SERVICE_SUPERVISOR_ROLLBACK = _constant(
-    "LOG680F",
-    "INFO",
-    "Supervisor rollback executed",
-    component="Service",
-    subcomponent="Supervisor",
-    tags=_tags("supervisor", "rollback"),
-)
-
-LOG_SERVICE_SUPERVISOR_SAFETY_STATE = _constant(
-    "LOG680G",
-    "INFO",
-    "Supervisor safety state changed",
-    component="Service",
-    subcomponent="Supervisor",
-    tags=_tags("supervisor", "safety", "state"),
+    subcomponent="JasonWorker",
+    tags=_tags("jason_worker", "error"),
 )
 LOG_SERVICE_TELEMETRY_STEP_REJECTED = _constant(
     "LOG601",
@@ -1638,6 +1602,24 @@ LOG_RUNBUS_DB_QUEUE_DEPTH = _constant(
     tags=_tags("runbus", "durable", "queue_depth"),
 )
 
+LOG_UI_FASTLANE_EVAL_SUMMARY_UPDATE = _constant(
+    "LOG958",
+    "INFO",
+    "Fast lane evaluation summary updated",
+    component="UI",
+    subcomponent="FastLane",
+    tags=_tags("fastlane", "eval", "summary"),
+)
+
+LOG_UI_FASTLANE_EVAL_SUMMARY_WARNING = _constant(
+    "LOG959",
+    "WARNING",
+    "Fast lane evaluation summary warning",
+    component="UI",
+    subcomponent="FastLane",
+    tags=_tags("fastlane", "eval", "warning"),
+)
+
 
 # ---------------------------------------------------------------------------
 # Utility constants (LOG801–LOG809)
@@ -1807,6 +1789,24 @@ LOG_WORKER_POLICY_EVAL_COMPLETED = _constant(
     component="Worker",
     subcomponent="Policy",
     tags=_tags("worker", "policy", "eval", "complete"),
+)
+
+LOG_WORKER_POLICY_EVAL_BATCH_STARTED = _constant(
+    "LOG961",
+    "INFO",
+    "Worker policy evaluation batch started",
+    component="Worker",
+    subcomponent="Policy",
+    tags=_tags("worker", "policy", "eval", "batch", "start"),
+)
+
+LOG_WORKER_POLICY_EVAL_BATCH_COMPLETED = _constant(
+    "LOG962",
+    "INFO",
+    "Worker policy evaluation batch completed",
+    component="Worker",
+    subcomponent="Policy",
+    tags=_tags("worker", "policy", "eval", "batch", "complete"),
 )
 
 LOG_WORKER_POLICY_LOAD_FAILED = _constant(
@@ -2125,13 +2125,9 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_SERVICE_TELEMETRY_HUB_SUBSCRIBED,
     LOG_SERVICE_TELEMETRY_HUB_TRACE,
     LOG_SERVICE_TELEMETRY_HUB_ERROR,
-    LOG_SERVICE_SUPERVISOR_EVENT,
-    LOG_SERVICE_SUPERVISOR_WARNING,
-    LOG_SERVICE_SUPERVISOR_ERROR,
-    LOG_SERVICE_SUPERVISOR_CONTROL_APPLIED,
-    LOG_SERVICE_SUPERVISOR_CONTROL_REJECTED,
-    LOG_SERVICE_SUPERVISOR_ROLLBACK,
-    LOG_SERVICE_SUPERVISOR_SAFETY_STATE,
+    LOG_SERVICE_JASON_WORKER_EVENT,
+    LOG_SERVICE_JASON_WORKER_WARNING,
+    LOG_SERVICE_JASON_WORKER_ERROR,
     LOG_RENDER_REGULATOR_NOT_STARTED,
     LOG_RENDER_DROPPED_FRAME,
     LOG_DAEMON_START,
@@ -2215,6 +2211,8 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_FASTLANE_HEADER_INVALID,
     LOG_FASTLANE_FRAME_READ_ERROR,
     LOG_RUNBUS_DB_QUEUE_DEPTH,
+    LOG_UI_FASTLANE_EVAL_SUMMARY_UPDATE,
+    LOG_UI_FASTLANE_EVAL_SUMMARY_WARNING,
     LOG_UTIL_QT_RESEED_SKIPPED,
     LOG_UTIL_QT_STATE_CAPTURE_FAILED,
     LOG_UTIL_SEED_CALLBACK_FAILED,
@@ -2334,13 +2332,9 @@ __all__ = (
     "LOG_SERVICE_TELEMETRY_HUB_SUBSCRIBED",
     "LOG_SERVICE_TELEMETRY_HUB_TRACE",
     "LOG_SERVICE_TELEMETRY_HUB_ERROR",
-    "LOG_SERVICE_SUPERVISOR_EVENT",
-    "LOG_SERVICE_SUPERVISOR_WARNING",
-    "LOG_SERVICE_SUPERVISOR_ERROR",
-    "LOG_SERVICE_SUPERVISOR_CONTROL_APPLIED",
-    "LOG_SERVICE_SUPERVISOR_CONTROL_REJECTED",
-    "LOG_SERVICE_SUPERVISOR_ROLLBACK",
-    "LOG_SERVICE_SUPERVISOR_SAFETY_STATE",
+    "LOG_SERVICE_JASON_WORKER_EVENT",
+    "LOG_SERVICE_JASON_WORKER_WARNING",
+    "LOG_SERVICE_JASON_WORKER_ERROR",
     "LOG_RENDER_REGULATOR_NOT_STARTED",
     "LOG_RENDER_DROPPED_FRAME",
     "LOG_DAEMON_START",
@@ -2421,6 +2415,8 @@ __all__ = (
     "LOG_FASTLANE_HEADER_INVALID",
     "LOG_FASTLANE_FRAME_READ_ERROR",
     "LOG_RUNBUS_DB_QUEUE_DEPTH",
+    "LOG_UI_FASTLANE_EVAL_SUMMARY_UPDATE",
+    "LOG_UI_FASTLANE_EVAL_SUMMARY_WARNING",
     "LOG_UTIL_QT_RESEED_SKIPPED",
     "LOG_UTIL_QT_STATE_CAPTURE_FAILED",
     "LOG_UTIL_SEED_CALLBACK_FAILED",
@@ -2439,6 +2435,8 @@ __all__ = (
     "LOG_WORKER_POLICY_ERROR",
     "LOG_WORKER_POLICY_EVAL_STARTED",
     "LOG_WORKER_POLICY_EVAL_COMPLETED",
+    "LOG_WORKER_POLICY_EVAL_BATCH_STARTED",
+    "LOG_WORKER_POLICY_EVAL_BATCH_COMPLETED",
     "LOG_WORKER_POLICY_LOAD_FAILED",
     "LOG_WORKER_BDI_EVENT",
     "LOG_WORKER_BDI_WARNING",
