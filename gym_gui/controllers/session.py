@@ -45,6 +45,7 @@ from gym_gui.controllers.interaction import (
     Box2DInteractionController,
     TurnBasedInteractionController,
     AleInteractionController,
+    ViZDoomInteractionController,
 )
 from gym_gui.logging_config.log_constants import (
     LOG_NORMALIZATION_STATS_DROPPED,
@@ -355,6 +356,10 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             return Box2DInteractionController(self, target_hz=50)
         if family in (EnvironmentFamily.ATARI, EnvironmentFamily.ALE):
             return AleInteractionController(self, target_hz=60)
+        if family == EnvironmentFamily.VIZDOOM:
+            # ViZDoom runs at 35 FPS by default - game advances continuously
+            # like ALE, enemies move and projectiles fly even without player input
+            return ViZDoomInteractionController(self, target_hz=35)
         return TurnBasedInteractionController()
 
     def perform_human_action(self, action: int, *, key_label: str | None = None) -> None:
@@ -956,8 +961,9 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             self._stop_idle_tick()
             return
         interaction = getattr(self, "_interaction", None)
-        # For ALE, do not gate on awaiting_human; always advance with NOOP when idle tick fires
-        require_awaiting = not isinstance(interaction, AleInteractionController)
+        # For ALE and ViZDoom, do not gate on awaiting_human; always advance with NOOP when idle tick fires
+        # These are continuous games where the world should keep moving regardless of player input
+        require_awaiting = not isinstance(interaction, (AleInteractionController, ViZDoomInteractionController))
         if require_awaiting and not self._awaiting_human:
             return
         # Determine idle action

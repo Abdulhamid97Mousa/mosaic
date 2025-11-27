@@ -25,6 +25,9 @@ class EnvironmentFamily(StrEnum):
     ALE = "ale"
     MUJOCO = "mujoco"
     MINIGRID = "minigrid"
+    VIZDOOM = "vizdoom"
+    PETTINGZOO = "pettingzoo"
+    PETTINGZOO_CLASSIC = "pettingzoo_classic"  # PettingZoo Classic: turn-based games (Chess, Go, Connect Four, etc.)
     OTHER = "other"
 
 
@@ -98,6 +101,20 @@ class GameId(StrEnum):
     MINIGRID_SIMPLE_CROSSING_S11N5 = "MiniGrid-SimpleCrossingS11N5-v0"
     MINIGRID_REDBLUE_DOORS_6x6 = "MiniGrid-RedBlueDoors-6x6-v0"
     MINIGRID_REDBLUE_DOORS_8x8 = "MiniGrid-RedBlueDoors-8x8-v0"
+    VIZDOOM_BASIC = "ViZDoom-Basic-v0"
+    VIZDOOM_DEADLY_CORRIDOR = "ViZDoom-DeadlyCorridor-v0"
+    VIZDOOM_DEFEND_THE_CENTER = "ViZDoom-DefendTheCenter-v0"
+    VIZDOOM_DEFEND_THE_LINE = "ViZDoom-DefendTheLine-v0"
+    VIZDOOM_HEALTH_GATHERING = "ViZDoom-HealthGathering-v0"
+    VIZDOOM_HEALTH_GATHERING_SUPREME = "ViZDoom-HealthGatheringSupreme-v0"
+    VIZDOOM_MY_WAY_HOME = "ViZDoom-MyWayHome-v0"
+    VIZDOOM_PREDICT_POSITION = "ViZDoom-PredictPosition-v0"
+    VIZDOOM_TAKE_COVER = "ViZDoom-TakeCover-v0"
+    VIZDOOM_DEATHMATCH = "ViZDoom-Deathmatch-v0"
+    # PettingZoo Classic Board Games
+    CHESS = "chess_v6"
+    CONNECT_FOUR = "connect_four_v3"
+    GO = "go_v5"
 
 
 def get_game_display_name(game_id: GameId) -> str:
@@ -116,7 +133,17 @@ def get_game_display_name(game_id: GameId) -> str:
     # ALE is a separate namespace (Atari via ALE) - keep as-is
     if value.startswith("ALE/"):
         return value
-    
+    # ViZDoom games already include descriptive prefix
+    if value.startswith("ViZDoom-"):
+        return value
+    # PettingZoo board games
+    if game_id == GameId.CHESS:
+        return "PettingZoo-Chess"
+    if game_id == GameId.CONNECT_FOUR:
+        return "PettingZoo-ConnectFour"
+    if game_id == GameId.GO:
+        return "PettingZoo-Go"
+
     # Determine Gym family based on enum
     if game_id in (GameId.FROZEN_LAKE, GameId.FROZEN_LAKE_V2, GameId.CLIFF_WALKING, 
                    GameId.TAXI, GameId.BLACKJACK):
@@ -265,6 +292,19 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.MINIGRID_SIMPLE_CROSSING_S11N5: EnvironmentFamily.MINIGRID,
     GameId.MINIGRID_REDBLUE_DOORS_6x6: EnvironmentFamily.MINIGRID,
     GameId.MINIGRID_REDBLUE_DOORS_8x8: EnvironmentFamily.MINIGRID,
+    GameId.VIZDOOM_BASIC: EnvironmentFamily.VIZDOOM,
+    GameId.VIZDOOM_DEADLY_CORRIDOR: EnvironmentFamily.VIZDOOM,
+    GameId.VIZDOOM_DEFEND_THE_CENTER: EnvironmentFamily.VIZDOOM,
+    GameId.VIZDOOM_DEFEND_THE_LINE: EnvironmentFamily.VIZDOOM,
+    GameId.VIZDOOM_HEALTH_GATHERING: EnvironmentFamily.VIZDOOM,
+    GameId.VIZDOOM_HEALTH_GATHERING_SUPREME: EnvironmentFamily.VIZDOOM,
+    GameId.VIZDOOM_MY_WAY_HOME: EnvironmentFamily.VIZDOOM,
+    GameId.VIZDOOM_PREDICT_POSITION: EnvironmentFamily.VIZDOOM,
+    GameId.VIZDOOM_TAKE_COVER: EnvironmentFamily.VIZDOOM,
+    GameId.VIZDOOM_DEATHMATCH: EnvironmentFamily.VIZDOOM,
+    GameId.CHESS: EnvironmentFamily.PETTINGZOO_CLASSIC,
+    GameId.CONNECT_FOUR: EnvironmentFamily.PETTINGZOO_CLASSIC,
+    GameId.GO: EnvironmentFamily.PETTINGZOO_CLASSIC,
 }
 
 
@@ -324,6 +364,20 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.MINIGRID_SIMPLE_CROSSING_S11N5: RenderMode.RGB_ARRAY,
     GameId.MINIGRID_REDBLUE_DOORS_6x6: RenderMode.RGB_ARRAY,
     GameId.MINIGRID_REDBLUE_DOORS_8x8: RenderMode.RGB_ARRAY,
+    GameId.VIZDOOM_BASIC: RenderMode.RGB_ARRAY,
+    GameId.VIZDOOM_DEADLY_CORRIDOR: RenderMode.RGB_ARRAY,
+    GameId.VIZDOOM_DEFEND_THE_CENTER: RenderMode.RGB_ARRAY,
+    GameId.VIZDOOM_DEFEND_THE_LINE: RenderMode.RGB_ARRAY,
+    GameId.VIZDOOM_HEALTH_GATHERING: RenderMode.RGB_ARRAY,
+    GameId.VIZDOOM_HEALTH_GATHERING_SUPREME: RenderMode.RGB_ARRAY,
+    GameId.VIZDOOM_MY_WAY_HOME: RenderMode.RGB_ARRAY,
+    GameId.VIZDOOM_PREDICT_POSITION: RenderMode.RGB_ARRAY,
+    GameId.VIZDOOM_TAKE_COVER: RenderMode.RGB_ARRAY,
+    GameId.VIZDOOM_DEATHMATCH: RenderMode.RGB_ARRAY,
+    # Board games use custom Qt widget rendering, not RGB_ARRAY
+    GameId.CHESS: RenderMode.RGB_ARRAY,  # Fallback, but we use InteractiveChessBoard
+    GameId.CONNECT_FOUR: RenderMode.RGB_ARRAY,  # Fallback, but we use InteractiveConnectFourBoard
+    GameId.GO: RenderMode.RGB_ARRAY,  # Fallback, but we use InteractiveGoBoard
 }
 
 
@@ -626,6 +680,76 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
         ControlMode.HYBRID_HUMAN_AGENT,
         ControlMode.MULTI_AGENT_COOP,
         ControlMode.MULTI_AGENT_COMPETITIVE,
+    ),
+    GameId.VIZDOOM_BASIC: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+    ),
+    GameId.VIZDOOM_DEADLY_CORRIDOR: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+    ),
+    GameId.VIZDOOM_DEFEND_THE_CENTER: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+    ),
+    GameId.VIZDOOM_DEFEND_THE_LINE: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+    ),
+    GameId.VIZDOOM_HEALTH_GATHERING: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+    ),
+    GameId.VIZDOOM_HEALTH_GATHERING_SUPREME: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+    ),
+    GameId.VIZDOOM_MY_WAY_HOME: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+    ),
+    GameId.VIZDOOM_PREDICT_POSITION: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+    ),
+    GameId.VIZDOOM_TAKE_COVER: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+    ),
+    GameId.VIZDOOM_DEATHMATCH: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+    ),
+    # Board games - Human Only for now (both players are human)
+    GameId.CHESS: (
+        ControlMode.HUMAN_ONLY,
+    ),
+    GameId.CONNECT_FOUR: (
+        ControlMode.HUMAN_ONLY,
+    ),
+    GameId.GO: (
+        ControlMode.HUMAN_ONLY,
     ),
 }
 

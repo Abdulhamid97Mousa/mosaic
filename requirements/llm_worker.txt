@@ -1,0 +1,56 @@
+# LLM Worker Dependencies (Ollama + LangChain)
+# Install with: pip install -r requirements/llm_worker.txt
+#
+# This file contains dependencies for LLM-based agents using Ollama
+# for local model inference and LangChain for agent workflows.
+
+# Include base requirements
+-r base.txt
+
+# ═══════════════════════════════════════════════════════════════
+# Core Ollama Integration
+# ═══════════════════════════════════════════════════════════════
+
+# Ollama Python SDK (official client)
+# https://github.com/ollama/ollama-python
+ollama>=0.3.0
+
+# Async HTTP client (used by ollama internally)
+httpx>=0.27.0
+
+# Configuration file support
+pyyaml>=6.0
+
+# JSON schema validation for LLM outputs
+jsonschema>=4.20.0
+
+# ═══════════════════════════════════════════════════════════════
+# LangChain Integration (for PettingZoo multi-agent games)
+# ═══════════════════════════════════════════════════════════════
+
+# LangChain core framework
+langchain>=0.3.0
+langchain-core>=0.3.0
+
+# LangChain Ollama integration (local LLM backend)
+langchain-ollama>=0.2.0
+
+# ═══════════════════════════════════════════════════════════════
+# PettingZoo Integration (multi-agent environments)
+# ═══════════════════════════════════════════════════════════════
+
+# Note: PettingZoo can also be installed via requirements/pettingzoo.txt
+# for full environment support. This includes minimal deps for LLM agents.
+pettingzoo>=1.24.0
+
+# ═══════════════════════════════════════════════════════════════
+# Optional Dependencies
+# ═══════════════════════════════════════════════════════════════
+
+# Optional: For vision models (processing screenshots)
+# Uncomment if using llama3.2-vision or similar:
+# opencv-python>=4.8.0
+
+# Optional: LangChain community integrations
+# Uncomment for additional tools and integrations:
+# langchain-community>=0.3.0

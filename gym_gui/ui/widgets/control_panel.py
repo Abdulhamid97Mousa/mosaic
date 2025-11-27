@@ -47,7 +47,15 @@ from gym_gui.ui.environments.single_agent_env.ale import (
     ControlCallbacks as ALEControlCallbacks,
     build_ale_controls,
 )
+from gym_gui.ui.environments.single_agent_env.vizdoom import (
+    VIZDOOM_GAME_IDS,
+    ControlCallbacks as ViZDoomControlCallbacks,
+    build_vizdoom_controls,
+)
+from gym_gui.core.adapters.vizdoom import ViZDoomConfig
 from gym_gui.ui.workers import WorkerDefinition, get_worker_catalog
+from gym_gui.ui.widgets.mujoco_mpc_tab import MuJoCoMPCTab
+from gym_gui.ui.widgets.multi_agent_tab import MultiAgentTab
 from gym_gui.telemetry.semconv import (
     TelemetryModes,
     TELEMETRY_MODE_DESCRIPTORS,
@@ -97,6 +105,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
     lunar_config_changed = pyqtSignal(str, object)  # (param_name, value)
     car_config_changed = pyqtSignal(str, object)  # (param_name, value)
     bipedal_config_changed = pyqtSignal(str, object)  # (param_name, value)
+    vizdoom_config_changed = pyqtSignal(str, object)  # (param_name, value)
     start_game_requested = pyqtSignal()
     pause_game_requested = pyqtSignal()
     continue_game_requested = pyqtSignal()
@@ -105,6 +114,13 @@ class ControlPanelWidget(QtWidgets.QWidget):
     actor_changed = pyqtSignal(str)
     train_agent_requested = pyqtSignal(str)  # New signal for headless training
     trained_agent_requested = pyqtSignal(str)  # Load trained policy/evaluation
+    # MuJoCo MPC signals - emitted when user launches from sidebar
+    mpc_launch_requested = pyqtSignal(str)  # Launch with display mode ("external" or "embedded")
+    mpc_stop_all_requested = pyqtSignal()  # Stop all MJPC instances
+    # Multi-Agent Mode signals - emitted from the Multi-Agent tab
+    multi_agent_load_requested = pyqtSignal(str, int)  # env_id, seed
+    multi_agent_start_requested = pyqtSignal(str, str, int)  # env_id, human_agent, seed
+    multi_agent_reset_requested = pyqtSignal(int)  # seed
 
     def __init__(
         self,
@@ -559,6 +575,10 @@ class ControlPanelWidget(QtWidgets.QWidget):
     def get_overrides(self, game_id: GameId) -> Dict[str, object]:
         return dict(self._game_overrides.get(game_id, {}))
 
+    def get_mujoco_mpc_tab(self) -> MuJoCoMPCTab:
+        """Return the MuJoCo MPC tab for status updates."""
+        return self._mujoco_mpc_tab
+
     def set_auto_running(self, running: bool) -> None:
         self._auto_running = running
         self._update_control_states()
@@ -632,12 +652,14 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._config_scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         self._config_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)  # type: ignore[attr-defined]
         self._config_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)  # type: ignore[attr-defined]
+        # Set minimum height so the config panel isn't too small
+        self._config_scroll.setMinimumHeight(200)
         sp = self._config_scroll.sizePolicy()
         sp.setVerticalPolicy(QtWidgets.QSizePolicy.Policy.Expanding)
         sp.setHorizontalPolicy(QtWidgets.QSizePolicy.Policy.Preferred)
         self._config_scroll.setSizePolicy(sp)
         self._config_scroll.setWidget(cfg_group)
-        human_layout.addWidget(self._config_scroll)
+        human_layout.addWidget(self._config_scroll, stretch=2)  # Give more stretch weight
 
         human_layout.addWidget(self._create_mode_group(self._human_tab))
         self._control_buttons_widget = self._create_control_group(self._human_tab)
@@ -659,16 +681,23 @@ class ControlPanelWidget(QtWidgets.QWidget):
         single_index = self._tab_widget.addTab(self._single_agent_tab, "Single-Agent Mode")
         self._tab_to_mode[single_index] = ControlMode.AGENT_ONLY
 
-        self._multi_agent_tab = QtWidgets.QWidget(self)
-        multi_layout = QtWidgets.QVBoxLayout(self._multi_agent_tab)
-        multi_layout.setContentsMargins(0, 0, 0, 0)
-        multi_layout.setSpacing(12)
-        placeholder = QtWidgets.QLabel("Multi-agent configuration coming soon.", self._multi_agent_tab)
-        placeholder.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        multi_layout.addWidget(placeholder)
-        multi_layout.addStretch(1)
+        # Multi-Agent Mode Tab with subtabs
+        self._multi_agent_tab = MultiAgentTab(self)
         multi_index = self._tab_widget.addTab(self._multi_agent_tab, "Multi-Agent Mode")
         self._tab_to_mode[multi_index] = ControlMode.MULTI_AGENT_COOP
+        # Connect multi-agent signals
+        self._multi_agent_tab.train_requested.connect(self._on_multi_agent_train_requested)
+        self._multi_agent_tab.evaluate_requested.connect(self._on_multi_agent_evaluate_requested)
+        self._multi_agent_tab.load_environment_requested.connect(self._on_multi_agent_load_requested)
+        self._multi_agent_tab.start_game_requested.connect(self.multi_agent_start_requested)
+        self._multi_agent_tab.reset_game_requested.connect(self.multi_agent_reset_requested)
+
+        # MuJoCo MPC Tab - launcher for MPC visualization in Render View
+        self._mujoco_mpc_tab = MuJoCoMPCTab(self)
+        self._tab_widget.addTab(self._mujoco_mpc_tab, "MuJoCo MPC")
+        # Connect signals directly
+        self._mujoco_mpc_tab.launch_mpc_requested.connect(self.mpc_launch_requested)
+        self._mujoco_mpc_tab.stop_all_requested.connect(self.mpc_stop_all_requested)
 
         self._on_tab_changed(self._tab_widget.currentIndex())
 
@@ -773,6 +802,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
         if index < 0:
             index = 0
         self._game_combo.setCurrentIndex(index)
+        # Refresh config UI to show proper options for the selected game
+        self._refresh_game_config_ui()
 
     def _on_family_changed(self, index: int) -> None:
         if self._family_combo is None:
@@ -1510,6 +1541,19 @@ class ControlPanelWidget(QtWidgets.QWidget):
                 config=self._config.bipedal_walker_config,
                 on_change=self._on_bipedal_config_changed,
             )
+        elif self._current_game is not None and self._current_game in VIZDOOM_GAME_IDS:
+            current_game = self._current_game
+            overrides = self._game_overrides.setdefault(current_game, {})
+            callbacks = ViZDoomControlCallbacks(on_change=self._on_vizdoom_config_changed)
+            defaults = ViZDoomConfig()
+            build_vizdoom_controls(
+                parent=self._config_group,
+                layout=self._config_layout,
+                game_id=current_game,
+                overrides=overrides,
+                defaults=defaults,
+                callbacks=callbacks,
+            )
         else:
             label = QtWidgets.QLabel(
                 "No additional configuration options for this environment.",
@@ -1524,6 +1568,41 @@ class ControlPanelWidget(QtWidgets.QWidget):
             return
         overrides = self._game_overrides.setdefault(current_game, {})
         overrides[param_name] = value
+
+    def _on_vizdoom_config_changed(self, param_name: str, value: object) -> None:
+        current_game = self._current_game
+        if current_game is None:
+            return
+        overrides = self._game_overrides.setdefault(current_game, {})
+        overrides[param_name] = value
+        self.vizdoom_config_changed.emit(param_name, value)
+
+    # ------------------------------------------------------------------
+    # Multi-Agent Tab Handlers
+    # ------------------------------------------------------------------
+    def _on_multi_agent_train_requested(self, worker_id: str, env_id: str) -> None:
+        """Handle train request from Multi-Agent tab."""
+        self._current_worker_id = worker_id
+        self.worker_changed.emit(worker_id)
+        self.train_agent_requested.emit(worker_id)
+
+    def _on_multi_agent_evaluate_requested(self, worker_id: str, env_id: str) -> None:
+        """Handle evaluate/policy load request from Multi-Agent tab."""
+        self._current_worker_id = worker_id
+        self.worker_changed.emit(worker_id)
+        self.trained_agent_requested.emit(worker_id)
+
+    def _on_multi_agent_load_requested(self, env_id: str, seed: int) -> None:
+        """Handle environment load request from Multi-Agent tab (Human vs Agent mode)."""
+        self.multi_agent_load_requested.emit(env_id, seed)
+
+    # ------------------------------------------------------------------
+    # Property accessors
+    # ------------------------------------------------------------------
+    @property
+    def multi_agent_tab(self) -> MultiAgentTab:
+        """Get the Multi-Agent tab widget."""
+        return self._multi_agent_tab
 
     # ------------------------------------------------------------------
     # Supervisor overlay polling

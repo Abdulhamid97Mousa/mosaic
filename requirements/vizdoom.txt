@@ -1,0 +1,25 @@
+# =============================================================================
+# ViZDoom Environment Dependencies
+# =============================================================================
+# ViZDoom enables Doom-based reinforcement learning with visual observations.
+# This optional requirements file installs everything needed for the ViZDoom
+# environment family within gym_gui.
+#
+# USAGE:
+#   pip install -r requirements/vizdoom.txt
+#
+# SYSTEM REQUIREMENTS:
+#   Linux:   sudo apt install libopenal-dev
+#   macOS:   brew install openal-soft
+#   Windows: OpenAL comes bundled with the official ViZDoom wheels
+#
+# NOTES:
+#   - Includes the ZDoom-based game engine (~50 MB download)
+#   - Human Control Mode requires a visible ViZDoom window for keyboard input
+# =============================================================================
+
+# Include core GUI + shared dependencies
+-r base.txt
+
+# ViZDoom - Doom-based RL platform (Python 3.8+)
+vizdoom>=1.2.0,<2.0.0

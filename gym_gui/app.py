@@ -4,7 +4,7 @@ from __future__ import annotations
 
 # CRITICAL: Set Qt API BEFORE any other imports that might use Qt
 import os
-os.environ.setdefault("QT_API", "pyqt6")
+os.environ.setdefault("QT_API", "PyQt6")
 
 import asyncio
 import errno

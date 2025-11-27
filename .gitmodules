@@ -65,7 +65,7 @@
 
 
 [submodule "cleanrl"]
-  path = cleanrl
+  path = 3rd_party/cleanrl_worker/cleanrl
   url = https://github.com/vwxyzjn/cleanrl.git
 
 [submodule "openrlbenchmark"]
@@ -99,3 +99,16 @@
 [submodule "xuance"]
   path = xuance
   url = https://github.com/agi-brain/xuance.git
+
+[submodule "mujoco_mpc"]
+  path = 3rd_party/mujoco_mpc_worker/mujoco_mpc
+  url = https://github.com/google-deepmind/mujoco_mpc.git
+
+[submodule "ViZDoom"]
+  path = 3rd_party/vizdoom_worker/ViZDoom
+  url = https://github.com/Farama-Foundation/ViZDoom.git
+
+[submodule "PettingZoo"]
+  path = 3rd_party/pettingzoo_worker/PettingZoo
+  url = https://github.com/Farama-Foundation/PettingZoo.git
+

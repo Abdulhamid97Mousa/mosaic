@@ -57,6 +57,70 @@ from .ale import (
     ALE_ADAPTERS,
 )
 
+try:  # Optional dependency
+    from .vizdoom import (  # pragma: no cover - exercised in integration
+        ViZDoomAdapter,
+        ViZDoomBasicAdapter,
+        ViZDoomConfig,
+        ViZDoomDeadlyCorridorAdapter,
+        ViZDoomDefendTheCenterAdapter,
+        ViZDoomDefendTheLineAdapter,
+        ViZDoomDeathmatchAdapter,
+        ViZDoomHealthGatheringAdapter,
+        ViZDoomHealthGatheringSupremeAdapter,
+        ViZDoomMyWayHomeAdapter,
+        ViZDoomPredictPositionAdapter,
+        ViZDoomTakeCoverAdapter,
+        VIZDOOM_ADAPTERS,
+    )
+    _VIZDOOM_AVAILABLE = True
+except Exception:  # pragma: no cover - vizdoom optional
+    ViZDoomAdapter = None  # type: ignore
+    ViZDoomBasicAdapter = None  # type: ignore
+    ViZDoomConfig = None  # type: ignore
+    ViZDoomDeadlyCorridorAdapter = None  # type: ignore
+    ViZDoomDefendTheCenterAdapter = None  # type: ignore
+    ViZDoomDefendTheLineAdapter = None  # type: ignore
+    ViZDoomDeathmatchAdapter = None  # type: ignore
+    ViZDoomHealthGatheringAdapter = None  # type: ignore
+    ViZDoomHealthGatheringSupremeAdapter = None  # type: ignore
+    ViZDoomMyWayHomeAdapter = None  # type: ignore
+    ViZDoomPredictPositionAdapter = None  # type: ignore
+    ViZDoomTakeCoverAdapter = None  # type: ignore
+    VIZDOOM_ADAPTERS = {}
+    _VIZDOOM_AVAILABLE = False
+
+try:  # Optional dependency - PettingZoo multi-agent environments
+    from .pettingzoo import (  # pragma: no cover - pettingzoo optional
+        PettingZooAdapter,
+        PettingZooConfig,
+        ChessAdapter,
+        ConnectFourAdapter,
+        TicTacToeAdapter,
+        GoAdapter,
+        SimpleSpreadAdapter,
+        SimpleTagAdapter,
+        PistonballAdapter,
+        MultiwalkerAdapter,
+        PETTINGZOO_ADAPTERS,
+        create_pettingzoo_adapter,
+    )
+    _PETTINGZOO_AVAILABLE = True
+except Exception:  # pragma: no cover - pettingzoo optional
+    PettingZooAdapter = None  # type: ignore
+    PettingZooConfig = None  # type: ignore
+    ChessAdapter = None  # type: ignore
+    ConnectFourAdapter = None  # type: ignore
+    TicTacToeAdapter = None  # type: ignore
+    GoAdapter = None  # type: ignore
+    SimpleSpreadAdapter = None  # type: ignore
+    SimpleTagAdapter = None  # type: ignore
+    PistonballAdapter = None  # type: ignore
+    MultiwalkerAdapter = None  # type: ignore
+    PETTINGZOO_ADAPTERS = {}
+    create_pettingzoo_adapter = None  # type: ignore
+    _PETTINGZOO_AVAILABLE = False
+
 __all__ = [
     "AdapterContext",
     "AdapterNotReadyError",
@@ -105,3 +169,36 @@ __all__ = [
     "AssaultV5Adapter",
     "ALE_ADAPTERS",
 ]
+
+if _VIZDOOM_AVAILABLE:
+    __all__ += [
+        "ViZDoomAdapter",
+        "ViZDoomConfig",
+        "ViZDoomBasicAdapter",
+        "ViZDoomDeadlyCorridorAdapter",
+        "ViZDoomDefendTheCenterAdapter",
+        "ViZDoomDefendTheLineAdapter",
+        "ViZDoomDeathmatchAdapter",
+        "ViZDoomHealthGatheringAdapter",
+        "ViZDoomHealthGatheringSupremeAdapter",
+        "ViZDoomMyWayHomeAdapter",
+        "ViZDoomPredictPositionAdapter",
+        "ViZDoomTakeCoverAdapter",
+        "VIZDOOM_ADAPTERS",
+    ]
+
+if _PETTINGZOO_AVAILABLE:
+    __all__ += [
+        "PettingZooAdapter",
+        "PettingZooConfig",
+        "ChessAdapter",
+        "ConnectFourAdapter",
+        "TicTacToeAdapter",
+        "GoAdapter",
+        "SimpleSpreadAdapter",
+        "SimpleTagAdapter",
+        "PistonballAdapter",
+        "MultiwalkerAdapter",
+        "PETTINGZOO_ADAPTERS",
+        "create_pettingzoo_adapter",
+    ]

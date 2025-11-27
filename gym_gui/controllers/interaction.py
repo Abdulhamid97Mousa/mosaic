@@ -75,9 +75,13 @@ class AleInteractionController(InteractionController):
         return self._interval_ms
 
     def should_idle_tick(self) -> bool:
-        # Human-only, not paused, adapter and game present, episode not finished
+        # Human-only, game started, not paused, adapter and game present, episode not finished
         o = self._owner
-        if o._adapter is None or o._game_id is None or o._game_paused:
+        if o._adapter is None or o._game_id is None:
+            return False
+        if not getattr(o, "_game_started", False):
+            return False
+        if o._game_paused:
             return False
         if getattr(o._control_mode, "name", "") != "HUMAN_ONLY":
             return False
@@ -88,6 +92,67 @@ class AleInteractionController(InteractionController):
     def maybe_passive_action(self) -> Optional[Any]:
         # ALE NOOP is action 0 in minimal action set
         return 0
+
+    def step_dt(self) -> float:
+        return 0.0
+
+
+class ViZDoomInteractionController(InteractionController):
+    """Idle controller for ViZDoom: step continuously with NOOP when idle.
+
+    ViZDoom games run at ~35 FPS (configurable). In Human Control mode,
+    the game should continue running (enemies move, projectiles fly, etc.)
+    even when the player doesn't provide input - just like a real FPS game.
+
+    This mirrors the ALE behavior where the game world keeps advancing.
+    """
+
+    def __init__(self, owner, target_hz: int = 35):
+        """Initialize ViZDoom interaction controller.
+
+        Args:
+            owner: SessionController instance.
+            target_hz: Target frame rate (default 35 FPS, ViZDoom's default ticrate).
+        """
+        self._owner = owner
+        self._interval_ms = max(1, int(1000 / float(target_hz)))  # ~28ms for 35 FPS
+
+    def idle_interval_ms(self) -> Optional[int]:
+        return self._interval_ms
+
+    def should_idle_tick(self) -> bool:
+        """Check if we should advance the game this tick.
+
+        Returns True when:
+        - Adapter and game are loaded
+        - Game is started
+        - Game is not paused
+        - Control mode is HUMAN_ONLY
+        - Episode is not finished
+        """
+        o = self._owner
+        if o._adapter is None or o._game_id is None:
+            return False
+        if not getattr(o, "_game_started", False):
+            return False
+        if o._game_paused:
+            return False
+        if getattr(o._control_mode, "name", "") != "HUMAN_ONLY":
+            return False
+        if o._last_step is not None and (o._last_step.terminated or o._last_step.truncated):
+            return False
+        return True
+
+    def maybe_passive_action(self) -> Optional[Any]:
+        """Return NOOP action for ViZDoom.
+
+        ViZDoom uses MultiBinary action space - NOOP is all zeros.
+        We return -1 as a special sentinel meaning "no buttons pressed".
+        The adapter's step() will recognize this and use all zeros.
+        """
+        # Return -1 as sentinel for NOOP (no buttons pressed)
+        # The adapter's step() handles this by keeping cmd as all zeros
+        return -1
 
     def step_dt(self) -> float:
         return 0.0

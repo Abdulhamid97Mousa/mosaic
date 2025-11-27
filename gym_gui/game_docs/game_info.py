@@ -44,6 +44,11 @@ from gym_gui.game_docs.MiniGrid import (
 from gym_gui.game_docs.ALE import (
     ADVENTURE_HTML,
 )
+from gym_gui.game_docs.PettingZoo import (
+    CHESS_HTML,
+    CONNECT_FOUR_HTML,
+    GO_HTML,
+)
 
 
 GAME_INFO: Dict[GameId, str] = {
@@ -125,6 +130,11 @@ GAME_INFO[GameId.MINIGRID_OBSTRUCTED_MAZE_FULL] = MINIGRID_OBSTRUCTED_MAZE_HTML
 # ALE mappings
 GAME_INFO[GameId.ADVENTURE_V4] = ADVENTURE_HTML
 GAME_INFO[GameId.ALE_ADVENTURE_V5] = ADVENTURE_HTML
+
+# PettingZoo mappings
+GAME_INFO[GameId.CHESS] = CHESS_HTML
+GAME_INFO[GameId.CONNECT_FOUR] = CONNECT_FOUR_HTML
+GAME_INFO[GameId.GO] = GO_HTML
 
 
 __all__ = ["GAME_INFO"]

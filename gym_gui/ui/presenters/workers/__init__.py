@@ -9,6 +9,7 @@ Presenters handle:
 Included presenters:
 - SpadeBdiWorkerPresenter: Orchestration for SPADE-BDI RL agents
 - CleanRlWorkerPresenter: Placeholder for analytics-first CleanRL worker
+- PettingZooWorkerPresenter: Multi-agent environments (PettingZoo)
 
 The registry is auto-populated at module load to support service discovery.
 """
@@ -16,12 +17,14 @@ The registry is auto-populated at module load to support service discovery.
 from .registry import WorkerPresenter, WorkerPresenterRegistry
 from .spade_bdi_worker_presenter import SpadeBdiWorkerPresenter
 from .cleanrl_worker_presenter import CleanRlWorkerPresenter
+from .pettingzoo_worker_presenter import PettingZooWorkerPresenter
 
 
 # Create and auto-register default presenters
 _registry = WorkerPresenterRegistry()
 _registry.register("spade_bdi_worker", SpadeBdiWorkerPresenter())
 _registry.register("cleanrl_worker", CleanRlWorkerPresenter())
+_registry.register("pettingzoo_worker", PettingZooWorkerPresenter())
 
 
 def get_worker_presenter_registry() -> WorkerPresenterRegistry:
@@ -38,5 +41,6 @@ __all__ = [
     "WorkerPresenterRegistry",
     "SpadeBdiWorkerPresenter",
     "CleanRlWorkerPresenter",
+    "PettingZooWorkerPresenter",
     "get_worker_presenter_registry",
 ]

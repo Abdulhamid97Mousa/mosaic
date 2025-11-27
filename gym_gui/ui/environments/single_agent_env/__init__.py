@@ -28,6 +28,12 @@ from .ale import (
     build_ale_controls,
 )
 
+from .vizdoom import (
+    VIZDOOM_GAME_IDS,
+    ControlCallbacks as ViZDoomControlCallbacks,
+    build_vizdoom_controls,
+)
+
 __all__ = [
     # Gym family
     "TOY_TEXT_FAMILY",
@@ -48,4 +54,7 @@ __all__ = [
     "ALE_GAME_IDS",
     "ALEControlCallbacks",
     "build_ale_controls",
+    "VIZDOOM_GAME_IDS",
+    "ViZDoomControlCallbacks",
+    "build_vizdoom_controls",
 ]

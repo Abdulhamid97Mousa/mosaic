@@ -1,0 +1,33 @@
+# MuJoCo MPC Worker Dependencies
+# This bundle contains dependencies required exclusively by the mujoco_mpc_worker.
+# Install this when using MuJoCo MPC for robotics control visualization.
+
+# Include base requirements
+-r base.txt
+
+# Core MuJoCo
+mujoco>=3.0.0
+
+# gRPC for MJPC communication
+grpcio>=1.50.0
+grpcio-tools>=1.50.0
+
+# Protobuf
+protobuf>=4.21.0
+
+# NumPy for array operations
+numpy>=1.24.0
+
+# Note: The MJPC agent_server binary must be built separately
+# See: 3rd_party/mujoco_mpc_worker/mujoco_mpc/README.md
+#
+# Build instructions (Ubuntu):
+#   sudo apt-get update && sudo apt-get install cmake libgl1-mesa-dev \
+#     libxinerama-dev libxcursor-dev libxrandr-dev libxi-dev ninja-build \
+#     zlib1g-dev clang-12
+#   cd 3rd_party/mujoco_mpc_worker/mujoco_mpc
+#   mkdir build && cd build
+#   cmake .. -DCMAKE_BUILD_TYPE:STRING=Release -G Ninja \
+#     -DCMAKE_C_COMPILER:STRING=clang-12 -DCMAKE_CXX_COMPILER:STRING=clang++-12 \
+#     -DMJPC_BUILD_GRPC_SERVICE:BOOL=ON
+#   cmake --build . --config=Release

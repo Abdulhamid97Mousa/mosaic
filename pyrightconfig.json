@@ -1,0 +1,14 @@
+{
+  // Make Pylance/Pyright aware of the vendored MuJoCo MPC worker package.
+  "extraPaths": [
+    "3rd_party/mujoco_mpc_worker"
+  ],
+  // Keep analysis focused on the project sources.
+  "include": [
+    "gym_gui",
+    "3rd_party/mujoco_mpc_worker"
+  ],
+  // Match the repo's virtual environment so stubs resolve correctly.
+  "venv": ".venv",
+  "venvPath": "."
+}

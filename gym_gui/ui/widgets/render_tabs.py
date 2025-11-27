@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import logging
-from typing import Any, List, Mapping, Optional, Tuple
+from typing import Any, Callable, List, Mapping, Optional, Tuple, TYPE_CHECKING
 
 from qtpy import QtCore, QtGui, QtWidgets
 
@@ -17,6 +17,7 @@ from gym_gui.rendering import (
     RendererStrategy,
     create_default_renderer_registry,
 )
+from gym_gui.rendering.strategies.board_game import BoardGameRendererStrategy
 from gym_gui.replays import EpisodeReplay, EpisodeReplayLoader
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
@@ -40,6 +41,15 @@ _LOGGER = logging.getLogger(__name__)
 
 class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
     """Tab widget combining grid, raw text, video, and replay views."""
+
+    # Signal emitted when a chess move is made (from_sq, to_sq)
+    chess_move_made = QtCore.Signal(str, str)
+    # Signal emitted when a Connect Four column is clicked
+    connect_four_column_clicked = QtCore.Signal(int)
+    # Signal emitted when a Go intersection is clicked (row, col)
+    go_intersection_clicked = QtCore.Signal(int, int)
+    # Signal emitted when Go pass is requested
+    go_pass_requested = QtCore.Signal()
 
     _current_game: GameId | None
 
@@ -89,6 +99,9 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
         )
         self._replay_tab_index = self.addTab(self._replay_tab, "Human Replay")
         self.setTabToolTip(self._replay_tab_index, "Review episodes from manual gameplay sessions only")
+
+        # Board game strategy (integrated into Grid tab, created on demand)
+        self._board_game_strategy: BoardGameRendererStrategy | None = None
 
         # Dynamic agent tabs state
         self.init_dynamic_tab_state()
@@ -387,6 +400,12 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
             self._update_game_from_payload(payload)
             self._raw_tab.display_from_payload(payload)
 
+            # Check for board game payloads (Chess, Connect Four, Go)
+            detected_game = BoardGameRendererStrategy.get_game_from_payload(payload)
+            if detected_game is not None:
+                self._display_board_game_payload(payload, detected_game)
+                return
+
             mode = _coerce_render_mode(payload.get("mode"))
             host = self._mode_hosts.get(mode) if mode is not None else None
             if host is not None and host.supports(payload):
@@ -408,6 +427,64 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
         self._reset_hosts()
         self._raw_tab.display_plain_text(str(payload))
         self._activate_tab(self._raw_tab.widget, enable_only=True)
+
+    def _display_board_game_payload(self, payload: Mapping[str, Any], game_id: GameId) -> None:
+        """Display a board game payload (Chess, Go, Connect Four) in the Grid tab.
+
+        Uses the BoardGameRendererStrategy which renders board games in the Grid tab
+        instead of creating separate tabs. This approach scales better as we add
+        more game types.
+
+        Args:
+            payload: The render payload from the adapter.
+            game_id: The detected GameId (CHESS, CONNECT_FOUR, or GO).
+        """
+        # Create board game strategy if needed (rendered in Grid tab)
+        if self._board_game_strategy is None:
+            self._board_game_strategy = BoardGameRendererStrategy(self)
+            # Connect signals
+            self._board_game_strategy.chess_move_made.connect(self.chess_move_made)
+            self._board_game_strategy.connect_four_column_clicked.connect(
+                self.connect_four_column_clicked
+            )
+            self._board_game_strategy.go_intersection_clicked.connect(
+                self.go_intersection_clicked
+            )
+            self._board_game_strategy.go_pass_requested.connect(self.go_pass_requested)
+
+            # Replace the Grid tab content with board game widget
+            if self._grid_tab_index >= 0:
+                # Get the existing widget and replace it
+                old_widget = self.widget(self._grid_tab_index)
+                if old_widget is not None:
+                    old_widget.deleteLater()
+                # Insert board game widget at same index
+                self.removeTab(self._grid_tab_index)
+                self._grid_tab_index = self.insertTab(
+                    self._grid_tab_index,
+                    self._board_game_strategy.widget,
+                    "Grid",
+                )
+
+        # Render the payload
+        context = RendererContext(game_id=game_id)
+        self._board_game_strategy.render(payload, context=context)
+
+        # Update tab title to show game name
+        game_names = {
+            GameId.CHESS: "Grid - Chess",
+            GameId.CONNECT_FOUR: "Grid - Connect Four",
+            GameId.GO: "Grid - Go",
+        }
+        self.setTabText(self._grid_tab_index, game_names.get(game_id, "Grid"))
+
+        # Activate Grid tab
+        self.setTabEnabled(self._grid_tab_index, True)
+        self.setCurrentIndex(self._grid_tab_index)
+
+    def get_board_game_strategy(self) -> BoardGameRendererStrategy | None:
+        """Get the board game renderer strategy if it exists."""
+        return self._board_game_strategy
 
     def refresh_replays(self) -> None:
         self._replay_tab.refresh()
@@ -448,6 +525,51 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
             if not enabled:
                 tip += " (disabled in Fast Lane only mode)"
             self.setTabToolTip(self._replay_tab_index, tip)
+
+    def configure_mouse_capture(
+        self,
+        *,
+        enabled: bool,
+        action_callback: "Callable[[int], None] | None" = None,
+        delta_callback: "Callable[[float, float], None] | None" = None,
+        turn_left_action: int = 1,
+        turn_right_action: int = 2,
+        sensitivity: float = 5.0,
+        delta_scale: float = 0.5,
+    ) -> None:
+        """Configure FPS-style mouse capture on the Video (RGB) tab.
+
+        Args:
+            enabled: Whether to enable mouse capture support.
+            action_callback: Callback invoked with action index when mouse moves (discrete mode).
+            delta_callback: Callback invoked with (delta_x, delta_y) in degrees (continuous mode).
+                           If provided, this takes precedence over action_callback.
+            turn_left_action: Action index for turning left (discrete mode only).
+            turn_right_action: Action index for turning right (discrete mode only).
+            sensitivity: Pixels of movement per action trigger (discrete mode).
+            delta_scale: Degrees per pixel (continuous mode, default 0.5).
+        """
+        if self._video_host is None:
+            return
+        strategy = self._video_host._strategy
+        # Check if the strategy supports mouse capture (RgbRendererStrategy)
+        if hasattr(strategy, "set_mouse_capture_enabled"):
+            strategy.set_mouse_capture_enabled(enabled)
+
+        # Prefer delta callback (continuous mode) if provided
+        if delta_callback is not None and hasattr(strategy, "set_mouse_delta_callback"):
+            strategy.set_mouse_delta_callback(delta_callback)
+            if hasattr(strategy, "set_mouse_delta_scale"):
+                strategy.set_mouse_delta_scale(delta_scale)
+        elif action_callback is not None and hasattr(strategy, "set_mouse_action_callback"):
+            strategy.set_mouse_action_callback(action_callback)
+            # Configure turn action indices and sensitivity on the underlying view
+            view = getattr(strategy, "_view", None)
+            if view is not None:
+                if hasattr(view, "set_turn_action_indices"):
+                    view.set_turn_action_indices(turn_left_action, turn_right_action)
+                if hasattr(view, "set_mouse_sensitivity"):
+                    view.set_mouse_sensitivity(sensitivity)
 
     def _update_game_from_payload(self, payload: Mapping[str, object]) -> None:
         raw_game = payload.get("game_id")

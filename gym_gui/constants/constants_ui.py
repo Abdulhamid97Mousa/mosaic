@@ -113,6 +113,68 @@ class LayoutDefaults:
     log_default_width: int = 300
 
 
+# ================================================================
+# Log Severity Options (for log viewer filter dropdown)
+# ================================================================
+
+LOG_SEVERITY_OPTIONS: dict[str, str | None] = {
+    "All": None,
+    "DEBUG": "DEBUG",
+    "INFO": "INFO",
+    "WARNING": "WARNING",
+    "ERROR": "ERROR",
+}
+
+
+# ================================================================
+# Control Mode Labels (human-readable display names)
+# ================================================================
+
+# Import ControlMode here to avoid circular imports at module level
+def _build_control_mode_labels() -> dict:
+    """Build control mode labels lazily to avoid circular import."""
+    from gym_gui.core.enums import ControlMode
+    return {
+        ControlMode.HUMAN_ONLY: "Human Only",
+        ControlMode.AGENT_ONLY: "Agent Only",
+        ControlMode.HYBRID_TURN_BASED: "Hybrid (Turn-Based)",
+        ControlMode.HYBRID_HUMAN_AGENT: "Hybrid (Human + Agent)",
+        ControlMode.MULTI_AGENT_COOP: "Multi-Agent (Cooperation)",
+        ControlMode.MULTI_AGENT_COMPETITIVE: "Multi-Agent (Competition)",
+    }
+
+
+def _build_human_input_modes() -> set:
+    """Build human input modes set lazily to avoid circular import."""
+    from gym_gui.core.enums import ControlMode
+    return {
+        ControlMode.HUMAN_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+        ControlMode.HYBRID_HUMAN_AGENT,
+    }
+
+
+# Lazy-loaded singletons
+_CONTROL_MODE_LABELS: dict | None = None
+_HUMAN_INPUT_MODES: set | None = None
+
+
+def get_control_mode_labels() -> dict:
+    """Get control mode display labels (lazy-loaded)."""
+    global _CONTROL_MODE_LABELS
+    if _CONTROL_MODE_LABELS is None:
+        _CONTROL_MODE_LABELS = _build_control_mode_labels()
+    return _CONTROL_MODE_LABELS
+
+
+def get_human_input_modes() -> set:
+    """Get set of control modes that require human input (lazy-loaded)."""
+    global _HUMAN_INPUT_MODES
+    if _HUMAN_INPUT_MODES is None:
+        _HUMAN_INPUT_MODES = _build_human_input_modes()
+    return _HUMAN_INPUT_MODES
+
+
 @dataclass(frozen=True)
 class UIDefaults:
     """Aggregated UI defaults."""
@@ -151,4 +213,8 @@ __all__ = [
     "SliderDefaults",
     "BufferDefaults",
     "LayoutDefaults",
+    # Log severity and control mode
+    "LOG_SEVERITY_OPTIONS",
+    "get_control_mode_labels",
+    "get_human_input_modes",
 ]

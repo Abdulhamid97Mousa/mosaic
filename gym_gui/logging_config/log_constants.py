@@ -721,6 +721,24 @@ LOG_SERVICE_SQLITE_WRITE_ERROR = _constant(
     tags=_tags("telemetry", "sqlite", "error"),
 )
 
+LOG_SERVICE_SQLITE_DISK_IO_ERROR = _constant(
+    "LOG622A",
+    "ERROR",
+    "Telemetry SQLite disk I/O error - database may be corrupted. Delete var/telemetry/telemetry.sqlite* files and restart.",
+    component="Service",
+    subcomponent="SQLite",
+    tags=_tags("telemetry", "sqlite", "disk_io", "corruption", "error"),
+)
+
+LOG_SERVICE_SQLITE_INIT_ERROR = _constant(
+    "LOG622B",
+    "ERROR",
+    "Telemetry SQLite initialization failed",
+    component="Service",
+    subcomponent="SQLite",
+    tags=_tags("telemetry", "sqlite", "init", "error"),
+)
+
 LOG_SERVICE_SQLITE_DESERIALIZATION_FAILED = _constant(
     "LOG623",
     "ERROR",
@@ -1528,6 +1546,100 @@ LOG_WORKER_CONFIG_READ_WARNING = _constant(
 
 
 # ---------------------------------------------------------------------------
+# Multi-Agent Tab constants (LOG750–LOG759)
+# ---------------------------------------------------------------------------
+LOG_UI_MULTI_AGENT_ENV_LOAD_REQUESTED = _constant(
+    "LOG750",
+    "INFO",
+    "Multi-agent environment load requested",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "environment", "load"),
+)
+
+LOG_UI_MULTI_AGENT_ENV_LOADED = _constant(
+    "LOG751",
+    "INFO",
+    "Multi-agent environment loaded successfully",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "environment", "loaded"),
+)
+
+LOG_UI_MULTI_AGENT_ENV_LOAD_ERROR = _constant(
+    "LOG752",
+    "ERROR",
+    "Multi-agent environment load failed",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "environment", "error"),
+)
+
+LOG_UI_MULTI_AGENT_POLICY_LOAD_REQUESTED = _constant(
+    "LOG753",
+    "INFO",
+    "Multi-agent policy load requested",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "policy", "load"),
+)
+
+LOG_UI_MULTI_AGENT_GAME_START_REQUESTED = _constant(
+    "LOG754",
+    "INFO",
+    "Multi-agent game start requested",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "game", "start"),
+)
+
+LOG_UI_MULTI_AGENT_RESET_REQUESTED = _constant(
+    "LOG755",
+    "INFO",
+    "Multi-agent reset requested",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "reset"),
+)
+
+LOG_UI_MULTI_AGENT_ACTION_SUBMITTED = _constant(
+    "LOG756",
+    "DEBUG",
+    "Multi-agent action submitted",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "action", "submit"),
+)
+
+LOG_UI_MULTI_AGENT_TRAIN_REQUESTED = _constant(
+    "LOG757",
+    "INFO",
+    "Multi-agent training requested",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "training", "start"),
+)
+
+LOG_UI_MULTI_AGENT_EVALUATE_REQUESTED = _constant(
+    "LOG758",
+    "INFO",
+    "Multi-agent evaluation requested",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "evaluation", "start"),
+)
+
+LOG_UI_MULTI_AGENT_ENV_NOT_LOADED = _constant(
+    "LOG759",
+    "WARNING",
+    "Multi-agent action attempted but no environment loaded",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "environment", "warning"),
+)
+
+
+# ---------------------------------------------------------------------------
 # Fast Lane / RunBus telemetry constants (LOG950–LOG959)
 # ---------------------------------------------------------------------------
 LOG_FASTLANE_CONNECTED = _constant(
@@ -2114,6 +2226,8 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_SERVICE_SQLITE_WORKER_STARTED,
     LOG_SERVICE_SQLITE_WORKER_STOPPED,
     LOG_SERVICE_SQLITE_WRITE_ERROR,
+    LOG_SERVICE_SQLITE_DISK_IO_ERROR,
+    LOG_SERVICE_SQLITE_INIT_ERROR,
     LOG_SERVICE_SQLITE_DESERIALIZATION_FAILED,
     LOG_SERVICE_TELEMETRY_BRIDGE_STEP_QUEUED,
     LOG_SERVICE_TELEMETRY_BRIDGE_EPISODE_QUEUED,
@@ -2197,6 +2311,16 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_UI_WORKER_TABS_INFO,
     LOG_UI_WORKER_TABS_WARNING,
     LOG_UI_WORKER_TABS_ERROR,
+    LOG_UI_MULTI_AGENT_ENV_LOAD_REQUESTED,
+    LOG_UI_MULTI_AGENT_ENV_LOADED,
+    LOG_UI_MULTI_AGENT_ENV_LOAD_ERROR,
+    LOG_UI_MULTI_AGENT_POLICY_LOAD_REQUESTED,
+    LOG_UI_MULTI_AGENT_GAME_START_REQUESTED,
+    LOG_UI_MULTI_AGENT_RESET_REQUESTED,
+    LOG_UI_MULTI_AGENT_ACTION_SUBMITTED,
+    LOG_UI_MULTI_AGENT_TRAIN_REQUESTED,
+    LOG_UI_MULTI_AGENT_EVALUATE_REQUESTED,
+    LOG_UI_MULTI_AGENT_ENV_NOT_LOADED,
     LOG_UI_PRESENTER_SIGNAL_CONNECTION_WARNING,
     LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING,
     LOG_UI_TENSORBOARD_KILL_WARNING,
@@ -2321,6 +2445,8 @@ __all__ = (
     "LOG_SERVICE_SQLITE_WORKER_STARTED",
     "LOG_SERVICE_SQLITE_WORKER_STOPPED",
     "LOG_SERVICE_SQLITE_WRITE_ERROR",
+    "LOG_SERVICE_SQLITE_DISK_IO_ERROR",
+    "LOG_SERVICE_SQLITE_INIT_ERROR",
     "LOG_SERVICE_SQLITE_DESERIALIZATION_FAILED",
     "LOG_SERVICE_TELEMETRY_BRIDGE_STEP_QUEUED",
     "LOG_SERVICE_TELEMETRY_BRIDGE_EPISODE_QUEUED",
@@ -2401,6 +2527,16 @@ __all__ = (
     "LOG_UI_WORKER_TABS_INFO",
     "LOG_UI_WORKER_TABS_WARNING",
     "LOG_UI_WORKER_TABS_ERROR",
+    "LOG_UI_MULTI_AGENT_ENV_LOAD_REQUESTED",
+    "LOG_UI_MULTI_AGENT_ENV_LOADED",
+    "LOG_UI_MULTI_AGENT_ENV_LOAD_ERROR",
+    "LOG_UI_MULTI_AGENT_POLICY_LOAD_REQUESTED",
+    "LOG_UI_MULTI_AGENT_GAME_START_REQUESTED",
+    "LOG_UI_MULTI_AGENT_RESET_REQUESTED",
+    "LOG_UI_MULTI_AGENT_ACTION_SUBMITTED",
+    "LOG_UI_MULTI_AGENT_TRAIN_REQUESTED",
+    "LOG_UI_MULTI_AGENT_EVALUATE_REQUESTED",
+    "LOG_UI_MULTI_AGENT_ENV_NOT_LOADED",
     "LOG_UI_PRESENTER_SIGNAL_CONNECTION_WARNING",
     "LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING",
     "LOG_UI_TENSORBOARD_KILL_WARNING",

@@ -61,7 +61,7 @@ class Settings:
     Taxi's is_raining) are now in gym_gui.config.game_configs module.
     """
 
-    qt_api: str = "pyqt6"
+    qt_api: str = "PyQt6"
     gym_default_env: str = "FrozenLake-v1"
     gym_video_dir: Path | None = None
     enable_agent_autostart: bool = False

@@ -7,7 +7,7 @@ import os
 import sys
 
 # Set Qt API BEFORE any other imports
-os.environ.setdefault("QT_API", "pyqt6")
+os.environ.setdefault("QT_API", "PyQt6")
 
 # Now import and run the app
 from gym_gui.app import main
