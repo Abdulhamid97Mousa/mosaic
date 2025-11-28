@@ -62,8 +62,22 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
                 "artifacts via the Fast Analytics Path."
             ),
             supports_training=True,
-            supports_policy_load=False,
+            supports_policy_load=True,
             requires_live_telemetry=False,
+            provides_fast_analytics=True,
+        ),
+        WorkerDefinition(
+            worker_id="pettingzoo_worker",
+            display_name="PettingZoo Worker",
+            description=(
+                "Multi-agent reinforcement learning using PettingZoo environments. "
+                "Supports both AEC (turn-based) and Parallel (simultaneous) APIs. "
+                "Includes classic board games (Chess, Go), cooperative environments (MPE, SISL), "
+                "and competitive scenarios. Human control available for turn-based games."
+            ),
+            supports_training=True,
+            supports_policy_load=True,
+            requires_live_telemetry=True,
             provides_fast_analytics=True,
         ),
     )

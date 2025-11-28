@@ -16,6 +16,25 @@ from gym_gui.config.game_configs import (
 )
 from gym_gui.core.enums import GameId
 
+try:
+    from gym_gui.core.adapters.vizdoom import ViZDoomConfig
+except ImportError:
+    ViZDoomConfig = None  # type: ignore
+
+# ViZDoom game IDs for config builder
+_VIZDOOM_GAME_IDS = (
+    GameId.VIZDOOM_BASIC,
+    GameId.VIZDOOM_DEADLY_CORRIDOR,
+    GameId.VIZDOOM_DEFEND_THE_CENTER,
+    GameId.VIZDOOM_DEFEND_THE_LINE,
+    GameId.VIZDOOM_HEALTH_GATHERING,
+    GameId.VIZDOOM_HEALTH_GATHERING_SUPREME,
+    GameId.VIZDOOM_MY_WAY_HOME,
+    GameId.VIZDOOM_PREDICT_POSITION,
+    GameId.VIZDOOM_TAKE_COVER,
+    GameId.VIZDOOM_DEATHMATCH,
+)
+
 
 class GameConfigBuilder:
     """Builds typed game configuration objects from UI override dictionaries."""
@@ -223,6 +242,42 @@ class GameConfigBuilder:
                 agent_view_size=agent_view_value,
                 max_episode_steps=max_steps_value,
                 seed=seed_value,
+            )
+
+        elif game_id in _VIZDOOM_GAME_IDS and ViZDoomConfig is not None:
+            # Build ViZDoomConfig from overrides
+            screen_resolution = str(overrides.get("screen_resolution", "RES_640X480"))
+            screen_format = str(overrides.get("screen_format", "RGB24"))
+            render_hud = bool(overrides.get("render_hud", True))
+            render_weapon = bool(overrides.get("render_weapon", True))
+            render_crosshair = bool(overrides.get("render_crosshair", False))
+            render_particles = bool(overrides.get("render_particles", True))
+            render_decals = bool(overrides.get("render_decals", True))
+            sound_enabled = bool(overrides.get("sound_enabled", False))
+            depth_buffer = bool(overrides.get("depth_buffer", False))
+            labels_buffer = bool(overrides.get("labels_buffer", False))
+            automap_buffer = bool(overrides.get("automap_buffer", False))
+
+            # Episode/reward settings
+            episode_timeout = int(overrides.get("episode_timeout", 2100))
+            living_reward = float(overrides.get("living_reward", 0.0))
+            death_penalty = float(overrides.get("death_penalty", 100.0))
+
+            return ViZDoomConfig(
+                screen_resolution=screen_resolution,
+                screen_format=screen_format,
+                render_hud=render_hud,
+                render_weapon=render_weapon,
+                render_crosshair=render_crosshair,
+                render_particles=render_particles,
+                render_decals=render_decals,
+                sound_enabled=sound_enabled,
+                depth_buffer=depth_buffer,
+                labels_buffer=labels_buffer,
+                automap_buffer=automap_buffer,
+                episode_timeout=episode_timeout,
+                living_reward=living_reward,
+                death_penalty=death_penalty,
             )
 
         return None

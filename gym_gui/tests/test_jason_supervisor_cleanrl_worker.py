@@ -1,8 +1,6 @@
 from __future__ import annotations
 
-import types
-
-from gym_gui.services.actor import StepSnapshot, EpisodeSummary
+from gym_gui.services.actor import CleanRLWorkerActor, StepSnapshot, EpisodeSummary
 from gym_gui.workers.jason_supervisor_cleanrl_worker import (
     JasonSupervisorCleanRLWorkerActor,
 )
@@ -10,7 +8,8 @@ from gym_gui.workers.jason_supervisor_cleanrl_worker import (
 
 def test_actor_protocol_minimal():
     actor = JasonSupervisorCleanRLWorkerActor()
-    assert actor.id == "jason_supervisor_cleanrl_worker"
+    assert isinstance(actor, CleanRLWorkerActor)
+    assert actor.id == "cleanrl_worker"
 
     # select_action abstains (CleanRL decides externally)
     step = StepSnapshot(

@@ -51,7 +51,9 @@ class TrainerTensorboardPathTests(unittest.TestCase):
         artifacts = metadata["artifacts"]
         tensorboard_meta = artifacts["tensorboard"]
 
-        expected_relative = f"var/trainer/runs/{run_id}/tensorboard"
+        # relative_path is now just the dirname (e.g., "tensorboard")
+        # The GUI resolves it relative to VAR_TRAINER_DIR/runs/<run_id>/
+        expected_relative = "tensorboard"
         expected_absolute = (VAR_TENSORBOARD_DIR / run_id / "tensorboard").resolve()
 
         self.assertEqual(tensorboard_meta["relative_path"], expected_relative)
@@ -74,7 +76,9 @@ class TrainerTensorboardPathTests(unittest.TestCase):
         self.assertIsInstance(artifacts, dict)
         tensorboard_meta = artifacts.get("tensorboard")
         self.assertIsInstance(tensorboard_meta, dict)
-        expected_relative = f"var/trainer/runs/{run_id}/tensorboard"
+        # relative_path is now just the dirname (e.g., "tensorboard")
+        # The GUI resolves it relative to VAR_TRAINER_DIR/runs/<run_id>/
+        expected_relative = "tensorboard"
         expected_absolute = (VAR_TENSORBOARD_DIR / run_id / "tensorboard").resolve()
         self.assertEqual(tensorboard_meta["relative_path"], expected_relative)
         self.assertEqual(tensorboard_meta["log_dir"], str(expected_absolute))

@@ -55,6 +55,29 @@ from gym_gui.game_docs.ALE import (
     ASSAULT_HTML,
 )
 
+from gym_gui.game_docs.PettingZoo import (
+    CHESS_HTML,
+    CONNECT_FOUR_HTML,
+    GO_HTML,
+)
+
+try:  # Optional dependency for ViZDoom docs (kept lightweight)
+    from gym_gui.game_docs.ViZDoom import (  # pragma: no cover - documentation only
+        VIZDOOM_BASIC_HTML,
+        VIZDOOM_DEADLY_CORRIDOR_HTML,
+        VIZDOOM_DEFEND_THE_CENTER_HTML,
+        VIZDOOM_DEFEND_THE_LINE_HTML,
+        VIZDOOM_DEATHMATCH_HTML,
+        VIZDOOM_HEALTH_GATHERING_HTML,
+        VIZDOOM_HEALTH_GATHERING_SUPREME_HTML,
+        VIZDOOM_MY_WAY_HOME_HTML,
+        VIZDOOM_PREDICT_POSITION_HTML,
+        VIZDOOM_TAKE_COVER_HTML,
+    )
+    _VIZDOOM_DOCS_AVAILABLE = True
+except Exception:  # pragma: no cover - ViZDoom optional
+    _VIZDOOM_DOCS_AVAILABLE = False
+
 _DEFAULT_DOC = (
     "<h3>Documentation unavailable</h3>"
     "<p>This environment does not yet have a descriptive blurb."
@@ -144,6 +167,27 @@ GAME_INFO[GameId.AIR_RAID_V4] = AIR_RAID_HTML
 GAME_INFO[GameId.ALE_AIR_RAID_V5] = AIR_RAID_HTML
 GAME_INFO[GameId.ASSAULT_V4] = ASSAULT_HTML
 GAME_INFO[GameId.ALE_ASSAULT_V5] = ASSAULT_HTML
+
+if _VIZDOOM_DOCS_AVAILABLE:
+    GAME_INFO.update(
+        {
+            GameId.VIZDOOM_BASIC: VIZDOOM_BASIC_HTML,
+            GameId.VIZDOOM_PREDICT_POSITION: VIZDOOM_PREDICT_POSITION_HTML,
+            GameId.VIZDOOM_TAKE_COVER: VIZDOOM_TAKE_COVER_HTML,
+            GameId.VIZDOOM_DEFEND_THE_CENTER: VIZDOOM_DEFEND_THE_CENTER_HTML,
+            GameId.VIZDOOM_DEFEND_THE_LINE: VIZDOOM_DEFEND_THE_LINE_HTML,
+            GameId.VIZDOOM_DEADLY_CORRIDOR: VIZDOOM_DEADLY_CORRIDOR_HTML,
+            GameId.VIZDOOM_HEALTH_GATHERING: VIZDOOM_HEALTH_GATHERING_HTML,
+            GameId.VIZDOOM_HEALTH_GATHERING_SUPREME: VIZDOOM_HEALTH_GATHERING_SUPREME_HTML,
+            GameId.VIZDOOM_MY_WAY_HOME: VIZDOOM_MY_WAY_HOME_HTML,
+            GameId.VIZDOOM_DEATHMATCH: VIZDOOM_DEATHMATCH_HTML,
+        }
+    )
+
+# PettingZoo Classic mappings
+GAME_INFO[GameId.CHESS] = CHESS_HTML
+GAME_INFO[GameId.CONNECT_FOUR] = CONNECT_FOUR_HTML
+GAME_INFO[GameId.GO] = GO_HTML
 
 
 def get_game_info(game_id: GameId) -> str:

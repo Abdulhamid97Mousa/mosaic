@@ -1,14 +1,10 @@
 from __future__ import annotations
 
-"""Jason Supervisor CleanRL worker package.
+"""Jason Supervisor CleanRL worker stub.
 
-This package provides a placeholder Actor that represents a CleanRL worker
-running under Jason Supervisor oversight, without modifying the existing
-CleanRL wiring. It allows the GUI to list/select this worker independently
-from the standard CleanRL worker actor.
-
-Registration is intentionally left to the application bootstrap or callers
-who want to opt into this worker (to avoid changing current defaults).
+The Jason supervisor integration no longer controls CleanRL workers. This
+package now exposes a compatibility alias so legacy imports continue to
+resolve, while the underlying behaviour defers to ``CleanRLWorkerActor``.
 """
 
 from .worker import JasonSupervisorCleanRLWorkerActor

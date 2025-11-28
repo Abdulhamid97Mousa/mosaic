@@ -37,3 +37,7 @@ gymnasium
 minigrid>=2,<3.0.0
 
 autorom[accept-rom-license]==0.6.1
+
+# Chess AI engine integration (for Human vs Agent mode)
+# Note: Also requires Stockfish binary: sudo apt install stockfish
+stockfish>=3.28.0

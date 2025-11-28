@@ -31,7 +31,7 @@
 # This is the dedicated Jason gRPC bidirectional bridge project, which will be used to establish comminication between Python server and Jason agents.
 # It lives at: 3rd_party/jason_worker/JASON_GRPC_BIDI_PYTHON 
 
-# OR you can use the example here  /home/hamid/Desktop/Projects/GUI_BDI_RL/JASON_GRPC_BIDI_PYTHON/JASON_java_project
+# OR you can use the example here  Desktop/Projects/GUI_BDI_RL/JASON_GRPC_BIDI_PYTHON/JASON_java_project
 
 
 # Installation 
@@ -70,10 +70,10 @@
 
 
 # for more details look into 
-# 1. /home/hamid/Desktop/Projects/GUI_BDI_RL/JASON_GRPC_BIDI_PYTHON/docs/JASON_GRPC_BIDI_PYTHON.drawio
-# 2. /home/hamid/Desktop/Projects/GUI_BDI_RL/JASON_GRPC_BIDI_PYTHON/docs/README.md
-# 3. /home/hamid/Desktop/Projects/GUI_BDI_RL/JASON_GRPC_BIDI_PYTHON/docs/GRPC_JASON_BRIDGE.md
+# 1. Desktop/Projects/GUI_BDI_RL/JASON_GRPC_BIDI_PYTHON/docs/JASON_GRPC_BIDI_PYTHON.drawio
+# 2. Desktop/Projects/GUI_BDI_RL/JASON_GRPC_BIDI_PYTHON/docs/README.md
+# 3. Desktop/Projects/GUI_BDI_RL/JASON_GRPC_BIDI_PYTHON/docs/GRPC_JASON_BRIDGE.md
 
 
 # for more general overview of the JASON and MOSAIC integration look into: 
-# /home/hamid/Desktop/Projects/GUI_BDI_RL/JASON_GRPC_BIDI_PYTHON/docs/GRPC_JASON_BRIDGE.md
+# Desktop/Projects/GUI_BDI_RL/JASON_GRPC_BIDI_PYTHON/docs/GRPC_JASON_BRIDGE.md

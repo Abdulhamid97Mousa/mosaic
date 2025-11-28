@@ -150,11 +150,7 @@ class ALEAdapter(EnvironmentAdapter[np.ndarray, int]):
 		seed: int | None = None,
 		options: dict[str, Any] | None = None,
 	) -> AdapterStep[np.ndarray]:
-		# Use adapter-configured seed when caller didn't supply one
-		applied_seed = seed
-		if applied_seed is None and self._config is not None:
-			applied_seed = getattr(self._config, "seed", None)
-		step = super().reset(seed=applied_seed, options=options)
+		step = super().reset(seed=seed, options=options)
 		self._step_counter = 0
 		self._episode_return = 0.0
 		return step
@@ -331,4 +327,3 @@ __all__ = [
     "AssaultV5Adapter",
 	"ALE_ADAPTERS",
 ]
-

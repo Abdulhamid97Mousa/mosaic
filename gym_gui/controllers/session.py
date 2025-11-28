@@ -29,7 +29,7 @@ from gym_gui.core.adapters.base import AdapterContext, AdapterStep, EnvironmentA
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.core.enums import ControlMode, GameId, EnvironmentFamily, ENVIRONMENT_FAMILY_BY_GAME
 from gym_gui.core.run_counter_manager import RunCounterManager
-from gym_gui.constants import format_episode_id
+from gym_gui.constants import format_episode_id, DEFAULT_RENDER_DELAY_MS
 from gym_gui.constants.constants_vector import SUPPORTED_AUTORESET_MODES
 from gym_gui.constants.constants_telemetry import (
     TELEMETRY_KEY_AUTORESET_MODE,
@@ -40,6 +40,13 @@ from gym_gui.constants.constants_telemetry import (
 from gym_gui.core.spaces.vector_metadata import extract_vector_step_details
 from gym_gui.core.schema import schema_registry
 from gym_gui.core.factories.adapters import create_adapter, get_adapter_cls
+from gym_gui.controllers.interaction import (
+    InteractionController,
+    Box2DInteractionController,
+    TurnBasedInteractionController,
+    AleInteractionController,
+    ViZDoomInteractionController,
+)
 from gym_gui.logging_config.log_constants import (
     LOG_NORMALIZATION_STATS_DROPPED,
     LOG_SCHEMA_MISMATCH,
@@ -58,6 +65,8 @@ from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
 from gym_gui.utils.seeding import SessionSeedManager
 from gym_gui.utils.timekeeping import SessionTimers
+from gym_gui.utils.fps_counter import FpsCounter
+import time
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -87,6 +96,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
     error_occurred = pyqtSignal(str)
     auto_play_state_changed = pyqtSignal(bool)
     seed_applied = pyqtSignal(int)
+    fps_updated = pyqtSignal(float)
 
     def __init__(self, settings: Settings, parent: Optional[QtCore.QObject] = None) -> None:
         super().__init__(parent)
@@ -100,7 +110,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._game_started: bool = False
         self._game_paused: bool = False
         self._auto_timer = QtCore.QTimer(self)
-        self._auto_timer.setInterval(600)
+        self._auto_timer.setInterval(DEFAULT_RENDER_DELAY_MS)
         if hasattr(self._auto_timer, "setTimerType"):
             try:
                 self._auto_timer.setTimerType(QtCore.Qt.TimerType.PreciseTimer)  # type: ignore[attr-defined]
@@ -112,7 +122,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
                 )
         self._auto_timer.timeout.connect(self._auto_step)
         self._idle_timer = QtCore.QTimer(self)
-        self._idle_timer.setInterval(600)
+        self._idle_timer.setInterval(DEFAULT_RENDER_DELAY_MS)
         if hasattr(self._idle_timer, "setTimerType"):
             try:
                 self._idle_timer.setTimerType(QtCore.Qt.TimerType.PreciseTimer)  # type: ignore[attr-defined]
@@ -130,11 +140,13 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._pending_input_label: str | None = None
         self._last_agent_position: tuple[int, int] | None = None
         self._timers = SessionTimers()
+        self._fps_counter = FpsCounter(window_s=1.5)
         self._seed_manager = SessionSeedManager()
         self._settings_overrides: dict[str, Any] = {}
         self._effective_settings: Settings = settings
         locator = get_service_locator()
         self._telemetry = locator.resolve(TelemetryService)
+        self._slow_lane_enabled: bool = False
         self._actor_service = locator.resolve(ActorService)
         self._frame_storage = locator.resolve(FrameStorageService)
         self._storage_service = locator.resolve(StorageRecorderService)
@@ -154,6 +166,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._next_seed = max(1, settings.default_seed)
         self._current_seed = self._next_seed
         self._game_config: GameConfig | None = None
+        self._interaction: InteractionController | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -163,6 +176,9 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._auto_timer.setInterval(interval)
         self._user_idle_interval = interval
         self._update_idle_timer()
+
+    def set_slow_lane_enabled(self, enabled: bool) -> None:
+        self._slow_lane_enabled = bool(enabled)
 
     def start_game(self) -> None:
         """Mark the game as started and enable input controls."""
@@ -174,6 +190,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._game_paused = False
         # Note: Human input controller is set up in main_window, not here
         self.status_message.emit("Game started! Use controls to play.")
+        self._update_idle_timer()
 
     def pause_game(self) -> None:
         """Pause the game - stops all actions."""
@@ -271,6 +288,12 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self.turn_changed.emit(self._turn)
         self._last_agent_position = self._extract_agent_position(initial_step)
         self._last_step = initial_step
+        # Select interaction controller per family
+        try:
+            family = ENVIRONMENT_FAMILY_BY_GAME.get(game_id)
+        except Exception:
+            family = None
+        self._interaction = self._create_interaction_controller(family)
         self._passive_action = self._resolve_passive_action()
         self._pending_input_label = "environment_ready"
         self._record_step(initial_step, action=None, input_source=self._pending_input_label)
@@ -308,11 +331,36 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self.turn_changed.emit(self._turn)
         self._last_agent_position = self._extract_agent_position(step)
         self._timers.reset_episode()
+        try:
+            self._fps_counter.reset()
+        except Exception:
+            pass
         self._last_step = step
+        # Re-select interaction controller (family may change if different env loaded later)
+        try:
+            family = ENVIRONMENT_FAMILY_BY_GAME.get(self._game_id)
+        except Exception:
+            family = None
+        self._interaction = self._create_interaction_controller(family)
         self._passive_action = self._resolve_passive_action()
         self._pending_input_label = "environment_reset"
         self._record_step(step, action=None, input_source=self._pending_input_label)
         self._update_idle_timer()
+
+    def _create_interaction_controller(
+        self, family: EnvironmentFamily | None
+    ) -> InteractionController:
+        """Return the interaction controller best suited for the env family."""
+
+        if family in (EnvironmentFamily.BOX2D, EnvironmentFamily.MUJOCO):
+            return Box2DInteractionController(self, target_hz=50)
+        if family in (EnvironmentFamily.ATARI, EnvironmentFamily.ALE):
+            return AleInteractionController(self, target_hz=60)
+        if family == EnvironmentFamily.VIZDOOM:
+            # ViZDoom runs at 35 FPS by default - game advances continuously
+            # like ALE, enemies move and projectiles fly even without player input
+            return ViZDoomInteractionController(self, target_hz=35)
+        return TurnBasedInteractionController()
 
     def perform_human_action(self, action: int, *, key_label: str | None = None) -> None:
         if self._adapter is None:
@@ -534,6 +582,12 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         )
         self._timers.mark_first_move(when=step_timestamp)
         self.step_processed.emit(step, self._step_index)
+        # Update dynamic FPS meter based on actual step cadence
+        try:
+            fps = self._fps_counter.tick(time.monotonic())
+            self.fps_updated.emit(fps)
+        except Exception:
+            pass
         self._update_status(step)
         self._log_step_outcome(action, step)
 
@@ -893,7 +947,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             space_signature=space_signature,
             vector_metadata=combined_vector_metadata,
         )
-        if self._telemetry is not None:
+        if self._telemetry is not None and self._slow_lane_enabled:
             self._telemetry.record_step(record)
         return record
 
@@ -906,24 +960,48 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         if not self._should_idle_tick():
             self._stop_idle_tick()
             return
-        if not self._awaiting_human:
+        interaction = getattr(self, "_interaction", None)
+        # For ALE and ViZDoom, do not gate on awaiting_human; always advance with NOOP when idle tick fires
+        # These are continuous games where the world should keep moving regardless of player input
+        require_awaiting = not isinstance(interaction, (AleInteractionController, ViZDoomInteractionController))
+        if require_awaiting and not self._awaiting_human:
             return
-        if self._passive_action is None:
+        # Determine idle action
+        action = None
+        if interaction is not None:
+            action = interaction.maybe_passive_action()
+        if action is None:
+            action = self._passive_action
+        if action is None:
             _LOGGER.debug("Idle timer active but passive action unavailable")
             self._stop_idle_tick()
             return
-        self._awaiting_human = False
-        self.awaiting_human.emit(False, "Passive idle step")
+        if require_awaiting:
+            self._awaiting_human = False
+            self.awaiting_human.emit(False, "Passive idle step")
         self._pending_input_label = "idle_tick"
-        self._apply_action(self._passive_action)
+        self._apply_action(action)
 
     def _determine_idle_interval(self) -> int:
         if self._user_idle_interval is not None:
             return self._user_idle_interval
+        interaction = getattr(self, "_interaction", None)
+        if interaction is not None:
+            interval = interaction.idle_interval_ms()
+            if interval is not None:
+                return interval
+        family = None
+        if self._game_id is not None:
+            try:
+                family = ENVIRONMENT_FAMILY_BY_GAME.get(self._game_id)
+            except Exception:
+                family = None
+        if family in (EnvironmentFamily.ATARI, EnvironmentFamily.ALE):
+            return 16  # ~60 FPS fallback for Atari/ALE
         return self._compute_idle_interval()
 
     def _set_idle_interval(self, interval: int) -> None:
-        clamped = max(30, int(interval))
+        clamped = max(10, int(interval))
         if clamped != self._current_idle_interval:
             self._idle_timer.setInterval(clamped)
             self._current_idle_interval = clamped
@@ -962,17 +1040,15 @@ class SessionController(QtCore.QObject, LogConstantMixin):
     def _should_idle_tick(self) -> bool:
         if self._adapter is None or self._game_id is None:
             return False
-        # Don't idle tick when game is paused
-        if self._game_paused:
-            return False
-        # Only allow idle tick for Box2D games
-        if ENVIRONMENT_FAMILY_BY_GAME.get(self._game_id) != EnvironmentFamily.BOX2D:
-            return False
-        if self._control_mode != ControlMode.HUMAN_ONLY:
+        if not self._game_started or self._game_paused:
             return False
         if self._last_step is not None and (self._last_step.terminated or self._last_step.truncated):
             return False
-        return self._passive_action is not None
+        # Delegate finer gating to the active interaction controller
+        interaction = getattr(self, "_interaction", None)
+        if interaction is not None:
+            return interaction.should_idle_tick()
+        return False
 
     def _start_idle_tick(self) -> None:
         if not self._idle_timer.isActive():
@@ -993,8 +1069,13 @@ class SessionController(QtCore.QObject, LogConstantMixin):
     def _resolve_passive_action(self) -> Any | None:
         if self._adapter is None or self._game_id is None:
             return None
-        # Only provide a passive action for Box2D games
-        if ENVIRONMENT_FAMILY_BY_GAME.get(self._game_id) != EnvironmentFamily.BOX2D:
+        # Delegate passive action decision to interaction controller if present
+        interaction = getattr(self, "_interaction", None)
+        if interaction is not None:
+            # Interaction controller uses _passive_action after resolution; fall through for Box2D parity
+            pass
+        fam = ENVIRONMENT_FAMILY_BY_GAME.get(self._game_id)
+        if fam not in (EnvironmentFamily.BOX2D, EnvironmentFamily.ATARI, EnvironmentFamily.ALE):
             return None
         space = self._adapter.action_space
         if isinstance(space, spaces.Discrete):

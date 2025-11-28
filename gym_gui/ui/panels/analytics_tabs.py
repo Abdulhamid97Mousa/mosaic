@@ -13,6 +13,7 @@ from qtpy import QtCore
 from gym_gui.config.paths import VAR_ROOT, VAR_TRAINER_DIR
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
+    LOG_UI_RENDER_TABS_ARTIFACTS_MISSING,
     LOG_UI_RENDER_TABS_TENSORBOARD_STATUS,
     LOG_UI_RENDER_TABS_TENSORBOARD_WAITING,
     LOG_UI_RENDER_TABS_WANDB_ERROR,
@@ -49,6 +50,27 @@ class AnalyticsTabManager(LogConstantMixin):
         """
 
         analytics_file = VAR_TRAINER_DIR / "runs" / run_id / "analytics.json"
+        run_dir = analytics_file.parent
+        if not run_dir.exists():
+            config_path = VAR_TRAINER_DIR / "configs" / f"config-{run_id}.json"
+            repo_root = VAR_ROOT.parent
+            third_party = repo_root / "3rd_party"
+            hint_cli = (
+                f"PYTHONPATH=\"{third_party}:$PYTHONPATH\" python -m cleanrl_worker.cli --config {config_path} "
+                "--grpc --grpc-target 127.0.0.1:50055"
+            )
+            self.log_constant(
+                LOG_UI_RENDER_TABS_ARTIFACTS_MISSING,
+                message="Run artifacts directory missing; worker appears not to have launched",
+                extra={
+                    "run_id": run_id,
+                    "agent_id": agent_id,
+                    "run_dir": str(run_dir),
+                    "config_path": str(config_path),
+                    "hint_cli": hint_cli,
+                },
+            )
+            return
         if not analytics_file.exists():
             self.log_constant(
                 LOG_UI_RENDER_TABS_WANDB_WARNING,
@@ -266,13 +288,25 @@ class AnalyticsTabManager(LogConstantMixin):
             )
             return False
 
+        # Resolve the tensorboard path - prefer relative path for portability
         resolved_path: Optional[Path] = None
-        log_dir = tensorboard_meta.get("log_dir")
         relative_path = tensorboard_meta.get("relative_path")
-        if isinstance(log_dir, str) and log_dir.strip():
-            resolved_path = Path(log_dir).expanduser()
-        elif isinstance(relative_path, str) and relative_path.strip():
-            resolved_path = (VAR_ROOT.parent / relative_path).resolve()
+        log_dir = tensorboard_meta.get("log_dir")  # Legacy absolute path fallback
+        manifest_run_id = metadata.get("run_id") if isinstance(metadata, Mapping) else None
+
+        if isinstance(relative_path, str) and relative_path.strip():
+            rel_stripped = relative_path.strip()
+            # Check if relative_path is actually absolute (legacy format)
+            if rel_stripped.startswith("/"):
+                resolved_path = Path(rel_stripped)
+            else:
+                # Use run_id from manifest or fallback to passed run_id
+                effective_run_id = manifest_run_id if isinstance(manifest_run_id, str) else run_id
+                # Resolve relative to VAR_TRAINER_DIR/runs/<run_id>/
+                resolved_path = (VAR_TRAINER_DIR / "runs" / effective_run_id / rel_stripped).resolve()
+        elif isinstance(log_dir, str) and log_dir.strip():
+            # Fallback to legacy log_dir (absolute path)
+            resolved_path = Path(log_dir.strip()).expanduser()
 
         if resolved_path is None:
             self.log_constant(

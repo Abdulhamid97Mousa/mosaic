@@ -524,67 +524,31 @@ LOG_ADAPTER_ALE_METADATA_PROBE_FAILED = _constant(
 # ---------------------------------------------------------------------------
 # Service and telemetry constants (LOG601–LOG650)
 # ---------------------------------------------------------------------------
-LOG_SERVICE_SUPERVISOR_EVENT = _constant(
+LOG_SERVICE_JASON_WORKER_EVENT = _constant(
     "LOG680A",
     "INFO",
-    "Supervisor event",
+    "Jason worker event",
     component="Service",
-    subcomponent="Supervisor",
-    tags=_tags("supervisor", "event"),
+    subcomponent="JasonWorker",
+    tags=_tags("jason_worker", "event"),
 )
 
-LOG_SERVICE_SUPERVISOR_WARNING = _constant(
+LOG_SERVICE_JASON_WORKER_WARNING = _constant(
     "LOG680B",
     "WARNING",
-    "Supervisor warning",
+    "Jason worker warning",
     component="Service",
-    subcomponent="Supervisor",
-    tags=_tags("supervisor", "warning"),
+    subcomponent="JasonWorker",
+    tags=_tags("jason_worker", "warning"),
 )
 
-LOG_SERVICE_SUPERVISOR_ERROR = _constant(
+LOG_SERVICE_JASON_WORKER_ERROR = _constant(
     "LOG680C",
     "ERROR",
-    "Supervisor error",
+    "Jason worker error",
     component="Service",
-    subcomponent="Supervisor",
-    tags=_tags("supervisor", "error"),
-)
-
-LOG_SERVICE_SUPERVISOR_CONTROL_APPLIED = _constant(
-    "LOG680D",
-    "INFO",
-    "Supervisor applied control update",
-    component="Service",
-    subcomponent="Supervisor",
-    tags=_tags("supervisor", "control", "applied"),
-)
-
-LOG_SERVICE_SUPERVISOR_CONTROL_REJECTED = _constant(
-    "LOG680E",
-    "WARNING",
-    "Supervisor control update rejected",
-    component="Service",
-    subcomponent="Supervisor",
-    tags=_tags("supervisor", "control", "rejected"),
-)
-
-LOG_SERVICE_SUPERVISOR_ROLLBACK = _constant(
-    "LOG680F",
-    "INFO",
-    "Supervisor rollback executed",
-    component="Service",
-    subcomponent="Supervisor",
-    tags=_tags("supervisor", "rollback"),
-)
-
-LOG_SERVICE_SUPERVISOR_SAFETY_STATE = _constant(
-    "LOG680G",
-    "INFO",
-    "Supervisor safety state changed",
-    component="Service",
-    subcomponent="Supervisor",
-    tags=_tags("supervisor", "safety", "state"),
+    subcomponent="JasonWorker",
+    tags=_tags("jason_worker", "error"),
 )
 LOG_SERVICE_TELEMETRY_STEP_REJECTED = _constant(
     "LOG601",
@@ -667,6 +631,42 @@ LOG_SERVICE_DB_SINK_FATAL = _constant(
     tags=_tags("telemetry", "db", "error"),
 )
 
+LOG_SERVICE_DB_SINK_QUEUE_DEPTH = _constant(
+    "LOG931",
+    "DEBUG",
+    "Telemetry DB sink queue depth snapshot",
+    component="Service",
+    subcomponent="DBSink",
+    tags=_tags("telemetry", "db", "queue"),
+)
+
+LOG_SERVICE_DB_SINK_QUEUE_PRESSURE = _constant(
+    "LOG932",
+    "WARNING",
+    "Telemetry DB sink queue high-water mark",
+    component="Service",
+    subcomponent="DBSink",
+    tags=_tags("telemetry", "db", "queue", "pressure"),
+)
+
+LOG_SERVICE_DB_SINK_FLUSH_STATS = _constant(
+    "LOG933",
+    "DEBUG",
+    "Telemetry DB sink flush statistics",
+    component="Service",
+    subcomponent="DBSink",
+    tags=_tags("telemetry", "db", "flush"),
+)
+
+LOG_SERVICE_DB_SINK_FLUSH_LATENCY = _constant(
+    "LOG934",
+    "WARNING",
+    "Telemetry DB sink flush latency exceeded threshold",
+    component="Service",
+    subcomponent="DBSink",
+    tags=_tags("telemetry", "db", "flush", "latency"),
+)
+
 LOG_SERVICE_SQLITE_DEBUG = _constant(
     "LOG617",
     "DEBUG",
@@ -719,6 +719,24 @@ LOG_SERVICE_SQLITE_WRITE_ERROR = _constant(
     component="Service",
     subcomponent="SQLite",
     tags=_tags("telemetry", "sqlite", "error"),
+)
+
+LOG_SERVICE_SQLITE_DISK_IO_ERROR = _constant(
+    "LOG622A",
+    "ERROR",
+    "Telemetry SQLite disk I/O error - database may be corrupted. Delete var/telemetry/telemetry.sqlite* files and restart.",
+    component="Service",
+    subcomponent="SQLite",
+    tags=_tags("telemetry", "sqlite", "disk_io", "corruption", "error"),
+)
+
+LOG_SERVICE_SQLITE_INIT_ERROR = _constant(
+    "LOG622B",
+    "ERROR",
+    "Telemetry SQLite initialization failed",
+    component="Service",
+    subcomponent="SQLite",
+    tags=_tags("telemetry", "sqlite", "init", "error"),
 )
 
 LOG_SERVICE_SQLITE_DESERIALIZATION_FAILED = _constant(
@@ -1289,6 +1307,15 @@ LOG_UI_RENDER_TABS_WANDB_PROXY_SKIPPED = _constant(
     tags=_tags("ui", "wandb", "proxy", "vpn"),
 )
 
+LOG_UI_RENDER_TABS_ARTIFACTS_MISSING = _constant(
+    "LOG72B",
+    "ERROR",
+    "Run artifacts directory missing",
+    component="UI",
+    subcomponent="RenderTabs",
+    tags=_tags("ui", "render", "runs", "missing"),
+)
+
 LOG_UI_RENDER_TABS_DELETE_REQUESTED = _constant(
     "LOG736",
     "INFO",
@@ -1400,6 +1427,33 @@ LOG_UI_TRAIN_FORM_TELEMETRY_PATH = _constant(
     tags=_tags("ui", "train_form", "telemetry_path"),
 )
 
+LOG_UI_POLICY_FORM_TRACE = _constant(
+    "LOG736",
+    "DEBUG",
+    "Policy form trace",
+    component="UI",
+    subcomponent="PolicyForm",
+    tags=_tags("ui", "policy_form", "trace"),
+)
+
+LOG_UI_POLICY_FORM_INFO = _constant(
+    "LOG737",
+    "INFO",
+    "Policy form event",
+    component="UI",
+    subcomponent="PolicyForm",
+    tags=_tags("ui", "policy_form"),
+)
+
+LOG_UI_POLICY_FORM_ERROR = _constant(
+    "LOG738",
+    "ERROR",
+    "Policy form error",
+    component="UI",
+    subcomponent="PolicyForm",
+    tags=_tags("ui", "policy_form", "error"),
+)
+
 LOG_UI_WORKER_TABS_TRACE = _constant(
     "LOG740",
     "DEBUG",
@@ -1488,6 +1542,194 @@ LOG_WORKER_CONFIG_READ_WARNING = _constant(
     component="Worker",
     subcomponent="Presenter",
     tags=_tags("worker", "presenter", "config", "read", "warning"),
+)
+
+
+# ---------------------------------------------------------------------------
+# Multi-Agent Tab constants (LOG750–LOG759)
+# ---------------------------------------------------------------------------
+LOG_UI_MULTI_AGENT_ENV_LOAD_REQUESTED = _constant(
+    "LOG750",
+    "INFO",
+    "Multi-agent environment load requested",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "environment", "load"),
+)
+
+LOG_UI_MULTI_AGENT_ENV_LOADED = _constant(
+    "LOG751",
+    "INFO",
+    "Multi-agent environment loaded successfully",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "environment", "loaded"),
+)
+
+LOG_UI_MULTI_AGENT_ENV_LOAD_ERROR = _constant(
+    "LOG752",
+    "ERROR",
+    "Multi-agent environment load failed",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "environment", "error"),
+)
+
+LOG_UI_MULTI_AGENT_POLICY_LOAD_REQUESTED = _constant(
+    "LOG753",
+    "INFO",
+    "Multi-agent policy load requested",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "policy", "load"),
+)
+
+LOG_UI_MULTI_AGENT_GAME_START_REQUESTED = _constant(
+    "LOG754",
+    "INFO",
+    "Multi-agent game start requested",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "game", "start"),
+)
+
+LOG_UI_MULTI_AGENT_RESET_REQUESTED = _constant(
+    "LOG755",
+    "INFO",
+    "Multi-agent reset requested",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "reset"),
+)
+
+LOG_UI_MULTI_AGENT_ACTION_SUBMITTED = _constant(
+    "LOG756",
+    "DEBUG",
+    "Multi-agent action submitted",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "action", "submit"),
+)
+
+LOG_UI_MULTI_AGENT_TRAIN_REQUESTED = _constant(
+    "LOG757",
+    "INFO",
+    "Multi-agent training requested",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "training", "start"),
+)
+
+LOG_UI_MULTI_AGENT_EVALUATE_REQUESTED = _constant(
+    "LOG758",
+    "INFO",
+    "Multi-agent evaluation requested",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "evaluation", "start"),
+)
+
+LOG_UI_MULTI_AGENT_ENV_NOT_LOADED = _constant(
+    "LOG759",
+    "WARNING",
+    "Multi-agent action attempted but no environment loaded",
+    component="UI",
+    subcomponent="MultiAgentTab",
+    tags=_tags("ui", "multi_agent", "environment", "warning"),
+)
+
+
+# ---------------------------------------------------------------------------
+# Fast Lane / RunBus telemetry constants (LOG950–LOG959)
+# ---------------------------------------------------------------------------
+LOG_FASTLANE_CONNECTED = _constant(
+    "LOG950",
+    "INFO",
+    "Fast lane consumer connected",
+    component="UI",
+    subcomponent="FastLane",
+    tags=_tags("fastlane", "status", "connected"),
+)
+
+LOG_FASTLANE_UNAVAILABLE = _constant(
+    "LOG951",
+    "WARNING",
+    "Fast lane consumer unavailable",
+    component="UI",
+    subcomponent="FastLane",
+    tags=_tags("fastlane", "status", "warning"),
+)
+
+LOG_FASTLANE_QUEUE_DEPTH = _constant(
+    "LOG952",
+    "INFO",
+    "Fast lane queue depth snapshot",
+    component="UI",
+    subcomponent="FastLane",
+    tags=_tags("fastlane", "metrics", "queue_depth"),
+)
+
+LOG_FASTLANE_READER_LAG = _constant(
+    "LOG953",
+    "WARNING",
+    "Fast lane reader lag detected",
+    component="UI",
+    subcomponent="FastLane",
+    tags=_tags("fastlane", "lag", "warning"),
+)
+
+LOG_RUNBUS_UI_QUEUE_DEPTH = _constant(
+    "LOG954",
+    "INFO",
+    "RunBus UI queue depth snapshot",
+    component="Controller",
+    subcomponent="LiveTelemetry",
+    tags=_tags("runbus", "ui", "queue_depth"),
+)
+
+LOG_FASTLANE_HEADER_INVALID = _constant(
+    "LOG955",
+    "WARNING",
+    "Fast lane shared memory header invalid",
+    component="UI",
+    subcomponent="FastLane",
+    tags=_tags("fastlane", "header", "warning"),
+)
+
+LOG_FASTLANE_FRAME_READ_ERROR = _constant(
+    "LOG956",
+    "ERROR",
+    "Fast lane frame read failed",
+    component="UI",
+    subcomponent="FastLane",
+    tags=_tags("fastlane", "reader", "error"),
+)
+
+LOG_RUNBUS_DB_QUEUE_DEPTH = _constant(
+    "LOG957",
+    "INFO",
+    "RunBus durable queue depth snapshot",
+    component="Telemetry",
+    subcomponent="DBSink",
+    tags=_tags("runbus", "durable", "queue_depth"),
+)
+
+LOG_UI_FASTLANE_EVAL_SUMMARY_UPDATE = _constant(
+    "LOG958",
+    "INFO",
+    "Fast lane evaluation summary updated",
+    component="UI",
+    subcomponent="FastLane",
+    tags=_tags("fastlane", "eval", "summary"),
+)
+
+LOG_UI_FASTLANE_EVAL_SUMMARY_WARNING = _constant(
+    "LOG959",
+    "WARNING",
+    "Fast lane evaluation summary warning",
+    component="UI",
+    subcomponent="FastLane",
+    tags=_tags("fastlane", "eval", "warning"),
 )
 
 
@@ -1641,6 +1883,51 @@ LOG_WORKER_POLICY_ERROR = _constant(
     component="Worker",
     subcomponent="Policy",
     tags=_tags("worker", "policy", "error"),
+)
+
+LOG_WORKER_POLICY_EVAL_STARTED = _constant(
+    "LOG918",
+    "INFO",
+    "Worker policy evaluation started",
+    component="Worker",
+    subcomponent="Policy",
+    tags=_tags("worker", "policy", "eval", "start"),
+)
+
+LOG_WORKER_POLICY_EVAL_COMPLETED = _constant(
+    "LOG919",
+    "INFO",
+    "Worker policy evaluation completed",
+    component="Worker",
+    subcomponent="Policy",
+    tags=_tags("worker", "policy", "eval", "complete"),
+)
+
+LOG_WORKER_POLICY_EVAL_BATCH_STARTED = _constant(
+    "LOG961",
+    "INFO",
+    "Worker policy evaluation batch started",
+    component="Worker",
+    subcomponent="Policy",
+    tags=_tags("worker", "policy", "eval", "batch", "start"),
+)
+
+LOG_WORKER_POLICY_EVAL_BATCH_COMPLETED = _constant(
+    "LOG962",
+    "INFO",
+    "Worker policy evaluation batch completed",
+    component="Worker",
+    subcomponent="Policy",
+    tags=_tags("worker", "policy", "eval", "batch", "complete"),
+)
+
+LOG_WORKER_POLICY_LOAD_FAILED = _constant(
+    "LOG920",
+    "ERROR",
+    "Worker policy checkpoint missing",
+    component="Worker",
+    subcomponent="Policy",
+    tags=_tags("worker", "policy", "missing"),
 )
 
 LOG_WORKER_BDI_EVENT = _constant(
@@ -1929,12 +2216,18 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_SERVICE_DB_SINK_STOP_TIMEOUT,
     LOG_SERVICE_DB_SINK_LOOP_EXITED,
     LOG_SERVICE_DB_SINK_FATAL,
+    LOG_SERVICE_DB_SINK_QUEUE_DEPTH,
+    LOG_SERVICE_DB_SINK_QUEUE_PRESSURE,
+    LOG_SERVICE_DB_SINK_FLUSH_STATS,
+    LOG_SERVICE_DB_SINK_FLUSH_LATENCY,
     LOG_SERVICE_SQLITE_DEBUG,
     LOG_SERVICE_SQLITE_INFO,
     LOG_SERVICE_SQLITE_WARNING,
     LOG_SERVICE_SQLITE_WORKER_STARTED,
     LOG_SERVICE_SQLITE_WORKER_STOPPED,
     LOG_SERVICE_SQLITE_WRITE_ERROR,
+    LOG_SERVICE_SQLITE_DISK_IO_ERROR,
+    LOG_SERVICE_SQLITE_INIT_ERROR,
     LOG_SERVICE_SQLITE_DESERIALIZATION_FAILED,
     LOG_SERVICE_TELEMETRY_BRIDGE_STEP_QUEUED,
     LOG_SERVICE_TELEMETRY_BRIDGE_EPISODE_QUEUED,
@@ -1946,13 +2239,9 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_SERVICE_TELEMETRY_HUB_SUBSCRIBED,
     LOG_SERVICE_TELEMETRY_HUB_TRACE,
     LOG_SERVICE_TELEMETRY_HUB_ERROR,
-    LOG_SERVICE_SUPERVISOR_EVENT,
-    LOG_SERVICE_SUPERVISOR_WARNING,
-    LOG_SERVICE_SUPERVISOR_ERROR,
-    LOG_SERVICE_SUPERVISOR_CONTROL_APPLIED,
-    LOG_SERVICE_SUPERVISOR_CONTROL_REJECTED,
-    LOG_SERVICE_SUPERVISOR_ROLLBACK,
-    LOG_SERVICE_SUPERVISOR_SAFETY_STATE,
+    LOG_SERVICE_JASON_WORKER_EVENT,
+    LOG_SERVICE_JASON_WORKER_WARNING,
+    LOG_SERVICE_JASON_WORKER_ERROR,
     LOG_RENDER_REGULATOR_NOT_STARTED,
     LOG_RENDER_DROPPED_FRAME,
     LOG_DAEMON_START,
@@ -2000,6 +2289,9 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_UI_RENDER_TABS_WANDB_STATUS,
     LOG_UI_RENDER_TABS_WANDB_WARNING,
     LOG_UI_RENDER_TABS_WANDB_ERROR,
+    LOG_UI_RENDER_TABS_WANDB_PROXY_APPLIED,
+    LOG_UI_RENDER_TABS_WANDB_PROXY_SKIPPED,
+    LOG_UI_RENDER_TABS_ARTIFACTS_MISSING,
     LOG_UI_RENDER_TABS_DELETE_REQUESTED,
     LOG_UI_RENDER_TABS_EVENT_FOR_DELETED_RUN,
     LOG_UI_RENDER_TABS_TAB_ADDED,
@@ -2012,16 +2304,39 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_UI_TRAIN_FORM_ERROR,
     LOG_UI_TRAIN_FORM_UI_PATH,
     LOG_UI_TRAIN_FORM_TELEMETRY_PATH,
+    LOG_UI_POLICY_FORM_TRACE,
+    LOG_UI_POLICY_FORM_INFO,
+    LOG_UI_POLICY_FORM_ERROR,
     LOG_UI_WORKER_TABS_TRACE,
     LOG_UI_WORKER_TABS_INFO,
     LOG_UI_WORKER_TABS_WARNING,
     LOG_UI_WORKER_TABS_ERROR,
+    LOG_UI_MULTI_AGENT_ENV_LOAD_REQUESTED,
+    LOG_UI_MULTI_AGENT_ENV_LOADED,
+    LOG_UI_MULTI_AGENT_ENV_LOAD_ERROR,
+    LOG_UI_MULTI_AGENT_POLICY_LOAD_REQUESTED,
+    LOG_UI_MULTI_AGENT_GAME_START_REQUESTED,
+    LOG_UI_MULTI_AGENT_RESET_REQUESTED,
+    LOG_UI_MULTI_AGENT_ACTION_SUBMITTED,
+    LOG_UI_MULTI_AGENT_TRAIN_REQUESTED,
+    LOG_UI_MULTI_AGENT_EVALUATE_REQUESTED,
+    LOG_UI_MULTI_AGENT_ENV_NOT_LOADED,
     LOG_UI_PRESENTER_SIGNAL_CONNECTION_WARNING,
     LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING,
     LOG_UI_TENSORBOARD_KILL_WARNING,
     LOG_ADAPTER_RENDERING_WARNING,
     LOG_TRAINER_LAUNCHER_LOG_FLUSH_WARNING,
     LOG_WORKER_CONFIG_READ_WARNING,
+    LOG_FASTLANE_CONNECTED,
+    LOG_FASTLANE_UNAVAILABLE,
+    LOG_FASTLANE_QUEUE_DEPTH,
+    LOG_FASTLANE_READER_LAG,
+    LOG_RUNBUS_UI_QUEUE_DEPTH,
+    LOG_FASTLANE_HEADER_INVALID,
+    LOG_FASTLANE_FRAME_READ_ERROR,
+    LOG_RUNBUS_DB_QUEUE_DEPTH,
+    LOG_UI_FASTLANE_EVAL_SUMMARY_UPDATE,
+    LOG_UI_FASTLANE_EVAL_SUMMARY_WARNING,
     LOG_UTIL_QT_RESEED_SKIPPED,
     LOG_UTIL_QT_STATE_CAPTURE_FAILED,
     LOG_UTIL_SEED_CALLBACK_FAILED,
@@ -2120,12 +2435,18 @@ __all__ = (
     "LOG_SERVICE_DB_SINK_STOP_TIMEOUT",
     "LOG_SERVICE_DB_SINK_LOOP_EXITED",
     "LOG_SERVICE_DB_SINK_FATAL",
+    "LOG_SERVICE_DB_SINK_QUEUE_DEPTH",
+    "LOG_SERVICE_DB_SINK_QUEUE_PRESSURE",
+    "LOG_SERVICE_DB_SINK_FLUSH_STATS",
+    "LOG_SERVICE_DB_SINK_FLUSH_LATENCY",
     "LOG_SERVICE_SQLITE_DEBUG",
     "LOG_SERVICE_SQLITE_INFO",
     "LOG_SERVICE_SQLITE_WARNING",
     "LOG_SERVICE_SQLITE_WORKER_STARTED",
     "LOG_SERVICE_SQLITE_WORKER_STOPPED",
     "LOG_SERVICE_SQLITE_WRITE_ERROR",
+    "LOG_SERVICE_SQLITE_DISK_IO_ERROR",
+    "LOG_SERVICE_SQLITE_INIT_ERROR",
     "LOG_SERVICE_SQLITE_DESERIALIZATION_FAILED",
     "LOG_SERVICE_TELEMETRY_BRIDGE_STEP_QUEUED",
     "LOG_SERVICE_TELEMETRY_BRIDGE_EPISODE_QUEUED",
@@ -2137,13 +2458,9 @@ __all__ = (
     "LOG_SERVICE_TELEMETRY_HUB_SUBSCRIBED",
     "LOG_SERVICE_TELEMETRY_HUB_TRACE",
     "LOG_SERVICE_TELEMETRY_HUB_ERROR",
-    "LOG_SERVICE_SUPERVISOR_EVENT",
-    "LOG_SERVICE_SUPERVISOR_WARNING",
-    "LOG_SERVICE_SUPERVISOR_ERROR",
-    "LOG_SERVICE_SUPERVISOR_CONTROL_APPLIED",
-    "LOG_SERVICE_SUPERVISOR_CONTROL_REJECTED",
-    "LOG_SERVICE_SUPERVISOR_ROLLBACK",
-    "LOG_SERVICE_SUPERVISOR_SAFETY_STATE",
+    "LOG_SERVICE_JASON_WORKER_EVENT",
+    "LOG_SERVICE_JASON_WORKER_WARNING",
+    "LOG_SERVICE_JASON_WORKER_ERROR",
     "LOG_RENDER_REGULATOR_NOT_STARTED",
     "LOG_RENDER_DROPPED_FRAME",
     "LOG_DAEMON_START",
@@ -2190,6 +2507,7 @@ __all__ = (
     "LOG_UI_RENDER_TABS_WANDB_ERROR",
     "LOG_UI_RENDER_TABS_WANDB_PROXY_APPLIED",
     "LOG_UI_RENDER_TABS_WANDB_PROXY_SKIPPED",
+    "LOG_UI_RENDER_TABS_ARTIFACTS_MISSING",
     "LOG_UI_RENDER_TABS_DELETE_REQUESTED",
     "LOG_UI_RENDER_TABS_EVENT_FOR_DELETED_RUN",
     "LOG_UI_RENDER_TABS_TAB_ADDED",
@@ -2202,16 +2520,39 @@ __all__ = (
     "LOG_UI_TRAIN_FORM_ERROR",
     "LOG_UI_TRAIN_FORM_UI_PATH",
     "LOG_UI_TRAIN_FORM_TELEMETRY_PATH",
+    "LOG_UI_POLICY_FORM_TRACE",
+    "LOG_UI_POLICY_FORM_INFO",
+    "LOG_UI_POLICY_FORM_ERROR",
     "LOG_UI_WORKER_TABS_TRACE",
     "LOG_UI_WORKER_TABS_INFO",
     "LOG_UI_WORKER_TABS_WARNING",
     "LOG_UI_WORKER_TABS_ERROR",
+    "LOG_UI_MULTI_AGENT_ENV_LOAD_REQUESTED",
+    "LOG_UI_MULTI_AGENT_ENV_LOADED",
+    "LOG_UI_MULTI_AGENT_ENV_LOAD_ERROR",
+    "LOG_UI_MULTI_AGENT_POLICY_LOAD_REQUESTED",
+    "LOG_UI_MULTI_AGENT_GAME_START_REQUESTED",
+    "LOG_UI_MULTI_AGENT_RESET_REQUESTED",
+    "LOG_UI_MULTI_AGENT_ACTION_SUBMITTED",
+    "LOG_UI_MULTI_AGENT_TRAIN_REQUESTED",
+    "LOG_UI_MULTI_AGENT_EVALUATE_REQUESTED",
+    "LOG_UI_MULTI_AGENT_ENV_NOT_LOADED",
     "LOG_UI_PRESENTER_SIGNAL_CONNECTION_WARNING",
     "LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING",
     "LOG_UI_TENSORBOARD_KILL_WARNING",
     "LOG_ADAPTER_RENDERING_WARNING",
     "LOG_TRAINER_LAUNCHER_LOG_FLUSH_WARNING",
     "LOG_WORKER_CONFIG_READ_WARNING",
+    "LOG_FASTLANE_CONNECTED",
+    "LOG_FASTLANE_UNAVAILABLE",
+    "LOG_FASTLANE_QUEUE_DEPTH",
+    "LOG_FASTLANE_READER_LAG",
+    "LOG_RUNBUS_UI_QUEUE_DEPTH",
+    "LOG_FASTLANE_HEADER_INVALID",
+    "LOG_FASTLANE_FRAME_READ_ERROR",
+    "LOG_RUNBUS_DB_QUEUE_DEPTH",
+    "LOG_UI_FASTLANE_EVAL_SUMMARY_UPDATE",
+    "LOG_UI_FASTLANE_EVAL_SUMMARY_WARNING",
     "LOG_UTIL_QT_RESEED_SKIPPED",
     "LOG_UTIL_QT_STATE_CAPTURE_FAILED",
     "LOG_UTIL_SEED_CALLBACK_FAILED",
@@ -2228,6 +2569,11 @@ __all__ = (
     "LOG_WORKER_POLICY_EVENT",
     "LOG_WORKER_POLICY_WARNING",
     "LOG_WORKER_POLICY_ERROR",
+    "LOG_WORKER_POLICY_EVAL_STARTED",
+    "LOG_WORKER_POLICY_EVAL_COMPLETED",
+    "LOG_WORKER_POLICY_EVAL_BATCH_STARTED",
+    "LOG_WORKER_POLICY_EVAL_BATCH_COMPLETED",
+    "LOG_WORKER_POLICY_LOAD_FAILED",
     "LOG_WORKER_BDI_EVENT",
     "LOG_WORKER_BDI_WARNING",
     "LOG_WORKER_BDI_ERROR",

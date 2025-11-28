@@ -1,0 +1,8 @@
+Metadata-Version: 2.4
+Name: mosaic-mujoco-mpc
+Version: 0.1.0
+Summary: MuJoCo MPC integration for MOSAIC BDI-RL framework
+License: Apache-2.0
+Requires-Python: >=3.10
+Provides-Extra: dev
+Requires-Dist: pytest>=7.0.0; extra == "dev"

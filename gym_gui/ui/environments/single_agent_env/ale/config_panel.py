@@ -45,7 +45,6 @@ def build_ale_controls(
     - repeat_action_probability (RAP)
     - difficulty and mode (flavour)
     - full_action_space
-    - seed (0 means environment default)
     """
 
     def emit_change(key: str, value: Any) -> None:
@@ -156,19 +155,6 @@ def build_ale_controls(
 
     layout.addRow("Difficulty", diff_spin)
     layout.addRow("Mode", mode_spin)
-
-    # -------- seed --------
-    seed_raw: Any = overrides.get("seed", getattr(defaults, "seed", None))
-    seed_value = int(seed_raw) if isinstance(seed_raw, (int, float)) and int(seed_raw) >= 0 else 0
-    overrides["seed"] = None if seed_value == 0 else seed_value
-    seed_spin = QtWidgets.QSpinBox(parent)
-    seed_spin.setRange(0, 2_147_483_647)
-    seed_spin.setSpecialValueText("Default")
-    seed_spin.setValue(seed_value)
-    seed_spin.valueChanged.connect(
-        lambda value: emit_change("seed", None if int(value) == 0 else int(value))
-    )
-    layout.addRow("Seed", seed_spin)
 
     # Guidance label
     guidance = QtWidgets.QLabel(

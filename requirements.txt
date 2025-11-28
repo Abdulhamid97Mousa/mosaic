@@ -7,11 +7,13 @@
 #   requirements/base.txt              - Core GUI + shared infrastructure
 #   requirements/spade_bdi_worker.txt  - SPADE-BDI worker dependencies
 #   requirements/cleanrl_worker.txt    - CleanRL worker dependencies
+#   requirements/vizdoom.txt           - Optional ViZDoom environment stack
 #
 # USAGE:
 #   GUI-only:       pip install -r requirements.txt
 #   With SPADE-BDI: pip install -r requirements/spade_bdi_worker.txt
 #   With CleanRL:   pip install -r requirements/cleanrl_worker.txt
+#   With ViZDoom:   pip install -r requirements/vizdoom.txt
 #
 # System Requirements:
 # sudo apt-get install -y swig
@@ -22,6 +24,7 @@
 #   libxcb-render-util0 libxcb-randr0 libxcb-shape0 \
 #   libxcb-xinerama0 libxcb-xkb1
 # sudo apt install sqlite3
+# ViZDoom (optional): sudo apt install libopenal-dev
 #
 # Protobuf Code Generation:
 # source ./.venv/bin/activate && python -m grpc_tools.protoc \
@@ -33,3 +36,22 @@
 
 # Include base dependencies (GUI + shared libraries)
 -r requirements/base.txt
+
+# CleanRL worker stack
+-r requirements/cleanrl_worker.txt
+
+# Jason worker stack (bridge + MAS tooling)
+-r requirements/jason_worker.txt
+
+
+# ViZDoom environment stack (Doom scenarios)
+# Uncomment to install ViZDoom by default:
+# -r requirements/vizdoom.txt
+
+
+# PettingZoo environment stack (multi-agent environments)
+-r requirements/pettingzoo.txt
+
+
+# SPADE-BDI worker stack
+-r requirements/spade_bdi_worker.txt

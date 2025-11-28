@@ -24,6 +24,8 @@ from gym_gui.logging_config.log_constants import (
     LOG_SERVICE_SQLITE_WORKER_STARTED,
     LOG_SERVICE_SQLITE_WORKER_STOPPED,
     LOG_SERVICE_SQLITE_WRITE_ERROR,
+    LOG_SERVICE_SQLITE_DISK_IO_ERROR,
+    LOG_SERVICE_SQLITE_INIT_ERROR,
 )
 
 _LOGGER = logging.getLogger("gym_gui.telemetry.sqlite_store")
@@ -54,14 +56,37 @@ class TelemetrySQLiteStore(LogConstantMixin):
         self._logger = _LOGGER
         self._deserialization_failures: set[str] = set()
 
-        self._conn = sqlite3.connect(
-            self._db_path,
-            detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
-            check_same_thread=False,
-        )
-        self._conn.execute("PRAGMA journal_mode=WAL")
-        self._conn.execute("PRAGMA synchronous=NORMAL")
-        self._conn.isolation_level = None  # Use explicit transactions
+        try:
+            self._conn = sqlite3.connect(
+                self._db_path,
+                detect_types=sqlite3.PARSE_DECLTYPES | sqlite3.PARSE_COLNAMES,
+                check_same_thread=False,
+            )
+            self._conn.execute("PRAGMA journal_mode=WAL")
+            self._conn.execute("PRAGMA synchronous=NORMAL")
+            self._conn.execute("PRAGMA temp_store=MEMORY")
+            # Negative cache_size value means kibibytes; -131072 ~= 512 MiB cache budget
+            self._conn.execute("PRAGMA cache_size=-131072")
+            self._conn.isolation_level = None  # Use explicit transactions
+        except sqlite3.OperationalError as e:
+            error_msg = str(e).lower()
+            if "disk i/o error" in error_msg or "database disk image is malformed" in error_msg:
+                log_constant(
+                    _LOGGER,
+                    LOG_SERVICE_SQLITE_DISK_IO_ERROR,
+                    extra={"db_path": str(self._db_path), "error": str(e)},
+                )
+                raise RuntimeError(
+                    f"LOG622A: SQLite disk I/O error - database may be corrupted. "
+                    f"Delete {self._db_path}* files and restart the application."
+                ) from e
+            log_constant(
+                _LOGGER,
+                LOG_SERVICE_SQLITE_INIT_ERROR,
+                extra={"db_path": str(self._db_path), "error": str(e)},
+                exc_info=e,
+            )
+            raise
 
         self._queue: "queue.Queue[tuple[str, Any]]" = queue.Queue()
         self._stop_event = threading.Event()
@@ -72,7 +97,21 @@ class TelemetrySQLiteStore(LogConstantMixin):
             daemon=True,
         )
 
-        self._initialize()
+        try:
+            self._initialize()
+        except sqlite3.OperationalError as e:
+            error_msg = str(e).lower()
+            if "disk i/o error" in error_msg or "database disk image is malformed" in error_msg:
+                log_constant(
+                    _LOGGER,
+                    LOG_SERVICE_SQLITE_DISK_IO_ERROR,
+                    extra={"db_path": str(self._db_path), "error": str(e)},
+                )
+                raise RuntimeError(
+                    f"LOG622A: SQLite disk I/O error - database may be corrupted. "
+                    f"Delete {self._db_path}* files and restart the application."
+                ) from e
+            raise
         self._worker.start()
         self.log_constant(LOG_SERVICE_SQLITE_WORKER_STARTED)
 
@@ -800,15 +839,26 @@ class TelemetrySQLiteStore(LogConstantMixin):
             )
 
     def close(self) -> None:
+        # Guard against close() being called on partially initialized objects
+        # (e.g., if __init__ raised an exception before _stop_event was set)
+        if not hasattr(self, "_stop_event"):
+            return
         if self._stop_event.is_set():
             return
         self._stop_event.set()
-        self._queue.put(("stop", None))
-        self._queue.join()
-        try:
-            self._worker.join(timeout=2.0)
-        finally:
-            self._conn.close()
+        if hasattr(self, "_queue"):
+            self._queue.put(("stop", None))
+            self._queue.join()
+        if hasattr(self, "_worker"):
+            try:
+                self._worker.join(timeout=2.0)
+            except Exception:
+                pass  # Best effort during cleanup
+        if hasattr(self, "_conn"):
+            try:
+                self._conn.close()
+            except Exception:
+                pass  # Best effort during cleanup
         self.log_constant(LOG_SERVICE_SQLITE_WORKER_STOPPED)
 
     def __enter__(self) -> "TelemetrySQLiteStore":

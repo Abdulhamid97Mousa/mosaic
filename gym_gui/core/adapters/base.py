@@ -369,6 +369,29 @@ class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT], LogConstantMixin):
         return 1
 
     # ------------------------------------------------------------------
+    # Mouse delta support (optional; overridden by adapters that need it)
+    # ------------------------------------------------------------------
+
+    def has_mouse_delta_support(self) -> bool:
+        """Return True if the adapter supports FPS-style mouse delta control.
+
+        Subclasses that provide mouse-look controls (e.g., ViZDoom) should
+        override this to return True.
+        """
+
+        return False
+
+    def apply_mouse_delta(self, delta_x: float, delta_y: float) -> None:
+        """Apply mouse movement deltas for FPS-style control.
+
+        Subclasses override to queue or immediately apply mouse motion. The
+        base implementation is a no-op to keep Pylance satisfied when a generic
+        EnvironmentAdapter is referenced.
+        """
+
+        del delta_x, delta_y
+
+    # ------------------------------------------------------------------
     # Optional utilities
     # ------------------------------------------------------------------
 

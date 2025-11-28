@@ -1,0 +1,77 @@
+# AirSim Worker Dependencies
+# Install with: pip install -r requirements/airsim_worker.txt
+#
+# This file contains dependencies for Project AirSim multi-agent
+# drone/rover simulation with Unreal Engine 5.
+
+# Include base requirements
+-r base.txt
+
+# ═══════════════════════════════════════════════════════════════
+# Project AirSim Python Client Dependencies
+# (from ProjectAirSim/client/python/projectairsim/pyproject.toml)
+# ═══════════════════════════════════════════════════════════════
+
+# NNG (nanomsg-next-gen) for server communication
+pynng>=0.5.0
+
+# Message serialization
+msgpack>=1.0.5
+
+# Image processing
+opencv-python>=4.2.0.32
+numpy
+
+# Visualization
+matplotlib
+
+# JSON configuration with comments
+commentjson>=0.9.0
+jsonschema>=4.4.0
+
+# Input handling (joystick, keyboard)
+inputs
+
+# Priority queue dictionary
+pqdict
+
+# Security/encryption
+cryptography
+
+# KML file support (flight paths)
+pykml
+
+# Testing output formats
+junit-xml
+jsonlines
+
+# Geometry operations
+Shapely
+
+# Point cloud processing
+open3d>=0.16.0
+
+# ═══════════════════════════════════════════════════════════════
+# Gymnasium for RL environments
+# ═══════════════════════════════════════════════════════════════
+gymnasium>=0.29.0
+
+# ═══════════════════════════════════════════════════════════════
+# Optional: Azure Storage (for cloud data)
+# Uncomment if using Azure blob storage:
+# ═══════════════════════════════════════════════════════════════
+# azure-storage-blob
+
+# ═══════════════════════════════════════════════════════════════
+# Optional: Autonomy Dependencies (for RL training and perception)
+# Uncomment if using ML features:
+# ═══════════════════════════════════════════════════════════════
+# torch>=1.8.0
+# torchvision>=0.9.0
+# scikit-image>=0.18.1
+# Pillow<=8.2.0
+# onnxruntime-gpu
+# pydantic
+# python-multipart
+# fastapi
+# uvicorn

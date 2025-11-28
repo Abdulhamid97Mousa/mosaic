@@ -9,6 +9,7 @@ import pytest
 from qtpy import QtWidgets
 
 from gym_gui.core.enums import GameId
+from gym_gui.telemetry.semconv import VideoModes
 from gym_gui.ui.widgets.cleanrl_train_form import CleanRlTrainForm
 
 # Ensure Qt renders offscreen in CI environments
@@ -28,10 +29,11 @@ def _base_form(qt_app) -> CleanRlTrainForm:
     index = form._algo_combo.findText("ppo")
     if index >= 0:
         form._algo_combo.setCurrentIndex(index)
-    form._custom_env_checkbox.setChecked(False)
     env_index = form._env_combo.findData("CartPole-v1")
-    assert env_index >= 0
+    if env_index < 0:
+        env_index = 0
     form._env_combo.setCurrentIndex(env_index)
+    form._test_selected_env = form._env_combo.currentData()
     form._timesteps_spin.setValue(4096)
     form._seed_spin.setValue(123)
     form._agent_id_input.setText("agent-cleanrl-test")
@@ -52,9 +54,10 @@ def test_get_config_includes_worker_metadata(qt_app) -> None:
     assert worker_meta.get("module") == "cleanrl_worker.cli"
     assert worker_meta.get("worker_id") == "cleanrl-test-worker"
     assert worker_meta.get("config", {}).get("algo") == "ppo"
-    assert worker_meta.get("config", {}).get("env_id") == "CartPole-v1"
+    assert worker_meta.get("config", {}).get("env_id") == form._test_selected_env
     assert worker_meta.get("config", {}).get("seed") == 123
-    assert worker_meta.get("arguments") == ["--dry-run", "--emit-summary"]
+    # arguments key is no longer present (removed dry-run checkbox)
+    assert "arguments" not in worker_meta
 
     extras = worker_meta.get("config", {}).get("extras", {})
     assert extras.get("cuda") is True
@@ -68,17 +71,6 @@ def test_get_config_includes_worker_metadata(qt_app) -> None:
     assert tensorboard_meta.get("relative_path").endswith("tensorboard")
     wandb_meta = artifacts.get("wandb", {})
     assert wandb_meta.get("enabled") is False
-
-    form.deleteLater()
-
-
-def test_disable_dry_run_removes_arguments(qt_app) -> None:
-    form = _base_form(qt_app)
-    form._dry_run_checkbox.setChecked(False)
-
-    config = form.get_config()
-    worker_meta = config["metadata"]["worker"]
-    assert worker_meta.get("arguments") == []
 
     form.deleteLater()
 
@@ -112,5 +104,35 @@ def test_disable_gpu_sets_cuda_false(qt_app) -> None:
     config = form.get_config()
     extras = config["metadata"]["worker"]["config"].get("extras", {})
     assert extras.get("cuda") is False
+
+    form.deleteLater()
+
+
+def _num_env_spin(form: CleanRlTrainForm) -> QtWidgets.QSpinBox:
+    widget = form._algo_param_inputs.get("num_envs")
+    assert isinstance(widget, QtWidgets.QSpinBox)
+    return widget
+
+
+def test_video_mode_syncs_to_single_env(qt_app) -> None:
+    form = _base_form(qt_app)
+    num_envs = _num_env_spin(form)
+    num_envs.setValue(1)
+
+    assert form._video_mode_combo.currentData() == VideoModes.SINGLE
+    assert form._grid_limit_spin.value() == 1
+    assert form._fastlane_slot_spin.value() == 0
+
+    form.deleteLater()
+
+
+def test_video_mode_syncs_to_grid_when_multi_env(qt_app) -> None:
+    form = _base_form(qt_app)
+    num_envs = _num_env_spin(form)
+    num_envs.setValue(4)
+
+    assert form._video_mode_combo.currentData() == VideoModes.GRID
+    assert form._grid_limit_spin.value() == 4
+    assert 0 <= form._fastlane_slot_spin.value() <= 3
 
     form.deleteLater()

@@ -1,4 +1,3 @@
-# /home/hamid/Desktop/Projects/GUI_BDI_RL/gym_gui/ui/widgets/live_telemetry_tab.py
 """Live telemetry tab widget for displaying streamed run data."""
 
 from __future__ import annotations

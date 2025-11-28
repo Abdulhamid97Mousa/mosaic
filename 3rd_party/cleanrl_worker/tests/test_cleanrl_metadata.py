@@ -8,7 +8,7 @@ REPO_ROOT = Path(__file__).resolve().parents[3]
 if str(REPO_ROOT) not in sys.path:
     sys.path.insert(0, str(REPO_ROOT))
 
-from cleanrl_worker.MOSAIC_CLEANRL_WORKER.runtime import DEFAULT_ALGO_REGISTRY
+from cleanrl_worker.runtime import DEFAULT_ALGO_REGISTRY
 
 SCHEMA_PATH = REPO_ROOT / "metadata" / "cleanrl" / "0.1.0" / "schemas.json"
 

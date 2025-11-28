@@ -1,4 +1,3 @@
-# /home/hamid/Desktop/Projects/GUI_BDI_RL/gym_gui/services/trainer/service.py
 from __future__ import annotations
 
 """gRPC service implementation for the trainer daemon."""

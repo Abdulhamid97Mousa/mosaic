@@ -41,7 +41,7 @@ gym_gui/var/config/*
 *_pb2.pyi
 *_pb2_grpc.py
 gym_gui/services/trainer/proto/trainer_pb2.pyi
-
+gym_gui.egg-info
 
 #
 .env
@@ -75,12 +75,14 @@ var/trainer.lock
 var/trainer/
 var/data/*
 
-JASON_GRPC_BIDI_PYTHON/.jdks
-JASON_GRPC_BIDI_PYTHON/JASON_java_project/.gradle
-JASON_GRPC_BIDI_PYTHON/JASON_java_project/examples
-JASON_GRPC_BIDI_PYTHON/JASON_java_project/demos
-JASON_GRPC_BIDI_PYTHON/JASON_java_project/doc
-JASON_GRPC_BIDI_PYTHON/JASON_java_project/jason-interpreter/build/tmp
+
+3rd_party/jason_worker/.gradle
+3rd/JASON_java_project/examples
+3rd/JASON_java_project/demos
+3rd/JASON_java_project/doc
+3rd/JASON_java_project/jason-interpreter/build/tmp
+3rd_party/pettingzoo_worker/PettingZoo
+3rd_party/vizdoom_worker/ViZDoom
 
 # JASON_GRPC_BIDI_PYTHON
 .cursorignore
@@ -89,3 +91,26 @@ JASON_GRPC_BIDI_PYTHON/JASON_java_project/jason-interpreter/build/tmp
 .cursor/rules/codacy.mdc
 
 .fake
+# gui_jason_grpc_cleanrl artifacts
+3rd_party/gui_jason_grpc_cleanrl/.venv/
+3rd_party/gui_jason_grpc_cleanrl/var/
+3rd_party/gui_jason_grpc_cleanrl/.pytest_cache/
+
+3rd_party/gui_jason_grpc_cleanrl/jason_worker/.gradle
+3rd_party/gui_jason_grpc_cleanrl/jason_worker/.jar
+3rd_party/gui_jason_grpc_cleanrl/jason_worker/build/
+3rd_party/gui_jason_grpc_cleanrl/jason_worker/dist/
+3rd_party/gui_jason_grpc_cleanrl/jason_worker/gradlew
+
+3rd_party/cleanrl_worker/mosaic_cleanrl.egg-info
+3rd_party/cleanrl_worker/cleanrl_worker.egg-info
+3rd_party/mujoco_mpc_worker/mosaic_mujoco_mpc.egg-info
+
+*.class
+*.jar
+build/
+dist/
+target/
+*.gradle
+.gradle/
+

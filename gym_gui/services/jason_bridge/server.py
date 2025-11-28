@@ -22,14 +22,12 @@ from concurrent import futures
 from typing import Optional, Any
 
 import grpc
-from google.protobuf import timestamp_pb2
 
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
-    LOG_SERVICE_SUPERVISOR_EVENT,
-    LOG_SERVICE_SUPERVISOR_ERROR,
-    LOG_SERVICE_SUPERVISOR_CONTROL_APPLIED,
-    LOG_SERVICE_SUPERVISOR_CONTROL_REJECTED,
+    LOG_SERVICE_JASON_WORKER_EVENT,
+    LOG_SERVICE_JASON_WORKER_ERROR,
+    LOG_SERVICE_JASON_WORKER_WARNING,
 )
 from gym_gui.services.jason_supervisor import JasonSupervisorService
 from gym_gui.services.service_locator import get_service_locator
@@ -117,7 +115,7 @@ class JasonBridgeServicer(bridge_pb2_grpc.JasonBridgeServicer, LogConstantMixin)
         self._percepts_buffer.append(request)
         # Future: convert into telemetry event
         self.log_constant(
-            LOG_SERVICE_SUPERVISOR_EVENT,
+            LOG_SERVICE_JASON_WORKER_EVENT,
             message="percept_received",
             extra={"name": request.name},
         )
@@ -133,7 +131,7 @@ class JasonBridgeServicer(bridge_pb2_grpc.JasonBridgeServicer, LogConstantMixin)
             params = json.loads(request.params_json or "{}")
         except json.JSONDecodeError:
             self.log_constant(
-                LOG_SERVICE_SUPERVISOR_CONTROL_REJECTED,
+                LOG_SERVICE_JASON_WORKER_ERROR,
                 message="invalid_params_json",
             )
             return supervisor_pb2.SupervisorControlAck(  # type: ignore[attr-defined]
@@ -152,12 +150,12 @@ class JasonBridgeServicer(bridge_pb2_grpc.JasonBridgeServicer, LogConstantMixin)
         )
         if accepted:
             self.log_constant(
-                LOG_SERVICE_SUPERVISOR_CONTROL_APPLIED,
+                LOG_SERVICE_JASON_WORKER_EVENT,
                 extra={"reason": request.reason, "source": request.source},
             )
         else:
             self.log_constant(
-                LOG_SERVICE_SUPERVISOR_CONTROL_REJECTED,
+                LOG_SERVICE_JASON_WORKER_WARNING,
                 extra={"reason": request.reason, "source": request.source},
             )
         return supervisor_pb2.SupervisorControlAck(  # type: ignore[attr-defined]
@@ -204,14 +202,14 @@ class JasonBridgeServer(LogConstantMixin):
             self._server = server
             self._bound_target = bind_addr
             self.log_constant(
-                LOG_SERVICE_SUPERVISOR_EVENT,
+                LOG_SERVICE_JASON_WORKER_EVENT,
                 message="jason_bridge_started",
                 extra={"bind": bind_addr},
             )
             return
         except RuntimeError as exc:
             self.log_constant(
-                LOG_SERVICE_SUPERVISOR_ERROR,
+                LOG_SERVICE_JASON_WORKER_ERROR,
                 message="jason_bridge_binding_failed",
                 extra={"target": bind_addr, "error": str(exc)},
             )
@@ -230,7 +228,7 @@ class JasonBridgeServer(LogConstantMixin):
             self._inprocess_target = None
         if self._bound_target is not None:
             self.log_constant(
-                LOG_SERVICE_SUPERVISOR_EVENT,
+                LOG_SERVICE_JASON_WORKER_EVENT,
                 message="jason_bridge_stopped",
             )
             self._bound_target = None

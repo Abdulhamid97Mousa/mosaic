@@ -1,424 +1,198 @@
-Hybrid Telemetry Bridge (low-latency + durable)
-Goal
+# Hybrid Telemetry Bridge (Low Latency + Durable)
 
-Keep SQLite + gRPC exactly as they are for durability and replay, but introduce a zero-copy, shared-memory fast lane for hot UI signals (frames, step counters, a few scalars). The GUI reads this fast lane directly; the daemon keeps persisting and broadcasting as today.
+## TL;DR
 
-Architecture at a glance
+- Keep the gRPC -> RunBus -> SQLite path for durability and replay.
+- Introduce a shared-memory fast lane so the GUI samples frames and HUD scalars directly at display cadence.
+- Use Qt Quick's scene graph (QQuickWindow/QQuickView) for high-FPS rendering instead of embedding other engines.
+- For the fully implemented walkthrough (with module references, failure modes, and instrumentation ideas), see `docs/1.0_DAY_28/TASK_1/README.md`.
 
-Producer (your worker proxy or worker): writes frames + tiny HUD metrics into a shared-memory ring buffer (SPSC: single producer, single consumer).
+## Goal
 
-Consumer (GUI): pulls from ring at the screen refresh cadence; when ring is empty, falls back to the existing gRPC stream.
+Maintain the current durable telemetry pipeline while delivering coach-like responsiveness by letting the GUI read the freshest visual data from a zero-copy buffer shared with the trainer or worker processes.
 
-Durability: unchanged—daemon still ingests via gRPC and batches into SQLite/WAL in the background.
+## Architecture Overview
 
-Why this works: Intel Coach feels instantaneous because its dashboard tails files and the renderer runs in-process—no cross-process marshaling. We replicate the in-process feel with a shared-memory ring, while keeping your gRPC/SQLite pipeline for correctness and replay. Coach’s own dashboard is a Bokeh server that tails CSVs in the experiment directory to update charts live; it’s fast precisely because it reads locally appended data. 
-Intel Labs
+### Producer Path
 
-Ring buffer design (cross-platform, lock-free)
+- The worker proxy (or worker itself) writes the latest frame and lightweight HUD metrics into a single-producer, single-consumer shared-memory ring buffer.
+- Each publication increments an atomic head counter and notifies the GUI via a lightweight local socket message.
 
-Memory layout (packed, cache-aligned):
+### Consumer Path
 
+- The GUI attaches to the shared-memory segment, reads the newest stable slot, and paints it at the screen's refresh cadence.
+- If the ring is empty, the GUI falls back to the existing gRPC stream so no telemetry is lost.
+
+### Durability Path
+
+- The daemon keeps ingesting telemetry via gRPC and batches writes into SQLite with WAL enabled.
+- Replay tooling, analytics, and long-term persistence remain unchanged.
+
+### Why This Works
+
+- Intel Coach achieves sub-frame latency by tailing files inside the same process; the shared-memory ring recreates that locality without collapsing multi-process boundaries.
+- Unity ML-Agents uses shared memory for hot observations and NVIDIA Isaac Sim renders straight from GPU-resident tensors. Adopting the same fast lane keeps the GUI responsive while preserving durability.
+
+### Terminology & Current Bottleneck
+
+- **HUD metrics**: shorthand for “Heads-Up Display” values (episode reward, current step, FPS, etc.). In today’s GUI they’re derived from telemetry rows pulled out of SQLite; in the fast lane we keep them in the shared-memory header so the HUD updates without touching the database.
+- **Ring creation point**: `trainer_telemetry_proxy.py` allocates the `SharedMemory` region when a run starts (one segment per run, named `mosaic.run.<run_id>.fastlane`). The proxy writes the header + slots; the GUI attaches when the run transitions to READY and detaches during teardown.
+- **QML**: Qt’s declarative UI language (Qt Modeling Language). Qt Quick scenes are described in QML files (e.g., `FastLaneView.qml`) and rendered by the scene graph on a dedicated thread. Our new renderer lives here, using a `QQuickFramebufferObject` or custom `QQuickItem` implemented in Python/C++ but embedded in QML.
+- **Existing bottleneck**: frames currently travel worker → protobuf → gRPC → TelemetryAsyncHub → QWidget painter. Each hop copies data, and the GUI waits for `_record_step()` to enqueue telemetry before it can paint. When SQLite falls behind (common with 60 FPS Atari), the UI thread blocks, so rendering stutters. The fast lane removes protobuf/SQLite from the hot path and lets Qt Quick paint directly from shared memory, leaving the durable path to catch up asynchronously.
+
+## Ring Buffer Design
+
+### Memory Layout
+
+```cpp
 struct Header {
-  uint32  version;
-  uint32  flags;             // bit 0: running, bit 1: paused …
-  uint64  capacity;          // number of slots
-  alignas(64) std::atomic<uint64_t> head; // producer writes
-  alignas(64) std::atomic<uint64_t> tail; // consumer reads
-  // hot scalars for HUD (rolling reward, fps, step/sec, etc.)
-  double  last_reward;
-  double  avg_reward_1s;
-  double  step_rate_hz;
+    uint32_t version;
+    uint32_t flags;          // bit 0: running, bit 1: paused, etc.
+    uint64_t capacity;       // number of slots
+    alignas(64) std::atomic<uint64_t> head;
+    alignas(64) std::atomic<uint64_t> tail;
+    double   last_reward;
+    double   avg_reward_1s;
+    double   step_rate_hz;
 };
 
 struct Slot {
-  uint64  seq;               // seqlock generation to prevent torn reads
-  uint32  w; uint32 h;       // frame dims
-  uint32  fmt;               // e.g., RGB8
-  uint32  bytes;             // payload length
-  uint8   payload[bytes];    // tight-packed frame
+    uint64_t seq;            // seqlock generation to prevent torn reads
+    uint32_t width;
+    uint32_t height;
+    uint32_t format;         // e.g., RGB8
+    uint32_t bytes;          // payload length
+    uint8_t  payload[bytes];
 };
+```
 
+### Flow Control
 
-SPSC flow: producer writes seq+1, copies payload, then writes seq+2 (even = stable). Consumer spins until seq is even and unchanged pre/post copy.
+- The producer writes `seq + 1`, copies the payload, then publishes `seq + 2`; even values indicate stable data.
+- The consumer waits for an even sequence value that is unchanged before and after copying, ensuring lock-free reads.
+- Dropping intermediate slots keeps the GUI real-time, while SQLite still guarantees durability.
 
-Per-run SHM name: mosaic.run.<run_id>.fastlane.
+### Naming and Lifecycle
 
-Cleanup: producer unlinks on process exit; GUI unlinks stale segments on run termination.
+- Shared-memory segment per run: `mosaic.run.<run_id>.fastlane`.
+- The producer creates the segment and unlinks it on exit; the GUI cleans up stale segments during run teardown.
 
-APIs you already have:
+### Accessible APIs
 
-In Python workers/proxies: multiprocessing.shared_memory.SharedMemory gives you a named, POSIX-backed segment on Linux/macOS and a file mapping on Windows (one API, cross-platform). 
-Python documentation
+- Python workers can rely on `multiprocessing.shared_memory.SharedMemory` for a cross-platform implementation today.
+- The GUI can stay on the Python shared-memory API for speed; Qt's `QSharedMemory`/`QSystemSemaphore` become useful if the reader moves to C++.
 
-In the Qt/GUI side (if you prefer Qt types): QSharedMemory + QSystemSemaphore exist, but since your GUI is Python+Qt6, sticking to Python’s shared_memory is simplest and fastest. Qt’s class is there if/when you move this to C++. 
-Qt Documentation
+### Payload Scope
 
-What goes through the ring (only the hot path):
+- Required: the freshest RGB frame (or tiled textures if cheaper).
+- Scalars: episode index, step, reward, steps per second, optional loss.
+- Optional: 8-bit overlays (heatmaps, visitation maps) for low-bandwidth value visualisations.
+- Everything else (protobuf telemetry, history, checkpoints) continues over gRPC into SQLite.
 
-Latest RGB frame (or tiled small textures if that’s cheaper).
+## SQLite Tuning
 
-A handful of scalars: episode index, step, reward, step/sec, loss* (if cheap).
+- Keep WAL mode and batch transactions to reduce writer/reader contention.
+- Set `PRAGMA synchronous=NORMAL` on the telemetry database to trim fsync overhead while remaining safe for this workload.
+- Trigger WAL checkpoints opportunistically to avoid long stalls.
 
-Optional: compressed 8-bit heatmaps or value overlays instead of full frames when bandwidth is tight.
+## Qt Rendering Strategy
 
-Everything else (per-step protobufs, long histograms, episodes, checkpoints) stays on gRPC → SQLite.
+### Preferred Path
 
-SQLite: keep it, tune it
+- Render inside `QQuickWindow`/`QQuickView` so Qt's scene-graph thread (backed by the RHI) can drive high frame rates.
+- Avoid `QQuickWidget` for visualisation tabs; it forces rendering onto the GUI thread and introduces extra copies.
 
-Ensure WAL mode and batched transactions (you already use WAL). WAL reduces writer/reader contention and is ideal for concurrent read-most workloads. Use WAL checkpoints sensibly to avoid stalls. 
-SQLite
+### Implementation Options
 
-For write latency, set PRAGMA synchronous=NORMAL (not FULL) on the telemetry DB; it meaningfully lowers fsync overhead while still being safe enough for this use-case. (See SQLite synchronous pragma docs for semantics.) 
-SQLite
+- **QQuickFramebufferObject**: implement a renderer that uploads each frame to a texture inside `render()`. Qt composites the offscreen FBO automatically and makes overlaying HUD elements trivial.
+- **Scene-Graph Texture Node**: subclass `QQuickItem`, hold a persistent `QSGSimpleTextureNode`, and refresh a `QSGTexture` whenever a new frame arrives. The pattern is ready for a future C++ rewrite using QRhi.
 
-High-FPS Qt Rendering (ditch PyGame/Pyglet windows)
+### Why It Fits
 
-Your UI is Qt; use Qt’s native GPU pipeline for frames. Qt Quick’s Scene Graph renders via the Qt Rendering Hardware Interface (RHI) across Vulkan/Metal/D3D/OpenGL, with a dedicated render thread. This is the right tool for smooth, high-rate visuals inside a Qt app.
+- Qt Quick lets the team layer text, charts, and badges in QML without extra windowing stacks.
+- The approach mirrors NVIDIA Isaac Sim, where GPU textures never leave the render process.
 
-What to use (and avoid)
+## Frame Scheduling and Threading
 
-Prefer: QQuickWindow/QQuickView (QML/Qt Quick). This is the fast path that sits directly on the scene graph/render thread.
+- A lightweight consumer thread maps the newest ring slot, wraps it in a `QImage` that references external memory, and signals the QML item.
+- Call `QQuickWindow::update()` so Qt schedules rendering at vsync on its dedicated thread.
+- For fixed-rate rendering, drive a precise timer on the Qt side and sample the freshest slot available.
 
-Avoid: QQuickWidget embedded in a QWidget hierarchy for high-FPS rendering—Qt explicitly calls out performance drawbacks; use QQuickWindow instead when you need throughput.
+## Implementation Phases
 
-Two proven ways to feed frames to Qt Quick
-1) QQuickFramebufferObject (FBO path)
+- **Phase A — Fast Lane (Unity Style)**: add the shared-memory writer to `trainer_telemetry_proxy.py`, allocate `Header + N * Slot` (N ≈ 64–256), publish frames and scalars, and wire a GUI reader that always consumes the latest stable slot.
+- **Phase B — Qt Quick Rendering (Isaac Friendly)**: introduce a dedicated QML scene (FBO or texture-node), overlay HUD information, and expose UI controls such as FPS caps and a "prefer shared memory" toggle.
+- **Phase C — Persistence Hardening (Coach Style)**: continue tuning WAL settings and optionally integrate control-stream credits so the GUI can request slower producers when sustained drops appear.
 
-Create a QQuickFramebufferObject (or its Python binding) and upload each frame to a texture in Renderer::render(). Qt handles the offscreen FBO and composes it into the scene graph on the render thread. This pattern is the canonical hook for custom real-time content in Qt Quick.
+## Validation and Metrics
 
-Why it’s good here
+- Target end-to-end latency (worker step to pixels) below 16 ms on mainstream hardware.
+- Track GUI frame time, dropped frames, and UI-thread jank.
+- Observe SQLite batch duration and WAL checkpoint pauses.
+- Compare gRPC step rate with GUI frame rate to confirm the GUI intentionally displays the newest data, not every step.
 
-Runs on the render thread (no GUI stutters).
+## Impacted and Likely Impacted Files
 
-Easy to layer HUD/overlays in QML on top (text, charts, badges).
+| Area | Files |
+| --- | --- |
+| Fast lane buffer and lifecycle | `trainer_telemetry_proxy.py`, `gym_gui/services/trainer/streams.py`, new `gym_gui/fastlane/__init__.py` (ring structs, shared-memory helpers) |
+| GUI integration | `gym_gui/ui/main_window.py`, new QML assets such as `resources/qml/FastLaneView.qml`, helpers in `gym_gui/ui/renderers` |
+| Telemetry persistence | `gym_gui/telemetry/db_sink.py`, `gym_gui/services/bootstrap.py`, `gym_gui/constants/constants_telemetry.py` (PRAGMA defaults) |
+| Configuration and toggles | `gym_gui/config/settings.py`, `gym_gui/config/storage_profiles.yaml`, control-panel UI wiring |
+| Backpressure and metrics | `gym_gui/logging_config/log_constants.py`, `TelemetryAsyncHub` statistics, new structured log events |
+| Likely touched later | `gym_gui/services/frame_storage.py`, `gym_gui/controllers/session.py`, packaging scripts (include new QML/resources) |
 
-Works across RHI backends transparently in Qt 6.
+## Architecture Snapshot
 
-2) Scene-graph texture node (zero-copy friendly)
+```mermaid
+flowchart LR
+    subgraph WorkerTrainerSide["Worker/Trainer Side"]
+        envAdapter[Env Adapter]
+        proxy[trainer_telemetry_proxy.py]
+        fastlaneWriter["FastLaneWriter (SharedMemory)"]
+        grpcStream[gRPC Telemetry Stream]
+    end
 
-Implement a QQuickItem that produces a QSGSimpleTextureNode fed by a QSGTexture you update each frame. If you later move to C++ for even lower overhead, you can use RHI directly (QRhi texture uploads, PBOs) and hook into QQuickWindow::beforeRendering to update the texture just-in-time.
+    subgraph GuiSide["GUI Side"]
+        fastlaneConsumer[FastLaneConsumer]
+        qtRenderer[Qt Quick Renderer]
+        asyncHub[TelemetryAsyncHub]
+        telemetryService[TelemetryService]
+        sqliteSink[TelemetryDBSink / SQLite]
+    end
 
-(Note: Qt 6’s RHI abstracts the underlying API; when/if you go native, you’ll see classes like QRhiGraphicsPipeline, QRhiShaderStage, etc., but you do not need to drop to these unless you’re writing custom GPU code.) 
-Qt Documentation
+    envAdapter --> proxy --> fastlaneWriter
+    proxy --> grpcStream --> asyncHub --> telemetryService --> sqliteSink
+    fastlaneWriter -- "latest frame & scalars" --> fastlaneConsumer --> qtRenderer
 
-Frame scheduling & threading
+    style fastlaneWriter fill:#e0f7ff,stroke:#00a
+    style qtRenderer fill:#ffe6cc,stroke:#f90
+    style sqliteSink fill:#fdd,stroke:#c44
+```
 
-Use a producer thread (or your SHM consumer thread) to map the latest ring slot into a CPU buffer and signal the QML item.
+The blue node highlights the shared-memory fast lane, orange covers the Qt Quick renderer, and red shows the durable telemetry pipeline.
 
-In QML/Qt Quick, call QQuickWindow::update(); Qt will render on its own render thread at vsync, pulling the latest texture.
+## References
 
-If you need fixed-rate rendering (e.g., 60/120 Hz independent of UI), drive a precise timer on the Qt render side and simply sample the most recent ring slot.
+| Topic | Key Docs |
+| --- | --- |
+| Unity ML-Agents shared memory | Unity ML-Agents Trainer <-> Game bridge documentation |
+| NVIDIA Isaac Sim GPU transport | NVIDIA Isaac documentation on Omniverse sensor streaming |
+| Intel Coach dashboard | Intel Coach dashboard notes (Intel Labs) |
+| Qt Quick scene graph and RHI | Qt 6 scene graph documentation |
+| `QQuickFramebufferObject` patterns | Qt reference manual and project notes (`QuickFramebufferObject.md`) |
+| Qt shared-memory primitives | Qt docs on `QSharedMemory` and `QSystemSemaphore` |
+| Python shared memory | Python `multiprocessing.shared_memory` docs |
+| SQLite WAL and PRAGMAs | Official SQLite documentation |
 
-Putting it together (step-by-step)
-Phase A — Fast lane
+## FAQ
 
-Add fastlane writer in trainer_telemetry_proxy.py:
+### Can Unity or Godot live inside `gym_gui`?
 
-Create a named SharedMemory per run.
+Not realistically. Both engines own their render loops and windowing systems. Embedding them inside Qt introduces event-loop conflicts, duplicated GPU contexts, and additional copies. The better approach is to keep Unity or Godot as external environment providers and feed their frames into the shared-memory bridge while Qt Quick handles the MOSAIC GUI.
 
-Allocate Header + N*Slot (N = 64–256).
+## Next Actions
 
-On each new frame/step: write scalar HUD metrics into Header; copy the frame into the next Slot (seqlock), bump head.
-
-Add fastlane reader in the GUI:
-
-Open SharedMemory by name when a run becomes READY.
-
-Start a lightweight consumer thread that polls head != tail, reads the latest stable slot, then sets tail = head (drop intermediate slots to stay real-time).
-
-Backpressure integration (optional now, nicer later):
-
-If GUI falls behind, show a counter; no need to pause training immediately.
-
-Later, wire credits through your planned ControlStream: when dropped-frame ratio > threshold, send pause or lower a max_rate_hz. (Your proto already sketches this path.)
-
-Phase B — Qt Quick rendering
-
-New QML scene with one of:
-
-QQuickFramebufferObject item that displays the latest frame texture.
-
-Or a QQuickItem producing a QSGSimpleTextureNode fed from the shared buffer.
-
-Overlays & HUD:
-
-Render episode/step/reward with QML Text over the texture.
-
-If you publish tiny 8-bit overlays (value/visitation maps) alongside the frame in the ring, draw them as separate semi-transparent textures.
-
-UI knobs:
-
-“Live FPS cap” (e.g., 30/60/120).
-
-“Drop frames to stay real-time” (on by default).
-
-“Prefer SHM fast lane / fall back to gRPC”.
-
-Phase C — Keep persistence perfect
-
-No change to your daemon’s PublishRun* handlers and SQLite sink.
-
-Tune SQLite (if not already): WAL + synchronous=NORMAL + batch size (64/128) to reduce commit pressure. 
-SQLite
-+1
-
-Why not PyGame/Pyglet/Godot here?
-
-You’re already in Qt; embedding another window stack adds copies and focus/input headaches. Qt Quick’s scene graph runs on the GPU with its own render thread and is the first-class high-performance path inside Qt. Godot is great for games but heavyweight to embed; PyGame/Pyglet create separate GL contexts and fight the event loop. Qt itself recommends QQuickWindow/QQuickView over QQuickWidget for performance-sensitive views.
-
-Validation & metrics
-
-Target latency: time from worker step → pixels on screen.
-
-SHM copy (CPU): 0.1–1.0 ms for ~84 KiB RGB (160×160) frames; ~2–5 ms for 84×84×3 with Python copies (opt: NumPy memoryview).
-
-Texture upload: a few ms depending on GPU/driver; keep textures persistent and reuse them to avoid allocations.
-
-End-to-end target: <16 ms (60 FPS) on mainstream hardware; faster if you skip full frames and render overlays.
-
-Measure:
-
-GUI: smoothed frame_time_ms, dropped frames, UI thread jank.
-
-Daemon: SQLite batch commit time, WAL checkpoint pauses.
-
-Transport: gRPC step rate vs. GUI frame rate (they can differ; GUI intentionally displays the latest, not every, step).
-
-What to build first (minimal viable)
-
-SHM ring (64 slots) + QQuickFramebufferObject viewer showing frames at 60 FPS.
-
-HUD scalars in header; overlay with QML Text.
-
-Drop-frames policy: always show the freshest slot; never block producer.
-
-Keep SQLite untouched; just measure.
-
-Optional: a toggle to bypass the JSONL→protobuf hop for local CleanRL runs (direct protobuf producer lowers one conversion).
-
-This gets you Coach-like “live feel”, inside your Qt app, while your current multi-process, replayable architecture keeps doing its job.
-
-References
-
-Coach dashboard tails experiment CSVs to update charts: Intel Coach “Dashboard” docs. 
-Intel Labs
-
-Qt Quick / Scene Graph (the high-performance rendering path in Qt 6; RHI under the hood).
-
-Avoid QQuickWidget for high FPS; prefer QQuickWindow/QQuickView.
-
-QQuickFramebufferObject for custom real-time content.
-
-Qt shared-memory primitives (QSharedMemory, QSystemSemaphore) if you later move the reader to C++. 
-Qt Documentation
-
-Python shared memory for the producer/GUI fast lane (cross-platform). 
-Python documentation
-
-SQLite WAL characteristics and write behavior; use WAL + batched transactions; consider synchronous=NORMAL. 
-SQLite
-+1
-
-If you want, I can draft the SHM header/slot struct and a tiny PyQt6 QQuickFramebufferObject sample to drop into your repo next.
-
-
-
-
-OTHER opinions
-
-
-Absolutely—here’s a concrete, engineering-level plan to get Coach-like responsiveness without giving up MOSAIC’s distributed & durable telemetry.
-
-Hybrid Telemetry Bridge (fast path + durable path)
-1) Architecture at a glance
-
-Keep your current gRPC → RunBus → SQLite pipeline for durability, replay, and multi-process workers.
-
-Add a shared-memory ring buffer for hot visuals (frames + a tiny struct of “now” metrics). Notify the GUI with a local, event-driven channel. The GUI paints directly from shared memory using Qt Quick’s scene graph.
-
-Worker/Proxy
-  └─ writes latest RGBA/NV12 frame + metrics → shm ring (overwrite oldest)
-  └─ signals "new head" via QLocalSocket/UDS
-  └─ still sends step/episode summaries via gRPC (durable)
-
-Trainer/GUI
-  └─ listens on QLocalSocket -> reads ring head
-  └─ wraps the shm pointer w/ QImage (no extra copy)
-  └─ uploads to a persistent GPU texture (Qt Quick scene graph) and repaints
-  └─ SQLite persists the slow path as today
-
-
-Why this works:
-
-Shared memory removes JSON/Protobuf (de)serialization and DB latency from visual updates.
-
-You still get replay & crash-safety from SQLite + gRPC.
-
-Overwrite semantics (ring) avoid backpressure stalls; visuals don’t need every frame.
-
-2) IPC & memory layout (portable and simple)
-
-Transport
-
-Control/notify: QLocalSocket (Qt’s local IPC socket) for “frame N is ready” events; integrates with Qt’s event loop out of the box.
-
-Data: QSharedMemory (or POSIX shm_open from the proxy, but the GUI side still attaches via Qt). It’s exactly for “fast data sharing between processes.”
-
-Ring buffer header (in shared memory, 64-byte aligned)
-
-struct ShmHeader {
-  uint32 magic;          // 'MOSA'
-  uint32 version;        // 1
-  uint32 capacity;       // number of frame slots
-  uint32 w, h;           // image size
-  uint32 fourcc;         // e.g., BGRA / NV12
-  uint32 stride;         // bytes per row for plane 0
-  uint64 head;           // monotonically increasing frame counter
-  uint64 tail;           // last frame the GUI has sampled (optional)
-  // room for metrics: reward, eps, fps, step_idx...
-  double last_reward;
-  double rolling_return;
-  double fps_estimate;
-};
-
-
-Frames
-
-Slot size = plane sizes rounded up to 64-byte boundaries.
-
-Formats:
-
-BGRA8 (fastest for Qt upload; one plane).
-
-Optional NV12 (half bandwidth; do simple shader in the Qt item to convert to RGB).
-
-Write path (proxy/worker)
-
-Next slot = head % capacity.
-
-Write pixels into slot; update header fields.
-
-head++; send tiny notify message on the local socket (e.g., 8-byte seq).
-
-Read path (GUI)
-
-On readyRead(), pull the latest head.
-
-Compute slot; wrap the address as a QImage that references external memory (no copy).
-
-Upload once into a persistent GPU texture and update() the Qt Quick item.
-
-3) Qt-native rendering (no Pyglet/Pygame/Godot)
-
-Pick one of these Qt Quick approaches; both use the scene graph and are built for high-FPS UIs:
-
-Option A — QQuickFramebufferObject (FBO-based)
-
-Implement a QQuickFramebufferObject::Renderer that, on each render(), updates a texture from the shm-backed QImage and draws a textured quad. Designed for custom rendering inside Qt Quick.
-
-Option B — QQuickItem::updatePaintNode + QSGTexture
-
-Subclass QQuickItem; in updatePaintNode(), keep a QSGSimpleTextureNode with a reused QSGTexture. When a new frame arrives, refresh the texture’s content and return the node. This is the canonical path for pushing dynamic images into the Qt Quick scene graph.
-
-Performance guidance
-
-Qt Quick’s scene graph runs a render thread; avoid copying on the GUI thread; only signal “new frame”.
-
-Follow the Scene Graph performance tips: avoid per-frame allocs, reuse textures/nodes, keep paint nodes stable.
-
-Advanced (later)
-
-If you need deeper control over the backend (Vulkan/Metal/GL/D3D), Qt 6’s QRhi API underpins textures/buffers; you can create/update a QRhiTexture and wrap it as a scene-graph texture. This is the modern low-level path in Qt 6+. 
-Qt Documentation
-
-4) Zero-copy(ish) from shm to GPU
-
-CPU: Use external-buffer QImage to avoid a CPU copy (ctor that wraps pointers). Upload to a persistent GPU texture each frame. (The GPU upload is unavoidable; minimize it by matching format BGRA8 to the window’s preferred format.)
-
-GPU: Keep a single QSGTexture alive; just upload/setTexture with new pixels; don’t recreate textures per frame. (This follows scene-graph best practices. )
-
-Notify via QLocalSocket → QMetaObject::invokeMethod(item, "newFrame") → update(); never block the GUI thread.
-
-5) Backpressure & fairness (simple and robust)
-
-Ring overwrites oldest if GUI lags—no stalls, visuals stay “present.”
-
-(Optional) if head - tail exceeds a threshold, have the proxy downsample visual frames (e.g., every 2nd/4th) while keeping all step/episode records on the durable path.
-
-You can add a per-run gRPC advisory rate or use your planned ControlStream tokens later; start simple first.
-
-6) Where this plugs into your code (surgical edits)
-
-Proxy side (trainer_telemetry_proxy.py)
-
-Add SharedFramePublisher: allocates shm (name mosaic.run.<run_id>.frames), writes header, publishes frames when it sees {"type":"frame"} JSONL or when it can synthesize from envs (CleanRL: use capture-video hook).
-
-Send notify bytes on a UNIX domain socket mosaic.run.<run_id>.sock each time head++.
-
-GUI side
-
-Add ShmFrameSource (C++/Python): attaches to shm, maps header + slots, opens QLocalSocket to ...sock, emits frameReady(seq).
-
-Add QuickShmViewerItem (Qt Quick item): holds a persistent QSGTexture; on frameReady, wraps the slot with a QImage and updates the texture; repaints via updatePaintNode().
-
-Wire into existing Live Tab; if shm is present, prefer it; else fall back to gRPC stream.
-
-No change to your SQLite classes; they continue to persist steps/episodes for replay.
-
-7) Tuning the slow path (today, no code changes)
-
-SQLite: keep WAL, batch 64–128 records/commit for step/episode inserts.
-
-GUI: throttle paint to vsync; add a “visual sampling” knob (e.g., draw every Nth frame) per run.
-
-gRPC: coalesce scalar telemetry (not frames) to ~30–60 Hz if producers are chatty.
-
-8) Expected gains
-
-Visual frame p50 latency: ~~15–40 ms → 3–8 ms (notify + memcpy into GPU) on the same machine.
-
-CPU relief on the GUI: remove JSON→proto→normalization on the hot path for frames.
-
-No loss of replay/durability; SQLite remains authoritative for analysis.
-
-9) Risks & mitigations
-
-Lifetime of external buffers: when wrapping shm with QImage, ensure the shm segment outlives the paint; keep a ref-count or fence the upload before advancing head.
-
-Cross-platform quirks: QSharedMemory works on Windows/macOS/Linux; stick to it on the GUI side to avoid platform #ifdefs.
-
-GPU upload cost: unavoidable; minimize by matching formats and reusing textures (scene-graph perf guide).
-
-10) Minimal milestone plan (1–2 iterations)
-
-Milestone A (prototype, ~1–2 days of coding)
-
-Proxy: dump one BGRA8 frame/second into shm + notify.
-
-GUI: QuickShmViewerItem using updatePaintNode() + QSGSimpleTextureNode; renders the frame.
-
-Toggle in UI: “Use fast visual path (shared memory)”.
-
-Milestone B (productionize)
-
-Ring with overwrite, per-run socket, metrics in header.
-
-Opt-in for CleanRL/BDI workers.
-
-Scene-graph cleanups per performance doc (persistent nodes, no allocs in hot loop).
-
-11) Why Qt over Pyglet/Pygame/Godot for this
-
-You’re already on Qt; Qt Quick Scene Graph is purpose-built for high-FPS UIs, runs a render thread, and integrates with the rest of your app’s models & signals—no second windowing stack.
-
-QQuickFramebufferObject / updatePaintNode are first-class APIs for custom textured rendering.
-
-QLocalSocket/QSharedMemory give you in-process-like latency while staying cross-platform and event-driven.
-
-TL;DR
-
-Yes: add a hybrid telemetry bridge—shared-memory ring + local notify for visuals; keep SQLite/gRPC for everything else.
-
-Yes: use Qt Quick’s scene graph (QQuickFramebufferObject or updatePaintNode + QSGTexture) for the fastest, most maintainable rendering path inside your Qt app.
-
-If you want, I can sketch the exact shm header, the Qt item skeleton, and the proxy write loop next.
+- Confirm the shared-memory header layout and prototype the publisher/consumer pair.
+- Decide between the QQuickFramebufferObject and texture-node approaches, then scaffold the chosen path.
+- If helpful, draft the shared-memory structs and a PyQt6 `QQuickFramebufferObject` sample for direct inclusion in the repo.

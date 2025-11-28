@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mosaic-mujoco-mpc"
+version = "0.1.0"
+description = "MuJoCo MPC integration for MOSAIC BDI-RL framework"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+# Dependencies are managed via the main project's requirements.txt
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+mujoco-mpc-worker = "mujoco_mpc_worker.cli:main"
+
+[tool.setuptools]
+# Expose both the original mujoco_mpc packages AND our wrapper
+packages = [
+    # Original MuJoCo MPC Python API (from mujoco_mpc/python/ subdirectory)
+    "mujoco_mpc",
+    "mujoco_mpc.demos",
+    "mujoco_mpc.mjx",
+    # Our integration wrapper
+    "mujoco_mpc_worker",
+]
+
+[tool.setuptools.package-dir]
+# Map vendored mujoco_mpc Python API to mujoco_mpc/ subdirectory
+"mujoco_mpc" = "mujoco_mpc/python/mujoco_mpc"
+"mujoco_mpc.demos" = "mujoco_mpc/python/mujoco_mpc/demos"
+"mujoco_mpc.mjx" = "mujoco_mpc/python/mujoco_mpc/mjx"
+# Our wrapper is directly in mujoco_mpc_worker/
+"mujoco_mpc_worker" = "mujoco_mpc_worker"
+
+# Note: The proto/ directory is generated during the C++ build process.
+# It is not included here. If you need gRPC support, build MJPC first:
+#   cd mujoco_mpc && mkdir build && cd build
+#   cmake .. -DMJPC_BUILD_GRPC_SERVICE:BOOL=ON && cmake --build .

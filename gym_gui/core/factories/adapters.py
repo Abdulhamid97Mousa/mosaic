@@ -22,6 +22,24 @@ from gym_gui.core.adapters.toy_text import TOY_TEXT_ADAPTERS
 from gym_gui.core.adapters.box2d import BOX2D_ADAPTERS
 from gym_gui.core.adapters.minigrid import MINIGRID_ADAPTERS
 from gym_gui.core.adapters.ale import ALE_ADAPTERS, ALEAdapter
+
+try:  # Optional dependency
+    from gym_gui.core.adapters.vizdoom import (  # pragma: no cover - optional
+        VIZDOOM_ADAPTERS,
+        ViZDoomAdapter,
+        ViZDoomConfig,
+    )
+except Exception:  # pragma: no cover - vizdoom optional
+    VIZDOOM_ADAPTERS = {}
+    ViZDoomAdapter = None  # type: ignore
+    ViZDoomConfig = None  # type: ignore
+
+try:  # Optional dependency - PettingZoo Classic
+    from gym_gui.core.adapters.pettingzoo_classic import (
+        PETTINGZOO_CLASSIC_ADAPTERS,
+    )
+except Exception:  # pragma: no cover - pettingzoo optional
+    PETTINGZOO_CLASSIC_ADAPTERS = {}
 from gym_gui.core.enums import GameId
 
 AdapterT = TypeVar("AdapterT", bound=EnvironmentAdapter)
@@ -44,6 +62,8 @@ def _registry() -> Mapping[GameId, type[EnvironmentAdapter]]:
         **BOX2D_ADAPTERS,
         **MINIGRID_ADAPTERS,
         **ALE_ADAPTERS,
+        **VIZDOOM_ADAPTERS,
+        **PETTINGZOO_CLASSIC_ADAPTERS,
     }
 
 
@@ -76,6 +96,7 @@ def create_adapter(
         | BipedalWalkerConfig
         | MiniGridConfig
         | ALEConfig
+        | ViZDoomConfig
         | None
     ) = None,
 ) -> EnvironmentAdapter:
@@ -138,6 +159,12 @@ def create_adapter(
         elif issubclass(adapter_cls, MiniGridAdapter) and isinstance(game_config, MiniGridConfig):
             adapter = adapter_cls(context, config=game_config)
         elif issubclass(adapter_cls, ALEAdapter) and isinstance(game_config, ALEConfig):
+            adapter = adapter_cls(context, config=game_config)
+        elif (
+            ViZDoomAdapter is not None
+            and issubclass(adapter_cls, ViZDoomAdapter)
+            and isinstance(game_config, ViZDoomConfig)
+        ):
             adapter = adapter_cls(context, config=game_config)
         else:
             adapter = adapter_cls(context)

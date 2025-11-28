@@ -1,5 +1,3 @@
-# /home/hamid/Desktop/Projects/GUI_BDI_RL/gym_gui/services/trainer/launcher.py
-
 from __future__ import annotations
 
 """Utilities for launching and supervising the trainer daemon process."""

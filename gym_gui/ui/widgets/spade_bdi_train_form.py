@@ -1392,7 +1392,7 @@ class SpadeBdiTrainForm(QtWidgets.QDialog, LogConstantMixin):
 
         return config
 
-    def get_config(self) -> Optional[dict]:
+    def get_config(self) -> Optional[Dict[str, Any]]:
         """Return the configured training parameters."""
         return self._selected_config
 

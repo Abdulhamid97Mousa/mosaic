@@ -12,6 +12,7 @@ from __future__ import annotations
 import logging
 import queue
 import threading
+import time
 from datetime import datetime
 from typing import Optional
 
@@ -38,6 +39,10 @@ from gym_gui.logging_config.log_constants import (
     LOG_SERVICE_DB_SINK_STOP_TIMEOUT,
     LOG_SERVICE_DB_SINK_FATAL,
     LOG_SERVICE_DB_SINK_LOOP_EXITED,
+    LOG_SERVICE_DB_SINK_QUEUE_DEPTH,
+    LOG_SERVICE_DB_SINK_QUEUE_PRESSURE,
+    LOG_SERVICE_DB_SINK_FLUSH_STATS,
+    LOG_SERVICE_DB_SINK_FLUSH_LATENCY,
 )
 
 
@@ -86,6 +91,10 @@ class TelemetryDBSink(LogConstantMixin):
         self._step_batch: list[StepRecord] = []
         self._episode_batch: list[EpisodeRollup] = []
         self._write_count = 0
+        self._queue_log_interval = 2.0  # seconds between queue depth snapshots
+        self._last_queue_log = 0.0
+        self._queue_pressure_ratio = 0.8  # warn when queue >= 80% full
+        self._flush_latency_warn_s = 0.25  # warn when flush slower than 250ms
 
         self.log_constant(
             LOG_SERVICE_DB_SINK_INITIALIZED,
@@ -150,6 +159,9 @@ class TelemetryDBSink(LogConstantMixin):
 
                     # Flush batches if needed
                     self._flush_batches()
+
+                    # Periodically emit queue depth metrics for observability
+                    self._maybe_log_queue_depth(step_queue, episode_queue)
 
                     # Small sleep to avoid busy-waiting
                     self._stop_event.wait(timeout=0.1)
@@ -313,18 +325,13 @@ class TelemetryDBSink(LogConstantMixin):
             if self._step_batch:
                 try:
                     batch_count = len(self._step_batch)
+                    start = time.perf_counter()
                     for step in self._step_batch:
                         self._store.record_step(step)
-                    _LOGGER.info(
-                        "Flushed step batch to SQLite",
-                        extra={
-                            "count": batch_count,
-                            "force": force,
-                            "total_writes": self._write_count + batch_count,
-                        },
-                    )
+                    duration = time.perf_counter() - start
                     self._write_count += batch_count
                     self._step_batch.clear()
+                    self._log_flush_stats("steps", batch_count, duration, force)
                 except Exception as e:
                     _LOGGER.exception("Failed to flush step batch", extra={"error": str(e)})
         
@@ -333,18 +340,13 @@ class TelemetryDBSink(LogConstantMixin):
             if self._episode_batch:
                 try:
                     batch_count = len(self._episode_batch)
+                    start = time.perf_counter()
                     for episode in self._episode_batch:
                         self._store.record_episode(episode)
-                    _LOGGER.info(
-                        "Flushed episode batch to SQLite",
-                        extra={
-                            "count": batch_count,
-                            "force": force,
-                            "total_writes": self._write_count + batch_count,
-                        },
-                    )
+                    duration = time.perf_counter() - start
                     self._write_count += batch_count
                     self._episode_batch.clear()
+                    self._log_flush_stats("episodes", batch_count, duration, force)
                 except Exception as e:
                     _LOGGER.exception("Failed to flush episode batch", extra={"error": str(e)})
         
@@ -359,6 +361,48 @@ class TelemetryDBSink(LogConstantMixin):
                 self._write_count = 0
             except Exception as e:
                 _LOGGER.warning("WAL checkpoint failed", extra={"error": str(e)})
+
+    def _maybe_log_queue_depth(self, step_queue: queue.Queue, episode_queue: queue.Queue) -> None:
+        """Emit periodic queue depth metrics to aid diagnosing backpressure."""
+
+        now = time.monotonic()
+        if now - self._last_queue_log < self._queue_log_interval:
+            return
+
+        step_depth = step_queue.qsize() if hasattr(step_queue, "qsize") else 0
+        episode_depth = episode_queue.qsize() if hasattr(episode_queue, "qsize") else 0
+        if step_depth <= 0 and episode_depth <= 0:
+            return
+
+        self._last_queue_log = now
+        extra = {
+            "step_depth": step_depth,
+            "episode_depth": episode_depth,
+            "queue_capacity": self._writer_queue_size,
+        }
+        self.log_constant(LOG_SERVICE_DB_SINK_QUEUE_DEPTH, extra=extra)
+
+        capacity = max(1, self._writer_queue_size)
+        high_water = max(step_depth, episode_depth)
+        if high_water >= capacity * self._queue_pressure_ratio:
+            extra = {
+                **extra,
+                "high_water_pct": float(high_water) / float(capacity),
+            }
+            self.log_constant(LOG_SERVICE_DB_SINK_QUEUE_PRESSURE, extra=extra)
+
+    def _log_flush_stats(self, kind: str, count: int, duration_s: float, force: bool) -> None:
+        """Log flush duration/size for observability and detect slow writes."""
+
+        extra = {
+            "batch_kind": kind,
+            "count": count,
+            "duration_ms": round(duration_s * 1000.0, 3),
+            "force": force,
+        }
+        self.log_constant(LOG_SERVICE_DB_SINK_FLUSH_STATS, extra=extra)
+        if duration_s >= self._flush_latency_warn_s:
+            self.log_constant(LOG_SERVICE_DB_SINK_FLUSH_LATENCY, extra=extra)
 
 
 __all__ = ["TelemetryDBSink"]
