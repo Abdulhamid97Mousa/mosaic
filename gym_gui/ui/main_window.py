@@ -89,9 +89,11 @@ from gym_gui.ui.handlers import (
     ChessHandler,
     ConnectFourHandler,
     GoHandler,
+    HumanVsAgentHandler,
 )
 from gym_gui.controllers.chess_controller import ChessGameController
 from gym_gui.core.adapters.chess_adapter import ChessState
+from gym_gui.ui.widgets.human_vs_agent_board import InteractiveChessBoard
 
 try:
     from mujoco_mpc_worker import get_launcher as get_mjpc_launcher
@@ -192,6 +194,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._chess_controller: Optional[ChessGameController] = None
         self._chess_board: Optional[InteractiveChessBoard] = None
         self._chess_tab_index: int = -1
+        # Human vs Agent handler (manages AI providers like Stockfish)
+        self._human_vs_agent_handler: Optional[HumanVsAgentHandler] = None
 
         # Get live telemetry controller from service locator
         live_controller = locator.resolve(LiveTelemetryController)
@@ -526,6 +530,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._control_panel.multi_agent_load_requested.connect(self._on_multi_agent_load_requested)
         self._control_panel.multi_agent_start_requested.connect(self._on_multi_agent_start_requested)
         self._control_panel.multi_agent_reset_requested.connect(self._on_multi_agent_reset_requested)
+        self._control_panel.multi_agent_tab.ai_opponent_changed.connect(self._on_ai_opponent_changed)
 
         # Board game handlers (Human Control Mode)
         # These signals come from BoardGameRendererStrategy in the Grid tab
@@ -654,7 +659,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             f"env_id={env_id} seed={seed}"
         )
 
-        if env_id == "chess":
+        if env_id == "chess_v6":
             self._load_chess_game(seed)
         else:
             # Other PettingZoo environments not yet implemented
@@ -674,6 +679,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._chess_controller.close()
             self._chess_controller = None
 
+        # Clean up existing handler if any
+        if self._human_vs_agent_handler is not None:
+            self._human_vs_agent_handler.cleanup()
+
         # Remove existing chess tab if present
         if self._chess_tab_index >= 0:
             self._render_tabs.removeTab(self._chess_tab_index)
@@ -684,6 +693,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         # Create chess controller
         self._chess_controller = ChessGameController(self)
+
+        # Create Human vs Agent handler for AI management
+        self._human_vs_agent_handler = HumanVsAgentHandler(self._status_bar)
 
         # Connect controller signals
         self._chess_controller.state_changed.connect(self._on_chess_state_changed)
@@ -699,8 +711,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # Connect board to controller
         self._chess_board.move_made.connect(self._on_chess_move_made)
 
-        # Add chess board tab
-        self._chess_tab_index = self._render_tabs.addTab(self._chess_board, "Chess Board")
+        # Add chess board tab with proper Human vs Agent naming
+        self._chess_tab_index = self._render_tabs.addTab(
+            self._chess_board, "Human vs Agent - Chess"
+        )
         self._render_tabs.setCurrentIndex(self._chess_tab_index)
 
         # Debug logging
@@ -715,18 +729,23 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         human_agent = human_vs_agent_tab._human_player_combo.currentData()
         human_color = "white" if human_agent == "player_0" else "black"
 
+        # Get AI opponent configuration and set up provider via handler
+        ai_config = human_vs_agent_tab.get_ai_config()
+        ai_name = self._human_vs_agent_handler.setup_ai_provider(
+            ai_config, self._chess_controller
+        )
+
         # Start the game
         self._chess_controller.start_game(human_color=human_color, seed=seed)
 
         # Update control panel state
-        human_vs_agent_tab.set_environment_loaded("chess", seed)
-        # For Chess, we use built-in random AI, so mark policy as loaded
-        human_vs_agent_tab.set_policy_loaded("Random AI (built-in)")
+        human_vs_agent_tab.set_environment_loaded("chess_v6", seed)
+        human_vs_agent_tab.set_policy_loaded(ai_name)
         # Enable reset button since game is active
         human_vs_agent_tab._reset_btn.setEnabled(True)
 
         self._status_bar.showMessage(
-            f"Chess loaded (seed={seed}). You play as {human_color}. Click board to move.",
+            f"Chess loaded (seed={seed}). You play as {human_color} vs {ai_name}. Click board to move.",
             5000
         )
 
@@ -816,6 +835,29 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._status_bar.showMessage(f"Chess game reset with seed={seed}", 3000)
         else:
             self._status_bar.showMessage("No active game to reset", 3000)
+
+    def _on_ai_opponent_changed(self, opponent_type: str, difficulty: str) -> None:
+        """Handle AI opponent selection change.
+
+        If a game is currently running, update the AI provider via handler.
+
+        Args:
+            opponent_type: Type of AI opponent ("random", "stockfish", "custom")
+            difficulty: Difficulty level for engines like Stockfish
+        """
+        if self._human_vs_agent_handler is None:
+            return
+
+        human_vs_agent_tab = self._control_panel.multi_agent_tab.human_vs_agent
+        ai_name = self._human_vs_agent_handler.on_ai_config_changed(
+            opponent_type,
+            difficulty,
+            self._chess_controller,
+            human_vs_agent_tab.get_ai_config,
+        )
+        if ai_name:
+            human_vs_agent_tab.set_policy_loaded(ai_name)
+            self._status_bar.showMessage(f"AI opponent changed to {ai_name}", 3000)
 
     def _on_chess_game_started(self) -> None:
         """Handle chess game start."""
@@ -2453,21 +2495,31 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             outcome_timestamp=timers.outcome_wall_clock_formatted(),
         )
 
-    def closeEvent(self, a0: QtGui.QCloseEvent | None) -> None:  
+    def closeEvent(self, a0: QtGui.QCloseEvent | None) -> None:
         logging.getLogger().removeHandler(self._log_handler)
-        
+
         # Shutdown live telemetry controller
         if hasattr(self, "_live_controller"):
             self._live_controller.shutdown()
 
         self._shutdown_run_watch()
-        
+
+        # Clean up chess game controller
+        if self._chess_controller is not None:
+            self._chess_controller.close()
+            self._chess_controller = None
+
+        # Clean up Stockfish service
+        if self._stockfish_service is not None:
+            self._stockfish_service.stop()
+            self._stockfish_service = None
+
         # Shutdown session
         self._session.shutdown()
-        
+
         if hasattr(self, "_time_refresh_timer") and self._time_refresh_timer.isActive():
             self._time_refresh_timer.stop()
-        
+
         super().closeEvent(a0)
 
 

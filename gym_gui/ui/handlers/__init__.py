@@ -10,6 +10,7 @@ receives its dependencies via constructor injection.
 - ChessHandler: Chess game move handling (Human Control Mode)
 - ConnectFourHandler: Connect Four game move handling (Human Control Mode)
 - GoHandler: Go game move handling (Human Control Mode)
+- HumanVsAgentHandler: Human vs Agent AI setup and management
 
 Usage:
     # In MainWindow.__init__:
@@ -27,6 +28,11 @@ Usage:
     self._render_tabs.go_intersection_clicked.connect(
         self._go_handler.on_intersection_clicked
     )
+
+    # For Human vs Agent mode:
+    self._human_vs_agent_handler = HumanVsAgentHandler(
+        status_bar=self._status_bar,
+    )
 """
 
 from __future__ import annotations
@@ -37,6 +43,7 @@ from gym_gui.ui.handlers.mpc_handlers import MPCHandler
 from gym_gui.ui.handlers.chess_handlers import ChessHandler
 from gym_gui.ui.handlers.connect_four_handlers import ConnectFourHandler
 from gym_gui.ui.handlers.go_handlers import GoHandler
+from gym_gui.ui.handlers.human_vs_agent_handlers import HumanVsAgentHandler
 
 __all__ = [
     "GameConfigHandler",
@@ -45,4 +52,5 @@ __all__ = [
     "ChessHandler",
     "ConnectFourHandler",
     "GoHandler",
+    "HumanVsAgentHandler",
 ]

@@ -31,6 +31,11 @@ from gym_gui.core.pettingzoo_enums import (
     is_aec_env,
 )
 from gym_gui.ui.workers import WorkerDefinition, get_worker_catalog
+from gym_gui.ui.widgets.human_vs_agent_config_form import (
+    HumanVsAgentConfigForm,
+    HumanVsAgentConfig,
+    DIFFICULTY_PRESETS,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -48,6 +53,7 @@ class HumanVsAgentTab(QtWidgets.QWidget):
     start_game_requested = pyqtSignal(str, str, int)  # env_id, human_agent, seed
     reset_game_requested = pyqtSignal(int)  # seed
     action_submitted = pyqtSignal(int)  # action_id
+    ai_opponent_changed = pyqtSignal(str, str)  # opponent_type, difficulty
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
@@ -56,6 +62,8 @@ class HumanVsAgentTab(QtWidgets.QWidget):
         self._allow_seed_reuse = False
         self._environment_loaded = False
         self._policy_loaded = False
+        # AI opponent configuration (default to Stockfish medium)
+        self._ai_config = HumanVsAgentConfig()
         self._build_ui()
         self._connect_signals()
         self._populate_environments()
@@ -125,24 +133,32 @@ class HumanVsAgentTab(QtWidgets.QWidget):
         )
         layout.addWidget(self._env_info)
 
-        # AI Policy group
-        policy_group = QtWidgets.QGroupBox("AI Policy", self)
-        policy_layout = QtWidgets.QVBoxLayout(policy_group)
+        # Environment Configuration group
+        config_group = QtWidgets.QGroupBox("Environment Configuration", self)
+        config_layout = QtWidgets.QVBoxLayout(config_group)
 
-        policy_btn_layout = QtWidgets.QHBoxLayout()
-        self._load_policy_btn = QtWidgets.QPushButton(
-            "Load Trained Policy...", policy_group
+        # Configure button
+        config_btn_layout = QtWidgets.QHBoxLayout()
+        self._configure_btn = QtWidgets.QPushButton("Configure AI Opponent...", config_group)
+        self._configure_btn.setToolTip(
+            "Open configuration dialog to set AI opponent type, "
+            "difficulty level, and advanced settings."
         )
-        self._load_policy_btn.setEnabled(False)  # Enable after environment loaded
-        policy_btn_layout.addWidget(self._load_policy_btn)
-        policy_btn_layout.addStretch(1)
-        policy_layout.addLayout(policy_btn_layout)
+        config_btn_layout.addWidget(self._configure_btn)
+        config_btn_layout.addStretch(1)
+        config_layout.addLayout(config_btn_layout)
 
-        self._policy_label = QtWidgets.QLabel("No policy loaded", policy_group)
-        self._policy_label.setStyleSheet("color: #888;")
-        policy_layout.addWidget(self._policy_label)
+        # Current configuration summary
+        self._config_summary = QtWidgets.QLabel(self)
+        self._config_summary.setWordWrap(True)
+        self._config_summary.setStyleSheet(
+            "color: #555; font-size: 11px; padding: 8px; "
+            "background-color: #f5f5f5; border-radius: 4px;"
+        )
+        self._update_config_summary()
+        config_layout.addWidget(self._config_summary)
 
-        layout.addWidget(policy_group)
+        layout.addWidget(config_group)
 
         # Player Assignment group
         player_group = QtWidgets.QGroupBox("Player Assignment", self)
@@ -194,9 +210,9 @@ class HumanVsAgentTab(QtWidgets.QWidget):
         self._env_combo.currentIndexChanged.connect(self._on_env_changed)
         self._seed_reuse_checkbox.stateChanged.connect(self._on_seed_reuse_changed)
         self._load_env_btn.clicked.connect(self._on_load_environment)
-        self._load_policy_btn.clicked.connect(self._on_load_policy)
         self._start_btn.clicked.connect(self._on_start_game)
         self._reset_btn.clicked.connect(self._on_reset_game)
+        self._configure_btn.clicked.connect(self._on_configure_clicked)
 
     def _populate_environments(self) -> None:
         """Populate environment dropdowns with human-controllable games."""
@@ -241,9 +257,8 @@ class HumanVsAgentTab(QtWidgets.QWidget):
             # Reset loaded state when environment changes
             self._environment_loaded = False
             self._policy_loaded = False
-            self._load_policy_btn.setEnabled(False)
             self._start_btn.setEnabled(False)
-            self._policy_label.setText("No policy loaded")
+            self._update_config_summary()
         except ValueError:
             self._env_info.setText("")
 
@@ -265,18 +280,15 @@ class HumanVsAgentTab(QtWidgets.QWidget):
             seed = self._seed_spin.value()
             self.load_environment_requested.emit(self._selected_env.value, seed)
             self._environment_loaded = True
-            self._load_policy_btn.setEnabled(True)
+            # For non-custom AI, policy is implicitly "loaded"
+            if self._ai_config.opponent_type != "custom":
+                self._policy_loaded = True
             self._update_button_states()
             _LOGGER.info(
                 "Environment load requested: %s (seed=%d)",
                 self._selected_env.value,
                 seed,
             )
-
-    def _on_load_policy(self) -> None:
-        """Handle load policy button click."""
-        if self._selected_env:
-            self.load_policy_requested.emit(self._selected_env.value)
 
     def _on_start_game(self) -> None:
         """Handle start game button click."""
@@ -302,19 +314,17 @@ class HumanVsAgentTab(QtWidgets.QWidget):
 
     def _update_button_states(self) -> None:
         """Update button enabled states based on current state."""
-        self._load_policy_btn.setEnabled(self._environment_loaded)
         self._start_btn.setEnabled(self._environment_loaded and self._policy_loaded)
 
     def set_policy_loaded(self, policy_path: str) -> None:
         """Update UI when a policy is loaded."""
-        self._policy_label.setText(f"Loaded: {policy_path}")
         self._policy_loaded = True
         self._update_button_states()
+        self._update_config_summary()
 
     def set_environment_loaded(self, env_id: str, seed: int) -> None:
         """Update UI when environment is loaded."""
         self._environment_loaded = True
-        self._load_policy_btn.setEnabled(True)
         _LOGGER.debug("Environment loaded: %s (seed=%d)", env_id, seed)
 
     def update_game_status(
@@ -340,6 +350,82 @@ class HumanVsAgentTab(QtWidgets.QWidget):
     def current_env_id(self) -> Optional[str]:
         """Get current environment ID."""
         return self._selected_env.value if self._selected_env else None
+
+    def _on_configure_clicked(self) -> None:
+        """Handle configure button click - open the configuration dialog."""
+        dialog = HumanVsAgentConfigForm(self, self._ai_config)
+        dialog.config_accepted.connect(self._on_config_accepted)
+        dialog.exec()
+
+    def _on_config_accepted(self, config: HumanVsAgentConfig) -> None:
+        """Handle configuration dialog accepted."""
+        self._ai_config = config
+        self._update_config_summary()
+
+        # Mark policy as loaded for non-custom opponents
+        if config.opponent_type != "custom":
+            self._policy_loaded = True
+        else:
+            self._policy_loaded = config.custom_policy_path is not None
+
+        self._update_button_states()
+
+        # Emit signal for main window to update AI provider
+        self.ai_opponent_changed.emit(config.opponent_type, config.difficulty)
+        _LOGGER.info(
+            "AI config updated: type=%s, difficulty=%s",
+            config.opponent_type,
+            config.difficulty,
+        )
+
+    def _update_config_summary(self) -> None:
+        """Update the configuration summary label."""
+        config = self._ai_config
+
+        if config.opponent_type == "random":
+            summary = (
+                "<b>AI Opponent:</b> Random<br>"
+                "Makes random legal moves (for testing)."
+            )
+        elif config.opponent_type == "stockfish":
+            preset = DIFFICULTY_PRESETS.get(config.difficulty)
+            summary = (
+                f"<b>AI Opponent:</b> Stockfish ({config.difficulty.capitalize()})<br>"
+                f"Skill: {config.stockfish.skill_level}, "
+                f"Depth: {config.stockfish.depth}, "
+                f"Time: {config.stockfish.time_limit_ms}ms"
+            )
+        elif config.opponent_type == "custom":
+            if config.custom_policy_path:
+                summary = (
+                    f"<b>AI Opponent:</b> Custom Policy<br>"
+                    f"Path: {config.custom_policy_path}"
+                )
+            else:
+                summary = (
+                    "<b>AI Opponent:</b> Custom Policy<br>"
+                    "<i>No policy loaded yet.</i>"
+                )
+        else:
+            summary = "<i>Click 'Configure AI Opponent' to set up.</i>"
+
+        self._config_summary.setText(summary)
+
+    def get_ai_config(self) -> HumanVsAgentConfig:
+        """Get the current AI opponent configuration.
+
+        Returns:
+            Full HumanVsAgentConfig object
+        """
+        return self._ai_config
+
+    def get_ai_opponent_config(self) -> tuple[str, str]:
+        """Get the current AI opponent configuration (legacy interface).
+
+        Returns:
+            Tuple of (opponent_type, difficulty)
+        """
+        return (self._ai_config.opponent_type, self._ai_config.difficulty)
 
 
 class MultiAgentCooperationTab(QtWidgets.QWidget):
@@ -766,6 +852,7 @@ class MultiAgentTab(QtWidgets.QWidget):
     load_environment_requested = pyqtSignal(str, int)  # env_id, seed
     start_game_requested = pyqtSignal(str, str, int)  # env_id, human_agent, seed
     reset_game_requested = pyqtSignal(int)  # seed
+    ai_opponent_changed = pyqtSignal(str, str)  # opponent_type, difficulty
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
@@ -808,6 +895,9 @@ class MultiAgentTab(QtWidgets.QWidget):
         )
         self._human_vs_agent_tab.reset_game_requested.connect(
             self.reset_game_requested
+        )
+        self._human_vs_agent_tab.ai_opponent_changed.connect(
+            self.ai_opponent_changed
         )
 
         # Cooperation

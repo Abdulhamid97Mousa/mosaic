@@ -19,3 +19,4 @@ mujoco_mpc/python/mujoco_mpc/mjx/visualize.py
 mujoco_mpc_worker/__init__.py
 mujoco_mpc_worker/cli.py
 mujoco_mpc_worker/config.py
+mujoco_mpc_worker/launcher.py
