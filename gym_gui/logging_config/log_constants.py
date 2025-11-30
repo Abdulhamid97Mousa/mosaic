@@ -524,32 +524,6 @@ LOG_ADAPTER_ALE_METADATA_PROBE_FAILED = _constant(
 # ---------------------------------------------------------------------------
 # Service and telemetry constants (LOG601–LOG650)
 # ---------------------------------------------------------------------------
-LOG_SERVICE_JASON_WORKER_EVENT = _constant(
-    "LOG680A",
-    "INFO",
-    "Jason worker event",
-    component="Service",
-    subcomponent="JasonWorker",
-    tags=_tags("jason_worker", "event"),
-)
-
-LOG_SERVICE_JASON_WORKER_WARNING = _constant(
-    "LOG680B",
-    "WARNING",
-    "Jason worker warning",
-    component="Service",
-    subcomponent="JasonWorker",
-    tags=_tags("jason_worker", "warning"),
-)
-
-LOG_SERVICE_JASON_WORKER_ERROR = _constant(
-    "LOG680C",
-    "ERROR",
-    "Jason worker error",
-    component="Service",
-    subcomponent="JasonWorker",
-    tags=_tags("jason_worker", "error"),
-)
 LOG_SERVICE_TELEMETRY_STEP_REJECTED = _constant(
     "LOG601",
     "WARNING",
@@ -2239,9 +2213,6 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_SERVICE_TELEMETRY_HUB_SUBSCRIBED,
     LOG_SERVICE_TELEMETRY_HUB_TRACE,
     LOG_SERVICE_TELEMETRY_HUB_ERROR,
-    LOG_SERVICE_JASON_WORKER_EVENT,
-    LOG_SERVICE_JASON_WORKER_WARNING,
-    LOG_SERVICE_JASON_WORKER_ERROR,
     LOG_RENDER_REGULATOR_NOT_STARTED,
     LOG_RENDER_DROPPED_FRAME,
     LOG_DAEMON_START,
@@ -2458,9 +2429,6 @@ __all__ = (
     "LOG_SERVICE_TELEMETRY_HUB_SUBSCRIBED",
     "LOG_SERVICE_TELEMETRY_HUB_TRACE",
     "LOG_SERVICE_TELEMETRY_HUB_ERROR",
-    "LOG_SERVICE_JASON_WORKER_EVENT",
-    "LOG_SERVICE_JASON_WORKER_WARNING",
-    "LOG_SERVICE_JASON_WORKER_ERROR",
     "LOG_RENDER_REGULATOR_NOT_STARTED",
     "LOG_RENDER_DROPPED_FRAME",
     "LOG_DAEMON_START",

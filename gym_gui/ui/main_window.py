@@ -40,7 +40,7 @@ from gym_gui.config.settings import Settings
 from gym_gui.core.enums import ControlMode, GameId
 from gym_gui.rendering import RendererRegistry
 from gym_gui.core.factories.adapters import available_games
-from gym_gui.controllers.human_input import HumanInputController, get_vizdoom_mouse_turn_actions
+from gym_gui.controllers.human_input import HumanInputController
 from gym_gui.controllers.session import SessionController
 from gym_gui.controllers.live_telemetry_controllers import LiveTelemetryController
 from gym_gui.logging_config.log_constants import (
@@ -90,18 +90,11 @@ from gym_gui.ui.handlers import (
     ConnectFourHandler,
     GoHandler,
     HumanVsAgentHandler,
+    ChessEnvLoader,
+    VizdoomEnvLoader,
 )
-from gym_gui.controllers.chess_controller import ChessGameController
-from gym_gui.core.adapters.chess_adapter import ChessState
-from gym_gui.ui.widgets.human_vs_agent_board import InteractiveChessBoard
 
-try:
-    from mujoco_mpc_worker import get_launcher as get_mjpc_launcher
-except ImportError:  # pragma: no cover - optional dependency
-    def get_mjpc_launcher():  # type: ignore[func-returns-value]
-        raise ImportError(
-            "MuJoCo MPC worker is not installed. Install with 'pip install -e 3rd_party/mujoco_mpc_worker'."
-        )
+from gym_gui.constants.optional_deps import get_mjpc_launcher
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from gym_gui.ui.widgets.spade_bdi_train_form import SpadeBdiTrainForm
@@ -149,6 +142,16 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         ControlMode.HYBRID_HUMAN_AGENT,
     }
 
+    _WATCHED_RUN_STATUSES = [
+        RunStatus.INIT,
+        RunStatus.HANDSHAKE,
+        RunStatus.READY,
+        RunStatus.EXECUTING,
+        RunStatus.PAUSED,
+        RunStatus.FAULTED,
+        RunStatus.TERMINATED,
+    ]
+
     def __init__(self, settings: Settings, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
         self._logger = _LOGGER
@@ -190,12 +193,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # MuJoCo MPC launcher
         self._mjpc_launcher = get_mjpc_launcher()
 
-        # Chess game controller (for multi-agent Human vs Agent mode)
-        self._chess_controller: Optional[ChessGameController] = None
-        self._chess_board: Optional[InteractiveChessBoard] = None
-        self._chess_tab_index: int = -1
-        # Human vs Agent handler (manages AI providers like Stockfish)
-        self._human_vs_agent_handler: Optional[HumanVsAgentHandler] = None
+        # Environment loaders (initialized in _init_handlers after UI components are created)
+        self._chess_env_loader: ChessEnvLoader
+        self._vizdoom_env_loader: VizdoomEnvLoader
 
         # Get live telemetry controller from service locator
         live_controller = locator.resolve(LiveTelemetryController)
@@ -496,13 +496,23 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             status_bar=self._status_bar,
         )
 
+        # Environment loaders (for Human vs Agent mode and environment-specific setup)
+        self._chess_env_loader = ChessEnvLoader(
+            render_tabs=self._render_tabs,
+            control_panel=self._control_panel,
+            status_bar=self._status_bar,
+        )
+        self._vizdoom_env_loader = VizdoomEnvLoader(
+            render_tabs=self._render_tabs,
+        )
+
     def _connect_signals(self) -> None:
         # Connect control panel signals to session controller
         self._control_panel.load_requested.connect(self._on_load_requested)
         self._control_panel.reset_requested.connect(self._on_reset_requested)
-        self._control_panel.agent_form_requested.connect(self._on_agent_form_requested)
         self._control_panel.train_agent_requested.connect(self._on_train_agent_requested)
         self._control_panel.trained_agent_requested.connect(self._on_trained_agent_requested)
+        self._control_panel.resume_training_requested.connect(self._on_resume_training_requested)
         self._control_panel.start_game_requested.connect(self._on_start_game)
         self._control_panel.pause_game_requested.connect(self._on_pause_game)
         self._control_panel.continue_game_requested.connect(self._on_continue_game)
@@ -671,142 +681,12 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
     def _load_chess_game(self, seed: int) -> None:
         """Load and initialize the Chess game with interactive board.
 
+        Delegates to ChessEnvLoader for all chess-specific setup.
+
         Args:
             seed: Random seed for game initialization
         """
-        # Clean up existing chess game if any
-        if self._chess_controller is not None:
-            self._chess_controller.close()
-            self._chess_controller = None
-
-        # Clean up existing handler if any
-        if self._human_vs_agent_handler is not None:
-            self._human_vs_agent_handler.cleanup()
-
-        # Remove existing chess tab if present
-        if self._chess_tab_index >= 0:
-            self._render_tabs.removeTab(self._chess_tab_index)
-            self._chess_tab_index = -1
-
-        # Create chess board widget
-        self._chess_board = InteractiveChessBoard(self._render_tabs)
-
-        # Create chess controller
-        self._chess_controller = ChessGameController(self)
-
-        # Create Human vs Agent handler for AI management
-        self._human_vs_agent_handler = HumanVsAgentHandler(self._status_bar)
-
-        # Connect controller signals
-        self._chess_controller.state_changed.connect(self._on_chess_state_changed)
-        self._chess_controller.game_started.connect(self._on_chess_game_started)
-        self._chess_controller.game_over.connect(self._on_chess_game_over)
-        self._chess_controller.status_message.connect(
-            lambda msg: self._status_bar.showMessage(msg, 3000)
-        )
-        self._chess_controller.error_occurred.connect(
-            lambda msg: self._status_bar.showMessage(f"Chess error: {msg}", 5000)
-        )
-
-        # Connect board to controller
-        self._chess_board.move_made.connect(self._on_chess_move_made)
-
-        # Add chess board tab with proper Human vs Agent naming
-        self._chess_tab_index = self._render_tabs.addTab(
-            self._chess_board, "Human vs Agent - Chess"
-        )
-        self._render_tabs.setCurrentIndex(self._chess_tab_index)
-
-        # Debug logging
-        _LOGGER.info(
-            f"Chess board added: tab_index={self._chess_tab_index}, "
-            f"board_visible={self._chess_board.isVisible()}, "
-            f"board_size={self._chess_board.size()}"
-        )
-
-        # Get human player selection from control panel
-        human_vs_agent_tab = self._control_panel.multi_agent_tab.human_vs_agent
-        human_agent = human_vs_agent_tab._human_player_combo.currentData()
-        human_color = "white" if human_agent == "player_0" else "black"
-
-        # Get AI opponent configuration and set up provider via handler
-        ai_config = human_vs_agent_tab.get_ai_config()
-        ai_name = self._human_vs_agent_handler.setup_ai_provider(
-            ai_config, self._chess_controller
-        )
-
-        # Start the game
-        self._chess_controller.start_game(human_color=human_color, seed=seed)
-
-        # Update control panel state
-        human_vs_agent_tab.set_environment_loaded("chess_v6", seed)
-        human_vs_agent_tab.set_policy_loaded(ai_name)
-        # Enable reset button since game is active
-        human_vs_agent_tab._reset_btn.setEnabled(True)
-
-        self._status_bar.showMessage(
-            f"Chess loaded (seed={seed}). You play as {human_color} vs {ai_name}. Click board to move.",
-            5000
-        )
-
-    def _on_chess_state_changed(self, state: ChessState) -> None:
-        """Handle chess state update from controller.
-
-        Args:
-            state: New chess game state
-        """
-        _LOGGER.debug(f"Chess state changed: player={state.current_player}, fen={state.fen[:30]}...")
-
-        if self._chess_board is None:
-            _LOGGER.warning("Chess board is None in state_changed handler")
-            return
-
-        # Update board position
-        self._chess_board.set_position(state.fen)
-        self._chess_board.set_legal_moves(state.legal_moves)
-        self._chess_board.set_current_player(state.current_player)
-
-        # Update highlights
-        if state.last_move:
-            from_sq = state.last_move[:2]
-            to_sq = state.last_move[2:4]
-            self._chess_board.set_last_move(from_sq, to_sq)
-        else:
-            self._chess_board.set_last_move(None, None)
-
-        # Update check status
-        if state.is_check:
-            # Find king square from FEN
-            king_sq = self._find_king_square(state.fen, state.current_player)
-            self._chess_board.set_check(True, king_sq)
-        else:
-            self._chess_board.set_check(False, None)
-
-        # Enable/disable board based on turn
-        if self._chess_controller is not None:
-            is_human_turn = self._chess_controller.is_human_turn()
-            self._chess_board.set_enabled(is_human_turn and not state.is_game_over)
-
-        # Update game status in control panel
-        human_vs_agent_tab = self._control_panel.multi_agent_tab.human_vs_agent
-        turn_text = f"{state.current_player.capitalize()}'s turn"
-        if state.is_check:
-            turn_text += " (CHECK!)"
-
-        score_text = f"Move {state.move_count}"
-
-        result = None
-        if state.is_game_over:
-            if state.winner == "draw":
-                result = "Draw"
-            elif state.winner:
-                result = f"{state.winner.capitalize()} wins!"
-
-        human_vs_agent_tab.update_game_status(
-            current_turn=turn_text,
-            score=score_text,
-            result=result,
-        )
+        self._chess_env_loader.load(seed, parent=self)
 
     def _on_multi_agent_start_requested(self, env_id: str, human_agent: str, seed: int) -> None:
         """Handle start game request from Multi-Agent tab.
@@ -816,11 +696,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             human_agent: Which agent the human plays ("player_0" or "player_1")
             seed: Random seed
         """
-        if env_id == "chess" and self._chess_controller is not None:
-            # Chess game is already started when loaded, but we can restart
-            human_color = "white" if human_agent == "player_0" else "black"
-            self._chess_controller.start_game(human_color=human_color, seed=seed)
-            self._status_bar.showMessage(f"Chess game started. You play as {human_color}.", 3000)
+        if env_id == "chess" and self._chess_env_loader.is_loaded:
+            self._chess_env_loader.on_start_requested(human_agent, seed)
         else:
             self._status_bar.showMessage(f"Start game not supported for: {env_id}", 3000)
 
@@ -830,179 +707,18 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         Args:
             seed: New random seed for reset
         """
-        if self._chess_controller is not None:
-            self._chess_controller.reset_game(seed=seed)
-            self._status_bar.showMessage(f"Chess game reset with seed={seed}", 3000)
-        else:
-            self._status_bar.showMessage("No active game to reset", 3000)
+        self._chess_env_loader.on_reset_requested(seed)
 
     def _on_ai_opponent_changed(self, opponent_type: str, difficulty: str) -> None:
         """Handle AI opponent selection change.
 
-        If a game is currently running, update the AI provider via handler.
+        If a game is currently running, update the AI provider via loader.
 
         Args:
             opponent_type: Type of AI opponent ("random", "stockfish", "custom")
             difficulty: Difficulty level for engines like Stockfish
         """
-        if self._human_vs_agent_handler is None:
-            return
-
-        human_vs_agent_tab = self._control_panel.multi_agent_tab.human_vs_agent
-        ai_name = self._human_vs_agent_handler.on_ai_config_changed(
-            opponent_type,
-            difficulty,
-            self._chess_controller,
-            human_vs_agent_tab.get_ai_config,
-        )
-        if ai_name:
-            human_vs_agent_tab.set_policy_loaded(ai_name)
-            self._status_bar.showMessage(f"AI opponent changed to {ai_name}", 3000)
-
-    def _on_chess_game_started(self) -> None:
-        """Handle chess game start."""
-        _LOGGER.info("Chess game started")
-
-        # Enable the Start Game button in control panel
-        human_vs_agent_tab = self._control_panel.multi_agent_tab.human_vs_agent
-        human_vs_agent_tab._start_btn.setEnabled(True)
-        human_vs_agent_tab._reset_btn.setEnabled(True)
-
-    def _on_chess_game_over(self, winner: str) -> None:
-        """Handle chess game end.
-
-        Args:
-            winner: "white", "black", or "draw"
-        """
-        _LOGGER.info(f"Chess game over: winner={winner}")
-
-        if self._chess_board is not None:
-            self._chess_board.set_enabled(False)
-
-    def _on_chess_move_made(self, from_sq: str, to_sq: str) -> None:
-        """Handle move from the interactive chess board (Multi-Agent mode).
-
-        Args:
-            from_sq: Source square (e.g., "e2")
-            to_sq: Destination square (e.g., "e4")
-        """
-        if self._chess_controller is not None:
-            self._chess_controller.submit_human_move(from_sq, to_sq)
-
-    # -------------------------------------------------------------------------
-    # Legacy chess methods (kept for backward compatibility with ChessGameController)
-    # -------------------------------------------------------------------------
-
-    def _on_render_tabs_chess_move(self, from_sq: str, to_sq: str) -> None:
-        """Handle chess move from RenderTabs (Human Control Mode).
-
-        DEPRECATED: Use _on_pettingzoo_chess_move instead.
-
-        Args:
-            from_sq: Source square (e.g., "e2")
-            to_sq: Destination square (e.g., "e4")
-        """
-        # Check if we're in Chess game
-        if self._session.game_id != GameId.CHESS:
-            return
-
-        # Get the chess adapter and submit the move
-        adapter = self._session._adapter
-        if adapter is None:
-            return
-
-        # Build UCI move
-        uci_move = f"{from_sq}{to_sq}"
-
-        # Check for pawn promotion (simple: always promote to queen)
-        try:
-            from_row = int(from_sq[1])
-            to_row = int(to_sq[1])
-            # Get piece at from_sq
-            chess_state = adapter.get_chess_state()
-            fen = chess_state.fen
-            piece = self._get_piece_from_fen(fen, from_sq)
-            if piece and piece.upper() == "P":
-                if (piece == "P" and to_row == 8) or (piece == "p" and to_row == 1):
-                    uci_move += "q"  # Auto-promote to queen
-        except Exception:
-            pass
-
-        # Validate and execute move
-        if not adapter.is_move_legal(uci_move):
-            self._status_bar.showMessage(f"Illegal move: {uci_move}", 3000)
-            return
-
-        try:
-            step = adapter.step_uci(uci_move)
-            # Update display
-            self._render_tabs.display_payload(step.render_payload)
-            # Update status
-            chess_state = adapter.get_chess_state()
-            status = f"{chess_state.current_player.capitalize()}'s turn"
-            if chess_state.is_check:
-                status += " - CHECK!"
-            if chess_state.is_game_over:
-                if chess_state.winner == "draw":
-                    status = "Game Over - Draw!"
-                elif chess_state.winner:
-                    status = f"Game Over - {chess_state.winner.capitalize()} wins!"
-            self._status_bar.showMessage(status, 5000)
-        except Exception as e:
-            self._status_bar.showMessage(f"Move failed: {e}", 5000)
-
-    def _get_piece_from_fen(self, fen: str, square: str) -> Optional[str]:
-        """Get piece at a square from FEN."""
-        position = fen.split()[0] if fen else ""
-        col = ord(square[0]) - ord("a")
-        row = int(square[1]) - 1
-
-        current_row = 7
-        current_col = 0
-
-        for char in position:
-            if char == "/":
-                current_row -= 1
-                current_col = 0
-            elif char.isdigit():
-                current_col += int(char)
-            else:
-                if current_row == row and current_col == col:
-                    return char
-                current_col += 1
-
-        return None
-
-    def _find_king_square(self, fen: str, player: str) -> Optional[str]:
-        """Find the king's square for a given player from FEN.
-
-        Args:
-            fen: FEN position string
-            player: "white" or "black"
-
-        Returns:
-            King's square in algebraic notation, or None if not found
-        """
-        king_char = "K" if player == "white" else "k"
-        position = fen.split()[0]
-
-        row = 7
-        col = 0
-
-        for char in position:
-            if char == "/":
-                row -= 1
-                col = 0
-            elif char.isdigit():
-                col += int(char)
-            else:
-                if char == king_char:
-                    file_char = chr(ord("a") + col)
-                    rank_char = str(row + 1)
-                    return f"{file_char}{rank_char}"
-                col += 1
-
-        return None
+        self._chess_env_loader.on_ai_config_changed(opponent_type, difficulty)
 
     def _on_start_game(self) -> None:
         """Handle Start Game button."""
@@ -1104,59 +820,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
     def _configure_mouse_capture(self) -> None:
         """Configure FPS-style mouse capture for ViZDoom games.
 
+        Delegates to VizdoomEnvLoader for all ViZDoom-specific mouse capture setup.
         Click on the Video tab to capture the mouse, ESC or focus-loss to release.
-        Mouse movement is converted to turn/look actions for controlling the player view.
-
-        Uses delta mode (continuous rotation in degrees) if the adapter supports it,
-        otherwise falls back to discrete turn actions.
         """
-        game_id = self._session.game_id
-        if game_id is None:
-            # No game loaded, disable mouse capture
-            self._render_tabs.configure_mouse_capture(enabled=False)
-            return
-
-        turn_actions = get_vizdoom_mouse_turn_actions(game_id)
-        if turn_actions is None:
-            # Not a ViZDoom game, disable mouse capture
-            self._render_tabs.configure_mouse_capture(enabled=False)
-            return
-
-        # Check if adapter supports delta mode (continuous mouse control)
-        adapter = self._session._adapter
-        has_delta_support = (
-            adapter is not None
-            and hasattr(adapter, "has_mouse_delta_support")
-            and adapter.has_mouse_delta_support()
-        )
-
-        if has_delta_support:
-            # Use continuous delta mode for true FPS control (360 degrees)
-            def mouse_delta_callback(delta_x: float, delta_y: float) -> None:
-                """Route mouse delta to the adapter for smooth rotation."""
-                if adapter is not None and hasattr(adapter, "apply_mouse_delta"):
-                    adapter.apply_mouse_delta(delta_x, delta_y)
-
-            self._render_tabs.configure_mouse_capture(
-                enabled=True,
-                delta_callback=mouse_delta_callback,
-                delta_scale=0.5,  # Degrees per pixel (can be made configurable)
-            )
-        else:
-            # Fallback to discrete turn actions
-            turn_left, turn_right = turn_actions
-
-            def mouse_action_callback(action: int) -> None:
-                """Route mouse-triggered turn actions to the session controller."""
-                self._session.perform_human_action(action, key_label="mouse_turn")
-
-            self._render_tabs.configure_mouse_capture(
-                enabled=True,
-                action_callback=mouse_action_callback,
-                turn_left_action=turn_left,
-                turn_right_action=turn_right,
-                sensitivity=5.0,  # Pixels per action trigger
-            )
+        self._vizdoom_env_loader.configure_mouse_capture(self._session)
 
     def _on_step_processed(self, step: object, index: int) -> None:
         """Handle step processed from session controller."""
@@ -1311,8 +978,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         )
         self._submit_training_config(config)
 
-    def _on_agent_form_requested(self, worker_id: str) -> None:
-        """Open the worker-specific training form."""
+    def _on_train_agent_requested(self, worker_id: str) -> None:
+        """Handle the 'Train Agent' button - opens the training configuration form."""
         if not worker_id:
             QtWidgets.QMessageBox.information(
                 self,
@@ -1375,9 +1042,62 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._status_bar.showMessage("Launching training run...", 5000)
         self._submit_training_config(config_payload)
 
-    def _on_train_agent_requested(self, worker_id: str) -> None:
-        """Handle the 'Train Agent' button by delegating to the configure workflow."""
-        self._on_agent_form_requested(worker_id)
+    def _on_resume_training_requested(self, worker_id: str) -> None:
+        """Handle the 'Resume Training' button - loads checkpoint and continues training."""
+        if not worker_id:
+            QtWidgets.QMessageBox.information(
+                self,
+                "Worker Required",
+                "Select a worker integration before resuming training.",
+            )
+            return
+
+        factory = get_worker_form_factory()
+        try:
+            dialog = factory.create_resume_form(
+                worker_id,
+                parent=self,
+                current_game=self._control_panel.current_game(),
+            )
+        except KeyError:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Resume form unavailable",
+                f"Resume training for '{worker_id}' is not yet implemented.",
+            )
+            return
+
+        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
+            return
+
+        get_config = getattr(dialog, "get_config", None)
+        if not callable(get_config):
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Unsupported Form",
+                "Selected worker form does not provide a configuration payload.",
+            )
+            return
+
+        config = get_config()
+        if config is None:
+            return
+        if not isinstance(config, dict):
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Invalid Configuration",
+                "Worker form returned an unexpected payload. Expected a dictionary.",
+            )
+            return
+
+        config_payload = cast(dict[str, object], config)
+        self.log_constant(
+            LOG_UI_MAINWINDOW_INFO,
+            message="Resume training configuration submitted from dialog",
+            extra={"worker_id": worker_id},
+        )
+        self._status_bar.showMessage("Resuming training run...", 5000)
+        self._submit_training_config(config_payload)
 
     def _build_policy_evaluation_config(
         self, worker_id: str, policy_path: Path
@@ -2249,15 +1969,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     message="Polling daemon for active training runs...",
                 )
             future = runner.list_runs(
-                statuses=[
-                    RunStatus.INIT,
-                    RunStatus.HANDSHAKE,
-                    RunStatus.READY,
-                    RunStatus.EXECUTING,
-                    RunStatus.PAUSED,
-                    RunStatus.FAULTED,
-                    RunStatus.TERMINATED,
-                ],
+                statuses=self._WATCHED_RUN_STATUSES,
                 deadline=3.0,
             )
             
@@ -2379,22 +2091,13 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             )
             return
 
-        statuses = [
-            RunStatus.INIT,
-            RunStatus.HANDSHAKE,
-            RunStatus.READY,
-            RunStatus.EXECUTING,
-            RunStatus.PAUSED,
-            RunStatus.FAULTED,
-            RunStatus.TERMINATED,
-        ]
-        subscription = runner.watch_runs(statuses=statuses, since_seq=0)
+        subscription = runner.watch_runs(statuses=self._WATCHED_RUN_STATUSES, since_seq=0)
         self._run_watch_subscription = subscription
 
         def _watch_loop() -> None:
             self.log_constant( 
                 LOG_UI_MAINWINDOW_INFO,
-                message=f"Run watch thread started (statuses={','.join([status.name for status in statuses])})",
+                message=f"Run watch thread started (statuses={','.join([status.name for status in self._WATCHED_RUN_STATUSES])})",
             )
             while not self._run_watch_stop.is_set():
                 try:
@@ -2504,10 +2207,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         self._shutdown_run_watch()
 
-        # Clean up chess game controller
-        if self._chess_controller is not None:
-            self._chess_controller.close()
-            self._chess_controller = None
+        # Clean up chess game (via env loader)
+        if hasattr(self, "_chess_env_loader"):
+            self._chess_env_loader.cleanup()
 
         # Clean up Stockfish service
         if self._stockfish_service is not None:

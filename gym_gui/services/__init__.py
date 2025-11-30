@@ -3,7 +3,6 @@
 from .actor import (
 	ActorDescriptor,
 	ActorService,
-	BDIQAgent,
 	EpisodeSummary,
 	HumanKeyboardActor,
 	LLMMultiStepAgent,
@@ -16,7 +15,6 @@ from .telemetry import TelemetryService
 __all__ = [
 	"ActorDescriptor",
 	"ActorService",
-	"BDIQAgent",
 	"EpisodeSummary",
 	"HumanKeyboardActor",
 	"LLMMultiStepAgent",

@@ -2,16 +2,24 @@ from __future__ import annotations
 
 """In-memory cache abstractions used across the GUI."""
 
-from functools import lru_cache
-from typing import Callable, TypeVar
+from functools import lru_cache, _lru_cache_wrapper
+from typing import Callable, ParamSpec, TypeVar
 
 T = TypeVar("T")
+P = ParamSpec("P")
 
 
-def memoize(maxsize: int = 128) -> Callable[[Callable[..., T]], Callable[..., T]]:
-    """Decorator wrapper around :func:`functools.lru_cache`."""
+def memoize(
+    maxsize: int = 128,
+) -> Callable[[Callable[P, T]], _lru_cache_wrapper[T]]:
+    """Decorator wrapper around :func:`functools.lru_cache`.
 
-    def decorator(func: Callable[..., T]) -> Callable[..., T]:
+    Returns:
+        A decorator that wraps functions with lru_cache, preserving
+        cache_clear(), cache_info(), and other lru_cache methods.
+    """
+
+    def decorator(func: Callable[P, T]) -> _lru_cache_wrapper[T]:
         return lru_cache(maxsize=maxsize)(func)
 
     return decorator

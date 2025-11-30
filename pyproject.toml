@@ -7,27 +7,155 @@ name = "gym-gui"
 version = "0.1.0"
 description = "MOSAIC GUI for BDI-RL integration with Gymnasium environments"
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.10,<3.13"
 license = {text = "MIT"}
 authors = [
     {name = "Hamid Mousa", email = "mousa.abdulhamid@bit.edu.cn"}
 ]
-# Note: dependencies are intentionally minimal here. Install full deps from requirements.txt
-# This allows pip install -e . to work without resolving the full dependency tree.
-dependencies = []
+
+# Core dependencies - ONLY what's needed to launch the GUI
+# No gymnasium environments here - those are optional
+dependencies = [
+    # Environment configuration
+    "python-dotenv>=1.0.0",
+    "PyYAML>=6.0",
+
+    # Qt GUI framework
+    "PyQt6>=6.7.0",
+    "qtpy>=2.4.0",
+    "qasync>=0.27.0",
+
+    # Core utilities
+    "packaging>=24.0",
+    "jsonschema>=4.20.0",
+    "pydantic>=2.0.0",
+    "Pillow>=10.0.0",
+    "numpy>=1.24.0",
+
+    # gRPC for trainer communication
+    "grpcio>=1.60.0",
+    "grpcio-tools>=1.60.0",
+    "protobuf>=4.25.0",
+
+    # Run ID generation
+    "python-ulid>=2.0.0",
+
+    # HDF5 for replay storage (frames, observations)
+    "h5py>=3.10.0",
+]
 
 [project.optional-dependencies]
-dev = [
-    "pytest>=7.0.0",
-    "pytest-asyncio>=0.21.0",
+# =============================================================================
+# Environment Families (additive - install what you need)
+# =============================================================================
+
+# Gymnasium core (needed for most environment families)
+gymnasium = ["gymnasium>=0.29.0"]
+
+# Box2D environments (LunarLander, BipedalWalker, CarRacing)
+box2d = [
+    "gymnasium[box2d]>=0.29.0",
 ]
+
+# MuJoCo environments (Ant, HalfCheetah, Humanoid, etc.)
+mujoco = [
+    "gymnasium[mujoco]>=0.29.0",
+]
+
+# Atari environments (Breakout, Pong, SpaceInvaders, etc.)
+atari = [
+    "gymnasium[atari]>=0.29.0",
+    "autorom[accept-rom-license]>=0.6.0",
+]
+
+# MiniGrid environments (grid-world navigation)
+minigrid = [
+    "gymnasium>=0.29.0",
+    "minigrid>=2.0.0,<3.0.0",
+]
+
+# PettingZoo multi-agent environments (Chess, Go, MPE, etc.)
+pettingzoo = [
+    "pettingzoo[classic,butterfly,mpe,sisl]>=1.24.0",
+    "supersuit>=3.9.0",
+    "stockfish>=3.28.0",
+]
+
+# ViZDoom FPS environments
 vizdoom = [
     "vizdoom>=1.2.0,<2.0.0",
 ]
-all = [
-    "vizdoom>=1.2.0,<2.0.0",
+
+# =============================================================================
+# Workers (training backends)
+# =============================================================================
+
+# CleanRL worker for RL training
+cleanrl = [
+    "torch>=2.0.0",
+    "tensorboard>=2.11.0",
+    "wandb>=0.22.3",
+    "tyro>=0.5.0",
+    "tenacity>=8.0.0",
+    "moviepy>=1.0.3",
+]
+
+# MuJoCo MPC worker (also requires building C++ binary)
+mujoco-mpc = [
+    "mujoco>=3.0.0",
+]
+
+# SPADE BDI worker
+spade-bdi = [
+    "spade>=4.0.0",
+    "spade-bdi>=0.3.0",
+]
+
+# LLM worker (Ollama integration)
+llm = [
+    "ollama>=0.3.0",
+    "langchain>=0.3.0",
+    "langchain-ollama>=0.1.0",
+    "langchain-core>=0.3.0",
+]
+
+# =============================================================================
+# Development & Testing
+# =============================================================================
+
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pyright>=1.1.0",
+]
+
+# =============================================================================
+# Convenience Bundles
+# =============================================================================
+
+# All Gymnasium single-agent environments
+all-gymnasium = [
+    "gym-gui[box2d,mujoco,atari,minigrid]",
+]
+
+# All environment families (single + multi-agent)
+all-envs = [
+    "gym-gui[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom]",
+]
+
+# Full development setup
+full = [
+    "gym-gui[all-envs,cleanrl,dev]",
 ]
 
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["gym_gui*"]
+
+[project.urls]
+Homepage = "https://github.com/hamid-mousa/GUI_BDI_RL"
+Repository = "https://github.com/hamid-mousa/GUI_BDI_RL"
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "basic"

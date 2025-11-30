@@ -4,13 +4,13 @@ These handlers extract related functionality from MainWindow to improve
 maintainability and testability. Each handler is a standalone class that
 receives its dependencies via constructor injection.
 
-- GameConfigHandler: Environment configuration change handlers
-- MPCHandler: MuJoCo MPC launch/stop handlers
-- LogHandler: Log filtering and display
-- ChessHandler: Chess game move handling (Human Control Mode)
-- ConnectFourHandler: Connect Four game move handling (Human Control Mode)
-- GoHandler: Go game move handling (Human Control Mode)
-- HumanVsAgentHandler: Human vs Agent AI setup and management
+Subdirectory structure:
+- game_moves/: Board game move handlers for Human Control Mode
+  - ChessHandler, GoHandler, ConnectFourHandler
+- features/: Cross-cutting feature handlers
+  - GameConfigHandler, MPCHandler, LogHandler, HumanVsAgentHandler
+- env_loaders/: Environment-specific loaders and lifecycle managers
+  - ChessEnvLoader, VizdoomEnvLoader
 
 Usage:
     # In MainWindow.__init__:
@@ -33,24 +33,49 @@ Usage:
     self._human_vs_agent_handler = HumanVsAgentHandler(
         status_bar=self._status_bar,
     )
+
+    # For environment-specific loaders:
+    self._chess_env_loader = ChessEnvLoader(
+        render_tabs=self._render_tabs,
+        control_panel=self._control_panel,
+        status_bar=self._status_bar,
+    )
 """
 
 from __future__ import annotations
 
-from gym_gui.ui.handlers.game_config_handlers import GameConfigHandler
-from gym_gui.ui.handlers.log_handlers import LogHandler
-from gym_gui.ui.handlers.mpc_handlers import MPCHandler
-from gym_gui.ui.handlers.chess_handlers import ChessHandler
-from gym_gui.ui.handlers.connect_four_handlers import ConnectFourHandler
-from gym_gui.ui.handlers.go_handlers import GoHandler
-from gym_gui.ui.handlers.human_vs_agent_handlers import HumanVsAgentHandler
+# Game move handlers (Human Control Mode)
+from gym_gui.ui.handlers.game_moves import (
+    ChessHandler,
+    GoHandler,
+    ConnectFourHandler,
+)
+
+# Feature handlers (cross-cutting concerns)
+from gym_gui.ui.handlers.features import (
+    GameConfigHandler,
+    MPCHandler,
+    LogHandler,
+    HumanVsAgentHandler,
+)
+
+# Environment loaders
+from gym_gui.ui.handlers.env_loaders import (
+    ChessEnvLoader,
+    VizdoomEnvLoader,
+)
 
 __all__ = [
-    "GameConfigHandler",
-    "LogHandler",
-    "MPCHandler",
+    # Game move handlers
     "ChessHandler",
-    "ConnectFourHandler",
     "GoHandler",
+    "ConnectFourHandler",
+    # Feature handlers
+    "GameConfigHandler",
+    "MPCHandler",
+    "LogHandler",
     "HumanVsAgentHandler",
+    # Environment loaders
+    "ChessEnvLoader",
+    "VizdoomEnvLoader",
 ]

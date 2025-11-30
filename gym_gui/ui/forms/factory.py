@@ -9,6 +9,7 @@ from qtpy import QtWidgets
 
 TrainFormFactory = Callable[..., QtWidgets.QDialog]
 PolicyFormFactory = Callable[..., QtWidgets.QDialog]
+ResumeFormFactory = Callable[..., QtWidgets.QDialog]
 
 
 class WorkerFormFactory:
@@ -17,6 +18,7 @@ class WorkerFormFactory:
     def __init__(self) -> None:
         self._train_forms: Dict[str, TrainFormFactory] = {}
         self._policy_forms: Dict[str, PolicyFormFactory] = {}
+        self._resume_forms: Dict[str, ResumeFormFactory] = {}
 
     # ------------------------------------------------------------------
     def register_train_form(self, worker_id: str, factory: TrainFormFactory) -> None:
@@ -28,6 +30,11 @@ class WorkerFormFactory:
         if worker_id in self._policy_forms:
             raise ValueError(f"Policy form already registered for worker '{worker_id}'")
         self._policy_forms[worker_id] = factory
+
+    def register_resume_form(self, worker_id: str, factory: ResumeFormFactory) -> None:
+        if worker_id in self._resume_forms:
+            raise ValueError(f"Resume form already registered for worker '{worker_id}'")
+        self._resume_forms[worker_id] = factory
 
     # ------------------------------------------------------------------
     def create_train_form(self, worker_id: str, *args, **kwargs) -> QtWidgets.QDialog:
@@ -42,12 +49,21 @@ class WorkerFormFactory:
             raise KeyError(f"No policy form registered for worker '{worker_id}'")
         return factory(*args, **kwargs)
 
+    def create_resume_form(self, worker_id: str, *args, **kwargs) -> QtWidgets.QDialog:
+        factory = self._resume_forms.get(worker_id)
+        if factory is None:
+            raise KeyError(f"No resume form registered for worker '{worker_id}'")
+        return factory(*args, **kwargs)
+
     # ------------------------------------------------------------------
     def has_train_form(self, worker_id: str) -> bool:
         return worker_id in self._train_forms
 
     def has_policy_form(self, worker_id: str) -> bool:
         return worker_id in self._policy_forms
+
+    def has_resume_form(self, worker_id: str) -> bool:
+        return worker_id in self._resume_forms
 
 
 _factory = WorkerFormFactory()

@@ -124,26 +124,42 @@ class CleanRlPolicyForm(QtWidgets.QDialog, LogConstantMixin):
         self._family_combo.currentIndexChanged.connect(self._on_family_changed)
         self._env_combo.currentIndexChanged.connect(self._on_env_changed)
 
-        # Telemetry controls
-        telemetry_group = QtWidgets.QGroupBox("Telemetry", self)
-        telemetry_layout = QtWidgets.QGridLayout(telemetry_group)
-        self._fastlane_only_checkbox = QtWidgets.QCheckBox("Fast Lane only (no durable path)", telemetry_group)
-        telemetry_layout.addWidget(self._fastlane_only_checkbox, 0, 0, 1, 2)
-        telemetry_layout.addWidget(QtWidgets.QLabel("Video Mode", telemetry_group), 1, 0)
-        self._video_mode_combo = QtWidgets.QComboBox(telemetry_group)
+        # Visualization options (FastLane is optional for evaluation)
+        vis_group = QtWidgets.QGroupBox("Visualization (Optional)", self)
+        vis_layout = QtWidgets.QGridLayout(vis_group)
+
+        self._enable_fastlane_checkbox = QtWidgets.QCheckBox("Enable FastLane real-time view", vis_group)
+        self._enable_fastlane_checkbox.setChecked(False)  # Off by default for evaluation
+        self._enable_fastlane_checkbox.setToolTip(
+            "Show the agent playing in real-time. Not required for evaluation - TensorBoard results are the primary output."
+        )
+        self._enable_fastlane_checkbox.stateChanged.connect(self._on_fastlane_toggled)
+        vis_layout.addWidget(self._enable_fastlane_checkbox, 0, 0, 1, 2)
+
+        # FastLane options (initially hidden)
+        self._fastlane_only_checkbox = QtWidgets.QCheckBox("Fast Lane only (no durable path)", vis_group)
+        self._fastlane_only_checkbox.setChecked(True)
+        vis_layout.addWidget(self._fastlane_only_checkbox, 1, 0, 1, 2)
+        vis_layout.addWidget(QtWidgets.QLabel("Video Mode", vis_group), 2, 0)
+        self._video_mode_combo = QtWidgets.QComboBox(vis_group)
         for mode, descriptor in VIDEO_MODE_DESCRIPTORS.items():
             self._video_mode_combo.addItem(descriptor.label, mode)
-        telemetry_layout.addWidget(self._video_mode_combo, 1, 1)
-        telemetry_layout.addWidget(QtWidgets.QLabel("Grid Limit", telemetry_group), 2, 0)
-        self._grid_spin = QtWidgets.QSpinBox(telemetry_group)
+        vis_layout.addWidget(self._video_mode_combo, 2, 1)
+        vis_layout.addWidget(QtWidgets.QLabel("Grid Limit", vis_group), 3, 0)
+        self._grid_spin = QtWidgets.QSpinBox(vis_group)
         self._grid_spin.setRange(1, 64)
-        telemetry_layout.addWidget(self._grid_spin, 2, 1)
+        vis_layout.addWidget(self._grid_spin, 3, 1)
         self._video_mode_combo.currentIndexChanged.connect(self._sync_video_mode_controls)
 
-        self._eval_video_checkbox = QtWidgets.QCheckBox("Capture evaluation video", telemetry_group)
-        telemetry_layout.addWidget(self._eval_video_checkbox, 3, 0, 1, 2)
+        self._eval_video_checkbox = QtWidgets.QCheckBox("Capture evaluation video to disk", vis_group)
+        vis_layout.addWidget(self._eval_video_checkbox, 4, 0, 1, 2)
 
-        form_layout.addWidget(telemetry_group, 3, 0, 1, 2)
+        # Initially hide FastLane options
+        self._fastlane_only_checkbox.setVisible(False)
+        self._video_mode_combo.setVisible(False)
+        self._grid_spin.setVisible(False)
+
+        form_layout.addWidget(vis_group, 3, 0, 1, 2)
 
         # Seed override
         form_layout.addWidget(QtWidgets.QLabel("Seed", self), 4, 0)
@@ -351,6 +367,26 @@ class CleanRlPolicyForm(QtWidgets.QDialog, LogConstantMixin):
         else:
             self._grid_spin.setEnabled(False)
 
+    def _on_fastlane_toggled(self, state: int) -> None:
+        """Show/hide FastLane options based on checkbox state."""
+        enabled = state == QtCore.Qt.CheckState.Checked.value
+        self._fastlane_only_checkbox.setVisible(enabled)
+        self._video_mode_combo.setVisible(enabled)
+        self._grid_spin.setVisible(enabled)
+        # Find and toggle the labels too
+        parent = self._video_mode_combo.parent()
+        if parent:
+            layout = parent.layout()
+            if layout:
+                for i in range(layout.count()):
+                    item = layout.itemAt(i)
+                    if item and item.widget():
+                        widget = item.widget()
+                        if isinstance(widget, QtWidgets.QLabel):
+                            text = widget.text()
+                            if text in ("Video Mode", "Grid Limit"):
+                                widget.setVisible(enabled)
+
     def _on_browse(self) -> None:
         path, _ = QtWidgets.QFileDialog.getOpenFileName(
             self,
@@ -402,13 +438,21 @@ class CleanRlPolicyForm(QtWidgets.QDialog, LogConstantMixin):
         run_id = generate_run_id("cleanrl-eval", checkpoint.algo or "policy")
         episodes_per_batch = int(self._episode_spin.value())
         repeat_eval = self._repeat_checkbox.isChecked()
+
+        # FastLane is optional for evaluation - only enable if user checks the box
+        fastlane_enabled = self._enable_fastlane_checkbox.isChecked()
+        fastlane_only = self._fastlane_only_checkbox.isChecked() if fastlane_enabled else False
+        video_mode = self._video_mode_combo.currentData() if fastlane_enabled else VideoModes.SINGLE
+        grid_limit = int(self._grid_spin.value()) if fastlane_enabled else 1
+
         extras: Dict[str, Any] = {
             "mode": "policy_eval",
             "policy_path": str(checkpoint.policy_path),
-            "fastlane_only": self._fastlane_only_checkbox.isChecked(),
+            "fastlane_enabled": fastlane_enabled,
+            "fastlane_only": fastlane_only,
             "fastlane_slot": 0,
-            "fastlane_video_mode": self._video_mode_combo.currentData(),
-            "fastlane_grid_limit": int(self._grid_spin.value()),
+            "fastlane_video_mode": video_mode,
+            "fastlane_grid_limit": grid_limit,
             "eval_capture_video": self._eval_video_checkbox.isChecked(),
             "eval_episodes": episodes_per_batch,
             "eval_batch_size": episodes_per_batch,
@@ -438,10 +482,11 @@ class CleanRlPolicyForm(QtWidgets.QDialog, LogConstantMixin):
                 "algo": worker_config["algo"],
                 "env_id": env_id,
                 "dry_run": False,
-                "fastlane_only": extras["fastlane_only"],
+                "fastlane_enabled": fastlane_enabled,
+                "fastlane_only": fastlane_only,
                 "fastlane_slot": 0,
-                "fastlane_video_mode": extras["fastlane_video_mode"],
-                "fastlane_grid_limit": extras["fastlane_grid_limit"],
+                "fastlane_video_mode": video_mode,
+                "fastlane_grid_limit": grid_limit,
                 "run_mode": "policy_eval",
                 "eval_episodes": episodes_per_batch,
                 "eval_batch_size": episodes_per_batch,
@@ -484,13 +529,19 @@ class CleanRlPolicyForm(QtWidgets.QDialog, LogConstantMixin):
             "WANDB_DISABLE_GYM": "true",
             "CLEANRL_NUM_ENVS": str(checkpoint.num_envs or 1),
         }
-        apply_fastlane_environment(
-            environment,
-            fastlane_only=extras["fastlane_only"],
-            fastlane_slot=0,
-            video_mode=extras["fastlane_video_mode"],
-            grid_limit=extras["fastlane_grid_limit"],
-        )
+
+        # Only apply FastLane environment when enabled
+        if fastlane_enabled:
+            apply_fastlane_environment(
+                environment,
+                fastlane_only=fastlane_only,
+                fastlane_slot=0,
+                video_mode=video_mode,
+                grid_limit=grid_limit,
+            )
+        else:
+            # Explicitly disable FastLane
+            environment["MOSAIC_FASTLANE_ENABLED"] = "0"
 
         config: Dict[str, Any] = {
             "run_name": run_id,

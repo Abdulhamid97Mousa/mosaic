@@ -59,7 +59,6 @@ from gym_gui.logging_config.log_constants import (
 )
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.services.actor import ActorService, EpisodeSummary, StepSnapshot
-from gym_gui.services.frame_storage import FrameStorageService
 from gym_gui.services.storage import StorageRecorderService
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
@@ -148,7 +147,6 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._telemetry = locator.resolve(TelemetryService)
         self._slow_lane_enabled: bool = False
         self._actor_service = locator.resolve(ActorService)
-        self._frame_storage = locator.resolve(FrameStorageService)
         self._storage_service = locator.resolve(StorageRecorderService)
         if self._actor_service is not None:
             self._seed_manager.register_consumer("actor_service", self._actor_service.seed)
@@ -909,22 +907,6 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         run_context = self._run_counter_manager
         run_id = getattr(run_context, "_run_id", None) if run_context is not None else None
         worker_id = getattr(run_context, "_worker_id", None) if run_context is not None else None
-
-        # Save frame to disk if frame_ref is available
-        if (
-            frame_ref
-            and self._frame_storage is not None
-            and step.render_payload is not None
-            and self._should_capture_frames()
-        ):
-            try:
-                self._frame_storage.save_frame(
-                    step.render_payload,
-                    frame_ref,
-                    run_id=run_id,
-                )
-            except Exception as e:
-                _LOGGER.debug(f"Failed to save frame {frame_ref}: {e}")
 
         record = StepRecord(
             episode_id=self._episode_id,

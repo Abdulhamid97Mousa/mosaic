@@ -1,6 +1,6 @@
 # Files In Use - Architecture Update (Refactored)
 
-**Date:** 2025-11-28
+**Date:** 2025-11-28 (Updated: 2025-11-29)
 **Status:** ✅ COMPLETE
 
 ## New Architecture: Consolidated Board Game Rendering
@@ -96,3 +96,76 @@ This supports both wrapped payloads and flat payloads from adapter `to_dict()` m
 ### `gym_gui/controllers/chess_controller.py`
 **Purpose:** Chess game controller for Human vs Agent gameplay
 **Status:** Independent of UI widgets, works with any UI via signals
+
+---
+
+## Human vs Agent Files (Added 2025-11-29)
+
+### `gym_gui/services/chess_ai/__init__.py`
+**Purpose:** Package init for chess AI services
+**Exports:** `StockfishService`
+
+### `gym_gui/services/chess_ai/stockfish_service.py`
+**Purpose:** Stockfish chess engine wrapper with difficulty presets
+**Contains:**
+- `StockfishConfig` - Configuration dataclass for Stockfish settings
+- `StockfishService` - Wrapper for Stockfish UCI protocol
+- `DIFFICULTY_PRESETS` - Named presets (beginner, easy, medium, hard, expert)
+**Used by:** `gym_gui/ui/handlers/human_vs_agent_handlers.py`
+
+### `gym_gui/ui/widgets/human_vs_agent_config_form.py`
+**Purpose:** Configuration dialog for Human vs Agent gameplay settings
+**Contains:**
+- `StockfishConfig` - Skill level, depth, time limit, threads, hash size
+- `HumanVsAgentConfig` - Opponent type, difficulty, custom policy path
+- `HumanVsAgentConfigForm` - QDialog with radio buttons, spinboxes, tooltips
+- `DIFFICULTY_PRESETS` - Preset configurations
+- `DIFFICULTY_DESCRIPTIONS` - User-friendly descriptions
+**Used by:** `gym_gui/ui/widgets/multi_agent_tab.py`
+
+### `gym_gui/ui/widgets/human_vs_agent_board.py`
+**Purpose:** Interactive chess board widget for Human vs Agent mode
+**Contains:**
+- `InteractiveChessBoard` - QWidget with chess board rendering
+  - Parses FEN strings
+  - Shows legal moves, last move, check highlights
+  - Emits `move_made(from_sq, to_sq)` signal on user moves
+**Used by:** `gym_gui/ui/main_window.py`
+
+### `gym_gui/ui/handlers/human_vs_agent_handlers.py`
+**Purpose:** Handler for Human vs Agent AI opponent management
+**Contains:**
+- `HumanVsAgentHandler` - Manages AI providers (Stockfish, random)
+  - `setup_ai_provider()` - Initializes AI based on config
+  - `on_ai_config_changed()` - Updates AI when settings change
+  - `cleanup()` - Stops Stockfish process
+**Used by:** `gym_gui/ui/main_window.py`
+
+## Updated Files (2025-11-29)
+
+### `gym_gui/ui/widgets/multi_agent_tab.py`
+**Changes:**
+- Added `HumanVsAgentConfig` dataclass import
+- Replaced inline AI opponent dropdowns with "Configure AI Opponent..." button
+- Added `_config_summary` label showing current configuration
+- Added `_on_configure_clicked()` - Opens config dialog
+- Added `_on_config_accepted()` - Handles dialog result
+- Added `_update_config_summary()` - Updates summary display
+- Added `get_ai_config()` - Returns full config object
+
+### `gym_gui/ui/main_window.py`
+**Changes:**
+- Fixed env_id comparison: `"chess"` → `"chess_v6"` (line 665)
+- Added `HumanVsAgentHandler` import and instance variable
+- Removed `_stockfish_service`, `_current_ai_opponent`, `_current_ai_difficulty`
+- Removed `_setup_chess_ai_provider_from_config()` method (moved to handler)
+- Updated `_load_chess_game()` to use handler
+- Updated `_on_ai_opponent_changed()` to delegate to handler
+
+### `gym_gui/ui/handlers/__init__.py`
+**Changes:**
+- Added `HumanVsAgentHandler` to exports
+
+### `requirements/base.txt`
+**Changes:**
+- Added `stockfish>=3.28.0` for Stockfish Python bindings

@@ -1,7 +1,7 @@
 # Implementation Roadmap: Multi-Agent Training for Human vs Agent Mode
 
-**Date:** 2025-11-28
-**Status:** Phase 1 (Board Game Rendering) ✅ COMPLETE
+**Date:** 2025-11-28 (Updated: 2025-11-29)
+**Status:** Phase 1 (Board Game Rendering) ✅ COMPLETE | Phase 1.5 (Stockfish Integration) ✅ COMPLETE
 
 ---
 
@@ -52,6 +52,37 @@ RenderTabs
 
 ---
 
+## ✅ COMPLETED: Phase 1.5 - Stockfish Integration (2025-11-29)
+
+### What Was Accomplished
+
+Human vs Agent Chess mode now works with Stockfish as the AI opponent:
+- Configuration dialog for AI opponent settings
+- 5 difficulty presets with detailed explanations
+- Interactive chess board with move highlighting
+- Handler-based architecture for clean code separation
+
+### Files Changed
+
+| Action | File | Description |
+|--------|------|-------------|
+| ✅ Created | `gym_gui/services/chess_ai/__init__.py` | Chess AI service package |
+| ✅ Created | `gym_gui/services/chess_ai/stockfish_service.py` | Stockfish wrapper with presets |
+| ✅ Created | `gym_gui/ui/widgets/human_vs_agent_config_form.py` | Config dialog with tooltips |
+| ✅ Created | `gym_gui/ui/widgets/human_vs_agent_board.py` | Interactive chess board |
+| ✅ Created | `gym_gui/ui/handlers/human_vs_agent_handlers.py` | AI provider handler |
+| ✅ Updated | `gym_gui/ui/widgets/multi_agent_tab.py` | Configure button + summary |
+| ✅ Updated | `gym_gui/ui/main_window.py` | Handler integration, bug fix |
+| ✅ Updated | `requirements/base.txt` | Added stockfish dependency |
+
+### Bug Fixed
+
+**Root Cause:** `main_window.py` compared `env_id == "chess"` but enum returns `"chess_v6"`, so tab never appeared.
+
+**Solution:** Changed to `env_id == "chess_v6"` at line 665.
+
+---
+
 ## ⏳ PENDING: Training Support Implementation
 
 ### Current State
@@ -59,10 +90,12 @@ RenderTabs
 - ✅ Single-Agent Mode has full training pipeline (Configure → Train → Load Policy)
 - ✅ Board widgets render and accept user input via BoardGameRendererStrategy
 - ✅ Human Control Mode allows playing against environment
-- ❌ HumanVsAgentTab has no worker selection
+- ✅ Human vs Agent Chess works with Stockfish AI opponent
+- ✅ Environment Configuration dialog with detailed settings
+- ❌ HumanVsAgentTab has no worker selection for custom training
 - ❌ HumanVsAgentTab has no training configuration
 - ❌ No self-play algorithm for PettingZoo Classic games
-- ❌ "Load Trained Policy" button exists but no policies to load
+- ❌ "Custom Policy" option exists but loading not yet implemented
 
 ---
 
@@ -179,18 +212,29 @@ def _connect_multi_agent_signals(self) -> None:
 - [x] `gym_gui/ui/main_window.py` - Updated
 - [x] Old board widget files - Deleted
 
+### Phase 1.5 (COMPLETE - Stockfish Integration)
+- [x] `gym_gui/services/chess_ai/__init__.py` - Created
+- [x] `gym_gui/services/chess_ai/stockfish_service.py` - Created
+- [x] `gym_gui/ui/widgets/human_vs_agent_config_form.py` - Created
+- [x] `gym_gui/ui/widgets/human_vs_agent_board.py` - Created
+- [x] `gym_gui/ui/handlers/human_vs_agent_handlers.py` - Created
+- [x] `gym_gui/ui/widgets/multi_agent_tab.py` - Updated with Configure button
+- [x] `gym_gui/ui/main_window.py` - Fixed env_id bug, integrated handler
+
 ### Phase 2-6 (PENDING)
-- [ ] `gym_gui/ui/widgets/multi_agent_tab.py` - Add training UI
+- [ ] `gym_gui/ui/widgets/multi_agent_tab.py` - Add worker selection for training
 - [ ] `gym_gui/ui/widgets/pettingzoo_classic_train_form.py` - Create
 - [ ] `gym_gui/ui/widgets/pettingzoo_classic_policy_form.py` - Create
 - [ ] `3rd_party/cleanrl_worker/cleanrl/cleanrl/ppo_pettingzoo_classic_selfplay.py` - Create
 - [ ] `3rd_party/cleanrl_worker/cleanrl_worker/cli.py` - Register algorithm
 
 ### Files to KEEP (In Use)
-- `gym_gui/ui/handlers/chess_handlers.py` - Chess-specific logic
-- `gym_gui/ui/handlers/go_handlers.py` - Go-specific logic
-- `gym_gui/ui/handlers/connect_four_handlers.py` - Connect Four logic
+- `gym_gui/ui/handlers/chess_handlers.py` - Chess-specific logic (Human Control Mode)
+- `gym_gui/ui/handlers/go_handlers.py` - Go-specific logic (Human Control Mode)
+- `gym_gui/ui/handlers/connect_four_handlers.py` - Connect Four logic (Human Control Mode)
+- `gym_gui/ui/handlers/human_vs_agent_handlers.py` - AI opponent management
 - `gym_gui/controllers/chess_controller.py` - Game flow controller
+- `gym_gui/services/chess_ai/stockfish_service.py` - Stockfish engine wrapper
 
 ---
 
@@ -200,9 +244,12 @@ def _connect_multi_agent_signals(self) -> None:
 |--------|--------|
 | Board games render in Grid tab correctly | ✅ Complete |
 | Games switch properly when loading different environments | ✅ Complete |
+| Human vs Agent Chess tab appears on Load Environment | ✅ Complete |
+| Stockfish AI opponent with difficulty presets | ✅ Complete |
+| Environment Configuration dialog functional | ✅ Complete |
+| Human can play against Stockfish AI | ✅ Complete |
 | Training pipeline works (configure → train → load) | ⏳ Pending |
-| Policies discovered and loadable | ⏳ Pending |
-| Human vs AI gameplay functional | ⏳ Pending |
+| Custom policies discovered and loadable | ⏳ Pending |
 
 ---
 
@@ -212,3 +259,5 @@ def _connect_multi_agent_signals(self) -> None:
 - PettingZoo Classic (`pip install 'pettingzoo[classic]'`)
 - python-chess (for Chess environment)
 - Existing CleanRL worker infrastructure
+- **Stockfish** (system): `sudo apt install stockfish`
+- **stockfish** (Python): `pip install stockfish>=3.28.0` (in requirements/base.txt)

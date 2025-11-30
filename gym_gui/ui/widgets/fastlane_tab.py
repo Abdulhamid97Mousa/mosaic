@@ -13,7 +13,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_UI_FASTLANE_EVAL_SUMMARY_WARNING,
 )
 from gym_gui.ui.fastlane_consumer import FastLaneConsumer, FastLaneFrameEvent
-from gym_gui.ui.renderers.fastlane_item import FastLaneItem  # ensures type registered
+from gym_gui.ui.qml.fastlane_item import FastLaneItem  # ensures type registered
 
 
 _LOGGER = logging.getLogger(__name__)

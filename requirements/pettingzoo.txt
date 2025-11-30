@@ -31,3 +31,7 @@ pettingzoo[sisl]>=1.24.0
 # SuperSuit: Environment wrappers for preprocessing
 # (frame stacking, resizing, normalization, etc.)
 supersuit>=3.9.0
+
+# Chess AI engine integration (for Human vs Agent mode)
+# Note: Also requires Stockfish binary: sudo apt install stockfish
+stockfish>=3.28.0

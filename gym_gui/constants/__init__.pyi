@@ -94,10 +94,6 @@ from .constants_trainer import (
     TrainerRetryDefaults,
     TrainRunSchemaDefaults,
 )
-from .constants_jason_supervisor import (
-    SupervisorDefaults,
-    DEFAULT_SUPERVISOR,
-)
 from .constants_game import (
     FROZEN_LAKE_DEFAULTS,
     FROZEN_LAKE_V2_DEFAULTS,
@@ -105,6 +101,23 @@ from .constants_game import (
     TAXI_DEFAULTS,
     TOY_TEXT_DEFAULTS,
     ToyTextDefaults,
+)
+from .constants_replay import (
+    REPLAY_DEFAULTS,
+    ReplayDefaults,
+    ReplayWriterDefaults,
+    ReplayReaderDefaults,
+    FrameRefDefaults,
+    ReplayPathDefaults,
+    REPLAY_MAX_STEPS_PER_RUN,
+    REPLAY_FRAME_CHUNK_SIZE,
+    REPLAY_COMPRESSION,
+    REPLAY_WRITE_BATCH_SIZE,
+    REPLAY_WRITE_QUEUE_SIZE,
+    FRAME_REF_SCHEME,
+    FRAME_REF_FRAMES_DATASET,
+    FRAME_REF_OBS_DATASET,
+    REPLAY_SUBDIR,
 )
 
 __all__ = [
@@ -205,7 +218,20 @@ __all__ = [
     "TAXI_DEFAULTS",
     "TOY_TEXT_DEFAULTS",
     "ToyTextDefaults",
-    # Supervisor (Jason)
-    "SupervisorDefaults",
-    "DEFAULT_SUPERVISOR",
+    # Replay Storage (HDF5)
+    "REPLAY_DEFAULTS",
+    "ReplayDefaults",
+    "ReplayWriterDefaults",
+    "ReplayReaderDefaults",
+    "FrameRefDefaults",
+    "ReplayPathDefaults",
+    "REPLAY_MAX_STEPS_PER_RUN",
+    "REPLAY_FRAME_CHUNK_SIZE",
+    "REPLAY_COMPRESSION",
+    "REPLAY_WRITE_BATCH_SIZE",
+    "REPLAY_WRITE_QUEUE_SIZE",
+    "FRAME_REF_SCHEME",
+    "FRAME_REF_FRAMES_DATASET",
+    "FRAME_REF_OBS_DATASET",
+    "REPLAY_SUBDIR",
 ]

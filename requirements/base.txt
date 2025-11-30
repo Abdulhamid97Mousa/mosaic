@@ -28,6 +28,10 @@ numpy==2.3.4
 pytest==8.4.2
 pydantic==2.8.0
 Pillow==10.4.0
+
+# HDF5 for replay storage (frames, observations)
+h5py>=3.10.0
+
 # Gymnasium core + environment families used across GUI and workers
 
 gymnasium[box2d]
@@ -37,7 +41,3 @@ gymnasium
 minigrid>=2,<3.0.0
 
 autorom[accept-rom-license]==0.6.1
-
-# Chess AI engine integration (for Human vs Agent mode)
-# Note: Also requires Stockfish binary: sudo apt install stockfish
-stockfish>=3.28.0

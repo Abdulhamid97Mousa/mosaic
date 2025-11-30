@@ -175,7 +175,6 @@ class TrainerControlUpdate(BaseModel):
 
     run_id: str = Field(..., description="Target run identifier")
     reason: str = Field(..., description="Human-readable reason for the change")
-    source: str = Field(default="jason_supervisor", description="Origin tag of the control")
     params: Dict[str, Any] = Field(default_factory=dict, description="Parameter overrides")
 
     class Config:

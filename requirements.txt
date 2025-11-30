@@ -55,3 +55,42 @@
 
 # SPADE-BDI worker stack
 -r requirements/spade_bdi_worker.txt
+
+
+# pyproject.toml - Optional Dependencies
+
+#   Usage:
+#   # Minimal GUI only (no environments)
+#   pip install -e .
+
+#   # GUI + PettingZoo (Chess, Go, etc.)
+#   pip install -e ".[pettingzoo]"
+
+#   # GUI + multiple environment families
+#   pip install -e ".[pettingzoo,vizdoom,box2d]"
+
+#   # GUI + CleanRL training worker
+#   pip install -e ".[cleanrl,mujoco]"
+
+#   # Everything
+#   pip install -e ".[all-envs]"
+
+#   Available optional groups:
+
+#   | Group         | Description                                  |
+#   |---------------|----------------------------------------------|
+#   | gymnasium     | Core gymnasium (no specific envs)            |
+#   | box2d         | LunarLander, BipedalWalker, CarRacing        |
+#   | mujoco        | Ant, HalfCheetah, Humanoid, etc.             |
+#   | atari         | Breakout, Pong, SpaceInvaders + ROMs         |
+#   | minigrid      | Grid-world navigation                        |
+#   | pettingzoo    | Chess, Go, MPE, SISL + Stockfish             |
+#   | vizdoom       | Doom FPS environments                        |
+#   | cleanrl       | CleanRL training (torch, tensorboard, wandb) |
+#   | mujoco-mpc    | MuJoCo MPC worker                            |
+#   | spade-bdi     | SPADE BDI agent framework                    |
+#   | llm           | Ollama/LangChain integration                 |
+#   | dev           | pytest, pyright                              |
+#   | all-gymnasium | All single-agent envs                        |
+#   | all-envs      | All environments                             |
+#   | full          | Everything                                   |

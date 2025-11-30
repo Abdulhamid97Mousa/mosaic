@@ -134,6 +134,7 @@ class TelemetrySQLiteStore(LogConstantMixin):
                 agent_id TEXT,
                 render_hint BLOB,
                 frame_ref TEXT,
+                obs_ref TEXT,
                 payload_version INTEGER NOT NULL DEFAULT 0,
                 run_id TEXT,
                 worker_id TEXT,
@@ -538,11 +539,11 @@ class TelemetrySQLiteStore(LogConstantMixin):
             INSERT INTO steps (
                 episode_id, step_index, action, observation, reward,
                 terminated, truncated, info, render_payload, timestamp,
-                agent_id, render_hint, frame_ref, payload_version, run_id, game_id, worker_id,
+                agent_id, render_hint, frame_ref, obs_ref, payload_version, run_id, game_id, worker_id,
                 space_signature, vector_metadata, time_step
             ) VALUES (:episode_id, :step_index, :action, :observation, :reward,
                 :terminated, :truncated, :info, :render_payload, :timestamp,
-                :agent_id, :render_hint, :frame_ref, :payload_version, :run_id, :game_id, :worker_id,
+                :agent_id, :render_hint, :frame_ref, :obs_ref, :payload_version, :run_id, :game_id, :worker_id,
                 :space_signature, :vector_metadata, :time_step)
             """,
             steps,
@@ -756,6 +757,7 @@ class TelemetrySQLiteStore(LogConstantMixin):
             "agent_id": record.agent_id,
             "render_hint": self._serialize_field(record.render_hint, context="render hint"),
             "frame_ref": record.frame_ref,
+            "obs_ref": record.obs_ref,
             "payload_version": int(record.payload_version),
             "run_id": record.run_id,
             "game_id": game_id,

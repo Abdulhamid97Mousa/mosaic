@@ -442,8 +442,16 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
         capture_video_layout.addLayout(self._capture_video_slot)
         capture_video_layout.addStretch(1)
 
+        self._save_model_checkbox = QtWidgets.QCheckBox("Save model after training", self)
+        self._save_model_checkbox.setChecked(True)
+        self._save_model_checkbox.setToolTip(
+            "Save the trained model checkpoint when training completes.\n"
+            "The model will be saved in the run directory."
+        )
+
         table_layout.addWidget(_inline_field("GPU", self._use_gpu_checkbox), 2, 0)
         table_layout.addWidget(_inline_field("Capture Video", capture_video_container), 2, 1)
+        table_layout.addWidget(_inline_field("Save Model", self._save_model_checkbox), 2, 2)
 
         self._fastlane_checkbox = QtWidgets.QCheckBox("Fast Lane Only (skip telemetry persistence)", self)
         self._fastlane_checkbox.setChecked(True)
@@ -965,6 +973,9 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 algo_params[key] = widget.isChecked()
             elif isinstance(widget, QtWidgets.QLineEdit):
                 algo_params[key] = widget.text().strip()
+
+        # Save model based on checkbox
+        algo_params["save_model"] = self._save_model_checkbox.isChecked()
 
         capture_video_widget = getattr(self, "_capture_video_checkbox", None)
         capture_video_enabled = (

@@ -151,6 +151,70 @@ try:  # pragma: no cover - torch optional
 except Exception:  # pragma: no cover - torch optional
     pass
 
+# --- Checkpoint resume auto-loading ---------------------------------------
+# Patches torch.nn.Module.to() to automatically load checkpoint weights when
+# CLEANRL_RESUME_PATH is set. Works for any algorithm transparently.
+try:  # pragma: no cover - torch optional
+    import torch.nn as nn
+
+    # Guard against double-patching on module reload
+    _MOSAIC_MODULE_TO_PATCHED = getattr(nn.Module.to, "_mosaic_patched", False)
+
+    if not _MOSAIC_MODULE_TO_PATCHED:
+        _ORIG_MODULE_TO = nn.Module.to
+    else:
+        # Already patched - _ORIG_MODULE_TO should exist from prior import
+        _ORIG_MODULE_TO = getattr(nn.Module, "_orig_to", nn.Module.to)
+
+    _RESUME_CHECKPOINT_LOADED = False
+
+    def _mosaic_module_to(self, *args, **kwargs):
+        global _RESUME_CHECKPOINT_LOADED
+        result = _ORIG_MODULE_TO(self, *args, **kwargs)
+
+        resume_path = os.getenv("CLEANRL_RESUME_PATH")
+        if not resume_path or _RESUME_CHECKPOINT_LOADED:
+            return result
+
+        checkpoint_file = Path(resume_path).expanduser().resolve()
+        if not checkpoint_file.exists():
+            return result
+
+        # Determine device from args
+        device = None
+        if args:
+            device = args[0]
+        elif "device" in kwargs:
+            device = kwargs["device"]
+
+        try:
+            checkpoint = torch.load(
+                checkpoint_file,
+                map_location=device,
+                weights_only=True,
+            )
+
+            # Only load if state_dict keys match (ensures we load into the right module)
+            model_keys = set(self.state_dict().keys())
+            checkpoint_keys = set(checkpoint.keys())
+
+            if model_keys == checkpoint_keys:
+                self.load_state_dict(checkpoint)
+                _RESUME_CHECKPOINT_LOADED = True
+                print(f"[MOSAIC] Resumed from checkpoint: {checkpoint_file}")
+        except Exception as exc:
+            # Silently skip if checkpoint doesn't match this module
+            pass
+
+        return result
+
+    # Apply patch and mark as patched to prevent recursion on reload
+    _mosaic_module_to._mosaic_patched = True
+    nn.Module._orig_to = _ORIG_MODULE_TO  # Store original for reload access
+    nn.Module.to = _mosaic_module_to
+except Exception:  # pragma: no cover - torch optional
+    pass
+
 try:  # pragma: no cover - cleanrl optional
     import os
     from cleanrl_utils.evals import ppo_eval as _ppo_eval

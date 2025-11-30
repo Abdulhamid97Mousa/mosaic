@@ -1,7 +1,7 @@
 # Multi-Agent Mode: Human vs Agent Training Support
 
-**Date:** 2025-11-28
-**Status:** Board Game Rendering ✅ COMPLETE | Training Support ⏳ PENDING
+**Date:** 2025-11-28 (Updated: 2025-11-29)
+**Status:** Board Game Rendering ✅ COMPLETE | Stockfish Integration ✅ COMPLETE | Training Support ⏳ PENDING
 
 ---
 
@@ -35,6 +35,74 @@ Grid Tab (Dynamic Title: "Grid - Chess", "Grid - Go", "Grid - Connect Four")
 2. **Lazy Loading**: Renderers created on-demand when first payload displayed
 3. **Signal Forwarding**: Board signals connected directly to handlers in MainWindow
 4. **Dynamic Tab Title**: Tab shows current game name ("Grid - Chess", etc.)
+
+---
+
+## ✅ Completed: Stockfish Integration & Human vs Agent Chess (2025-11-29)
+
+### What Was Done
+
+Implemented a working Human vs Agent Chess mode using Stockfish as the AI opponent:
+
+```
+Multi-Agent Mode → Human vs Agent Tab
+├── Environment selection (Chess)
+├── Environment Configuration dialog
+│   ├── AI Opponent type (Random, Stockfish, Custom Policy)
+│   ├── Difficulty presets (Beginner, Easy, Medium, Hard, Expert)
+│   └── Advanced settings (Skill level, Search depth, Time limit, Threads, Hash)
+├── Player assignment (Human as White or Black)
+└── Game controls (Load Environment, Start Game, Reset)
+```
+
+### Files Created/Modified
+
+| Action | File | Description |
+|--------|------|-------------|
+| ✅ Created | `gym_gui/services/chess_ai/__init__.py` | Chess AI service package |
+| ✅ Created | `gym_gui/services/chess_ai/stockfish_service.py` | Stockfish engine wrapper with difficulty presets |
+| ✅ Created | `gym_gui/ui/widgets/human_vs_agent_config_form.py` | Configuration dialog for AI opponent settings |
+| ✅ Created | `gym_gui/ui/widgets/human_vs_agent_board.py` | Interactive chess board widget for gameplay |
+| ✅ Created | `gym_gui/ui/handlers/human_vs_agent_handlers.py` | Handler for AI provider management |
+| ✅ Updated | `gym_gui/ui/widgets/multi_agent_tab.py` | Added Configure button, config summary display |
+| ✅ Updated | `gym_gui/ui/main_window.py` | Integrated handler, fixed env_id comparison |
+| ✅ Updated | `gym_gui/ui/handlers/__init__.py` | Added HumanVsAgentHandler export |
+| ✅ Updated | `requirements/base.txt` | Added `stockfish>=3.28.0` dependency |
+
+### Bug Fixed
+
+**Root Cause:** The env_id comparison in `main_window.py` was checking `if env_id == "chess"` but the PettingZoo enum returns `"chess_v6"`. This caused the "Human vs Agent - Chess" tab to never be created.
+
+### Architecture
+
+```
+HumanVsAgentTab (Control Panel)
+│
+├── "Configure AI Opponent..." button
+│   └── HumanVsAgentConfigForm dialog
+│       ├── StockfishConfig dataclass
+│       ├── HumanVsAgentConfig dataclass
+│       └── DIFFICULTY_PRESETS dict
+│
+├── "Load Environment" button
+│   └── MainWindow._on_multi_agent_load_requested()
+│       └── _load_chess_game()
+│           ├── Creates InteractiveChessBoard widget
+│           ├── Creates ChessGameController
+│           ├── Creates HumanVsAgentHandler
+│           │   └── setup_ai_provider() → StockfishService
+│           └── Adds "Human vs Agent - Chess" tab to RenderTabs
+│
+└── Game flow
+    ├── Human moves via InteractiveChessBoard
+    ├── AI moves via StockfishService.get_best_move()
+    └── State updates via ChessGameController
+```
+
+### Requirements
+
+- **System:** `sudo apt install stockfish`
+- **Python:** `pip install stockfish>=3.28.0` (included in requirements/base.txt)
 
 ---
 
@@ -188,8 +256,10 @@ gym_gui/
 | Criteria | Status |
 |----------|--------|
 | Board games render in Grid tab with proper switching | ✅ Complete |
+| Human vs Agent Chess tab appears when Load Environment clicked | ✅ Complete |
+| Stockfish AI opponent works with adjustable difficulty | ✅ Complete |
+| Environment Configuration dialog with detailed settings | ✅ Complete |
 | User can select CleanRL worker in Human vs Agent tab | ⏳ Pending |
 | User can configure and start training | ⏳ Pending |
 | Training runs in background with telemetry | ⏳ Pending |
-| User can load trained policy | ⏳ Pending |
-| Human can play against trained AI agent | ⏳ Pending |
+| User can load custom trained policy | ⏳ Pending |

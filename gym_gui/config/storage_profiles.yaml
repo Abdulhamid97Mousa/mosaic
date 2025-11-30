@@ -1,31 +1,69 @@
-# Default storage profiles for Gym GUI sessions.
-# These settings govern how frames, telemetry, and metadata are persisted per environment family or agent type.
+# Storage profiles for Gym GUI sessions.
+# These settings govern how frames, telemetry, and metadata are persisted.
+#
+# Available strategies:
+#   - telemetry_only: Only store telemetry to SQLite (no frames/observations)
+#   - hdf5: Store frames/observations in HDF5, scalars in SQLite (recommended)
+#   - ndjson: Legacy NDJSON session recording
+#
+# HDF5 storage (recommended for high-FPS environments):
+#   - Frames stored in var/replay/{run_id}.h5
+#   - SQLite stores frame_ref URIs (e.g., "h5://run_id/frames/123")
+#   - 20x faster writes, 100x faster reads vs JSON blobs
 
-toy_text:
-  strategy: ndjson_ansi
-  ring_buffer: 2048
-  keep_disk_snapshots: true
-  prune_after_days: 7
+# Default profile for Atari and high-FPS environments
+atari:
+  strategy: hdf5
   telemetry_store: sqlite
+  capture_frames: true
+  frame_compression: lzf      # Fast compression for HDF5
+  frames_per_chunk: 100       # HDF5 chunk size
+  drop_render_payload: false  # Store frames in HDF5
+  drop_observation: false     # Store observations in HDF5
 
+# Box2D environments (moderate frame rate)
 box2d:
-  strategy: ndjson_png
-  ring_buffer: 256
-  frame_compression: png
-  max_record_bytes: 2147483648 # 2 GiB
-  keep_every_n_frames: 1
+  strategy: hdf5
+  telemetry_store: sqlite
+  capture_frames: true
+  frame_compression: lzf
+  frames_per_chunk: 100
+  drop_render_payload: false
+  drop_observation: true      # Observations are small, not needed
+
+# Toy text environments (no frames, just ANSI grids)
+toy_text:
+  strategy: telemetry_only
+  telemetry_store: sqlite
   capture_frames: false
-  drop_render_payload: true
+  drop_render_payload: true   # Grid rendering handled by UI
   drop_observation: true
-  telemetry_store: sqlite
 
-atari_sqlite:
-  strategy: sqlite_blob
-  frames_per_chunk: 256
-  max_sessions: 3
-  telemetry_store: sqlite
-
+# Minimal profile - telemetry only (fastest, smallest storage)
 telemetry_only:
   strategy: telemetry_only
   ring_buffer: 0
   telemetry_store: sqlite
+  capture_frames: false
+  drop_render_payload: true
+  drop_observation: true
+
+# Multi-agent environments (PettingZoo)
+multi_agent:
+  strategy: hdf5
+  telemetry_store: sqlite
+  capture_frames: true
+  frame_compression: lzf
+  frames_per_chunk: 100
+  drop_render_payload: false
+  drop_observation: false
+
+# Debug profile - store everything for debugging
+debug:
+  strategy: hdf5
+  telemetry_store: sqlite
+  capture_frames: true
+  frame_compression: none     # No compression for debugging
+  frames_per_chunk: 10
+  drop_render_payload: false
+  drop_observation: false
