@@ -55,7 +55,11 @@ class PPOSelector(BaseSelector):
 
         self._agent = cls(envs).to(device)
         checkpoint = torch.load(model_path, map_location=device, weights_only=True)
-        self._agent.load_state_dict(checkpoint)
+        # Handle both old format (just state_dict) and new format (dict with model_state_dict)
+        if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+            self._agent.load_state_dict(checkpoint["model_state_dict"])
+        else:
+            self._agent.load_state_dict(checkpoint)
         self._agent.eval()
 
     def select_action(self, obs: np.ndarray) -> np.ndarray:

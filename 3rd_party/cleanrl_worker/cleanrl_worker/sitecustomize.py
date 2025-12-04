@@ -194,14 +194,28 @@ try:  # pragma: no cover - torch optional
                 weights_only=True,
             )
 
-            # Only load if state_dict keys match (ensures we load into the right module)
+            # Handle both old format (just state_dict) and new format (dict with model_state_dict)
             model_keys = set(self.state_dict().keys())
-            checkpoint_keys = set(checkpoint.keys())
 
-            if model_keys == checkpoint_keys:
-                self.load_state_dict(checkpoint)
-                _RESUME_CHECKPOINT_LOADED = True
-                print(f"[MOSAIC] Resumed from checkpoint: {checkpoint_file}")
+            # New format: {"model_state_dict": ..., "global_step": ..., "iteration": ...}
+            if isinstance(checkpoint, dict) and "model_state_dict" in checkpoint:
+                checkpoint_keys = set(checkpoint["model_state_dict"].keys())
+                if model_keys == checkpoint_keys:
+                    self.load_state_dict(checkpoint["model_state_dict"])
+                    _RESUME_CHECKPOINT_LOADED = True
+                    # Set env var for global_step restoration
+                    if "global_step" in checkpoint:
+                        os.environ["CLEANRL_RESUME_GLOBAL_STEP"] = str(checkpoint["global_step"])
+                    print(f"[MOSAIC] Resumed from checkpoint: {checkpoint_file}")
+                    if "global_step" in checkpoint:
+                        print(f"[MOSAIC] Resume global_step: {checkpoint['global_step']}")
+            else:
+                # Old format: just the state_dict directly
+                checkpoint_keys = set(checkpoint.keys())
+                if model_keys == checkpoint_keys:
+                    self.load_state_dict(checkpoint)
+                    _RESUME_CHECKPOINT_LOADED = True
+                    print(f"[MOSAIC] Resumed from checkpoint: {checkpoint_file}")
         except Exception as exc:
             # Silently skip if checkpoint doesn't match this module
             pass

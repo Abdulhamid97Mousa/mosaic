@@ -183,7 +183,16 @@ if __name__ == "__main__":
     values = torch.zeros((args.num_steps, args.num_envs)).to(device)
 
     # TRY NOT TO MODIFY: start the game
-    global_step = 0
+    # Check for resume state from env var (set by sitecustomize when loading checkpoint)
+    resume_global_step = os.environ.get("CLEANRL_RESUME_GLOBAL_STEP")
+    if resume_global_step is not None:
+        try:
+            global_step = int(resume_global_step)
+            print(f"[MOSAIC] Resuming from global_step={global_step}")
+        except ValueError:
+            global_step = 0
+    else:
+        global_step = 0
     start_time = time.time()
     next_obs, _ = envs.reset(seed=args.seed)
     next_obs = torch.Tensor(next_obs).to(device)
@@ -317,7 +326,13 @@ if __name__ == "__main__":
 
     if args.save_model:
         model_path = f"runs/{run_name}/{args.exp_name}.cleanrl_model"
-        torch.save(agent.state_dict(), model_path)
+        # Save full checkpoint with training state for proper resume
+        checkpoint = {
+            "model_state_dict": agent.state_dict(),
+            "global_step": global_step,
+            "iteration": args.num_iterations,  # Final iteration
+        }
+        torch.save(checkpoint, model_path)
         print(f"model saved to {model_path}")
 
         from cleanrl_utils.evals.ppo_eval import evaluate

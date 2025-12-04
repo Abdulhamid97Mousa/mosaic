@@ -2212,7 +2212,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._chess_env_loader.cleanup()
 
         # Clean up Stockfish service
-        if self._stockfish_service is not None:
+        if hasattr(self, "_stockfish_service") and self._stockfish_service is not None:
             self._stockfish_service.stop()
             self._stockfish_service = None
 
