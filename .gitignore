@@ -179,7 +179,7 @@ ml-agents/
 3rd/JASON_java_project/demos/
 3rd/JASON_java_project/doc/
 3rd/JASON_java_project/jason-interpreter/build/tmp/
-
+3rd_party/godot_worker/bin/godot
 # =============================================================================
 # Java / Gradle (for Jason worker)
 # =============================================================================
@@ -202,8 +202,9 @@ chatbdi/
 coach/
 xuance/
 ray/
+SuperSuit/
+Vesna_RL/
 .fake/
-
 # =============================================================================
 # GitHub / CI
 # =============================================================================
