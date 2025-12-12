@@ -114,7 +114,7 @@ html_css_files = [
 ]
 
 favicons = [
-    {"href": "figures/favicon.svg"},
+    {"href": "figures/favicon.png"},
 ]
 
 # -- Intersphinx configuration -----------------------------------------------
