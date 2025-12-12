@@ -7,46 +7,33 @@ and enables extensibility.
 System Layers
 -------------
 
-.. mermaid::
+.. grid:: 1
+   :gutter: 2
 
-   flowchart TD
-       subgraph Visual["Visual Layer (PyQt6)"]
-           MW[MainWindow]
-           CP[ControlPanel]
-           RT[RenderTabs]
-           AC[AdvancedConfigTab]
-       end
+   .. grid-item-card:: Visual Layer
+      :class-header: sd-bg-primary sd-text-white
 
-       subgraph Service["Service Layer"]
-           PMS[PolicyMappingService]
-           AS[ActorService]
-           TS[TelemetryService]
-       end
+      PyQt6 GUI: MainWindow, ControlPanel, RenderTabs, AdvancedConfig
 
-       subgraph Controller["Controller Layer"]
-           SC[SessionController]
-           HIC[HumanInputController]
-           EM[EnvironmentManager]
-       end
+   .. grid-item-card:: Service Layer
+      :class-header: sd-bg-success sd-text-white
 
-       subgraph Adapter["Adapter Layer"]
-           PA[ParadigmAdapter]
-           EA[EnvironmentAdapter]
-           PZA[PettingZooAdapter]
-       end
+      PolicyMappingService, ActorService, TelemetryService, SeedManager
 
-       subgraph Worker["Worker Layer (3rd Party)"]
-           CRL[CleanRL]
-           XU[XuanCe]
-           RL[RLlib]
-           BDI[Jason/SPADE BDI]
-           LLM[LLM]
-       end
+   .. grid-item-card:: Controller Layer
+      :class-header: sd-bg-warning
 
-       Visual --> Service
-       Service --> Controller
-       Controller --> Adapter
-       Adapter <-->|gRPC / IPC| Worker
+      SessionController, HumanInputController, EnvironmentManager
+
+   .. grid-item-card:: Adapter Layer
+      :class-header: sd-bg-info sd-text-white
+
+      ParadigmAdapter, EnvironmentAdapter, PettingZooAdapter, ViZDoomAdapter
+
+   .. grid-item-card:: Worker Layer (gRPC/IPC)
+      :class-header: sd-bg-secondary sd-text-white
+
+      CleanRL | XuanCe | RLlib | Jason BDI | SPADE | LLM
 
 Visual Layer
 ------------
