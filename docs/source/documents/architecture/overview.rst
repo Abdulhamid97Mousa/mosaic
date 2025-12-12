@@ -7,32 +7,46 @@ and enables extensibility.
 System Layers
 -------------
 
-.. code-block:: text
+.. mermaid::
 
-   ┌─────────────────────────────────────────────────────────────────┐
-   │                     VISUAL LAYER (PyQt6)                        │
-   │  MainWindow │ ControlPanel │ RenderTabs │ AdvancedConfigTab    │
-   └─────────────────────────────────────────────────────────────────┘
-                                 │
-   ┌─────────────────────────────────────────────────────────────────┐
-   │                     SERVICE LAYER                               │
-   │  PolicyMappingService │ ActorService │ TelemetryService        │
-   └─────────────────────────────────────────────────────────────────┘
-                                 │
-   ┌─────────────────────────────────────────────────────────────────┐
-   │                     CONTROLLER LAYER                            │
-   │  SessionController │ HumanInputController │ EnvironmentMgr     │
-   └─────────────────────────────────────────────────────────────────┘
-                                 │
-   ┌─────────────────────────────────────────────────────────────────┐
-   │                     ADAPTER LAYER                               │
-   │  ParadigmAdapter │ EnvironmentAdapter │ PettingZooAdapter      │
-   └─────────────────────────────────────────────────────────────────┘
-                                 │
-   ┌─────────────────────────────────────────────────────────────────┐
-   │                     WORKER LAYER (3rd Party)                    │
-   │  CleanRL │ XuanCe │ RLlib │ Jason BDI │ SPADE │ LLM            │
-   └─────────────────────────────────────────────────────────────────┘
+   flowchart TD
+       subgraph Visual["Visual Layer (PyQt6)"]
+           MW[MainWindow]
+           CP[ControlPanel]
+           RT[RenderTabs]
+           AC[AdvancedConfigTab]
+       end
+
+       subgraph Service["Service Layer"]
+           PMS[PolicyMappingService]
+           AS[ActorService]
+           TS[TelemetryService]
+       end
+
+       subgraph Controller["Controller Layer"]
+           SC[SessionController]
+           HIC[HumanInputController]
+           EM[EnvironmentManager]
+       end
+
+       subgraph Adapter["Adapter Layer"]
+           PA[ParadigmAdapter]
+           EA[EnvironmentAdapter]
+           PZA[PettingZooAdapter]
+       end
+
+       subgraph Worker["Worker Layer (3rd Party)"]
+           CRL[CleanRL]
+           XU[XuanCe]
+           RL[RLlib]
+           BDI[Jason/SPADE BDI]
+           LLM[LLM]
+       end
+
+       Visual --> Service
+       Service --> Controller
+       Controller --> Adapter
+       Adapter <-->|gRPC / IPC| Worker
 
 Visual Layer
 ------------
