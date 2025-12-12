@@ -1,5 +1,5 @@
-MOSAIC: Multi-paradigm Orchestration System for Agent Integration & Composition
-================================================================================
+MOSAIC: Multi-Agent Orchestration System with Adaptive Intelligent Control for Heterogeneous Agent Workloads
+=============================================================================================================
 
 .. raw:: html
 
@@ -26,10 +26,11 @@ MOSAIC: Multi-paradigm Orchestration System for Agent Integration & Composition
 
    <br><br>
 
-**MOSAIC** (Multi-paradigm Orchestration System for Agent Integration & Composition) is a unified
-platform that orchestrates diverse agents, paradigms, and workers to create cohesive intelligent
-systems — like tiles in a mosaic forming a complete picture. It provides a visual-first interface
-for configuring, running, and analyzing reinforcement learning experiments across multiple paradigms.
+**MOSAIC** (Multi-Agent Orchestration System with Adaptive Intelligent Control for Heterogeneous
+Agent Workloads) is a unified platform that orchestrates diverse agents, paradigms, and workers
+to create cohesive intelligent systems — like tiles in a mosaic forming a complete picture.
+It provides a visual-first interface for configuring, running, and analyzing reinforcement
+learning experiments across multiple paradigms.
 
 .. image:: images/Platform_Main_View.png
    :alt: MOSAIC Platform - Main View
@@ -45,18 +46,19 @@ for configuring, running, and analyzing reinforcement learning experiments acros
 Why MOSAIC?
 -----------
 
-MOSAIC addresses a fundamental challenge in multi-agent reinforcement learning:
-**existing platforms are locked to single stepping paradigms**, forcing researchers
-to choose between frameworks like RLlib (POSG) or PettingZoo (AEC).
+Today's AI landscape offers powerful but **fragmented** tools: RL frameworks (CleanRL, RLlib, XuanCe),
+symbolic AI (Jason BDI, SPADE), language models (GPT, Claude), robotics simulators (MuJoCo), and
+3D game engines (Godot). Each excels in isolation, but **no platform bridges them together**
+under a unified, visual-first interface.
 
 MOSAIC provides:
 
-- **Multi-Paradigm Support**: Seamlessly switch between Single-Agent, Sequential (AEC), Simultaneous (Parallel), and Hierarchical paradigms
-- **Agent Integration**: Mix Human, RL (CleanRL, RLlib, XuanCe), BDI (Jason, SPADE), and LLM agents in the same environment
-- **Visual-First Design**: Configure experiments through an intuitive PyQt6 interface
-- **Policy Mapping**: Per-agent policy binding with paradigm awareness
-- **3D Engine Support**: MuJoCo MPC for robotics, Godot for game environments, AirSim planned
-- **Extensible Worker Architecture**: Add new training backends without modifying core code
+- **Unified Framework Bridge**: Connect RL, LLM, BDI, Robotics, and 3D Simulation in a single platform
+- **Visual-First Design**: Configure experiments through an intuitive PyQt6 interface — no code required
+- **Heterogeneous Agent Mixing**: Run Human + RL + BDI + LLM agents in the same environment
+- **Resource Management & Quotas**: GPU allocation, queue limits, credit-based backpressure, health monitoring
+- **Per-Agent Policy Binding**: Route each agent to different workers via ``PolicyMappingService``
+- **Worker Lifecycle Orchestration**: Subprocess management with heartbeat monitoring and graceful termination
 
 Supported Paradigms
 -------------------

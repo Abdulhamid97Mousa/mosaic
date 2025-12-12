@@ -3,7 +3,7 @@
 This module provides the welcome HTML displayed in the Game Info panel
 when the GUI launches, before any environment is selected.
 
-MOSAIC: Multi-paradigm Orchestration System for Agent Integration & Composition
+MOSAIC: Multi-Agent Orchestration System with Adaptive Intelligent Control for Heterogeneous Agent Workloads
 """
 
 MOSAIC_WELCOME_HTML = """
@@ -11,7 +11,7 @@ MOSAIC_WELCOME_HTML = """
 <tr><td>
     <h1 style="color: white; margin: 0; letter-spacing: 3px; font-size: 28px;">MOSAIC</h1>
     <p style="color: #e0d8f0; margin: 5px 0 0 0; font-size: 12px;">
-        Multi-paradigm Orchestration System for Agent Integration &amp; Composition
+        Multi-Agent Orchestration System with Adaptive Intelligent Control for Heterogeneous Agent Workloads
     </p>
 </td></tr>
 </table>

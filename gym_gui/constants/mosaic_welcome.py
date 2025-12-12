@@ -206,7 +206,7 @@ SATELLITE_HIT_RADIUS = 25  # Hover detection radius
 # =============================================================================
 
 PLANET_NAME = "MOSAIC"
-PLANET_DESCRIPTION = "MOSAIC - Multi-paradigm Orchestration System"
+PLANET_DESCRIPTION = "MOSAIC - Multi-Agent Orchestration System with Adaptive Intelligent Control for Heterogeneous Agent Workloads"
 PLANET_FEATURES = [
     "Unified agent framework",
     "Human + AI collaboration",
@@ -303,7 +303,7 @@ TOOLTIP_SHADOW_COLOR = (0, 0, 0, 80)
 # UI Text
 # =============================================================================
 
-SUBTITLE_TEXT = "Multi-paradigm Orchestration System for Agent Integration & Composition"
+SUBTITLE_TEXT = "Multi-Agent Orchestration System with Adaptive Intelligent Control for Heterogeneous Agent Workloads"
 INSTRUCTION_TEXT = "Select an environment from the sidebar and click 'Load Environment' to begin"
 
 HINT_TEXTS = [
