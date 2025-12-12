@@ -37,6 +37,7 @@ extensions = [
     "sphinx_tabs.tabs",
     "sphinx_design",
     "sphinx_favicon",
+    "sphinxcontrib.mermaid",
 ]
 
 # Napoleon settings (for Google/NumPy docstrings)

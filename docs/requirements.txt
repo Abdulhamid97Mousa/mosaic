@@ -7,3 +7,4 @@ sphinx-tabs
 sphinx-design
 sphinx-favicon
 sphinx-autobuild
+sphinxcontrib-mermaid

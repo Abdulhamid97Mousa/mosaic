@@ -128,32 +128,23 @@ Quick Example
 Architecture Overview
 ---------------------
 
-.. code-block:: text
+.. mermaid::
 
-   ┌─────────────────────────────────────────────────────────────────┐
-   │                        MOSAIC Platform                          │
-   ├─────────────────────────────────────────────────────────────────┤
-   │  ┌───────────────────────────────────────────────────────────┐  │
-   │  │                    Visual Layer (PyQt6)                    │  │
-   │  │  MainWindow │ ControlPanel │ RenderTabs │ AdvancedConfig  │  │
-   │  └───────────────────────────────────────────────────────────┘  │
-   │                              │                                   │
-   │  ┌───────────────────────────────────────────────────────────┐  │
-   │  │                    Service Layer                           │  │
-   │  │  PolicyMappingService │ ActorService │ TelemetryService   │  │
-   │  └───────────────────────────────────────────────────────────┘  │
-   │                              │                                   │
-   │  ┌───────────────────────────────────────────────────────────┐  │
-   │  │                    Adapter Layer                           │  │
-   │  │  ParadigmAdapter │ EnvironmentAdapter │ PettingZooAdapter │  │
-   │  └───────────────────────────────────────────────────────────┘  │
-   │                              │                                   │
-   └──────────────────────────────┼───────────────────────────────────┘
-                                  │ gRPC / IPC
-   ┌──────────────────────────────┼───────────────────────────────────┐
-   │                        3rd Party Workers                         │
-   │  CleanRL │ XuanCe │ RLlib │ MuJoCo MPC │ Godot │ BDI │ LLM     │
-   └──────────────────────────────────────────────────────────────────┘
+   flowchart TD
+       subgraph Platform["MOSAIC Platform"]
+           UI["Visual Layer<br/>(PyQt6)"]
+           SVC["Service Layer<br/>(PolicyMapping, Actor, Telemetry)"]
+           ADP["Adapter Layer<br/>(Paradigm, Environment)"]
+       end
+
+       subgraph Workers["Training Workers"]
+           RL["Neural RL<br/>CleanRL | XuanCe | RLlib"]
+           BDI["Symbolic AI<br/>Jason | SPADE"]
+           SIM["Simulation<br/>MuJoCo | Godot | LLM"]
+       end
+
+       UI --> SVC --> ADP
+       ADP <-->|gRPC / IPC| Workers
 
 Core Features
 -------------
