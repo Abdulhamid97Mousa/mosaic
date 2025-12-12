@@ -11,7 +11,7 @@ from typing import TYPE_CHECKING
 
 from gym_gui.config.game_config_builder import GameConfigBuilder
 from gym_gui.core.enums import GameId
-from gym_gui.ui.environments.single_agent_env.vizdoom import VIZDOOM_GAME_IDS
+from gym_gui.ui.config_panels.single_agent.vizdoom import VIZDOOM_GAME_IDS
 
 if TYPE_CHECKING:
     from qtpy.QtWidgets import QStatusBar

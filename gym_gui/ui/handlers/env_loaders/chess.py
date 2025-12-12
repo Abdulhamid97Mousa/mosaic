@@ -12,6 +12,8 @@ from __future__ import annotations
 import logging
 from typing import TYPE_CHECKING, Optional
 
+from qtpy import QtCore
+
 if TYPE_CHECKING:
     from qtpy.QtWidgets import QStatusBar
     from gym_gui.ui.widgets.render_tabs import RenderTabs
@@ -62,12 +64,12 @@ class ChessEnvLoader:
         """Whether a chess game is currently loaded."""
         return self._chess_controller is not None
 
-    def load(self, seed: int, parent: object = None) -> str:
+    def load(self, seed: int, parent: Optional[QtCore.QObject] = None) -> str:
         """Load and initialize the Chess game with interactive board.
 
         Args:
             seed: Random seed for game initialization.
-            parent: Parent object for ChessGameController (usually MainWindow).
+            parent: Parent QObject for ChessGameController (usually MainWindow).
 
         Returns:
             AI opponent display name.

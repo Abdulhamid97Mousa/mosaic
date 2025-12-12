@@ -15,12 +15,14 @@ Available handlers:
 
 from gym_gui.ui.handlers.features.game_config import GameConfigHandler
 from gym_gui.ui.handlers.features.mpc import MPCHandler
+from gym_gui.ui.handlers.features.godot import GodotHandler
 from gym_gui.ui.handlers.features.log import LogHandler
 from gym_gui.ui.handlers.features.human_vs_agent import HumanVsAgentHandler
 
 __all__ = [
     "GameConfigHandler",
     "MPCHandler",
+    "GodotHandler",
     "LogHandler",
     "HumanVsAgentHandler",
 ]

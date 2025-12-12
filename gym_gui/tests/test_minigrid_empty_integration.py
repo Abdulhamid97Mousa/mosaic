@@ -30,7 +30,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_ENV_MINIGRID_BOOT,
     LOG_ENV_MINIGRID_STEP,
 )
-from gym_gui.ui.environments.single_agent_env.minigrid import (
+from gym_gui.ui.config_panels.single_agent.minigrid import (
     MINIGRID_GAME_IDS,
     resolve_default_config,
 )

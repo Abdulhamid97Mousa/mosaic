@@ -55,6 +55,7 @@ from gym_gui.ui.handlers.game_moves import (
 from gym_gui.ui.handlers.features import (
     GameConfigHandler,
     MPCHandler,
+    GodotHandler,
     LogHandler,
     HumanVsAgentHandler,
 )
@@ -62,6 +63,9 @@ from gym_gui.ui.handlers.features import (
 # Environment loaders
 from gym_gui.ui.handlers.env_loaders import (
     ChessEnvLoader,
+    ConnectFourEnvLoader,
+    GoEnvLoader,
+    TicTacToeEnvLoader,
     VizdoomEnvLoader,
 )
 
@@ -73,9 +77,13 @@ __all__ = [
     # Feature handlers
     "GameConfigHandler",
     "MPCHandler",
+    "GodotHandler",
     "LogHandler",
     "HumanVsAgentHandler",
     # Environment loaders
     "ChessEnvLoader",
+    "ConnectFourEnvLoader",
+    "GoEnvLoader",
+    "TicTacToeEnvLoader",
     "VizdoomEnvLoader",
 ]

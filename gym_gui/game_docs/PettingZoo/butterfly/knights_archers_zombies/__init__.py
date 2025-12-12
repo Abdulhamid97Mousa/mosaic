@@ -1,0 +1,63 @@
+"""Documentation for PettingZoo Butterfly Knights Archers Zombies environment."""
+from __future__ import annotations
+
+
+def get_kaz_html(env_id: str = "knights_archers_zombies_v10") -> str:
+    """Generate Knights Archers Zombies environment HTML documentation."""
+    return (
+        "<h3>PettingZoo Butterfly: Knights Archers Zombies (knights_archers_zombies_v10)</h3>"
+        "<p>Zombies walk from the top of the screen toward the bottom. Knights and archers "
+        "must work together to kill zombies before they reach the bottom or collide with agents.</p>"
+        "<h4>Environment Details</h4>"
+        "<ul>"
+        "<li><strong>Import:</strong> <code>from pettingzoo.butterfly import knights_archers_zombies_v10</code></li>"
+        "<li><strong>Actions:</strong> Discrete</li>"
+        "<li><strong>Parallel API:</strong> Yes</li>"
+        "<li><strong>Manual Control:</strong> Yes (WASD+F for archer, IJKL+; for knight)</li>"
+        "<li><strong>Agents:</strong> ['archer_0', 'archer_1', 'knight_0', 'knight_1']</li>"
+        "<li><strong>Action Shape:</strong> (1,) with values [0-5]</li>"
+        "<li><strong>Observation Shape:</strong> (512, 512, 3) or vectorized</li>"
+        "</ul>"
+        "<h4>Agent Types</h4>"
+        "<ul>"
+        "<li><strong>Knights:</strong> Swing mace in arc, close combat</li>"
+        "<li><strong>Archers:</strong> Fire arrows in straight line, ranged combat</li>"
+        "</ul>"
+        "<h4>Actions</h4>"
+        "<p>[nothing, rotate_cw, rotate_ccw, move_forward, move_backward, attack]</p>"
+        "<h4>Rewards</h4>"
+        "<p>+1 for killing a zombie with mace (knight) or arrow (archer)</p>"
+        "<h4>Game End</h4>"
+        "<ul>"
+        "<li>All agents die (collide with zombie)</li>"
+        "<li>Zombie reaches bottom screen border</li>"
+        "<li>max_cycles reached</li>"
+        "</ul>"
+        "<h4>Key Arguments</h4>"
+        "<pre><code>knights_archers_zombies_v10.env(\n"
+        "    spawn_rate=20,         # Cycles between zombie spawns\n"
+        "    num_archers=2,\n"
+        "    num_knights=2,\n"
+        "    max_zombies=10,\n"
+        "    max_arrows=10,\n"
+        "    killable_knights=True,\n"
+        "    killable_archers=True,\n"
+        "    line_death=False,      # Die at top/bottom border\n"
+        "    vector_state=True,     # Use vectorized obs\n"
+        "    max_cycles=900\n"
+        ")</code></pre>"
+        "<h4>Usage</h4>"
+        "<pre><code>from pettingzoo.butterfly import knights_archers_zombies_v10\n\n"
+        "env = knights_archers_zombies_v10.env(render_mode='human')\n"
+        "env.reset(seed=42)\n\n"
+        "for agent in env.agent_iter():\n"
+        "    obs, reward, term, trunc, info = env.last()\n"
+        "    action = None if term or trunc else env.action_space(agent).sample()\n"
+        "    env.step(action)\n"
+        "env.close()</code></pre>"
+    )
+
+
+KAZ_HTML = get_kaz_html()
+
+__all__ = ["KAZ_HTML", "get_kaz_html"]

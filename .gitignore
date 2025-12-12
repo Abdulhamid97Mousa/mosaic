@@ -221,3 +221,8 @@ _vizdoom.ini
 # Uncomment if you want to ignore generated lock files:
 # requirements/*.txt
 # !requirements/README.md
+
+
+#Ignore cursor AI rules
+.cursor/rules/codacy.mdc
+

@@ -66,6 +66,7 @@ from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWid
 from gym_gui.ui.indicators.busy_indicator import modal_busy_indicator
 from gym_gui.ui.widgets.render_tabs import RenderTabs
 from gym_gui.game_docs import get_game_info
+from gym_gui.game_docs.mosaic_welcome import MOSAIC_WELCOME_HTML
 from gym_gui.services.actor import ActorService
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
@@ -86,15 +87,20 @@ from gym_gui.ui.handlers import (
     GameConfigHandler,
     LogHandler,
     MPCHandler,
+    GodotHandler,
     ChessHandler,
     ConnectFourHandler,
     GoHandler,
     HumanVsAgentHandler,
     ChessEnvLoader,
+    ConnectFourEnvLoader,
+    GoEnvLoader,
+    TicTacToeEnvLoader,
     VizdoomEnvLoader,
 )
+from gym_gui.ui.widgets.advanced_config import LaunchConfig, RunMode
 
-from gym_gui.constants.optional_deps import get_mjpc_launcher
+from gym_gui.constants.optional_deps import get_mjpc_launcher, get_godot_launcher
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from gym_gui.ui.widgets.spade_bdi_train_form import SpadeBdiTrainForm
@@ -193,8 +199,14 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # MuJoCo MPC launcher
         self._mjpc_launcher = get_mjpc_launcher()
 
+        # Godot game engine launcher
+        self._godot_launcher = get_godot_launcher()
+
         # Environment loaders (initialized in _init_handlers after UI components are created)
         self._chess_env_loader: ChessEnvLoader
+        self._connect_four_env_loader: ConnectFourEnvLoader
+        self._go_env_loader: GoEnvLoader
+        self._tictactoe_env_loader: TicTacToeEnvLoader
         self._vizdoom_env_loader: VizdoomEnvLoader
 
         # Get live telemetry controller from service locator
@@ -361,6 +373,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._game_info = QtWidgets.QTextBrowser(self._info_group)
         self._game_info.setReadOnly(True)
         self._game_info.setOpenExternalLinks(True)
+        # Set MOSAIC welcome message as default
+        self._game_info.setHtml(MOSAIC_WELCOME_HTML)
         info_layout.addWidget(self._game_info, 1)
 
         # Runtime Log panel (far-right column)
@@ -469,6 +483,14 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             status_bar=self._status_bar,
         )
 
+        # Godot handler
+        self._godot_handler = GodotHandler(
+            godot_launcher=self._godot_launcher,
+            render_tabs=self._render_tabs,
+            control_panel=self._control_panel,
+            status_bar=self._status_bar,
+        )
+
         # Log handler
         self._log_handler_composed = LogHandler(
             log_filter=self._log_filter,
@@ -498,6 +520,21 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         # Environment loaders (for Human vs Agent mode and environment-specific setup)
         self._chess_env_loader = ChessEnvLoader(
+            render_tabs=self._render_tabs,
+            control_panel=self._control_panel,
+            status_bar=self._status_bar,
+        )
+        self._connect_four_env_loader = ConnectFourEnvLoader(
+            render_tabs=self._render_tabs,
+            control_panel=self._control_panel,
+            status_bar=self._status_bar,
+        )
+        self._go_env_loader = GoEnvLoader(
+            render_tabs=self._render_tabs,
+            control_panel=self._control_panel,
+            status_bar=self._status_bar,
+        )
+        self._tictactoe_env_loader = TicTacToeEnvLoader(
             render_tabs=self._render_tabs,
             control_panel=self._control_panel,
             status_bar=self._status_bar,
@@ -536,11 +573,20 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._control_panel.mpc_launch_requested.connect(self._mpc_handler.on_launch_requested)
         self._control_panel.mpc_stop_all_requested.connect(self._mpc_handler.on_stop_all_requested)
 
+        # Godot handlers (delegated)
+        self._control_panel.godot_launch_requested.connect(self._godot_handler.on_launch_requested)
+        self._control_panel.godot_editor_requested.connect(self._godot_handler.on_editor_requested)
+        self._control_panel.godot_stop_all_requested.connect(self._godot_handler.on_stop_all_requested)
+
         # Multi-Agent Mode handlers
         self._control_panel.multi_agent_load_requested.connect(self._on_multi_agent_load_requested)
         self._control_panel.multi_agent_start_requested.connect(self._on_multi_agent_start_requested)
         self._control_panel.multi_agent_reset_requested.connect(self._on_multi_agent_reset_requested)
         self._control_panel.multi_agent_tab.ai_opponent_changed.connect(self._on_ai_opponent_changed)
+
+        # Advanced Configuration Tab handlers
+        self._control_panel.advanced_launch_requested.connect(self._on_advanced_launch)
+        self._control_panel.advanced_env_load_requested.connect(self._on_advanced_env_load)
 
         # Board game handlers (Human Control Mode)
         # These signals come from BoardGameRendererStrategy in the Grid tab
@@ -662,7 +708,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         """Handle load request from Multi-Agent tab (Human vs Agent mode).
 
         This creates a PettingZoo environment for human vs agent play.
-        Currently supports Chess with interactive board UI.
+        Supports Chess, Connect Four, and Go with interactive board UI.
         """
         _LOGGER.info(
             f"{LOG_UI_MULTI_AGENT_ENV_LOAD_REQUESTED.code} {LOG_UI_MULTI_AGENT_ENV_LOAD_REQUESTED.message} | "
@@ -671,6 +717,12 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         if env_id == "chess_v6":
             self._load_chess_game(seed)
+        elif env_id == "connect_four_v3":
+            self._load_connect_four_game(seed)
+        elif env_id == "go_v5":
+            self._load_go_game(seed)
+        elif env_id == "tictactoe_v3":
+            self._load_tictactoe_game(seed)
         else:
             # Other PettingZoo environments not yet implemented
             self._status_bar.showMessage(
@@ -687,27 +739,91 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             seed: Random seed for game initialization
         """
         self._chess_env_loader.load(seed, parent=self)
+        # Update game info panel
+        desc = get_game_info(GameId.CHESS)
+        if desc:
+            self._set_game_info(desc)
+
+    def _load_connect_four_game(self, seed: int) -> None:
+        """Load and initialize the Connect Four game with interactive board.
+
+        Delegates to ConnectFourEnvLoader for all Connect Four-specific setup.
+
+        Args:
+            seed: Random seed for game initialization
+        """
+        self._connect_four_env_loader.load(seed, parent=self)
+        # Update game info panel
+        desc = get_game_info(GameId.CONNECT_FOUR)
+        if desc:
+            self._set_game_info(desc)
+
+    def _load_go_game(self, seed: int) -> None:
+        """Load and initialize the Go game with interactive board.
+
+        Delegates to GoEnvLoader for all Go-specific setup.
+
+        Args:
+            seed: Random seed for game initialization
+        """
+        self._go_env_loader.load(seed, parent=self)
+        # Update game info panel
+        desc = get_game_info(GameId.GO)
+        if desc:
+            self._set_game_info(desc)
+
+    def _load_tictactoe_game(self, seed: int) -> None:
+        """Load and initialize the Tic-Tac-Toe game with interactive board.
+
+        Delegates to TicTacToeEnvLoader for all Tic-Tac-Toe-specific setup.
+
+        Args:
+            seed: Random seed for game initialization
+        """
+        self._tictactoe_env_loader.load(seed, parent=self)
+        # Update game info panel
+        desc = get_game_info(GameId.TIC_TAC_TOE)
+        if desc:
+            self._set_game_info(desc)
 
     def _on_multi_agent_start_requested(self, env_id: str, human_agent: str, seed: int) -> None:
         """Handle start game request from Multi-Agent tab.
 
         Args:
-            env_id: Environment ID (e.g., "chess")
+            env_id: Environment ID (e.g., "chess", "chess_v6")
             human_agent: Which agent the human plays ("player_0" or "player_1")
             seed: Random seed
         """
-        if env_id == "chess" and self._chess_env_loader.is_loaded:
+        if env_id in ("chess", "chess_v6") and self._chess_env_loader.is_loaded:
             self._chess_env_loader.on_start_requested(human_agent, seed)
+        elif env_id in ("connect_four", "connect_four_v3") and self._connect_four_env_loader.is_loaded:
+            self._connect_four_env_loader.on_start_requested(human_agent, seed)
+        elif env_id in ("go", "go_v5") and self._go_env_loader.is_loaded:
+            self._go_env_loader.on_start_requested(human_agent, seed)
+        elif env_id in ("tictactoe", "tictactoe_v3") and self._tictactoe_env_loader.is_loaded:
+            self._tictactoe_env_loader.on_start_requested(human_agent, seed)
         else:
             self._status_bar.showMessage(f"Start game not supported for: {env_id}", 3000)
 
     def _on_multi_agent_reset_requested(self, seed: int) -> None:
         """Handle reset game request from Multi-Agent tab.
 
+        Resets the currently active game.
+
         Args:
             seed: New random seed for reset
         """
-        self._chess_env_loader.on_reset_requested(seed)
+        # Try to reset whichever game is currently loaded
+        if self._chess_env_loader.is_loaded:
+            self._chess_env_loader.on_reset_requested(seed)
+        elif self._connect_four_env_loader.is_loaded:
+            self._connect_four_env_loader.on_reset_requested(seed)
+        elif self._go_env_loader.is_loaded:
+            self._go_env_loader.on_reset_requested(seed)
+        elif self._tictactoe_env_loader.is_loaded:
+            self._tictactoe_env_loader.on_reset_requested(seed)
+        else:
+            self._status_bar.showMessage("No active game to reset", 3000)
 
     def _on_ai_opponent_changed(self, opponent_type: str, difficulty: str) -> None:
         """Handle AI opponent selection change.
@@ -719,6 +835,199 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             difficulty: Difficulty level for engines like Stockfish
         """
         self._chess_env_loader.on_ai_config_changed(opponent_type, difficulty)
+
+    # ------------------------------------------------------------------
+    # Advanced Configuration Tab Handlers
+    # ------------------------------------------------------------------
+
+    def _on_advanced_env_load(self, env_id: str, seed: int) -> None:
+        """Handle environment load request from Advanced Configuration tab.
+
+        This is triggered when the user clicks 'Load Environment' in Step 1.
+        Currently logs the request; full environment loading will be implemented
+        as part of Phase 2.2 (SessionController integration).
+
+        Args:
+            env_id: Environment identifier (e.g., "CartPole-v1", "chess_v6")
+            seed: Random seed for environment initialization
+        """
+        _LOGGER.info(
+            "Advanced tab: Environment load requested | env_id=%s seed=%d",
+            env_id,
+            seed,
+        )
+        self._status_bar.showMessage(
+            f"Environment preview: {env_id} (seed={seed})", 3000
+        )
+
+    def _on_advanced_launch(self, config: LaunchConfig) -> None:
+        """Handle launch request from Advanced Configuration tab.
+
+        Dispatches to the appropriate handler based on run mode:
+        - INTERACTIVE: Start rendered session via SessionController
+        - HEADLESS: Submit to trainer daemon for background training
+        - EVALUATION: Load policy and run evaluation with rendering
+
+        Args:
+            config: Complete launch configuration from the Advanced tab
+        """
+        _LOGGER.info(
+            "Advanced tab: Launch requested | env=%s mode=%s paradigm=%s agents=%d",
+            config.env_id,
+            config.run_mode.name,
+            config.paradigm.value,
+            len(config.agent_bindings),
+        )
+
+        if config.run_mode == RunMode.INTERACTIVE:
+            self._launch_interactive_session(config)
+        elif config.run_mode == RunMode.HEADLESS:
+            self._launch_headless_training(config)
+        elif config.run_mode == RunMode.EVALUATION:
+            self._launch_evaluation_session(config)
+        else:
+            _LOGGER.warning("Unknown run mode: %s", config.run_mode)
+            self._status_bar.showMessage(
+                f"Unknown run mode: {config.run_mode.name}", 5000
+            )
+
+    def _launch_interactive_session(self, config: LaunchConfig) -> None:
+        """Launch an interactive session with rendering.
+
+        Uses the existing SessionController infrastructure.
+
+        Args:
+            config: Launch configuration
+        """
+        _LOGGER.info(
+            "Launching interactive session: env=%s seed=%d",
+            config.env_id,
+            config.seed,
+        )
+
+        # TODO (Phase 2.2): Full integration with SessionController
+        # For now, provide a status message indicating the configuration is ready
+        # The PolicyMappingService is already configured by AdvancedConfigTab._configure_policy_mapping()
+
+        human_agents = [
+            aid for aid, b in config.agent_bindings.items()
+            if b.actor_id == "human_keyboard"
+        ]
+        ai_agents = [
+            aid for aid, b in config.agent_bindings.items()
+            if b.actor_id != "human_keyboard"
+        ]
+
+        self._status_bar.showMessage(
+            f"Interactive: {config.env_id} | {len(human_agents)} human, {len(ai_agents)} AI agents",
+            5000,
+        )
+
+        # Log the full configuration for debugging
+        _LOGGER.debug(
+            "Interactive session config: paradigm=%s bindings=%s",
+            config.paradigm.value,
+            {aid: (b.actor_id, b.worker_id) for aid, b in config.agent_bindings.items()},
+        )
+
+    def _launch_headless_training(self, config: LaunchConfig) -> None:
+        """Launch headless training via the trainer daemon.
+
+        Builds a training configuration from the LaunchConfig and submits
+        it to the TrainerClientRunner.
+
+        Args:
+            config: Launch configuration
+        """
+        _LOGGER.info(
+            "Launching headless training: env=%s seed=%d",
+            config.env_id,
+            config.seed,
+        )
+
+        # Build training config from LaunchConfig
+        training_config = self._build_training_config_from_launch(config)
+        if training_config is None:
+            return
+
+        self._status_bar.showMessage(
+            f"Submitting training: {config.env_id}", 5000
+        )
+        self._submit_training_config(training_config)
+
+    def _launch_evaluation_session(self, config: LaunchConfig) -> None:
+        """Launch evaluation session with a trained policy.
+
+        Loads the trained policy and runs in evaluation mode with rendering.
+
+        Args:
+            config: Launch configuration
+        """
+        _LOGGER.info(
+            "Launching evaluation session: env=%s seed=%d",
+            config.env_id,
+            config.seed,
+        )
+
+        # TODO (Phase 2.2): Full integration with policy loading
+        # For now, provide status and log the configuration
+
+        self._status_bar.showMessage(
+            f"Evaluation: {config.env_id} (policy loading not yet implemented)",
+            5000,
+        )
+
+    def _build_training_config_from_launch(
+        self, config: LaunchConfig
+    ) -> Optional[dict[str, object]]:
+        """Build a training configuration dict from LaunchConfig.
+
+        Converts the unified LaunchConfig into the format expected by
+        the trainer daemon.
+
+        Args:
+            config: Launch configuration from Advanced tab
+
+        Returns:
+            Training config dict, or None if configuration fails
+        """
+        # Determine primary worker
+        primary_worker = config.primary_worker_id
+        if not primary_worker:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "No Worker Selected",
+                "Headless training requires at least one agent with a worker "
+                "(e.g., CleanRL, RLlib). Please configure a non-local worker.",
+            )
+            return None
+
+        # Get worker-specific config
+        worker_config = config.worker_configs.get(primary_worker, {})
+
+        # Build training config
+        training_config: dict[str, object] = {
+            "env_id": config.env_id,
+            "seed": config.seed,
+            "worker_id": primary_worker,
+            "paradigm": config.paradigm.value,
+            "agent_bindings": {
+                aid: {
+                    "actor_id": b.actor_id,
+                    "worker_id": b.worker_id,
+                    "mode": b.mode,
+                }
+                for aid, b in config.agent_bindings.items()
+            },
+            **worker_config,
+        }
+
+        _LOGGER.debug(
+            "Built training config: %s",
+            {k: v for k, v in training_config.items() if k != "agent_bindings"},
+        )
+
+        return training_config
 
     def _on_start_game(self) -> None:
         """Handle Start Game button."""
@@ -814,7 +1123,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         if not hasattr(self, "_game_info"):
             return
         if not html:
-            html = "<p>Select an environment to begin. The Game Info panel will show rules, controls, and rewards for the chosen environment.</p>"
+            html = MOSAIC_WELCOME_HTML
         self._game_info.setHtml(html)
 
     def _configure_mouse_capture(self) -> None:
@@ -2207,9 +2516,15 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         self._shutdown_run_watch()
 
-        # Clean up chess game (via env loader)
+        # Clean up board games (via env loaders)
         if hasattr(self, "_chess_env_loader"):
             self._chess_env_loader.cleanup()
+        if hasattr(self, "_connect_four_env_loader"):
+            self._connect_four_env_loader.cleanup()
+        if hasattr(self, "_go_env_loader"):
+            self._go_env_loader.cleanup()
+        if hasattr(self, "_tictactoe_env_loader"):
+            self._tictactoe_env_loader.cleanup()
 
         # Clean up Stockfish service
         if hasattr(self, "_stockfish_service") and self._stockfish_service is not None:

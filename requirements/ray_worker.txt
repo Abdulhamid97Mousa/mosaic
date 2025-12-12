@@ -1,0 +1,32 @@
+# Ray/RLlib Worker Dependencies
+# This bundle contains dependencies required exclusively by the ray_worker.
+# Install this when launching RLlib-based distributed training runs.
+
+# Include base requirements
+-r base.txt
+
+# Ray core and RLlib for distributed reinforcement learning
+# Note: Ray is a large dependency with many optional extras.
+# For production, you may want to install ray[rllib] directly.
+
+ray[rllib]>=2.9.0
+ray[tune]>=2.9.0
+
+# Deep learning backends (RLlib supports multiple)
+torch>=2.0.0
+
+# Additional utilities commonly used with RLlib
+tensorboard>=2.11.0
+dm-tree>=0.1.8
+
+# Gymnasium compatibility (RLlib uses gymnasium by default since Ray 2.3)
+gymnasium>=0.29.0
+
+# PettingZoo for multi-agent environments (optional but recommended)
+pettingzoo>=1.24.0
+
+# Optional: For hyperparameter tuning
+# optuna>=3.0.0
+
+# For full Ray installation with all extras:
+# pip install "ray[rllib,tune,train]"

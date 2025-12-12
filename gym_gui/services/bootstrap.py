@@ -13,6 +13,7 @@ from gym_gui.services.actor import (
     CleanRLWorkerActor,
     HumanKeyboardActor,
 )
+from gym_gui.services.policy_mapping import PolicyMappingService
 from gym_gui.services.service_locator import ServiceLocator, get_service_locator
 from gym_gui.services.trainer import TrainerClient, TrainerClientConfig, TrainerClientRunner
 from gym_gui.services.trainer.launcher import TrainerDaemonHandle, ensure_trainer_daemon_running
@@ -91,10 +92,14 @@ def bootstrap_default_services() -> ServiceLocator:
     action_mapper: ContinuousActionMapper = create_default_action_mapper()
     renderer_registry: RendererRegistry = create_default_renderer_registry()  # default strategies
 
+    # Create PolicyMappingService wrapping ActorService for multi-agent support
+    policy_mapping = PolicyMappingService(actors)
+
     locator.register(StorageRecorderService, storage)
     locator.register(TelemetryService, telemetry)
     locator.register(TelemetrySQLiteStore, telemetry_store)
     locator.register(ActorService, actors)
+    locator.register(PolicyMappingService, policy_mapping)
     locator.register(ContinuousActionMapper, action_mapper)
 
     client_config = TrainerClientConfig()
@@ -154,6 +159,7 @@ def bootstrap_default_services() -> ServiceLocator:
     locator.register("telemetry", telemetry)
     locator.register("telemetry_store", telemetry_store)
     locator.register("actors", actors)
+    locator.register("policy_mapping", policy_mapping)
     locator.register("action_mapper", action_mapper)
     locator.register("renderer_registry", renderer_registry)
     locator.register("trainer_client", trainer_client)

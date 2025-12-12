@@ -455,5 +455,11 @@ __all__: list[str] = [
 if _game_exports:  # pragma: no cover
     __all__.extend(_game_exports)  # type: ignore[attr-defined]
 
+# ================================================================
+# MOSAIC Welcome Widget Constants
+# ================================================================
+# Import as submodule for use with `const.` prefix in widget
+from gym_gui.constants import mosaic_welcome
+
 # Clean up temporary variables
 del _constants_game, _game_exports, _name

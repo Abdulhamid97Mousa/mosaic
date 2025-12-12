@@ -34,6 +34,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_UI_RENDER_TABS_EVENT_FOR_DELETED_RUN,
     LOG_UI_RENDER_TABS_TAB_ADDED,
 )
+from gym_gui.ui.widgets.mosaic_welcome_widget import MosaicWelcomeWidget
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -75,12 +76,21 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
 
         self._raw_tab = _RawTab(parent=self)
 
-        self._grid_host = self._create_host(RenderMode.GRID, parent=self)
+        # Create a stacked widget for Grid tab (welcome + actual content)
+        self._grid_stack = QtWidgets.QStackedWidget(self)
+        self._welcome_widget = MosaicWelcomeWidget(self._grid_stack)
+        self._grid_stack.addWidget(self._welcome_widget)  # Index 0: Welcome
+
+        self._grid_host = self._create_host(RenderMode.GRID, parent=self._grid_stack)
         if self._grid_host is not None:
-            self._grid_tab_index = self.addTab(self._grid_host.widget, "Grid")
-            self.setTabEnabled(self._grid_tab_index, False)
+            self._grid_stack.addWidget(self._grid_host.widget)  # Index 1: Grid content
+            self._grid_tab_index = self.addTab(self._grid_stack, "Grid")
+            self.setTabEnabled(self._grid_tab_index, True)  # Enable to show welcome
+            self._grid_stack.setCurrentIndex(0)  # Show welcome by default
         else:
-            self._grid_tab_index = -1
+            self._grid_tab_index = self.addTab(self._grid_stack, "Grid")
+            self.setTabEnabled(self._grid_tab_index, True)
+            self._grid_stack.setCurrentIndex(0)  # Show welcome
 
         self._raw_tab_index = self.addTab(self._raw_tab.widget, "Raw")
         self.setTabEnabled(self._raw_tab_index, True)
@@ -410,7 +420,14 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
             host = self._mode_hosts.get(mode) if mode is not None else None
             if host is not None and host.supports(payload):
                 host.render(payload)
-                self._activate_tab(host.widget)
+                # For Grid mode, switch the stack to show grid content
+                if mode == RenderMode.GRID and self._grid_host is not None:
+                    self._grid_stack.setCurrentWidget(self._grid_host.widget)
+                    self._hide_welcome()
+                    self.setTabEnabled(self._grid_tab_index, True)
+                    self.setCurrentIndex(self._grid_tab_index)
+                else:
+                    self._activate_tab(host.widget)
                 return
 
             text = payload.get("ansi") or payload.get("text") or str(payload)
@@ -452,19 +469,8 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
             )
             self._board_game_strategy.go_pass_requested.connect(self.go_pass_requested)
 
-            # Replace the Grid tab content with board game widget
-            if self._grid_tab_index >= 0:
-                # Get the existing widget and replace it
-                old_widget = self.widget(self._grid_tab_index)
-                if old_widget is not None:
-                    old_widget.deleteLater()
-                # Insert board game widget at same index
-                self.removeTab(self._grid_tab_index)
-                self._grid_tab_index = self.insertTab(
-                    self._grid_tab_index,
-                    self._board_game_strategy.widget,
-                    "Grid",
-                )
+            # Add board game widget to the grid stack (index 2)
+            self._grid_stack.addWidget(self._board_game_strategy.widget)
 
         # Render the payload
         context = RendererContext(game_id=game_id)
@@ -478,9 +484,24 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
         }
         self.setTabText(self._grid_tab_index, game_names.get(game_id, "Grid"))
 
-        # Activate Grid tab
+        # Show board game widget in stack and activate Grid tab
+        self._grid_stack.setCurrentWidget(self._board_game_strategy.widget)
+        self._hide_welcome()
         self.setTabEnabled(self._grid_tab_index, True)
         self.setCurrentIndex(self._grid_tab_index)
+
+    def show_welcome(self) -> None:
+        """Show the MOSAIC welcome animation in the Grid tab."""
+        if hasattr(self, '_grid_stack') and hasattr(self, '_welcome_widget'):
+            self._grid_stack.setCurrentWidget(self._welcome_widget)
+            self._welcome_widget.start_animation()
+            self.setTabText(self._grid_tab_index, "Grid")
+            self.setCurrentIndex(self._grid_tab_index)
+
+    def _hide_welcome(self) -> None:
+        """Stop the welcome animation when content is displayed."""
+        if hasattr(self, '_welcome_widget'):
+            self._welcome_widget.stop_animation()
 
     def get_board_game_strategy(self) -> BoardGameRendererStrategy | None:
         """Get the board game renderer strategy if it exists."""

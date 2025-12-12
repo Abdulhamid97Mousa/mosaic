@@ -7,12 +7,16 @@
 #   requirements/base.txt              - Core GUI + shared infrastructure
 #   requirements/spade_bdi_worker.txt  - SPADE-BDI worker dependencies
 #   requirements/cleanrl_worker.txt    - CleanRL worker dependencies
+#   requirements/ray_worker.txt        - Ray/RLlib worker dependencies
+#   requirements/xuance_worker.txt     - XuanCe MARL worker dependencies
 #   requirements/vizdoom.txt           - Optional ViZDoom environment stack
 #
 # USAGE:
 #   GUI-only:       pip install -r requirements.txt
 #   With SPADE-BDI: pip install -r requirements/spade_bdi_worker.txt
 #   With CleanRL:   pip install -r requirements/cleanrl_worker.txt
+#   With Ray/RLlib: pip install -r requirements/ray_worker.txt
+#   With XuanCe:    pip install -r requirements/xuance_worker.txt
 #   With ViZDoom:   pip install -r requirements/vizdoom.txt
 #
 # System Requirements:
@@ -87,10 +91,12 @@
 #   | pettingzoo    | Chess, Go, MPE, SISL + Stockfish             |
 #   | vizdoom       | Doom FPS environments                        |
 #   | cleanrl       | CleanRL training (torch, tensorboard, wandb) |
+#   | ray-rllib     | Ray/RLlib distributed training               |
+#   | xuance        | XuanCe MARL training                         |
 #   | mujoco-mpc    | MuJoCo MPC worker                            |
 #   | spade-bdi     | SPADE BDI agent framework                    |
 #   | llm           | Ollama/LangChain integration                 |
 #   | dev           | pytest, pyright                              |
 #   | all-gymnasium | All single-agent envs                        |
 #   | all-envs      | All environments                             |
-#   | full          | Everything                                   |
+#   | full          | All envs + CleanRL + dev                     |

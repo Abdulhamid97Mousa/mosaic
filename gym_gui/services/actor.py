@@ -2,18 +2,29 @@
 
 from __future__ import annotations
 
-"""Actor abstractions and registry for human and autonomous agents."""
+"""Actor abstractions and registry for human and autonomous agents.
+
+This module provides:
+- Actor: Simple protocol for single-agent action selection
+- PolicyController: Paradigm-aware protocol for multi-agent/multi-paradigm support
+- ActorService: Registry for managing active actors
+"""
 
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Optional, Protocol
 
+from gym_gui.core.enums import SteppingParadigm
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import LOG_SERVICE_ACTOR_SEED_ERROR
 
 
 class Actor(Protocol):
-    """Protocol every actor implementation must follow."""
+    """Protocol every actor implementation must follow.
+
+    This is the simple, legacy protocol for single-agent environments.
+    For multi-agent or paradigm-aware control, use PolicyController instead.
+    """
 
     id: str
 
@@ -25,6 +36,115 @@ class Actor(Protocol):
 
     def on_episode_end(self, summary: "EpisodeSummary") -> None:
         """Episode lifecycle hook for cleanup or learning updates."""
+
+
+class PolicyController(Protocol):
+    """Paradigm-aware protocol for multi-agent and multi-paradigm policy control.
+
+    This protocol extends the Actor concept with:
+    1. Agent-specific action selection (for multi-agent environments)
+    2. Batch action selection (for SIMULTANEOUS/POSG paradigms)
+    3. Explicit paradigm declaration
+
+    PolicyController is designed to work with the WorkerOrchestrator and
+    PolicyMappingService for paradigm-agnostic training coordination.
+
+    Example (Sequential/AEC):
+        >>> controller.select_action("player_0", observation, info)
+
+    Example (Simultaneous/POSG):
+        >>> controller.select_actions({"player_0": obs0, "player_1": obs1})
+
+    See Also:
+        - docs/1.0_DAY_41/TASK_1/00_multi_paradigm_orchestrator_plan.md
+        - docs/1.0_DAY_41/TASK_1/01_paradigm_comparison.md
+    """
+
+    @property
+    def id(self) -> str:
+        """Unique identifier for this policy controller."""
+        ...
+
+    @property
+    def paradigm(self) -> SteppingParadigm:
+        """The stepping paradigm this controller is designed for."""
+        ...
+
+    def select_action(
+        self,
+        agent_id: str,
+        observation: Any,
+        info: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Any]:
+        """Select action for a specific agent (Sequential/AEC mode).
+
+        Args:
+            agent_id: The identifier of the agent needing an action.
+            observation: The agent's current observation.
+            info: Optional environment info dict.
+
+        Returns:
+            The action to take, or None to abstain.
+        """
+        ...
+
+    def select_actions(
+        self,
+        observations: Dict[str, Any],
+        infos: Optional[Dict[str, Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        """Select actions for all agents at once (Simultaneous/POSG mode).
+
+        Args:
+            observations: Dict mapping agent_id to observation.
+            infos: Optional dict mapping agent_id to info dict.
+
+        Returns:
+            Dict mapping agent_id to action.
+        """
+        ...
+
+    def on_step_result(
+        self,
+        agent_id: str,
+        observation: Any,
+        reward: float,
+        terminated: bool,
+        truncated: bool,
+        info: Dict[str, Any],
+    ) -> None:
+        """Receive feedback after a step (for learning updates).
+
+        Args:
+            agent_id: The agent that took the action.
+            observation: New observation after the step.
+            reward: Reward received.
+            terminated: Whether episode ended naturally.
+            truncated: Whether episode was truncated.
+            info: Environment info dict.
+        """
+        ...
+
+    def on_episode_end(
+        self,
+        agent_id: str,
+        summary: "EpisodeSummary",
+    ) -> None:
+        """Called when an episode ends for a specific agent.
+
+        Args:
+            agent_id: The agent whose episode ended.
+            summary: Aggregated episode information.
+        """
+        ...
+
+    def reset(self, seed: Optional[int] = None) -> None:
+        """Reset internal state for a new episode.
+
+        Args:
+            seed: Optional deterministic seed.
+        """
+        ...
 
 
 @dataclass(slots=True)
@@ -218,6 +338,7 @@ class CleanRLWorkerActor:
 
 __all__ = [
     "Actor",
+    "PolicyController",
     "ActorService",
     "ActorDescriptor",
     "StepSnapshot",

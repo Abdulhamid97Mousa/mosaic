@@ -115,6 +115,7 @@ class GameId(StrEnum):
     CHESS = "chess_v6"
     CONNECT_FOUR = "connect_four_v3"
     GO = "go_v5"
+    TIC_TAC_TOE = "tictactoe_v3"
 
 
 def get_game_display_name(game_id: GameId) -> str:
@@ -143,6 +144,8 @@ def get_game_display_name(game_id: GameId) -> str:
         return "PettingZoo-ConnectFour"
     if game_id == GameId.GO:
         return "PettingZoo-Go"
+    if game_id == GameId.TIC_TAC_TOE:
+        return "PettingZoo-TicTacToe"
 
     # Determine Gym family based on enum
     if game_id in (GameId.FROZEN_LAKE, GameId.FROZEN_LAKE_V2, GameId.CLIFF_WALKING, 
@@ -236,6 +239,50 @@ class AdapterCapability(Enum):
     MULTI_AGENT = auto()
 
 
+class SteppingParadigm(StrEnum):
+    """Defines how RL agents interact with the environment.
+
+    This enum describes the stepping model - how actions are collected and applied.
+    It is orthogonal to ControlMode (who controls) and EnvironmentFamily (library).
+
+    NOTE: This enum is for RL training paradigms ONLY.
+    Non-RL systems like MuJoCo MPC (optimal control) are managed separately
+    by gym_gui/services/mujoco_mpc_controller/.
+
+    See Also:
+        - docs/1.0_DAY_41/TASK_1/01_paradigm_comparison.md for POSG vs AEC details
+        - docs/1.0_DAY_41/TASK_1/00_multi_paradigm_orchestrator_plan.md for architecture
+    """
+
+    SINGLE_AGENT = "single_agent"
+    """Gymnasium single-agent: one agent, one action per step.
+
+    Used by: CleanRL, stable-baselines3, MuJoCo envs (HalfCheetah, etc.)
+    API: obs, reward, done, info = env.step(action)
+    """
+
+    SEQUENTIAL = "sequential"
+    """PettingZoo AEC / OpenSpiel: agents take turns, one at a time.
+
+    Used by: PettingZoo env(), Chess, Go, turn-based games
+    API: for agent in env.agent_iter(): env.step(action)
+    """
+
+    SIMULTANEOUS = "simultaneous"
+    """RLlib / PettingZoo Parallel: all agents act at once.
+
+    Used by: RLlib MultiAgentEnv, PettingZoo parallel_env(), MPE
+    API: obs_dict, rewards, dones, infos = env.step(action_dict)
+    """
+
+    HIERARCHICAL = "hierarchical"
+    """BDI + RL: high-level goals decomposed into low-level RL actions.
+
+    Used by: Jason/BDI workers, goal-driven agents
+    API: Custom goal → action mapping with RL sub-policies
+    """
+
+
 ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.FROZEN_LAKE: EnvironmentFamily.TOY_TEXT,
     GameId.FROZEN_LAKE_V2: EnvironmentFamily.TOY_TEXT,
@@ -305,6 +352,7 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.CHESS: EnvironmentFamily.PETTINGZOO_CLASSIC,
     GameId.CONNECT_FOUR: EnvironmentFamily.PETTINGZOO_CLASSIC,
     GameId.GO: EnvironmentFamily.PETTINGZOO_CLASSIC,
+    GameId.TIC_TAC_TOE: EnvironmentFamily.PETTINGZOO_CLASSIC,
 }
 
 
@@ -378,6 +426,7 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.CHESS: RenderMode.RGB_ARRAY,  # Fallback, but we use InteractiveChessBoard
     GameId.CONNECT_FOUR: RenderMode.RGB_ARRAY,  # Fallback, but we use InteractiveConnectFourBoard
     GameId.GO: RenderMode.RGB_ARRAY,  # Fallback, but we use InteractiveGoBoard
+    GameId.TIC_TAC_TOE: RenderMode.RGB_ARRAY,  # Fallback, but we use InteractiveTicTacToeBoard
 }
 
 
@@ -751,7 +800,44 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
     GameId.GO: (
         ControlMode.HUMAN_ONLY,
     ),
+    GameId.TIC_TAC_TOE: (
+        ControlMode.HUMAN_ONLY,
+    ),
 }
+
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Stepping Paradigm Mappings
+# ─────────────────────────────────────────────────────────────────────────────
+
+DEFAULT_PARADIGM_BY_FAMILY: dict[EnvironmentFamily, SteppingParadigm] = {
+    # Maps environment families to their default stepping paradigm.
+    # Adapters can override this by setting their own `stepping_paradigm` attribute.
+    EnvironmentFamily.TOY_TEXT: SteppingParadigm.SINGLE_AGENT,
+    EnvironmentFamily.BOX2D: SteppingParadigm.SINGLE_AGENT,
+    EnvironmentFamily.CLASSIC_CONTROL: SteppingParadigm.SINGLE_AGENT,
+    EnvironmentFamily.ATARI: SteppingParadigm.SINGLE_AGENT,
+    EnvironmentFamily.ALE: SteppingParadigm.SINGLE_AGENT,
+    EnvironmentFamily.MUJOCO: SteppingParadigm.SINGLE_AGENT,
+    EnvironmentFamily.MINIGRID: SteppingParadigm.SINGLE_AGENT,
+    EnvironmentFamily.VIZDOOM: SteppingParadigm.SINGLE_AGENT,
+    EnvironmentFamily.PETTINGZOO: SteppingParadigm.SEQUENTIAL,  # AEC by default
+    EnvironmentFamily.PETTINGZOO_CLASSIC: SteppingParadigm.SEQUENTIAL,  # Chess, Go, etc.
+    EnvironmentFamily.OTHER: SteppingParadigm.SINGLE_AGENT,
+}
+
+
+def get_stepping_paradigm(game_id: GameId) -> SteppingParadigm:
+    """Infer the stepping paradigm for a game based on its environment family.
+
+    Args:
+        game_id: The game identifier.
+
+    Returns:
+        The stepping paradigm for the game. Defaults to SINGLE_AGENT if unknown.
+    """
+    family = ENVIRONMENT_FAMILY_BY_GAME.get(game_id, EnvironmentFamily.OTHER)
+    return DEFAULT_PARADIGM_BY_FAMILY.get(family, SteppingParadigm.SINGLE_AGENT)
 
 
 __all__ = [
@@ -762,8 +848,11 @@ __all__ = [
     "ActionSpaceType",
     "AgentRole",
     "AdapterCapability",
+    "SteppingParadigm",
     "ENVIRONMENT_FAMILY_BY_GAME",
     "DEFAULT_RENDER_MODES",
     "DEFAULT_CONTROL_MODES",
+    "DEFAULT_PARADIGM_BY_FAMILY",
     "get_game_display_name",
+    "get_stepping_paradigm",
 ]

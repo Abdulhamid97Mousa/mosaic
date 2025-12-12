@@ -3,6 +3,7 @@
 ## Problem Statement
 
 The current CleanRL evaluation system has separate `*_eval.py` files for each algorithm, leading to:
+
 - Code duplication (each file has nearly identical episode loops)
 - Difficult maintenance when adding new algorithms
 - Inconsistent interfaces across algorithms
@@ -11,6 +12,7 @@ The current CleanRL evaluation system has separate `*_eval.py` files for each al
 ## Proposed Solution: Unified Evaluator with Algorithm Adapters
 
 Following XuanCe's pattern of explicit, simple code, we propose a **unified evaluation system** that:
+
 1. Has a single evaluation loop for all algorithms
 2. Uses algorithm-specific "ActionSelector" adapters for model loading and action selection
 3. Explicit checkpoint loading (no monkey-patching)
@@ -23,6 +25,7 @@ Following XuanCe's pattern of explicit, simple code, we propose a **unified eval
 ### PyTorch Algorithms (37 total)
 
 #### Category 1: Single Agent Model (PPO Family) - 14 algorithms
+
 These use `Agent` class with `get_action_and_value()` method.
 
 | Algorithm | File | Model Class | Action Space | Environment |
@@ -45,6 +48,7 @@ These use `Agent` class with `get_action_and_value()` method.
 **Action selection:** `agent.get_action_and_value(obs)` → returns `(actions, _, _, _)`
 
 #### Category 2: Single QNetwork (DQN Family) - 7 algorithms
+
 These use `QNetwork` class called directly with argmax.
 
 | Algorithm | File | Model Class | Action Space | Environment |
@@ -61,6 +65,7 @@ These use `QNetwork` class called directly with argmax.
 **Action selection:** `argmax(model(obs), dim=1)` with epsilon-greedy
 
 #### Category 3: Distributional RL (C51 Family) - 2 algorithms
+
 These use `QNetwork` with distributional parameters.
 
 | Algorithm | File | Model Class | Action Space | Environment |
@@ -73,6 +78,7 @@ These use `QNetwork` with distributional parameters.
 **Extra constructor args:** `n_atoms`, `v_min`, `v_max`
 
 #### Category 4: Actor-Critic Continuous (DDPG) - 1 algorithm
+
 Uses separate Actor and QNetwork.
 
 | Algorithm | File | Model Classes | Action Space | Environment |
@@ -83,6 +89,7 @@ Uses separate Actor and QNetwork.
 **Action selection:** `actor(obs)` + exploration noise
 
 #### Category 5: Twin Q-Network (TD3) - 1 algorithm
+
 Uses Actor and twin Q-networks.
 
 | Algorithm | File | Model Classes | Action Space | Environment |
@@ -93,6 +100,7 @@ Uses Actor and twin Q-networks.
 **Action selection:** `actor(obs)` + exploration noise
 
 #### Category 6: Soft Actor-Critic (SAC) - 2 algorithms
+
 Uses Actor and SoftQNetwork.
 
 | Algorithm | File | Model Classes | Action Space | Environment |
@@ -536,12 +544,14 @@ These were workarounds; the unified evaluator handles this properly.
 ## Implementation Phases
 
 ### Phase 1: Core Infrastructure (Priority: High)
+
 1. Create `unified_eval/` package structure
 2. Implement `ActionSelector` protocol in `base.py`
 3. Implement unified `evaluate()` function in `evaluator.py`
 4. Create adapter registry in `registry.py`
 
 ### Phase 2: PyTorch Adapters (Priority: High)
+
 1. Implement `PPOSelector` - covers 14 algorithms
 2. Implement `DQNSelector` - covers 7 algorithms
 3. Implement `C51Selector` - covers 2 algorithms
@@ -552,16 +562,19 @@ These were workarounds; the unified evaluator handles this properly.
 **Total PyTorch coverage: 27 algorithms with 6 adapters**
 
 ### Phase 3: Special Cases (Priority: Medium)
+
 1. `PPOLSTMSelector` for LSTM-based algorithms
 2. `PPOMultiAgentSelector` for PettingZoo
 3. `DQNLSTMSelector` for LSTM DQN variants
 
 ### Phase 4: JAX Support (Priority: Low)
+
 1. Create `adapters/jax/` subpackage
 2. Implement JAX equivalents of each adapter
 3. Handle Flax model loading
 
 ### Phase 5: Integration & Cleanup (Priority: High)
+
 1. Update `runtime.py` to use unified evaluator
 2. Remove monkey-patches from `sitecustomize.py`
 3. Update `eval_registry.py` to use new adapters

@@ -107,6 +107,67 @@ def is_mjpc_available() -> bool:
 
 
 # =============================================================================
+# Godot Game Engine Worker
+# =============================================================================
+
+_godot_launcher: Any = None
+_godot_launcher_loaded: bool = False
+
+
+def get_godot_launcher() -> Any:
+    """Get the Godot game engine launcher.
+
+    Returns:
+        GodotLauncher instance from godot_worker
+
+    Raises:
+        OptionalDependencyError: If godot_worker is not installed
+    """
+    global _godot_launcher, _godot_launcher_loaded
+
+    if _godot_launcher_loaded:
+        if _godot_launcher is None:
+            raise OptionalDependencyError(
+                package="Godot worker",
+                install_cmd="pip install -e 3rd_party/godot_worker",
+                extra_info="Also requires the Godot binary in 3rd_party/godot_worker/bin/"
+            )
+        return _godot_launcher()
+
+    try:
+        from godot_worker import get_launcher
+        _godot_launcher = get_launcher
+        _godot_launcher_loaded = True
+        return _godot_launcher()
+    except ImportError:
+        _godot_launcher = None
+        _godot_launcher_loaded = True
+        raise OptionalDependencyError(
+            package="Godot worker",
+            install_cmd="pip install -e 3rd_party/godot_worker",
+            extra_info="Also requires the Godot binary in 3rd_party/godot_worker/bin/"
+        )
+
+
+def is_godot_available() -> bool:
+    """Check if Godot worker is available without raising an error."""
+    global _godot_launcher, _godot_launcher_loaded
+
+    if _godot_launcher_loaded:
+        return _godot_launcher is not None
+
+    try:
+        from godot_worker import get_launcher
+        _godot_launcher = get_launcher
+        _godot_launcher_loaded = True
+        return True
+    except ImportError:
+        _godot_launcher = None
+        _godot_launcher_loaded = True
+        return False
+
+
+# =============================================================================
 # ViZDoom Environment
 # =============================================================================
 
@@ -297,6 +358,9 @@ __all__ = [
     # MuJoCo MPC
     "get_mjpc_launcher",
     "is_mjpc_available",
+    # Godot
+    "get_godot_launcher",
+    "is_godot_available",
     # ViZDoom
     "is_vizdoom_available",
     "require_vizdoom",

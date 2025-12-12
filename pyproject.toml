@@ -105,6 +105,12 @@ mujoco-mpc = [
     "mujoco>=3.0.0",
 ]
 
+# Godot worker (binary included in 3rd_party/godot_worker/bin/)
+godot = [
+    # Optional: godot-rl for Python RL bridge
+    # "godot-rl>=0.6.0",
+]
+
 # SPADE BDI worker
 spade-bdi = [
     "spade>=4.0.0",
@@ -117,6 +123,30 @@ llm = [
     "langchain>=0.3.0",
     "langchain-ollama>=0.1.0",
     "langchain-core>=0.3.0",
+]
+
+# Ray/RLlib worker for distributed RL training
+ray-rllib = [
+    "ray[rllib]>=2.9.0",
+    "ray[tune]>=2.9.0",
+    "torch>=2.0.0",
+    "tensorboard>=2.11.0",
+    "dm-tree>=0.1.8",
+]
+
+# XuanCe worker for MARL training
+xuance = [
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "scipy>=1.5.0",
+    "pygame>=2.1.0",
+    "tqdm>=4.66.0",
+    "tensorboard>=2.11.0",
+    "wandb>=0.15.3",
+    "moviepy==1.0.3",
+    "imageio>=2.9.0",
+    "opencv-python>=4.5.0",
+    "mpi4py>=3.1.0",
 ]
 
 # =============================================================================

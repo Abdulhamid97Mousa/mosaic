@@ -426,17 +426,11 @@ def is_parallel_env(env_id: PettingZooEnvId) -> bool:
 # Environments that support human control (turn-based games with discrete actions)
 HUMAN_CONTROLLABLE_ENVS: frozenset[PettingZooEnvId] = frozenset({
     # All AEC environments support human control (turn-based)
+    # Currently limited to board games with interactive UI support
     PettingZooEnvId.CHESS,
     PettingZooEnvId.CONNECT_FOUR,
-    PettingZooEnvId.TIC_TAC_TOE,
-    PettingZooEnvId.RPS,
-    PettingZooEnvId.BACKGAMMON,
     PettingZooEnvId.GO,
-    PettingZooEnvId.HANABI,
-    PettingZooEnvId.TEXAS_HOLDEM,
-    PettingZooEnvId.TEXAS_HOLDEM_NO_LIMIT,
-    PettingZooEnvId.GIN_RUMMY,
-    PettingZooEnvId.LEDUC_HOLDEM,
+    PettingZooEnvId.TIC_TAC_TOE,
 })
 
 

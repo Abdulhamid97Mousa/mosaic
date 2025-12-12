@@ -13,6 +13,7 @@ from __future__ import annotations
 from .classic.chess import CHESS_HTML, get_chess_html
 from .classic.connect_four import CONNECT_FOUR_HTML, get_connect_four_html
 from .classic.go import GO_HTML, get_go_html
+from .classic.tictactoe import TICTACTOE_HTML, get_tictactoe_html
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # Classic Family - Board Games and Card Games (AEC API)
@@ -536,6 +537,8 @@ __all__ = [
     "CONNECT_FOUR_HTML",
     "get_connect_four_html",
     "TIC_TAC_TOE_HTML",
+    "TICTACTOE_HTML",
+    "get_tictactoe_html",
     "GO_HTML",
     "get_go_html",
     "HANABI_HTML",

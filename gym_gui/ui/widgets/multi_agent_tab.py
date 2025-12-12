@@ -379,8 +379,29 @@ class HumanVsAgentTab(QtWidgets.QWidget):
         )
 
     def _update_config_summary(self) -> None:
-        """Update the configuration summary label."""
+        """Update the configuration summary label.
+
+        Shows appropriate AI opponent info based on the selected game:
+        - Chess: Stockfish engine available with difficulty options
+        - Connect Four/Go: Random AI only (no dedicated engine)
+        """
         config = self._ai_config
+
+        # Check if selected game supports Stockfish (only Chess)
+        is_chess = (
+            self._selected_env is not None
+            and self._selected_env.value == "chess_v6"
+        )
+
+        # For non-Chess games, always show Random AI
+        if not is_chess and self._selected_env is not None:
+            game_name = get_display_name(self._selected_env) if self._selected_env else "this game"
+            summary = (
+                "<b>AI Opponent:</b> Random AI<br>"
+                f"Makes random legal moves. (Stockfish is only available for Chess.)"
+            )
+            self._config_summary.setText(summary)
+            return
 
         if config.opponent_type == "random":
             summary = (
