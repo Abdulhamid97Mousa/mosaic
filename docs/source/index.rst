@@ -1,5 +1,5 @@
-MOSAIC: Multi-Agent Orchestration System
-========================================
+MOSAIC: Multi-paradigm Orchestration System for Agent Integration & Composition
+================================================================================
 
 .. raw:: html
 
@@ -26,9 +26,19 @@ MOSAIC: Multi-Agent Orchestration System
 
    <br><br>
 
-**MOSAIC** (Multi-Agent Orchestration System with Adaptive Intelligent Control) is a unified platform
-for heterogeneous agent workloads. It provides a visual-first interface for configuring, running,
-and analyzing reinforcement learning experiments across multiple paradigms.
+**MOSAIC** (Multi-paradigm Orchestration System for Agent Integration & Composition) is a unified
+platform that orchestrates diverse agents, paradigms, and workers to create cohesive intelligent
+systems — like tiles in a mosaic forming a complete picture. It provides a visual-first interface
+for configuring, running, and analyzing reinforcement learning experiments across multiple paradigms.
+
+.. image:: images/Platform_Main_View.png
+   :alt: MOSAIC Platform - Main View
+   :align: center
+   :width: 100%
+
+.. raw:: html
+
+   <br>
 
 | **GitHub**: `https://github.com/Abdulhamid97Mousa/MOSAIC <https://github.com/Abdulhamid97Mousa/MOSAIC>`_
 
@@ -41,29 +51,58 @@ to choose between frameworks like RLlib (POSG) or PettingZoo (AEC).
 
 MOSAIC provides:
 
-- **Multi-Paradigm Support**: Seamlessly switch between Single-Agent, Sequential (AEC), Simultaneous (POSG), and Hierarchical paradigms
-- **Heterogeneous Agent Composition**: Mix Human, RL (CleanRL, RLlib, XuanCe), BDI (Jason, SPADE), and LLM agents in the same environment
+- **Multi-Paradigm Support**: Seamlessly switch between Single-Agent, Sequential (AEC), Simultaneous (Parallel), and Hierarchical paradigms
+- **Agent Integration**: Mix Human, RL (CleanRL, RLlib, XuanCe), BDI (Jason, SPADE), and LLM agents in the same environment
 - **Visual-First Design**: Configure experiments through an intuitive PyQt6 interface
-- **PolicyMappingService**: Per-agent policy binding with paradigm awareness
+- **Policy Mapping**: Per-agent policy binding with paradigm awareness
+- **3D Engine Support**: MuJoCo MPC for robotics, Godot for game environments, AirSim planned
 - **Extensible Worker Architecture**: Add new training backends without modifying core code
 
-Key Features
-------------
+Supported Paradigms
+-------------------
 
-**Multi-Paradigm Orchestration**
+.. list-table::
+   :widths: 20 40 40
+   :header-rows: 1
 
-* :class:`SINGLE_AGENT` - Standard Gymnasium environments
-* :class:`SEQUENTIAL` - PettingZoo AEC (turn-based games like Chess)
-* :class:`SIMULTANEOUS` - PettingZoo Parallel / RLlib (cooperative/competitive continuous control)
-* :class:`HIERARCHICAL` - BDI agents with goal-driven behavior
+   * - Paradigm
+     - Description
+     - Example Environments
+   * - **Gymnasium**
+     - Standard single-agent RL API
+     - CartPole, MountainCar, Atari, MuJoCo
+   * - **PettingZoo AEC**
+     - Turn-based multi-agent (Alternating Environment Cycle)
+     - Chess, Go, Tic-Tac-Toe, Connect Four
+   * - **PettingZoo Parallel**
+     - Simultaneous multi-agent environments
+     - MPE, SISL, Butterfly
+   * - **MiniGrid**
+     - Procedural grid-world environments
+     - Empty, DoorKey, MultiRoom, RedBlueDoors
+   * - **ViZDoom**
+     - Doom-based visual RL platform
+     - Basic, Deadly Corridor, Defend the Center
+   * - **MuJoCo MPC**
+     - Model Predictive Control for robotics
+     - Humanoid, Quadruped, Manipulation tasks
+   * - **Godot UE**
+     - Custom 3D game environments
+     - Custom game AI training scenarios
+   * - **ALE Atari**
+     - Arcade Learning Environment
+     - Breakout, Pong, Space Invaders
 
-**Supported Workers**
+Supported Workers
+-----------------
 
 * **CleanRL** - Single-file RL implementations (PPO, DQN, SAC, TD3)
 * **XuanCe** - Multi-agent algorithms (MAPPO, QMIX, MADDPG)
 * **RLlib** - Distributed training with Ray
-* **Jason BDI** - AgentSpeak agents via Java bridge
+* **Jason BDI** - AgentSpeak agents via Java/gRPC bridge
 * **SPADE BDI** - Python-native BDI agents
+* **MuJoCo MPC** - Model Predictive Control worker
+* **Godot** - 3D game engine integration
 * **LLM** - Language model agents (planned)
 
 Quick Example
@@ -71,8 +110,8 @@ Quick Example
 
 .. code-block:: python
 
-   from mosaic.services import PolicyMappingService
-   from mosaic.core.enums import SteppingParadigm
+   from gym_gui.services import PolicyMappingService
+   from gym_gui.core.enums import SteppingParadigm
 
    # Configure heterogeneous agents for a Chess game
    policy_service = PolicyMappingService()
@@ -111,8 +150,29 @@ Architecture Overview
                                   │ gRPC / IPC
    ┌──────────────────────────────┼───────────────────────────────────┐
    │                        3rd Party Workers                         │
-   │  CleanRL │ XuanCe │ RLlib │ Jason BDI │ SPADE │ LLM │ ViZDoom  │
+   │  CleanRL │ XuanCe │ RLlib │ MuJoCo MPC │ Godot │ BDI │ LLM     │
    └──────────────────────────────────────────────────────────────────┘
+
+Core Features
+-------------
+
+**Multi-Paradigm Support**
+   Seamlessly switch between single-agent, multi-agent (AEC/Parallel), and hybrid environments
+   without changing your agent code.
+
+**Agent Integration**
+   Human, RL (CleanRL, Ray), BDI (SPADE, Jason), and future LLM agents in the same framework.
+
+**Policy Mapping**
+   Assign different policies to different agents with flexible configuration through the
+   PolicyMappingService.
+
+**3D Engine Support**
+   MuJoCo MPC for robotics, Godot for game environments, with AirSim planned for drone/vehicle
+   simulation.
+
+**Real-time Visualization**
+   Interactive render view with the MOSAIC space animation, live telemetry, and episode replay.
 
 Who Is MOSAIC For?
 ------------------
@@ -123,6 +183,7 @@ MOSAIC is designed for:
 - **Developers** building RL applications with visual configuration
 - **Students** learning about different RL paradigms and agent architectures
 - **AI practitioners** interested in combining symbolic AI (BDI) with neural methods (RL)
+- **Game developers** training AI agents in custom 3D environments
 
 .. raw:: html
 
