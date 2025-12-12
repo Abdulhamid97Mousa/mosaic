@@ -7,8 +7,11 @@
 [![Gymnasium](https://img.shields.io/badge/gymnasium-%3E%3D0.28.1-blue)](https://www.gymlibrary.dev/)
 [![PettingZoo](https://img.shields.io/badge/PettingZoo-%3E%3D1.24.0-blue)](https://pettingzoo.farama.org/)
 [![License](https://img.shields.io/github/license/Abdulhamid97Mousa/MOSAIC)](LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-ReadTheDocs-blue)](https://mosaic-multi-agent-orchestration-system.readthedocs.io/)
 
 A unified platform that orchestrates diverse agents, paradigms, and workers to create cohesive intelligent systems — like tiles in a mosaic forming a complete picture.
+
+**[Read the Documentation](https://mosaic-multi-agent-orchestration-system.readthedocs.io/)**
 
 ![MOSAIC Platform](docs/source/images/Platform_Main_View.png)
 
