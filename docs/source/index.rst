@@ -130,21 +130,30 @@ Architecture Overview
 
 .. mermaid::
 
-   flowchart TD
-       subgraph Platform["MOSAIC Platform"]
-           UI["Visual Layer<br/>(PyQt6)"]
-           SVC["Service Layer<br/>(PolicyMapping, Actor, Telemetry)"]
-           ADP["Adapter Layer<br/>(Paradigm, Environment)"]
-       end
+   graph LR
+       A[PyQt6 GUI] --> B[Services]
+       B --> C[Adapters]
+       C <--> D[Workers]
 
-       subgraph Workers["Training Workers"]
-           RL["Neural RL<br/>CleanRL | XuanCe | RLlib"]
-           BDI["Symbolic AI<br/>Jason | SPADE"]
-           SIM["Simulation<br/>MuJoCo | Godot | LLM"]
-       end
+       style A fill:#4a90d9,stroke:#2e5a87,color:#fff
+       style B fill:#50c878,stroke:#2e8b57,color:#fff
+       style C fill:#ff7f50,stroke:#cc5500,color:#fff
+       style D fill:#9370db,stroke:#6a0dad,color:#fff
 
-       UI --> SVC --> ADP
-       ADP <-->|gRPC / IPC| Workers
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - Layer
+     - Components
+   * - **GUI**
+     - MainWindow, ControlPanel, RenderTabs, AdvancedConfig
+   * - **Services**
+     - PolicyMappingService, ActorService, TelemetryService
+   * - **Adapters**
+     - ParadigmAdapter, PettingZooAdapter, ViZDoomAdapter
+   * - **Workers**
+     - CleanRL, XuanCe, RLlib, Jason BDI, SPADE, LLM
 
 Core Features
 -------------
