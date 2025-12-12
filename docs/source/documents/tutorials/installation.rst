@@ -4,10 +4,6 @@ Installation
 This guide covers installing MOSAIC and its dependencies, explaining our modular
 dependency architecture and how to choose what to install.
 
-.. contents:: Table of Contents
-   :local:
-   :depth: 2
-
 Why Modular Dependencies?
 -------------------------
 
