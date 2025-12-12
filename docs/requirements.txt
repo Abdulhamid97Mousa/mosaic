@@ -1,0 +1,9 @@
+# Sphinx documentation dependencies
+sphinx>=7.0.0
+furo
+myst-parser
+sphinx-copybutton
+sphinx-tabs
+sphinx-design
+sphinx-favicon
+sphinx-autobuild
