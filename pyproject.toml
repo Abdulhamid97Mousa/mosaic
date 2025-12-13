@@ -3,14 +3,32 @@ requires = ["setuptools>=65", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "gym-gui"
+name = "mosaic"
 version = "0.1.0"
-description = "MOSAIC GUI for BDI-RL integration with Gymnasium environments"
+description = "MOSAIC: Multi-Agent Orchestration System with Adaptive Intelligent Control for Heterogeneous Agent Workloads"
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 license = {text = "MIT"}
 authors = [
-    {name = "Hamid Mousa", email = "mousa.abdulhamid@bit.edu.cn"}
+    {name = "Dr. Abdulhamid Mousa", email = "mousa.abdulhamid@bit.edu.cn"}
+]
+keywords = [
+    "reinforcement-learning",
+    "multi-agent",
+    "gymnasium",
+    "pettingzoo",
+    "bdi",
+    "orchestration",
+    "pyqt6",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 
 # Core dependencies - ONLY what's needed to launch the GUI
@@ -165,17 +183,17 @@ dev = [
 
 # All Gymnasium single-agent environments
 all-gymnasium = [
-    "gym-gui[box2d,mujoco,atari,minigrid]",
+    "mosaic[box2d,mujoco,atari,minigrid]",
 ]
 
 # All environment families (single + multi-agent)
 all-envs = [
-    "gym-gui[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom]",
+    "mosaic[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom]",
 ]
 
 # Full development setup
 full = [
-    "gym-gui[all-envs,cleanrl,dev]",
+    "mosaic[all-envs,cleanrl,dev]",
 ]
 
 [tool.setuptools.packages.find]
@@ -183,8 +201,9 @@ where = ["."]
 include = ["gym_gui*"]
 
 [project.urls]
-Homepage = "https://github.com/hamid-mousa/GUI_BDI_RL"
-Repository = "https://github.com/hamid-mousa/GUI_BDI_RL"
+Homepage = "https://github.com/Abdulhamid97Mousa/MOSAIC"
+Repository = "https://github.com/Abdulhamid97Mousa/MOSAIC"
+Documentation = "https://mosaic-multi-agent-orchestration-system.readthedocs.io/"
 
 [tool.pyright]
 pythonVersion = "3.11"

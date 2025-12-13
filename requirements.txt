@@ -1,102 +1,53 @@
-# =============================================================================
-# GUI_BDI_RL Root Requirements File
-# =============================================================================
-# This file serves as the entry point for installing gym_gui dependencies.
-# Worker-specific dependencies are organized in requirements/ directory:
+# ==============================================================================
+# MOSAIC - Requirements
+# Multi-Agent Orchestration System with Adaptive Intelligent Control
+# ==============================================================================
 #
-#   requirements/base.txt              - Core GUI + shared infrastructure
-#   requirements/spade_bdi_worker.txt  - SPADE-BDI worker dependencies
-#   requirements/cleanrl_worker.txt    - CleanRL worker dependencies
-#   requirements/ray_worker.txt        - Ray/RLlib worker dependencies
-#   requirements/xuance_worker.txt     - XuanCe MARL worker dependencies
-#   requirements/vizdoom.txt           - Optional ViZDoom environment stack
+# This file installs a standard development setup with commonly used workers.
+# For minimal or custom installations, use pyproject.toml optional dependencies.
 #
-# USAGE:
-#   GUI-only:       pip install -r requirements.txt
-#   With SPADE-BDI: pip install -r requirements/spade_bdi_worker.txt
-#   With CleanRL:   pip install -r requirements/cleanrl_worker.txt
-#   With Ray/RLlib: pip install -r requirements/ray_worker.txt
-#   With XuanCe:    pip install -r requirements/xuance_worker.txt
-#   With ViZDoom:   pip install -r requirements/vizdoom.txt
+# INSTALLATION OPTIONS:
 #
-# System Requirements:
-# sudo apt-get install -y swig
-# sudo apt-get install -y python3.12-dev
-# sudo apt-get install -y \
-#   libxcb-cursor0 libxkbcommon-x11-0 \
-#   libxcb-icccm4 libxcb-image0 libxcb-keysyms1 \
-#   libxcb-render-util0 libxcb-randr0 libxcb-shape0 \
-#   libxcb-xinerama0 libxcb-xkb1
-# sudo apt install sqlite3
-# ViZDoom (optional): sudo apt install libopenal-dev
+#   Standard (this file):
+#     pip install -r requirements.txt
 #
-# Protobuf Code Generation:
-# source ./.venv/bin/activate && python -m grpc_tools.protoc \
-#   -I gym_gui/services/trainer/proto \
-#   --python_out=gym_gui/services/trainer/proto \
-#   --grpc_python_out=gym_gui/services/trainer/proto \
-#   gym_gui/services/trainer/proto/trainer.proto
-# =============================================================================
+#   Minimal GUI only:
+#     pip install -e .
+#
+#   With specific extras:
+#     pip install -e ".[pettingzoo,cleanrl]"
+#
+#   Full installation:
+#     pip install -e ".[full]"
+#
+# WORKER-SPECIFIC REQUIREMENTS:
+#   requirements/base.txt           - Core GUI dependencies
+#   requirements/cleanrl_worker.txt - CleanRL training backend
+#   requirements/pettingzoo.txt     - Multi-agent environments
+#   requirements/vizdoom.txt        - ViZDoom FPS environments
+#   requirements/ray_worker.txt     - Ray/RLlib distributed training
+#   requirements/xuance_worker.txt  - XuanCe MARL algorithms
+#   requirements/jason_worker.txt   - Jason BDI agents
+#   requirements/spade_bdi_worker.txt - SPADE BDI agents
+#   requirements/llm_worker.txt     - LLM/Ollama integration
+#
+# SYSTEM DEPENDENCIES (Ubuntu/Debian):
+#   sudo apt-get install -y swig python3-dev
+#   sudo apt-get install -y libxcb-cursor0 libxkbcommon-x11-0
+#
+# ==============================================================================
 
-# Include base dependencies (GUI + shared libraries)
+# Core GUI + infrastructure
 -r requirements/base.txt
 
-# CleanRL worker stack
+# CleanRL training backend
 -r requirements/cleanrl_worker.txt
 
-# Jason worker stack (bridge + MAS tooling)
--r requirements/jason_worker.txt
-
-
-# ViZDoom environment stack (Doom scenarios)
-# Uncomment to install ViZDoom by default:
-# -r requirements/vizdoom.txt
-
-
-# PettingZoo environment stack (multi-agent environments)
+# PettingZoo multi-agent environments
 -r requirements/pettingzoo.txt
 
+# Jason BDI agent bridge
+-r requirements/jason_worker.txt
 
-# SPADE-BDI worker stack
+# SPADE BDI agents
 -r requirements/spade_bdi_worker.txt
-
-
-# pyproject.toml - Optional Dependencies
-
-#   Usage:
-#   # Minimal GUI only (no environments)
-#   pip install -e .
-
-#   # GUI + PettingZoo (Chess, Go, etc.)
-#   pip install -e ".[pettingzoo]"
-
-#   # GUI + multiple environment families
-#   pip install -e ".[pettingzoo,vizdoom,box2d]"
-
-#   # GUI + CleanRL training worker
-#   pip install -e ".[cleanrl,mujoco]"
-
-#   # Everything
-#   pip install -e ".[all-envs]"
-
-#   Available optional groups:
-
-#   | Group         | Description                                  |
-#   |---------------|----------------------------------------------|
-#   | gymnasium     | Core gymnasium (no specific envs)            |
-#   | box2d         | LunarLander, BipedalWalker, CarRacing        |
-#   | mujoco        | Ant, HalfCheetah, Humanoid, etc.             |
-#   | atari         | Breakout, Pong, SpaceInvaders + ROMs         |
-#   | minigrid      | Grid-world navigation                        |
-#   | pettingzoo    | Chess, Go, MPE, SISL + Stockfish             |
-#   | vizdoom       | Doom FPS environments                        |
-#   | cleanrl       | CleanRL training (torch, tensorboard, wandb) |
-#   | ray-rllib     | Ray/RLlib distributed training               |
-#   | xuance        | XuanCe MARL training                         |
-#   | mujoco-mpc    | MuJoCo MPC worker                            |
-#   | spade-bdi     | SPADE BDI agent framework                    |
-#   | llm           | Ollama/LangChain integration                 |
-#   | dev           | pytest, pyright                              |
-#   | all-gymnasium | All single-agent envs                        |
-#   | all-envs      | All environments                             |
-#   | full          | All envs + CleanRL + dev                     |

@@ -233,6 +233,12 @@ _vizdoom.ini
 # !requirements/README.md
 
 
-#Ignore cursor AI rules
+# Ignore cursor AI rules
 .cursor/rules/codacy.mdc
+
+# =============================================================================
+# Development Progress (internal documentation - not for public release)
+# =============================================================================
+
+docs/Development_Progress/
 
