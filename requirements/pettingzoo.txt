@@ -23,6 +23,9 @@ pettingzoo[mpe]>=1.24.0
 
 # SISL: Cooperative continuous control (Multiwalker, Waterworld, Pursuit)
 pettingzoo[sisl]>=1.24.0
+# Pymunk constraint: PettingZoo waterworld uses add_collision_handler() API
+# which was removed in pymunk 7.x (replaced with on_collision)
+pymunk>=6.0.0,<7.0.0
 
 # Optional: Atari multi-agent games (Pong, Boxing, Tennis)
 # Requires ROM license acceptance - uncomment if needed:

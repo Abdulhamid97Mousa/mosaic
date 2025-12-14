@@ -321,7 +321,19 @@ class AnalyticsTabManager(LogConstantMixin):
             )
             return False
 
-        tab_name = f"TensorBoard-Agent-{agent_id}"
+        # Generate tab name based on worker type and env
+        # For ray_worker: TensorBoard-{env}-{run_id[:8]} (matches FastLane naming)
+        # For cleanrl_worker: TensorBoard-{env}-{run_id[:8]} or TensorBoard-{agent_id}
+        worker_type = metadata.get("worker_type") if isinstance(metadata, Mapping) else None
+        ray_metadata = metadata.get("ray_metadata") if isinstance(metadata, Mapping) else None
+        env_id: Optional[str] = None
+
+        if worker_type == "ray_worker" and isinstance(ray_metadata, Mapping):
+            env_id = ray_metadata.get("env_id", "MultiAgent")
+            tab_name = f"TensorBoard-{env_id}-{run_id[:8]}"
+        else:
+            # Legacy: use agent_id for non-ray workers
+            tab_name = f"TensorBoard-{agent_id}-{run_id[:8]}"
         existing_tabs = self._render_tabs._agent_tabs.get(run_id, {})
         existing_widget = existing_tabs.get(tab_name)
         if existing_widget is not None:
@@ -339,7 +351,9 @@ class AnalyticsTabManager(LogConstantMixin):
             )
             return True
 
-        tab = TensorboardArtifactTab(run_id, agent_id, resolved_path, parent=self._parent)
+        # For ray_worker, use env_id as the display label; for others use agent_id
+        display_label = env_id if env_id else agent_id
+        tab = TensorboardArtifactTab(run_id, display_label, resolved_path, parent=self._parent)
         self._render_tabs.add_dynamic_tab(run_id, tab_name, tab)
         self.log_constant(
             LOG_UI_RENDER_TABS_TENSORBOARD_STATUS,

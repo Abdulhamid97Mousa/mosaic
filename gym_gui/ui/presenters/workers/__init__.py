@@ -18,6 +18,7 @@ from .registry import WorkerPresenter, WorkerPresenterRegistry
 from .spade_bdi_worker_presenter import SpadeBdiWorkerPresenter
 from .cleanrl_worker_presenter import CleanRlWorkerPresenter
 from .pettingzoo_worker_presenter import PettingZooWorkerPresenter
+from .ray_worker_presenter import RayWorkerPresenter
 
 
 # Create and auto-register default presenters
@@ -25,6 +26,7 @@ _registry = WorkerPresenterRegistry()
 _registry.register("spade_bdi_worker", SpadeBdiWorkerPresenter())
 _registry.register("cleanrl_worker", CleanRlWorkerPresenter())
 _registry.register("pettingzoo_worker", PettingZooWorkerPresenter())
+_registry.register("ray_worker", RayWorkerPresenter())
 
 
 def get_worker_presenter_registry() -> WorkerPresenterRegistry:
@@ -42,5 +44,6 @@ __all__ = [
     "SpadeBdiWorkerPresenter",
     "CleanRlWorkerPresenter",
     "PettingZooWorkerPresenter",
+    "RayWorkerPresenter",
     "get_worker_presenter_registry",
 ]

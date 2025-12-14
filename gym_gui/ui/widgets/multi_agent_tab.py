@@ -36,6 +36,7 @@ from gym_gui.ui.widgets.human_vs_agent_config_form import (
     HumanVsAgentConfig,
     DIFFICULTY_PRESETS,
 )
+from gym_gui.ui.widgets.policy_assignment_panel import PolicyAssignmentPanel
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -460,10 +461,12 @@ class MultiAgentCooperationTab(QtWidgets.QWidget):
     worker_changed = pyqtSignal(str)  # worker_id
     train_requested = pyqtSignal(str, str)  # worker_id, env_id
     evaluate_requested = pyqtSignal(str, str)  # worker_id, env_id
+    policy_evaluate_requested = pyqtSignal(dict)  # Full evaluation config with policies
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
         self._workers: List[WorkerDefinition] = []
+        self._current_agent_ids: List[str] = []
         self._build_ui()
         self._connect_signals()
         self._populate_workers()
@@ -530,6 +533,10 @@ class MultiAgentCooperationTab(QtWidgets.QWidget):
 
         layout.addWidget(action_group)
 
+        # Policy Assignment panel
+        self._policy_panel = PolicyAssignmentPanel(self)
+        layout.addWidget(self._policy_panel)
+
         layout.addStretch(1)
 
     def _connect_signals(self) -> None:
@@ -539,6 +546,15 @@ class MultiAgentCooperationTab(QtWidgets.QWidget):
         self._env_combo.currentIndexChanged.connect(self._on_env_changed)
         self._train_btn.clicked.connect(self._on_train)
         self._eval_btn.clicked.connect(self._on_evaluate)
+        self._policy_panel.evaluate_requested.connect(self._on_policy_evaluate)
+
+    def _on_policy_evaluate(self, config: dict) -> None:
+        """Handle policy evaluation request from the panel."""
+        # Add environment info to config
+        config["env_id"] = self._env_combo.currentData()
+        config["env_family"] = self._family_combo.currentData()
+        config["worker_id"] = self._worker_combo.currentData()
+        self.policy_evaluate_requested.emit(config)
 
     def _populate_workers(self) -> None:
         """Populate worker dropdown."""
@@ -616,6 +632,7 @@ class MultiAgentCooperationTab(QtWidgets.QWidget):
         env_value = self._env_combo.currentData()
         if not env_value:
             self._env_info.setText("")
+            self._policy_panel.set_agents([])
             return
 
         try:
@@ -623,8 +640,47 @@ class MultiAgentCooperationTab(QtWidgets.QWidget):
             description = get_description(env_id)
             api_type = get_api_type(env_id)
             self._env_info.setText(f"{description}\n(API: {api_type.value.upper()})")
+
+            # Detect agents for this environment
+            agent_ids = self._detect_agents(env_value)
+            self._current_agent_ids = agent_ids
+            self._policy_panel.set_agents(agent_ids)
+
         except ValueError:
             self._env_info.setText("")
+            self._policy_panel.set_agents([])
+
+    def _detect_agents(self, env_id: str) -> List[str]:
+        """Detect agent IDs for an environment.
+
+        Args:
+            env_id: PettingZoo environment ID
+
+        Returns:
+            List of agent IDs
+        """
+        family = self._family_combo.currentData()
+        if not family:
+            return []
+
+        try:
+            # Try to create environment and get agents
+            from gym_gui.core.adapters.pettingzoo import PettingZooAdapter
+            adapter = PettingZooAdapter()
+            adapter.load_game(env_id, {"family": family})
+            agent_ids = list(adapter.possible_agents) if hasattr(adapter, 'possible_agents') else []
+            adapter.close()
+            return agent_ids
+        except Exception as e:
+            _LOGGER.warning("Could not detect agents for %s: %s", env_id, e)
+            # Return default agent pattern based on env
+            if "waterworld" in env_id:
+                return [f"pursuer_{i}" for i in range(5)]
+            elif "multiwalker" in env_id:
+                return [f"walker_{i}" for i in range(3)]
+            elif "pursuit" in env_id:
+                return [f"pursuer_{i}" for i in range(8)]
+            return ["agent_0", "agent_1"]
 
     def _on_train(self) -> None:
         """Handle train button click."""
@@ -652,10 +708,12 @@ class MultiAgentCompetitionTab(QtWidgets.QWidget):
     worker_changed = pyqtSignal(str)  # worker_id
     train_requested = pyqtSignal(str, str)  # worker_id, env_id
     evaluate_requested = pyqtSignal(str, str)  # worker_id, env_id
+    policy_evaluate_requested = pyqtSignal(dict)  # Full evaluation config with policies
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
         self._workers: List[WorkerDefinition] = []
+        self._current_agent_ids: List[str] = []
         self._build_ui()
         self._connect_signals()
         self._populate_workers()
@@ -745,6 +803,10 @@ class MultiAgentCompetitionTab(QtWidgets.QWidget):
 
         layout.addWidget(action_group)
 
+        # Policy Assignment panel
+        self._policy_panel = PolicyAssignmentPanel(self)
+        layout.addWidget(self._policy_panel)
+
         layout.addStretch(1)
 
     def _connect_signals(self) -> None:
@@ -754,6 +816,14 @@ class MultiAgentCompetitionTab(QtWidgets.QWidget):
         self._env_combo.currentIndexChanged.connect(self._on_env_changed)
         self._train_btn.clicked.connect(self._on_train)
         self._eval_btn.clicked.connect(self._on_evaluate)
+        self._policy_panel.evaluate_requested.connect(self._on_policy_evaluate)
+
+    def _on_policy_evaluate(self, config: dict) -> None:
+        """Handle policy evaluation request from the panel."""
+        config["env_id"] = self._env_combo.currentData()
+        config["env_family"] = self._family_combo.currentData()
+        config["worker_id"] = self._worker_combo.currentData()
+        self.policy_evaluate_requested.emit(config)
 
     def _populate_workers(self) -> None:
         """Populate worker dropdown."""
@@ -831,6 +901,7 @@ class MultiAgentCompetitionTab(QtWidgets.QWidget):
         env_value = self._env_combo.currentData()
         if not env_value:
             self._env_info.setText("")
+            self._policy_panel.set_agents([])
             return
 
         try:
@@ -838,8 +909,41 @@ class MultiAgentCompetitionTab(QtWidgets.QWidget):
             description = get_description(env_id)
             api_type = get_api_type(env_id)
             self._env_info.setText(f"{description}\n(API: {api_type.value.upper()})")
+
+            # Detect agents for this environment
+            agent_ids = self._detect_agents(env_value)
+            self._current_agent_ids = agent_ids
+            self._policy_panel.set_agents(agent_ids)
+
         except ValueError:
             self._env_info.setText("")
+            self._policy_panel.set_agents([])
+
+    def _detect_agents(self, env_id: str) -> List[str]:
+        """Detect agent IDs for an environment."""
+        family = self._family_combo.currentData()
+        if not family:
+            return []
+
+        try:
+            from gym_gui.core.adapters.pettingzoo import PettingZooAdapter
+            adapter = PettingZooAdapter()
+            adapter.load_game(env_id, {"family": family})
+            agent_ids = list(adapter.possible_agents) if hasattr(adapter, 'possible_agents') else []
+            adapter.close()
+            return agent_ids
+        except Exception as e:
+            _LOGGER.warning("Could not detect agents for %s: %s", env_id, e)
+            # Return default agents for competitive games
+            if "chess" in env_id:
+                return ["player_0", "player_1"]
+            elif "go" in env_id:
+                return ["black_0", "white_0"]
+            elif "connect_four" in env_id:
+                return ["player_0", "player_1"]
+            elif "tictactoe" in env_id:
+                return ["player_1", "player_2"]
+            return ["agent_0", "agent_1"]
 
     def _on_train(self) -> None:
         """Handle train button click."""
@@ -869,6 +973,7 @@ class MultiAgentTab(QtWidgets.QWidget):
     worker_changed = pyqtSignal(str)
     train_requested = pyqtSignal(str, str)  # worker_id, env_id
     evaluate_requested = pyqtSignal(str, str)  # worker_id, env_id
+    policy_evaluate_requested = pyqtSignal(dict)  # Full evaluation config with policies
     load_policy_requested = pyqtSignal(str)  # env_id
     load_environment_requested = pyqtSignal(str, int)  # env_id, seed
     start_game_requested = pyqtSignal(str, str, int)  # env_id, human_agent, seed
@@ -925,11 +1030,13 @@ class MultiAgentTab(QtWidgets.QWidget):
         self._cooperation_tab.worker_changed.connect(self.worker_changed)
         self._cooperation_tab.train_requested.connect(self.train_requested)
         self._cooperation_tab.evaluate_requested.connect(self.evaluate_requested)
+        self._cooperation_tab.policy_evaluate_requested.connect(self.policy_evaluate_requested)
 
         # Competition
         self._competition_tab.worker_changed.connect(self.worker_changed)
         self._competition_tab.train_requested.connect(self.train_requested)
         self._competition_tab.evaluate_requested.connect(self.evaluate_requested)
+        self._competition_tab.policy_evaluate_requested.connect(self.policy_evaluate_requested)
 
     @property
     def human_vs_agent(self) -> HumanVsAgentTab:

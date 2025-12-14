@@ -2035,6 +2035,100 @@ LOG_COUNTER_RESET = _constant(
 )
 
 
+# ---------------------------------------------------------------------------
+# Ray Worker constants (LOG970–LOG979)
+# ---------------------------------------------------------------------------
+LOG_RAY_WORKER_RUNTIME_STARTED = _constant(
+    "LOG970",
+    "INFO",
+    "Ray RLlib worker runtime started",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "runtime", "lifecycle"),
+)
+
+LOG_RAY_WORKER_RUNTIME_STOPPED = _constant(
+    "LOG971",
+    "INFO",
+    "Ray RLlib worker runtime stopped",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "runtime", "lifecycle"),
+)
+
+LOG_RAY_WORKER_RUNTIME_ERROR = _constant(
+    "LOG972",
+    "ERROR",
+    "Ray RLlib worker runtime error",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "runtime", "error"),
+)
+
+LOG_RAY_WORKER_TRAINING_STARTED = _constant(
+    "LOG973",
+    "INFO",
+    "Ray RLlib training started",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "training", "start"),
+)
+
+LOG_RAY_WORKER_TRAINING_COMPLETED = _constant(
+    "LOG974",
+    "INFO",
+    "Ray RLlib training completed",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "training", "complete"),
+)
+
+LOG_RAY_WORKER_CHECKPOINT_SAVED = _constant(
+    "LOG975",
+    "INFO",
+    "Ray RLlib checkpoint saved",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "checkpoint", "save"),
+)
+
+LOG_RAY_WORKER_FASTLANE_ENABLED = _constant(
+    "LOG976",
+    "INFO",
+    "Ray RLlib FastLane streaming enabled",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "fastlane", "enabled"),
+)
+
+LOG_RAY_WORKER_ENV_WRAPPED = _constant(
+    "LOG977",
+    "INFO",
+    "PettingZoo environment wrapped for Ray RLlib",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "environment", "wrapped"),
+)
+
+LOG_RAY_WORKER_POLICY_LOADED = _constant(
+    "LOG978",
+    "INFO",
+    "Ray RLlib policy loaded from checkpoint",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "policy", "loaded"),
+)
+
+LOG_RAY_WORKER_ANALYTICS_WRITTEN = _constant(
+    "LOG979",
+    "INFO",
+    "Ray RLlib analytics manifest written",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "analytics", "manifest"),
+)
+
+
 # =========================================================================
 # Helper Functions for Runtime Discovery & Validation
 # =========================================================================
@@ -2338,6 +2432,17 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_COUNTER_VALIDATION_ERROR,
     LOG_COUNTER_NEXT_EPISODE,
     LOG_COUNTER_RESET,
+    # Ray Worker
+    LOG_RAY_WORKER_RUNTIME_STARTED,
+    LOG_RAY_WORKER_RUNTIME_STOPPED,
+    LOG_RAY_WORKER_RUNTIME_ERROR,
+    LOG_RAY_WORKER_TRAINING_STARTED,
+    LOG_RAY_WORKER_TRAINING_COMPLETED,
+    LOG_RAY_WORKER_CHECKPOINT_SAVED,
+    LOG_RAY_WORKER_FASTLANE_ENABLED,
+    LOG_RAY_WORKER_ENV_WRAPPED,
+    LOG_RAY_WORKER_POLICY_LOADED,
+    LOG_RAY_WORKER_ANALYTICS_WRITTEN,
 )
 
 
@@ -2556,4 +2661,15 @@ __all__ = (
     "LOG_COUNTER_VALIDATION_ERROR",
     "LOG_COUNTER_NEXT_EPISODE",
     "LOG_COUNTER_RESET",
+    # Ray Worker
+    "LOG_RAY_WORKER_RUNTIME_STARTED",
+    "LOG_RAY_WORKER_RUNTIME_STOPPED",
+    "LOG_RAY_WORKER_RUNTIME_ERROR",
+    "LOG_RAY_WORKER_TRAINING_STARTED",
+    "LOG_RAY_WORKER_TRAINING_COMPLETED",
+    "LOG_RAY_WORKER_CHECKPOINT_SAVED",
+    "LOG_RAY_WORKER_FASTLANE_ENABLED",
+    "LOG_RAY_WORKER_ENV_WRAPPED",
+    "LOG_RAY_WORKER_POLICY_LOADED",
+    "LOG_RAY_WORKER_ANALYTICS_WRITTEN",
 )

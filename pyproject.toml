@@ -97,6 +97,8 @@ pettingzoo = [
     "pettingzoo[classic,butterfly,mpe,sisl]>=1.24.0",
     "supersuit>=3.9.0",
     "stockfish>=3.28.0",
+    # pymunk 7.x removed add_collision_handler() API used by waterworld
+    "pymunk>=6.0.0,<7.0.0",
 ]
 
 # ViZDoom FPS environments

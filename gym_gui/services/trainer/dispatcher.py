@@ -305,7 +305,8 @@ class TrainerDispatcher:
                 suffix = f"-{worker_id}" if worker_id else ""
                 config_path = config_dir / f"worker-{run.run_id}{suffix}.json"
                 worker_payload = dict(worker_config)
-                worker_payload.setdefault("run_id", run.run_id)
+                # Always use the actual run_id from the trainer (ULID), not the form's run_name
+                worker_payload["run_id"] = run.run_id
                 if worker_id:
                     worker_payload.setdefault("worker_id", worker_id)
                 schema_id = worker_payload.get("schema_id")
@@ -501,6 +502,16 @@ class TrainerDispatcher:
             for key, value in env_overrides.items():
                 if key and value is not None:
                     env[str(key)] = str(value)
+
+        # CRITICAL: Override RAY_FASTLANE_RUN_ID to use the actual run_id (ULID)
+        # The form generates a human-readable run_name but the trainer assigns the actual ULID.
+        # FastLane requires the actual run_id to match between UI and worker.
+        if "RAY_FASTLANE_RUN_ID" in env:
+            env["RAY_FASTLANE_RUN_ID"] = run.run_id
+            _LOGGER.debug(
+                "Updated RAY_FASTLANE_RUN_ID to actual run_id",
+                extra={"run_id": run.run_id, "original": env_overrides.get("RAY_FASTLANE_RUN_ID") if env_overrides else None},
+            )
 
         worker_meta = config_json.get("metadata", {}).get("worker", {}) if isinstance(config_json, dict) else {}
         worker_id = ""

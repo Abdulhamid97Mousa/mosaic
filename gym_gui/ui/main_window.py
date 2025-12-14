@@ -75,6 +75,7 @@ from gym_gui.services.trainer.streams import TelemetryAsyncHub
 from gym_gui.services.trainer.client_runner import TrainerWatchStopped
 from gym_gui.ui.widgets.live_telemetry_tab import LiveTelemetryTab
 from gym_gui.ui.widgets.fastlane_tab import FastLaneTab
+from gym_gui.ui.widgets.ray_multi_worker_fastlane_tab import RayMultiWorkerFastLaneTab
 from gym_gui.ui.presenters.workers import (
     get_worker_presenter_registry,
 )
@@ -1871,12 +1872,105 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         canonical_agent_id = self._canonical_agent_id(metadata, agent_id)
         run_mode = self._metadata_run_mode(metadata)
-        key = (run_id, canonical_agent_id)
+        worker_id = self._get_worker_id_from_metadata(metadata)
+        env_id = self._get_env_id_from_metadata(metadata)
+
+        # For Ray workers with num_workers > 0, create multiple tabs
+        if worker_id == "ray_worker":
+            num_workers = self._get_num_workers_from_metadata(metadata)
+            self._open_ray_fastlane_tabs(
+                run_id, canonical_agent_id, run_mode, env_id, num_workers
+            )
+        else:
+            # CleanRL or other workers: single tab
+            self._open_single_fastlane_tab(
+                run_id, canonical_agent_id, run_mode, env_id, worker_id
+            )
+
+    def _get_num_workers_from_metadata(self, metadata: Dict[str, Any]) -> int:
+        """Extract num_workers from metadata (default 0 for single worker)."""
+        worker_meta = metadata.get("worker") if isinstance(metadata, dict) else None
+        if isinstance(worker_meta, dict):
+            worker_config = worker_meta.get("config")
+            if isinstance(worker_config, dict):
+                resources = worker_config.get("resources")
+                if isinstance(resources, dict):
+                    num_workers = resources.get("num_workers")
+                    if isinstance(num_workers, int):
+                        return num_workers
+        return 0
+
+    def _open_ray_fastlane_tabs(
+        self,
+        run_id: str,
+        agent_id: str,
+        run_mode: str,
+        env_id: str,
+        num_workers: int,
+    ) -> None:
+        """Open a single grid-based FastLane tab for active Ray workers.
+
+        RLlib architecture:
+        - num_workers=0: W0 samples (1 cell)
+        - num_workers=2: W1, W2 sample (2 cells, W0 is coordinator)
+        """
+        # Use run_id as key - one grid tab per run
+        key = (run_id, "ray_grid")
+        if key in self._fastlane_tabs_open:
+            self.log_constant(
+                LOG_UI_MAINWINDOW_TRACE,
+                message="Ray multi-worker FastLane tab already open",
+                extra={"run_id": run_id},
+            )
+            return
+
+        env_label = env_id or "MultiAgent"
+        mode_prefix = "Ray-Eval" if run_mode == "policy_eval" else "Ray-Live"
+        # Active workers: W0 if num_workers=0, else W1..WN (num_workers count)
+        active_workers = 1 if num_workers == 0 else num_workers
+
+        try:
+            tab = RayMultiWorkerFastLaneTab(
+                run_id,
+                num_workers,
+                env_id=env_id,
+                run_mode=run_mode,
+                parent=self._render_tabs,
+            )
+        except Exception as exc:
+            self.log_constant(
+                LOG_UI_MAINWINDOW_WARNING,
+                message="Failed to create Ray multi-worker FastLane tab",
+                extra={"run_id": run_id, "num_workers": num_workers},
+                exc_info=exc,
+            )
+            return
+
+        # Tab title: Ray-Live-{env}-{N}W-{run_id[:8]}
+        title = f"{mode_prefix}-{env_label}-{active_workers}W-{run_id[:8]}"
+        self._render_tabs.add_dynamic_tab(run_id, title, tab)
+        self._fastlane_tabs_open.add(key)
+        self.log_constant(
+            LOG_UI_MAINWINDOW_INFO,
+            message="Opened Ray multi-worker FastLane grid tab",
+            extra={"run_id": run_id, "active_workers": active_workers, "title": title},
+        )
+
+    def _open_single_fastlane_tab(
+        self,
+        run_id: str,
+        agent_id: str,
+        run_mode: str,
+        env_id: str,
+        worker_id: str,
+    ) -> None:
+        """Open a single FastLane tab (for CleanRL and other non-Ray workers)."""
+        key = (run_id, agent_id)
         if key in self._fastlane_tabs_open:
             self.log_constant(
                 LOG_UI_MAINWINDOW_TRACE,
                 message="FastLane tab already tracked",
-                extra={"run_id": run_id, "agent_id": canonical_agent_id},
+                extra={"run_id": run_id, "agent_id": agent_id},
             )
             return
 
@@ -1884,7 +1978,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             mode_label = "Fast lane (evaluation)" if run_mode == "policy_eval" else "Fast lane"
             tab = FastLaneTab(
                 run_id,
-                canonical_agent_id,
+                agent_id,
                 mode_label=mode_label,
                 run_mode=run_mode,
                 parent=self._render_tabs,
@@ -1893,21 +1987,23 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self.log_constant(
                 LOG_UI_MAINWINDOW_WARNING,
                 message="Failed to create FastLane tab",
-                extra={"run_id": run_id, "agent_id": canonical_agent_id},
+                extra={"run_id": run_id, "agent_id": agent_id},
                 exc_info=exc,
             )
             return
 
+        # CleanRL or other workers: CleanRL-Live-{agent_id}
         if run_mode == "policy_eval":
-            title = f"CleanRL-Eval-{canonical_agent_id or 'agent'}"
+            title = f"CleanRL-Eval-{agent_id or 'agent'}"
         else:
-            title = f"CleanRL-Live-{canonical_agent_id or 'agent'}"
+            title = f"CleanRL-Live-{agent_id or 'agent'}"
+
         self._render_tabs.add_dynamic_tab(run_id, title, tab)
         self._fastlane_tabs_open.add(key)
         self.log_constant(
             LOG_UI_MAINWINDOW_INFO,
             message="Opened FastLane tab",
-            extra={"run_id": run_id, "agent_id": canonical_agent_id, "title": title},
+            extra={"run_id": run_id, "agent_id": agent_id, "title": title},
         )
 
     def _canonical_agent_id(self, metadata: Dict[str, Any], fallback: str) -> str:
@@ -1922,6 +2018,42 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 if isinstance(config_agent, str) and config_agent.strip():
                     return config_agent.strip()
         return fallback
+
+    def _get_worker_id_from_metadata(self, metadata: Dict[str, Any]) -> str:
+        """Extract worker_id from metadata (e.g., 'ray_worker', 'cleanrl_worker')."""
+        # Try worker.worker_id first
+        worker_meta = metadata.get("worker") if isinstance(metadata, dict) else None
+        if isinstance(worker_meta, dict):
+            worker_id = worker_meta.get("worker_id")
+            if isinstance(worker_id, str) and worker_id.strip():
+                return worker_id.strip()
+        # Try ui.worker_id
+        ui_meta = metadata.get("ui") if isinstance(metadata, dict) else None
+        if isinstance(ui_meta, dict):
+            worker_id = ui_meta.get("worker_id")
+            if isinstance(worker_id, str) and worker_id.strip():
+                return worker_id.strip()
+        return ""
+
+    def _get_env_id_from_metadata(self, metadata: Dict[str, Any]) -> str:
+        """Extract environment ID from metadata for tab naming."""
+        # Try ui.env_id first (set by forms)
+        ui_meta = metadata.get("ui") if isinstance(metadata, dict) else None
+        if isinstance(ui_meta, dict):
+            env_id = ui_meta.get("env_id")
+            if isinstance(env_id, str) and env_id.strip():
+                return env_id.strip()
+        # Try worker.config.environment.env_id
+        worker_meta = metadata.get("worker") if isinstance(metadata, dict) else None
+        if isinstance(worker_meta, dict):
+            worker_config = worker_meta.get("config")
+            if isinstance(worker_config, dict):
+                env_config = worker_config.get("environment")
+                if isinstance(env_config, dict):
+                    env_id = env_config.get("env_id")
+                    if isinstance(env_id, str) and env_id.strip():
+                        return env_id.strip()
+        return ""
 
     def _metadata_run_mode(self, metadata: Dict[str, Any]) -> str:
         ui_meta = metadata.get("ui") if isinstance(metadata, dict) else None
