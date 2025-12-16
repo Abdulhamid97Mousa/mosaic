@@ -10,7 +10,7 @@ _REPO_ROOT = _PACKAGE_ROOT.parent
 
 # Writable runtime artifacts (shared with worker stack). Prefer repo-level var/.
 VAR_ROOT = (_REPO_ROOT / "var").resolve()
-VAR_RECORDS_DIR = VAR_ROOT / "records"
+VAR_REPLAY_DIR = VAR_ROOT / "replay"  # HDF5 replay storage (frames, observations)
 VAR_TELEMETRY_DIR = VAR_ROOT / "telemetry"
 VAR_CACHE_DIR = VAR_ROOT / "cache"
 VAR_TMP_DIR = VAR_ROOT / "tmp"
@@ -28,7 +28,7 @@ def ensure_var_directories() -> None:
 
     for path in (
         VAR_ROOT,
-        VAR_RECORDS_DIR,
+        VAR_REPLAY_DIR,
         VAR_TELEMETRY_DIR,
         VAR_CACHE_DIR,
         VAR_TMP_DIR,
@@ -43,7 +43,7 @@ def ensure_var_directories() -> None:
 
 __all__ = [
     "VAR_ROOT",
-    "VAR_RECORDS_DIR",
+    "VAR_REPLAY_DIR",
     "VAR_TELEMETRY_DIR",
     "VAR_CACHE_DIR",
     "VAR_TMP_DIR",

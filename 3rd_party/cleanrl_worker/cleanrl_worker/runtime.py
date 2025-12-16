@@ -165,8 +165,10 @@ _RESERVED_EXTRA_KEYS: frozenset[str] = frozenset(
         "fastlane_slot",
         "fastlane_video_mode",
         "fastlane_grid_limit",
+        "fastlane_enabled",
         "mode",
         "policy_path",
+        "checkpoint_path",
         "eval_capture_video",
         "eval_episodes",
         "eval_gamma",
@@ -806,23 +808,31 @@ class CleanRLWorkerRuntime:
                         return make_env(env_id, idx, capture_video, run_name)
 
                 def adapted_make_env(env_id, idx, capture_video, run_name, _gamma_unused):
-                    env = base_factory(env_id, idx, capture_video, run_name, target_gamma)
-                    if max_seconds_override is not None:
-                        from gym_gui.core.wrappers.time_limits import TimeLimitSeconds
+                    # Return a factory function that creates the wrapped environment.
+                    # CleanRL's ppo_eval.py passes this to gym.vector.SyncVectorEnv which
+                    # expects a callable that returns an env, not an env directly.
+                    def env_factory():
+                        # base_factory returns a factory function, so we call it twice:
+                        # base_factory(...) -> returns factory function
+                        # base_factory(...)() -> calls factory to create actual env
+                        env = base_factory(env_id, idx, capture_video, run_name, target_gamma)()
+                        if max_seconds_override is not None:
+                            from gym_gui.core.wrappers.time_limits import TimeLimitSeconds
 
-                        try:
-                            env = TimeLimitSeconds(env, float(max_seconds_override))
-                        except Exception:
-                            pass
-                    if max_steps_override is not None:
-                        from gym_gui.core.wrappers.time_limits import configure_step_limit
+                            try:
+                                env = TimeLimitSeconds(env, float(max_seconds_override))
+                            except Exception:
+                                pass
+                        if max_steps_override is not None:
+                            from gym_gui.core.wrappers.time_limits import configure_step_limit
 
-                        try:
-                            env = configure_step_limit(env, int(max_steps_override))
-                        except Exception:
-                            pass
-                    env = _EvalStepLoggingWrapper(env, self._config.run_id, idx)
-                    return env
+                            try:
+                                env = configure_step_limit(env, int(max_steps_override))
+                            except Exception:
+                                pass
+                        env = _EvalStepLoggingWrapper(env, self._config.run_id, idx)
+                        return env
+                    return env_factory
 
                 result: Optional[EvalRunResult] = run_batched_evaluation(
                     evaluate_fn,

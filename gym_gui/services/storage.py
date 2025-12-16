@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Optional
 
-from gym_gui.config.paths import VAR_RECORDS_DIR, ensure_var_directories
+from gym_gui.config.paths import VAR_REPLAY_DIR, ensure_var_directories
 from gym_gui.config.settings import get_storage_profile_config
 from gym_gui.storage.session import EpisodeRecord, SessionRecorder
 
@@ -151,7 +151,7 @@ class StorageRecorderService:
         if self._recorder is not None:
             return self._recorder
         ensure_var_directories()
-        base_dir = VAR_RECORDS_DIR
+        base_dir = VAR_REPLAY_DIR
         base_dir.mkdir(parents=True, exist_ok=True)
         profile = self.get_active_profile()
         self._recorder = SessionRecorder(

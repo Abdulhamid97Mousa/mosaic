@@ -9,7 +9,7 @@ from typing import Any, Callable, Generic, Mapping, Sequence, TypeVar
 
 import gymnasium as gym  # type: ignore[import]
 
-from gym_gui.core.enums import ControlMode, RenderMode
+from gym_gui.core.enums import ControlMode, RenderMode, SteppingParadigm
 from gym_gui.core.spaces.serializer import describe_space
 from gym_gui.core.spaces.vector_metadata import describe_vector_environment
 from gym_gui.logging_config.log_constants import (
@@ -45,6 +45,81 @@ class AdapterContext:
         if self.logger_factory is not None:
             return self.logger_factory(name)
         return logging.getLogger(name)
+
+
+@dataclass(frozen=True)
+class WorkerCapabilities:
+    """Declares what stepping paradigms and features a worker/adapter supports.
+
+    This dataclass is used by the WorkerOrchestrator to:
+    1. Match environments to compatible workers
+    2. Configure paradigm-specific stepping behavior
+    3. Validate worker compatibility before launching runs
+
+    Attributes:
+        stepping_paradigm: Primary stepping model (SINGLE_AGENT, SEQUENTIAL, etc.)
+        supported_paradigms: All paradigms this worker can handle.
+        env_types: Environment types supported (e.g., ["gymnasium", "pettingzoo"]).
+        action_spaces: Action space types supported (e.g., ["discrete", "continuous"]).
+        observation_spaces: Observation space types supported (e.g., ["box", "dict"]).
+        max_agents: Maximum number of agents (1 for single-agent).
+        supports_self_play: Whether worker can train via self-play.
+        supports_population: Whether worker supports population-based training.
+        supports_record: Whether worker supports recording episodes.
+        supports_fast_reset: Whether worker supports fast environment reset.
+        max_fps: Target frame rate for continuous paradigms (None for turn-based).
+        requires_gpu: Whether GPU is required.
+        gpu_memory_mb: Estimated GPU memory requirement in MB.
+        cpu_cores: Recommended CPU cores.
+
+    Example:
+        >>> caps = WorkerCapabilities(
+        ...     stepping_paradigm=SteppingParadigm.SINGLE_AGENT,
+        ...     env_types=["gymnasium"],
+        ...     action_spaces=["discrete", "continuous"],
+        ...     max_agents=1,
+        ... )
+    """
+
+    stepping_paradigm: SteppingParadigm
+    supported_paradigms: tuple[SteppingParadigm, ...] = ()
+    env_types: tuple[str, ...] = ("gymnasium",)
+    action_spaces: tuple[str, ...] = ("discrete",)
+    observation_spaces: tuple[str, ...] = ("box",)
+    max_agents: int = 1
+    supports_self_play: bool = False
+    supports_population: bool = False
+    supports_record: bool = False
+    supports_fast_reset: bool = False
+    max_fps: float | None = None
+    requires_gpu: bool = False
+    gpu_memory_mb: int | None = None
+    cpu_cores: int = 1
+
+    def __post_init__(self) -> None:
+        # Ensure stepping_paradigm is in supported_paradigms
+        if not self.supported_paradigms:
+            object.__setattr__(
+                self,
+                "supported_paradigms",
+                (self.stepping_paradigm,),
+            )
+
+    def supports_paradigm(self, paradigm: SteppingParadigm) -> bool:
+        """Check if this worker supports the given stepping paradigm."""
+        return paradigm in self.supported_paradigms
+
+    def supports_env_type(self, env_type: str) -> bool:
+        """Check if this worker supports the given environment type."""
+        return env_type in self.env_types
+
+    def supports_action_space(self, space_type: str) -> bool:
+        """Check if this worker supports the given action space type."""
+        return space_type in self.action_spaces
+
+    def is_multi_agent(self) -> bool:
+        """Check if this worker supports multi-agent environments."""
+        return self.max_agents > 1
 
 
 @dataclass(slots=True)
@@ -121,12 +196,21 @@ class UnsupportedModeError(RuntimeError):
 
 
 class EnvironmentAdapter(ABC, Generic[ObservationT, ActionT], LogConstantMixin):
-    """Lifecycle contract for all Gymnasium environment adapters."""
+    """Lifecycle contract for all Gymnasium environment adapters.
+
+    Attributes:
+        id: The Gymnasium environment ID (e.g., "CartPole-v1").
+        supported_control_modes: Control modes this adapter supports.
+        supported_render_modes: Render modes this adapter supports.
+        default_render_mode: Default render mode for this adapter.
+        stepping_paradigm: The RL stepping paradigm (default: SINGLE_AGENT).
+    """
 
     id: str
     supported_control_modes: tuple[ControlMode, ...]
     supported_render_modes: tuple[RenderMode, ...] = ()
     default_render_mode: RenderMode
+    stepping_paradigm: SteppingParadigm = SteppingParadigm.SINGLE_AGENT
 
     def __init__(self, context: AdapterContext | None = None) -> None:
         self._context = context

@@ -123,7 +123,7 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
         self._details_container = details_container
 
         header = QtWidgets.QLabel(
-            f"TensorBoard metrics for run {self._run_id[:12]}… (agent {self._agent_id})"
+            f"TensorBoard metrics for run {self._run_id[:12]}… ({self._agent_id})"
         )
         header.setWordWrap(True)
         details_layout.addWidget(header)

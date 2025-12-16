@@ -2,18 +2,29 @@
 
 from __future__ import annotations
 
-"""Actor abstractions and registry for human and autonomous agents."""
+"""Actor abstractions and registry for human and autonomous agents.
+
+This module provides:
+- Actor: Simple protocol for single-agent action selection
+- PolicyController: Paradigm-aware protocol for multi-agent/multi-paradigm support
+- ActorService: Registry for managing active actors
+"""
 
 import logging
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, Optional, Protocol
 
+from gym_gui.core.enums import SteppingParadigm
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import LOG_SERVICE_ACTOR_SEED_ERROR
 
 
 class Actor(Protocol):
-    """Protocol every actor implementation must follow."""
+    """Protocol every actor implementation must follow.
+
+    This is the simple, legacy protocol for single-agent environments.
+    For multi-agent or paradigm-aware control, use PolicyController instead.
+    """
 
     id: str
 
@@ -25,6 +36,115 @@ class Actor(Protocol):
 
     def on_episode_end(self, summary: "EpisodeSummary") -> None:
         """Episode lifecycle hook for cleanup or learning updates."""
+
+
+class PolicyController(Protocol):
+    """Paradigm-aware protocol for multi-agent and multi-paradigm policy control.
+
+    This protocol extends the Actor concept with:
+    1. Agent-specific action selection (for multi-agent environments)
+    2. Batch action selection (for SIMULTANEOUS/POSG paradigms)
+    3. Explicit paradigm declaration
+
+    PolicyController is designed to work with the WorkerOrchestrator and
+    PolicyMappingService for paradigm-agnostic training coordination.
+
+    Example (Sequential/AEC):
+        >>> controller.select_action("player_0", observation, info)
+
+    Example (Simultaneous/POSG):
+        >>> controller.select_actions({"player_0": obs0, "player_1": obs1})
+
+    See Also:
+        - docs/1.0_DAY_41/TASK_1/00_multi_paradigm_orchestrator_plan.md
+        - docs/1.0_DAY_41/TASK_1/01_paradigm_comparison.md
+    """
+
+    @property
+    def id(self) -> str:
+        """Unique identifier for this policy controller."""
+        ...
+
+    @property
+    def paradigm(self) -> SteppingParadigm:
+        """The stepping paradigm this controller is designed for."""
+        ...
+
+    def select_action(
+        self,
+        agent_id: str,
+        observation: Any,
+        info: Optional[Dict[str, Any]] = None,
+    ) -> Optional[Any]:
+        """Select action for a specific agent (Sequential/AEC mode).
+
+        Args:
+            agent_id: The identifier of the agent needing an action.
+            observation: The agent's current observation.
+            info: Optional environment info dict.
+
+        Returns:
+            The action to take, or None to abstain.
+        """
+        ...
+
+    def select_actions(
+        self,
+        observations: Dict[str, Any],
+        infos: Optional[Dict[str, Dict[str, Any]]] = None,
+    ) -> Dict[str, Any]:
+        """Select actions for all agents at once (Simultaneous/POSG mode).
+
+        Args:
+            observations: Dict mapping agent_id to observation.
+            infos: Optional dict mapping agent_id to info dict.
+
+        Returns:
+            Dict mapping agent_id to action.
+        """
+        ...
+
+    def on_step_result(
+        self,
+        agent_id: str,
+        observation: Any,
+        reward: float,
+        terminated: bool,
+        truncated: bool,
+        info: Dict[str, Any],
+    ) -> None:
+        """Receive feedback after a step (for learning updates).
+
+        Args:
+            agent_id: The agent that took the action.
+            observation: New observation after the step.
+            reward: Reward received.
+            terminated: Whether episode ended naturally.
+            truncated: Whether episode was truncated.
+            info: Environment info dict.
+        """
+        ...
+
+    def on_episode_end(
+        self,
+        agent_id: str,
+        summary: "EpisodeSummary",
+    ) -> None:
+        """Called when an episode ends for a specific agent.
+
+        Args:
+            agent_id: The agent whose episode ended.
+            summary: Aggregated episode information.
+        """
+        ...
+
+    def reset(self, seed: Optional[int] = None) -> None:
+        """Reset internal state for a new episode.
+
+        Args:
+            seed: Optional deterministic seed.
+        """
+        ...
 
 
 @dataclass(slots=True)
@@ -190,72 +310,6 @@ class HumanKeyboardActor:
 
 
 @dataclass(slots=True)
-class BDIQAgent:
-    """BDI-driven agent wrapper with pluggable learning strategies (default: Q-learning)."""
-
-    id: str = "bdi_q_agent"
-    q_table: Optional[Any] = None  # Reference to RL agent's Q-table (numpy array)
-    epsilon: float = 0.1  # Exploration rate
-    training: bool = True  # Whether in training mode (affects exploration)
-
-    def select_action(self, step: StepSnapshot) -> Optional[int]:
-        """Select action using epsilon-greedy policy from Q-table.
-        
-        If training: randomly explore with probability epsilon, else exploit best action.
-        If not training: always select greedy best action (no exploration).
-        
-        Args:
-            step: Current step snapshot with observation
-            
-        Returns:
-            Integer action index (0 to num_actions-1) or None if Q-table unavailable
-        """
-        if self.q_table is None or step.observation is None:
-            return None  # Abstain if Q-table not initialized
-        
-        try:
-            import numpy as np
-            state_val = step.observation
-            if not isinstance(state_val, int):
-                state_val = int(state_val)  # type: ignore[arg-type]
-            state = state_val
-            
-            # Check if state is valid
-            if state < 0 or state >= len(self.q_table):
-                return None
-            
-            q_values = self.q_table[state]
-            num_actions = len(q_values)
-            
-            if self.training and np.random.random() < self.epsilon:
-                # Exploration: random action
-                return int(np.random.randint(0, num_actions))
-            else:
-                # Exploitation: greedy action (highest Q-value)
-                return int(np.argmax(q_values))
-        except (TypeError, IndexError, ValueError):
-            return None
-
-    def on_step(self, step: StepSnapshot) -> None:
-        """Receive feedback after an action has been applied.
-        
-        Q-table updates are handled by the trainer/RL agent, not here.
-        This hook can be used for logging or observation filtering.
-        """
-        pass
-
-    def on_episode_end(self, summary: EpisodeSummary) -> None:
-        """Episode lifecycle hook for learning rate decay or checkpointing.
-        
-        Args:
-            summary: Aggregated episode statistics
-        """
-        # Decay exploration rate over episodes
-        if self.training and self.epsilon > 0.01:
-            self.epsilon = max(0.01, self.epsilon * 0.99)
-
-
-@dataclass(slots=True)
 class LLMMultiStepAgent:
     """Agent that leverages an LLM with tool calls for decision making."""
 
@@ -284,12 +338,12 @@ class CleanRLWorkerActor:
 
 __all__ = [
     "Actor",
+    "PolicyController",
     "ActorService",
     "ActorDescriptor",
     "StepSnapshot",
     "EpisodeSummary",
     "HumanKeyboardActor",
-    "BDIQAgent",
     "LLMMultiStepAgent",
     "CleanRLWorkerActor",
 ]

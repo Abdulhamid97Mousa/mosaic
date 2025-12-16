@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mosaic-ray-worker"
+version = "0.1.0"
+description = "Ray/RLlib integration for MOSAIC BDI-RL framework"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+# Dependencies are managed via the main project's requirements.txt
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+ray-worker = "ray_worker.cli:main"
+
+[tool.setuptools]
+# Expose both the original Ray packages AND our harness
+packages = [
+    # Our integration harness
+    "ray_worker",
+]
+
+[tool.setuptools.package-dir]
+# Our harness is directly in ray_worker/
+"ray_worker" = "ray_worker"

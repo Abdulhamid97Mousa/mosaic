@@ -28,7 +28,7 @@ from gym_gui.config.game_configs import (
 from gym_gui.core.enums import ControlMode, GameId
 from gym_gui.game_docs import get_game_info
 from gym_gui.logging_config.log_constants import LOG_ENV_MINIGRID_BOOT
-from gym_gui.ui.environments.single_agent_env.minigrid.config_panel import (
+from gym_gui.ui.config_panels.single_agent.minigrid.config_panel import (
     MINIGRID_GAME_IDS,
     resolve_default_config,
 )

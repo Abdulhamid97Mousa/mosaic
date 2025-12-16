@@ -5,16 +5,15 @@ from __future__ import annotations
 import logging
 import os
 
-from gym_gui.config.paths import VAR_TELEMETRY_DIR, ensure_var_directories, VAR_ROOT
+from gym_gui.config.paths import VAR_TELEMETRY_DIR, VAR_REPLAY_DIR, ensure_var_directories, VAR_ROOT
 from gym_gui.rendering import RendererRegistry, create_default_renderer_registry
 from gym_gui.services.action_mapping import ContinuousActionMapper, create_default_action_mapper
 from gym_gui.services.actor import (
     ActorService,
-    BDIQAgent,
     CleanRLWorkerActor,
     HumanKeyboardActor,
 )
-from gym_gui.services.frame_storage import FrameStorageService
+from gym_gui.services.policy_mapping import PolicyMappingService
 from gym_gui.services.service_locator import ServiceLocator, get_service_locator
 from gym_gui.services.trainer import TrainerClient, TrainerClientConfig, TrainerClientRunner
 from gym_gui.services.trainer.launcher import TrainerDaemonHandle, ensure_trainer_daemon_running
@@ -34,10 +33,6 @@ from gym_gui.constants import (
     HEALTH_MONITOR_HEARTBEAT_INTERVAL_S,
 )
 from gym_gui.controllers.live_telemetry_controllers import LiveTelemetryController
-from gym_gui.services.jason_supervisor import JasonSupervisorService
-from gym_gui.validations.validations_telemetry import ValidationService
-from gym_gui.services.jason_bridge import JasonBridgeServer
-from gym_gui.config.settings import get_settings
 
 
 def bootstrap_default_services() -> ServiceLocator:
@@ -72,13 +67,13 @@ def bootstrap_default_services() -> ServiceLocator:
         backend_label="Qt keyboard input",
         activate=True,
     )
-    actors.register_actor(
-        BDIQAgent(),
-        display_name="BDI Agent",
-        description="Belief-Desire-Intention agent with pluggable learning backends.",
-        policy_label="BDI planner + RL policy",
-        backend_label="In-process Python actor",
-    )
+    # actors.register_actor(
+    #     BDIQAgent(),
+    #     display_name="BDI Agent",
+    #     description="Belief-Desire-Intention agent with pluggable learning backends.",
+    #     policy_label="BDI planner + RL policy",
+    #     backend_label="In-process Python actor",
+    # )
     # actors.register_actor(
     #     LLMMultiStepAgent(),
     #     display_name="LLM Multi-Step Agent",
@@ -94,24 +89,18 @@ def bootstrap_default_services() -> ServiceLocator:
         backend_label="Trainer-managed worker",
     )
 
-    # Jason Supervisor service (lightweight state + control validation)
-    supervisor_validator = ValidationService(strict_mode=False)
-    supervisor_service = JasonSupervisorService(validator=supervisor_validator)
-    # Activate by default (UI can toggle later)
-    supervisor_service.set_active(True)
-    locator.register(JasonSupervisorService, supervisor_service)
-    locator.register("supervisor_service", supervisor_service)
-
     action_mapper: ContinuousActionMapper = create_default_action_mapper()
     renderer_registry: RendererRegistry = create_default_renderer_registry()  # default strategies
-    frame_storage: FrameStorageService = FrameStorageService()
+
+    # Create PolicyMappingService wrapping ActorService for multi-agent support
+    policy_mapping = PolicyMappingService(actors)
 
     locator.register(StorageRecorderService, storage)
     locator.register(TelemetryService, telemetry)
     locator.register(TelemetrySQLiteStore, telemetry_store)
     locator.register(ActorService, actors)
+    locator.register(PolicyMappingService, policy_mapping)
     locator.register(ContinuousActionMapper, action_mapper)
-    locator.register(FrameStorageService, frame_storage)
 
     client_config = TrainerClientConfig()
 
@@ -136,6 +125,7 @@ def bootstrap_default_services() -> ServiceLocator:
 
     # Initialize and start database sink for durable persistence
     # Writer queue is larger (512) to handle backlog, UI queue is smaller (64)
+    # HDF5 replay storage enabled: frames/observations → var/replay/, SQLite stores refs only
     bus = get_bus()
     db_sink = TelemetryDBSink(
         telemetry_store,
@@ -143,6 +133,7 @@ def bootstrap_default_services() -> ServiceLocator:
         batch_size=DB_SINK_BATCH_SIZE,
         checkpoint_interval=DB_SINK_CHECKPOINT_INTERVAL,
         writer_queue_size=DB_SINK_WRITER_QUEUE_SIZE,
+        replay_dir=VAR_REPLAY_DIR,  # Enable HDF5 storage for frames/observations
     )
     db_sink.start()
 
@@ -168,6 +159,7 @@ def bootstrap_default_services() -> ServiceLocator:
     locator.register("telemetry", telemetry)
     locator.register("telemetry_store", telemetry_store)
     locator.register("actors", actors)
+    locator.register("policy_mapping", policy_mapping)
     locator.register("action_mapper", action_mapper)
     locator.register("renderer_registry", renderer_registry)
     locator.register("trainer_client", trainer_client)
@@ -175,21 +167,6 @@ def bootstrap_default_services() -> ServiceLocator:
     locator.register("telemetry_hub", telemetry_hub)
     locator.register("live_telemetry_controller", live_controller)
     locator.register("trainer_daemon_handle", daemon_handle)
-
-    # Optionally start Jason bridge server using typed settings (preferred over raw env).
-    # Environment variables still populate settings via get_settings().
-    settings = get_settings()
-    if settings.jason_bridge_enabled:
-        try:
-            bridge_server = JasonBridgeServer(
-                host=settings.jason_bridge_host,
-                port=settings.jason_bridge_port,
-            )
-            bridge_server.start()
-            locator.register(JasonBridgeServer, bridge_server)
-            locator.register("jason_bridge_server", bridge_server)
-        except Exception:  # pragma: no cover - do not crash bootstrap on failures
-            logging.getLogger(__name__).exception("Failed to start JasonBridgeServer")
 
     return locator
 

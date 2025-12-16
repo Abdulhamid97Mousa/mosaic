@@ -24,7 +24,7 @@ from gym_gui.core.adapters.base import (
     EnvironmentAdapter,
     StepState,
 )
-from gym_gui.core.enums import ControlMode, RenderMode
+from gym_gui.core.enums import ControlMode, RenderMode, SteppingParadigm
 from gym_gui.core.pettingzoo_enums import (
     HUMAN_CONTROLLABLE_ENVS,
     PETTINGZOO_CONTROL_MODES,
@@ -215,6 +215,18 @@ class PettingZooAdapter(EnvironmentAdapter[Any, Any]):
     def num_agents(self) -> int:
         """Get number of agents."""
         return len(self.possible_agents)
+
+    @property
+    def stepping_paradigm(self) -> SteppingParadigm:  # type: ignore[override]
+        """Return the stepping paradigm based on environment type.
+
+        Returns:
+            SIMULTANEOUS for Parallel API environments,
+            SEQUENTIAL for AEC environments.
+        """
+        if self._is_parallel:
+            return SteppingParadigm.SIMULTANEOUS
+        return SteppingParadigm.SEQUENTIAL
 
     def load(self) -> None:
         """Instantiate the PettingZoo environment."""

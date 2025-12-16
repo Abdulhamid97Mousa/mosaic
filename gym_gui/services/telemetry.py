@@ -6,6 +6,7 @@ import asyncio
 import logging
 from dataclasses import replace
 from collections import deque
+from pathlib import Path
 from typing import Any, Deque, Dict, Iterable, Optional, TYPE_CHECKING
 
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
@@ -21,6 +22,7 @@ if TYPE_CHECKING:  # pragma: no cover - type checking only
     from gym_gui.services.storage import StorageRecorderService
     from gym_gui.validations import ValidationService
     from gym_gui.telemetry import TelemetrySQLiteStore
+    from gym_gui.replay import FrameResolver
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -33,6 +35,7 @@ class TelemetryService(LogConstantMixin):
         *,
         history_limit: int = TELEMETRY_SERVICE_HISTORY_LIMIT,
         validation_service: Optional["ValidationService"] = None,
+        replay_dir: Optional[Path] = None,
     ) -> None:
         self._logger = _LOGGER
         self._history_limit = max(1, history_limit)
@@ -43,6 +46,8 @@ class TelemetryService(LogConstantMixin):
         self._storage: "StorageRecorderService | None" = None
         self._store: "TelemetrySQLiteStore | None" = None
         self._validation_service: "ValidationService | None" = validation_service
+        self._replay_dir = replay_dir
+        self._frame_resolver: "FrameResolver | None" = None
 
     def attach_storage(self, storage: "StorageRecorderService") -> None:
         self._storage = storage
@@ -53,6 +58,60 @@ class TelemetryService(LogConstantMixin):
     def attach_validation_service(self, validation_service: "ValidationService") -> None:
         """Attach a validation service for data validation."""
         self._validation_service = validation_service
+
+    def attach_frame_resolver(self, resolver: "FrameResolver") -> None:
+        """Attach a FrameResolver for resolving HDF5 frame references."""
+        self._frame_resolver = resolver
+
+    def get_frame_resolver(self) -> Optional["FrameResolver"]:
+        """Get the attached FrameResolver, lazily creating one if replay_dir is set."""
+        if self._frame_resolver is None and self._replay_dir is not None:
+            from gym_gui.replay import FrameResolver
+
+            self._frame_resolver = FrameResolver(self._replay_dir)
+        return self._frame_resolver
+
+    def resolve_step_frame(self, step: StepRecord) -> StepRecord:
+        """Resolve frame_ref to actual frame data if available.
+
+        Args:
+            step: StepRecord with potential frame_ref
+
+        Returns:
+            StepRecord with resolved render_payload if frame_ref was set
+        """
+        if not step.frame_ref:
+            return step
+
+        resolver = self.get_frame_resolver()
+        if resolver is None:
+            return step
+
+        frame = resolver.resolve(step.frame_ref)
+        if frame is not None:
+            return replace(step, render_payload={"frame": frame})
+        return step
+
+    def resolve_step_observation(self, step: StepRecord) -> StepRecord:
+        """Resolve obs_ref to actual observation data if available.
+
+        Args:
+            step: StepRecord with potential obs_ref
+
+        Returns:
+            StepRecord with resolved observation if obs_ref was set
+        """
+        if not step.obs_ref:
+            return step
+
+        resolver = self.get_frame_resolver()
+        if resolver is None:
+            return step
+
+        observation = resolver.resolve(step.obs_ref)
+        if observation is not None:
+            return replace(step, observation=observation)
+        return step
 
     # ------------------------------------------------------------------
     def record_step(self, record: StepRecord) -> None:

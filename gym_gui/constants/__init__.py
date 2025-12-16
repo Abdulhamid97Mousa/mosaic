@@ -241,10 +241,46 @@ from gym_gui.constants.constants_wandb import (
     build_wandb_run_url,
 )
 
-# Supervisor (Jason) Defaults
-from gym_gui.constants.constants_jason_supervisor import (
-    SupervisorDefaults,
-    DEFAULT_SUPERVISOR,
+# ================================================================
+# Replay Storage Constants (HDF5)
+# ================================================================
+
+from gym_gui.constants.constants_replay import (
+    REPLAY_DEFAULTS,
+    ReplayDefaults,
+    ReplayWriterDefaults,
+    ReplayReaderDefaults,
+    FrameRefDefaults,
+    ReplayPathDefaults,
+    REPLAY_MAX_STEPS_PER_RUN,
+    REPLAY_FRAME_CHUNK_SIZE,
+    REPLAY_COMPRESSION,
+    REPLAY_WRITE_BATCH_SIZE,
+    REPLAY_WRITE_QUEUE_SIZE,
+    FRAME_REF_SCHEME,
+    FRAME_REF_FRAMES_DATASET,
+    FRAME_REF_OBS_DATASET,
+    REPLAY_SUBDIR,
+)
+
+# ================================================================
+# Optional Dependencies
+# ================================================================
+
+from gym_gui.constants.optional_deps import (
+    OptionalDependencyError,
+    get_mjpc_launcher,
+    is_mjpc_available,
+    is_vizdoom_available,
+    require_vizdoom,
+    is_pettingzoo_available,
+    require_pettingzoo,
+    is_stockfish_available,
+    require_stockfish,
+    is_cleanrl_available,
+    require_cleanrl,
+    is_torch_available,
+    require_torch,
 )
 
 # ================================================================
@@ -382,15 +418,48 @@ __all__: list[str] = [
     "DEFAULT_WANDB",
     "WandbDefaults",
     "build_wandb_run_url",
-    # Supervisor
-    "SupervisorDefaults",
-    "DEFAULT_SUPERVISOR",
+    # Replay Storage (HDF5)
+    "REPLAY_DEFAULTS",
+    "ReplayDefaults",
+    "ReplayWriterDefaults",
+    "ReplayReaderDefaults",
+    "FrameRefDefaults",
+    "ReplayPathDefaults",
+    "REPLAY_MAX_STEPS_PER_RUN",
+    "REPLAY_FRAME_CHUNK_SIZE",
+    "REPLAY_COMPRESSION",
+    "REPLAY_WRITE_BATCH_SIZE",
+    "REPLAY_WRITE_QUEUE_SIZE",
+    "FRAME_REF_SCHEME",
+    "FRAME_REF_FRAMES_DATASET",
+    "FRAME_REF_OBS_DATASET",
+    "REPLAY_SUBDIR",
+    # Optional Dependencies
+    "OptionalDependencyError",
+    "get_mjpc_launcher",
+    "is_mjpc_available",
+    "is_vizdoom_available",
+    "require_vizdoom",
+    "is_pettingzoo_available",
+    "require_pettingzoo",
+    "is_stockfish_available",
+    "require_stockfish",
+    "is_cleanrl_available",
+    "require_cleanrl",
+    "is_torch_available",
+    "require_torch",
     # Game (will be extended if game_constants has __all__)
 ]
 
 # Append game constants if they're available
 if _game_exports:  # pragma: no cover
     __all__.extend(_game_exports)  # type: ignore[attr-defined]
+
+# ================================================================
+# MOSAIC Welcome Widget Constants
+# ================================================================
+# Import as submodule for use with `const.` prefix in widget
+from gym_gui.constants import mosaic_welcome
 
 # Clean up temporary variables
 del _constants_game, _game_exports, _name

@@ -39,27 +39,21 @@ class WorkerDefinition:
 
 
 def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
-    """Return the catalog of worker integrations recognised by the UI."""
+    """Return the catalog of worker integrations recognised by the UI.
+
+    Note: SPADE-BDI and CleanRL workers have been removed from Multi-Agent Mode.
+    Only Ray RLlib and PettingZoo workers are available for multi-agent training.
+    """
     return (
         WorkerDefinition(
-            worker_id="spade_bdi_worker",
-            display_name="SPADE-BDI RL Worker",
+            worker_id="ray_worker",
+            display_name="Ray RLlib Worker",
             description=(
-                "Runs SPADE-BDI based reinforcement learning agents with live telemetry "
-                "streaming through the Telemetry Hub. Supports training, policy evaluation, and "
-                "TensorBoard analytics surfaced directly in the GUI."
-            ),
-            supports_training=True,
-            supports_policy_load=True,
-            requires_live_telemetry=True,
-            provides_fast_analytics=True,
-        ),
-        WorkerDefinition(
-            worker_id="cleanrl_worker",
-            display_name="CleanRL Worker",
-            description=(
-                "Launches CleanRL reference algorithms and surfaces TensorBoard/WANDB "
-                "artifacts via the Fast Analytics Path."
+                "Distributed multi-agent reinforcement learning using Ray RLlib. "
+                "Supports multiple training paradigms: Parameter Sharing, Independent Learning, "
+                "Self-Play, and Shared Value Function (CTDE). "
+                "Works with PettingZoo environments (SISL, Classic, Butterfly, MPE). "
+                "FastLane integration for live training visualization with per-worker grid."
             ),
             supports_training=True,
             supports_policy_load=True,

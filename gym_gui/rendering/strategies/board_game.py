@@ -37,7 +37,7 @@ class BoardGameRendererStrategy(RendererStrategy):
     mode = RenderMode.GRID  # Rendered in Grid tab
 
     # Supported game IDs
-    SUPPORTED_GAMES = frozenset({GameId.CHESS, GameId.CONNECT_FOUR, GameId.GO})
+    SUPPORTED_GAMES = frozenset({GameId.CHESS, GameId.CONNECT_FOUR, GameId.GO, GameId.TIC_TAC_TOE})
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         self._widget = _BoardGameWidget(parent)
@@ -67,6 +67,11 @@ class BoardGameRendererStrategy(RendererStrategy):
     def go_pass_requested(self) -> QtCore.SignalInstance:
         """Signal: Go pass requested."""
         return self._widget.go_pass_requested
+
+    @property
+    def tictactoe_cell_clicked(self) -> QtCore.SignalInstance:
+        """Signal: Tic-Tac-Toe cell clicked (row: int, col: int)."""
+        return self._widget.tictactoe_cell_clicked
 
     def render(
         self, payload: Mapping[str, object], *, context: RendererContext | None = None
@@ -187,6 +192,7 @@ class _BoardGameWidget(QtWidgets.QStackedWidget):
     connect_four_column_clicked = QtCore.Signal(int)  # column
     go_intersection_clicked = QtCore.Signal(int, int)  # row, col
     go_pass_requested = QtCore.Signal()
+    tictactoe_cell_clicked = QtCore.Signal(int, int)  # row, col
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
@@ -195,6 +201,7 @@ class _BoardGameWidget(QtWidgets.QStackedWidget):
         self._chess_renderer: _ChessBoardRenderer | None = None
         self._connect_four_renderer: _ConnectFourBoardRenderer | None = None
         self._go_renderer: _GoBoardRenderer | None = None
+        self._tictactoe_renderer: _TicTacToeBoardRenderer | None = None
 
         # Placeholder for empty state
         self._placeholder = QtWidgets.QLabel("No board game loaded", self)
@@ -216,6 +223,10 @@ class _BoardGameWidget(QtWidgets.QStackedWidget):
             self.setCurrentWidget(renderer)
         elif game_id == GameId.GO:
             renderer = self._get_go_renderer()
+            renderer.update_from_payload(payload)
+            self.setCurrentWidget(renderer)
+        elif game_id == GameId.TIC_TAC_TOE:
+            renderer = self._get_tictactoe_renderer()
             renderer.update_from_payload(payload)
             self.setCurrentWidget(renderer)
         else:
@@ -254,6 +265,14 @@ class _BoardGameWidget(QtWidgets.QStackedWidget):
             self._go_renderer.pass_requested.connect(self.go_pass_requested)
             self.addWidget(self._go_renderer)
         return self._go_renderer
+
+    def _get_tictactoe_renderer(self) -> "_TicTacToeBoardRenderer":
+        """Lazy-load Tic-Tac-Toe renderer."""
+        if self._tictactoe_renderer is None:
+            self._tictactoe_renderer = _TicTacToeBoardRenderer(self)
+            self._tictactoe_renderer.cell_clicked.connect(self.tictactoe_cell_clicked)
+            self.addWidget(self._tictactoe_renderer)
+        return self._tictactoe_renderer
 
 
 # =============================================================================
@@ -1128,11 +1147,14 @@ class _GoBoardRenderer(QtWidgets.QWidget):
         if self._last_move is None:
             return
 
-        coords = self.action_to_coords(self._last_move)
-        if coords is None:
-            return
-
-        row, col = coords
+        # Handle both int action (Chess/Connect Four) and tuple coords (Go)
+        if isinstance(self._last_move, tuple):
+            row, col = self._last_move
+        else:
+            coords = self.action_to_coords(self._last_move)
+            if coords is None:
+                return
+            row, col = coords
         pos = self._intersection_to_pixel(row, col)
         marker_radius = max(3, self._stone_radius // 3)
         stone = self._board[row][col]
@@ -1144,6 +1166,253 @@ class _GoBoardRenderer(QtWidgets.QWidget):
 
         painter.setPen(QtCore.Qt.PenStyle.NoPen)
         painter.drawEllipse(pos, marker_radius, marker_radius)
+
+
+# =============================================================================
+# Tic-Tac-Toe Board Renderer
+# =============================================================================
+
+# Tic-Tac-Toe colors
+_TTT_GRID_COLOR = QtGui.QColor(50, 50, 50)
+_TTT_X_COLOR = QtGui.QColor(50, 100, 200)
+_TTT_O_COLOR = QtGui.QColor(200, 50, 50)
+_TTT_BG_COLOR = QtGui.QColor(245, 245, 220)
+_TTT_HOVER = QtGui.QColor(100, 100, 255, 50)
+_TTT_LAST_MOVE = QtGui.QColor(255, 255, 0, 100)
+_TTT_HUMAN_WIN_HIGHLIGHT = QtGui.QColor(0, 200, 0, 120)  # Green for human win
+_TTT_AI_WIN_HIGHLIGHT = QtGui.QColor(200, 50, 50, 120)  # Red for AI win
+
+
+class _TicTacToeBoardRenderer(QtWidgets.QWidget):
+    """Tic-Tac-Toe board renderer with interactive cell selection."""
+
+    cell_clicked = QtCore.Signal(int, int)  # row, col
+
+    SIZE = 3  # 3x3 board
+
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        super().__init__(parent)
+
+        # Board state (0=empty, 1=X, 2=O)
+        self._board: List[List[int]] = [[0] * self.SIZE for _ in range(self.SIZE)]
+        self._legal_actions: List[int] = list(range(9))
+        self._current_player: str = "player_1"
+        self._last_row: Optional[int] = None
+        self._last_col: Optional[int] = None
+        self._winning_positions: Optional[List[tuple[int, int]]] = None
+        self._is_game_over: bool = False
+        self._winner: Optional[str] = None  # "player_1", "player_2", or "draw"
+        self._human_player: str = "player_1"  # Track who human is for win highlight color
+
+        # Rendering settings
+        self._cell_size: int = 100
+        self._margin: int = 20
+        self._line_width: int = 4
+        self._enabled: bool = True
+        self._hover_pos: Optional[tuple[int, int]] = None
+
+        # Widget setup
+        self.setMouseTracking(True)
+        self.setMinimumSize(self._margin * 2 + self._cell_size * self.SIZE,
+                           self._margin * 2 + self._cell_size * self.SIZE)
+
+    def update_from_payload(self, payload: Dict[str, Any]) -> None:
+        """Update board state from adapter payload."""
+        # Get board
+        board_data = payload.get("board")
+        if board_data is not None:
+            self._board = [row[:] for row in board_data]
+
+        # Get legal actions
+        self._legal_actions = payload.get("legal_actions", [])
+
+        # Get current player
+        self._current_player = payload.get("current_player", "player_1")
+
+        # Get last move
+        self._last_row = payload.get("last_row")
+        self._last_col = payload.get("last_col")
+
+        # Get game over state
+        self._is_game_over = bool(payload.get("is_game_over", False))
+        self._winning_positions = payload.get("winning_positions")
+        self._winner = payload.get("winner")
+
+        # Get human player for win highlight color
+        human_player = payload.get("human_player")
+        if human_player:
+            self._human_player = human_player
+
+        self.update()
+
+    def set_enabled(self, enabled: bool) -> None:
+        """Enable or disable interaction."""
+        self._enabled = enabled
+
+    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
+        """Handle resize to keep board square and centered."""
+        super().resizeEvent(event)
+        available = min(self.width(), self.height())
+        self._cell_size = (available - 2 * self._margin) // self.SIZE
+        self._margin = (available - self._cell_size * self.SIZE) // 2
+
+    def paintEvent(self, event: QtGui.QPaintEvent) -> None:
+        """Paint the Tic-Tac-Toe board."""
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+
+        # Background
+        painter.fillRect(self.rect(), _TTT_BG_COLOR)
+
+        # Draw grid
+        self._draw_grid(painter)
+
+        # Draw marks (X and O)
+        self._draw_marks(painter)
+
+        # Draw hover
+        self._draw_hover(painter)
+
+        # Draw last move highlight
+        self._draw_last_move(painter)
+
+        # Draw winning line
+        self._draw_winning_line(painter)
+
+        painter.end()
+
+    def _draw_grid(self, painter: QtGui.QPainter) -> None:
+        """Draw the grid lines."""
+        pen = QtGui.QPen(_TTT_GRID_COLOR, self._line_width)
+        painter.setPen(pen)
+
+        # Vertical lines
+        for i in range(1, self.SIZE):
+            x = self._margin + i * self._cell_size
+            painter.drawLine(x, self._margin,
+                           x, self._margin + self.SIZE * self._cell_size)
+
+        # Horizontal lines
+        for i in range(1, self.SIZE):
+            y = self._margin + i * self._cell_size
+            painter.drawLine(self._margin, y,
+                           self._margin + self.SIZE * self._cell_size, y)
+
+    def _draw_marks(self, painter: QtGui.QPainter) -> None:
+        """Draw X and O marks."""
+        for row in range(self.SIZE):
+            for col in range(self.SIZE):
+                mark = self._board[row][col]
+                if mark == 0:
+                    continue
+
+                cx = self._margin + col * self._cell_size + self._cell_size // 2
+                cy = self._margin + row * self._cell_size + self._cell_size // 2
+                size = int(self._cell_size * 0.35)
+
+                if mark == 1:  # X
+                    pen = QtGui.QPen(_TTT_X_COLOR, self._line_width + 2)
+                    painter.setPen(pen)
+                    painter.drawLine(cx - size, cy - size, cx + size, cy + size)
+                    painter.drawLine(cx - size, cy + size, cx + size, cy - size)
+                else:  # O
+                    pen = QtGui.QPen(_TTT_O_COLOR, self._line_width + 2)
+                    painter.setPen(pen)
+                    painter.drawEllipse(QtCore.QPoint(cx, cy), size, size)
+
+    def _draw_hover(self, painter: QtGui.QPainter) -> None:
+        """Draw hover highlight on empty cells."""
+        if self._hover_pos is None or self._is_game_over or not self._enabled:
+            return
+
+        row, col = self._hover_pos
+        if self._board[row][col] != 0:
+            return
+
+        # Check if legal
+        action = col * 3 + row  # PettingZoo column-major indexing
+        if action not in self._legal_actions:
+            return
+
+        x = self._margin + col * self._cell_size
+        y = self._margin + row * self._cell_size
+        painter.fillRect(x, y, self._cell_size, self._cell_size, _TTT_HOVER)
+
+    def _draw_last_move(self, painter: QtGui.QPainter) -> None:
+        """Draw highlight on last move."""
+        if self._last_row is None or self._last_col is None:
+            return
+
+        x = self._margin + self._last_col * self._cell_size
+        y = self._margin + self._last_row * self._cell_size
+        painter.fillRect(x, y, self._cell_size, self._cell_size, _TTT_LAST_MOVE)
+
+    def _draw_winning_line(self, painter: QtGui.QPainter) -> None:
+        """Draw highlight on winning positions.
+
+        Uses green for human wins and red for AI wins.
+        """
+        if self._winning_positions is None:
+            return
+
+        # Determine highlight color based on winner
+        if self._winner == self._human_player:
+            highlight_color = _TTT_HUMAN_WIN_HIGHLIGHT  # Green for human win
+        else:
+            highlight_color = _TTT_AI_WIN_HIGHLIGHT  # Red for AI win
+
+        for row, col in self._winning_positions:
+            x = self._margin + col * self._cell_size
+            y = self._margin + row * self._cell_size
+            painter.fillRect(x, y, self._cell_size, self._cell_size, highlight_color)
+
+    def _pixel_to_cell(self, pos: QtCore.QPointF) -> Optional[tuple[int, int]]:
+        """Convert pixel position to cell coordinates."""
+        x = int(pos.x()) - self._margin
+        y = int(pos.y()) - self._margin
+
+        if x < 0 or y < 0:
+            return None
+
+        col = x // self._cell_size
+        row = y // self._cell_size
+
+        if row >= self.SIZE or col >= self.SIZE:
+            return None
+
+        return (row, col)
+
+    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
+        """Handle mouse click to place mark."""
+        if not self._enabled or self._is_game_over:
+            return super().mousePressEvent(event)
+        if event.button() != QtCore.Qt.MouseButton.LeftButton:
+            return super().mousePressEvent(event)
+
+        cell = self._pixel_to_cell(event.position())
+        if cell is not None:
+            row, col = cell
+            # Check if cell is empty and legal
+            if self._board[row][col] == 0:
+                action = col * 3 + row  # PettingZoo column-major indexing
+                if action in self._legal_actions:
+                    self.cell_clicked.emit(row, col)
+
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:
+        """Handle mouse move for hover effect."""
+        cell = self._pixel_to_cell(event.position())
+        if cell != self._hover_pos:
+            self._hover_pos = cell
+            self.update()
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event: QtCore.QEvent) -> None:
+        """Clear hover when mouse leaves."""
+        self._hover_pos = None
+        self.update()
+        super().leaveEvent(event)
 
 
 # =============================================================================

@@ -27,7 +27,7 @@ from gym_gui.core.enums import (
     get_game_display_name,
 )
 from gym_gui.services.actor import ActorDescriptor
-from gym_gui.ui.environments.single_agent_env.gym import (
+from gym_gui.ui.config_panels.single_agent.gym import (
     build_bipedal_controls,
     build_car_racing_controls,
     build_cliff_controls,
@@ -36,18 +36,18 @@ from gym_gui.ui.environments.single_agent_env.gym import (
     build_lunarlander_controls,
     build_taxi_controls,
 )
-from gym_gui.ui.environments.single_agent_env.minigrid.config_panel import (
+from gym_gui.ui.config_panels.single_agent.minigrid.config_panel import (
     MINIGRID_GAME_IDS,
     ControlCallbacks as MinigridControlCallbacks,
     build_minigrid_controls,
     resolve_default_config as resolve_minigrid_default_config,
 )
-from gym_gui.ui.environments.single_agent_env.ale import (
+from gym_gui.ui.config_panels.single_agent.ale import (
     ALE_GAME_IDS,
     ControlCallbacks as ALEControlCallbacks,
     build_ale_controls,
 )
-from gym_gui.ui.environments.single_agent_env.vizdoom import (
+from gym_gui.ui.config_panels.single_agent.vizdoom import (
     VIZDOOM_GAME_IDS,
     ControlCallbacks as ViZDoomControlCallbacks,
     build_vizdoom_controls,
@@ -56,6 +56,8 @@ from gym_gui.core.adapters.vizdoom import ViZDoomConfig
 from gym_gui.ui.workers import WorkerDefinition, get_worker_catalog
 from gym_gui.ui.widgets.mujoco_mpc_tab import MuJoCoMPCTab
 from gym_gui.ui.widgets.multi_agent_tab import MultiAgentTab
+from gym_gui.ui.widgets.advanced_config import AdvancedConfigTab
+from gym_gui.ui.widgets.godot_ue_tab import GodotUETab
 from gym_gui.telemetry.semconv import (
     TelemetryModes,
     TELEMETRY_MODE_DESCRIPTORS,
@@ -96,7 +98,6 @@ class ControlPanelWidget(QtWidgets.QWidget):
     game_changed = pyqtSignal(GameId)
     load_requested = pyqtSignal(GameId, ControlMode, int)
     reset_requested = pyqtSignal(int)
-    agent_form_requested = pyqtSignal(str)
     worker_changed = pyqtSignal(str)
     slippery_toggled = pyqtSignal(bool)
     frozen_v2_config_changed = pyqtSignal(str, object)  # (param_name, value)
@@ -112,15 +113,23 @@ class ControlPanelWidget(QtWidgets.QWidget):
     terminate_game_requested = pyqtSignal()
     agent_step_requested = pyqtSignal()
     actor_changed = pyqtSignal(str)
-    train_agent_requested = pyqtSignal(str)  # New signal for headless training
-    trained_agent_requested = pyqtSignal(str)  # Load trained policy/evaluation
+    train_agent_requested = pyqtSignal(str)  # Start fresh headless training
+    trained_agent_requested = pyqtSignal(str)  # Load trained policy for evaluation
+    resume_training_requested = pyqtSignal(str)  # Resume training from checkpoint
     # MuJoCo MPC signals - emitted when user launches from sidebar
     mpc_launch_requested = pyqtSignal(str)  # Launch with display mode ("external" or "embedded")
     mpc_stop_all_requested = pyqtSignal()  # Stop all MJPC instances
+    # Godot UE signals - emitted when user launches from sidebar
+    godot_launch_requested = pyqtSignal(str)  # Launch with display mode ("external" or "embedded")
+    godot_editor_requested = pyqtSignal()  # Launch Godot editor
+    godot_stop_all_requested = pyqtSignal()  # Stop all Godot instances
     # Multi-Agent Mode signals - emitted from the Multi-Agent tab
     multi_agent_load_requested = pyqtSignal(str, int)  # env_id, seed
     multi_agent_start_requested = pyqtSignal(str, str, int)  # env_id, human_agent, seed
     multi_agent_reset_requested = pyqtSignal(int)  # seed
+    # Advanced Mode signals - emitted from the Advanced Config tab
+    advanced_launch_requested = pyqtSignal(object)  # LaunchConfig
+    advanced_env_load_requested = pyqtSignal(str, int)  # env_id, seed
 
     def __init__(
         self,
@@ -406,8 +415,6 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._update_control_states()
         self._populate_actor_combo()
         self._populate_worker_combo()
-        # Show static supervisor status since Jason integration is disabled
-        self._init_supervisor_polling()
 
     # ------------------------------------------------------------------
     # Public API
@@ -579,6 +586,10 @@ class ControlPanelWidget(QtWidgets.QWidget):
         """Return the MuJoCo MPC tab for status updates."""
         return self._mujoco_mpc_tab
 
+    def get_godot_ue_tab(self) -> GodotUETab:
+        """Return the Godot UE tab for status updates."""
+        return self._godot_ue_tab
+
     def set_auto_running(self, running: bool) -> None:
         self._auto_running = running
         self._update_control_states()
@@ -699,6 +710,21 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._mujoco_mpc_tab.launch_mpc_requested.connect(self.mpc_launch_requested)
         self._mujoco_mpc_tab.stop_all_requested.connect(self.mpc_stop_all_requested)
 
+        # Godot UE Tab - launcher for Godot game engine (UE-style 3D environments)
+        self._godot_ue_tab = GodotUETab(self)
+        self._tab_widget.addTab(self._godot_ue_tab, "Godot UE")
+        # Connect signals directly
+        self._godot_ue_tab.launch_godot_requested.connect(self.godot_launch_requested)
+        self._godot_ue_tab.launch_editor_requested.connect(self.godot_editor_requested)
+        self._godot_ue_tab.stop_all_requested.connect(self.godot_stop_all_requested)
+
+        # Advanced Configuration Tab - full Unified Flow for power users
+        self._advanced_tab = AdvancedConfigTab(self)
+        self._tab_widget.addTab(self._advanced_tab, "Advanced")
+        # Connect signals
+        self._advanced_tab.launch_requested.connect(self.advanced_launch_requested)
+        self._advanced_tab.environment_load_requested.connect(self.advanced_env_load_requested)
+
         self._on_tab_changed(self._tab_widget.currentIndex())
 
     def _create_environment_group(self, parent: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
@@ -797,11 +823,11 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._game_combo.clear()
         for label, gid in games:
             self._game_combo.addItem(label, gid)
-        self._game_combo.blockSignals(False)
         index = self._game_combo.findData(target)
         if index < 0:
             index = 0
         self._game_combo.setCurrentIndex(index)
+        self._game_combo.blockSignals(False)
         # Refresh config UI to show proper options for the selected game
         self._refresh_game_config_ui()
 
@@ -890,22 +916,9 @@ class ControlPanelWidget(QtWidgets.QWidget):
         group = QtWidgets.QGroupBox("Headless Training", parent)
         layout = QtWidgets.QVBoxLayout(group)
 
-        self._configure_agent_button = QtWidgets.QPushButton("🚀 Configure Agent…", group)
-        self._configure_agent_button.setToolTip(
-            "Open the agent training form to configure the backend used for headless training."
-        )
-        self._configure_agent_button.setEnabled(False)
-        self._configure_agent_button.setStyleSheet(
-            "QPushButton { font-weight: bold; padding: 8px; background-color: #455a64; color: white; }"
-            "QPushButton:hover { background-color: #37474f; }"
-            "QPushButton:pressed { background-color: #263238; }"
-            "QPushButton:disabled { background-color: #9ea7aa; color: #ECEFF1; }"
-        )
-        layout.addWidget(self._configure_agent_button)
-
         self._train_agent_button = QtWidgets.QPushButton("🤖 Train Agent", group)
         self._train_agent_button.setToolTip(
-            "Submit a headless training run to the trainer daemon.\n"
+            "Start a fresh headless training run.\n"
             "Training will run in the background with live telemetry streaming."
         )
         self._train_agent_button.setEnabled(False)
@@ -917,7 +930,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         )
         layout.addWidget(self._train_agent_button)
 
-        self._trained_agent_button = QtWidgets.QPushButton("📦 Load Trained Policy", group)
+        self._trained_agent_button = QtWidgets.QPushButton("📦 Evaluate Policy", group)
         self._trained_agent_button.setToolTip(
             "Select an existing policy or checkpoint to evaluate inside the GUI."
         )
@@ -929,6 +942,19 @@ class ControlPanelWidget(QtWidgets.QWidget):
             "QPushButton:disabled { background-color: #a5d6a7; color: #E8F5E9; }"
         )
         layout.addWidget(self._trained_agent_button)
+
+        self._resume_training_button = QtWidgets.QPushButton("🔄 Resume Training", group)
+        self._resume_training_button.setToolTip(
+            "Load a checkpoint and continue training from where it left off."
+        )
+        self._resume_training_button.setEnabled(False)
+        self._resume_training_button.setStyleSheet(
+            "QPushButton { padding: 8px; font-weight: bold; background-color: #f57c00; color: white; }"
+            "QPushButton:hover { background-color: #ef6c00; }"
+            "QPushButton:pressed { background-color: #e65100; }"
+            "QPushButton:disabled { background-color: #ffcc80; color: #FFF3E0; }"
+        )
+        layout.addWidget(self._resume_training_button)
         return group
 
 
@@ -970,9 +996,6 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._outcome_time_label = QtWidgets.QLabel("—", self._status_group)
         self._fps_label = QtWidgets.QLabel("—", self._status_group)
         self._telemetry_status_label = QtWidgets.QLabel("—", self._status_group)
-        # Supervisor overlays (lightweight status)
-        self._supervisor_label = QtWidgets.QLabel("—", self._status_group)
-        self._safety_mode_label = QtWidgets.QLabel("—", self._status_group)
 
         fields = [
             ("Step", self._step_label),
@@ -987,8 +1010,6 @@ class ControlPanelWidget(QtWidgets.QWidget):
             ("Outcome Time", self._outcome_time_label),
             ("Live FPS", self._fps_label),
             ("Telemetry Mode", self._telemetry_status_label),
-            ("Supervisor", self._supervisor_label),
-            ("Safety", self._safety_mode_label),
         ]
 
         midpoint = (len(fields) + 1) // 2
@@ -1044,11 +1065,11 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._seed_spin.valueChanged.connect(lambda _: self._update_control_states())
         self._wire_mode_combo()
         self._worker_combo.currentIndexChanged.connect(self._on_worker_selection_changed)
-        self._configure_agent_button.clicked.connect(self._emit_agent_form_requested)
 
         self._load_button.clicked.connect(self._on_load_clicked)
         self._train_agent_button.clicked.connect(self._emit_train_agent_requested)
         self._trained_agent_button.clicked.connect(self._emit_trained_agent_requested)
+        self._resume_training_button.clicked.connect(self._emit_resume_training_requested)
         self._start_button.clicked.connect(self._on_start_clicked)
         self._pause_button.clicked.connect(self._on_pause_clicked)
         self._continue_button.clicked.connect(self._on_continue_clicked)
@@ -1274,9 +1295,9 @@ class ControlPanelWidget(QtWidgets.QWidget):
         worker_def = self._current_worker_definition()
         supports_training = bool(worker_def and worker_def.supports_training)
         supports_policy = bool(worker_def and worker_def.supports_policy_load)
-        self._configure_agent_button.setEnabled(agent_only_mode and supports_training)
         self._train_agent_button.setEnabled(agent_only_mode and supports_training)
         self._trained_agent_button.setEnabled(agent_only_mode and supports_policy)
+        self._resume_training_button.setEnabled(agent_only_mode and supports_training)
 
         self._update_actor_description()
         self._update_worker_description()
@@ -1371,17 +1392,17 @@ class ControlPanelWidget(QtWidgets.QWidget):
         if worker_id:
             self.worker_changed.emit(worker_id)
 
-    def _emit_agent_form_requested(self) -> None:
-        worker_id = self._current_worker_id
-        if worker_id is None:
-            return
-        self.agent_form_requested.emit(worker_id)
-
     def _emit_train_agent_requested(self) -> None:
         worker_id = self._current_worker_id
         if worker_id is None:
             return
         self.train_agent_requested.emit(worker_id)
+
+    def _emit_resume_training_requested(self) -> None:
+        worker_id = self._current_worker_id
+        if worker_id is None:
+            return
+        self.resume_training_requested.emit(worker_id)
 
     def _emit_trained_agent_requested(self) -> None:
         worker_id = self._current_worker_id
@@ -1603,13 +1624,3 @@ class ControlPanelWidget(QtWidgets.QWidget):
     def multi_agent_tab(self) -> MultiAgentTab:
         """Get the Multi-Agent tab widget."""
         return self._multi_agent_tab
-
-    # ------------------------------------------------------------------
-    # Supervisor overlay polling
-    # ------------------------------------------------------------------
-    def _init_supervisor_polling(self) -> None:
-        """Display static supervisor status noting the integration is disabled."""
-        self._supervisor_label.setText("Disabled")
-        self._supervisor_label.setToolTip("Jason Supervisor integration disabled.")
-        self._safety_mode_label.setText("—")
-        self._safety_mode_label.setToolTip("Safety control handled locally.")

@@ -1,0 +1,25 @@
+# Godot Worker Dependencies
+# This bundle contains dependencies required exclusively by the godot_worker.
+# Install this when using Godot for RL environment visualization.
+
+# Include base requirements
+-r base.txt
+
+# Note: The Godot binary is pre-compiled and included in bin/.
+# No additional Python dependencies required for basic Godot launching.
+
+# Optional: Godot RL Agents (if using godot_rl_agents library)
+# Uncomment below if you need the Python RL bridge:
+# godot-rl>=0.6.0
+
+# Optional: For Stable-Baselines3 integration with Godot
+# sb3-contrib>=2.0.0
+
+# Note: The Godot binary lives at:
+#   3rd_party/godot_worker/bin/godot
+#
+# Usage:
+#   pip install -e 3rd_party/godot_worker
+#   godot-worker --help
+#   godot-worker --editor --project /path/to/project
+#   godot-worker --headless --project /path/to/project --port 8080

@@ -134,10 +134,11 @@ class MuJoCoMPCTab(QtWidgets.QWidget):
 
         # Stop all button
         self._stop_all_btn = QtWidgets.QPushButton("Stop All Instances", group)
+        self._stop_all_btn.setMinimumHeight(40)
         self._stop_all_btn.setEnabled(False)
         self._stop_all_btn.setStyleSheet(
             "QPushButton { background-color: #f44336; color: white; "
-            "font-weight: bold; border-radius: 4px; }"
+            "font-weight: bold; border-radius: 4px; font-size: 14px; }"
             "QPushButton:hover { background-color: #da190b; }"
             "QPushButton:disabled { background-color: #cccccc; color: #888; }"
         )

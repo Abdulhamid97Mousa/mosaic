@@ -59,7 +59,7 @@ from gym_gui.logging_config.log_constants import (
 )
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.services.actor import ActorService, EpisodeSummary, StepSnapshot
-from gym_gui.services.frame_storage import FrameStorageService
+from gym_gui.services.policy_mapping import PolicyMappingService
 from gym_gui.services.storage import StorageRecorderService
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
@@ -148,7 +148,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._telemetry = locator.resolve(TelemetryService)
         self._slow_lane_enabled: bool = False
         self._actor_service = locator.resolve(ActorService)
-        self._frame_storage = locator.resolve(FrameStorageService)
+        self._policy_mapping = locator.resolve(PolicyMappingService)
         self._storage_service = locator.resolve(StorageRecorderService)
         if self._actor_service is not None:
             self._seed_manager.register_consumer("actor_service", self._actor_service.seed)
@@ -425,7 +425,9 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         if self._game_paused:
             self.status_message.emit("Game is paused. Click 'Continue' to resume.")
             return
-        action = self._select_agent_action()
+        # Get active agent from last step for multi-agent environments
+        active_agent = self._get_active_agent()
+        action = self._select_agent_action(agent_id=active_agent)
         if action is None:
             self._awaiting_human = True
             self.awaiting_human.emit(True, "Awaiting human action")
@@ -496,7 +498,9 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             # Auto-play should be stopped when paused, but add safety check
             self.stop_auto_play()
             return
-        action = self._select_agent_action()
+        # Get active agent from last step for multi-agent environments
+        active_agent = self._get_active_agent()
+        action = self._select_agent_action(agent_id=active_agent)
         if action is None:
             # Waiting for human input in human or hybrid modes
             self.stop_auto_play()
@@ -506,7 +510,19 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._pending_input_label = "auto_play"
         self._apply_action(action)
 
-    def _select_agent_action(self) -> int | None:
+    def _select_agent_action(self, agent_id: str | None = None) -> int | None:
+        """Select action for an agent.
+
+        For multi-agent environments, uses PolicyMappingService for per-agent
+        policy selection. For single-agent, falls back to ActorService.
+
+        Args:
+            agent_id: The agent ID for multi-agent environments (from step.state.active_agent).
+                     If None, uses legacy single-agent behavior.
+
+        Returns:
+            The action to take, or None to abstain.
+        """
         if self._adapter is None:
             return None
 
@@ -516,16 +532,23 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         if self._control_mode == ControlMode.HYBRID_TURN_BASED and self._turn != "agent":
             return None
 
-        if self._actor_service is not None and self._last_step is not None:
+        if self._last_step is not None:
             snapshot = self._build_step_snapshot(self._last_step)
             try:
-                selected = self._actor_service.select_action(snapshot)
+                # Use PolicyMappingService for multi-agent, ActorService for single-agent
+                if self._policy_mapping is not None and agent_id is not None:
+                    selected = self._policy_mapping.select_action(agent_id, snapshot)
+                elif self._actor_service is not None:
+                    selected = self._actor_service.select_action(snapshot)
+                else:
+                    selected = None
             except Exception as exc:  # pragma: no cover - defensive
                 self.log_constant(
                     LOG_SESSION_STEP_ERROR,
                     exc_info=exc,
                     extra={
                         "stage": "actor_select",
+                        "agent_id": agent_id,
                         "game_id": self._game_id.value if self._game_id else "unknown",
                     },
                 )
@@ -731,15 +754,23 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             return None
         snapshot = self._build_step_snapshot(step)
         self._episode_reward += step.reward
-        if self._actor_service is not None and action is not None:
+
+        # Notify the appropriate policy of the step
+        # Use PolicyMappingService for multi-agent, ActorService for single-agent
+        agent_id = getattr(step.state, "active_agent", None)
+        if action is not None:
             try:
-                self._actor_service.notify_step(snapshot)
+                if self._policy_mapping is not None and agent_id is not None:
+                    self._policy_mapping.notify_step(agent_id, snapshot)
+                elif self._actor_service is not None:
+                    self._actor_service.notify_step(snapshot)
             except Exception as exc:  # pragma: no cover - defensive safeguard
                 self.log_constant(
                     LOG_SESSION_STEP_ERROR,
                     exc_info=exc,
                     extra={
                         "stage": "actor_notify_step",
+                        "agent_id": agent_id,
                         "game_id": self._game_id.value if self._game_id else "unknown",
                     },
                 )
@@ -909,22 +940,6 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         run_context = self._run_counter_manager
         run_id = getattr(run_context, "_run_id", None) if run_context is not None else None
         worker_id = getattr(run_context, "_worker_id", None) if run_context is not None else None
-
-        # Save frame to disk if frame_ref is available
-        if (
-            frame_ref
-            and self._frame_storage is not None
-            and step.render_payload is not None
-            and self._should_capture_frames()
-        ):
-            try:
-                self._frame_storage.save_frame(
-                    step.render_payload,
-                    frame_ref,
-                    run_id=run_id,
-                )
-            except Exception as e:
-                _LOGGER.debug(f"Failed to save frame {frame_ref}: {e}")
 
         record = StepRecord(
             episode_id=self._episode_id,
@@ -1105,6 +1120,20 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             return tuple(self._resolve_passive_component(sub) for sub in space.spaces)
         return None
 
+    def _get_active_agent(self) -> str | None:
+        """Get the active agent ID from the last step.
+
+        For PettingZoo AEC environments, this returns the agent whose turn it is.
+        For single-agent environments, returns None.
+
+        Returns:
+            The active agent ID, or None for single-agent environments.
+        """
+        if self._last_step is None:
+            return None
+        # PettingZoo AEC environments provide active_agent in state
+        return getattr(self._last_step.state, "active_agent", None)
+
     def _build_step_snapshot(self, step: AdapterStep) -> StepSnapshot:
         info_payload = dict(step.info)
         if self._current_seed is not None:
@@ -1201,20 +1230,38 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             steps=self._step_index + 1,
             metadata=dict(self._episode_metadata),
         )
-        if self._actor_service is not None:
-            try:
+
+        # Notify all agents of episode end
+        # For multi-agent, use PolicyMappingService.notify_all_episode_end
+        # For single-agent, use ActorService.notify_episode_end
+        agent_id = getattr(step.state, "active_agent", None)
+        try:
+            if self._policy_mapping is not None and self._policy_mapping.is_multi_agent():
+                # Create summary for each agent
+                agent_summaries = {
+                    aid: EpisodeSummary(
+                        episode_index=episode_index,
+                        total_reward=self._episode_reward,  # Note: per-agent rewards not yet tracked
+                        steps=self._step_index + 1,
+                        metadata=dict(self._episode_metadata),
+                    )
+                    for aid in self._policy_mapping.agent_ids
+                }
+                self._policy_mapping.notify_all_episode_end(agent_summaries)
+            elif self._actor_service is not None:
                 self._actor_service.notify_episode_end(summary)
-            except Exception as exc:  # pragma: no cover - defensive safeguard
-                self.log_constant(
-                    LOG_SESSION_EPISODE_ERROR,
-                    exc_info=exc,
-                    extra={
-                        "stage": "actor_notify_episode_end",
-                        "game_id": summary.metadata.get("game_id")
-                        or (self._game_id.value if self._game_id else "unknown"),
-                        "episode_id": self._episode_id,
-                    },
-                )
+        except Exception as exc:  # pragma: no cover - defensive safeguard
+            self.log_constant(
+                LOG_SESSION_EPISODE_ERROR,
+                exc_info=exc,
+                extra={
+                    "stage": "actor_notify_episode_end",
+                    "agent_id": agent_id,
+                    "game_id": summary.metadata.get("game_id")
+                    or (self._game_id.value if self._game_id else "unknown"),
+                    "episode_id": self._episode_id,
+                },
+            )
         if self._telemetry is not None:
             run_context = self._run_counter_manager
             run_id = getattr(run_context, "_run_id", None) if run_context is not None else None

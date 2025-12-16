@@ -3,12 +3,12 @@
 from .actor import (
 	ActorDescriptor,
 	ActorService,
-	BDIQAgent,
 	EpisodeSummary,
 	HumanKeyboardActor,
 	LLMMultiStepAgent,
 	StepSnapshot,
 )
+from .policy_mapping import AgentPolicyBinding, PolicyMappingService
 from .service_locator import ServiceLocator, get_service_locator
 from .storage import StorageProfile, StorageRecorderService
 from .telemetry import TelemetryService
@@ -16,10 +16,11 @@ from .telemetry import TelemetryService
 __all__ = [
 	"ActorDescriptor",
 	"ActorService",
-	"BDIQAgent",
+	"AgentPolicyBinding",
 	"EpisodeSummary",
 	"HumanKeyboardActor",
 	"LLMMultiStepAgent",
+	"PolicyMappingService",
 	"StepSnapshot",
 	"ServiceLocator",
 	"get_service_locator",

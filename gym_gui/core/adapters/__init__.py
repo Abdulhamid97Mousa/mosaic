@@ -6,6 +6,16 @@ from .base import (
     AdapterStep,
     EnvironmentAdapter,
     UnsupportedModeError,
+    WorkerCapabilities,
+)
+from .paradigm import (
+    ParadigmAdapter,
+    ParadigmStepResult,
+    SingleAgentParadigmAdapter,
+    SequentialParadigmAdapter,
+    SimultaneousParadigmAdapter,
+    HierarchicalParadigmAdapter,
+    create_paradigm_adapter,
 )
 from .toy_text import (
     FrozenLakeAdapter,
@@ -121,12 +131,29 @@ except Exception:  # pragma: no cover - pettingzoo optional
     create_pettingzoo_adapter = None  # type: ignore
     _PETTINGZOO_AVAILABLE = False
 
+# Standalone adapters for Human vs Agent mode (simplified state-based interfaces)
+from .chess_adapter import ChessAdapter as ChessHvAAdapter, ChessState
+from .connect_four_adapter import ConnectFourAdapter as ConnectFourHvAAdapter, ConnectFourState
+from .go_adapter import GoAdapter as GoHvAAdapter, GoState
+from .tictactoe_adapter import TicTacToeAdapter as TicTacToeHvAAdapter, TicTacToeState
+
 __all__ = [
+    # Base classes
     "AdapterContext",
     "AdapterNotReadyError",
     "AdapterStep",
     "EnvironmentAdapter",
     "UnsupportedModeError",
+    "WorkerCapabilities",
+    # Paradigm adapters
+    "ParadigmAdapter",
+    "ParadigmStepResult",
+    "SingleAgentParadigmAdapter",
+    "SequentialParadigmAdapter",
+    "SimultaneousParadigmAdapter",
+    "HierarchicalParadigmAdapter",
+    "create_paradigm_adapter",
+    # Toy text adapters
     "FrozenLakeAdapter",
     "FrozenLakeV2Adapter",
     "CliffWalkingAdapter",
@@ -202,3 +229,15 @@ if _PETTINGZOO_AVAILABLE:
         "PETTINGZOO_ADAPTERS",
         "create_pettingzoo_adapter",
     ]
+
+# Human vs Agent mode adapters (always available)
+__all__ += [
+    "ChessHvAAdapter",
+    "ChessState",
+    "ConnectFourHvAAdapter",
+    "ConnectFourState",
+    "GoHvAAdapter",
+    "GoState",
+    "TicTacToeHvAAdapter",
+    "TicTacToeState",
+]

@@ -5,16 +5,22 @@ This module implements the "durable path" of the dual-path architecture:
 - Batches events for efficient SQLite writes
 - Uses WAL mode for concurrent reads/writes
 - Periodic checkpoint operations to manage WAL file size
+- Optional HDF5 replay storage for frames/observations (via ReplayWriter)
 """
 
 from __future__ import annotations
 
+import json
 import logging
 import queue
 import threading
 import time
 from datetime import datetime
-from typing import Optional
+from pathlib import Path
+from typing import Optional, TYPE_CHECKING
+
+import numpy as np
+from gym_gui.replay import ReplayWriter
 
 from gym_gui.core.data_model.telemetry_core import StepRecord, EpisodeRollup
 from gym_gui.telemetry.sqlite_store import TelemetrySQLiteStore
@@ -45,16 +51,22 @@ from gym_gui.logging_config.log_constants import (
     LOG_SERVICE_DB_SINK_FLUSH_LATENCY,
 )
 
+if TYPE_CHECKING:
+    from gym_gui.replay import ReplayWriter
+
 
 _LOGGER = logging.getLogger(__name__)
 
 
 class TelemetryDBSink(LogConstantMixin):
     """Background writer that persists telemetry events to SQLite.
-    
+
     This class subscribes to the RunBus and batches events for efficient
     persistence to SQLite. It runs in a background thread to avoid blocking
     the UI or other components.
+
+    When replay_dir is provided, frames and observations are stored in HDF5
+    files for efficient replay, with only references stored in SQLite.
     """
 
     def __init__(
@@ -65,6 +77,7 @@ class TelemetryDBSink(LogConstantMixin):
         batch_size: int = DB_SINK_BATCH_SIZE,
         checkpoint_interval: int = DB_SINK_CHECKPOINT_INTERVAL,
         writer_queue_size: int = DB_SINK_WRITER_QUEUE_SIZE,
+        replay_dir: Optional[Path] = None,
     ) -> None:
         """Initialize the DB sink.
 
@@ -74,6 +87,9 @@ class TelemetryDBSink(LogConstantMixin):
             batch_size: Number of events to batch before flushing
             checkpoint_interval: Number of writes before WAL checkpoint
             writer_queue_size: Queue size for writer subscriber (larger than UI)
+            replay_dir: Directory for HDF5 replay files. If None, arrays are
+                        stored in SQLite (legacy mode). If set, frames/observations
+                        go to HDF5 and SQLite stores only references.
 
         Note: ALL events are written to the database (no sampling/dropping).
         The database uses efficient batching (batch_size=64) and WAL mode.
@@ -85,6 +101,10 @@ class TelemetryDBSink(LogConstantMixin):
         self._batch_size = batch_size
         self._checkpoint_interval = checkpoint_interval
         self._writer_queue_size = writer_queue_size
+        self._replay_dir = replay_dir
+
+        # HDF5 replay writers (one per run_id)
+        self._replay_writers: dict[str, "ReplayWriter"] = {}
 
         self._thread: Optional[threading.Thread] = None
         self._stop_event = threading.Event()
@@ -102,6 +122,7 @@ class TelemetryDBSink(LogConstantMixin):
                 "batch_size": batch_size,
                 "checkpoint_interval": checkpoint_interval,
                 "writer_queue_size": writer_queue_size,
+                "hdf5_enabled": replay_dir is not None,
             },
         )
 
@@ -121,7 +142,7 @@ class TelemetryDBSink(LogConstantMixin):
         self.log_constant(LOG_SERVICE_DB_SINK_STARTED)
 
     def stop(self) -> None:
-        """Stop the background writer thread."""
+        """Stop the background writer thread and close HDF5 writers."""
         if self._thread is None:
             return
 
@@ -132,6 +153,18 @@ class TelemetryDBSink(LogConstantMixin):
         else:
             self.log_constant(LOG_SERVICE_DB_SINK_STOPPED)
         self._thread = None
+
+        # Close all HDF5 replay writers
+        for run_id, writer in self._replay_writers.items():
+            try:
+                writer.close()
+                _LOGGER.debug("Closed ReplayWriter", extra={"run_id": run_id})
+            except Exception as e:
+                _LOGGER.warning(
+                    "Failed to close ReplayWriter",
+                    extra={"run_id": run_id, "error": str(e)},
+                )
+        self._replay_writers.clear()
 
     def _run(self) -> None:
         """Main loop for the background writer thread."""
@@ -182,6 +215,45 @@ class TelemetryDBSink(LogConstantMixin):
             self._flush_batches(force=True)
             self.log_constant(LOG_SERVICE_DB_SINK_LOOP_EXITED)
 
+    def _get_replay_writer(self, run_id: str) -> Optional["ReplayWriter"]:
+        """Get or create a ReplayWriter for the given run_id."""
+        if self._replay_dir is None or not run_id:
+            return None
+
+        if run_id not in self._replay_writers:
+            
+
+            writer = ReplayWriter(run_id, self._replay_dir)
+            writer.start()
+            self._replay_writers[run_id] = writer
+            _LOGGER.info(
+                "Created HDF5 ReplayWriter for run",
+                extra={"run_id": run_id, "replay_dir": str(self._replay_dir)},
+            )
+
+        return self._replay_writers[run_id]
+
+    def _extract_frame(self, render_payload: object) -> Optional[np.ndarray]:
+        """Extract numpy frame from render_payload."""
+        if render_payload is None:
+            return None
+
+        if isinstance(render_payload, np.ndarray):
+            return render_payload
+
+        if isinstance(render_payload, dict):
+            frame = render_payload.get("frame")
+            if isinstance(frame, np.ndarray):
+                return frame
+
+        return None
+
+    def _extract_observation(self, observation: object) -> Optional[np.ndarray]:
+        """Extract numpy observation array."""
+        if isinstance(observation, np.ndarray):
+            return observation
+        return None
+
     def _process_step_queue(self, q: queue.Queue) -> None:
         """Process all available step events from the queue."""
         while True:
@@ -201,21 +273,66 @@ class TelemetryDBSink(LogConstantMixin):
                     except (ValueError, TypeError):
                         pass
 
+                # Extract arrays for potential HDF5 storage
+                raw_observation = payload.get("observation")
+                raw_render_payload = payload.get("render_payload")
+
+                # Default values for StepRecord
+                observation_to_store = raw_observation
+                render_payload_to_store = raw_render_payload
+                frame_ref = payload.get("frame_ref")
+                obs_ref = None
+
+                # If HDF5 enabled, write arrays to HDF5 and get references
+                run_id = evt.run_id
+                # Derive run_id from episode_id if not provided
+                # e.g., "CarRacing-v3-ep000001" -> "CarRacing-v3"
+                if not run_id:
+                    episode_id = payload.get("episode_id", "")
+                    if "-ep" in episode_id:
+                        run_id = episode_id.rsplit("-ep", 1)[0]
+                if run_id and self._replay_dir is not None:
+                    replay_writer = self._get_replay_writer(run_id)
+                    if replay_writer is not None:
+                        frame = self._extract_frame(raw_render_payload)
+                        observation = self._extract_observation(raw_observation)
+
+                        # Write to HDF5 if we have array data
+                        if frame is not None or observation is not None:
+                            # Handle both discrete (int) and continuous (array) actions
+                            action = payload.get("action", 0)
+                            frame_ref = replay_writer.record_step(
+                                frame=frame,
+                                observation=observation,
+                                action=action,
+                                reward=payload.get("reward", 0.0),
+                                done=payload.get("terminated", False) or payload.get("truncated", False),
+                            )
+                            # obs_ref uses same index pattern
+                            if observation is not None and frame_ref:
+                                obs_ref = frame_ref.replace("/frames/", "/observations/")
+
+                            # Clear arrays from SQLite storage (store only refs)
+                            observation_to_store = None
+                            render_payload_to_store = None
+
                 step = StepRecord(
                     episode_id=payload.get("episode_id", ""),
                     step_index=payload.get("step_index", 0),
                     action=payload.get("action"),
-                    observation=payload.get("observation"),
+                    observation=observation_to_store,
                     reward=payload.get("reward", 0.0),
                     terminated=payload.get("terminated", False),
                     truncated=payload.get("truncated", False),
                     info=payload.get("info", {}),
-                    render_payload=payload.get("render_payload"),
+                    render_payload=render_payload_to_store,
                     agent_id=evt.agent_id,
                     render_hint=payload.get("render_hint"),
-                    frame_ref=payload.get("frame_ref"),
+                    # Use derived run_id if original was empty
+                    frame_ref=frame_ref,
+                    obs_ref=obs_ref,
                     payload_version=payload.get("payload_version", 0),
-                    run_id=evt.run_id,
+                    run_id=run_id,
                     worker_id=payload.get("worker_id"),
                     time_step=payload.get(TELEMETRY_KEY_TIME_STEP),
                     space_signature=payload.get(TELEMETRY_KEY_SPACE_SIGNATURE),
@@ -233,6 +350,7 @@ class TelemetryDBSink(LogConstantMixin):
                         "seq_id": evt.seq_id,
                         "episode_id": payload.get("episode_id", ""),
                         "step_index": payload.get("step_index", 0),
+                        "hdf5_frame_ref": frame_ref if self._replay_dir else None,
                     },
                 )
 
@@ -266,7 +384,6 @@ class TelemetryDBSink(LogConstantMixin):
                     metadata_json = payload.get("metadata_json", "")
                     if isinstance(metadata_json, str) and metadata_json:
                         try:
-                            import json
                             metadata = json.loads(metadata_json)
                             _LOGGER.debug(
                                 "Parsed metadata_json from payload",

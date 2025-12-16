@@ -27,13 +27,14 @@ class StepRecord:
     render_payload: Any | None = None
     agent_id: str | None = None
     render_hint: Mapping[str, Any] | None = None
-    frame_ref: str | None = None
+    frame_ref: str | None = None  # HDF5 reference: "h5://run_id/frames/123"
+    obs_ref: str | None = None  # HDF5 reference: "h5://run_id/observations/123"
     payload_version: int = 0
-    run_id: str | None = None  # NEW: Training run identifier for correlation
-    worker_id: str | None = None  # NEW: Worker identifier for distributed runs
-    time_step: int | None = None  # NEW: Snapshot of the environment's time step
-    space_signature: Mapping[str, Any] | None = None  # NEW: Describes action/observation spaces
-    vector_metadata: Mapping[str, Any] | None = None  # NEW: Vectorised env configuration details
+    run_id: str | None = None  # Training run identifier for correlation
+    worker_id: str | None = None  # Worker identifier for distributed runs
+    time_step: int | None = None  # Snapshot of the environment's time step
+    space_signature: Mapping[str, Any] | None = None  # Describes action/observation spaces
+    vector_metadata: Mapping[str, Any] | None = None  # Vectorised env configuration details
 
 
 @dataclass(slots=True)
