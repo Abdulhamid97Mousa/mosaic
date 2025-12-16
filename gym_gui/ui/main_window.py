@@ -70,9 +70,8 @@ from gym_gui.game_docs.mosaic_welcome import MOSAIC_WELCOME_HTML
 from gym_gui.services.actor import ActorService
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
-from gym_gui.services.trainer import TrainerClient, TrainerClientRunner, RunStatus
+from gym_gui.services.trainer import TrainerClient, TrainerClientRunner
 from gym_gui.services.trainer.streams import TelemetryAsyncHub
-from gym_gui.services.trainer.client_runner import TrainerWatchStopped
 from gym_gui.ui.widgets.live_telemetry_tab import LiveTelemetryTab
 from gym_gui.ui.widgets.fastlane_tab import FastLaneTab
 from gym_gui.ui.widgets.ray_multi_worker_fastlane_tab import RayMultiWorkerFastLaneTab
@@ -98,6 +97,12 @@ from gym_gui.ui.handlers import (
     GoEnvLoader,
     TicTacToeEnvLoader,
     VizdoomEnvLoader,
+    # New composed handlers for extracted functionality
+    MultiAgentGameHandler,
+    TrainingFormHandler,
+    PolicyEvaluationHandler,
+    FastLaneTabHandler,
+    TrainingMonitorHandler,
 )
 from gym_gui.ui.widgets.advanced_config import LaunchConfig, RunMode
 
@@ -123,8 +128,6 @@ _LOGGER = logging.getLogger(__name__)
 class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
     """Primary window that orchestrates the Gym session."""
 
-    _auto_subscribe_requested = pyqtSignal(str)
-
     # Severity-level filters for log viewer
     LOG_SEVERITY_OPTIONS: Dict[str, str | None] = {
         "All": None,
@@ -148,16 +151,6 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         ControlMode.HYBRID_TURN_BASED,
         ControlMode.HYBRID_HUMAN_AGENT,
     }
-
-    _WATCHED_RUN_STATUSES = [
-        RunStatus.INIT,
-        RunStatus.HANDSHAKE,
-        RunStatus.READY,
-        RunStatus.EXECUTING,
-        RunStatus.PAUSED,
-        RunStatus.FAULTED,
-        RunStatus.TERMINATED,
-    ]
 
     def __init__(self, settings: Settings, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
@@ -187,15 +180,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         
         # Track dynamic agent tabs by (run_id, agent_id)
         self._agent_tab_index: set[tuple[str, str]] = set()
-        self._run_watch_stop = threading.Event()
-        self._run_watch_thread: Optional[threading.Thread] = None
-        self._run_watch_subscription = None
         self._selected_policy_path: Optional[Path] = None
         self._run_metadata: Dict[tuple[str, str], Dict[str, Any]] = {}
-        self._fastlane_tabs_open: set[tuple[str, str]] = set()
-        self._trainer_daemon_ready: bool = False
-        self._trainer_poll_failures: int = 0
-        self._trainer_poll_quiet_logged: bool = False
+        # Note: FastLane tab tracking moved to FastLaneTabHandler
+        # Note: Run watch/poll state moved to TrainingMonitorHandler
 
         # MuJoCo MPC launcher
         self._mjpc_launcher = get_mjpc_launcher()
@@ -254,9 +242,6 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # Create presenter to coordinate
         self._presenter = MainWindowPresenter(self._session, self._human_input, parent=self)
 
-        # Ensure auto-subscribe dispatches cross-thread via Qt's signal delivery
-        self._auto_subscribe_requested.connect(self._auto_subscribe_run_main_thread)
-        
         status_bar = self.statusBar()
         if status_bar is None:
             status_bar = QtWidgets.QStatusBar(self)
@@ -279,14 +264,13 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._render_tabs.set_human_replay_enabled(not self._control_panel.fastlane_only_enabled())
         QtCore.QTimer.singleShot(0, self._render_tabs.refresh_replays)
         
-        # Poll for new training runs and auto-subscribe
-        self._known_runs: set[str] = set()
+        # Poll for new training runs and auto-subscribe (delegated to handler)
         self._run_poll_timer = QtCore.QTimer(self)
         self._run_poll_timer.setInterval(2000)  # Poll every 2 seconds
-        self._run_poll_timer.timeout.connect(self._poll_for_new_runs)
+        self._run_poll_timer.timeout.connect(self._training_monitor_handler.poll_for_new_runs)
         self._run_poll_timer.start()
 
-        self._start_run_watch()
+        self._training_monitor_handler.start_run_watch()
 
         # Bind presenter to view
         self._wire_presenter()
@@ -544,13 +528,80 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             render_tabs=self._render_tabs,
         )
 
+        # Multi-agent game routing handler
+        self._multi_agent_game_handler = MultiAgentGameHandler(
+            status_bar=self._status_bar,
+            chess_loader=self._chess_env_loader,
+            connect_four_loader=self._connect_four_env_loader,
+            go_loader=self._go_env_loader,
+            tictactoe_loader=self._tictactoe_env_loader,
+            set_game_info=self._set_game_info,
+            get_game_info=get_game_info,
+            parent=self,
+        )
+
+        # Training form handler (Train/Policy/Resume dialogs)
+        self._training_form_handler = TrainingFormHandler(
+            parent=self,
+            get_form_factory=get_worker_form_factory,
+            get_current_game=self._control_panel.current_game,
+            get_cleanrl_env_id=self._control_panel.cleanrl_environment_id,
+            submit_config=self._submit_training_config,
+            build_policy_config=self._build_policy_evaluation_config,
+            log_callback=lambda message=None, extra=None, exc_info=None: self.log_constant(
+                LOG_UI_MAINWINDOW_INFO, message=message, extra=extra, exc_info=exc_info
+            ),
+            status_callback=self._status_bar.showMessage,
+        )
+
+        # FastLane tab handler (must be initialized before PolicyEvaluationHandler)
+        self._fastlane_tab_handler = FastLaneTabHandler(
+            render_tabs=self._render_tabs,
+            log_callback=lambda message=None, extra=None, exc_info=None: self.log_constant(
+                LOG_UI_WORKER_TABS_INFO, message=message, extra=extra, exc_info=exc_info
+            ),
+        )
+
+        # Policy evaluation handler
+        self._policy_evaluation_handler = PolicyEvaluationHandler(
+            parent=self,
+            status_bar=self._status_bar,
+            open_ray_fastlane_tabs=self._fastlane_tab_handler.open_ray_fastlane_tabs,
+        )
+
+        # Training monitor handler
+        # Note: fastlane_callback delegates to FastLaneTabHandler with metadata resolution
+        self._training_monitor_handler = TrainingMonitorHandler(
+            parent=self,
+            live_controller=self._live_controller,
+            analytics_tabs=self._analytics_tabs,
+            render_tabs=self._render_tabs,
+            run_metadata=self._run_metadata,
+            trainer_dir=VAR_TRAINER_DIR,
+            log_callback=lambda message=None, extra=None, exc_info=None: self.log_constant(
+                LOG_UI_MAINWINDOW_INFO, message=message, extra=extra, exc_info=exc_info
+            ),
+            status_callback=self._status_bar.showMessage,
+            title_callback=self._render_group.setTitle,
+            fastlane_callback=lambda run_id, agent_id: self._fastlane_tab_handler.maybe_open_fastlane_tab(
+                run_id, agent_id, self._resolve_run_metadata(run_id, agent_id)
+            ),
+        )
+
     def _connect_signals(self) -> None:
         # Connect control panel signals to session controller
         self._control_panel.load_requested.connect(self._on_load_requested)
         self._control_panel.reset_requested.connect(self._on_reset_requested)
-        self._control_panel.train_agent_requested.connect(self._on_train_agent_requested)
-        self._control_panel.trained_agent_requested.connect(self._on_trained_agent_requested)
-        self._control_panel.resume_training_requested.connect(self._on_resume_training_requested)
+        # Training form signals (delegated to handler)
+        self._control_panel.train_agent_requested.connect(
+            self._training_form_handler.on_train_agent_requested
+        )
+        self._control_panel.trained_agent_requested.connect(
+            self._training_form_handler.on_trained_agent_requested
+        )
+        self._control_panel.resume_training_requested.connect(
+            self._training_form_handler.on_resume_training_requested
+        )
         self._control_panel.start_game_requested.connect(self._on_start_game)
         self._control_panel.pause_game_requested.connect(self._on_pause_game)
         self._control_panel.continue_game_requested.connect(self._on_continue_game)
@@ -580,10 +631,23 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._control_panel.godot_stop_all_requested.connect(self._godot_handler.on_stop_all_requested)
 
         # Multi-Agent Mode handlers
-        self._control_panel.multi_agent_load_requested.connect(self._on_multi_agent_load_requested)
-        self._control_panel.multi_agent_start_requested.connect(self._on_multi_agent_start_requested)
-        self._control_panel.multi_agent_reset_requested.connect(self._on_multi_agent_reset_requested)
-        self._control_panel.multi_agent_tab.ai_opponent_changed.connect(self._on_ai_opponent_changed)
+        # Multi-agent game signals (delegated to handler)
+        self._control_panel.multi_agent_load_requested.connect(
+            self._multi_agent_game_handler.on_load_requested
+        )
+        self._control_panel.multi_agent_start_requested.connect(
+            self._multi_agent_game_handler.on_start_requested
+        )
+        self._control_panel.multi_agent_reset_requested.connect(
+            self._multi_agent_game_handler.on_reset_requested
+        )
+        self._control_panel.multi_agent_tab.ai_opponent_changed.connect(
+            self._multi_agent_game_handler.on_ai_opponent_changed
+        )
+        # Policy evaluation (delegated to handler)
+        self._control_panel.policy_evaluate_requested.connect(
+            self._policy_evaluation_handler.handle_evaluate_request
+        )
 
         # Advanced Configuration Tab handlers
         self._control_panel.advanced_launch_requested.connect(self._on_advanced_launch)
@@ -705,137 +769,15 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         self._session.reset_environment(seed=seed)
 
-    def _on_multi_agent_load_requested(self, env_id: str, seed: int) -> None:
-        """Handle load request from Multi-Agent tab (Human vs Agent mode).
+    # Multi-agent game methods delegated to MultiAgentGameHandler:
+    # - on_load_requested
+    # - on_start_requested
+    # - on_reset_requested
+    # - on_ai_opponent_changed
 
-        This creates a PettingZoo environment for human vs agent play.
-        Supports Chess, Connect Four, and Go with interactive board UI.
-        """
-        _LOGGER.info(
-            f"{LOG_UI_MULTI_AGENT_ENV_LOAD_REQUESTED.code} {LOG_UI_MULTI_AGENT_ENV_LOAD_REQUESTED.message} | "
-            f"env_id={env_id} seed={seed}"
-        )
-
-        if env_id == "chess_v6":
-            self._load_chess_game(seed)
-        elif env_id == "connect_four_v3":
-            self._load_connect_four_game(seed)
-        elif env_id == "go_v5":
-            self._load_go_game(seed)
-        elif env_id == "tictactoe_v3":
-            self._load_tictactoe_game(seed)
-        else:
-            # Other PettingZoo environments not yet implemented
-            self._status_bar.showMessage(
-                f"Multi-agent environment not yet supported: {env_id}",
-                5000
-            )
-
-    def _load_chess_game(self, seed: int) -> None:
-        """Load and initialize the Chess game with interactive board.
-
-        Delegates to ChessEnvLoader for all chess-specific setup.
-
-        Args:
-            seed: Random seed for game initialization
-        """
-        self._chess_env_loader.load(seed, parent=self)
-        # Update game info panel
-        desc = get_game_info(GameId.CHESS)
-        if desc:
-            self._set_game_info(desc)
-
-    def _load_connect_four_game(self, seed: int) -> None:
-        """Load and initialize the Connect Four game with interactive board.
-
-        Delegates to ConnectFourEnvLoader for all Connect Four-specific setup.
-
-        Args:
-            seed: Random seed for game initialization
-        """
-        self._connect_four_env_loader.load(seed, parent=self)
-        # Update game info panel
-        desc = get_game_info(GameId.CONNECT_FOUR)
-        if desc:
-            self._set_game_info(desc)
-
-    def _load_go_game(self, seed: int) -> None:
-        """Load and initialize the Go game with interactive board.
-
-        Delegates to GoEnvLoader for all Go-specific setup.
-
-        Args:
-            seed: Random seed for game initialization
-        """
-        self._go_env_loader.load(seed, parent=self)
-        # Update game info panel
-        desc = get_game_info(GameId.GO)
-        if desc:
-            self._set_game_info(desc)
-
-    def _load_tictactoe_game(self, seed: int) -> None:
-        """Load and initialize the Tic-Tac-Toe game with interactive board.
-
-        Delegates to TicTacToeEnvLoader for all Tic-Tac-Toe-specific setup.
-
-        Args:
-            seed: Random seed for game initialization
-        """
-        self._tictactoe_env_loader.load(seed, parent=self)
-        # Update game info panel
-        desc = get_game_info(GameId.TIC_TAC_TOE)
-        if desc:
-            self._set_game_info(desc)
-
-    def _on_multi_agent_start_requested(self, env_id: str, human_agent: str, seed: int) -> None:
-        """Handle start game request from Multi-Agent tab.
-
-        Args:
-            env_id: Environment ID (e.g., "chess", "chess_v6")
-            human_agent: Which agent the human plays ("player_0" or "player_1")
-            seed: Random seed
-        """
-        if env_id in ("chess", "chess_v6") and self._chess_env_loader.is_loaded:
-            self._chess_env_loader.on_start_requested(human_agent, seed)
-        elif env_id in ("connect_four", "connect_four_v3") and self._connect_four_env_loader.is_loaded:
-            self._connect_four_env_loader.on_start_requested(human_agent, seed)
-        elif env_id in ("go", "go_v5") and self._go_env_loader.is_loaded:
-            self._go_env_loader.on_start_requested(human_agent, seed)
-        elif env_id in ("tictactoe", "tictactoe_v3") and self._tictactoe_env_loader.is_loaded:
-            self._tictactoe_env_loader.on_start_requested(human_agent, seed)
-        else:
-            self._status_bar.showMessage(f"Start game not supported for: {env_id}", 3000)
-
-    def _on_multi_agent_reset_requested(self, seed: int) -> None:
-        """Handle reset game request from Multi-Agent tab.
-
-        Resets the currently active game.
-
-        Args:
-            seed: New random seed for reset
-        """
-        # Try to reset whichever game is currently loaded
-        if self._chess_env_loader.is_loaded:
-            self._chess_env_loader.on_reset_requested(seed)
-        elif self._connect_four_env_loader.is_loaded:
-            self._connect_four_env_loader.on_reset_requested(seed)
-        elif self._go_env_loader.is_loaded:
-            self._go_env_loader.on_reset_requested(seed)
-        elif self._tictactoe_env_loader.is_loaded:
-            self._tictactoe_env_loader.on_reset_requested(seed)
-        else:
-            self._status_bar.showMessage("No active game to reset", 3000)
-
-    def _on_ai_opponent_changed(self, opponent_type: str, difficulty: str) -> None:
-        """Handle AI opponent selection change.
-
-        If a game is currently running, update the AI provider via loader.
-
-        Args:
-            opponent_type: Type of AI opponent ("random", "stockfish", "custom")
-            difficulty: Difficulty level for engines like Stockfish
-        """
-        self._chess_env_loader.on_ai_config_changed(opponent_type, difficulty)
+    # Policy evaluation methods delegated to PolicyEvaluationHandler:
+    # - handle_evaluate_request
+    # - _launch_evaluation (uses EvaluationWorker QThread)
 
     # ------------------------------------------------------------------
     # Advanced Configuration Tab Handlers
@@ -1221,193 +1163,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._control_panel.set_auto_running(running)
         self._update_input_state()
 
-
-    def _on_trained_agent_requested(self, worker_id: str) -> None:
-        """Handle the 'Load Trained Policy' button for a specific worker."""
-        if not worker_id:
-            QtWidgets.QMessageBox.information(
-                self,
-                "Worker Required",
-                "Select a worker integration before loading a trained policy.",
-            )
-            return
-
-        factory = get_worker_form_factory()
-        try:
-            dialog = factory.create_policy_form(
-                worker_id,
-                parent=self,
-                current_game=self._control_panel.current_game(),
-            )
-        except KeyError:
-            QtWidgets.QMessageBox.warning(
-                self,
-                "Policy form unavailable",
-                f"No policy selection form registered for worker '{worker_id}'.",
-            )
-            return
-
-        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
-            return
-
-        config_builder = getattr(dialog, "get_config", None)
-        if callable(config_builder):
-            config = config_builder()
-            if not config:
-                return
-            self.log_constant(
-                LOG_UI_MAINWINDOW_INFO,
-                message="CleanRL policy evaluation submitted",
-                extra={"worker_id": worker_id},
-            )
-            self._status_bar.showMessage("Launching evaluation run...", 5000)
-            self._submit_training_config(cast(Dict[str, Any], config))
-            return
-
-        policy_path = getattr(dialog, "selected_path", None)
-        if policy_path is None:
-            return
-
-        self._selected_policy_path = policy_path
-        self.log_constant(
-            LOG_UI_MAINWINDOW_INFO,
-            message="Selected policy for evaluation",
-            extra={
-                "policy_path": str(policy_path),
-                "worker_id": worker_id,
-            },
-        )
-
-        config = self._build_policy_evaluation_config(worker_id, policy_path)
-        if config is None:
-            return
-
-        self._status_bar.showMessage(
-            f"Launching evaluation run for {policy_path.name}",
-            5000,
-        )
-        self._submit_training_config(config)
-
-    def _on_train_agent_requested(self, worker_id: str) -> None:
-        """Handle the 'Train Agent' button - opens the training configuration form."""
-        if not worker_id:
-            QtWidgets.QMessageBox.information(
-                self,
-                "Worker Required",
-                "Select a worker integration before configuring training.",
-            )
-            return
-
-        factory = get_worker_form_factory()
-        form_kwargs: dict[str, Any] = {
-            "parent": self,
-            "default_game": self._control_panel.current_game(),
-        }
-        if worker_id == "cleanrl_worker":
-            env_id = self._control_panel.cleanrl_environment_id()
-            if env_id:
-                form_kwargs["default_env_id"] = env_id
-        try:
-            dialog = factory.create_train_form(
-                worker_id,
-                **form_kwargs,
-            )
-        except KeyError:
-            QtWidgets.QMessageBox.warning(
-                self,
-                "Train form unavailable",
-                f"No train form registered for worker '{worker_id}'.",
-            )
-            return
-
-        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
-            return
-
-        get_config = getattr(dialog, "get_config", None)
-        if not callable(get_config):
-            QtWidgets.QMessageBox.warning(
-                self,
-                "Unsupported Form",
-                "Selected worker form does not provide a configuration payload.",
-            )
-            return
-
-        config = get_config()
-        if config is None:
-            return
-        if not isinstance(config, dict):
-            QtWidgets.QMessageBox.warning(
-                self,
-                "Invalid Configuration",
-                "Worker form returned an unexpected payload. Expected a dictionary.",
-            )
-            return
-
-        config_payload = cast(dict[str, object], config)
-        self.log_constant(
-            LOG_UI_MAINWINDOW_INFO,
-            message="Agent training configuration submitted from dialog",
-            extra={"worker_id": worker_id},
-        )
-        self._status_bar.showMessage("Launching training run...", 5000)
-        self._submit_training_config(config_payload)
-
-    def _on_resume_training_requested(self, worker_id: str) -> None:
-        """Handle the 'Resume Training' button - loads checkpoint and continues training."""
-        if not worker_id:
-            QtWidgets.QMessageBox.information(
-                self,
-                "Worker Required",
-                "Select a worker integration before resuming training.",
-            )
-            return
-
-        factory = get_worker_form_factory()
-        try:
-            dialog = factory.create_resume_form(
-                worker_id,
-                parent=self,
-                current_game=self._control_panel.current_game(),
-            )
-        except KeyError:
-            QtWidgets.QMessageBox.warning(
-                self,
-                "Resume form unavailable",
-                f"Resume training for '{worker_id}' is not yet implemented.",
-            )
-            return
-
-        if dialog.exec() != QtWidgets.QDialog.DialogCode.Accepted:
-            return
-
-        get_config = getattr(dialog, "get_config", None)
-        if not callable(get_config):
-            QtWidgets.QMessageBox.warning(
-                self,
-                "Unsupported Form",
-                "Selected worker form does not provide a configuration payload.",
-            )
-            return
-
-        config = get_config()
-        if config is None:
-            return
-        if not isinstance(config, dict):
-            QtWidgets.QMessageBox.warning(
-                self,
-                "Invalid Configuration",
-                "Worker form returned an unexpected payload. Expected a dictionary.",
-            )
-            return
-
-        config_payload = cast(dict[str, object], config)
-        self.log_constant(
-            LOG_UI_MAINWINDOW_INFO,
-            message="Resume training configuration submitted from dialog",
-            extra={"worker_id": worker_id},
-        )
-        self._status_bar.showMessage("Resuming training run...", 5000)
-        self._submit_training_config(config_payload)
+    # Training form methods delegated to TrainingFormHandler:
+    # - on_trained_agent_requested
+    # - on_train_agent_requested
+    # - on_resume_training_requested
 
     def _build_policy_evaluation_config(
         self, worker_id: str, policy_path: Path
@@ -1662,7 +1421,18 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._run_metadata[(run_id, agent_id_key)] = metadata
 
         # Attempt to provision FastLane tab immediately (fastlane-only runs may never emit telemetry)
-        self._maybe_open_fastlane_tab(run_id, agent_id_key)
+        self.log_constant(
+            LOG_UI_MAINWINDOW_TRACE,
+            message="Calling maybe_open_fastlane_tab",
+            extra={
+                "run_id": run_id,
+                "agent_id_key": agent_id_key,
+                "metadata_keys": list(metadata.keys()) if metadata else None,
+                "ui_fastlane_only": metadata.get("ui", {}).get("fastlane_only") if metadata else None,
+                "worker_module": metadata.get("worker", {}).get("module") if metadata else None,
+            },
+        )
+        self._fastlane_tab_handler.maybe_open_fastlane_tab(run_id, agent_id_key, metadata)
 
         tb_ready = self._analytics_tabs.ensure_tensorboard_tab(run_id, agent_id_key, metadata)
         wb_ready = self._analytics_tabs.ensure_wandb_tab(run_id, agent_id_key, metadata)
@@ -1743,13 +1513,15 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # Add to render tabs widget using add_dynamic_tab to include close button
         self._render_tabs.add_dynamic_tab(run_id, tab_title, tab)
 
-        self.log_constant( 
+        self.log_constant(
             LOG_UI_MAINWINDOW_INFO,
             message="Created live telemetry tab",
             extra={"run_id": run_id, "agent_id": agent_id, "title": tab_title, "game_id": game_id_str},
         )
 
-        self._maybe_open_fastlane_tab(run_id, agent_id)
+        self._fastlane_tab_handler.maybe_open_fastlane_tab(
+            run_id, agent_id, self._resolve_run_metadata(run_id, agent_id)
+        )
 
     # NOTE: Removed _on_live_step_received and _on_live_episode_received
     # The LiveTelemetryController now owns all routing (tab creation and step/episode delivery).
@@ -1853,347 +1625,16 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 return stored_meta
         return None
 
-    def _maybe_open_fastlane_tab(self, run_id: str, agent_id: str) -> None:
-        metadata = self._resolve_run_metadata(run_id, agent_id)
-        if not metadata:
-            self.log_constant(
-                LOG_UI_MAINWINDOW_TRACE,
-                message="FastLane tab skipped; metadata missing",
-                extra={"run_id": run_id, "agent_id": agent_id},
-            )
-            return
-        if not self._metadata_supports_fastlane(metadata):
-            self.log_constant(
-                LOG_UI_MAINWINDOW_TRACE,
-                message="FastLane tab skipped; metadata does not advertise fastlane",
-                extra={"run_id": run_id, "agent_id": agent_id},
-            )
-            return
+    # FastLane tab methods delegated to FastLaneTabHandler:
+    # - maybe_open_fastlane_tab
+    # - open_ray_fastlane_tabs
+    # - open_single_fastlane_tab
+    # - get_num_workers, get_canonical_agent_id, get_worker_id, get_env_id
+    # - get_run_mode, metadata_supports_fastlane, clear_tabs_for_run
 
-        canonical_agent_id = self._canonical_agent_id(metadata, agent_id)
-        run_mode = self._metadata_run_mode(metadata)
-        worker_id = self._get_worker_id_from_metadata(metadata)
-        env_id = self._get_env_id_from_metadata(metadata)
-
-        # For Ray workers with num_workers > 0, create multiple tabs
-        if worker_id == "ray_worker":
-            num_workers = self._get_num_workers_from_metadata(metadata)
-            self._open_ray_fastlane_tabs(
-                run_id, canonical_agent_id, run_mode, env_id, num_workers
-            )
-        else:
-            # CleanRL or other workers: single tab
-            self._open_single_fastlane_tab(
-                run_id, canonical_agent_id, run_mode, env_id, worker_id
-            )
-
-    def _get_num_workers_from_metadata(self, metadata: Dict[str, Any]) -> int:
-        """Extract num_workers from metadata (default 0 for single worker)."""
-        worker_meta = metadata.get("worker") if isinstance(metadata, dict) else None
-        if isinstance(worker_meta, dict):
-            worker_config = worker_meta.get("config")
-            if isinstance(worker_config, dict):
-                resources = worker_config.get("resources")
-                if isinstance(resources, dict):
-                    num_workers = resources.get("num_workers")
-                    if isinstance(num_workers, int):
-                        return num_workers
-        return 0
-
-    def _open_ray_fastlane_tabs(
-        self,
-        run_id: str,
-        agent_id: str,
-        run_mode: str,
-        env_id: str,
-        num_workers: int,
-    ) -> None:
-        """Open a single grid-based FastLane tab for active Ray workers.
-
-        RLlib architecture:
-        - num_workers=0: W0 samples (1 cell)
-        - num_workers=2: W1, W2 sample (2 cells, W0 is coordinator)
-        """
-        # Use run_id as key - one grid tab per run
-        key = (run_id, "ray_grid")
-        if key in self._fastlane_tabs_open:
-            self.log_constant(
-                LOG_UI_MAINWINDOW_TRACE,
-                message="Ray multi-worker FastLane tab already open",
-                extra={"run_id": run_id},
-            )
-            return
-
-        env_label = env_id or "MultiAgent"
-        mode_prefix = "Ray-Eval" if run_mode == "policy_eval" else "Ray-Live"
-        # Active workers: W0 if num_workers=0, else W1..WN (num_workers count)
-        active_workers = 1 if num_workers == 0 else num_workers
-
-        try:
-            tab = RayMultiWorkerFastLaneTab(
-                run_id,
-                num_workers,
-                env_id=env_id,
-                run_mode=run_mode,
-                parent=self._render_tabs,
-            )
-        except Exception as exc:
-            self.log_constant(
-                LOG_UI_MAINWINDOW_WARNING,
-                message="Failed to create Ray multi-worker FastLane tab",
-                extra={"run_id": run_id, "num_workers": num_workers},
-                exc_info=exc,
-            )
-            return
-
-        # Tab title: Ray-Live-{env}-{N}W-{run_id[:8]}
-        title = f"{mode_prefix}-{env_label}-{active_workers}W-{run_id[:8]}"
-        self._render_tabs.add_dynamic_tab(run_id, title, tab)
-        self._fastlane_tabs_open.add(key)
-        self.log_constant(
-            LOG_UI_MAINWINDOW_INFO,
-            message="Opened Ray multi-worker FastLane grid tab",
-            extra={"run_id": run_id, "active_workers": active_workers, "title": title},
-        )
-
-    def _open_single_fastlane_tab(
-        self,
-        run_id: str,
-        agent_id: str,
-        run_mode: str,
-        env_id: str,
-        worker_id: str,
-    ) -> None:
-        """Open a single FastLane tab (for CleanRL and other non-Ray workers)."""
-        key = (run_id, agent_id)
-        if key in self._fastlane_tabs_open:
-            self.log_constant(
-                LOG_UI_MAINWINDOW_TRACE,
-                message="FastLane tab already tracked",
-                extra={"run_id": run_id, "agent_id": agent_id},
-            )
-            return
-
-        try:
-            mode_label = "Fast lane (evaluation)" if run_mode == "policy_eval" else "Fast lane"
-            tab = FastLaneTab(
-                run_id,
-                agent_id,
-                mode_label=mode_label,
-                run_mode=run_mode,
-                parent=self._render_tabs,
-            )
-        except Exception as exc:
-            self.log_constant(
-                LOG_UI_MAINWINDOW_WARNING,
-                message="Failed to create FastLane tab",
-                extra={"run_id": run_id, "agent_id": agent_id},
-                exc_info=exc,
-            )
-            return
-
-        # CleanRL or other workers: CleanRL-Live-{agent_id}
-        if run_mode == "policy_eval":
-            title = f"CleanRL-Eval-{agent_id or 'agent'}"
-        else:
-            title = f"CleanRL-Live-{agent_id or 'agent'}"
-
-        self._render_tabs.add_dynamic_tab(run_id, title, tab)
-        self._fastlane_tabs_open.add(key)
-        self.log_constant(
-            LOG_UI_MAINWINDOW_INFO,
-            message="Opened FastLane tab",
-            extra={"run_id": run_id, "agent_id": agent_id, "title": title},
-        )
-
-    def _canonical_agent_id(self, metadata: Dict[str, Any], fallback: str) -> str:
-        worker_meta = metadata.get("worker") if isinstance(metadata, dict) else None
-        if isinstance(worker_meta, dict):
-            meta_agent = worker_meta.get("agent_id")
-            if isinstance(meta_agent, str) and meta_agent.strip():
-                return meta_agent.strip()
-            worker_config = worker_meta.get("config")
-            if isinstance(worker_config, dict):
-                config_agent = worker_config.get("agent_id")
-                if isinstance(config_agent, str) and config_agent.strip():
-                    return config_agent.strip()
-        return fallback
-
-    def _get_worker_id_from_metadata(self, metadata: Dict[str, Any]) -> str:
-        """Extract worker_id from metadata (e.g., 'ray_worker', 'cleanrl_worker')."""
-        # Try worker.worker_id first
-        worker_meta = metadata.get("worker") if isinstance(metadata, dict) else None
-        if isinstance(worker_meta, dict):
-            worker_id = worker_meta.get("worker_id")
-            if isinstance(worker_id, str) and worker_id.strip():
-                return worker_id.strip()
-        # Try ui.worker_id
-        ui_meta = metadata.get("ui") if isinstance(metadata, dict) else None
-        if isinstance(ui_meta, dict):
-            worker_id = ui_meta.get("worker_id")
-            if isinstance(worker_id, str) and worker_id.strip():
-                return worker_id.strip()
-        return ""
-
-    def _get_env_id_from_metadata(self, metadata: Dict[str, Any]) -> str:
-        """Extract environment ID from metadata for tab naming."""
-        # Try ui.env_id first (set by forms)
-        ui_meta = metadata.get("ui") if isinstance(metadata, dict) else None
-        if isinstance(ui_meta, dict):
-            env_id = ui_meta.get("env_id")
-            if isinstance(env_id, str) and env_id.strip():
-                return env_id.strip()
-        # Try worker.config.environment.env_id
-        worker_meta = metadata.get("worker") if isinstance(metadata, dict) else None
-        if isinstance(worker_meta, dict):
-            worker_config = worker_meta.get("config")
-            if isinstance(worker_config, dict):
-                env_config = worker_config.get("environment")
-                if isinstance(env_config, dict):
-                    env_id = env_config.get("env_id")
-                    if isinstance(env_id, str) and env_id.strip():
-                        return env_id.strip()
-        return ""
-
-    def _metadata_run_mode(self, metadata: Dict[str, Any]) -> str:
-        ui_meta = metadata.get("ui") if isinstance(metadata, dict) else None
-        if isinstance(ui_meta, dict):
-            mode = ui_meta.get("run_mode")
-            if isinstance(mode, str) and mode.strip():
-                return mode.strip().lower()
-        worker_meta = metadata.get("worker") if isinstance(metadata, dict) else None
-        if isinstance(worker_meta, dict):
-            config = worker_meta.get("config")
-            if isinstance(config, dict):
-                extras = config.get("extras")
-                if isinstance(extras, dict):
-                    mode = extras.get("mode")
-                    if isinstance(mode, str) and mode.strip():
-                        return mode.strip().lower()
-        return "train"
-
-    def _metadata_supports_fastlane(self, metadata: Dict[str, Any]) -> bool:
-        """Return True if the run metadata indicates FastLane visuals are available."""
-
-        def _is_truthy(value: Any) -> bool:
-            if isinstance(value, bool):
-                return value
-            if isinstance(value, (int, float)):
-                return value != 0
-            if isinstance(value, str):
-                return value.strip().lower() in {"1", "true", "yes", "on"}
-            return False
-
-        ui_meta = metadata.get("ui") if isinstance(metadata, dict) else None
-        if isinstance(ui_meta, dict) and _is_truthy(ui_meta.get("fastlane_only")):
-            return True
-
-        worker_meta = metadata.get("worker") if isinstance(metadata, dict) else None
-        if not isinstance(worker_meta, dict):
-            return False
-
-        module_name = str(worker_meta.get("module") or "").lower()
-        worker_kind = str(worker_meta.get("worker_kind") or "").lower()
-        worker_identifier = str(worker_meta.get("worker_id") or "").lower()
-        if "cleanrl_worker" in module_name or worker_kind == "cleanrl" or worker_identifier == "cleanrl_worker":
-            return True
-
-        worker_config = worker_meta.get("config")
-        if isinstance(worker_config, dict):
-            extras = worker_config.get("extras")
-            if isinstance(extras, dict):
-                if _is_truthy(extras.get("fastlane_only")) or _is_truthy(extras.get("fastlane_enabled")):
-                    return True
-
-        return False
-
-    def _backfill_run_metadata_from_disk(self, run_id: str) -> None:
-        """Load run metadata for previously scheduled runs discovered outside the submission flow."""
-        config_path = VAR_TRAINER_DIR / "configs" / f"config-{run_id}.json"
-        if not config_path.exists():
-            self.log_constant(
-                LOG_UI_MAINWINDOW_TRACE,
-                message="Metadata backfill skipped; trainer config not found",
-                extra={"run_id": run_id, "path": str(config_path)},
-            )
-            return
-
-        try:
-            with config_path.open("r", encoding="utf-8") as handle:
-                config_payload = json.load(handle)
-        except Exception as exc:
-            self.log_constant(
-                LOG_UI_MAINWINDOW_WARNING,
-                message="Failed to load trainer config for metadata backfill",
-                extra={"run_id": run_id, "path": str(config_path)},
-                exc_info=exc,
-            )
-            return
-
-        metadata = config_payload.get("metadata")
-        if not isinstance(metadata, dict):
-            self.log_constant(
-                LOG_UI_MAINWINDOW_TRACE,
-                message="Metadata backfill skipped; config payload missing metadata",
-                extra={"run_id": run_id, "path": str(config_path)},
-            )
-            return
-
-        candidate_agent_ids: List[str] = []
-        worker_meta = metadata.get("worker")
-        if isinstance(worker_meta, dict):
-            worker_agent = worker_meta.get("agent_id")
-            if worker_agent is not None:
-                candidate_agent_ids.append(str(worker_agent))
-            worker_config = worker_meta.get("config")
-            if isinstance(worker_config, dict):
-                config_agent = worker_config.get("agent_id")
-                if config_agent is not None:
-                    candidate_agent_ids.append(str(config_agent))
-
-        env_payload = config_payload.get("environment")
-        if isinstance(env_payload, dict):
-            env_agent = env_payload.get("TRAIN_AGENT_ID")
-            if env_agent is not None:
-                candidate_agent_ids.append(str(env_agent))
-
-        if not candidate_agent_ids:
-            candidate_agent_ids.append("default")
-
-        ordered_unique_agent_ids: List[str] = []
-        for agent_id in candidate_agent_ids:
-            if agent_id not in ordered_unique_agent_ids:
-                ordered_unique_agent_ids.append(agent_id)
-
-        artifacts_payload = metadata.get("artifacts") if isinstance(metadata, dict) else None
-
-        for agent_id in ordered_unique_agent_ids:
-            key = (run_id, agent_id)
-            if key in self._run_metadata:
-                existing_payload = self._run_metadata[key]
-                if isinstance(existing_payload, dict):
-                    current_artifacts = existing_payload.get("artifacts")
-                    if not isinstance(current_artifacts, dict) and isinstance(artifacts_payload, dict):
-                        existing_payload["artifacts"] = artifacts_payload
-                        self.log_constant(
-                            LOG_UI_MAINWINDOW_TRACE,
-                            message="Backfilled tensorboard artifacts into existing metadata",
-                            extra={"run_id": run_id, "agent_id": agent_id},
-                        )
-                meta_payload = self._run_metadata.get(key)
-                self._analytics_tabs.ensure_tensorboard_tab(run_id, agent_id, meta_payload)
-                self._analytics_tabs.ensure_wandb_tab(run_id, agent_id, meta_payload)
-                continue
-
-            self._run_metadata[key] = metadata
-            self.log_constant(
-                LOG_UI_MAINWINDOW_TRACE,
-                message="Backfilled run metadata from trainer config",
-                extra={"run_id": run_id, "agent_id": agent_id, "path": str(config_path)},
-            )
-            self._analytics_tabs.ensure_tensorboard_tab(run_id, agent_id, metadata)
-            self._analytics_tabs.ensure_wandb_tab(run_id, agent_id, metadata)
-            self._maybe_open_fastlane_tab(run_id, agent_id)
+    # Training monitor methods delegated to TrainingMonitorHandler:
+    # - poll_for_new_runs, start_run_watch, shutdown_run_watch
+    # - backfill_run_metadata_from_disk, auto_subscribe_run
 
     def _on_training_finished(self, run_id: str, outcome: str, failure_reason: str) -> None:
         """Handle training_finished signal - create/refresh replay tabs for all agents in this run."""
@@ -2356,13 +1797,14 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
     def _on_run_completed(self, run_id: str) -> None:
         """Handle run completion - keep Live-Agent tabs open, add Replay tabs."""
-        self.log_constant( 
+        self.log_constant(
             LOG_LIVE_CONTROLLER_RUN_COMPLETED,
             message="Run completed signal received",
             extra={"run_id": run_id},
         )
 
-        self._fastlane_tabs_open = {key for key in self._fastlane_tabs_open if key[0] != run_id}
+        # Clear FastLane tab tracking for this run (delegated to handler)
+        self._fastlane_tab_handler.clear_tabs_for_run(run_id)
 
         # Unsubscribe from telemetry (stops new events from arriving)
         if self._live_controller:
@@ -2384,225 +1826,11 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # NOTE: Do NOT remove Live-Agent tabs - keep them open so user can review the training
         # The Live-Agent tab will remain visible with the final state
         # Replay tabs will be created by _on_training_finished() signal
-        self.log_constant( 
+        self.log_constant(
             LOG_LIVE_CONTROLLER_RUN_COMPLETED,
             message="Run completed - Live-Agent tabs remain open for review",
             extra={"run_id": run_id},
         )
-
-    def _poll_for_new_runs(self) -> None:
-        """Poll daemon for new training runs and auto-subscribe to their telemetry."""
-        try:
-            
-            locator = get_service_locator()
-            runner = locator.resolve(TrainerClientRunner)
-            if runner is None:
-                self.log_constant( 
-                    LOG_UI_MAINWINDOW_TRACE,
-                    message="TrainerClientRunner not available, skipping poll",
-                )
-                return
-            
-            # List runs that should have tabs (active or recently completed)
-            if self._trainer_daemon_ready:
-                self.log_constant( 
-                    LOG_UI_MAINWINDOW_TRACE,
-                    message="Polling daemon for active training runs...",
-                )
-            future = runner.list_runs(
-                statuses=self._WATCHED_RUN_STATUSES,
-                deadline=3.0,
-            )
-            
-            def on_done(fut):
-                try:
-                    response = fut.result(timeout=1.0)
-                except Exception as exc:
-                    self._trainer_poll_failures += 1
-                    if self._trainer_daemon_ready:
-                        self.log_constant( 
-                            LOG_UI_MAINWINDOW_TRACE,
-                            message=f"Run poll failed: {exc}",
-                        )
-                    else:
-                        if not self._trainer_poll_quiet_logged:
-                            self.log_constant(
-                                LOG_UI_MAINWINDOW_TRACE,
-                                message="Trainer daemon not yet reachable; suppressing poll failures until it responds",
-                            )
-                            self._trainer_poll_quiet_logged = True
-                    return
-                self._trainer_daemon_ready = True
-                if self._trainer_poll_failures and self._trainer_poll_quiet_logged:
-                    self.log_constant(
-                        LOG_UI_MAINWINDOW_TRACE,
-                        message="Trainer daemon responded; resuming poll logging",
-                    )
-                self._trainer_poll_failures = 0
-                self._trainer_poll_quiet_logged = False
-                self.log_constant( 
-                    LOG_UI_MAINWINDOW_TRACE,
-                    message=f"Received {len(response.runs)} active runs from daemon",
-                )
-                for record in response.runs:
-                    run_id = str(record.run_id)
-                    if run_id not in self._known_runs:
-                        # Convert protobuf status integer to human-readable name
-                        status_value = record.status
-                        status_name = status_value
-                        if isinstance(status_value, int):
-                            from gym_gui.services.trainer import RunStatus
-                            status_name = RunStatus.from_proto(status_value).value
-                        self.log_constant( 
-                            LOG_UI_MAINWINDOW_TRACE,
-                            message=f"Discovered new run: {run_id} (status={status_name}, proto={status_value})",
-                        )
-                        self.log_constant( 
-                            LOG_UI_MAINWINDOW_TRACE,
-                            message=f"Calling auto-subscribe directly for run: {run_id}",
-                        )
-                        self._auto_subscribe_run(run_id)
-                    else:
-                        self.log_constant( 
-                            LOG_UI_MAINWINDOW_TRACE,
-                            message=f"Run {run_id[:12]} already known, skipping",
-                        )
-            
-            future.add_done_callback(on_done)
-            
-        except Exception as e:
-            self.log_constant( 
-                LOG_UI_MAINWINDOW_TRACE,
-                message="Failed to initiate run poll",
-                exc_info=e,
-            )
-    
-    def _auto_subscribe_run(self, run_id: str) -> None:
-        """Ensure auto-subscribe logic executes on the GUI thread."""
-        current_thread = QtCore.QThread.currentThread()
-        widget_thread = self.thread()
-        if current_thread != widget_thread:
-            self.log_constant(
-                LOG_UI_MAINWINDOW_TRACE,
-                message="Queueing auto-subscribe on GUI thread",
-                extra={
-                    "run_id": run_id,
-                    "current_thread": repr(current_thread),
-                    "widget_thread": repr(widget_thread),
-                },
-            )
-            self._auto_subscribe_requested.emit(run_id)
-            return
-
-        self._auto_subscribe_run_main_thread(run_id)
-
-    @pyqtSlot(str)
-    def _auto_subscribe_run_main_thread(self, run_id: str) -> None:
-        """Auto-subscribe to a newly discovered run (always called on main thread)."""
-        self.log_constant( 
-            LOG_UI_MAINWINDOW_INFO,
-            message="Auto-subscribing to new run",
-            extra={"run_id": run_id},
-        )
-        self._known_runs.add(run_id)
-        self._backfill_run_metadata_from_disk(run_id)
-        try:
-            self._live_controller.subscribe_to_run(run_id)
-            self._render_group.setTitle(f"Live Training - {run_id[:12]}...")
-            self._status_bar.showMessage(f"Detected new training run: {run_id[:12]}...", 5000)
-            self.log_constant( 
-                LOG_UI_MAINWINDOW_INFO,
-                message="Subscribed to run - waiting for telemetry steps to create agent tabs",
-                extra={"run_id": run_id},
-            )
-        except Exception as e:
-            self.log_constant( 
-                LOG_UI_MAINWINDOW_ERROR,
-                message=f"Failed to subscribe to run {run_id}",
-                exc_info=e,
-            )
-
-    def _start_run_watch(self) -> None:
-        locator = get_service_locator()
-        runner: Optional[TrainerClientRunner] = locator.resolve(TrainerClientRunner)
-        if runner is None:
-            self.log_constant( 
-                LOG_UI_MAINWINDOW_TRACE,
-                message="TrainerClientRunner not available; skipping run watch subscription",
-            )
-            return
-
-        subscription = runner.watch_runs(statuses=self._WATCHED_RUN_STATUSES, since_seq=0)
-        self._run_watch_subscription = subscription
-
-        def _watch_loop() -> None:
-            self.log_constant( 
-                LOG_UI_MAINWINDOW_INFO,
-                message=f"Run watch thread started (statuses={','.join([status.name for status in self._WATCHED_RUN_STATUSES])})",
-            )
-            while not self._run_watch_stop.is_set():
-                try:
-                    record = subscription.get(timeout=1.0)
-                except TrainerWatchStopped:
-                    self.log_constant( 
-                        LOG_UI_MAINWINDOW_INFO,
-                        message="Run watch subscription closed by daemon",
-                    )
-                    break
-                except TimeoutError:
-                    continue
-                except Exception as exc:
-                    self.log_constant( 
-                        LOG_UI_MAINWINDOW_TRACE,
-                        message=f"Run watch error: {exc}",
-                    )
-                    continue
-
-                run_id = getattr(record, "run_id", "")
-                status_value = getattr(record, "status", None)
-                # Convert protobuf status integer to human-readable name
-                status_name = status_value
-                if isinstance(status_value, int):
-                    from gym_gui.services.trainer import RunStatus
-                    status_name = RunStatus.from_proto(status_value).value
-                self.log_constant( 
-                    LOG_UI_MAINWINDOW_INFO,
-                    message=f"Run watch update: run_id={run_id} status={status_name} (proto={status_value})",
-                )
-                QtCore.QTimer.singleShot(0, lambda rid=run_id: self._auto_subscribe_run(rid))
-
-            subscription.close()
-            self.log_constant( 
-                LOG_UI_MAINWINDOW_INFO,
-                message="Run watch thread exiting",
-            )
-
-        self._run_watch_thread = threading.Thread(
-            target=_watch_loop,
-            name="trainer-run-watch",
-            daemon=True,
-        )
-        self._run_watch_thread.start()
-
-    def _shutdown_run_watch(self) -> None:
-        self._run_watch_stop.set()
-        if self._run_watch_subscription is not None:
-            try:
-                self._run_watch_subscription.close()
-            except Exception as exc:
-                self.log_constant(
-                    LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING,
-                    message="Failed to close run watch subscription during shutdown",
-                    extra={
-                        "error": str(exc),
-                        "error_type": type(exc).__name__,
-                    },
-                    exc_info=exc,
-                )
-            self._run_watch_subscription = None
-        if self._run_watch_thread is not None:
-            self._run_watch_thread.join(timeout=2.0)
-            self._run_watch_thread = None
 
     # ------------------------------------------------------------------
     # Helpers
@@ -2646,7 +1874,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         if hasattr(self, "_live_controller"):
             self._live_controller.shutdown()
 
-        self._shutdown_run_watch()
+        self._training_monitor_handler.shutdown_run_watch()
 
         # Clean up board games (via env loaders)
         if hasattr(self, "_chess_env_loader"):

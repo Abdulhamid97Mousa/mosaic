@@ -25,6 +25,7 @@
 #   requirements/cleanrl_worker.txt - CleanRL training backend
 #   requirements/pettingzoo.txt     - Multi-agent environments
 #   requirements/vizdoom.txt        - ViZDoom FPS environments
+#   requirements/nethack.txt        - NetHack/MiniHack roguelike environments
 #   requirements/ray_worker.txt     - Ray/RLlib distributed training
 #   requirements/xuance_worker.txt  - XuanCe MARL algorithms
 #   requirements/jason_worker.txt   - Jason BDI agents

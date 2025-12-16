@@ -59,6 +59,7 @@ def _load_schemas() -> Dict[str, Any]:
         _schema_cache = json.load(f)
 
     logger.debug(f"Loaded algorithm schemas from {SCHEMAS_PATH}")
+    assert _schema_cache is not None  # json.load always returns a value
     return _schema_cache
 
 

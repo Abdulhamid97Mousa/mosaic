@@ -10,7 +10,7 @@ from qtpy import QtWidgets
 
 from gym_gui.core.enums import EnvironmentFamily, GameId
 from gym_gui.telemetry.semconv import VideoModes
-from gym_gui.workers.cleanrl_policy_metadata import (
+from gym_gui.policy_discovery.cleanrl_policy_metadata import (
     CleanRlCheckpoint,
     discover_policies,
     load_metadata_for_policy,

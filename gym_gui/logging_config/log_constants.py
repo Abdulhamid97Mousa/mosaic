@@ -1612,6 +1612,42 @@ LOG_UI_MULTI_AGENT_ENV_NOT_LOADED = _constant(
     tags=_tags("ui", "multi_agent", "environment", "warning"),
 )
 
+LOG_UI_POLICY_ASSIGNMENT_REQUESTED = _constant(
+    "LOG760",
+    "INFO",
+    "Policy assignment evaluation requested",
+    component="UI",
+    subcomponent="PolicyAssignment",
+    tags=_tags("ui", "multi_agent", "policy", "evaluation", "start"),
+)
+
+LOG_UI_POLICY_ASSIGNMENT_LOADED = _constant(
+    "LOG761",
+    "INFO",
+    "Policy checkpoint loaded for evaluation",
+    component="UI",
+    subcomponent="PolicyAssignment",
+    tags=_tags("ui", "multi_agent", "policy", "loaded"),
+)
+
+LOG_UI_POLICY_DISCOVERY_SCAN = _constant(
+    "LOG762",
+    "DEBUG",
+    "Scanning for policy checkpoints",
+    component="UI",
+    subcomponent="PolicyDiscovery",
+    tags=_tags("ui", "policy", "discovery", "scan"),
+)
+
+LOG_UI_POLICY_DISCOVERY_FOUND = _constant(
+    "LOG763",
+    "INFO",
+    "Policy checkpoints discovered",
+    component="UI",
+    subcomponent="PolicyDiscovery",
+    tags=_tags("ui", "policy", "discovery", "found"),
+)
+
 
 # ---------------------------------------------------------------------------
 # Fast Lane / RunBus telemetry constants (LOG950–LOG959)
@@ -2128,6 +2164,100 @@ LOG_RAY_WORKER_ANALYTICS_WRITTEN = _constant(
     tags=_tags("ray", "worker", "analytics", "manifest"),
 )
 
+# =========================================================================
+# Ray Policy Evaluation Constants
+# =========================================================================
+
+LOG_RAY_EVAL_REQUESTED = _constant(
+    "LOG980",
+    "INFO",
+    "Ray policy evaluation requested",
+    component="Worker",
+    subcomponent="RayEvaluator",
+    tags=_tags("ray", "evaluation", "requested"),
+)
+
+LOG_RAY_EVAL_SETUP_STARTED = _constant(
+    "LOG981",
+    "INFO",
+    "Ray policy evaluation setup started",
+    component="Worker",
+    subcomponent="RayEvaluator",
+    tags=_tags("ray", "evaluation", "setup", "started"),
+)
+
+LOG_RAY_EVAL_SETUP_COMPLETED = _constant(
+    "LOG982",
+    "INFO",
+    "Ray policy evaluation setup completed",
+    component="Worker",
+    subcomponent="RayEvaluator",
+    tags=_tags("ray", "evaluation", "setup", "completed"),
+)
+
+LOG_RAY_EVAL_EPISODE_STARTED = _constant(
+    "LOG983",
+    "DEBUG",
+    "Ray policy evaluation episode started",
+    component="Worker",
+    subcomponent="RayEvaluator",
+    tags=_tags("ray", "evaluation", "episode", "started"),
+)
+
+LOG_RAY_EVAL_EPISODE_COMPLETED = _constant(
+    "LOG984",
+    "INFO",
+    "Ray policy evaluation episode completed",
+    component="Worker",
+    subcomponent="RayEvaluator",
+    tags=_tags("ray", "evaluation", "episode", "completed"),
+)
+
+LOG_RAY_EVAL_RUN_COMPLETED = _constant(
+    "LOG985",
+    "INFO",
+    "Ray policy evaluation run completed",
+    component="Worker",
+    subcomponent="RayEvaluator",
+    tags=_tags("ray", "evaluation", "completed"),
+)
+
+LOG_RAY_EVAL_ERROR = _constant(
+    "LOG986",
+    "ERROR",
+    "Ray policy evaluation error",
+    component="Worker",
+    subcomponent="RayEvaluator",
+    tags=_tags("ray", "evaluation", "error"),
+)
+
+LOG_RAY_EVAL_FASTLANE_CONNECTED = _constant(
+    "LOG987",
+    "INFO",
+    "Ray evaluation FastLane connected",
+    component="Worker",
+    subcomponent="RayEvaluator",
+    tags=_tags("ray", "evaluation", "fastlane", "connected"),
+)
+
+LOG_RAY_EVAL_POLICY_LOADED = _constant(
+    "LOG988",
+    "INFO",
+    "Ray evaluation policy loaded from checkpoint",
+    component="Worker",
+    subcomponent="RayEvaluator",
+    tags=_tags("ray", "evaluation", "policy", "loaded"),
+)
+
+LOG_RAY_EVAL_TAB_CREATED = _constant(
+    "LOG989",
+    "INFO",
+    "Ray evaluation FastLane tab created",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("ray", "evaluation", "tab", "created"),
+)
+
 
 # =========================================================================
 # Helper Functions for Runtime Discovery & Validation
@@ -2386,6 +2516,10 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_UI_MULTI_AGENT_TRAIN_REQUESTED,
     LOG_UI_MULTI_AGENT_EVALUATE_REQUESTED,
     LOG_UI_MULTI_AGENT_ENV_NOT_LOADED,
+    LOG_UI_POLICY_ASSIGNMENT_REQUESTED,
+    LOG_UI_POLICY_ASSIGNMENT_LOADED,
+    LOG_UI_POLICY_DISCOVERY_SCAN,
+    LOG_UI_POLICY_DISCOVERY_FOUND,
     LOG_UI_PRESENTER_SIGNAL_CONNECTION_WARNING,
     LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING,
     LOG_UI_TENSORBOARD_KILL_WARNING,
@@ -2443,6 +2577,17 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_RAY_WORKER_ENV_WRAPPED,
     LOG_RAY_WORKER_POLICY_LOADED,
     LOG_RAY_WORKER_ANALYTICS_WRITTEN,
+    # Ray Evaluation
+    LOG_RAY_EVAL_REQUESTED,
+    LOG_RAY_EVAL_SETUP_STARTED,
+    LOG_RAY_EVAL_SETUP_COMPLETED,
+    LOG_RAY_EVAL_EPISODE_STARTED,
+    LOG_RAY_EVAL_EPISODE_COMPLETED,
+    LOG_RAY_EVAL_RUN_COMPLETED,
+    LOG_RAY_EVAL_ERROR,
+    LOG_RAY_EVAL_FASTLANE_CONNECTED,
+    LOG_RAY_EVAL_POLICY_LOADED,
+    LOG_RAY_EVAL_TAB_CREATED,
 )
 
 
@@ -2610,6 +2755,10 @@ __all__ = (
     "LOG_UI_MULTI_AGENT_TRAIN_REQUESTED",
     "LOG_UI_MULTI_AGENT_EVALUATE_REQUESTED",
     "LOG_UI_MULTI_AGENT_ENV_NOT_LOADED",
+    "LOG_UI_POLICY_ASSIGNMENT_REQUESTED",
+    "LOG_UI_POLICY_ASSIGNMENT_LOADED",
+    "LOG_UI_POLICY_DISCOVERY_SCAN",
+    "LOG_UI_POLICY_DISCOVERY_FOUND",
     "LOG_UI_PRESENTER_SIGNAL_CONNECTION_WARNING",
     "LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING",
     "LOG_UI_TENSORBOARD_KILL_WARNING",
@@ -2672,4 +2821,15 @@ __all__ = (
     "LOG_RAY_WORKER_ENV_WRAPPED",
     "LOG_RAY_WORKER_POLICY_LOADED",
     "LOG_RAY_WORKER_ANALYTICS_WRITTEN",
+    # Ray Evaluation
+    "LOG_RAY_EVAL_REQUESTED",
+    "LOG_RAY_EVAL_SETUP_STARTED",
+    "LOG_RAY_EVAL_SETUP_COMPLETED",
+    "LOG_RAY_EVAL_EPISODE_STARTED",
+    "LOG_RAY_EVAL_EPISODE_COMPLETED",
+    "LOG_RAY_EVAL_RUN_COMPLETED",
+    "LOG_RAY_EVAL_ERROR",
+    "LOG_RAY_EVAL_FASTLANE_CONNECTED",
+    "LOG_RAY_EVAL_POLICY_LOADED",
+    "LOG_RAY_EVAL_TAB_CREATED",
 )

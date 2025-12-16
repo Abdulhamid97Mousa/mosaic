@@ -35,9 +35,14 @@ from __future__ import annotations
 import logging
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Set, Union
+from typing import Any, Dict, List, Optional, Set, Union, TYPE_CHECKING
 
 import numpy as np
+
+# Type checking imports for forward references
+if TYPE_CHECKING:
+    from gym_gui.core.enums import SteppingParadigm
+    from gym_gui.services.actor import StepSnapshot, EpisodeSummary
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,12 +64,16 @@ class RayPolicyConfig:
         checkpoint_path: Path to Ray RLlib checkpoint directory.
         policy_id: ID of the policy to use (e.g., "shared", "main", agent_id).
         env_name: Optional environment name for Ray registration.
+        env_family: Environment family (sisl, mpe, butterfly, classic).
+        env_id: Environment ID (e.g., "pursuit_v4", "waterworld_v4").
         device: Device for inference ("cpu" or "cuda").
         deterministic: Whether to use deterministic actions.
     """
     checkpoint_path: str
     policy_id: str = "shared"
     env_name: Optional[str] = None
+    env_family: Optional[str] = None
+    env_id: Optional[str] = None
     device: str = "cpu"
     deterministic: bool = False
 
@@ -112,6 +121,8 @@ class RayPolicyActor:
         policy_id: str = "shared",
         actor_id: str = "ray_policy",
         env_name: Optional[str] = None,
+        env_family: Optional[str] = None,
+        env_id: Optional[str] = None,
         device: str = "cpu",
         deterministic: bool = False,
     ) -> "RayPolicyActor":
@@ -121,7 +132,9 @@ class RayPolicyActor:
             checkpoint_path: Path to Ray RLlib checkpoint directory.
             policy_id: ID of the policy to use for inference.
             actor_id: Unique identifier for this actor.
-            env_name: Optional environment name.
+            env_name: Optional environment name (format: "{family}_{env_id}").
+            env_family: Environment family (sisl, mpe, butterfly, classic).
+            env_id: Environment ID (e.g., "pursuit_v4", "waterworld_v4").
             device: Device for inference.
             deterministic: Whether to use deterministic actions.
 
@@ -131,15 +144,26 @@ class RayPolicyActor:
         Raises:
             FileNotFoundError: If checkpoint path doesn't exist.
             ValueError: If policy_id not found in checkpoint.
+
+        Note:
+            Either env_name OR (env_family + env_id) must be provided for
+            environment registration with Ray. The checkpoint was trained
+            with a specific environment name that must be re-registered.
         """
         checkpoint_path = Path(checkpoint_path)
         if not checkpoint_path.exists():
             raise FileNotFoundError(f"Checkpoint not found: {checkpoint_path}")
 
+        # Build env_name from family and env_id if not provided
+        if env_name is None and env_family and env_id:
+            env_name = f"{env_family}_{env_id}"
+
         config = RayPolicyConfig(
             checkpoint_path=str(checkpoint_path),
             policy_id=policy_id,
             env_name=env_name,
+            env_family=env_family,
+            env_id=env_id,
             device=device,
             deterministic=deterministic,
         )
@@ -149,29 +173,53 @@ class RayPolicyActor:
         return actor
 
     def _load_checkpoint(self) -> None:
-        """Load the algorithm and policy from checkpoint."""
+        """Load the algorithm and policy from checkpoint.
+
+        This method:
+        1. Initializes Ray if needed (with fresh state for evaluation)
+        2. Registers the environment with Ray using the same name as training
+        3. Loads the algorithm from checkpoint
+        4. Extracts the policy for inference
+        """
         if self.config is None:
             raise ValueError("Config must be set before loading checkpoint")
 
         ray, Algorithm, Policy = _get_ray_imports()
+        from ray.tune.registry import register_env
 
-        # Initialize Ray if needed
+        # IMPORTANT: Do NOT shutdown Ray if it's already running
+        # The training process may have started Ray, and shutting it down
+        # causes background threads to fail with GCS connection errors,
+        # which can terminate the entire application after 60 seconds.
         if not ray.is_initialized():
+            _LOGGER.info("Initializing Ray for policy evaluation")
             ray.init(ignore_reinit_error=True, log_to_driver=False)
+        else:
+            _LOGGER.info("Reusing existing Ray instance for evaluation")
 
         checkpoint_path = Path(self.config.checkpoint_path)
+
+        # Register the environment before loading checkpoint
+        # The checkpoint expects the environment to be registered with the same name
+        if self.config.env_name and self.config.env_family and self.config.env_id:
+            self._register_environment(register_env)
+        else:
+            _LOGGER.warning(
+                "Environment info not provided - checkpoint may fail to load if "
+                "it requires a registered environment. Provide env_family and env_id."
+            )
 
         # Try to load algorithm from checkpoint
         try:
             self._algorithm = Algorithm.from_checkpoint(str(checkpoint_path))
             _LOGGER.info(f"Loaded algorithm from checkpoint: {checkpoint_path}")
 
-            # Get available policies
-            available_policies = list(self._algorithm.workers.local_worker().policy_map.keys())
+            # Get available policies - handle different Ray RLlib versions
+            available_policies = self._get_available_policies()
             _LOGGER.info(f"Available policies: {available_policies}")
 
             # Validate requested policy exists
-            if self.config.policy_id not in available_policies:
+            if available_policies and self.config.policy_id not in available_policies:
                 # Try to find a matching policy
                 if len(available_policies) == 1:
                     actual_policy = available_policies[0]
@@ -188,20 +236,165 @@ class RayPolicyActor:
 
             # Get the policy
             self._policy = self._algorithm.get_policy(self.config.policy_id)
+            if self._policy is None:
+                # Try common fallback policy names
+                for fallback in ["shared", "default_policy", "main"]:
+                    self._policy = self._algorithm.get_policy(fallback)
+                    if self._policy is not None:
+                        _LOGGER.warning(f"Using fallback policy: {fallback}")
+                        self.config.policy_id = fallback
+                        break
+
+            if self._policy is None:
+                raise ValueError(f"Could not load any policy from checkpoint")
+
             self._initialized = True
 
         except Exception as e:
             _LOGGER.error(f"Failed to load checkpoint: {e}")
             raise
 
-    def _preprocess_observation(self, observation: Any) -> np.ndarray:
+    def _get_available_policies(self) -> List[str]:
+        """Get list of available policy IDs from algorithm.
+
+        Handles different Ray RLlib versions and worker configurations.
+        """
+        # Try different methods to get policies
+        try:
+            # Method 1: Through workers (Ray RLlib < 2.x or with workers enabled)
+            if hasattr(self._algorithm, 'workers'):
+                workers = self._algorithm.workers
+                if hasattr(workers, 'local_worker') and callable(workers.local_worker):
+                    local_worker = workers.local_worker()
+                    if hasattr(local_worker, 'policy_map'):
+                        return list(local_worker.policy_map.keys())  # type: ignore[union-attr]
+        except Exception as e:
+            _LOGGER.debug(f"Could not get policies from workers: {e}")
+
+        try:
+            # Method 2: Through algorithm config (Ray RLlib 2.x)
+            if hasattr(self._algorithm, 'config'):
+                config = self._algorithm.config
+                if hasattr(config, 'policies') and config.policies:
+                    if isinstance(config.policies, dict):
+                        return list(config.policies.keys())
+                    elif isinstance(config.policies, set):
+                        return list(config.policies)
+        except Exception as e:
+            _LOGGER.debug(f"Could not get policies from config: {e}")
+
+        try:
+            # Method 3: Through get_policy with common names
+            common_names = ["shared", "default_policy", "main"]
+            found = []
+            for name in common_names:
+                policy = self._algorithm.get_policy(name)
+                if policy is not None:
+                    found.append(name)
+            if found:
+                return found
+        except Exception as e:
+            _LOGGER.debug(f"Could not probe for common policy names: {e}")
+
+        # Return requested policy as fallback (will be validated later)
+        if self.config is None:
+            return []
+        return [self.config.policy_id] if self.config.policy_id else []
+
+    def _register_environment(self, register_env) -> None:
+        """Register the environment with Ray for checkpoint loading.
+
+        Creates an environment factory and registers it with the same name
+        that was used during training, so Algorithm.from_checkpoint() can
+        find and recreate the environment.
+        """
+        from ray.rllib.env.wrappers.pettingzoo_env import ParallelPettingZooEnv, PettingZooEnv
+
+        if self.config is None:
+            raise ValueError("Config not set, cannot register environment")
+        env_name = self.config.env_name
+        env_family = self.config.env_family.lower() if self.config.env_family else ""
+        env_id = self.config.env_id
+
+        _LOGGER.info(f"Registering environment: {env_name} (family={env_family}, env_id={env_id})")
+
+        def env_creator(_config: dict):
+            """Create the PettingZoo environment for Ray."""
+            # Create environment based on family
+            if env_family == "sisl":
+                if env_id == "waterworld_v4":
+                    from pettingzoo.sisl import waterworld_v4
+                    env = waterworld_v4.parallel_env(render_mode="rgb_array")
+                elif env_id == "multiwalker_v9":
+                    from pettingzoo.sisl import multiwalker_v9
+                    env = multiwalker_v9.parallel_env(render_mode="rgb_array")
+                elif env_id == "pursuit_v4":
+                    from pettingzoo.sisl import pursuit_v4
+                    env = pursuit_v4.parallel_env(render_mode="rgb_array")
+                else:
+                    raise ValueError(f"Unknown SISL environment: {env_id}")
+            elif env_family == "mpe":
+                if env_id == "simple_spread_v3":
+                    from pettingzoo.mpe import simple_spread_v3
+                    env = simple_spread_v3.parallel_env(render_mode="rgb_array")
+                elif env_id == "simple_adversary_v3":
+                    from pettingzoo.mpe import simple_adversary_v3
+                    env = simple_adversary_v3.parallel_env(render_mode="rgb_array")
+                elif env_id == "simple_tag_v3":
+                    from pettingzoo.mpe import simple_tag_v3
+                    env = simple_tag_v3.parallel_env(render_mode="rgb_array")
+                else:
+                    raise ValueError(f"Unknown MPE environment: {env_id}")
+            elif env_family == "butterfly":
+                if env_id == "knights_archers_zombies_v10":
+                    from pettingzoo.butterfly import knights_archers_zombies_v10
+                    env = knights_archers_zombies_v10.parallel_env(render_mode="rgb_array")
+                elif env_id == "cooperative_pong_v5":
+                    from pettingzoo.butterfly import cooperative_pong_v5
+                    env = cooperative_pong_v5.parallel_env(render_mode="rgb_array")
+                elif env_id == "pistonball_v6":
+                    from pettingzoo.butterfly import pistonball_v6
+                    env = pistonball_v6.parallel_env(render_mode="rgb_array")
+                else:
+                    raise ValueError(f"Unknown Butterfly environment: {env_id}")
+            elif env_family == "classic":
+                # Classic games use AEC API
+                if env_id == "chess_v6":
+                    from pettingzoo.classic import chess_v6
+                    env = chess_v6.env()
+                elif env_id == "go_v5":
+                    from pettingzoo.classic import go_v5
+                    env = go_v5.env()
+                elif env_id == "connect_four_v3":
+                    from pettingzoo.classic import connect_four_v3
+                    env = connect_four_v3.env()
+                elif env_id == "tictactoe_v3":
+                    from pettingzoo.classic import tictactoe_v3
+                    env = tictactoe_v3.env()
+                else:
+                    raise ValueError(f"Unknown Classic environment: {env_id}")
+            else:
+                raise ValueError(f"Unknown environment family: {env_family}")
+
+            # Wrap for Ray RLlib
+            # Classic games are AEC, others are Parallel
+            if env_family == "classic":
+                return PettingZooEnv(env)
+            else:
+                return ParallelPettingZooEnv(env)
+
+        # Register the environment
+        register_env(env_name, env_creator)
+        _LOGGER.info(f"Environment registered: {env_name}")
+
+    def _preprocess_observation(self, observation: Any) -> Union[np.ndarray, Dict[str, Any]]:
         """Preprocess observation for policy inference.
 
         Args:
             observation: Raw observation from environment.
 
         Returns:
-            Preprocessed observation as numpy array.
+            Preprocessed observation as numpy array or dict for complex spaces.
         """
         if isinstance(observation, np.ndarray):
             return observation
@@ -213,7 +406,7 @@ class RayPolicyActor:
         else:
             return np.array(observation)
 
-    def select_action(self, step: "StepSnapshot") -> Optional[int]:
+    def select_action(self, step: "StepSnapshot") -> Union[int, np.ndarray, None]:
         """Select action based on current observation.
 
         Implements the Actor protocol for single-agent environments.
@@ -222,7 +415,7 @@ class RayPolicyActor:
             step: Current step snapshot with observation.
 
         Returns:
-            Action to take, or None if not ready.
+            Action to take (int for discrete, array for continuous), or None if not ready.
         """
         if not self._initialized or self._policy is None:
             _LOGGER.warning("Policy not initialized, returning None")
@@ -276,7 +469,8 @@ class RayPolicyActor:
 
         try:
             # Determine which policy to use for this agent
-            policy_id = self._policy_mapping.get(agent_id, self.config.policy_id)
+            default_policy = self.config.policy_id if self.config else "shared"
+            policy_id = self._policy_mapping.get(agent_id, default_policy)
 
             # Get the policy (may be different per agent)
             if self._algorithm is not None:
@@ -388,10 +582,7 @@ class RayPolicyActor:
         """Get list of available policy IDs."""
         if self._algorithm is None:
             return [self.config.policy_id] if self.config else []
-        try:
-            return list(self._algorithm.workers.local_worker().policy_map.keys())
-        except Exception:
-            return []
+        return self._get_available_policies()
 
 
 @dataclass
@@ -407,7 +598,7 @@ class RayPolicyController:
     """
 
     actor: RayPolicyActor
-    _paradigm: "SteppingParadigm" = None
+    _paradigm: Optional["SteppingParadigm"] = None
 
     @property
     def id(self) -> str:
@@ -508,7 +699,17 @@ def list_checkpoint_policies(checkpoint_path: Union[str, Path]) -> List[str]:
 
     try:
         algo = Algorithm.from_checkpoint(str(checkpoint_path))
-        policies = list(algo.workers.local_worker().policy_map.keys())
+        # Access workers and policy_map with proper checks for Ray internals
+        workers = getattr(algo, 'workers', None)
+        if workers is not None:
+            local_worker = workers.local_worker() if callable(getattr(workers, 'local_worker', None)) else None
+            if local_worker is not None:
+                policy_map = getattr(local_worker, 'policy_map', {})
+                policies = list(policy_map.keys())
+            else:
+                policies = []
+        else:
+            policies = []
         algo.stop()
         return policies
     except Exception as e:

@@ -1,15 +1,20 @@
-"""Dialog for loading trained Ray RLlib policies."""
+"""Dialog for loading trained Ray RLlib policies.
+
+This is a thin wrapper around LoadPolicyDialog that:
+1. Filters to show only Ray RLlib checkpoints
+2. Converts the selected checkpoint to the expected config format
+"""
 
 from __future__ import annotations
 
 import logging
-from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 
-from qtpy import QtCore, QtWidgets
+from qtpy import QtWidgets
 
-from gym_gui.config.paths import VAR_TRAINER_DIR
-from gym_gui.ui.forms import get_worker_form_factory
+from gym_gui.ui.forms.factory import get_worker_form_factory
+from gym_gui.ui.widgets.load_policy_dialog import LoadPolicyDialog
+from gym_gui.policy_discovery.ray_policy_metadata import RayRLlibCheckpoint
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -17,10 +22,8 @@ _LOGGER = logging.getLogger(__name__)
 class RayPolicyForm(QtWidgets.QDialog):
     """Dialog for loading trained Ray RLlib checkpoints.
 
-    Provides UI for:
-    - Browsing for checkpoint directories
-    - Selecting which policy to use
-    - Configuring evaluation settings
+    This wraps LoadPolicyDialog with a filter for Ray-only checkpoints
+    and converts the selection to the expected config format.
     """
 
     def __init__(
@@ -28,189 +31,83 @@ class RayPolicyForm(QtWidgets.QDialog):
         parent: Optional[QtWidgets.QWidget] = None,
         *,
         default_game: Optional[Any] = None,
+        current_game: Optional[Any] = None,  # Alias for default_game
     ) -> None:
         super().__init__(parent)
         self.setWindowTitle("Load Ray RLlib Policy")
-        self.resize(600, 400)
 
-        self._default_game = default_game
-        self._checkpoint_path: Optional[Path] = None
+        # Accept either default_game or current_game
+        self._default_game = default_game or current_game
         self._result_config: Optional[Dict[str, Any]] = None
 
-        self._build_ui()
-        self._scan_checkpoints()
-
-    def _build_ui(self) -> None:
-        """Build the dialog UI."""
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(12, 12, 12, 12)
-        layout.setSpacing(10)
-
-        # Instructions
-        intro = QtWidgets.QLabel(self)
-        intro.setWordWrap(True)
-        intro.setText(
-            "Select a Ray RLlib checkpoint to load for evaluation. "
-            "Checkpoints are stored in var/trainer/runs/{run_id}/checkpoints/."
+        # Create the wrapped dialog with Ray filter
+        self._inner_dialog = LoadPolicyDialog(
+            parent=self,
+            filter_worker="ray",
         )
-        layout.addWidget(intro)
 
-        # Checkpoint table
-        self._table = QtWidgets.QTableWidget(self)
-        self._table.setColumnCount(4)
-        self._table.setHorizontalHeaderLabels(["Run ID", "Environment", "Paradigm", "Path"])
-        self._table.setSelectionBehavior(QtWidgets.QAbstractItemView.SelectionBehavior.SelectRows)
-        self._table.setEditTriggers(QtWidgets.QAbstractItemView.EditTrigger.NoEditTriggers)
-        self._table.verticalHeader().setVisible(False)
-        self._table.horizontalHeader().setStretchLastSection(True)
-        self._table.itemSelectionChanged.connect(self._on_selection_changed)
-        layout.addWidget(self._table, 2)
+        # Forward the dialog result
+        self._inner_dialog.finished.connect(self._on_inner_finished)
 
-        # Browse button
-        browse_layout = QtWidgets.QHBoxLayout()
-        self._path_label = QtWidgets.QLabel("No checkpoint selected", self)
-        self._path_label.setTextInteractionFlags(
-            QtCore.Qt.TextInteractionFlag.TextSelectableByMouse
-        )
-        browse_layout.addWidget(self._path_label, 1)
-        browse_btn = QtWidgets.QPushButton("Browse...", self)
-        browse_btn.clicked.connect(self._on_browse)
-        browse_layout.addWidget(browse_btn)
-        layout.addLayout(browse_layout)
+    def _on_inner_finished(self, result: int) -> None:
+        """Handle inner dialog completion."""
+        if result == QtWidgets.QDialog.DialogCode.Accepted:
+            checkpoint = self._inner_dialog.get_selected_checkpoint()
+            if checkpoint is not None and isinstance(checkpoint, RayRLlibCheckpoint):
+                self._result_config = self._build_config(checkpoint)
+                self.accept()
+            else:
+                self.reject()
+        else:
+            self.reject()
 
-        # Policy selection
-        policy_group = QtWidgets.QGroupBox("Policy Settings", self)
-        policy_layout = QtWidgets.QFormLayout(policy_group)
+    def exec(self) -> int:
+        """Execute the dialog."""
+        # Show the inner dialog instead of this one
+        result = self._inner_dialog.exec()
+        if result == QtWidgets.QDialog.DialogCode.Accepted:
+            checkpoint = self._inner_dialog.get_selected_checkpoint()
+            if checkpoint is not None and isinstance(checkpoint, RayRLlibCheckpoint):
+                self._result_config = self._build_config(checkpoint)
+                return QtWidgets.QDialog.DialogCode.Accepted
+        return QtWidgets.QDialog.DialogCode.Rejected
 
-        self._policy_combo = QtWidgets.QComboBox(self)
-        self._policy_combo.addItem("shared (parameter sharing)", "shared")
-        self._policy_combo.addItem("main (self-play)", "main")
-        policy_layout.addRow("Policy ID:", self._policy_combo)
+    def _build_config(self, checkpoint: RayRLlibCheckpoint) -> Dict[str, Any]:
+        """Build the evaluation configuration from a checkpoint.
 
-        self._deterministic_checkbox = QtWidgets.QCheckBox(
-            "Deterministic actions (no exploration)", self
-        )
-        self._deterministic_checkbox.setChecked(True)
-        policy_layout.addRow("", self._deterministic_checkbox)
+        Args:
+            checkpoint: The selected Ray RLlib checkpoint
 
-        layout.addWidget(policy_group)
-
-        # Dialog buttons
-        button_box = QtWidgets.QDialogButtonBox(
-            QtWidgets.QDialogButtonBox.StandardButton.Ok
-            | QtWidgets.QDialogButtonBox.StandardButton.Cancel,
-            self,
-        )
-        button_box.accepted.connect(self._on_accept)
-        button_box.rejected.connect(self.reject)
-        layout.addWidget(button_box)
-
-    def _scan_checkpoints(self) -> None:
-        """Scan var/trainer/runs for Ray checkpoints."""
-        runs_dir = VAR_TRAINER_DIR / "runs"
-        if not runs_dir.exists():
-            return
-
-        self._table.setRowCount(0)
-
-        for run_dir in sorted(runs_dir.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
-
-            # Look for Ray checkpoint indicators
-            checkpoint_dir = run_dir / "checkpoints"
-            analytics_file = run_dir / "analytics.json"
-
-            # Check if this looks like a Ray run
-            if not checkpoint_dir.exists():
-                continue
-
-            # Check for Ray checkpoint structure
-            ray_checkpoints = list(checkpoint_dir.glob("checkpoint_*"))
-            if not ray_checkpoints:
-                continue
-
-            # Read analytics to get metadata
-            env_id = "unknown"
-            paradigm = "unknown"
-            if analytics_file.exists():
-                try:
-                    import json
-                    data = json.loads(analytics_file.read_text())
-                    ray_meta = data.get("ray_metadata", {})
-                    env_id = ray_meta.get("env_id", "unknown")
-                    paradigm = ray_meta.get("paradigm", "unknown")
-                except Exception:
-                    pass
-
-            # Add to table
-            row = self._table.rowCount()
-            self._table.insertRow(row)
-            self._table.setItem(row, 0, QtWidgets.QTableWidgetItem(run_dir.name))
-            self._table.setItem(row, 1, QtWidgets.QTableWidgetItem(env_id))
-            self._table.setItem(row, 2, QtWidgets.QTableWidgetItem(paradigm))
-            self._table.setItem(row, 3, QtWidgets.QTableWidgetItem(str(ray_checkpoints[-1])))
-
-        self._table.resizeColumnsToContents()
-
-    def _on_selection_changed(self) -> None:
-        """Handle table selection change."""
-        selected = self._table.selectedItems()
-        if not selected:
-            self._checkpoint_path = None
-            self._path_label.setText("No checkpoint selected")
-            return
-
-        row = selected[0].row()
-        path_item = self._table.item(row, 3)
-        if path_item:
-            self._checkpoint_path = Path(path_item.text())
-            self._path_label.setText(str(self._checkpoint_path))
-
-    def _on_browse(self) -> None:
-        """Handle browse button click."""
-        start_dir = str(VAR_TRAINER_DIR / "runs")
-        path = QtWidgets.QFileDialog.getExistingDirectory(
-            self,
-            "Select Ray RLlib Checkpoint",
-            start_dir,
-        )
-        if path:
-            self._checkpoint_path = Path(path)
-            self._path_label.setText(str(self._checkpoint_path))
-
-    def _on_accept(self) -> None:
-        """Handle OK button click."""
-        if self._checkpoint_path is None:
-            QtWidgets.QMessageBox.warning(
-                self,
-                "No Checkpoint Selected",
-                "Please select a checkpoint to load.",
-            )
-            return
-
-        self._result_config = self._build_config()
-        self.accept()
-
-    def _build_config(self) -> Dict[str, Any]:
-        """Build the evaluation configuration."""
-        policy_id = self._policy_combo.currentData() or "shared"
-        deterministic = self._deterministic_checkbox.isChecked()
+        Returns:
+            Configuration dict for evaluation
+        """
+        # Default to "shared" policy for parameter sharing paradigm
+        policy_id = "shared" if checkpoint.paradigm == "parameter_sharing" else "main"
+        if checkpoint.policy_ids:
+            policy_id = checkpoint.policy_ids[0]
 
         return {
             "mode": "evaluate",
-            "checkpoint_path": str(self._checkpoint_path),
+            "checkpoint_path": str(checkpoint.checkpoint_path),
             "policy_id": policy_id,
-            "deterministic": deterministic,
+            "deterministic": True,
             "metadata": {
                 "ui": {
                     "worker_id": "ray_worker",
                     "mode": "evaluate",
                 },
                 "worker": {
-                    "checkpoint_path": str(self._checkpoint_path),
+                    "checkpoint_path": str(checkpoint.checkpoint_path),
                     "policy_id": policy_id,
-                    "deterministic": deterministic,
+                    "deterministic": True,
+                },
+                "ray_checkpoint": {
+                    "run_id": checkpoint.run_id,
+                    "env_id": checkpoint.env_id,
+                    "env_family": checkpoint.env_family,
+                    "algorithm": checkpoint.algorithm,
+                    "paradigm": checkpoint.paradigm,
+                    "policy_ids": checkpoint.policy_ids,
                 },
             },
         }

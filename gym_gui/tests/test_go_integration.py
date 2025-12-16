@@ -17,7 +17,7 @@ if TYPE_CHECKING:
     from gym_gui.core.adapters.pettingzoo_classic import GoEnvironmentAdapter
 
 from gym_gui.core.enums import EnvironmentFamily, GameId
-from gym_gui.ui.handlers.go_handlers import GoHandler
+from gym_gui.ui.handlers import GoHandler
 
 
 class TestGoAdapterLoads:

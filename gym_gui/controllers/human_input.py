@@ -441,6 +441,73 @@ _VIZDOOM_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
     ),
 }
 
+# ===========================================================================
+# MiniHack Mappings (roguelike vi-keys + WASD alternatives)
+# NLE action indices: 0-7 = 8 compass directions (N, E, S, W, NE, SE, SW, NW)
+# Many MiniHack envs use Discrete(8) for basic navigation
+# ===========================================================================
+def _minihack_nav_mappings() -> Tuple[ShortcutMapping, ...]:
+    """Standard 8-direction navigation for MiniHack environments."""
+    return (
+        _mapping(("Key_K", "Key_Up", "Key_W"), 0),     # North (up)
+        _mapping(("Key_L", "Key_Right", "Key_D"), 1),  # East (right)
+        _mapping(("Key_J", "Key_Down", "Key_S"), 2),   # South (down)
+        _mapping(("Key_H", "Key_Left", "Key_A"), 3),   # West (left)
+        _mapping(("Key_U",), 4),                        # Northeast (diag)
+        _mapping(("Key_N",), 5),                        # Southeast (diag)
+        _mapping(("Key_B",), 6),                        # Southwest (diag)
+        _mapping(("Key_Y",), 7),                        # Northwest (diag)
+    )
+
+
+_MINIHACK_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
+    # Navigation environments (8 directions)
+    GameId.MINIHACK_ROOM_5X5: _minihack_nav_mappings(),
+    GameId.MINIHACK_ROOM_15X15: _minihack_nav_mappings(),
+    GameId.MINIHACK_CORRIDOR_R2: _minihack_nav_mappings(),
+    GameId.MINIHACK_CORRIDOR_R3: _minihack_nav_mappings(),
+    GameId.MINIHACK_CORRIDOR_R5: _minihack_nav_mappings(),
+    GameId.MINIHACK_MAZEWALK_9X9: _minihack_nav_mappings(),
+    GameId.MINIHACK_MAZEWALK_15X15: _minihack_nav_mappings(),
+    GameId.MINIHACK_MAZEWALK_45X19: _minihack_nav_mappings(),
+    GameId.MINIHACK_RIVER: _minihack_nav_mappings(),
+    GameId.MINIHACK_RIVER_NARROW: _minihack_nav_mappings(),
+    # Exploration environments
+    GameId.MINIHACK_EXPLOREMAZE_EASY: _minihack_nav_mappings(),
+    GameId.MINIHACK_EXPLOREMAZE_HARD: _minihack_nav_mappings(),
+    GameId.MINIHACK_HIDENSEEK: _minihack_nav_mappings(),
+    GameId.MINIHACK_MEMENTO_F2: _minihack_nav_mappings(),
+    GameId.MINIHACK_MEMENTO_F4: _minihack_nav_mappings(),
+    # Skill environments (use fallback for extended actions)
+    GameId.MINIHACK_EAT: _minihack_nav_mappings(),
+    GameId.MINIHACK_WEAR: _minihack_nav_mappings(),
+    GameId.MINIHACK_WIELD: _minihack_nav_mappings(),
+    GameId.MINIHACK_ZAP: _minihack_nav_mappings(),
+    GameId.MINIHACK_READ: _minihack_nav_mappings(),
+    GameId.MINIHACK_QUAFF: _minihack_nav_mappings(),
+    GameId.MINIHACK_PUTON: _minihack_nav_mappings(),
+    GameId.MINIHACK_LAVACROSS: _minihack_nav_mappings(),
+    GameId.MINIHACK_WOD_EASY: _minihack_nav_mappings(),
+    GameId.MINIHACK_WOD_MEDIUM: _minihack_nav_mappings(),
+    GameId.MINIHACK_WOD_HARD: _minihack_nav_mappings(),
+}
+
+# ===========================================================================
+# NetHack Mappings (full game via NLE)
+# NLE has ~113 actions; mapping core navigation here
+# ===========================================================================
+_NETHACK_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
+    # NetHack full game uses same 8-direction navigation as base
+    GameId.NETHACK_FULL: _minihack_nav_mappings(),
+    GameId.NETHACK_SCORE: _minihack_nav_mappings(),
+    GameId.NETHACK_STAIRCASE: _minihack_nav_mappings(),
+    GameId.NETHACK_STAIRCASE_PET: _minihack_nav_mappings(),
+    GameId.NETHACK_ORACLE: _minihack_nav_mappings(),
+    GameId.NETHACK_GOLD: _minihack_nav_mappings(),
+    GameId.NETHACK_EAT: _minihack_nav_mappings(),
+    GameId.NETHACK_SCOUT: _minihack_nav_mappings(),
+}
+
 _ALE_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
     # Minimal but explicit mapping for core and diagonal moves, plus fire variants via letter keys.
     GameId.ADVENTURE_V4: (
@@ -549,6 +616,10 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
                 mappings = _ALE_MAPPINGS.get(game_id)
             if mappings is None:
                 mappings = _VIZDOOM_MAPPINGS.get(game_id)
+            if mappings is None:
+                mappings = _MINIHACK_MAPPINGS.get(game_id)
+            if mappings is None:
+                mappings = _NETHACK_MAPPINGS.get(game_id)
             if mappings is None and isinstance(action_space, spaces.Discrete):
                 mappings = self._fallback_mappings(action_space)
 

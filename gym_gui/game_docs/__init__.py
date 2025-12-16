@@ -78,6 +78,28 @@ try:  # Optional dependency for ViZDoom docs (kept lightweight)
 except Exception:  # pragma: no cover - ViZDoom optional
     _VIZDOOM_DOCS_AVAILABLE = False
 
+try:  # Optional dependency for NetHack/MiniHack docs
+    from gym_gui.game_docs.NetHack import (  # pragma: no cover - documentation only
+        NETHACK_CONTROLS_HTML,
+        # Navigation
+        MINIHACK_ROOM_HTML,
+        MINIHACK_CORRIDOR_HTML,
+        MINIHACK_MAZEWALK_HTML,
+        MINIHACK_RIVER_HTML,
+        # Skills
+        MINIHACK_SKILLS_SIMPLE_HTML,
+        MINIHACK_SKILLS_LAVA_HTML,
+        MINIHACK_SKILLS_WOD_HTML,
+        MINIHACK_SKILLS_QUEST_HTML,
+        # Exploration
+        MINIHACK_EXPLORE_MAZE_HTML,
+        MINIHACK_HIDENSEEK_HTML,
+        MINIHACK_MEMENTO_HTML,
+    )
+    _NETHACK_DOCS_AVAILABLE = True
+except Exception:  # pragma: no cover - NetHack optional
+    _NETHACK_DOCS_AVAILABLE = False
+
 _DEFAULT_DOC = (
     "<h3>Documentation unavailable</h3>"
     "<p>This environment does not yet have a descriptive blurb."

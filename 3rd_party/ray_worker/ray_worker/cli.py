@@ -229,6 +229,8 @@ def main(argv: Optional[list[str]] = None) -> int:
             wandb_project=config.wandb_project,
             wandb_entity=config.wandb_entity,
             wandb_run_name=config.wandb_run_name,
+            fastlane_enabled=config.fastlane_enabled,
+            fastlane_throttle_ms=config.fastlane_throttle_ms,
             extras=config.extras,
         )
 

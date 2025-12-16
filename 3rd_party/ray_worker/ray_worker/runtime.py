@@ -381,31 +381,38 @@ class RayWorkerRuntime:
         config = self.config
 
         def env_creator(_config: dict) -> Any:
+            # Get worker index from Ray's config
+            worker_index = getattr(_config, "worker_index", 0)
+
+            # Create environment
             env = EnvironmentFactory.create_env(
                 family=config.environment.family,
                 env_id=config.environment.env_id,
                 api_type=config.environment.api_type,
                 **config.environment.env_kwargs,
             )
-            return env
+
+            # Wrap with FastLane and Ray wrappers
+            wrapped_env = self._wrap_env_for_ray(env, worker_index=worker_index)
+            return wrapped_env
 
         return env_creator
 
-    def _wrap_env_for_ray(self, env: Any) -> Any:
+    def _wrap_env_for_ray(self, env: Any, worker_index: int = 0) -> Any:
         """Wrap PettingZoo environment for Ray RLlib.
 
+        Delegates to the module-level _wrap_env_for_ray function which correctly
+        handles both AEC and Parallel API types with FastLane support.
+
         Args:
-            env: Raw PettingZoo AEC environment
+            env: Raw PettingZoo environment (AEC or Parallel)
+            worker_index: Ray worker index for unique FastLane stream
 
         Returns:
-            Ray-compatible wrapped environment (PettingZooEnv)
+            Ray-compatible wrapped environment (PettingZooEnv or ParallelPettingZooEnv)
         """
-        # Wrap with FastLane for live visualization if enabled
-        env = maybe_wrap_env(env)
-
-        # All environments are created as AEC (see EnvironmentFactory)
-        # Ray RLlib's PettingZooEnv handles AEC environments
-        return PettingZooEnv(env)
+        # Use the module-level function which handles both API types
+        return _wrap_env_for_ray(env, self.config.environment.api_type, worker_index)
 
     def _get_agent_ids(self) -> Set[str]:
         """Get agent IDs from the environment."""

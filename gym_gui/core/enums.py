@@ -26,6 +26,8 @@ class EnvironmentFamily(StrEnum):
     MUJOCO = "mujoco"
     MINIGRID = "minigrid"
     VIZDOOM = "vizdoom"
+    MINIHACK = "minihack"  # MiniHack sandbox environments (built on NLE)
+    NETHACK = "nethack"  # Full NetHack game (via NLE)
     PETTINGZOO = "pettingzoo"
     PETTINGZOO_CLASSIC = "pettingzoo_classic"  # PettingZoo Classic: turn-based games (Chess, Go, Connect Four, etc.)
     OTHER = "other"
@@ -117,6 +119,51 @@ class GameId(StrEnum):
     GO = "go_v5"
     TIC_TAC_TOE = "tictactoe_v3"
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # MiniHack Environments (sandbox RL environments built on NLE)
+    # ─────────────────────────────────────────────────────────────────────────
+    # Navigation
+    MINIHACK_ROOM_5X5 = "MiniHack-Room-5x5-v0"
+    MINIHACK_ROOM_15X15 = "MiniHack-Room-15x15-v0"
+    MINIHACK_CORRIDOR_R2 = "MiniHack-Corridor-R2-v0"
+    MINIHACK_CORRIDOR_R3 = "MiniHack-Corridor-R3-v0"
+    MINIHACK_CORRIDOR_R5 = "MiniHack-Corridor-R5-v0"
+    MINIHACK_MAZEWALK_9X9 = "MiniHack-MazeWalk-9x9-v0"
+    MINIHACK_MAZEWALK_15X15 = "MiniHack-MazeWalk-15x15-v0"
+    MINIHACK_MAZEWALK_45X19 = "MiniHack-MazeWalk-45x19-v0"
+    MINIHACK_RIVER = "MiniHack-River-v0"
+    MINIHACK_RIVER_NARROW = "MiniHack-River-Narrow-v0"
+    # Skills
+    MINIHACK_EAT = "MiniHack-Eat-v0"
+    MINIHACK_WEAR = "MiniHack-Wear-v0"
+    MINIHACK_WIELD = "MiniHack-Wield-v0"
+    MINIHACK_ZAP = "MiniHack-Zap-v0"
+    MINIHACK_READ = "MiniHack-Read-v0"
+    MINIHACK_QUAFF = "MiniHack-Quaff-v0"
+    MINIHACK_PUTON = "MiniHack-PutOn-v0"
+    MINIHACK_LAVACROSS = "MiniHack-LavaCross-v0"
+    MINIHACK_WOD_EASY = "MiniHack-WoD-Easy-v0"
+    MINIHACK_WOD_MEDIUM = "MiniHack-WoD-Medium-v0"
+    MINIHACK_WOD_HARD = "MiniHack-WoD-Hard-v0"
+    # Exploration
+    MINIHACK_EXPLOREMAZE_EASY = "MiniHack-ExploreMaze-Easy-v0"
+    MINIHACK_EXPLOREMAZE_HARD = "MiniHack-ExploreMaze-Hard-v0"
+    MINIHACK_HIDENSEEK = "MiniHack-HideNSeek-v0"
+    MINIHACK_MEMENTO_F2 = "MiniHack-Memento-F2-v0"
+    MINIHACK_MEMENTO_F4 = "MiniHack-Memento-F4-v0"
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # NetHack (Full Game via NLE)
+    # ─────────────────────────────────────────────────────────────────────────
+    NETHACK_FULL = "NetHackChallenge-v0"
+    NETHACK_SCORE = "NetHackScore-v0"
+    NETHACK_STAIRCASE = "NetHackStaircase-v0"
+    NETHACK_STAIRCASE_PET = "NetHackStaircasePet-v0"
+    NETHACK_ORACLE = "NetHackOracle-v0"
+    NETHACK_GOLD = "NetHackGold-v0"
+    NETHACK_EAT = "NetHackEat-v0"
+    NETHACK_SCOUT = "NetHackScout-v0"
+
 
 def get_game_display_name(game_id: GameId) -> str:
     """Get the display name for a GameId with family prefix.
@@ -136,6 +183,12 @@ def get_game_display_name(game_id: GameId) -> str:
         return value
     # ViZDoom games already include descriptive prefix
     if value.startswith("ViZDoom-"):
+        return value
+    # MiniHack environments already include descriptive prefix
+    if value.startswith("MiniHack-"):
+        return value
+    # NetHack environments already include descriptive prefix
+    if value.startswith("NetHack"):
         return value
     # PettingZoo board games
     if game_id == GameId.CHESS:
@@ -353,6 +406,42 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.CONNECT_FOUR: EnvironmentFamily.PETTINGZOO_CLASSIC,
     GameId.GO: EnvironmentFamily.PETTINGZOO_CLASSIC,
     GameId.TIC_TAC_TOE: EnvironmentFamily.PETTINGZOO_CLASSIC,
+    # MiniHack environments
+    GameId.MINIHACK_ROOM_5X5: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_ROOM_15X15: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_CORRIDOR_R2: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_CORRIDOR_R3: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_CORRIDOR_R5: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_MAZEWALK_9X9: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_MAZEWALK_15X15: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_MAZEWALK_45X19: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_RIVER: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_RIVER_NARROW: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_EAT: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_WEAR: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_WIELD: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_ZAP: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_READ: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_QUAFF: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_PUTON: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_LAVACROSS: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_WOD_EASY: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_WOD_MEDIUM: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_WOD_HARD: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_EXPLOREMAZE_EASY: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_EXPLOREMAZE_HARD: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_HIDENSEEK: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_MEMENTO_F2: EnvironmentFamily.MINIHACK,
+    GameId.MINIHACK_MEMENTO_F4: EnvironmentFamily.MINIHACK,
+    # NetHack (full game) environments
+    GameId.NETHACK_FULL: EnvironmentFamily.NETHACK,
+    GameId.NETHACK_SCORE: EnvironmentFamily.NETHACK,
+    GameId.NETHACK_STAIRCASE: EnvironmentFamily.NETHACK,
+    GameId.NETHACK_STAIRCASE_PET: EnvironmentFamily.NETHACK,
+    GameId.NETHACK_ORACLE: EnvironmentFamily.NETHACK,
+    GameId.NETHACK_GOLD: EnvironmentFamily.NETHACK,
+    GameId.NETHACK_EAT: EnvironmentFamily.NETHACK,
+    GameId.NETHACK_SCOUT: EnvironmentFamily.NETHACK,
 }
 
 
@@ -427,6 +516,42 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.CONNECT_FOUR: RenderMode.RGB_ARRAY,  # Fallback, but we use InteractiveConnectFourBoard
     GameId.GO: RenderMode.RGB_ARRAY,  # Fallback, but we use InteractiveGoBoard
     GameId.TIC_TAC_TOE: RenderMode.RGB_ARRAY,  # Fallback, but we use InteractiveTicTacToeBoard
+    # MiniHack - pixel rendering (16x16 tiles)
+    GameId.MINIHACK_ROOM_5X5: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_ROOM_15X15: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_CORRIDOR_R2: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_CORRIDOR_R3: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_CORRIDOR_R5: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_MAZEWALK_9X9: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_MAZEWALK_15X15: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_MAZEWALK_45X19: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_RIVER: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_RIVER_NARROW: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_EAT: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_WEAR: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_WIELD: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_ZAP: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_READ: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_QUAFF: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_PUTON: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_LAVACROSS: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_WOD_EASY: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_WOD_MEDIUM: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_WOD_HARD: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_EXPLOREMAZE_EASY: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_EXPLOREMAZE_HARD: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_HIDENSEEK: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_MEMENTO_F2: RenderMode.RGB_ARRAY,
+    GameId.MINIHACK_MEMENTO_F4: RenderMode.RGB_ARRAY,
+    # NetHack - pixel rendering
+    GameId.NETHACK_FULL: RenderMode.RGB_ARRAY,
+    GameId.NETHACK_SCORE: RenderMode.RGB_ARRAY,
+    GameId.NETHACK_STAIRCASE: RenderMode.RGB_ARRAY,
+    GameId.NETHACK_STAIRCASE_PET: RenderMode.RGB_ARRAY,
+    GameId.NETHACK_ORACLE: RenderMode.RGB_ARRAY,
+    GameId.NETHACK_GOLD: RenderMode.RGB_ARRAY,
+    GameId.NETHACK_EAT: RenderMode.RGB_ARRAY,
+    GameId.NETHACK_SCOUT: RenderMode.RGB_ARRAY,
 }
 
 
@@ -803,6 +928,178 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
     GameId.TIC_TAC_TOE: (
         ControlMode.HUMAN_ONLY,
     ),
+    # MiniHack - turn-based roguelike (supports Human Control)
+    GameId.MINIHACK_ROOM_5X5: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_ROOM_15X15: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_CORRIDOR_R2: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_CORRIDOR_R3: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_CORRIDOR_R5: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_MAZEWALK_9X9: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_MAZEWALK_15X15: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_MAZEWALK_45X19: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_RIVER: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_RIVER_NARROW: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_EAT: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_WEAR: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_WIELD: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_ZAP: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_READ: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_QUAFF: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_PUTON: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_LAVACROSS: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_WOD_EASY: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_WOD_MEDIUM: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_WOD_HARD: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_EXPLOREMAZE_EASY: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_EXPLOREMAZE_HARD: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_HIDENSEEK: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_MEMENTO_F2: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.MINIHACK_MEMENTO_F4: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    # NetHack (full game) - turn-based roguelike
+    GameId.NETHACK_FULL: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.NETHACK_SCORE: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.NETHACK_STAIRCASE: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.NETHACK_STAIRCASE_PET: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.NETHACK_ORACLE: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.NETHACK_GOLD: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.NETHACK_EAT: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.NETHACK_SCOUT: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
 }
 
 
@@ -821,6 +1118,8 @@ DEFAULT_PARADIGM_BY_FAMILY: dict[EnvironmentFamily, SteppingParadigm] = {
     EnvironmentFamily.MUJOCO: SteppingParadigm.SINGLE_AGENT,
     EnvironmentFamily.MINIGRID: SteppingParadigm.SINGLE_AGENT,
     EnvironmentFamily.VIZDOOM: SteppingParadigm.SINGLE_AGENT,
+    EnvironmentFamily.MINIHACK: SteppingParadigm.SINGLE_AGENT,  # Turn-based roguelike
+    EnvironmentFamily.NETHACK: SteppingParadigm.SINGLE_AGENT,  # Turn-based roguelike
     EnvironmentFamily.PETTINGZOO: SteppingParadigm.SEQUENTIAL,  # AEC by default
     EnvironmentFamily.PETTINGZOO_CLASSIC: SteppingParadigm.SEQUENTIAL,  # Chess, Go, etc.
     EnvironmentFamily.OTHER: SteppingParadigm.SINGLE_AGENT,

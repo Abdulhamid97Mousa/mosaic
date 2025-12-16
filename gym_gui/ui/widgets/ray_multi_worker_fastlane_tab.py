@@ -82,7 +82,9 @@ class WorkerCell(QtWidgets.QFrame):
         self._quick = QtQuickWidgets.QQuickWidget(self)
         self._quick.setResizeMode(QtQuickWidgets.QQuickWidget.ResizeMode.SizeRootObjectToView)
         qml_path = Path(__file__).resolve().parent.parent / "qml" / "FastLaneView.qml"
-        self._quick.engine().addImportPath(str(qml_path.parent))
+        engine = self._quick.engine()
+        if engine is not None:
+            engine.addImportPath(str(qml_path.parent))
         self._quick.setSource(QtCore.QUrl.fromLocalFile(str(qml_path)))
         layout.addWidget(self._quick, 1)
 
@@ -185,7 +187,7 @@ class RayMultiWorkerFastLaneTab(QtWidgets.QWidget):
 
         # Create cells for each active worker
         for cell_idx, worker_idx in enumerate(worker_indices):
-            stream_id = f"{run_id}-worker-{worker_idx}"
+            stream_id = f"{run_id}-w{worker_idx}"
             cell = WorkerCell(
                 stream_id,
                 worker_idx,
@@ -224,6 +226,6 @@ class RayMultiWorkerFastLaneTab(QtWidgets.QWidget):
             cell.cleanup()
         self._cells.clear()
 
-    def closeEvent(self, event: QtGui.QCloseEvent) -> None:
+    def closeEvent(self, a0: QtGui.QCloseEvent | None) -> None:
         self.cleanup()
-        super().closeEvent(event)
+        super().closeEvent(a0)

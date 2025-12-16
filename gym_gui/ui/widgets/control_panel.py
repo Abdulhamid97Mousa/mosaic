@@ -53,7 +53,7 @@ from gym_gui.ui.config_panels.single_agent.vizdoom import (
     build_vizdoom_controls,
 )
 from gym_gui.core.adapters.vizdoom import ViZDoomConfig
-from gym_gui.ui.workers import WorkerDefinition, get_worker_catalog
+from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
 from gym_gui.ui.widgets.mujoco_mpc_tab import MuJoCoMPCTab
 from gym_gui.ui.widgets.multi_agent_tab import MultiAgentTab
 from gym_gui.ui.widgets.advanced_config import AdvancedConfigTab
@@ -127,6 +127,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
     multi_agent_load_requested = pyqtSignal(str, int)  # env_id, seed
     multi_agent_start_requested = pyqtSignal(str, str, int)  # env_id, human_agent, seed
     multi_agent_reset_requested = pyqtSignal(int)  # seed
+    policy_evaluate_requested = pyqtSignal(dict)  # Full evaluation config with policies
     # Advanced Mode signals - emitted from the Advanced Config tab
     advanced_launch_requested = pyqtSignal(object)  # LaunchConfig
     advanced_env_load_requested = pyqtSignal(str, int)  # env_id, seed
@@ -702,6 +703,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._multi_agent_tab.load_environment_requested.connect(self._on_multi_agent_load_requested)
         self._multi_agent_tab.start_game_requested.connect(self.multi_agent_start_requested)
         self._multi_agent_tab.reset_game_requested.connect(self.multi_agent_reset_requested)
+        self._multi_agent_tab.policy_evaluate_requested.connect(self._on_policy_evaluate_requested)
 
         # MuJoCo MPC Tab - launcher for MPC visualization in Render View
         self._mujoco_mpc_tab = MuJoCoMPCTab(self)
@@ -1612,6 +1614,30 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._current_worker_id = worker_id
         self.worker_changed.emit(worker_id)
         self.trained_agent_requested.emit(worker_id)
+
+    def _on_policy_evaluate_requested(self, config: dict) -> None:
+        """Handle policy evaluation request from PolicyAssignmentPanel.
+
+        This is triggered when user clicks 'Evaluate Policies' in the
+        Cooperation/Competition tab after assigning policies to agents.
+
+        Args:
+            config: Evaluation configuration containing:
+                - mode: "evaluate"
+                - agent_policies: {agent_id: checkpoint_path}
+                - policy_types: {agent_id: "ray" | "cleanrl" | "random"}
+                - agents: list of agent IDs
+                - env_id: environment ID
+                - env_family: environment family
+                - worker_id: worker ID
+        """
+        import logging
+        _logger = logging.getLogger(__name__)
+
+        _logger.info("Policy evaluation requested: %s", config)
+
+        # Forward to main window via signal
+        self.policy_evaluate_requested.emit(config)
 
     def _on_multi_agent_load_requested(self, env_id: str, seed: int) -> None:
         """Handle environment load request from Multi-Agent tab (Human vs Agent mode)."""

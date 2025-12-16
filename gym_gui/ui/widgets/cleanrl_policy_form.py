@@ -27,7 +27,7 @@ from gym_gui.ui.widgets.cleanrl_train_form import (
 )
 from gym_gui.ui.widgets.cleanrl_train_form import _generate_run_id as generate_run_id
 from gym_gui.ui.widgets.cleanrl_train_form import _format_cleanrl_family_label as format_family_label
-from gym_gui.workers.cleanrl_policy_metadata import (
+from gym_gui.policy_discovery.cleanrl_policy_metadata import (
     CleanRlCheckpoint,
     discover_policies,
     load_metadata_for_policy,

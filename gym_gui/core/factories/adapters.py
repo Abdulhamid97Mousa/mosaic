@@ -40,6 +40,28 @@ try:  # Optional dependency - PettingZoo Classic
     )
 except Exception:  # pragma: no cover - pettingzoo optional
     PETTINGZOO_CLASSIC_ADAPTERS = {}
+
+try:  # Optional dependency - MiniHack (sandbox RL on NLE)
+    from gym_gui.core.adapters.minihack import (  # pragma: no cover - optional
+        MINIHACK_ADAPTERS,
+        MiniHackAdapter,
+        MiniHackConfig,
+    )
+except Exception:  # pragma: no cover - minihack optional
+    MINIHACK_ADAPTERS = {}
+    MiniHackAdapter = None  # type: ignore
+    MiniHackConfig = None  # type: ignore
+
+try:  # Optional dependency - NetHack (full game via NLE)
+    from gym_gui.core.adapters.nethack import (  # pragma: no cover - optional
+        NETHACK_ADAPTERS,
+        NetHackAdapter,
+        NetHackConfig,
+    )
+except Exception:  # pragma: no cover - nethack optional
+    NETHACK_ADAPTERS = {}
+    NetHackAdapter = None  # type: ignore
+    NetHackConfig = None  # type: ignore
 from gym_gui.core.enums import GameId
 
 AdapterT = TypeVar("AdapterT", bound=EnvironmentAdapter)
@@ -64,6 +86,8 @@ def _registry() -> Mapping[GameId, type[EnvironmentAdapter]]:
         **ALE_ADAPTERS,
         **VIZDOOM_ADAPTERS,
         **PETTINGZOO_CLASSIC_ADAPTERS,
+        **MINIHACK_ADAPTERS,
+        **NETHACK_ADAPTERS,
     }
 
 
@@ -97,13 +121,15 @@ def create_adapter(
         | MiniGridConfig
         | ALEConfig
         | ViZDoomConfig
+        | MiniHackConfig
+        | NetHackConfig
         | None
     ) = None,
 ) -> EnvironmentAdapter:
     """Instantiate the adapter bound to the optional ``context`` and ``game_config``."""
 
     adapter_cls = get_adapter_cls(game_id)
-    
+
     # Import adapter classes to check if game_config is supported
     from gym_gui.core.adapters.toy_text import (
         CliffWalkingAdapter,
@@ -137,7 +163,7 @@ def create_adapter(
         AdventureV4Adapter,
         AdventureV5Adapter,
     )
-    
+
     # Pass game config to appropriate adapter constructor
     if game_config is not None:
         if adapter_cls is FrozenLakeAdapter and isinstance(game_config, FrozenLakeConfig):
@@ -166,11 +192,25 @@ def create_adapter(
             and isinstance(game_config, ViZDoomConfig)
         ):
             adapter = adapter_cls(context, config=game_config)
+        elif (
+            MiniHackAdapter is not None
+            and issubclass(adapter_cls, MiniHackAdapter)
+            and MiniHackConfig is not None
+            and isinstance(game_config, MiniHackConfig)
+        ):
+            adapter = adapter_cls(context, config=game_config)
+        elif (
+            NetHackAdapter is not None
+            and issubclass(adapter_cls, NetHackAdapter)
+            and NetHackConfig is not None
+            and isinstance(game_config, NetHackConfig)
+        ):
+            adapter = adapter_cls(context, config=game_config)
         else:
             adapter = adapter_cls(context)
     else:
         adapter = adapter_cls(context)
-    
+
     if context is not None:
         adapter.ensure_control_mode(context.control_mode)
     return adapter

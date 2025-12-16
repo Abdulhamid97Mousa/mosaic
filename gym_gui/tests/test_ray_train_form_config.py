@@ -25,7 +25,7 @@ class TestRayTrainFormConfigStructure:
             "arguments": ["-m", "ray_worker.cli"],  # No 'train' subcommand!
             "environment": {
                 "RAY_FASTLANE_ENABLED": "1",
-                "RAY_FASTLANE_RUN_ID": "ray-multiwalker-v9-20251213-222144",
+                # RAY_FASTLANE_RUN_ID is NOT set by form - dispatcher sets it with ULID
                 "RAY_FASTLANE_ENV_NAME": "multiwalker_v9",
                 "RAY_FASTLANE_THROTTLE_MS": "33",
                 "GYM_GUI_FASTLANE_ONLY": "1",
@@ -57,7 +57,7 @@ class TestRayTrainFormConfigStructure:
                     "use_grpc": True,
                     "grpc_target": "127.0.0.1:50055",
                     "config": {
-                        "run_id": "01KCC1DJ2BJM9PWZ727ACYZMJX",
+                        # run_id is NOT set by form - dispatcher sets it with ULID
                         "environment": {
                             "family": "sisl",
                             "env_id": "multiwalker_v9",
@@ -141,10 +141,11 @@ class TestRayTrainFormConfigStructure:
         env_id = sample_config["metadata"]["ui"]["env_id"]
         assert env_id == "multiwalker_v9"
 
-    def test_run_id_in_worker_config(self, sample_config):
-        """run_id should be in metadata.worker.config."""
-        run_id = sample_config["metadata"]["worker"]["config"]["run_id"]
-        assert run_id  # Non-empty
+    def test_no_run_id_in_worker_config(self, sample_config):
+        """Worker config should NOT have run_id - dispatcher sets it with ULID."""
+        worker_config = sample_config["metadata"]["worker"]["config"]
+        # run_id is NOT set by form - dispatcher adds it later
+        assert "run_id" not in worker_config
 
     def test_fastlane_mode_is_composite(self, sample_config):
         """FastLane mode should be 'composite' for multi-agent."""
@@ -152,10 +153,11 @@ class TestRayTrainFormConfigStructure:
         assert mode == "composite"
 
     def test_fastlane_environment_variables(self, sample_config):
-        """FastLane env vars should be set."""
+        """FastLane env vars should be set (except RUN_ID which dispatcher adds)."""
         env = sample_config["environment"]
         assert env["RAY_FASTLANE_ENABLED"] == "1"
-        assert "RAY_FASTLANE_RUN_ID" in env
+        # RAY_FASTLANE_RUN_ID is NOT in form config - dispatcher adds it with ULID
+        assert "RAY_FASTLANE_RUN_ID" not in env
         assert "RAY_FASTLANE_ENV_NAME" in env
         assert "RAY_FASTLANE_THROTTLE_MS" in env
 

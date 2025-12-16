@@ -32,6 +32,14 @@ def log_constant(
         Exception info to attach for stack traces.
     """
 
+    # Reserved LogRecord attributes that cannot be overwritten via extra
+    _RESERVED_LOG_KEYS = {
+        "name", "msg", "args", "created", "filename", "funcName", "levelname",
+        "levelno", "lineno", "module", "msecs", "pathname", "process",
+        "processName", "relativeCreated", "stack_info", "exc_info", "exc_text",
+        "thread", "threadName", "taskName", "message", "asctime",
+    }
+
     payload: dict[str, Any] = {
         "log_code": constant.code,
         "component": constant.component,
@@ -39,7 +47,9 @@ def log_constant(
         "tags": ",".join(constant.tags),
     }
     if extra:
-        payload.update(extra)
+        # Filter out reserved keys to avoid LogRecord conflicts
+        safe_extra = {k: v for k, v in extra.items() if k not in _RESERVED_LOG_KEYS}
+        payload.update(safe_extra)
 
     text = constant.message if message is None else f"{constant.message} | {message}"
     level = getattr(logging, constant.level) if isinstance(constant.level, str) else constant.level

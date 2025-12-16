@@ -41,10 +41,26 @@ class WorkerDefinition:
 def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
     """Return the catalog of worker integrations recognised by the UI.
 
-    Note: SPADE-BDI and CleanRL workers have been removed from Multi-Agent Mode.
-    Only Ray RLlib and PettingZoo workers are available for multi-agent training.
+    Workers available:
+    - CleanRL: Single-agent RL with clean implementations (PPO, DQN, SAC, TD3, etc.)
+    - Ray RLlib: Multi-agent distributed RL with various paradigms
+    - PettingZoo: Multi-agent environments with AEC and Parallel APIs
     """
     return (
+        WorkerDefinition(
+            worker_id="cleanrl_worker",
+            display_name="CleanRL Worker",
+            description=(
+                "Single-agent reinforcement learning using CleanRL implementations. "
+                "Clean, single-file implementations of popular algorithms: PPO, DQN, SAC, TD3, DDPG. "
+                "Works with Gymnasium environments (Classic Control, Box2D, MuJoCo, Atari). "
+                "FastLane integration for live training visualization."
+            ),
+            supports_training=True,
+            supports_policy_load=True,
+            requires_live_telemetry=True,
+            provides_fast_analytics=True,
+        ),
         WorkerDefinition(
             worker_id="ray_worker",
             display_name="Ray RLlib Worker",

@@ -79,8 +79,8 @@ def _create_wrapper(original_fn: Callable, module_name: str) -> Callable:
     # Preserve function metadata
     wrapped_env_fn.__name__ = original_fn.__name__
     wrapped_env_fn.__doc__ = original_fn.__doc__
-    wrapped_env_fn._mosaic_wrapped = True
-    wrapped_env_fn._mosaic_original = original_fn
+    setattr(wrapped_env_fn, '_mosaic_wrapped', True)
+    setattr(wrapped_env_fn, '_mosaic_original', original_fn)
 
     return wrapped_env_fn
 

@@ -23,7 +23,7 @@ from gym_gui.logging_config.log_constants import (
 )
 from gym_gui.telemetry.semconv import VideoModes, VIDEO_MODE_DESCRIPTORS
 from gym_gui.ui.widgets.cleanrl_train_form import _generate_run_id as generate_run_id
-from gym_gui.workers.cleanrl_policy_metadata import (
+from gym_gui.policy_discovery.cleanrl_policy_metadata import (
     CleanRlCheckpoint,
     discover_policies,
     load_metadata_for_policy,
