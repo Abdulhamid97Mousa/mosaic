@@ -187,6 +187,9 @@ class MJPCLauncher:
             cmd = [str(self.mjpc_binary_path)]
             if task_id:
                 cmd.extend(["--task", task_id])
+            else:
+                # Default to Cartpole as Quadruped Flat (default) is unstable on some systems
+                cmd.extend(["--task", "Cartpole"])
 
             # Set environment for proper rendering
             env = os.environ.copy()

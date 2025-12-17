@@ -135,7 +135,7 @@ def get_godot_launcher() -> Any:
         return _godot_launcher()
 
     try:
-        from godot_worker import get_launcher
+        from godot_worker import get_launcher  # type: ignore[import-not-found]
         _godot_launcher = get_launcher
         _godot_launcher_loaded = True
         return _godot_launcher()
@@ -157,7 +157,7 @@ def is_godot_available() -> bool:
         return _godot_launcher is not None
 
     try:
-        from godot_worker import get_launcher
+        from godot_worker import get_launcher  # type: ignore[import-not-found]
         _godot_launcher = get_launcher
         _godot_launcher_loaded = True
         return True
@@ -293,7 +293,7 @@ def is_cleanrl_available() -> bool:
         return _cleanrl_available
 
     try:
-        import cleanrl_worker  # noqa: F401
+        import cleanrl_worker  # type: ignore[import-not-found]  # noqa: F401
         _cleanrl_available = True
         return True
     except ImportError:

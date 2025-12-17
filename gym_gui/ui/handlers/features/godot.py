@@ -10,6 +10,13 @@ from typing import TYPE_CHECKING, Any, Dict
 
 from qtpy import QtCore, QtWidgets
 
+from gym_gui.logging_config.log_constants import (
+    GODOT_BINARY_NOT_FOUND_MSG,
+    GODOT_BINARY_NOT_FOUND_TITLE,
+    GODOT_NOT_INSTALLED_MSG,
+    GODOT_NOT_INSTALLED_TITLE,
+)
+
 if TYPE_CHECKING:
     from qtpy.QtWidgets import QStatusBar
     from gym_gui.ui.widgets.control_panel import ControlPanelWidget
@@ -53,19 +60,22 @@ class GodotHandler:
         Args:
             display_mode: Either "external" (separate window) or "embedded" (in Render View)
         """
+        # Check if Godot launcher is available
+        if self._godot_launcher is None:
+            QtWidgets.QMessageBox.warning(
+                None,
+                GODOT_NOT_INSTALLED_TITLE,
+                GODOT_NOT_INSTALLED_MSG,
+            )
+            return
+
         # Check if Godot is available
         if not self._godot_launcher.is_available():
             status = self._godot_launcher.get_status()
             QtWidgets.QMessageBox.warning(
                 None,
-                "Godot Not Available",
-                "Godot binary not found.\n\n"
-                "Please ensure the Godot binary is installed at:\n"
-                f"  {status['godot_binary']}\n\n"
-                "You can copy the Godot binary from:\n"
-                "  Vesna_RL/Godot_v4.5.1-stable_linux.x86_64\n"
-                "to:\n"
-                "  3rd_party/godot_worker/bin/godot",
+                GODOT_BINARY_NOT_FOUND_TITLE,
+                GODOT_BINARY_NOT_FOUND_MSG.format(godot_binary=status["godot_binary"]),
             )
             return
 

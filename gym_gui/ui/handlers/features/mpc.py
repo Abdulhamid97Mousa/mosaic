@@ -10,6 +10,13 @@ from typing import TYPE_CHECKING, Any, Dict
 
 from qtpy import QtCore, QtWidgets
 
+from gym_gui.logging_config.log_constants import (
+    MJPC_NOT_BUILT_MSG,
+    MJPC_NOT_BUILT_TITLE,
+    MJPC_NOT_INSTALLED_MSG,
+    MJPC_NOT_INSTALLED_TITLE,
+)
+
 if TYPE_CHECKING:
     from qtpy.QtWidgets import QStatusBar
     from gym_gui.ui.widgets.control_panel import ControlPanelWidget
@@ -53,19 +60,25 @@ class MPCHandler:
         Args:
             display_mode: Either "external" (separate window) or "embedded" (in Render View)
         """
+        # Check if MJPC launcher is available
+        if self._mjpc_launcher is None:
+            QtWidgets.QMessageBox.warning(
+                None,
+                MJPC_NOT_INSTALLED_TITLE,
+                MJPC_NOT_INSTALLED_MSG,
+            )
+            return
+
         # Check if MJPC is built
         if not self._mjpc_launcher.is_built():
             build_status = self._mjpc_launcher.get_build_status()
             QtWidgets.QMessageBox.warning(
                 None,
-                "MJPC Not Built",
-                "MuJoCo MPC needs to be built first.\n\n"
-                "Run the following commands:\n\n"
-                "  cd 3rd_party/mujoco_mpc_worker/mujoco_mpc/build\n"
-                "  cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja\n"
-                "  ninja -j$(nproc)\n\n"
-                f"Source dir: {build_status['source_dir']}\n"
-                f"Source exists: {build_status['source_exists']}",
+                MJPC_NOT_BUILT_TITLE,
+                MJPC_NOT_BUILT_MSG.format(
+                    source_dir=build_status["source_dir"],
+                    source_exists=build_status["source_exists"],
+                ),
             )
             return
 
