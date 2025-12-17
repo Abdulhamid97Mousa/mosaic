@@ -107,7 +107,7 @@ FROZEN_V2_HTML = (
 
 
 CLIFF_HTML = (
-    "<h3>CliffWalking-v1</h3>"
+    "<h3>CliffWalking-v0</h3>"
     "<p>Navigate from start to goal along a cliff; stepping off the cliff is heavily penalized.</p>"
     "<h4>Starting state</h4>"
     "<p>Player starts in state 36 (row 3, column 0) by default.</p>"

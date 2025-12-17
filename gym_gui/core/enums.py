@@ -28,9 +28,10 @@ class EnvironmentFamily(StrEnum):
     VIZDOOM = "vizdoom"
     MINIHACK = "minihack"  # MiniHack sandbox environments (built on NLE)
     NETHACK = "nethack"  # Full NetHack game (via NLE)
+    CRAFTER = "crafter"  # Crafter open world survival benchmark
     PETTINGZOO = "pettingzoo"
     PETTINGZOO_CLASSIC = "pettingzoo_classic"  # PettingZoo Classic: turn-based games (Chess, Go, Connect Four, etc.)
-    OTHER = "other"
+    OTHER = "other"  # Fallback for unknown environments (not displayed in UI)
 
 
 class GameId(StrEnum):
@@ -38,7 +39,7 @@ class GameId(StrEnum):
 
     FROZEN_LAKE = "FrozenLake-v1"
     FROZEN_LAKE_V2 = "FrozenLake-v2"
-    CLIFF_WALKING = "CliffWalking-v1"
+    CLIFF_WALKING = "CliffWalking-v0"  # Gymnasium 1.0.0 only has v0
     TAXI = "Taxi-v3"
     BLACKJACK = "Blackjack-v1"
     LUNAR_LANDER = "LunarLander-v3"
@@ -55,8 +56,6 @@ class GameId(StrEnum):
     ALE_AIR_RAID_V5 = "ALE/AirRaid-v5"
     ASSAULT_V4 = "Assault-v4"
     ALE_ASSAULT_V5 = "ALE/Assault-v5"
-    PROCGEN_COINRUN = "procgen:procgen-coinrun-v0"
-    PROCGEN_MAZE = "procgen:procgen-maze-v0"
     ANT = "Ant-v5"
     HALF_CHEETAH = "HalfCheetah-v5"
     HOPPER = "Hopper-v5"
@@ -164,6 +163,12 @@ class GameId(StrEnum):
     NETHACK_EAT = "NetHackEat-v0"
     NETHACK_SCOUT = "NetHackScout-v0"
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # Crafter (Open World Survival Benchmark)
+    # ─────────────────────────────────────────────────────────────────────────
+    CRAFTER_REWARD = "CrafterReward-v1"
+    CRAFTER_NO_REWARD = "CrafterNoReward-v1"
+
 
 def get_game_display_name(game_id: GameId) -> str:
     """Get the display name for a GameId with family prefix.
@@ -189,6 +194,9 @@ def get_game_display_name(game_id: GameId) -> str:
         return value
     # NetHack environments already include descriptive prefix
     if value.startswith("NetHack"):
+        return value
+    # Crafter environments
+    if value.startswith("Crafter"):
         return value
     # PettingZoo board games
     if game_id == GameId.CHESS:
@@ -224,11 +232,6 @@ def get_game_display_name(game_id: GameId) -> str:
     ):
         # Legacy non-namespaced Atari environments
         return f"Atari-{value}"
-    elif game_id in (
-        GameId.PROCGEN_COINRUN,
-        GameId.PROCGEN_MAZE,
-    ):
-        return f"Procgen-{value}"
     elif game_id in (
         GameId.ANT,
         GameId.HALF_CHEETAH,
@@ -356,8 +359,6 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.ALE_AIR_RAID_V5: EnvironmentFamily.ALE,
     GameId.ASSAULT_V4: EnvironmentFamily.ALE,
     GameId.ALE_ASSAULT_V5: EnvironmentFamily.ALE,
-    GameId.PROCGEN_COINRUN: EnvironmentFamily.OTHER,
-    GameId.PROCGEN_MAZE: EnvironmentFamily.OTHER,
     GameId.ANT: EnvironmentFamily.MUJOCO,
     GameId.HALF_CHEETAH: EnvironmentFamily.MUJOCO,
     GameId.HOPPER: EnvironmentFamily.MUJOCO,
@@ -442,6 +443,9 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.NETHACK_GOLD: EnvironmentFamily.NETHACK,
     GameId.NETHACK_EAT: EnvironmentFamily.NETHACK,
     GameId.NETHACK_SCOUT: EnvironmentFamily.NETHACK,
+    # Crafter environments
+    GameId.CRAFTER_REWARD: EnvironmentFamily.CRAFTER,
+    GameId.CRAFTER_NO_REWARD: EnvironmentFamily.CRAFTER,
 }
 
 
@@ -465,8 +469,6 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.ALE_AIR_RAID_V5: RenderMode.RGB_ARRAY,
     GameId.ASSAULT_V4: RenderMode.RGB_ARRAY,
     GameId.ALE_ASSAULT_V5: RenderMode.RGB_ARRAY,
-    GameId.PROCGEN_COINRUN: RenderMode.RGB_ARRAY,
-    GameId.PROCGEN_MAZE: RenderMode.RGB_ARRAY,
     GameId.ANT: RenderMode.RGB_ARRAY,
     GameId.HALF_CHEETAH: RenderMode.RGB_ARRAY,
     GameId.HOPPER: RenderMode.RGB_ARRAY,
@@ -552,6 +554,9 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.NETHACK_GOLD: RenderMode.RGB_ARRAY,
     GameId.NETHACK_EAT: RenderMode.RGB_ARRAY,
     GameId.NETHACK_SCOUT: RenderMode.RGB_ARRAY,
+    # Crafter - RGB observation (64x64x3)
+    GameId.CRAFTER_REWARD: RenderMode.RGB_ARRAY,
+    GameId.CRAFTER_NO_REWARD: RenderMode.RGB_ARRAY,
 }
 
 
@@ -658,8 +663,6 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
         ControlMode.HYBRID_TURN_BASED,
         ControlMode.HYBRID_HUMAN_AGENT,
     ),
-    GameId.PROCGEN_COINRUN: (ControlMode.AGENT_ONLY,),
-    GameId.PROCGEN_MAZE: (ControlMode.AGENT_ONLY,),
     GameId.ANT: (ControlMode.AGENT_ONLY,),
     GameId.HALF_CHEETAH: (ControlMode.AGENT_ONLY,),
     GameId.HOPPER: (ControlMode.AGENT_ONLY,),
@@ -1100,6 +1103,17 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
         ControlMode.AGENT_ONLY,
         ControlMode.HYBRID_TURN_BASED,
     ),
+    # Crafter - turn-based open world survival (supports Human Control)
+    GameId.CRAFTER_REWARD: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
+    GameId.CRAFTER_NO_REWARD: (
+        ControlMode.HUMAN_ONLY,
+        ControlMode.AGENT_ONLY,
+        ControlMode.HYBRID_TURN_BASED,
+    ),
 }
 
 
@@ -1120,9 +1134,10 @@ DEFAULT_PARADIGM_BY_FAMILY: dict[EnvironmentFamily, SteppingParadigm] = {
     EnvironmentFamily.VIZDOOM: SteppingParadigm.SINGLE_AGENT,
     EnvironmentFamily.MINIHACK: SteppingParadigm.SINGLE_AGENT,  # Turn-based roguelike
     EnvironmentFamily.NETHACK: SteppingParadigm.SINGLE_AGENT,  # Turn-based roguelike
+    EnvironmentFamily.CRAFTER: SteppingParadigm.SINGLE_AGENT,  # Turn-based survival game
     EnvironmentFamily.PETTINGZOO: SteppingParadigm.SEQUENTIAL,  # AEC by default
     EnvironmentFamily.PETTINGZOO_CLASSIC: SteppingParadigm.SEQUENTIAL,  # Chess, Go, etc.
-    EnvironmentFamily.OTHER: SteppingParadigm.SINGLE_AGENT,
+    EnvironmentFamily.OTHER: SteppingParadigm.SINGLE_AGENT,  # Fallback
 }
 
 

@@ -522,6 +522,55 @@ LOG_ADAPTER_ALE_METADATA_PROBE_FAILED = _constant(
 
 
 # ---------------------------------------------------------------------------
+# Crafter adapter specific constants (LOG530–LOG534)
+# ---------------------------------------------------------------------------
+LOG_ENV_CRAFTER_BOOT = _constant(
+    "LOG530",
+    "INFO",
+    "Crafter adapter bootstrapped",
+    component="Adapter",
+    subcomponent="Crafter",
+    tags=_tags("crafter", "environment", "boot"),
+)
+
+LOG_ENV_CRAFTER_STEP = _constant(
+    "LOG531",
+    "DEBUG",
+    "Crafter step checkpoint",
+    component="Adapter",
+    subcomponent="Crafter",
+    tags=_tags("crafter", "step"),
+)
+
+LOG_ENV_CRAFTER_ERROR = _constant(
+    "LOG532",
+    "ERROR",
+    "Crafter adapter failure",
+    component="Adapter",
+    subcomponent="Crafter",
+    tags=_tags("crafter", "error"),
+)
+
+LOG_ENV_CRAFTER_RENDER_WARNING = _constant(
+    "LOG533",
+    "WARNING",
+    "Crafter render payload unavailable",
+    component="Adapter",
+    subcomponent="Crafter",
+    tags=_tags("crafter", "render", "warning"),
+)
+
+LOG_ENV_CRAFTER_ACHIEVEMENT = _constant(
+    "LOG534",
+    "INFO",
+    "Crafter achievement unlocked",
+    component="Adapter",
+    subcomponent="Crafter",
+    tags=_tags("crafter", "achievement", "milestone"),
+)
+
+
+# ---------------------------------------------------------------------------
 # Service and telemetry constants (LOG601–LOG650)
 # ---------------------------------------------------------------------------
 LOG_SERVICE_TELEMETRY_STEP_REJECTED = _constant(
@@ -2259,6 +2308,100 @@ LOG_RAY_EVAL_TAB_CREATED = _constant(
 )
 
 
+# ---------------------------------------------------------------------------
+# XuanCe Worker constants (LOG990–LOG999)
+# ---------------------------------------------------------------------------
+LOG_XUANCE_WORKER_RUNTIME_STARTED = _constant(
+    "LOG990",
+    "INFO",
+    "XuanCe worker runtime started",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "runtime", "lifecycle"),
+)
+
+LOG_XUANCE_WORKER_RUNTIME_STOPPED = _constant(
+    "LOG991",
+    "INFO",
+    "XuanCe worker runtime stopped",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "runtime", "lifecycle"),
+)
+
+LOG_XUANCE_WORKER_RUNTIME_ERROR = _constant(
+    "LOG992",
+    "ERROR",
+    "XuanCe worker runtime error",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "runtime", "error"),
+)
+
+LOG_XUANCE_WORKER_TRAINING_STARTED = _constant(
+    "LOG993",
+    "INFO",
+    "XuanCe training started",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "training", "start"),
+)
+
+LOG_XUANCE_WORKER_TRAINING_COMPLETED = _constant(
+    "LOG994",
+    "INFO",
+    "XuanCe training completed",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "training", "complete"),
+)
+
+LOG_XUANCE_WORKER_CHECKPOINT_SAVED = _constant(
+    "LOG995",
+    "INFO",
+    "XuanCe checkpoint saved",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "checkpoint", "save"),
+)
+
+LOG_XUANCE_WORKER_RUNNER_CREATED = _constant(
+    "LOG996",
+    "INFO",
+    "XuanCe runner created",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "runner", "created"),
+)
+
+LOG_XUANCE_WORKER_CONFIG_LOADED = _constant(
+    "LOG997",
+    "INFO",
+    "XuanCe configuration loaded",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "config", "loaded"),
+)
+
+LOG_XUANCE_WORKER_BENCHMARK_STARTED = _constant(
+    "LOG998",
+    "INFO",
+    "XuanCe benchmark mode started",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "benchmark", "start"),
+)
+
+LOG_XUANCE_WORKER_DEBUG = _constant(
+    "LOG999",
+    "DEBUG",
+    "XuanCe worker debug event",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "debug"),
+)
+
+
 # =========================================================================
 # Helper Functions for Runtime Discovery & Validation
 # =========================================================================
@@ -2405,6 +2548,11 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_ENV_MINIGRID_RENDER_WARNING,
     LOG_ADAPTER_ALE_NAMESPACE_IMPORT_FAILED,
     LOG_ADAPTER_ALE_METADATA_PROBE_FAILED,
+    LOG_ENV_CRAFTER_BOOT,
+    LOG_ENV_CRAFTER_STEP,
+    LOG_ENV_CRAFTER_ERROR,
+    LOG_ENV_CRAFTER_RENDER_WARNING,
+    LOG_ENV_CRAFTER_ACHIEVEMENT,
     LOG_SERVICE_TELEMETRY_STEP_REJECTED,
     LOG_SERVICE_TELEMETRY_ASYNC_ERROR,
     LOG_SERVICE_DB_SINK_INITIALIZED,
@@ -2588,6 +2736,17 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_RAY_EVAL_FASTLANE_CONNECTED,
     LOG_RAY_EVAL_POLICY_LOADED,
     LOG_RAY_EVAL_TAB_CREATED,
+    # XuanCe Worker
+    LOG_XUANCE_WORKER_RUNTIME_STARTED,
+    LOG_XUANCE_WORKER_RUNTIME_STOPPED,
+    LOG_XUANCE_WORKER_RUNTIME_ERROR,
+    LOG_XUANCE_WORKER_TRAINING_STARTED,
+    LOG_XUANCE_WORKER_TRAINING_COMPLETED,
+    LOG_XUANCE_WORKER_CHECKPOINT_SAVED,
+    LOG_XUANCE_WORKER_RUNNER_CREATED,
+    LOG_XUANCE_WORKER_CONFIG_LOADED,
+    LOG_XUANCE_WORKER_BENCHMARK_STARTED,
+    LOG_XUANCE_WORKER_DEBUG,
 )
 
 
@@ -2647,6 +2806,11 @@ __all__ = (
     "LOG_ENV_MINIGRID_RENDER_WARNING",
     "LOG_ADAPTER_ALE_NAMESPACE_IMPORT_FAILED",
     "LOG_ADAPTER_ALE_METADATA_PROBE_FAILED",
+    "LOG_ENV_CRAFTER_BOOT",
+    "LOG_ENV_CRAFTER_STEP",
+    "LOG_ENV_CRAFTER_ERROR",
+    "LOG_ENV_CRAFTER_RENDER_WARNING",
+    "LOG_ENV_CRAFTER_ACHIEVEMENT",
     "LOG_SERVICE_TELEMETRY_STEP_REJECTED",
     "LOG_SERVICE_TELEMETRY_ASYNC_ERROR",
     "LOG_SERVICE_DB_SINK_INITIALIZED",
@@ -2832,6 +2996,17 @@ __all__ = (
     "LOG_RAY_EVAL_FASTLANE_CONNECTED",
     "LOG_RAY_EVAL_POLICY_LOADED",
     "LOG_RAY_EVAL_TAB_CREATED",
+    # XuanCe Worker
+    "LOG_XUANCE_WORKER_RUNTIME_STARTED",
+    "LOG_XUANCE_WORKER_RUNTIME_STOPPED",
+    "LOG_XUANCE_WORKER_RUNTIME_ERROR",
+    "LOG_XUANCE_WORKER_TRAINING_STARTED",
+    "LOG_XUANCE_WORKER_TRAINING_COMPLETED",
+    "LOG_XUANCE_WORKER_CHECKPOINT_SAVED",
+    "LOG_XUANCE_WORKER_RUNNER_CREATED",
+    "LOG_XUANCE_WORKER_CONFIG_LOADED",
+    "LOG_XUANCE_WORKER_BENCHMARK_STARTED",
+    "LOG_XUANCE_WORKER_DEBUG",
     # Worker Availability Messages
     "GODOT_NOT_INSTALLED_TITLE",
     "GODOT_NOT_INSTALLED_MSG",

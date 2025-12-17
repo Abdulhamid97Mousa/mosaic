@@ -5,7 +5,6 @@ from .actor import (
 	ActorService,
 	EpisodeSummary,
 	HumanKeyboardActor,
-	LLMMultiStepAgent,
 	StepSnapshot,
 )
 from .policy_mapping import AgentPolicyBinding, PolicyMappingService
@@ -19,7 +18,6 @@ __all__ = [
 	"AgentPolicyBinding",
 	"EpisodeSummary",
 	"HumanKeyboardActor",
-	"LLMMultiStepAgent",
 	"PolicyMappingService",
 	"StepSnapshot",
 	"ServiceLocator",

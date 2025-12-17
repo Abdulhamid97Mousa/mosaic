@@ -7,7 +7,7 @@ name = "mosaic-xuance-worker"
 version = "0.1.0"
 description = "XuanCe integration for MOSAIC BDI-RL framework"
 requires-python = ">=3.10"
-license = {text = "MIT"}
+license = "MIT"
 # Dependencies are managed via the main project's requirements.txt
 dependencies = []
 
@@ -19,33 +19,13 @@ dev = [
 [project.scripts]
 xuance-worker = "xuance_worker.cli:main"
 
-[tool.setuptools]
-# Expose both the original XuanCe packages AND our harness
-packages = [
-    # Original XuanCe packages (from xuance/ subdirectory)
-    "xuance",
-    "xuance.common",
-    "xuance.configs",
-    "xuance.environment",
-    "xuance.learners",
-    "xuance.policies",
-    "xuance.representations",
-    "xuance.agents",
-    "xuance.utils",
-    # Our integration harness
-    "xuance_worker",
-]
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["xuance_worker*"]
 
 [tool.setuptools.package-dir]
-# Map original XuanCe packages to xuance/ subdirectory
-"xuance" = "xuance/xuance"
-"xuance.common" = "xuance/xuance/common"
-"xuance.configs" = "xuance/xuance/configs"
-"xuance.environment" = "xuance/xuance/environment"
-"xuance.learners" = "xuance/xuance/learners"
-"xuance.policies" = "xuance/xuance/policies"
-"xuance.representations" = "xuance/xuance/representations"
-"xuance.agents" = "xuance/xuance/agents"
-"xuance.utils" = "xuance/xuance/utils"
 # Our harness is directly in xuance_worker/
 "xuance_worker" = "xuance_worker"
+
+[tool.setuptools.package-data]
+xuance_worker = ["py.typed"]

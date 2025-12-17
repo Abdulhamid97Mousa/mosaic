@@ -45,7 +45,8 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
     """Return the catalog of worker integrations recognised by the UI.
 
     Workers available:
-    - CleanRL: Single-agent RL with clean implementations (PPO, DQN, SAC, TD3, etc.)
+    - CleanRL: Single/multi-agent RL with clean implementations (PPO, DQN, SAC, TD3, etc.)
+    - XuanCe: Comprehensive RL library with 46+ algorithms for single/multi-agent
     - Ray RLlib: Multi-agent distributed RL with various paradigms
     - PettingZoo: Multi-agent environments with AEC and Parallel APIs
     """
@@ -54,16 +55,31 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
             worker_id="cleanrl_worker",
             display_name="CleanRL Worker",
             description=(
-                "Single-agent reinforcement learning using CleanRL implementations. "
+                "Reinforcement learning using CleanRL implementations. "
                 "Clean, single-file implementations of popular algorithms: PPO, DQN, SAC, TD3, DDPG. "
-                "Works with Gymnasium environments (Classic Control, Box2D, MuJoCo, Atari). "
+                "Supports single-agent Gymnasium environments and multi-agent PettingZoo (MA-Atari). "
                 "FastLane integration for live training visualization."
             ),
             supports_training=True,
             supports_policy_load=True,
             requires_live_telemetry=True,
             provides_fast_analytics=True,
-            supports_multi_agent=False,
+            supports_multi_agent=True,
+        ),
+        WorkerDefinition(
+            worker_id="xuance_worker",
+            display_name="XuanCe Worker",
+            description=(
+                "Comprehensive RL library with 46+ algorithms. "
+                "Single-agent: DQN, PPO, SAC, TD3, DreamerV3. Multi-agent: MAPPO, QMIX, MADDPG, VDN, COMA. "
+                "Works with Gymnasium, PettingZoo, SMAC, and Google Football environments. "
+                "PyTorch backend with TensorBoard/WandB logging."
+            ),
+            supports_training=True,
+            supports_policy_load=False,  # Phase 1: CLI only
+            requires_live_telemetry=False,  # Phase 1: No FastLane yet
+            provides_fast_analytics=False,
+            supports_multi_agent=True,
         ),
         WorkerDefinition(
             worker_id="ray_worker",

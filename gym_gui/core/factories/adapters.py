@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-from gym_gui.cache.memory import memoize
-from typing import Iterable, Mapping, TypeVar
+from typing import TYPE_CHECKING, Any, Iterable, Mapping, TypeVar
 
 from gym_gui.cache.memory import memoize
 from gym_gui.config.game_configs import (
@@ -23,6 +22,12 @@ from gym_gui.core.adapters.box2d import BOX2D_ADAPTERS
 from gym_gui.core.adapters.minigrid import MINIGRID_ADAPTERS
 from gym_gui.core.adapters.ale import ALE_ADAPTERS, ALEAdapter
 
+if TYPE_CHECKING:
+    from gym_gui.core.adapters.vizdoom import ViZDoomConfig as _ViZDoomConfigType
+    from gym_gui.core.adapters.minihack import MiniHackConfig as _MiniHackConfigType
+    from gym_gui.core.adapters.nethack import NetHackConfig as _NetHackConfigType
+    from gym_gui.config.game_configs import CrafterConfig as _CrafterConfigType
+
 try:  # Optional dependency
     from gym_gui.core.adapters.vizdoom import (  # pragma: no cover - optional
         VIZDOOM_ADAPTERS,
@@ -30,16 +35,16 @@ try:  # Optional dependency
         ViZDoomConfig,
     )
 except Exception:  # pragma: no cover - vizdoom optional
-    VIZDOOM_ADAPTERS = {}
-    ViZDoomAdapter = None  # type: ignore
-    ViZDoomConfig = None  # type: ignore
+    VIZDOOM_ADAPTERS: dict[Any, Any] = {}
+    ViZDoomAdapter = None  # type: ignore[misc, assignment]
+    ViZDoomConfig = None  # type: ignore[misc, assignment]
 
 try:  # Optional dependency - PettingZoo Classic
     from gym_gui.core.adapters.pettingzoo_classic import (
         PETTINGZOO_CLASSIC_ADAPTERS,
     )
 except Exception:  # pragma: no cover - pettingzoo optional
-    PETTINGZOO_CLASSIC_ADAPTERS = {}
+    PETTINGZOO_CLASSIC_ADAPTERS: dict[Any, Any] = {}
 
 try:  # Optional dependency - MiniHack (sandbox RL on NLE)
     from gym_gui.core.adapters.minihack import (  # pragma: no cover - optional
@@ -48,9 +53,9 @@ try:  # Optional dependency - MiniHack (sandbox RL on NLE)
         MiniHackConfig,
     )
 except Exception:  # pragma: no cover - minihack optional
-    MINIHACK_ADAPTERS = {}
-    MiniHackAdapter = None  # type: ignore
-    MiniHackConfig = None  # type: ignore
+    MINIHACK_ADAPTERS: dict[Any, Any] = {}
+    MiniHackAdapter = None  # type: ignore[misc, assignment]
+    MiniHackConfig = None  # type: ignore[misc, assignment]
 
 try:  # Optional dependency - NetHack (full game via NLE)
     from gym_gui.core.adapters.nethack import (  # pragma: no cover - optional
@@ -59,9 +64,21 @@ try:  # Optional dependency - NetHack (full game via NLE)
         NetHackConfig,
     )
 except Exception:  # pragma: no cover - nethack optional
-    NETHACK_ADAPTERS = {}
-    NetHackAdapter = None  # type: ignore
-    NetHackConfig = None  # type: ignore
+    NETHACK_ADAPTERS: dict[Any, Any] = {}
+    NetHackAdapter = None  # type: ignore[misc, assignment]
+    NetHackConfig = None  # type: ignore[misc, assignment]
+
+try:  # Optional dependency - Crafter (open world survival benchmark)
+    from gym_gui.core.adapters.crafter import (  # pragma: no cover - optional
+        CRAFTER_ADAPTERS,
+        CrafterAdapter,
+    )
+    from gym_gui.config.game_configs import CrafterConfig
+except Exception:  # pragma: no cover - crafter optional
+    CRAFTER_ADAPTERS: dict[Any, Any] = {}
+    CrafterAdapter = None  # type: ignore[misc, assignment]
+    CrafterConfig = None  # type: ignore[misc, assignment]
+
 from gym_gui.core.enums import GameId
 
 AdapterT = TypeVar("AdapterT", bound=EnvironmentAdapter)
@@ -88,6 +105,7 @@ def _registry() -> Mapping[GameId, type[EnvironmentAdapter]]:
         **PETTINGZOO_CLASSIC_ADAPTERS,
         **MINIHACK_ADAPTERS,
         **NETHACK_ADAPTERS,
+        **CRAFTER_ADAPTERS,
     }
 
 
@@ -120,9 +138,10 @@ def create_adapter(
         | BipedalWalkerConfig
         | MiniGridConfig
         | ALEConfig
-        | ViZDoomConfig
-        | MiniHackConfig
-        | NetHackConfig
+        | "_ViZDoomConfigType"
+        | "_MiniHackConfigType"
+        | "_NetHackConfigType"
+        | "_CrafterConfigType"
         | None
     ) = None,
 ) -> EnvironmentAdapter:
@@ -189,23 +208,31 @@ def create_adapter(
         elif (
             ViZDoomAdapter is not None
             and issubclass(adapter_cls, ViZDoomAdapter)
+            and ViZDoomConfig is not None
             and isinstance(game_config, ViZDoomConfig)
         ):
-            adapter = adapter_cls(context, config=game_config)
+            adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
         elif (
             MiniHackAdapter is not None
             and issubclass(adapter_cls, MiniHackAdapter)
             and MiniHackConfig is not None
             and isinstance(game_config, MiniHackConfig)
         ):
-            adapter = adapter_cls(context, config=game_config)
+            adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
         elif (
             NetHackAdapter is not None
             and issubclass(adapter_cls, NetHackAdapter)
             and NetHackConfig is not None
             and isinstance(game_config, NetHackConfig)
         ):
-            adapter = adapter_cls(context, config=game_config)
+            adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
+        elif (
+            CrafterAdapter is not None
+            and issubclass(adapter_cls, CrafterAdapter)
+            and CrafterConfig is not None
+            and isinstance(game_config, CrafterConfig)
+        ):
+            adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
         else:
             adapter = adapter_cls(context)
     else:

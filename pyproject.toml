@@ -113,6 +113,12 @@ nethack = [
     "minihack>=0.1.5",
 ]
 
+# Crafter open-world survival benchmark (Hafner 2022, ICLR)
+# Paper: "Benchmarking the Spectrum of Agent Capabilities"
+crafter = [
+    "crafter>=1.8.0",
+]
+
 # =============================================================================
 # Workers (training backends)
 # =============================================================================
@@ -197,7 +203,7 @@ all-gymnasium = [
 
 # All environment families (single + multi-agent)
 all-envs = [
-    "mosaic[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom,nethack]",
+    "mosaic[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom,nethack,crafter]",
 ]
 
 # Full development setup

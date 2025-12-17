@@ -26,6 +26,7 @@
 #   requirements/pettingzoo.txt     - Multi-agent environments
 #   requirements/vizdoom.txt        - ViZDoom FPS environments
 #   requirements/nethack.txt        - NetHack/MiniHack roguelike environments
+#   requirements/crafter.txt        - Crafter open-world survival benchmark
 #   requirements/ray_worker.txt     - Ray/RLlib distributed training
 #   requirements/xuance_worker.txt  - XuanCe MARL algorithms
 #   requirements/jason_worker.txt   - Jason BDI agents

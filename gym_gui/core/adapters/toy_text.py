@@ -742,13 +742,12 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
         self._custom_desc = self._generate_map_descriptor()
         kwargs = {
             "is_slippery": self._game_config.is_slippery,
-            "success_rate": self._game_config.success_rate,
-            "reward_schedule": self._game_config.reward_schedule,
             "desc": self._custom_desc,
         }
-        # Use FrozenLake8x8-v1 (the 8x8 variant available in Gymnasium)
-        # This adapter is designed for larger customizable grids, hence the v2 naming in our code
-        env = gym.make("FrozenLake8x8-v1", render_mode=self._gym_render_mode, **kwargs)
+        # Note: success_rate and reward_schedule require Gymnasium >= 1.1.0
+        # Current version (1.0.0) doesn't support these parameters
+        # Use FrozenLake-v1 (base variant) instead of FrozenLake8x8-v1
+        env = gym.make("FrozenLake-v1", render_mode=self._gym_render_mode, **kwargs)
         
         # Log complete map configuration
         self.log_constant(

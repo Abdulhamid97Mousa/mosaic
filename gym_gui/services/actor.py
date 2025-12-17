@@ -310,21 +310,50 @@ class HumanKeyboardActor:
 
 
 @dataclass(slots=True)
-class LLMMultiStepAgent:
-    """Agent that leverages an LLM with tool calls for decision making."""
-
-    id: str = "llm_multi_step"
-
-    def select_action(self, step: StepSnapshot) -> Optional[int]:
-        # Placeholder: integrate with tool/snapshot pipeline.
-        return None
-
-
-@dataclass(slots=True)
 class CleanRLWorkerActor:
     """Placeholder actor representing the CleanRL worker backend (no direct actions)."""
 
     id: str = "cleanrl_worker"
+
+    def select_action(self, step: StepSnapshot) -> Optional[int]:  # pragma: no cover - managed out-of-band
+        return None
+
+    def on_step(self, step: StepSnapshot) -> None:  # pragma: no cover - managed out-of-band
+        return
+
+    def on_episode_end(self, summary: EpisodeSummary) -> None:  # pragma: no cover - managed out-of-band
+        return
+
+
+@dataclass(slots=True)
+class XuanCeWorkerActor:
+    """Placeholder actor representing the XuanCe worker backend (no direct actions).
+
+    XuanCe training is managed out-of-band by the XuanCeWorkerRuntime.
+    This actor serves as a placeholder for the Active Actor widget.
+    """
+
+    id: str = "xuance_worker"
+
+    def select_action(self, step: StepSnapshot) -> Optional[int]:  # pragma: no cover - managed out-of-band
+        return None
+
+    def on_step(self, step: StepSnapshot) -> None:  # pragma: no cover - managed out-of-band
+        return
+
+    def on_episode_end(self, summary: EpisodeSummary) -> None:  # pragma: no cover - managed out-of-band
+        return
+
+
+@dataclass(slots=True)
+class RayRLlibWorkerActor:
+    """Placeholder actor representing the Ray RLlib worker backend (no direct actions).
+
+    Ray RLlib training is managed out-of-band by the Ray distributed runtime.
+    This actor serves as a placeholder for the Active Actor widget.
+    """
+
+    id: str = "ray_worker"
 
     def select_action(self, step: StepSnapshot) -> Optional[int]:  # pragma: no cover - managed out-of-band
         return None
@@ -344,6 +373,7 @@ __all__ = [
     "StepSnapshot",
     "EpisodeSummary",
     "HumanKeyboardActor",
-    "LLMMultiStepAgent",
     "CleanRLWorkerActor",
+    "XuanCeWorkerActor",
+    "RayRLlibWorkerActor",
 ]

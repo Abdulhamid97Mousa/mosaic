@@ -62,6 +62,7 @@ class MiniHackConfig:
 
     # Rendering
     pixel_size: int = 16  # Size of each tile in pixel rendering (16x16 default)
+    render_scale: int = 3  # Scale factor for rendered image (3 = triple size)
 
     # Reward shaping (environment-specific, passed to gym.make)
     reward_lose: float = -1.0
@@ -185,6 +186,11 @@ class MiniHackAdapter(EnvironmentAdapter[dict, int]):
         else:
             # Fallback: render TTY chars as simple image
             frame = self._render_tty_fallback(obs)
+
+        # Scale up the image for better visibility in GUI
+        scale = self._config.render_scale
+        if scale > 1:
+            frame = np.repeat(np.repeat(frame, scale, axis=0), scale, axis=1)
 
         return {
             "mode": RenderMode.RGB_ARRAY.value,

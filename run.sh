@@ -44,8 +44,8 @@ mkdir -p var/logs var/trainer
 # Cleanup handler
 # ------------------------------------------------------------------------------
 cleanup() {
-    if [ "${REUSED_DAEMON:-0}" -eq 0 ] && ps -p "${DAEMON_PID:-0}" >/dev/null 2>&1; then
-        echo "Shutting down trainer daemon..."
+    if ps -p "${DAEMON_PID:-0}" >/dev/null 2>&1; then
+        echo "Shutting down trainer daemon (PID: $DAEMON_PID)..."
         kill "$DAEMON_PID" 2>/dev/null || true
         wait "$DAEMON_PID" 2>/dev/null || true
     fi
@@ -58,23 +58,28 @@ trap cleanup EXIT
 PYTHON_BIN="${PYTHON_BIN:-$(command -v python)}"
 
 # ------------------------------------------------------------------------------
-# Handle existing daemon processes
+# Kill any existing trainer daemon processes
 # ------------------------------------------------------------------------------
-STALE_PIDS="$(pgrep -f 'gym_gui.services.trainer_daemon' || true)"
-if [ -n "$STALE_PIDS" ]; then
-    for pid in $STALE_PIDS; do
-        if ps -p "$pid" -o stat= 2>/dev/null | grep -q 'Z'; then
-            echo "Cleaning up zombie daemon process (PID: $pid)..."
-            kill -9 "$pid" 2>/dev/null || true
-        elif ! timeout 1 bash -c "kill -0 $pid 2>/dev/null"; then
-            echo "Cleaning up stale daemon process (PID: $pid)..."
-            kill -9 "$pid" 2>/dev/null || true
-        else
-            echo "Trainer daemon already running (PID: $pid). Reusing."
-            DAEMON_PID=$pid
-            REUSED_DAEMON=1
-        fi
+echo "Checking for existing trainer processes..."
+EXISTING_PIDS="$(pgrep -f 'gym_gui.services.trainer_daemon' || true)"
+if [ -n "$EXISTING_PIDS" ]; then
+    echo "Killing existing trainer daemon processes..."
+    for pid in $EXISTING_PIDS; do
+        echo "  Terminating PID: $pid"
+        kill "$pid" 2>/dev/null || true
     done
+    # Give processes time to terminate gracefully
+    sleep 1
+    # Force kill any remaining
+    REMAINING_PIDS="$(pgrep -f 'gym_gui.services.trainer_daemon' || true)"
+    if [ -n "$REMAINING_PIDS" ]; then
+        echo "Force killing remaining processes..."
+        for pid in $REMAINING_PIDS; do
+            kill -9 "$pid" 2>/dev/null || true
+        done
+        sleep 0.5
+    fi
+    echo "Existing trainer processes terminated."
 fi
 
 rm -f var/trainer/trainer.pid 2>/dev/null || true
@@ -82,13 +87,10 @@ rm -f var/trainer/trainer.pid 2>/dev/null || true
 # ------------------------------------------------------------------------------
 # Start trainer daemon
 # ------------------------------------------------------------------------------
-if [ "${REUSED_DAEMON:-0}" -eq 0 ]; then
-    echo "Starting trainer daemon..."
-    QT_DEBUG_PLUGINS=0 \
-        "$PYTHON_BIN" -m gym_gui.services.trainer_daemon > var/logs/trainer_daemon.log 2>&1 &
-    DAEMON_PID=$!
-    REUSED_DAEMON=0
-fi
+echo "Starting trainer daemon..."
+QT_DEBUG_PLUGINS=0 \
+    "$PYTHON_BIN" -m gym_gui.services.trainer_daemon > var/logs/trainer_daemon.log 2>&1 &
+DAEMON_PID=$!
 
 # ------------------------------------------------------------------------------
 # Wait for daemon to be ready

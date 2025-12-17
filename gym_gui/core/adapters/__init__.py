@@ -225,6 +225,25 @@ except Exception:  # pragma: no cover - nethack optional
     NETHACK_ADAPTERS = {}
     _NETHACK_AVAILABLE = False
 
+try:  # Optional dependency - Crafter (open world survival benchmark)
+    from .crafter import (  # pragma: no cover - crafter optional
+        CrafterAdapter,
+        CrafterRewardAdapter,
+        CrafterNoRewardAdapter,
+        CRAFTER_ADAPTERS,
+        CRAFTER_ACHIEVEMENTS,
+        CRAFTER_ACTIONS,
+    )
+    _CRAFTER_AVAILABLE = True
+except Exception:  # pragma: no cover - crafter optional
+    CrafterAdapter = None  # type: ignore
+    CrafterRewardAdapter = None  # type: ignore
+    CrafterNoRewardAdapter = None  # type: ignore
+    CRAFTER_ADAPTERS = {}
+    CRAFTER_ACHIEVEMENTS = []  # type: ignore
+    CRAFTER_ACTIONS = []  # type: ignore
+    _CRAFTER_AVAILABLE = False
+
 # Standalone adapters for Human vs Agent mode (simplified state-based interfaces)
 from .chess_adapter import ChessAdapter as ChessHvAAdapter, ChessState
 from .connect_four_adapter import ConnectFourAdapter as ConnectFourHvAAdapter, ConnectFourState
@@ -370,6 +389,16 @@ if _NETHACK_AVAILABLE:
         "NetHackEatTaskAdapter",
         "NetHackScoutAdapter",
         "NETHACK_ADAPTERS",
+    ]
+
+if _CRAFTER_AVAILABLE:
+    __all__ += [
+        "CrafterAdapter",
+        "CrafterRewardAdapter",
+        "CrafterNoRewardAdapter",
+        "CRAFTER_ADAPTERS",
+        "CRAFTER_ACHIEVEMENTS",
+        "CRAFTER_ACTIONS",
     ]
 
 # Human vs Agent mode adapters (always available)

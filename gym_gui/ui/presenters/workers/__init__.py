@@ -10,6 +10,8 @@ Included presenters:
 - SpadeBdiWorkerPresenter: Orchestration for SPADE-BDI RL agents
 - CleanRlWorkerPresenter: Placeholder for analytics-first CleanRL worker
 - PettingZooWorkerPresenter: Multi-agent environments (PettingZoo)
+- RayWorkerPresenter: Ray RLlib distributed training
+- XuanCeWorkerPresenter: XuanCe 46+ algorithm RL library
 
 The registry is auto-populated at module load to support service discovery.
 """
@@ -19,6 +21,7 @@ from .spade_bdi_worker_presenter import SpadeBdiWorkerPresenter
 from .cleanrl_worker_presenter import CleanRlWorkerPresenter
 from .pettingzoo_worker_presenter import PettingZooWorkerPresenter
 from .ray_worker_presenter import RayWorkerPresenter
+from .xuance_worker_presenter import XuanCeWorkerPresenter
 
 
 # Create and auto-register default presenters
@@ -27,6 +30,7 @@ _registry.register("spade_bdi_worker", SpadeBdiWorkerPresenter())
 _registry.register("cleanrl_worker", CleanRlWorkerPresenter())
 _registry.register("pettingzoo_worker", PettingZooWorkerPresenter())
 _registry.register("ray_worker", RayWorkerPresenter())
+_registry.register("xuance_worker", XuanCeWorkerPresenter())
 
 
 def get_worker_presenter_registry() -> WorkerPresenterRegistry:
@@ -45,5 +49,6 @@ __all__ = [
     "CleanRlWorkerPresenter",
     "PettingZooWorkerPresenter",
     "RayWorkerPresenter",
+    "XuanCeWorkerPresenter",
     "get_worker_presenter_registry",
 ]

@@ -508,6 +508,42 @@ _NETHACK_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
     GameId.NETHACK_SCOUT: _minihack_nav_mappings(),
 }
 
+# ===========================================================================
+# Crafter Mappings (open-world survival benchmark)
+# 17 discrete actions from crafter/data.yaml:
+# 0:noop, 1:move_left, 2:move_right, 3:move_up, 4:move_down, 5:do, 6:sleep,
+# 7:place_stone, 8:place_table, 9:place_furnace, 10:place_plant,
+# 11:make_wood_pickaxe, 12:make_stone_pickaxe, 13:make_iron_pickaxe,
+# 14:make_wood_sword, 15:make_stone_sword, 16:make_iron_sword
+# ===========================================================================
+def _crafter_mappings() -> Tuple[ShortcutMapping, ...]:
+    """Standard 17-action mapping for Crafter environments."""
+    return (
+        # Note: action 0 (noop) has no key - happens on timeout or idle
+        _mapping(("Key_Left", "Key_A"), 1),       # move_left
+        _mapping(("Key_Right", "Key_D"), 2),      # move_right
+        _mapping(("Key_Up", "Key_W"), 3),         # move_up
+        _mapping(("Key_Down", "Key_S"), 4),       # move_down
+        _mapping(("Key_Space",), 5),               # do (interact)
+        _mapping(("Key_R",), 6),                   # sleep
+        _mapping(("Key_1",), 7),                   # place_stone
+        _mapping(("Key_2",), 8),                   # place_table
+        _mapping(("Key_3",), 9),                   # place_furnace
+        _mapping(("Key_4",), 10),                  # place_plant
+        _mapping(("Key_Q",), 11),                  # make_wood_pickaxe
+        _mapping(("Key_E",), 12),                  # make_stone_pickaxe
+        _mapping(("Key_F",), 13),                  # make_iron_pickaxe
+        _mapping(("Key_Z",), 14),                  # make_wood_sword
+        _mapping(("Key_X",), 15),                  # make_stone_sword
+        _mapping(("Key_C",), 16),                  # make_iron_sword
+    )
+
+
+_CRAFTER_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
+    GameId.CRAFTER_REWARD: _crafter_mappings(),
+    GameId.CRAFTER_NO_REWARD: _crafter_mappings(),
+}
+
 _ALE_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
     # Minimal but explicit mapping for core and diagonal moves, plus fire variants via letter keys.
     GameId.ADVENTURE_V4: (
@@ -620,6 +656,8 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
                 mappings = _MINIHACK_MAPPINGS.get(game_id)
             if mappings is None:
                 mappings = _NETHACK_MAPPINGS.get(game_id)
+            if mappings is None:
+                mappings = _CRAFTER_MAPPINGS.get(game_id)
             if mappings is None and isinstance(action_space, spaces.Discrete):
                 mappings = self._fallback_mappings(action_space)
 

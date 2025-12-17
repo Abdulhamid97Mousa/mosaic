@@ -72,6 +72,9 @@ class NetHackConfig:
     penalty_time: float = -0.0
     penalty_mode: str = "constant"  # "constant", "exp", "square", "linear"
 
+    # Rendering
+    render_scale: int = 3  # Scale factor for rendered image (3 = triple size)
+
 
 class NetHackAdapter(EnvironmentAdapter[dict, int]):
     """Base adapter for full NetHack game environments.
@@ -197,6 +200,11 @@ class NetHackAdapter(EnvironmentAdapter[dict, int]):
         else:
             # Fallback: render glyphs/chars
             frame = self._render_glyphs_fallback(obs)
+
+        # Scale up the image for better visibility in GUI
+        scale = self._config.render_scale
+        if scale > 1:
+            frame = np.repeat(np.repeat(frame, scale, axis=0), scale, axis=1)
 
         return {
             "mode": RenderMode.RGB_ARRAY.value,

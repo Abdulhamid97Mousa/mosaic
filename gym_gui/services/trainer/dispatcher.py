@@ -336,6 +336,8 @@ class TrainerDispatcher:
             if worker_cmd is not None:
                 if module and module.startswith("cleanrl_worker"):
                     self._ensure_cleanrl_worker_available(run.run_id, module)
+                elif module and module.startswith("xuance_worker"):
+                    self._ensure_xuance_worker_available(run.run_id, module)
                 if config_path is not None and "--config" not in args:
                     args.extend(["--config", str(config_path)])
                 if use_grpc:
@@ -475,6 +477,23 @@ class TrainerDispatcher:
         raise RuntimeError(
             "cleanrl_worker module not importable. Ensure PYTHONPATH includes "
             "3rd_party/cleanrl_worker before launching the trainer."
+        )
+
+    def _ensure_xuance_worker_available(self, run_id: str, module: str) -> None:
+        """Log a structured error if xuance_worker cannot be imported."""
+
+        if importlib.util.find_spec("xuance_worker") is not None:
+            return
+
+        extra = {
+            "run_id": run_id,
+            "module": module,
+            "pythonpath": os.environ.get("PYTHONPATH", ""),
+        }
+        log_constant(_LOGGER, LOG_TRAINER_WORKER_IMPORT_ERROR, extra=extra)
+        raise RuntimeError(
+            "xuance_worker module not importable. Install with: "
+            "pip install -e 3rd_party/xuance_worker"
         )
 
     def _build_worker_env(self, run: RunRecord) -> dict[str, str]:
