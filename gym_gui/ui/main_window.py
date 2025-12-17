@@ -101,7 +101,11 @@ from gym_gui.ui.handlers import (
 )
 from gym_gui.ui.widgets.advanced_config import LaunchConfig, RunMode
 
-from gym_gui.constants.optional_deps import get_mjpc_launcher, get_godot_launcher
+from gym_gui.constants.optional_deps import (
+    get_mjpc_launcher,
+    get_godot_launcher,
+    OptionalDependencyError,
+)
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from gym_gui.ui.widgets.spade_bdi_train_form import SpadeBdiTrainForm
@@ -197,11 +201,19 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._trainer_poll_failures: int = 0
         self._trainer_poll_quiet_logged: bool = False
 
-        # MuJoCo MPC launcher
-        self._mjpc_launcher = get_mjpc_launcher()
+        # MuJoCo MPC launcher (optional)
+        try:
+            self._mjpc_launcher = get_mjpc_launcher()
+        except OptionalDependencyError as e:
+            _LOGGER.warning(f"MuJoCo MPC launcher not available: {e}")
+            self._mjpc_launcher = None
 
-        # Godot game engine launcher
-        self._godot_launcher = get_godot_launcher()
+        # Godot game engine launcher (optional)
+        try:
+            self._godot_launcher = get_godot_launcher()
+        except OptionalDependencyError as e:
+            _LOGGER.warning(f"Godot launcher not available: {e}")
+            self._godot_launcher = None
 
         # Environment loaders (initialized in _init_handlers after UI components are created)
         self._chess_env_loader: ChessEnvLoader

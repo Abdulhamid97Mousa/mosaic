@@ -26,23 +26,16 @@ if ! "$PYTHON_BIN" -c "import grpc_tools" 2>/dev/null; then
   exit 1
 fi
 
-SUPERVISOR_DIR="gym_gui/services/jason_supervisor/proto"
-BRIDGE_DIR="gym_gui/services/jason_bridge"
+TRAINER_DIR="gym_gui/services/trainer/proto"
 
 cd "$ROOT_DIR"
 
-echo "[protos] Generating supervisor stubs"
+echo "[protos] Generating trainer stubs"
 "$PYTHON_BIN" -m grpc_tools.protoc \
-  -I "$SUPERVISOR_DIR" \
-  --python_out="$SUPERVISOR_DIR" \
-  --grpc_python_out="$SUPERVISOR_DIR" \
-  "$SUPERVISOR_DIR/supervisor.proto"
-
-echo "[protos] Generating bridge stubs"
-"$PYTHON_BIN" -m grpc_tools.protoc \
-  -I "$SUPERVISOR_DIR" -I "$BRIDGE_DIR" \
-  --python_out="$BRIDGE_DIR" \
-  --grpc_python_out="$BRIDGE_DIR" \
-  "$BRIDGE_DIR/bridge.proto"
+  -I "$TRAINER_DIR" \
+  --python_out="$TRAINER_DIR" \
+  --grpc_python_out="$TRAINER_DIR" \
+  --pyi_out="$TRAINER_DIR" \
+  "$TRAINER_DIR/trainer.proto"
 
 echo "[protos] Done"

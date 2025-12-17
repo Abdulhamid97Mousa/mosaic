@@ -2672,4 +2672,58 @@ __all__ = (
     "LOG_RAY_WORKER_ENV_WRAPPED",
     "LOG_RAY_WORKER_POLICY_LOADED",
     "LOG_RAY_WORKER_ANALYTICS_WRITTEN",
+    # Worker Availability Messages
+    "GODOT_NOT_INSTALLED_TITLE",
+    "GODOT_NOT_INSTALLED_MSG",
+    "GODOT_BINARY_NOT_FOUND_TITLE",
+    "GODOT_BINARY_NOT_FOUND_MSG",
+    "MJPC_NOT_INSTALLED_TITLE",
+    "MJPC_NOT_INSTALLED_MSG",
+    "MJPC_NOT_BUILT_TITLE",
+    "MJPC_NOT_BUILT_MSG",
+)
+
+# ================================================================
+# Worker Availability Messages (User Notifications)
+# ================================================================
+
+# Godot Worker Messages
+GODOT_NOT_INSTALLED_TITLE = "Godot Not Available"
+GODOT_NOT_INSTALLED_MSG = (
+    "Godot worker is not installed.\n\n"
+    "Install with:\n\n"
+    "  pip install -e 3rd_party/godot_worker\n\n"
+    "Also requires the Godot binary in 3rd_party/godot_worker/bin/"
+)
+
+GODOT_BINARY_NOT_FOUND_TITLE = "Godot Not Available"
+GODOT_BINARY_NOT_FOUND_MSG = (
+    "Godot binary not found.\n\n"
+    "Please ensure the Godot binary is installed at:\n"
+    "  {godot_binary}\n\n"
+    "You can copy the Godot binary from:\n"
+    "  Vesna_RL/Godot_v4.5.1-stable_linux.x86_64\n"
+    "to:\n"
+    "  3rd_party/godot_worker/bin/godot"
+)
+
+# MuJoCo MPC Worker Messages
+MJPC_NOT_INSTALLED_TITLE = "MJPC Not Available"
+MJPC_NOT_INSTALLED_MSG = (
+    "MuJoCo MPC worker is not installed.\n\n"
+    "Install with:\n\n"
+    "  pip install -e 3rd_party/mujoco_mpc_worker\n\n"
+    "Also requires building the MJPC agent_server binary.\n"
+    "See: 3rd_party/mujoco_mpc_worker/mujoco_mpc/README.md"
+)
+
+MJPC_NOT_BUILT_TITLE = "MJPC Not Built"
+MJPC_NOT_BUILT_MSG = (
+    "MuJoCo MPC needs to be built first.\n\n"
+    "Run the following commands:\n\n"
+    "  cd 3rd_party/mujoco_mpc_worker/mujoco_mpc/build\n"
+    "  cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja\n"
+    "  ninja -j$(nproc)\n\n"
+    "Source dir: {source_dir}\n"
+    "Source exists: {source_exists}"
 )

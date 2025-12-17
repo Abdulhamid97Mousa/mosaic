@@ -23,6 +23,7 @@ class WorkerDefinition:
     supports_policy_load: bool = False
     requires_live_telemetry: bool = True
     provides_fast_analytics: bool = False
+    supports_multi_agent: bool = True
 
     def capabilities(self) -> Tuple[str, ...]:
         """Return a human-readable tuple of capability labels."""
@@ -35,6 +36,8 @@ class WorkerDefinition:
             labels.append("Training")
         if self.supports_policy_load:
             labels.append("Policy evaluation")
+        if self.supports_multi_agent:
+            labels.append("Multi-agent")
         return tuple(labels)
 
 
@@ -45,6 +48,20 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
     Only Ray RLlib and PettingZoo workers are available for multi-agent training.
     """
     return (
+        WorkerDefinition(
+            worker_id="cleanrl_worker",
+            display_name="CleanRL Worker",
+            description=(
+                "Single-agent reinforcement learning using CleanRL algorithms. "
+                "Supports PPO, DQN, A2C, SAC, TD3, and DDPG. "
+                "Optimized for single-file implementations and transparency."
+            ),
+            supports_training=True,
+            supports_policy_load=True,
+            requires_live_telemetry=True,
+            provides_fast_analytics=True,
+            supports_multi_agent=False,
+        ),
         WorkerDefinition(
             worker_id="ray_worker",
             display_name="Ray RLlib Worker",
@@ -59,6 +76,7 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
             supports_policy_load=True,
             requires_live_telemetry=False,
             provides_fast_analytics=True,
+            supports_multi_agent=True,
         ),
         WorkerDefinition(
             worker_id="pettingzoo_worker",
@@ -73,6 +91,7 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
             supports_policy_load=True,
             requires_live_telemetry=True,
             provides_fast_analytics=True,
+            supports_multi_agent=True,
         ),
     )
 
