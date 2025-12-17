@@ -27,6 +27,7 @@ if TYPE_CHECKING:
     from gym_gui.core.adapters.minihack import MiniHackConfig as _MiniHackConfigType
     from gym_gui.core.adapters.nethack import NetHackConfig as _NetHackConfigType
     from gym_gui.config.game_configs import CrafterConfig as _CrafterConfigType
+    from gym_gui.config.game_configs import ProcgenConfig as _ProcgenConfigType
 
 try:  # Optional dependency
     from gym_gui.core.adapters.vizdoom import (  # pragma: no cover - optional
@@ -79,6 +80,17 @@ except Exception:  # pragma: no cover - crafter optional
     CrafterAdapter = None  # type: ignore[misc, assignment]
     CrafterConfig = None  # type: ignore[misc, assignment]
 
+try:  # Optional dependency - Procgen (procedurally generated benchmark)
+    from gym_gui.core.adapters.procgen import (  # pragma: no cover - optional
+        PROCGEN_ADAPTERS,
+        ProcgenAdapter,
+    )
+    from gym_gui.config.game_configs import ProcgenConfig
+except Exception:  # pragma: no cover - procgen optional
+    PROCGEN_ADAPTERS: dict[Any, Any] = {}
+    ProcgenAdapter = None  # type: ignore[misc, assignment]
+    ProcgenConfig = None  # type: ignore[misc, assignment]
+
 from gym_gui.core.enums import GameId
 
 AdapterT = TypeVar("AdapterT", bound=EnvironmentAdapter)
@@ -106,6 +118,7 @@ def _registry() -> Mapping[GameId, type[EnvironmentAdapter]]:
         **MINIHACK_ADAPTERS,
         **NETHACK_ADAPTERS,
         **CRAFTER_ADAPTERS,
+        **PROCGEN_ADAPTERS,
     }
 
 
@@ -142,6 +155,7 @@ def create_adapter(
         | "_MiniHackConfigType"
         | "_NetHackConfigType"
         | "_CrafterConfigType"
+        | "_ProcgenConfigType"
         | None
     ) = None,
 ) -> EnvironmentAdapter:
@@ -231,6 +245,13 @@ def create_adapter(
             and issubclass(adapter_cls, CrafterAdapter)
             and CrafterConfig is not None
             and isinstance(game_config, CrafterConfig)
+        ):
+            adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
+        elif (
+            ProcgenAdapter is not None
+            and issubclass(adapter_cls, ProcgenAdapter)
+            and ProcgenConfig is not None
+            and isinstance(game_config, ProcgenConfig)
         ):
             adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
         else:

@@ -69,10 +69,6 @@ class MuJoCoMPCTab(QtWidgets.QWidget):
         """Create an info banner explaining MuJoCo MPC."""
         banner = QtWidgets.QFrame(self)
         banner.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        banner.setStyleSheet(
-            "QFrame { background-color: #e8f4f8; border: 1px solid #b8d4e3; "
-            "border-radius: 4px; padding: 8px; }"
-        )
         layout = QtWidgets.QVBoxLayout(banner)
         layout.setContentsMargins(8, 8, 8, 8)
 
@@ -87,7 +83,6 @@ class MuJoCoMPCTab(QtWidgets.QWidget):
             banner
         )
         desc.setWordWrap(True)
-        desc.setStyleSheet("color: #555; font-size: 11px;")
         layout.addWidget(desc)
 
         return banner
@@ -123,25 +118,13 @@ class MuJoCoMPCTab(QtWidgets.QWidget):
 
         # Launch button
         self._launch_btn = QtWidgets.QPushButton("Launch MJPC", group)
-        self._launch_btn.setMinimumHeight(40)
-        self._launch_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; "
-            "font-weight: bold; border-radius: 4px; font-size: 14px; }"
-            "QPushButton:hover { background-color: #45a049; }"
-            "QPushButton:disabled { background-color: #cccccc; }"
-        )
+        self._launch_btn.setMinimumHeight(36)
         layout.addWidget(self._launch_btn)
 
         # Stop all button
         self._stop_all_btn = QtWidgets.QPushButton("Stop All Instances", group)
-        self._stop_all_btn.setMinimumHeight(40)
+        self._stop_all_btn.setMinimumHeight(36)
         self._stop_all_btn.setEnabled(False)
-        self._stop_all_btn.setStyleSheet(
-            "QPushButton { background-color: #f44336; color: white; "
-            "font-weight: bold; border-radius: 4px; font-size: 14px; }"
-            "QPushButton:hover { background-color: #da190b; }"
-            "QPushButton:disabled { background-color: #cccccc; color: #888; }"
-        )
         layout.addWidget(self._stop_all_btn)
 
         return group

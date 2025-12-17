@@ -119,6 +119,16 @@ crafter = [
     "crafter>=1.8.0",
 ]
 
+# Procgen procedurally generated benchmark (Cobbe et al. 2019)
+# Paper: "Leveraging Procedural Generation to Benchmark RL"
+# 16 environments for testing generalization: coinrun, starpilot, etc.
+# NOTE: Official procgen only has wheels for Python 3.7-3.10.
+# For Python 3.11+, we use procgen-mirror which provides community wheels.
+procgen = [
+    "procgen>=0.10.7; python_version < '3.11'",
+    "procgen-mirror>=0.10.7; python_version >= '3.11'",
+]
+
 # =============================================================================
 # Workers (training backends)
 # =============================================================================
@@ -150,12 +160,11 @@ spade-bdi = [
     "spade-bdi>=0.3.0",
 ]
 
-# LLM worker (Ollama integration)
-llm = [
-    "ollama>=0.3.0",
-    "langchain>=0.3.0",
-    "langchain-ollama>=0.1.0",
-    "langchain-core>=0.3.0",
+# LLM Chat UI (OpenRouter cloud + vLLM local)
+# Enables the Chat panel in the GUI for interacting with LLMs
+# vLLM is the standard for local GPU inference (like BALROG)
+chat = [
+    "requests>=2.31.0",
 ]
 
 # Ray/RLlib worker for distributed RL training
@@ -203,7 +212,7 @@ all-gymnasium = [
 
 # All environment families (single + multi-agent)
 all-envs = [
-    "mosaic[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom,nethack,crafter]",
+    "mosaic[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom,nethack,crafter,procgen]",
 ]
 
 # Full development setup

@@ -259,6 +259,16 @@ SATELLITES = [
         features=["22 achievement tasks", "Procedural 2D worlds", "Agent capability spectrum", "github.com/danijar/crafter"],
         ring_index=5
     ),
+    SatelliteConfig(
+        name="Procgen",
+        color=(128, 0, 128),  # Purple
+        orbit_radius=1.0,
+        speed=0.32,
+        phase=60,
+        description="Procgen - Procedurally Generated Benchmark",
+        features=["16 diverse environments", "Tests generalization", "Procedural level generation", "github.com/openai/procgen"],
+        ring_index=5
+    ),
 ]
 
 # Satellite visual settings

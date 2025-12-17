@@ -81,6 +81,13 @@ from gym_gui.ui.presenters.workers import (
 from gym_gui.ui.widgets.spade_bdi_worker_tabs import (
     AgentReplayTab,
 )
+from gym_gui.services.llm import LLM_CHAT_AVAILABLE
+from gym_gui.ui.themes import apply_theme, DARK_THEME, LIGHT_THEME
+
+if LLM_CHAT_AVAILABLE:
+    from gym_gui.ui.widgets.chat_panel import ChatPanel
+else:
+    ChatPanel = None  # type: ignore[misc, assignment]
 from gym_gui.ui.panels.analytics_tabs import AnalyticsTabManager
 from gym_gui.ui.forms import get_worker_form_factory
 from gym_gui.ui.handlers import (
@@ -401,23 +408,50 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         log_layout.addWidget(self._log_console, 1)
         self._log_group.setMinimumWidth(layout_defaults.log_min_width)
 
+        # Chat panel (MOSAIC Assistant) - optional, requires [chat] extra
+        self._chat_group: QtWidgets.QGroupBox | None = None
+        self._chat_panel = None
+        if LLM_CHAT_AVAILABLE and ChatPanel is not None:
+            self._chat_group = QtWidgets.QGroupBox("Chat", self)
+            chat_layout = QtWidgets.QVBoxLayout(self._chat_group)
+            chat_layout.setContentsMargins(0, 0, 0, 0)
+            self._chat_panel = ChatPanel(parent=self._chat_group)
+            chat_layout.addWidget(self._chat_panel)
+
         info_log_splitter = QtWidgets.QSplitter(QtCore.Qt.Orientation.Vertical, central)
         info_log_splitter.setChildrenCollapsible(True)
         self._info_group.setMinimumWidth(layout_defaults.info_min_width)
         info_log_splitter.addWidget(self._info_group)
         info_log_splitter.addWidget(self._log_group)
-        info_log_splitter.setStretchFactor(0, 2)
-        info_log_splitter.setStretchFactor(1, 1)
+        if self._chat_group is not None:
+            info_log_splitter.addWidget(self._chat_group)
+
+        # Adjust stretch factors based on whether chat panel is present
+        if self._chat_group is not None:
+            info_log_splitter.setStretchFactor(0, 2)  # Game Info
+            info_log_splitter.setStretchFactor(1, 1)  # Runtime Log
+            info_log_splitter.setStretchFactor(2, 2)  # Chat
+            info_log_splitter.setSizes(
+                [
+                    layout_defaults.info_default_width // 2,
+                    layout_defaults.log_default_width,
+                    layout_defaults.info_default_width // 2,
+                ]
+            )
+        else:
+            info_log_splitter.setStretchFactor(0, 2)  # Game Info
+            info_log_splitter.setStretchFactor(1, 1)  # Runtime Log
+            info_log_splitter.setSizes(
+                [
+                    layout_defaults.info_default_width,
+                    layout_defaults.log_default_width,
+                ]
+            )
+
         info_log_splitter.setMinimumWidth(layout_defaults.info_min_width + layout_defaults.log_min_width)
         info_log_splitter.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.MinimumExpanding,
             QtWidgets.QSizePolicy.Policy.Expanding,
-        )
-        info_log_splitter.setSizes(
-            [
-                layout_defaults.info_default_width,
-                layout_defaults.log_default_width,
-            ]
         )
         splitter.addWidget(info_log_splitter)
 
@@ -448,6 +482,24 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._add_view_toggle("Render View", self._render_group)
         self._add_view_toggle("Game Info", self._info_group)
         self._add_view_toggle("Runtime Log", self._log_group)
+        if self._chat_group is not None:
+            self._add_view_toggle("Chat", self._chat_group)
+
+        # Add spacer to push theme toggle to the right
+        spacer = QtWidgets.QWidget()
+        spacer.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Preferred,
+        )
+        self._view_toolbar.addWidget(spacer)
+
+        # Add theme toggle
+        self._dark_mode = False
+        self._theme_action = QAction("Dark Mode", self)
+        self._theme_action.setCheckable(True)
+        self._theme_action.setChecked(False)
+        self._theme_action.toggled.connect(self._on_theme_toggled)
+        self._view_toolbar.addAction(self._theme_action)
 
     def _add_view_toggle(self, label: str, widget: QtWidgets.QWidget) -> None:
         """Insert a checkable action to show/hide a widget."""
@@ -462,6 +514,28 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         action.toggled.connect(handle_toggle)
         self._view_toolbar.addAction(action)
         self._view_actions[label] = action
+
+    def _on_theme_toggled(self, checked: bool) -> None:
+        """Toggle between light and dark themes."""
+        self._dark_mode = checked
+        self._theme_action.setText("Light Mode" if checked else "Dark Mode")
+
+        if checked:
+            self._apply_dark_theme()
+        else:
+            self._apply_light_theme()
+
+        self._status_bar.showMessage(
+            f"{'Dark' if checked else 'Light'} theme applied", 2000
+        )
+
+    def _apply_dark_theme(self) -> None:
+        """Apply dark theme from external QSS file."""
+        apply_theme(DARK_THEME)
+
+    def _apply_light_theme(self) -> None:
+        """Apply light theme (reset to system default)."""
+        apply_theme(LIGHT_THEME)
 
     def _init_handlers(self) -> None:
         """Initialize composed handlers for delegated functionality."""
@@ -1902,6 +1976,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         if hasattr(self, "_stockfish_service") and self._stockfish_service is not None:
             self._stockfish_service.stop()
             self._stockfish_service = None
+
+        # Clean up chat panel (optional - requires [chat] extra)
+        if hasattr(self, "_chat_panel") and self._chat_panel is not None:
+            self._chat_panel.cleanup()
 
         # Shutdown session
         self._session.shutdown()

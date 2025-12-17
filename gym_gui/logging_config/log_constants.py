@@ -571,6 +571,55 @@ LOG_ENV_CRAFTER_ACHIEVEMENT = _constant(
 
 
 # ---------------------------------------------------------------------------
+# Procgen adapter specific constants (LOG540–LOG544)
+# ---------------------------------------------------------------------------
+LOG_ENV_PROCGEN_BOOT = _constant(
+    "LOG540",
+    "INFO",
+    "Procgen adapter bootstrapped",
+    component="Adapter",
+    subcomponent="Procgen",
+    tags=_tags("procgen", "bootstrap", "lifecycle"),
+)
+
+LOG_ENV_PROCGEN_STEP = _constant(
+    "LOG541",
+    "DEBUG",
+    "Procgen step checkpoint",
+    component="Adapter",
+    subcomponent="Procgen",
+    tags=_tags("procgen", "step", "checkpoint"),
+)
+
+LOG_ENV_PROCGEN_ERROR = _constant(
+    "LOG542",
+    "ERROR",
+    "Procgen environment error",
+    component="Adapter",
+    subcomponent="Procgen",
+    tags=_tags("procgen", "error"),
+)
+
+LOG_ENV_PROCGEN_RENDER_WARNING = _constant(
+    "LOG543",
+    "WARNING",
+    "Procgen render mode constraint",
+    component="Adapter",
+    subcomponent="Procgen",
+    tags=_tags("procgen", "render", "warning"),
+)
+
+LOG_ENV_PROCGEN_LEVEL_COMPLETE = _constant(
+    "LOG544",
+    "INFO",
+    "Procgen level completed",
+    component="Adapter",
+    subcomponent="Procgen",
+    tags=_tags("procgen", "level", "complete"),
+)
+
+
+# ---------------------------------------------------------------------------
 # Service and telemetry constants (LOG601–LOG650)
 # ---------------------------------------------------------------------------
 LOG_SERVICE_TELEMETRY_STEP_REJECTED = _constant(
@@ -2553,6 +2602,11 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_ENV_CRAFTER_ERROR,
     LOG_ENV_CRAFTER_RENDER_WARNING,
     LOG_ENV_CRAFTER_ACHIEVEMENT,
+    LOG_ENV_PROCGEN_BOOT,
+    LOG_ENV_PROCGEN_STEP,
+    LOG_ENV_PROCGEN_ERROR,
+    LOG_ENV_PROCGEN_RENDER_WARNING,
+    LOG_ENV_PROCGEN_LEVEL_COMPLETE,
     LOG_SERVICE_TELEMETRY_STEP_REJECTED,
     LOG_SERVICE_TELEMETRY_ASYNC_ERROR,
     LOG_SERVICE_DB_SINK_INITIALIZED,
@@ -2811,6 +2865,11 @@ __all__ = (
     "LOG_ENV_CRAFTER_ERROR",
     "LOG_ENV_CRAFTER_RENDER_WARNING",
     "LOG_ENV_CRAFTER_ACHIEVEMENT",
+    "LOG_ENV_PROCGEN_BOOT",
+    "LOG_ENV_PROCGEN_STEP",
+    "LOG_ENV_PROCGEN_ERROR",
+    "LOG_ENV_PROCGEN_RENDER_WARNING",
+    "LOG_ENV_PROCGEN_LEVEL_COMPLETE",
     "LOG_SERVICE_TELEMETRY_STEP_REJECTED",
     "LOG_SERVICE_TELEMETRY_ASYNC_ERROR",
     "LOG_SERVICE_DB_SINK_INITIALIZED",

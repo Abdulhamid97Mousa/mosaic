@@ -544,6 +544,60 @@ _CRAFTER_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
     GameId.CRAFTER_NO_REWARD: _crafter_mappings(),
 }
 
+# ===========================================================================
+# Procgen Mappings (procedurally generated benchmark - 16 environments)
+# 15 discrete actions (button combinations):
+# 0:down_left, 1:left, 2:up_left, 3:down, 4:noop, 5:up,
+# 6:down_right, 7:right, 8:up_right,
+# 9:action_d (fire), 10:action_a, 11:action_w, 12:action_s, 13:action_q, 14:action_e
+# ===========================================================================
+def _procgen_mappings() -> Tuple[ShortcutMapping, ...]:
+    """Standard 15-action mapping for Procgen environments."""
+    return (
+        # Diagonal: down-left (action 0) - no common key, use numpad 1 or Z
+        _mapping(("Key_Z",), 0),                    # down_left
+        # Cardinal directions using arrow keys
+        _mapping(("Key_Left",), 1),                 # left
+        # Diagonal: up-left (action 2) - use Q
+        _mapping(("Key_Q",), 2),                    # up_left
+        _mapping(("Key_Down",), 3),                 # down
+        # Noop (action 4) - space or 0
+        _mapping(("Key_0",), 4),                    # noop
+        _mapping(("Key_Up",), 5),                   # up
+        # Diagonal: down-right (action 6) - use C
+        _mapping(("Key_C",), 6),                    # down_right
+        _mapping(("Key_Right",), 7),                # right
+        # Diagonal: up-right (action 8) - use E
+        _mapping(("Key_E",), 8),                    # up_right
+        # Game-specific actions (fire/interact buttons)
+        _mapping(("Key_Space", "Key_D"), 9),        # action_d (primary fire/interact)
+        _mapping(("Key_A",), 10),                   # action_a (secondary)
+        _mapping(("Key_W",), 11),                   # action_w (tertiary)
+        _mapping(("Key_S",), 12),                   # action_s (quaternary)
+        _mapping(("Key_1",), 13),                   # action_q (special 1)
+        _mapping(("Key_2",), 14),                   # action_e (special 2)
+    )
+
+
+_PROCGEN_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
+    GameId.PROCGEN_BIGFISH: _procgen_mappings(),
+    GameId.PROCGEN_BOSSFIGHT: _procgen_mappings(),
+    GameId.PROCGEN_CAVEFLYER: _procgen_mappings(),
+    GameId.PROCGEN_CHASER: _procgen_mappings(),
+    GameId.PROCGEN_CLIMBER: _procgen_mappings(),
+    GameId.PROCGEN_COINRUN: _procgen_mappings(),
+    GameId.PROCGEN_DODGEBALL: _procgen_mappings(),
+    GameId.PROCGEN_FRUITBOT: _procgen_mappings(),
+    GameId.PROCGEN_HEIST: _procgen_mappings(),
+    GameId.PROCGEN_JUMPER: _procgen_mappings(),
+    GameId.PROCGEN_LEAPER: _procgen_mappings(),
+    GameId.PROCGEN_MAZE: _procgen_mappings(),
+    GameId.PROCGEN_MINER: _procgen_mappings(),
+    GameId.PROCGEN_NINJA: _procgen_mappings(),
+    GameId.PROCGEN_PLUNDER: _procgen_mappings(),
+    GameId.PROCGEN_STARPILOT: _procgen_mappings(),
+}
+
 _ALE_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
     # Minimal but explicit mapping for core and diagonal moves, plus fire variants via letter keys.
     GameId.ADVENTURE_V4: (
@@ -658,6 +712,8 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
                 mappings = _NETHACK_MAPPINGS.get(game_id)
             if mappings is None:
                 mappings = _CRAFTER_MAPPINGS.get(game_id)
+            if mappings is None:
+                mappings = _PROCGEN_MAPPINGS.get(game_id)
             if mappings is None and isinstance(action_space, spaces.Discrete):
                 mappings = self._fallback_mappings(action_space)
 

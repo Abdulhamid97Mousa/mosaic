@@ -31,7 +31,8 @@
 #   requirements/xuance_worker.txt  - XuanCe MARL algorithms
 #   requirements/jason_worker.txt   - Jason BDI agents
 #   requirements/spade_bdi_worker.txt - SPADE BDI agents
-#   requirements/llm_worker.txt     - LLM/Ollama integration
+#   requirements/llm_worker.txt     - LLM agents with vLLM (BALROG-style)
+#   requirements/chat.txt           - LLM Chat UI (OpenRouter/vLLM)
 #
 # SYSTEM DEPENDENCIES (Ubuntu/Debian):
 #   sudo apt-get install -y swig python3-dev

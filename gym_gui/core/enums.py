@@ -29,6 +29,7 @@ class EnvironmentFamily(StrEnum):
     MINIHACK = "minihack"  # MiniHack sandbox environments (built on NLE)
     NETHACK = "nethack"  # Full NetHack game (via NLE)
     CRAFTER = "crafter"  # Crafter open world survival benchmark
+    PROCGEN = "procgen"  # Procgen procedural benchmark (16 environments)
     PETTINGZOO = "pettingzoo"
     PETTINGZOO_CLASSIC = "pettingzoo_classic"  # PettingZoo Classic: turn-based games (Chess, Go, Connect Four, etc.)
     OTHER = "other"  # Fallback for unknown environments (not displayed in UI)
@@ -169,6 +170,26 @@ class GameId(StrEnum):
     CRAFTER_REWARD = "CrafterReward-v1"
     CRAFTER_NO_REWARD = "CrafterNoReward-v1"
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # Procgen (Procedurally Generated Benchmark - 16 environments)
+    # ─────────────────────────────────────────────────────────────────────────
+    PROCGEN_BIGFISH = "procgen:procgen-bigfish-v0"
+    PROCGEN_BOSSFIGHT = "procgen:procgen-bossfight-v0"
+    PROCGEN_CAVEFLYER = "procgen:procgen-caveflyer-v0"
+    PROCGEN_CHASER = "procgen:procgen-chaser-v0"
+    PROCGEN_CLIMBER = "procgen:procgen-climber-v0"
+    PROCGEN_COINRUN = "procgen:procgen-coinrun-v0"
+    PROCGEN_DODGEBALL = "procgen:procgen-dodgeball-v0"
+    PROCGEN_FRUITBOT = "procgen:procgen-fruitbot-v0"
+    PROCGEN_HEIST = "procgen:procgen-heist-v0"
+    PROCGEN_JUMPER = "procgen:procgen-jumper-v0"
+    PROCGEN_LEAPER = "procgen:procgen-leaper-v0"
+    PROCGEN_MAZE = "procgen:procgen-maze-v0"
+    PROCGEN_MINER = "procgen:procgen-miner-v0"
+    PROCGEN_NINJA = "procgen:procgen-ninja-v0"
+    PROCGEN_PLUNDER = "procgen:procgen-plunder-v0"
+    PROCGEN_STARPILOT = "procgen:procgen-starpilot-v0"
+
 
 def get_game_display_name(game_id: GameId) -> str:
     """Get the display name for a GameId with family prefix.
@@ -198,6 +219,12 @@ def get_game_display_name(game_id: GameId) -> str:
     # Crafter environments
     if value.startswith("Crafter"):
         return value
+    # Procgen environments (procgen:procgen-name-v0 → Procgen-Name)
+    if value.startswith("procgen:"):
+        # Extract game name: "procgen:procgen-coinrun-v0" → "coinrun"
+        env_part = value.split(":")[1]  # "procgen-coinrun-v0"
+        name_part = env_part.replace("procgen-", "").replace("-v0", "")  # "coinrun"
+        return f"Procgen-{name_part.title()}"
     # PettingZoo board games
     if game_id == GameId.CHESS:
         return "PettingZoo-Chess"
@@ -446,6 +473,23 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     # Crafter environments
     GameId.CRAFTER_REWARD: EnvironmentFamily.CRAFTER,
     GameId.CRAFTER_NO_REWARD: EnvironmentFamily.CRAFTER,
+    # Procgen environments (16 procedurally generated games)
+    GameId.PROCGEN_BIGFISH: EnvironmentFamily.PROCGEN,
+    GameId.PROCGEN_BOSSFIGHT: EnvironmentFamily.PROCGEN,
+    GameId.PROCGEN_CAVEFLYER: EnvironmentFamily.PROCGEN,
+    GameId.PROCGEN_CHASER: EnvironmentFamily.PROCGEN,
+    GameId.PROCGEN_CLIMBER: EnvironmentFamily.PROCGEN,
+    GameId.PROCGEN_COINRUN: EnvironmentFamily.PROCGEN,
+    GameId.PROCGEN_DODGEBALL: EnvironmentFamily.PROCGEN,
+    GameId.PROCGEN_FRUITBOT: EnvironmentFamily.PROCGEN,
+    GameId.PROCGEN_HEIST: EnvironmentFamily.PROCGEN,
+    GameId.PROCGEN_JUMPER: EnvironmentFamily.PROCGEN,
+    GameId.PROCGEN_LEAPER: EnvironmentFamily.PROCGEN,
+    GameId.PROCGEN_MAZE: EnvironmentFamily.PROCGEN,
+    GameId.PROCGEN_MINER: EnvironmentFamily.PROCGEN,
+    GameId.PROCGEN_NINJA: EnvironmentFamily.PROCGEN,
+    GameId.PROCGEN_PLUNDER: EnvironmentFamily.PROCGEN,
+    GameId.PROCGEN_STARPILOT: EnvironmentFamily.PROCGEN,
 }
 
 
@@ -557,6 +601,23 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     # Crafter - RGB observation (64x64x3)
     GameId.CRAFTER_REWARD: RenderMode.RGB_ARRAY,
     GameId.CRAFTER_NO_REWARD: RenderMode.RGB_ARRAY,
+    # Procgen - RGB observation (64x64x3)
+    GameId.PROCGEN_BIGFISH: RenderMode.RGB_ARRAY,
+    GameId.PROCGEN_BOSSFIGHT: RenderMode.RGB_ARRAY,
+    GameId.PROCGEN_CAVEFLYER: RenderMode.RGB_ARRAY,
+    GameId.PROCGEN_CHASER: RenderMode.RGB_ARRAY,
+    GameId.PROCGEN_CLIMBER: RenderMode.RGB_ARRAY,
+    GameId.PROCGEN_COINRUN: RenderMode.RGB_ARRAY,
+    GameId.PROCGEN_DODGEBALL: RenderMode.RGB_ARRAY,
+    GameId.PROCGEN_FRUITBOT: RenderMode.RGB_ARRAY,
+    GameId.PROCGEN_HEIST: RenderMode.RGB_ARRAY,
+    GameId.PROCGEN_JUMPER: RenderMode.RGB_ARRAY,
+    GameId.PROCGEN_LEAPER: RenderMode.RGB_ARRAY,
+    GameId.PROCGEN_MAZE: RenderMode.RGB_ARRAY,
+    GameId.PROCGEN_MINER: RenderMode.RGB_ARRAY,
+    GameId.PROCGEN_NINJA: RenderMode.RGB_ARRAY,
+    GameId.PROCGEN_PLUNDER: RenderMode.RGB_ARRAY,
+    GameId.PROCGEN_STARPILOT: RenderMode.RGB_ARRAY,
 }
 
 
@@ -1114,6 +1175,23 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
         ControlMode.AGENT_ONLY,
         ControlMode.HYBRID_TURN_BASED,
     ),
+    # Procgen - procedurally generated games (supports Human Control)
+    GameId.PROCGEN_BIGFISH: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.PROCGEN_BOSSFIGHT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.PROCGEN_CAVEFLYER: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.PROCGEN_CHASER: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.PROCGEN_CLIMBER: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.PROCGEN_COINRUN: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.PROCGEN_DODGEBALL: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.PROCGEN_FRUITBOT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.PROCGEN_HEIST: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.PROCGEN_JUMPER: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.PROCGEN_LEAPER: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.PROCGEN_MAZE: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.PROCGEN_MINER: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.PROCGEN_NINJA: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.PROCGEN_PLUNDER: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.PROCGEN_STARPILOT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
 }
 
 
@@ -1135,6 +1213,7 @@ DEFAULT_PARADIGM_BY_FAMILY: dict[EnvironmentFamily, SteppingParadigm] = {
     EnvironmentFamily.MINIHACK: SteppingParadigm.SINGLE_AGENT,  # Turn-based roguelike
     EnvironmentFamily.NETHACK: SteppingParadigm.SINGLE_AGENT,  # Turn-based roguelike
     EnvironmentFamily.CRAFTER: SteppingParadigm.SINGLE_AGENT,  # Turn-based survival game
+    EnvironmentFamily.PROCGEN: SteppingParadigm.SINGLE_AGENT,  # Procedurally generated games
     EnvironmentFamily.PETTINGZOO: SteppingParadigm.SEQUENTIAL,  # AEC by default
     EnvironmentFamily.PETTINGZOO_CLASSIC: SteppingParadigm.SEQUENTIAL,  # Chess, Go, etc.
     EnvironmentFamily.OTHER: SteppingParadigm.SINGLE_AGENT,  # Fallback

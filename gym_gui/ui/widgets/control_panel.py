@@ -52,7 +52,13 @@ from gym_gui.ui.config_panels.single_agent.vizdoom import (
     ControlCallbacks as ViZDoomControlCallbacks,
     build_vizdoom_controls,
 )
+from gym_gui.ui.config_panels.single_agent.procgen import (
+    PROCGEN_GAME_IDS,
+    ControlCallbacks as ProcgenControlCallbacks,
+    build_procgen_controls,
+)
 from gym_gui.core.adapters.vizdoom import ViZDoomConfig
+from gym_gui.config.game_configs import ProcgenConfig
 from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
 from gym_gui.ui.widgets.mujoco_mpc_tab import MuJoCoMPCTab
 from gym_gui.ui.widgets.multi_agent_tab import MultiAgentTab
@@ -1577,6 +1583,19 @@ class ControlPanelWidget(QtWidgets.QWidget):
                 defaults=defaults,
                 callbacks=callbacks,
             )
+        elif self._current_game is not None and self._current_game in PROCGEN_GAME_IDS:
+            current_game = self._current_game
+            overrides = self._game_overrides.setdefault(current_game, {})
+            callbacks = ProcgenControlCallbacks(on_change=self._on_procgen_config_changed)
+            defaults = ProcgenConfig()
+            build_procgen_controls(
+                parent=self._config_group,
+                layout=self._config_layout,
+                game_id=current_game,
+                overrides=overrides,
+                defaults=defaults,
+                callbacks=callbacks,
+            )
         else:
             label = QtWidgets.QLabel(
                 "No additional configuration options for this environment.",
@@ -1599,6 +1618,13 @@ class ControlPanelWidget(QtWidgets.QWidget):
         overrides = self._game_overrides.setdefault(current_game, {})
         overrides[param_name] = value
         self.vizdoom_config_changed.emit(param_name, value)
+
+    def _on_procgen_config_changed(self, param_name: str, value: object) -> None:
+        current_game = self._current_game
+        if current_game is None:
+            return
+        overrides = self._game_overrides.setdefault(current_game, {})
+        overrides[param_name] = value
 
     # ------------------------------------------------------------------
     # Multi-Agent Tab Handlers

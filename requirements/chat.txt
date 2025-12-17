@@ -1,0 +1,42 @@
+# LLM Chat UI Dependencies (OpenRouter + vLLM)
+# Install with: pip install -r requirements/chat.txt
+#
+# This file contains dependencies for the Chat panel in the GUI,
+# which supports OpenRouter (cloud) and vLLM (local) providers.
+#
+# Alternative: pip install -e ".[chat]"
+
+# Include base requirements
+-r base.txt
+
+# ═══════════════════════════════════════════════════════════════
+# HTTP Client for LLM API Requests
+# ═══════════════════════════════════════════════════════════════
+
+# HTTP client for OpenRouter and vLLM API calls
+# Both providers use OpenAI-compatible chat completions API
+# See: https://openrouter.ai/docs/quickstart
+# See: https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html
+requests>=2.31.0
+
+# ═══════════════════════════════════════════════════════════════
+# Supported Providers
+# ═══════════════════════════════════════════════════════════════
+#
+# OpenRouter (Cloud):
+#   - Base URL: https://openrouter.ai/api/v1
+#   - API Key: Get from https://openrouter.ai/keys
+#   - Models: GPT-4, Claude, Llama, Mistral, etc.
+#
+# vLLM (Local GPU):
+#   - Base URL: http://localhost:8000/v1
+#   - Start server: vllm serve <model> --api-key token-abc123
+#   - Models: Any HuggingFace model
+#
+# ═══════════════════════════════════════════════════════════════
+# Configuration
+# ═══════════════════════════════════════════════════════════════
+#
+# Set in .env or enter API key directly in the Chat panel UI:
+#   OPENROUTER_API_KEY=sk-or-v1-your_api_key_here
+#   VLLM_BASE_URL=http://localhost:8000/v1

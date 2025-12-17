@@ -471,6 +471,65 @@ class CrafterConfig:
 
 
 @dataclass(frozen=True)
+class ProcgenConfig:
+    """Configuration payload for Procgen environments.
+
+    Procgen provides 16 procedurally-generated game-like environments designed
+    to measure sample efficiency and generalization in reinforcement learning.
+
+    Paper: Cobbe et al. (2019). Leveraging Procedural Generation to Benchmark RL.
+    Repository: https://github.com/openai/procgen
+    """
+
+    env_name: str = "coinrun"
+    """Procgen game name (one of 16: bigfish, bossfight, caveflyer, etc.)."""
+
+    num_levels: int = 0
+    """Number of unique levels (0 = unlimited levels for generalization testing)."""
+
+    start_level: int = 0
+    """Starting level seed for reproducibility."""
+
+    distribution_mode: str = "hard"
+    """Difficulty mode: 'easy', 'hard', 'extreme', 'memory', 'exploration'."""
+
+    use_backgrounds: bool = True
+    """Use human-designed backgrounds (False = pure black)."""
+
+    center_agent: bool = True
+    """Center observations on agent."""
+
+    use_sequential_levels: bool = False
+    """Progress through levels sequentially (like gym-retro)."""
+
+    paint_vel_info: bool = False
+    """Paint velocity info on observations (game-specific)."""
+
+    render_mode: str = "rgb_array"
+    """Render mode requested during environment creation."""
+
+    render_scale: int = 4
+    """Scale factor for 512x512 info["rgb"] (4 = 2048x2048 display)."""
+
+    seed: int | None = None
+    """Default seed forwarded to :meth:`gymnasium.Env.reset`."""
+
+    def to_gym_kwargs(self) -> Dict[str, Any]:
+        """Convert to Gymnasium environment kwargs."""
+        return {
+            "env_name": self.env_name,
+            "num_levels": self.num_levels,
+            "start_level": self.start_level,
+            "distribution_mode": self.distribution_mode,
+            "use_backgrounds": self.use_backgrounds,
+            "center_agent": self.center_agent,
+            "use_sequential_levels": self.use_sequential_levels,
+            "paint_vel_info": self.paint_vel_info,
+            "render_mode": self.render_mode,
+        }
+
+
+@dataclass(frozen=True)
 class ALEConfig:
     """Configuration payload for ALE Atari environments.
 
@@ -521,6 +580,7 @@ GameConfig: TypeAlias = (
     | BipedalWalkerConfig
     | MiniGridConfig
     | CrafterConfig
+    | ProcgenConfig
     | ALEConfig
 )
 
@@ -535,6 +595,7 @@ __all__ = [
     "BipedalWalkerConfig",
     "MiniGridConfig",
     "CrafterConfig",
+    "ProcgenConfig",
     "ALEConfig",
     "GameConfig",
     "DEFAULT_FROZEN_LAKE_CONFIG",
