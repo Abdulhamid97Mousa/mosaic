@@ -6,37 +6,167 @@
 # This file installs a standard development setup with commonly used workers.
 # For minimal or custom installations, use pyproject.toml optional dependencies.
 #
-# INSTALLATION OPTIONS:
+# ==============================================================================
+# INSTALLATION OPTIONS
+# ==============================================================================
 #
-#   Standard (this file):
-#     pip install -r requirements.txt
+# Option 1: Standard Development Setup (this file)
+# ─────────────────────────────────────────────────────────────────────────────
+#   pip install -r requirements.txt
 #
-#   Minimal GUI only:
-#     pip install -e .
+#   Installs: Core GUI + CleanRL + PettingZoo + Jason BDI + SPADE BDI + Chat UI
+#   Size: ~2-3 GB
+#   Use for: Standard RL development with multi-agent support and LLM chat
 #
-#   With specific extras:
-#     pip install -e ".[pettingzoo,cleanrl]"
+# Option 2: Minimal GUI Only
+# ─────────────────────────────────────────────────────────────────────────────
+#   pip install -e .
 #
-#   Full installation:
-#     pip install -e ".[full]"
+#   Installs: Core GUI (PyQt6, replay storage, gRPC infrastructure)
+#   Size: ~500 MB
+#   Use for: Running the GUI without any specific workers/environments
 #
-# WORKER-SPECIFIC REQUIREMENTS:
-#   requirements/base.txt           - Core GUI dependencies
-#   requirements/cleanrl_worker.txt - CleanRL training backend
-#   requirements/pettingzoo.txt     - Multi-agent environments
-#   requirements/vizdoom.txt        - ViZDoom FPS environments
-#   requirements/nethack.txt        - NetHack/MiniHack roguelike environments
-#   requirements/crafter.txt        - Crafter open-world survival benchmark
-#   requirements/ray_worker.txt     - Ray/RLlib distributed training
-#   requirements/xuance_worker.txt  - XuanCe MARL algorithms
-#   requirements/jason_worker.txt   - Jason BDI agents
-#   requirements/spade_bdi_worker.txt - SPADE BDI agents
-#   requirements/llm_worker.txt     - LLM agents with vLLM (BALROG-style)
-#   requirements/chat.txt           - LLM Chat UI (OpenRouter/vLLM)
+# Option 3: GUI with Specific Extras (Recommended for Developers)
+# ─────────────────────────────────────────────────────────────────────────────
+#   pip install -e ".[chat]"                    # Chat UI only
+#   pip install -e ".[chat,pettingzoo]"         # Chat + multi-agent envs
+#   pip install -e ".[chat,cleanrl,pettingzoo]" # Chat + training + envs
+#   pip install -e ".[full]"                    # Everything
 #
-# SYSTEM DEPENDENCIES (Ubuntu/Debian):
+#   Benefits of -e (editable mode):
+#   - Code changes are immediately active (no reinstall needed)
+#   - Perfect for development workflow
+#   - Can import gym_gui from anywhere
+#
+#   Available extras (see pyproject.toml for full list):
+#   - chat           : LLM Chat UI (OpenRouter cloud + vLLM local)
+#   - cleanrl        : CleanRL training algorithms (DQN, PPO, SAC, etc.)
+#   - pettingzoo     : Multi-agent environments (Chess, MPE, etc.)
+#   - vizdoom        : ViZDoom FPS environments
+#   - nethack        : NetHack/MiniHack roguelike environments
+#   - crafter        : Crafter open-world survival benchmark
+#   - procgen        : Procgen procedurally generated benchmark
+#   - ray-rllib      : Ray/RLlib distributed training
+#   - xuance         : XuanCe MARL algorithms
+#   - jason          : Jason BDI agents
+#   - spade-bdi      : SPADE BDI agents
+#   - full           : All of the above
+#
+# ==============================================================================
+# WORKER-SPECIFIC REQUIREMENTS FILES
+# ==============================================================================
+#
+# requirements/base.txt
+#   Core GUI dependencies (PyQt6, HDF5 replay storage, gRPC, YAML config)
+#   Required by all other installation options
+#
+# requirements/cleanrl_worker.txt
+#   CleanRL training backend (PyTorch, Stable-Baselines3, TensorBoard)
+#   Single-agent RL algorithms: DQN, PPO, SAC, TD3, A2C
+#   GPU support via PyTorch CUDA
+#
+# requirements/pettingzoo.txt
+#   Multi-agent environments (PettingZoo, SuperSuit)
+#   Includes: Chess, Go, MPE, Butterfly, SISL, Classic games
+#   Also includes pymunk for physics-based environments
+#
+# requirements/vizdoom.txt
+#   ViZDoom FPS environments for visual RL
+#   Doom-based 3D environments with visual observations
+#
+# requirements/nethack.txt
+#   NetHack Learning Environment (NLE) + MiniHack
+#   Roguelike procedurally generated environments
+#   Requires: build-essential, cmake, flex, bison (system packages)
+#
+# requirements/crafter.txt
+#   Crafter open-world survival benchmark (Hafner 2022, ICLR)
+#   Survival tasks in procedurally generated worlds
+#
+# requirements/ray_worker.txt
+#   Ray/RLlib distributed training framework
+#   Multi-GPU and multi-node RL training
+#   Includes: Ray Tune for hyperparameter optimization
+#
+# requirements/xuance_worker.txt
+#   XuanCe MARL algorithms
+#   Multi-agent reinforcement learning library
+#
+# requirements/jason_worker.txt
+#   Jason BDI (Belief-Desire-Intention) agents
+#   Requires: Java runtime for Jason AgentSpeak
+#
+# requirements/spade_bdi_worker.txt
+#   SPADE BDI agents (Python-based BDI framework)
+#   XMPP-based multi-agent systems
+#
+# requirements/llm_worker.txt
+#   LLM agents with vLLM (BALROG-style agentic evaluation)
+#   For LLM-powered agents in environments (not Chat UI)
+#   Includes: vLLM server, httpx for async requests
+#
+# requirements/chat.txt
+#   LLM Chat UI panel (OpenRouter cloud + vLLM local)
+#   Enables Chat panel in the GUI for interacting with LLMs
+#   Includes: vLLM (466MB), HuggingFace Hub for model downloads
+#   Note: vLLM requires NVIDIA GPU with CUDA support
+#   Installation time: 5-10 minutes for vLLM
+#
+# ==============================================================================
+# SYSTEM DEPENDENCIES (Ubuntu/Debian)
+# ==============================================================================
+#
+# Required for most installations:
+#   sudo apt-get update
 #   sudo apt-get install -y swig python3-dev
 #   sudo apt-get install -y libxcb-cursor0 libxkbcommon-x11-0
+#
+# Additional for NetHack/MiniHack:
+#   sudo apt-get install -y build-essential cmake flex bison
+#
+# For CUDA/GPU support (vLLM, PyTorch):
+#   - NVIDIA drivers: https://ubuntu.com/server/docs/nvidia-drivers-installation
+#   - CUDA toolkit: https://developer.nvidia.com/cuda-downloads
+#   - Verify: nvidia-smi (should show your GPU)
+#
+# ==============================================================================
+# TROUBLESHOOTING
+# ==============================================================================
+#
+# Issue: "vLLM not found" in Chat panel
+# Solution:
+#   1. Check if installed: pip list | grep vllm
+#   2. If missing: pip install vllm (takes 5-10 minutes)
+#   3. Restart the GUI after installation
+#   4. Or use OpenRouter cloud provider instead
+#
+# Issue: Qt platform plugin errors
+# Solution:
+#   sudo apt-get install -y libxcb-cursor0 libxkbcommon-x11-0
+#
+# Issue: CUDA out of memory (vLLM)
+# Solution:
+#   1. Use smaller models (Llama 3.2 1B instead of 8B)
+#   2. Reduce GPU memory: vllm serve ... --gpu-memory-utilization 0.7
+#   3. Or use OpenRouter cloud provider (no GPU required)
+#
+# Issue: NetHack/MiniHack build fails
+# Solution:
+#   sudo apt-get install -y build-essential cmake flex bison
+#
+# Issue: Editable install not working
+# Solution:
+#   1. Uninstall: pip uninstall gym-gui
+#   2. Reinstall: pip install -e ".[chat]"
+#   3. Verify: pip show gym-gui (should show Editable project location)
+#
+# ==============================================================================
+# DOCUMENTATION
+# ==============================================================================
+#
+# - Installation Guide: docs/INSTALLATION_GUIDE.md
+# - Development Progress: docs/Development_Progress/
+# - API Documentation: Use pyright/mypy for type hints
 #
 # ==============================================================================
 
