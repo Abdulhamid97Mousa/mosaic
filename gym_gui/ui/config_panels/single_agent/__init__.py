@@ -34,6 +34,13 @@ from .vizdoom import (
     build_vizdoom_controls,
 )
 
+# Re-export Crafter helpers
+from .crafter import (
+    CRAFTER_GAME_IDS,
+    ControlCallbacks as CrafterControlCallbacks,
+    build_crafter_controls,
+)
+
 __all__ = [
     # Gym family
     "TOY_TEXT_FAMILY",
@@ -57,4 +64,8 @@ __all__ = [
     "VIZDOOM_GAME_IDS",
     "ViZDoomControlCallbacks",
     "build_vizdoom_controls",
+    # Crafter family
+    "CRAFTER_GAME_IDS",
+    "CrafterControlCallbacks",
+    "build_crafter_controls",
 ]

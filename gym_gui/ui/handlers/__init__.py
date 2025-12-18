@@ -58,6 +58,11 @@ from gym_gui.ui.handlers.features import (
     GodotHandler,
     LogHandler,
     HumanVsAgentHandler,
+    PolicyEvaluationHandler,
+    FastLaneTabHandler,
+    TrainingMonitorHandler,
+    TrainingFormHandler,
+    MultiAgentGameHandler,
 )
 
 # Environment loaders
@@ -80,6 +85,11 @@ __all__ = [
     "GodotHandler",
     "LogHandler",
     "HumanVsAgentHandler",
+    "PolicyEvaluationHandler",
+    "FastLaneTabHandler",
+    "TrainingMonitorHandler",
+    "TrainingFormHandler",
+    "MultiAgentGameHandler",
     # Environment loaders
     "ChessEnvLoader",
     "ConnectFourEnvLoader",

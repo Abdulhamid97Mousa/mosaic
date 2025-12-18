@@ -12,6 +12,8 @@ from gym_gui.services.actor import (
     ActorService,
     CleanRLWorkerActor,
     HumanKeyboardActor,
+    XuanCeWorkerActor,
+    RayRLlibWorkerActor,
 )
 from gym_gui.services.policy_mapping import PolicyMappingService
 from gym_gui.services.service_locator import ServiceLocator, get_service_locator
@@ -87,6 +89,20 @@ def bootstrap_default_services() -> ServiceLocator:
         description="Delegates decisions to a CleanRL policy running in the worker process.",
         policy_label="External CleanRL policy",
         backend_label="Trainer-managed worker",
+    )
+    actors.register_actor(
+        XuanCeWorkerActor(),
+        display_name="XuanCe Worker",
+        description="Comprehensive RL library with 46+ algorithms (DQN, PPO, SAC, MAPPO, QMIX).",
+        policy_label="External XuanCe policy",
+        backend_label="Trainer-managed worker",
+    )
+    actors.register_actor(
+        RayRLlibWorkerActor(),
+        display_name="Ray RLlib Worker",
+        description="Distributed multi-agent RL with various training paradigms.",
+        policy_label="External Ray RLlib policy",
+        backend_label="Ray distributed runtime",
     )
 
     action_mapper: ContinuousActionMapper = create_default_action_mapper()

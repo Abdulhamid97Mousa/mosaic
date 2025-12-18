@@ -807,7 +807,19 @@ class MosaicWelcomeWidget(QWidget):
             return
 
         tooltip_width = const.TOOLTIP_WIDTH
-        tooltip_height = 120 + len(features) * const.TOOLTIP_FEATURE_LINE_HEIGHT
+
+        # Calculate description wrapped height
+        desc_font = QFont("Arial", 10)
+        desc_fm = QFontMetrics(desc_font)
+        desc_available_width = tooltip_width - 36  # 18px padding on each side
+        desc_rect = desc_fm.boundingRect(
+            0, 0, desc_available_width, 1000,
+            Qt.TextFlag.TextWordWrap, description
+        )
+        desc_height = max(desc_rect.height(), 18)  # Minimum one line height
+
+        # Base height: title area (35px) + description + gap (15px) + features
+        tooltip_height = 35 + desc_height + 15 + len(features) * const.TOOLTIP_FEATURE_LINE_HEIGHT + 20
 
         tx = self._mouse_pos.x() + const.TOOLTIP_OFFSET_X
         ty = self._mouse_pos.y() - tooltip_height // 2
@@ -850,10 +862,14 @@ class MosaicWelcomeWidget(QWidget):
         painter.setPen(QColor(255, 255, 255, int(255 * self._tooltip_opacity)))
         painter.drawText(int(tx + 18), int(ty + 28), title)
 
-        desc_font = QFont("Arial", 10)
         painter.setFont(desc_font)
         painter.setPen(QColor(180, 190, 210, int(220 * self._tooltip_opacity)))
-        painter.drawText(int(tx + 18), int(ty + 50), description)
+        # Draw description with word wrap
+        desc_draw_rect = QRectF(tx + 18, ty + 35, desc_available_width, desc_height)
+        painter.drawText(desc_draw_rect, Qt.TextFlag.TextWordWrap, description)
+
+        # Features start after description
+        features_start_y = ty + 35 + desc_height + 10
 
         feature_font = QFont("Arial", 9)
         painter.setFont(feature_font)
@@ -863,10 +879,11 @@ class MosaicWelcomeWidget(QWidget):
             bullet_color.setAlpha(int(180 * self._tooltip_opacity))
             painter.setBrush(bullet_color)
             painter.setPen(Qt.PenStyle.NoPen)
-            painter.drawEllipse(int(tx + 22), int(ty + 68 + i * const.TOOLTIP_FEATURE_LINE_HEIGHT), 5, 5)
+            bullet_y = features_start_y + i * const.TOOLTIP_FEATURE_LINE_HEIGHT
+            painter.drawEllipse(int(tx + 22), int(bullet_y), 5, 5)
 
             painter.setPen(QColor(160, 175, 195, int(200 * self._tooltip_opacity)))
-            painter.drawText(int(tx + 34), int(ty + 75 + i * const.TOOLTIP_FEATURE_LINE_HEIGHT), feature)
+            painter.drawText(int(tx + 34), int(bullet_y + 7), feature)
 
     def _draw_text_overlay(self, painter: QPainter, cx: float, height: int) -> None:
         """Draw title and instructions."""

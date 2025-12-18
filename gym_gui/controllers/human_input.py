@@ -441,6 +441,163 @@ _VIZDOOM_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
     ),
 }
 
+# ===========================================================================
+# MiniHack Mappings (roguelike vi-keys + WASD alternatives)
+# NLE action indices: 0-7 = 8 compass directions (N, E, S, W, NE, SE, SW, NW)
+# Many MiniHack envs use Discrete(8) for basic navigation
+# ===========================================================================
+def _minihack_nav_mappings() -> Tuple[ShortcutMapping, ...]:
+    """Standard 8-direction navigation for MiniHack environments."""
+    return (
+        _mapping(("Key_K", "Key_Up", "Key_W"), 0),     # North (up)
+        _mapping(("Key_L", "Key_Right", "Key_D"), 1),  # East (right)
+        _mapping(("Key_J", "Key_Down", "Key_S"), 2),   # South (down)
+        _mapping(("Key_H", "Key_Left", "Key_A"), 3),   # West (left)
+        _mapping(("Key_U",), 4),                        # Northeast (diag)
+        _mapping(("Key_N",), 5),                        # Southeast (diag)
+        _mapping(("Key_B",), 6),                        # Southwest (diag)
+        _mapping(("Key_Y",), 7),                        # Northwest (diag)
+    )
+
+
+_MINIHACK_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
+    # Navigation environments (8 directions)
+    GameId.MINIHACK_ROOM_5X5: _minihack_nav_mappings(),
+    GameId.MINIHACK_ROOM_15X15: _minihack_nav_mappings(),
+    GameId.MINIHACK_CORRIDOR_R2: _minihack_nav_mappings(),
+    GameId.MINIHACK_CORRIDOR_R3: _minihack_nav_mappings(),
+    GameId.MINIHACK_CORRIDOR_R5: _minihack_nav_mappings(),
+    GameId.MINIHACK_MAZEWALK_9X9: _minihack_nav_mappings(),
+    GameId.MINIHACK_MAZEWALK_15X15: _minihack_nav_mappings(),
+    GameId.MINIHACK_MAZEWALK_45X19: _minihack_nav_mappings(),
+    GameId.MINIHACK_RIVER: _minihack_nav_mappings(),
+    GameId.MINIHACK_RIVER_NARROW: _minihack_nav_mappings(),
+    # Exploration environments
+    GameId.MINIHACK_EXPLOREMAZE_EASY: _minihack_nav_mappings(),
+    GameId.MINIHACK_EXPLOREMAZE_HARD: _minihack_nav_mappings(),
+    GameId.MINIHACK_HIDENSEEK: _minihack_nav_mappings(),
+    GameId.MINIHACK_MEMENTO_F2: _minihack_nav_mappings(),
+    GameId.MINIHACK_MEMENTO_F4: _minihack_nav_mappings(),
+    # Skill environments (use fallback for extended actions)
+    GameId.MINIHACK_EAT: _minihack_nav_mappings(),
+    GameId.MINIHACK_WEAR: _minihack_nav_mappings(),
+    GameId.MINIHACK_WIELD: _minihack_nav_mappings(),
+    GameId.MINIHACK_ZAP: _minihack_nav_mappings(),
+    GameId.MINIHACK_READ: _minihack_nav_mappings(),
+    GameId.MINIHACK_QUAFF: _minihack_nav_mappings(),
+    GameId.MINIHACK_PUTON: _minihack_nav_mappings(),
+    GameId.MINIHACK_LAVACROSS: _minihack_nav_mappings(),
+    GameId.MINIHACK_WOD_EASY: _minihack_nav_mappings(),
+    GameId.MINIHACK_WOD_MEDIUM: _minihack_nav_mappings(),
+    GameId.MINIHACK_WOD_HARD: _minihack_nav_mappings(),
+}
+
+# ===========================================================================
+# NetHack Mappings (full game via NLE)
+# NLE has ~113 actions; mapping core navigation here
+# ===========================================================================
+_NETHACK_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
+    # NetHack full game uses same 8-direction navigation as base
+    GameId.NETHACK_FULL: _minihack_nav_mappings(),
+    GameId.NETHACK_SCORE: _minihack_nav_mappings(),
+    GameId.NETHACK_STAIRCASE: _minihack_nav_mappings(),
+    GameId.NETHACK_STAIRCASE_PET: _minihack_nav_mappings(),
+    GameId.NETHACK_ORACLE: _minihack_nav_mappings(),
+    GameId.NETHACK_GOLD: _minihack_nav_mappings(),
+    GameId.NETHACK_EAT: _minihack_nav_mappings(),
+    GameId.NETHACK_SCOUT: _minihack_nav_mappings(),
+}
+
+# ===========================================================================
+# Crafter Mappings (open-world survival benchmark)
+# 17 discrete actions from crafter/data.yaml:
+# 0:noop, 1:move_left, 2:move_right, 3:move_up, 4:move_down, 5:do, 6:sleep,
+# 7:place_stone, 8:place_table, 9:place_furnace, 10:place_plant,
+# 11:make_wood_pickaxe, 12:make_stone_pickaxe, 13:make_iron_pickaxe,
+# 14:make_wood_sword, 15:make_stone_sword, 16:make_iron_sword
+# ===========================================================================
+def _crafter_mappings() -> Tuple[ShortcutMapping, ...]:
+    """Standard 17-action mapping for Crafter environments."""
+    return (
+        # Note: action 0 (noop) has no key - happens on timeout or idle
+        _mapping(("Key_Left", "Key_A"), 1),       # move_left
+        _mapping(("Key_Right", "Key_D"), 2),      # move_right
+        _mapping(("Key_Up", "Key_W"), 3),         # move_up
+        _mapping(("Key_Down", "Key_S"), 4),       # move_down
+        _mapping(("Key_Space",), 5),               # do (interact)
+        _mapping(("Key_R",), 6),                   # sleep
+        _mapping(("Key_1",), 7),                   # place_stone
+        _mapping(("Key_2",), 8),                   # place_table
+        _mapping(("Key_3",), 9),                   # place_furnace
+        _mapping(("Key_4",), 10),                  # place_plant
+        _mapping(("Key_Q",), 11),                  # make_wood_pickaxe
+        _mapping(("Key_E",), 12),                  # make_stone_pickaxe
+        _mapping(("Key_F",), 13),                  # make_iron_pickaxe
+        _mapping(("Key_Z",), 14),                  # make_wood_sword
+        _mapping(("Key_X",), 15),                  # make_stone_sword
+        _mapping(("Key_C",), 16),                  # make_iron_sword
+    )
+
+
+_CRAFTER_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
+    GameId.CRAFTER_REWARD: _crafter_mappings(),
+    GameId.CRAFTER_NO_REWARD: _crafter_mappings(),
+}
+
+# ===========================================================================
+# Procgen Mappings (procedurally generated benchmark - 16 environments)
+# 15 discrete actions (button combinations):
+# 0:down_left, 1:left, 2:up_left, 3:down, 4:noop, 5:up,
+# 6:down_right, 7:right, 8:up_right,
+# 9:action_d (fire), 10:action_a, 11:action_w, 12:action_s, 13:action_q, 14:action_e
+# ===========================================================================
+def _procgen_mappings() -> Tuple[ShortcutMapping, ...]:
+    """Standard 15-action mapping for Procgen environments."""
+    return (
+        # Diagonal: down-left (action 0) - no common key, use numpad 1 or Z
+        _mapping(("Key_Z",), 0),                    # down_left
+        # Cardinal directions using arrow keys
+        _mapping(("Key_Left",), 1),                 # left
+        # Diagonal: up-left (action 2) - use Q
+        _mapping(("Key_Q",), 2),                    # up_left
+        _mapping(("Key_Down",), 3),                 # down
+        # Noop (action 4) - space or 0
+        _mapping(("Key_0",), 4),                    # noop
+        _mapping(("Key_Up",), 5),                   # up
+        # Diagonal: down-right (action 6) - use C
+        _mapping(("Key_C",), 6),                    # down_right
+        _mapping(("Key_Right",), 7),                # right
+        # Diagonal: up-right (action 8) - use E
+        _mapping(("Key_E",), 8),                    # up_right
+        # Game-specific actions (fire/interact buttons)
+        _mapping(("Key_Space", "Key_D"), 9),        # action_d (primary fire/interact)
+        _mapping(("Key_A",), 10),                   # action_a (secondary)
+        _mapping(("Key_W",), 11),                   # action_w (tertiary)
+        _mapping(("Key_S",), 12),                   # action_s (quaternary)
+        _mapping(("Key_1",), 13),                   # action_q (special 1)
+        _mapping(("Key_2",), 14),                   # action_e (special 2)
+    )
+
+
+_PROCGEN_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
+    GameId.PROCGEN_BIGFISH: _procgen_mappings(),
+    GameId.PROCGEN_BOSSFIGHT: _procgen_mappings(),
+    GameId.PROCGEN_CAVEFLYER: _procgen_mappings(),
+    GameId.PROCGEN_CHASER: _procgen_mappings(),
+    GameId.PROCGEN_CLIMBER: _procgen_mappings(),
+    GameId.PROCGEN_COINRUN: _procgen_mappings(),
+    GameId.PROCGEN_DODGEBALL: _procgen_mappings(),
+    GameId.PROCGEN_FRUITBOT: _procgen_mappings(),
+    GameId.PROCGEN_HEIST: _procgen_mappings(),
+    GameId.PROCGEN_JUMPER: _procgen_mappings(),
+    GameId.PROCGEN_LEAPER: _procgen_mappings(),
+    GameId.PROCGEN_MAZE: _procgen_mappings(),
+    GameId.PROCGEN_MINER: _procgen_mappings(),
+    GameId.PROCGEN_NINJA: _procgen_mappings(),
+    GameId.PROCGEN_PLUNDER: _procgen_mappings(),
+    GameId.PROCGEN_STARPILOT: _procgen_mappings(),
+}
+
 _ALE_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
     # Minimal but explicit mapping for core and diagonal moves, plus fire variants via letter keys.
     GameId.ADVENTURE_V4: (
@@ -549,6 +706,14 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
                 mappings = _ALE_MAPPINGS.get(game_id)
             if mappings is None:
                 mappings = _VIZDOOM_MAPPINGS.get(game_id)
+            if mappings is None:
+                mappings = _MINIHACK_MAPPINGS.get(game_id)
+            if mappings is None:
+                mappings = _NETHACK_MAPPINGS.get(game_id)
+            if mappings is None:
+                mappings = _CRAFTER_MAPPINGS.get(game_id)
+            if mappings is None:
+                mappings = _PROCGEN_MAPPINGS.get(game_id)
             if mappings is None and isinstance(action_space, spaces.Discrete):
                 mappings = self._fallback_mappings(action_space)
 

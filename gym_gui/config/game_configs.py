@@ -64,25 +64,25 @@ class FrozenLakeConfig:
     
     def to_gym_kwargs(self) -> Dict[str, Any]:
         """Convert to Gymnasium environment kwargs.
-        
-        For FrozenLake-v1: Pass only is_slippery, success_rate, reward_schedule.
+
+        For FrozenLake-v1: Pass only is_slippery (Gymnasium 1.0.0 compatible).
                           Do NOT pass map_name or grid dimensions.
-        
-        For FrozenLake-v2: Pass all parameters; custom map generation handled by adapter
-                           when grid dimensions or positions deviate from defaults.
+
+        For FrozenLake-v2: Custom map generation handled by adapter.
+
+        Note: success_rate and reward_schedule require Gymnasium >= 1.1.0
+        and are NOT passed to gym.make() in current implementation.
         """
         kwargs: Dict[str, Any] = {
             "is_slippery": self.is_slippery,
-            "success_rate": self.success_rate,
-            "reward_schedule": self.reward_schedule,
         }
-        
+
         # Note: grid_height, grid_width, start_position, goal_position, and hole_count
         # should only be used by FrozenLakeV2Adapter._generate_map_descriptor().
         # DO NOT pass map_name to Gymnasium for v1 (causes initialization failure).
         # FrozenLakeV2Adapter handles custom map generation separately via gym_kwargs()
         # in its subclass override.
-        
+
         return kwargs
 
 
@@ -347,15 +347,7 @@ class MiniGridConfig:
         return kwargs
 
 
-GameConfig: TypeAlias = (
-    FrozenLakeConfig
-    | TaxiConfig
-    | CliffWalkingConfig
-    | LunarLanderConfig
-    | CarRacingConfig
-    | BipedalWalkerConfig
-    | MiniGridConfig
-)
+# GameConfig type alias is defined after all config classes (see below)
 
 
 # Default configurations for each game
@@ -433,6 +425,111 @@ DEFAULT_MINIGRID_REDBLUE_DOORS_8x8_CONFIG = MiniGridConfig(
 # ---------------------------------------------------------------------------
 
 @dataclass(frozen=True)
+class CrafterConfig:
+    """Configuration payload for Crafter environments.
+
+    Crafter is an open world survival game benchmark for reinforcement learning
+    that evaluates a wide range of agent capabilities within a single environment.
+
+    Paper: Hafner, D. (2022). Benchmarking the Spectrum of Agent Capabilities. ICLR 2022.
+    Repository: https://github.com/danijar/crafter
+    """
+
+    env_id: str = GameId.CRAFTER_REWARD.value
+    """Gymnasium environment identifier (e.g., ``CrafterReward-v1``)."""
+
+    area: tuple[int, int] = (64, 64)
+    """World dimensions (width, height). Default is 64x64."""
+
+    view: tuple[int, int] = (9, 9)
+    """Agent viewport dimensions (width, height). Default is 9x9."""
+
+    size: tuple[int, int] = (512, 512)
+    """Rendered image size (width, height). Default is 512x512 for GUI visibility."""
+
+    reward: bool = True
+    """Enable rewards. Set to False for CrafterNoReward-v1 variant."""
+
+    length: int = 10000
+    """Maximum episode steps. Default is 10,000."""
+
+    seed: int | None = None
+    """Default seed forwarded to :meth:`gymnasium.Env.reset`."""
+
+    render_mode: str = "rgb_array"
+    """Render mode requested during environment creation."""
+
+    reward_multiplier: float = 1.0
+    """Scalar applied to environment rewards."""
+
+    def to_gym_kwargs(self) -> Dict[str, Any]:
+        """Convert to Gymnasium environment kwargs."""
+        kwargs: Dict[str, Any] = {"render_mode": self.render_mode}
+        # Note: area, view, size, reward, length are typically passed
+        # during environment creation for custom configurations
+        return kwargs
+
+
+@dataclass(frozen=True)
+class ProcgenConfig:
+    """Configuration payload for Procgen environments.
+
+    Procgen provides 16 procedurally-generated game-like environments designed
+    to measure sample efficiency and generalization in reinforcement learning.
+
+    Paper: Cobbe et al. (2019). Leveraging Procedural Generation to Benchmark RL.
+    Repository: https://github.com/openai/procgen
+    """
+
+    env_name: str = "coinrun"
+    """Procgen game name (one of 16: bigfish, bossfight, caveflyer, etc.)."""
+
+    num_levels: int = 0
+    """Number of unique levels (0 = unlimited levels for generalization testing)."""
+
+    start_level: int = 0
+    """Starting level seed for reproducibility."""
+
+    distribution_mode: str = "hard"
+    """Difficulty mode: 'easy', 'hard', 'extreme', 'memory', 'exploration'."""
+
+    use_backgrounds: bool = True
+    """Use human-designed backgrounds (False = pure black)."""
+
+    center_agent: bool = True
+    """Center observations on agent."""
+
+    use_sequential_levels: bool = False
+    """Progress through levels sequentially (like gym-retro)."""
+
+    paint_vel_info: bool = False
+    """Paint velocity info on observations (game-specific)."""
+
+    render_mode: str = "rgb_array"
+    """Render mode requested during environment creation."""
+
+    render_scale: int = 4
+    """Scale factor for 512x512 info["rgb"] (4 = 2048x2048 display)."""
+
+    seed: int | None = None
+    """Default seed forwarded to :meth:`gymnasium.Env.reset`."""
+
+    def to_gym_kwargs(self) -> Dict[str, Any]:
+        """Convert to Gymnasium environment kwargs."""
+        return {
+            "env_name": self.env_name,
+            "num_levels": self.num_levels,
+            "start_level": self.start_level,
+            "distribution_mode": self.distribution_mode,
+            "use_backgrounds": self.use_backgrounds,
+            "center_agent": self.center_agent,
+            "use_sequential_levels": self.use_sequential_levels,
+            "paint_vel_info": self.paint_vel_info,
+            "render_mode": self.render_mode,
+        }
+
+
+@dataclass(frozen=True)
 class ALEConfig:
     """Configuration payload for ALE Atari environments.
 
@@ -473,6 +570,21 @@ class ALEConfig:
         return kwargs
 
 
+# Type alias for all game configuration types
+GameConfig: TypeAlias = (
+    FrozenLakeConfig
+    | TaxiConfig
+    | CliffWalkingConfig
+    | LunarLanderConfig
+    | CarRacingConfig
+    | BipedalWalkerConfig
+    | MiniGridConfig
+    | CrafterConfig
+    | ProcgenConfig
+    | ALEConfig
+)
+
+
 __all__ = [
     "FrozenLakeConfig",
     "TaxiConfig",
@@ -482,6 +594,8 @@ __all__ = [
     "CarRacingConfig",
     "BipedalWalkerConfig",
     "MiniGridConfig",
+    "CrafterConfig",
+    "ProcgenConfig",
     "ALEConfig",
     "GameConfig",
     "DEFAULT_FROZEN_LAKE_CONFIG",

@@ -117,6 +117,24 @@ class TestMetadataExtraction:
         env_id = _get_env_id_from_metadata(metadata)
         assert env_id == ""
 
+    def test_get_num_workers_from_metadata(self):
+        """Extract num_workers from metadata."""
+        metadata = {
+            "worker": {
+                "config": {
+                    "resources": {"num_workers": 2},
+                }
+            }
+        }
+        num_workers = _get_num_workers_from_metadata(metadata)
+        assert num_workers == 2
+
+    def test_get_num_workers_default_to_zero(self):
+        """Returns 0 if resources.num_workers not found."""
+        metadata = {"worker": {"config": {}}}
+        num_workers = _get_num_workers_from_metadata(metadata)
+        assert num_workers == 0
+
 
 class TestGridDimensions:
     """Test grid dimension calculations for multi-worker display."""
@@ -219,8 +237,8 @@ class TestRayGridTabNaming:
         stream_ids = _build_ray_stream_ids(run_id, num_workers)
 
         assert stream_ids == [
-            "01KCC1DJ2BJM9PWZ727ACYZMJX-worker-1",
-            "01KCC1DJ2BJM9PWZ727ACYZMJX-worker-2",
+            "01KCC1DJ2BJM9PWZ727ACYZMJX-w1",
+            "01KCC1DJ2BJM9PWZ727ACYZMJX-w2",
         ]
 
     def test_ray_worker_stream_ids_single_worker(self):
@@ -230,7 +248,7 @@ class TestRayGridTabNaming:
 
         stream_ids = _build_ray_stream_ids(run_id, num_workers)
 
-        assert stream_ids == ["01KCC1DJ2BJM9PWZ727ACYZMJX-worker-0"]
+        assert stream_ids == ["01KCC1DJ2BJM9PWZ727ACYZMJX-w0"]
 
 
 class TestCleanRLTabNaming:
@@ -364,6 +382,23 @@ def _get_env_id_from_metadata(metadata: Dict[str, Any]) -> str:
     return ""
 
 
+def _get_num_workers_from_metadata(metadata: Dict[str, Any]) -> int:
+    """Extract num_workers from metadata (default 0 for single worker).
+
+    Mirrors the logic in FastLaneTabHandler.get_num_workers
+    """
+    worker_meta = metadata.get("worker") if isinstance(metadata, dict) else None
+    if isinstance(worker_meta, dict):
+        worker_config = worker_meta.get("config")
+        if isinstance(worker_config, dict):
+            resources = worker_config.get("resources")
+            if isinstance(resources, dict):
+                num_workers = resources.get("num_workers")
+                if isinstance(num_workers, int):
+                    return num_workers
+    return 0
+
+
 def _get_ray_active_worker_indices(num_workers: int) -> List[int]:
     """Get list of ACTIVE worker indices only.
 
@@ -398,11 +433,11 @@ def _build_ray_grid_tab_title(
 def _build_ray_stream_ids(run_id: str, num_workers: int) -> List[str]:
     """Build stream IDs for ACTIVE Ray workers only.
 
-    - num_workers=0: [{run_id}-worker-0]
-    - num_workers=2: [{run_id}-worker-1, {run_id}-worker-2]
+    - num_workers=0: [{run_id}-w0]
+    - num_workers=2: [{run_id}-w1, {run_id}-w2]
     """
     worker_indices = _get_ray_active_worker_indices(num_workers)
-    return [f"{run_id}-worker-{idx}" for idx in worker_indices]
+    return [f"{run_id}-w{idx}" for idx in worker_indices]
 
 
 def _build_tab_title(

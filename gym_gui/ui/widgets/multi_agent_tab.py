@@ -9,7 +9,7 @@ This widget provides three game modes for multi-agent environments:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, TYPE_CHECKING
 
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import pyqtSignal
@@ -30,13 +30,14 @@ from gym_gui.core.pettingzoo_enums import (
     get_human_vs_agent_envs,
     is_aec_env,
 )
-from gym_gui.ui.workers import WorkerDefinition, get_worker_catalog
+from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
 from gym_gui.ui.widgets.human_vs_agent_config_form import (
     HumanVsAgentConfigForm,
     HumanVsAgentConfig,
     DIFFICULTY_PRESETS,
 )
 from gym_gui.ui.widgets.policy_assignment_panel import PolicyAssignmentPanel
+from gym_gui.ui.widgets.load_policy_dialog import LoadPolicyDialog
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -665,10 +666,25 @@ class MultiAgentCooperationTab(QtWidgets.QWidget):
 
         try:
             # Try to create environment and get agents
-            from gym_gui.core.adapters.pettingzoo import PettingZooAdapter
-            adapter = PettingZooAdapter()
-            adapter.load_game(env_id, {"family": family})
-            agent_ids = list(adapter.possible_agents) if hasattr(adapter, 'possible_agents') else []
+            from gym_gui.core.adapters.pettingzoo import PettingZooAdapter, PettingZooConfig
+            from gym_gui.core.pettingzoo_enums import PettingZooEnvId, PettingZooFamily as PZFamily
+
+            # Create config for the environment
+            try:
+                pz_env_id = PettingZooEnvId(env_id)
+                pz_family = PZFamily(family)
+            except ValueError:
+                return ["agent_0", "agent_1"]
+
+            config = PettingZooConfig(env_id=pz_env_id, family=pz_family)
+            adapter = PettingZooAdapter(config=config)
+            adapter.load()
+
+            # Get possible agents from the underlying environment
+            if hasattr(adapter, '_pz_env') and adapter._pz_env is not None:
+                agent_ids = list(adapter._pz_env.possible_agents)
+            else:
+                agent_ids = []
             adapter.close()
             return agent_ids
         except Exception as e:
@@ -690,11 +706,30 @@ class MultiAgentCooperationTab(QtWidgets.QWidget):
             self.train_requested.emit(worker_id, env_id)
 
     def _on_evaluate(self) -> None:
-        """Handle evaluate button click."""
+        """Handle evaluate/load policy button click."""
+        env_id = self._env_combo.currentData()
+
+        # Open the LoadPolicyDialog with environment filter
+        dialog = LoadPolicyDialog(
+            self,
+            filter_env=env_id,
+            filter_worker="ray",  # Default to Ray for multi-agent
+        )
+        dialog.policy_selected.connect(self._on_policy_loaded)
+        dialog.exec()
+
+    def _on_policy_loaded(self, checkpoint: Any) -> None:
+        """Handle policy loaded from dialog."""
         worker_id = self._worker_combo.currentData()
         env_id = self._env_combo.currentData()
         if worker_id and env_id:
+            # Emit with checkpoint info
             self.evaluate_requested.emit(worker_id, env_id)
+            _LOGGER.info(
+                "Policy loaded for evaluation: %s (env=%s)",
+                getattr(checkpoint, 'run_id', 'unknown'),
+                env_id,
+            )
 
 
 class MultiAgentCompetitionTab(QtWidgets.QWidget):
@@ -926,10 +961,25 @@ class MultiAgentCompetitionTab(QtWidgets.QWidget):
             return []
 
         try:
-            from gym_gui.core.adapters.pettingzoo import PettingZooAdapter
-            adapter = PettingZooAdapter()
-            adapter.load_game(env_id, {"family": family})
-            agent_ids = list(adapter.possible_agents) if hasattr(adapter, 'possible_agents') else []
+            from gym_gui.core.adapters.pettingzoo import PettingZooAdapter, PettingZooConfig
+            from gym_gui.core.pettingzoo_enums import PettingZooEnvId, PettingZooFamily as PZFamily
+
+            # Create config for the environment
+            try:
+                pz_env_id = PettingZooEnvId(env_id)
+                pz_family = PZFamily(family)
+            except ValueError:
+                return ["agent_0", "agent_1"]
+
+            config = PettingZooConfig(env_id=pz_env_id, family=pz_family)
+            adapter = PettingZooAdapter(config=config)
+            adapter.load()
+
+            # Get possible agents from the underlying environment
+            if hasattr(adapter, '_pz_env') and adapter._pz_env is not None:
+                agent_ids = list(adapter._pz_env.possible_agents)
+            else:
+                agent_ids = []
             adapter.close()
             return agent_ids
         except Exception as e:
@@ -953,11 +1003,30 @@ class MultiAgentCompetitionTab(QtWidgets.QWidget):
             self.train_requested.emit(worker_id, env_id)
 
     def _on_evaluate(self) -> None:
-        """Handle evaluate button click."""
+        """Handle evaluate/load policy button click."""
+        env_id = self._env_combo.currentData()
+
+        # Open the LoadPolicyDialog with environment filter
+        dialog = LoadPolicyDialog(
+            self,
+            filter_env=env_id,
+            filter_worker="ray",  # Default to Ray for multi-agent
+        )
+        dialog.policy_selected.connect(self._on_policy_loaded)
+        dialog.exec()
+
+    def _on_policy_loaded(self, checkpoint: Any) -> None:
+        """Handle policy loaded from dialog."""
         worker_id = self._worker_combo.currentData()
         env_id = self._env_combo.currentData()
         if worker_id and env_id:
+            # Emit with checkpoint info
             self.evaluate_requested.emit(worker_id, env_id)
+            _LOGGER.info(
+                "Policy loaded for evaluation: %s (env=%s)",
+                getattr(checkpoint, 'run_id', 'unknown'),
+                env_id,
+            )
 
 
 class MultiAgentTab(QtWidgets.QWidget):

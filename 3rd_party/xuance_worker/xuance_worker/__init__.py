@@ -1,35 +1,90 @@
-"""XuanCe worker integration for MOSAIC BDI-RL framework.
+"""XuanCe Worker - MOSAIC Integration for XuanCe RL Library.
 
-This module provides the integration layer between MOSAIC's GUI and
-XuanCe's comprehensive deep reinforcement learning library.
+This module provides CLI and programmatic interfaces for running XuanCe
+algorithms within the MOSAIC framework.
+
+XuanCe is a comprehensive deep reinforcement learning library with 46+
+algorithms supporting single-agent, multi-agent, and offline RL.
 
 Key Features:
-- Single-agent RL: DQN, PPO, SAC, TD3, DDPG, A2C, and many more
-- Multi-agent RL (MARL): MAPPO, MADDPG, QMIX, VDN, COMA, and more
-- Support for PyTorch, TensorFlow, and MindSpore backends
-- Integration with MOSAIC's PolicyMappingService
+- Single-agent RL: DQN, PPO, SAC, TD3, DDPG, A2C, DreamerV3
+- Multi-agent RL: MAPPO, MADDPG, QMIX, VDN, COMA
+- Multiple backends: PyTorch (primary), TensorFlow, MindSpore
+- Integration with MOSAIC's training and telemetry infrastructure
 
-Supported Algorithms:
-    Single-Agent: DQN, DDQN, DuelingDQN, NoisyDQN, C51, QRDQN, PG, A2C, PPO,
-                  PPG, DDPG, TD3, SAC, DRQN, DreamerV2, DreamerV3
-    Multi-Agent:  IQL, VDN, QMIX, WQMIX, QTRAN, DCG, MAPPO, MADDPG, MATD3,
-                  MASAC, IPPO, ISAC, IAC, COMA, MeanField
+Supported Runners:
+- RunnerDRL: Single-agent Gymnasium environments
+- RunnerMARL: Multi-agent cooperative environments (SMAC, etc.)
+- RunnerPettingzoo: PettingZoo environments
+- RunnerStarCraft2: StarCraft Multi-Agent Challenge
+- RunnerFootball: Google Research Football
 
 Example:
-    from xuance_worker import XuanCeWorker
+    >>> from xuance_worker import XuanCeWorkerConfig, XuanCeWorkerRuntime
+    >>>
+    >>> config = XuanCeWorkerConfig(
+    ...     run_id="test_run",
+    ...     method="ppo",
+    ...     env="classic_control",
+    ...     env_id="CartPole-v1",
+    ...     running_steps=100000,
+    ... )
+    >>> runtime = XuanCeWorkerRuntime(config)
+    >>> summary = runtime.run()
+    >>> print(summary.status)
+    'completed'
 
-    worker = XuanCeWorker(config={
-        "algorithm": "MAPPO",
-        "env_id": "simple_spread_v3",
-        "backend": "torch",
-    })
-    worker.train(total_timesteps=100000)
+CLI Usage:
+    # Direct parameter mode
+    xuance-worker --method ppo --env classic_control --env-id CartPole-v1
+
+    # Config file mode
+    xuance-worker --config /path/to/config.json
+
+    # Dry-run mode
+    xuance-worker --method dqn --env atari --env-id Pong-v5 --dry-run
 """
 
 from __future__ import annotations
+
+from .config import XuanCeWorkerConfig
+from .runtime import XuanCeRuntimeSummary, XuanCeWorkerRuntime
+from .cli import main
+from .algorithm_registry import (
+    Backend,
+    Paradigm,
+    AlgorithmInfo,
+    get_algorithms,
+    get_algorithms_for_backend,
+    get_algorithms_for_paradigm,
+    get_algorithm_info,
+    get_algorithm_choices,
+    get_algorithms_by_category,
+    is_algorithm_available,
+    get_backend_summary,
+)
 
 __version__ = "0.1.0"
 
 __all__ = [
     "__version__",
+    # Configuration
+    "XuanCeWorkerConfig",
+    # Runtime
+    "XuanCeWorkerRuntime",
+    "XuanCeRuntimeSummary",
+    # CLI
+    "main",
+    # Algorithm Registry
+    "Backend",
+    "Paradigm",
+    "AlgorithmInfo",
+    "get_algorithms",
+    "get_algorithms_for_backend",
+    "get_algorithms_for_paradigm",
+    "get_algorithm_info",
+    "get_algorithm_choices",
+    "get_algorithms_by_category",
+    "is_algorithm_available",
+    "get_backend_summary",
 ]

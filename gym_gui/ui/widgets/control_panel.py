@@ -52,8 +52,14 @@ from gym_gui.ui.config_panels.single_agent.vizdoom import (
     ControlCallbacks as ViZDoomControlCallbacks,
     build_vizdoom_controls,
 )
+from gym_gui.ui.config_panels.single_agent.procgen import (
+    PROCGEN_GAME_IDS,
+    ControlCallbacks as ProcgenControlCallbacks,
+    build_procgen_controls,
+)
 from gym_gui.core.adapters.vizdoom import ViZDoomConfig
-from gym_gui.ui.workers import WorkerDefinition, get_worker_catalog
+from gym_gui.config.game_configs import ProcgenConfig
+from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
 from gym_gui.ui.widgets.mujoco_mpc_tab import MuJoCoMPCTab
 from gym_gui.ui.widgets.multi_agent_tab import MultiAgentTab
 from gym_gui.ui.widgets.advanced_config import AdvancedConfigTab
@@ -127,6 +133,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
     multi_agent_load_requested = pyqtSignal(str, int)  # env_id, seed
     multi_agent_start_requested = pyqtSignal(str, str, int)  # env_id, human_agent, seed
     multi_agent_reset_requested = pyqtSignal(int)  # seed
+    policy_evaluate_requested = pyqtSignal(dict)  # Full evaluation config with policies
     # Advanced Mode signals - emitted from the Advanced Config tab
     advanced_launch_requested = pyqtSignal(object)  # LaunchConfig
     advanced_env_load_requested = pyqtSignal(str, int)  # env_id, seed
@@ -702,6 +709,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._multi_agent_tab.load_environment_requested.connect(self._on_multi_agent_load_requested)
         self._multi_agent_tab.start_game_requested.connect(self.multi_agent_start_requested)
         self._multi_agent_tab.reset_game_requested.connect(self.multi_agent_reset_requested)
+        self._multi_agent_tab.policy_evaluate_requested.connect(self._on_policy_evaluate_requested)
 
         # MuJoCo MPC Tab - launcher for MPC visualization in Render View
         self._mujoco_mpc_tab = MuJoCoMPCTab(self)
@@ -1575,6 +1583,19 @@ class ControlPanelWidget(QtWidgets.QWidget):
                 defaults=defaults,
                 callbacks=callbacks,
             )
+        elif self._current_game is not None and self._current_game in PROCGEN_GAME_IDS:
+            current_game = self._current_game
+            overrides = self._game_overrides.setdefault(current_game, {})
+            callbacks = ProcgenControlCallbacks(on_change=self._on_procgen_config_changed)
+            defaults = ProcgenConfig()
+            build_procgen_controls(
+                parent=self._config_group,
+                layout=self._config_layout,
+                game_id=current_game,
+                overrides=overrides,
+                defaults=defaults,
+                callbacks=callbacks,
+            )
         else:
             label = QtWidgets.QLabel(
                 "No additional configuration options for this environment.",
@@ -1598,6 +1619,13 @@ class ControlPanelWidget(QtWidgets.QWidget):
         overrides[param_name] = value
         self.vizdoom_config_changed.emit(param_name, value)
 
+    def _on_procgen_config_changed(self, param_name: str, value: object) -> None:
+        current_game = self._current_game
+        if current_game is None:
+            return
+        overrides = self._game_overrides.setdefault(current_game, {})
+        overrides[param_name] = value
+
     # ------------------------------------------------------------------
     # Multi-Agent Tab Handlers
     # ------------------------------------------------------------------
@@ -1612,6 +1640,30 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._current_worker_id = worker_id
         self.worker_changed.emit(worker_id)
         self.trained_agent_requested.emit(worker_id)
+
+    def _on_policy_evaluate_requested(self, config: dict) -> None:
+        """Handle policy evaluation request from PolicyAssignmentPanel.
+
+        This is triggered when user clicks 'Evaluate Policies' in the
+        Cooperation/Competition tab after assigning policies to agents.
+
+        Args:
+            config: Evaluation configuration containing:
+                - mode: "evaluate"
+                - agent_policies: {agent_id: checkpoint_path}
+                - policy_types: {agent_id: "ray" | "cleanrl" | "random"}
+                - agents: list of agent IDs
+                - env_id: environment ID
+                - env_family: environment family
+                - worker_id: worker ID
+        """
+        import logging
+        _logger = logging.getLogger(__name__)
+
+        _logger.info("Policy evaluation requested: %s", config)
+
+        # Forward to main window via signal
+        self.policy_evaluate_requested.emit(config)
 
     def _on_multi_agent_load_requested(self, env_id: str, seed: int) -> None:
         """Handle environment load request from Multi-Agent tab (Human vs Agent mode)."""

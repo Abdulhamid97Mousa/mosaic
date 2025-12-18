@@ -85,25 +85,10 @@ PPO_ATARI_HTML = (
     "<p>Ensure the environment is wrapped with <code>cleanrl_utils.wrappers.AtariWrapper</code> for evaluation.</p>"
 )
 
-PPO_PROCGEN_HTML = (
-    "<h3>PPO Procgen / EnvPool</h3>"
-    "<p>Targets high-throughput procedurally generated environments. Emphasizes scale over per-env fidelity.</p>"
-    "<ul>"
-    "<li><strong>Total Timesteps</strong>: 50e6 – 200e6 (Procgen rewards are sparse).</li>"
-    "<li><strong>num_envs</strong>: 64 (CPU) or leverage EnvPool for thousands of async envs.</li>"
-    "<li><strong>num_steps</strong>: 256, <strong>batch_size</strong>: 16384.</li>"
-    "<li><strong>learning_rate</strong>: 5e-4, <strong>gamma</strong>: 0.999, <strong>gae_lambda</strong>: 0.95.</li>"
-    "<li><strong>Entropic regularization</strong>: raise <code>ent_coef</code> to 0.01–0.05 to encourage exploration.</li>"
-    "</ul>"
-    "<p>Enable <code>track_wandb</code> to monitor <code>eval/episodic_return</code> across generated levels.</p>"
-)
-
 ALGO_DOCS = {
     "ppo": PPO_BASE_HTML,
     "ppo_continuous_action": PPO_CONTINUOUS_HTML,
     "ppo_atari": PPO_ATARI_HTML,
-    "ppg_procgen": PPO_PROCGEN_HTML,
-    "ppo_rnd_envpool": PPO_PROCGEN_HTML,
 }
 
 DEFAULT_PPO_DOC = PPO_BASE_HTML
@@ -114,5 +99,4 @@ __all__ = [
     "PPO_BASE_HTML",
     "PPO_CONTINUOUS_HTML",
     "PPO_ATARI_HTML",
-    "PPO_PROCGEN_HTML",
 ]

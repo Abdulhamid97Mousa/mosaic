@@ -38,7 +38,7 @@ try:
         VAR_WANDB_DIR,
         ensure_var_directories,
     )
-    from gym_gui.constants import (
+    from gym_gui.constants.constants_tensorboard import (
         build_tensorboard_log_dir,
         build_tensorboard_relative_path,
     )

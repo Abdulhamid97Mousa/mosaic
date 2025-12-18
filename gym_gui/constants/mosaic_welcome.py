@@ -104,9 +104,14 @@ class OrbitRingConfig:
 
 
 ORBIT_RINGS = [
+    # Inner orbits (Workers/Paradigms - close to MOSAIC)
     OrbitRingConfig(tilt_x=75, tilt_z=0, radius=1.0, rotation_speed=0.03),
     OrbitRingConfig(tilt_x=75, tilt_z=60, radius=1.05, rotation_speed=-0.02),
     OrbitRingConfig(tilt_x=75, tilt_z=120, radius=1.1, rotation_speed=0.025),
+    # Outer orbits (Research Environments - further from MOSAIC)
+    OrbitRingConfig(tilt_x=70, tilt_z=30, radius=1.45, rotation_speed=0.015),
+    OrbitRingConfig(tilt_x=70, tilt_z=90, radius=1.6, rotation_speed=-0.012),
+    OrbitRingConfig(tilt_x=70, tilt_z=150, radius=1.75, rotation_speed=0.01),
 ]
 
 # Ring visual settings
@@ -189,9 +194,80 @@ SATELLITES = [
         orbit_radius=1.0,
         speed=0.6,
         phase=225,
-        description="Godot Engine - 3D Game Environments",
-        features=["Custom 3D worlds", "Game AI training", "Procedural content", "Cross-platform"],
+        description="Godot Engine - Free & Open Source Game Engine",
+        features=["2D and 3D game development", "GDScript & C# support", "Cross-platform export", "godotengine.org"],
         ring_index=2
+    ),
+    SatelliteConfig(
+        name="CleanRL",
+        color=(55, 71, 79),  # Blue-grey
+        orbit_radius=1.0,
+        speed=0.6,
+        phase=135,
+        description="CleanRL - Single-file RL Implementations",
+        features=["Reference implementations", "PyTorch-based", "WandB integration", "github.com/vwxyzjn/cleanrl"],
+        ring_index=2
+    ),
+    SatelliteConfig(
+        name="XuanCe",
+        color=(25, 118, 210),  # Blue
+        orbit_radius=1.0,
+        speed=0.6,
+        phase=315,
+        description="XuanCe - Comprehensive DRL Library",
+        features=["PyTorch/TensorFlow/MindSpore", "50+ algorithms", "Single & Multi-agent", "github.com/agi-brain/xuance"],
+        ring_index=2
+    ),
+    SatelliteConfig(
+        name="Ray RLlib",
+        color=(0, 188, 212),  # Cyan (matches HTML color scheme)
+        orbit_radius=1.0,
+        speed=0.55,
+        phase=270,
+        description="Ray RLlib - Scalable Reinforcement Learning",
+        features=["Distributed training at scale", "Multi-agent support", "Industry-grade performance", "docs.ray.io/en/latest/rllib"],
+        ring_index=2
+    ),
+    # Outer orbit environments (Research Environments)
+    SatelliteConfig(
+        name="NetHack",
+        color=(139, 0, 0),  # Dark red
+        orbit_radius=1.0,
+        speed=0.4,
+        phase=0,
+        description="NetHack Learning Environment (NLE)",
+        features=["Procedurally generated roguelike", "Hard exploration challenge", "NeurIPS 2020 benchmark", "github.com/facebookresearch/nle"],
+        ring_index=3
+    ),
+    SatelliteConfig(
+        name="MiniHack",
+        color=(255, 102, 0),  # Orange
+        orbit_radius=1.0,
+        speed=0.35,
+        phase=120,
+        description="MiniHack - Customizable RL Sandbox",
+        features=["Built on NetHack/NLE", "Custom environment design", "Level editor support", "github.com/facebookresearch/minihack"],
+        ring_index=4
+    ),
+    SatelliteConfig(
+        name="Crafter",
+        color=(34, 139, 34),  # Forest green
+        orbit_radius=1.0,
+        speed=0.3,
+        phase=240,
+        description="Crafter - Open World Survival Benchmark",
+        features=["22 achievement tasks", "Procedural 2D worlds", "Agent capability spectrum", "github.com/danijar/crafter"],
+        ring_index=5
+    ),
+    SatelliteConfig(
+        name="Procgen",
+        color=(128, 0, 128),  # Purple
+        orbit_radius=1.0,
+        speed=0.32,
+        phase=60,
+        description="Procgen - Procedurally Generated Benchmark",
+        features=["16 diverse environments", "Tests generalization", "Procedural level generation", "github.com/openai/procgen"],
+        ring_index=5
     ),
 ]
 

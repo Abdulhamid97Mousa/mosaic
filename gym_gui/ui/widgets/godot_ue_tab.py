@@ -1,7 +1,7 @@
-"""Godot UE Tab Widget for the control panel sidebar.
+"""Godot Game Engine Tab Widget for the control panel sidebar.
 
 This module provides a launcher tab for Godot game engine sessions.
-Godot serves as our first "Unreal Engine" style 3D environment integration.
+Godot 4.x is used for 3D RL environment integration.
 
 When launched, Godot opens either as an external window or embedded.
 
@@ -73,14 +73,10 @@ class GodotUETab(QtWidgets.QWidget):
         """Create an info banner explaining Godot integration."""
         banner = QtWidgets.QFrame(self)
         banner.setFrameShape(QtWidgets.QFrame.Shape.StyledPanel)
-        banner.setStyleSheet(
-            "QFrame { background-color: #f3e8ff; border: 1px solid #c4b5d4; "
-            "border-radius: 4px; padding: 8px; }"
-        )
         layout = QtWidgets.QVBoxLayout(banner)
         layout.setContentsMargins(8, 8, 8, 8)
 
-        title = QtWidgets.QLabel("<b>Godot Game Engine (UE)</b>", banner)
+        title = QtWidgets.QLabel("<b>Godot Game Engine</b>", banner)
         layout.addWidget(title)
 
         desc = QtWidgets.QLabel(
@@ -91,7 +87,6 @@ class GodotUETab(QtWidgets.QWidget):
             banner
         )
         desc.setWordWrap(True)
-        desc.setStyleSheet("color: #555; font-size: 11px;")
         layout.addWidget(desc)
 
         return banner
@@ -127,36 +122,18 @@ class GodotUETab(QtWidgets.QWidget):
 
         # Launch button
         self._launch_btn = QtWidgets.QPushButton("Launch Godot", group)
-        self._launch_btn.setMinimumHeight(40)
-        self._launch_btn.setStyleSheet(
-            "QPushButton { background-color: #7c3aed; color: white; "
-            "font-weight: bold; border-radius: 4px; font-size: 14px; }"
-            "QPushButton:hover { background-color: #6d28d9; }"
-            "QPushButton:disabled { background-color: #cccccc; }"
-        )
+        self._launch_btn.setMinimumHeight(36)
         layout.addWidget(self._launch_btn)
 
         # Launch Editor button
         self._editor_btn = QtWidgets.QPushButton("Launch Editor", group)
-        self._editor_btn.setMinimumHeight(40)
-        self._editor_btn.setStyleSheet(
-            "QPushButton { background-color: #2563eb; color: white; "
-            "font-weight: bold; border-radius: 4px; font-size: 14px; }"
-            "QPushButton:hover { background-color: #1d4ed8; }"
-            "QPushButton:disabled { background-color: #cccccc; color: #888; }"
-        )
+        self._editor_btn.setMinimumHeight(36)
         layout.addWidget(self._editor_btn)
 
         # Stop all button
         self._stop_all_btn = QtWidgets.QPushButton("Stop All Instances", group)
-        self._stop_all_btn.setMinimumHeight(40)
+        self._stop_all_btn.setMinimumHeight(36)
         self._stop_all_btn.setEnabled(False)
-        self._stop_all_btn.setStyleSheet(
-            "QPushButton { background-color: #f44336; color: white; "
-            "font-weight: bold; border-radius: 4px; font-size: 14px; }"
-            "QPushButton:hover { background-color: #da190b; }"
-            "QPushButton:disabled { background-color: #cccccc; color: #888; }"
-        )
         layout.addWidget(self._stop_all_btn)
 
         return group

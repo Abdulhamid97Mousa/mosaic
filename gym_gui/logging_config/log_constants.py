@@ -522,6 +522,104 @@ LOG_ADAPTER_ALE_METADATA_PROBE_FAILED = _constant(
 
 
 # ---------------------------------------------------------------------------
+# Crafter adapter specific constants (LOG530–LOG534)
+# ---------------------------------------------------------------------------
+LOG_ENV_CRAFTER_BOOT = _constant(
+    "LOG530",
+    "INFO",
+    "Crafter adapter bootstrapped",
+    component="Adapter",
+    subcomponent="Crafter",
+    tags=_tags("crafter", "environment", "boot"),
+)
+
+LOG_ENV_CRAFTER_STEP = _constant(
+    "LOG531",
+    "DEBUG",
+    "Crafter step checkpoint",
+    component="Adapter",
+    subcomponent="Crafter",
+    tags=_tags("crafter", "step"),
+)
+
+LOG_ENV_CRAFTER_ERROR = _constant(
+    "LOG532",
+    "ERROR",
+    "Crafter adapter failure",
+    component="Adapter",
+    subcomponent="Crafter",
+    tags=_tags("crafter", "error"),
+)
+
+LOG_ENV_CRAFTER_RENDER_WARNING = _constant(
+    "LOG533",
+    "WARNING",
+    "Crafter render payload unavailable",
+    component="Adapter",
+    subcomponent="Crafter",
+    tags=_tags("crafter", "render", "warning"),
+)
+
+LOG_ENV_CRAFTER_ACHIEVEMENT = _constant(
+    "LOG534",
+    "INFO",
+    "Crafter achievement unlocked",
+    component="Adapter",
+    subcomponent="Crafter",
+    tags=_tags("crafter", "achievement", "milestone"),
+)
+
+
+# ---------------------------------------------------------------------------
+# Procgen adapter specific constants (LOG540–LOG544)
+# ---------------------------------------------------------------------------
+LOG_ENV_PROCGEN_BOOT = _constant(
+    "LOG540",
+    "INFO",
+    "Procgen adapter bootstrapped",
+    component="Adapter",
+    subcomponent="Procgen",
+    tags=_tags("procgen", "bootstrap", "lifecycle"),
+)
+
+LOG_ENV_PROCGEN_STEP = _constant(
+    "LOG541",
+    "DEBUG",
+    "Procgen step checkpoint",
+    component="Adapter",
+    subcomponent="Procgen",
+    tags=_tags("procgen", "step", "checkpoint"),
+)
+
+LOG_ENV_PROCGEN_ERROR = _constant(
+    "LOG542",
+    "ERROR",
+    "Procgen environment error",
+    component="Adapter",
+    subcomponent="Procgen",
+    tags=_tags("procgen", "error"),
+)
+
+LOG_ENV_PROCGEN_RENDER_WARNING = _constant(
+    "LOG543",
+    "WARNING",
+    "Procgen render mode constraint",
+    component="Adapter",
+    subcomponent="Procgen",
+    tags=_tags("procgen", "render", "warning"),
+)
+
+LOG_ENV_PROCGEN_LEVEL_COMPLETE = _constant(
+    "LOG544",
+    "INFO",
+    "Procgen level completed",
+    component="Adapter",
+    subcomponent="Procgen",
+    tags=_tags("procgen", "level", "complete"),
+)
+
+
+# ---------------------------------------------------------------------------
 # Service and telemetry constants (LOG601–LOG650)
 # ---------------------------------------------------------------------------
 LOG_SERVICE_TELEMETRY_STEP_REJECTED = _constant(
@@ -1612,6 +1710,226 @@ LOG_UI_MULTI_AGENT_ENV_NOT_LOADED = _constant(
     tags=_tags("ui", "multi_agent", "environment", "warning"),
 )
 
+LOG_UI_POLICY_ASSIGNMENT_REQUESTED = _constant(
+    "LOG760",
+    "INFO",
+    "Policy assignment evaluation requested",
+    component="UI",
+    subcomponent="PolicyAssignment",
+    tags=_tags("ui", "multi_agent", "policy", "evaluation", "start"),
+)
+
+LOG_UI_POLICY_ASSIGNMENT_LOADED = _constant(
+    "LOG761",
+    "INFO",
+    "Policy checkpoint loaded for evaluation",
+    component="UI",
+    subcomponent="PolicyAssignment",
+    tags=_tags("ui", "multi_agent", "policy", "loaded"),
+)
+
+LOG_UI_POLICY_DISCOVERY_SCAN = _constant(
+    "LOG762",
+    "DEBUG",
+    "Scanning for policy checkpoints",
+    component="UI",
+    subcomponent="PolicyDiscovery",
+    tags=_tags("ui", "policy", "discovery", "scan"),
+)
+
+LOG_UI_POLICY_DISCOVERY_FOUND = _constant(
+    "LOG763",
+    "INFO",
+    "Policy checkpoints discovered",
+    component="UI",
+    subcomponent="PolicyDiscovery",
+    tags=_tags("ui", "policy", "discovery", "found"),
+)
+
+
+# ---------------------------------------------------------------------------
+# LLM Chat UI constants (LOG770–LOG789)
+# ---------------------------------------------------------------------------
+LOG_UI_CHAT_GPU_DETECTION_STARTED = _constant(
+    "LOG770",
+    "INFO",
+    "GPU detection worker started",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "gpu", "detection", "thread"),
+)
+
+LOG_UI_CHAT_GPU_DETECTION_COMPLETED = _constant(
+    "LOG771",
+    "INFO",
+    "GPU detection completed",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "gpu", "detection"),
+)
+
+LOG_UI_CHAT_GPU_DETECTION_ERROR = _constant(
+    "LOG772",
+    "ERROR",
+    "GPU detection failed",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "gpu", "detection", "error"),
+)
+
+LOG_UI_CHAT_HF_TOKEN_SAVE_STARTED = _constant(
+    "LOG773",
+    "INFO",
+    "HuggingFace token save worker started",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "huggingface", "token", "save", "thread"),
+)
+
+LOG_UI_CHAT_HF_TOKEN_SAVED = _constant(
+    "LOG774",
+    "INFO",
+    "HuggingFace token saved successfully",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "huggingface", "token", "save"),
+)
+
+LOG_UI_CHAT_HF_TOKEN_SAVE_ERROR = _constant(
+    "LOG775",
+    "ERROR",
+    "HuggingFace token save failed",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "huggingface", "token", "save", "error"),
+)
+
+LOG_UI_CHAT_HF_TOKEN_VALIDATION_STARTED = _constant(
+    "LOG776",
+    "INFO",
+    "HuggingFace token validation worker started",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "huggingface", "token", "validation", "thread"),
+)
+
+LOG_UI_CHAT_HF_TOKEN_VALIDATED = _constant(
+    "LOG777",
+    "INFO",
+    "HuggingFace token validated successfully",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "huggingface", "token", "validation"),
+)
+
+LOG_UI_CHAT_HF_TOKEN_VALIDATION_ERROR = _constant(
+    "LOG778",
+    "ERROR",
+    "HuggingFace token validation failed",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "huggingface", "token", "validation", "error"),
+)
+
+LOG_UI_CHAT_MODEL_DOWNLOAD_STARTED = _constant(
+    "LOG779",
+    "INFO",
+    "Model download worker started",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "model", "download", "thread"),
+)
+
+LOG_UI_CHAT_MODEL_DOWNLOAD_PROGRESS = _constant(
+    "LOG780",
+    "DEBUG",
+    "Model download progress update",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "model", "download", "progress"),
+)
+
+LOG_UI_CHAT_MODEL_DOWNLOADED = _constant(
+    "LOG781",
+    "INFO",
+    "Model downloaded successfully",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "model", "download"),
+)
+
+LOG_UI_CHAT_MODEL_DOWNLOAD_ERROR = _constant(
+    "LOG782",
+    "ERROR",
+    "Model download failed",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "model", "download", "error"),
+)
+
+LOG_UI_CHAT_REQUEST_STARTED = _constant(
+    "LOG783",
+    "INFO",
+    "Chat completion request worker started",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "completion", "request", "thread"),
+)
+
+LOG_UI_CHAT_REQUEST_COMPLETED = _constant(
+    "LOG784",
+    "INFO",
+    "Chat completion request completed",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "completion", "request"),
+)
+
+LOG_UI_CHAT_REQUEST_ERROR = _constant(
+    "LOG785",
+    "ERROR",
+    "Chat completion request failed",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "completion", "request", "error"),
+)
+
+LOG_UI_CHAT_REQUEST_CANCELLED = _constant(
+    "LOG786",
+    "WARNING",
+    "Chat completion request cancelled by user",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "completion", "cancelled"),
+)
+
+LOG_UI_CHAT_PROXY_ENABLED = _constant(
+    "LOG787",
+    "INFO",
+    "Proxy settings enabled for LLM operations",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "proxy", "enabled"),
+)
+
+LOG_UI_CHAT_PROXY_DISABLED = _constant(
+    "LOG788",
+    "INFO",
+    "Proxy settings disabled for LLM operations",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "proxy", "disabled"),
+)
+
+LOG_UI_CHAT_CLEANUP_WARNING = _constant(
+    "LOG789",
+    "WARNING",
+    "Chat panel cleanup warning",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "cleanup", "warning"),
+)
+
 
 # ---------------------------------------------------------------------------
 # Fast Lane / RunBus telemetry constants (LOG950–LOG959)
@@ -2128,6 +2446,194 @@ LOG_RAY_WORKER_ANALYTICS_WRITTEN = _constant(
     tags=_tags("ray", "worker", "analytics", "manifest"),
 )
 
+# =========================================================================
+# Ray Policy Evaluation Constants
+# =========================================================================
+
+LOG_RAY_EVAL_REQUESTED = _constant(
+    "LOG980",
+    "INFO",
+    "Ray policy evaluation requested",
+    component="Worker",
+    subcomponent="RayEvaluator",
+    tags=_tags("ray", "evaluation", "requested"),
+)
+
+LOG_RAY_EVAL_SETUP_STARTED = _constant(
+    "LOG981",
+    "INFO",
+    "Ray policy evaluation setup started",
+    component="Worker",
+    subcomponent="RayEvaluator",
+    tags=_tags("ray", "evaluation", "setup", "started"),
+)
+
+LOG_RAY_EVAL_SETUP_COMPLETED = _constant(
+    "LOG982",
+    "INFO",
+    "Ray policy evaluation setup completed",
+    component="Worker",
+    subcomponent="RayEvaluator",
+    tags=_tags("ray", "evaluation", "setup", "completed"),
+)
+
+LOG_RAY_EVAL_EPISODE_STARTED = _constant(
+    "LOG983",
+    "DEBUG",
+    "Ray policy evaluation episode started",
+    component="Worker",
+    subcomponent="RayEvaluator",
+    tags=_tags("ray", "evaluation", "episode", "started"),
+)
+
+LOG_RAY_EVAL_EPISODE_COMPLETED = _constant(
+    "LOG984",
+    "INFO",
+    "Ray policy evaluation episode completed",
+    component="Worker",
+    subcomponent="RayEvaluator",
+    tags=_tags("ray", "evaluation", "episode", "completed"),
+)
+
+LOG_RAY_EVAL_RUN_COMPLETED = _constant(
+    "LOG985",
+    "INFO",
+    "Ray policy evaluation run completed",
+    component="Worker",
+    subcomponent="RayEvaluator",
+    tags=_tags("ray", "evaluation", "completed"),
+)
+
+LOG_RAY_EVAL_ERROR = _constant(
+    "LOG986",
+    "ERROR",
+    "Ray policy evaluation error",
+    component="Worker",
+    subcomponent="RayEvaluator",
+    tags=_tags("ray", "evaluation", "error"),
+)
+
+LOG_RAY_EVAL_FASTLANE_CONNECTED = _constant(
+    "LOG987",
+    "INFO",
+    "Ray evaluation FastLane connected",
+    component="Worker",
+    subcomponent="RayEvaluator",
+    tags=_tags("ray", "evaluation", "fastlane", "connected"),
+)
+
+LOG_RAY_EVAL_POLICY_LOADED = _constant(
+    "LOG988",
+    "INFO",
+    "Ray evaluation policy loaded from checkpoint",
+    component="Worker",
+    subcomponent="RayEvaluator",
+    tags=_tags("ray", "evaluation", "policy", "loaded"),
+)
+
+LOG_RAY_EVAL_TAB_CREATED = _constant(
+    "LOG989",
+    "INFO",
+    "Ray evaluation FastLane tab created",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("ray", "evaluation", "tab", "created"),
+)
+
+
+# ---------------------------------------------------------------------------
+# XuanCe Worker constants (LOG990–LOG999)
+# ---------------------------------------------------------------------------
+LOG_XUANCE_WORKER_RUNTIME_STARTED = _constant(
+    "LOG990",
+    "INFO",
+    "XuanCe worker runtime started",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "runtime", "lifecycle"),
+)
+
+LOG_XUANCE_WORKER_RUNTIME_STOPPED = _constant(
+    "LOG991",
+    "INFO",
+    "XuanCe worker runtime stopped",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "runtime", "lifecycle"),
+)
+
+LOG_XUANCE_WORKER_RUNTIME_ERROR = _constant(
+    "LOG992",
+    "ERROR",
+    "XuanCe worker runtime error",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "runtime", "error"),
+)
+
+LOG_XUANCE_WORKER_TRAINING_STARTED = _constant(
+    "LOG993",
+    "INFO",
+    "XuanCe training started",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "training", "start"),
+)
+
+LOG_XUANCE_WORKER_TRAINING_COMPLETED = _constant(
+    "LOG994",
+    "INFO",
+    "XuanCe training completed",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "training", "complete"),
+)
+
+LOG_XUANCE_WORKER_CHECKPOINT_SAVED = _constant(
+    "LOG995",
+    "INFO",
+    "XuanCe checkpoint saved",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "checkpoint", "save"),
+)
+
+LOG_XUANCE_WORKER_RUNNER_CREATED = _constant(
+    "LOG996",
+    "INFO",
+    "XuanCe runner created",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "runner", "created"),
+)
+
+LOG_XUANCE_WORKER_CONFIG_LOADED = _constant(
+    "LOG997",
+    "INFO",
+    "XuanCe configuration loaded",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "config", "loaded"),
+)
+
+LOG_XUANCE_WORKER_BENCHMARK_STARTED = _constant(
+    "LOG998",
+    "INFO",
+    "XuanCe benchmark mode started",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "benchmark", "start"),
+)
+
+LOG_XUANCE_WORKER_DEBUG = _constant(
+    "LOG999",
+    "DEBUG",
+    "XuanCe worker debug event",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "debug"),
+)
+
 
 # =========================================================================
 # Helper Functions for Runtime Discovery & Validation
@@ -2275,6 +2781,16 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_ENV_MINIGRID_RENDER_WARNING,
     LOG_ADAPTER_ALE_NAMESPACE_IMPORT_FAILED,
     LOG_ADAPTER_ALE_METADATA_PROBE_FAILED,
+    LOG_ENV_CRAFTER_BOOT,
+    LOG_ENV_CRAFTER_STEP,
+    LOG_ENV_CRAFTER_ERROR,
+    LOG_ENV_CRAFTER_RENDER_WARNING,
+    LOG_ENV_CRAFTER_ACHIEVEMENT,
+    LOG_ENV_PROCGEN_BOOT,
+    LOG_ENV_PROCGEN_STEP,
+    LOG_ENV_PROCGEN_ERROR,
+    LOG_ENV_PROCGEN_RENDER_WARNING,
+    LOG_ENV_PROCGEN_LEVEL_COMPLETE,
     LOG_SERVICE_TELEMETRY_STEP_REJECTED,
     LOG_SERVICE_TELEMETRY_ASYNC_ERROR,
     LOG_SERVICE_DB_SINK_INITIALIZED,
@@ -2386,6 +2902,10 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_UI_MULTI_AGENT_TRAIN_REQUESTED,
     LOG_UI_MULTI_AGENT_EVALUATE_REQUESTED,
     LOG_UI_MULTI_AGENT_ENV_NOT_LOADED,
+    LOG_UI_POLICY_ASSIGNMENT_REQUESTED,
+    LOG_UI_POLICY_ASSIGNMENT_LOADED,
+    LOG_UI_POLICY_DISCOVERY_SCAN,
+    LOG_UI_POLICY_DISCOVERY_FOUND,
     LOG_UI_PRESENTER_SIGNAL_CONNECTION_WARNING,
     LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING,
     LOG_UI_TENSORBOARD_KILL_WARNING,
@@ -2443,6 +2963,28 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_RAY_WORKER_ENV_WRAPPED,
     LOG_RAY_WORKER_POLICY_LOADED,
     LOG_RAY_WORKER_ANALYTICS_WRITTEN,
+    # Ray Evaluation
+    LOG_RAY_EVAL_REQUESTED,
+    LOG_RAY_EVAL_SETUP_STARTED,
+    LOG_RAY_EVAL_SETUP_COMPLETED,
+    LOG_RAY_EVAL_EPISODE_STARTED,
+    LOG_RAY_EVAL_EPISODE_COMPLETED,
+    LOG_RAY_EVAL_RUN_COMPLETED,
+    LOG_RAY_EVAL_ERROR,
+    LOG_RAY_EVAL_FASTLANE_CONNECTED,
+    LOG_RAY_EVAL_POLICY_LOADED,
+    LOG_RAY_EVAL_TAB_CREATED,
+    # XuanCe Worker
+    LOG_XUANCE_WORKER_RUNTIME_STARTED,
+    LOG_XUANCE_WORKER_RUNTIME_STOPPED,
+    LOG_XUANCE_WORKER_RUNTIME_ERROR,
+    LOG_XUANCE_WORKER_TRAINING_STARTED,
+    LOG_XUANCE_WORKER_TRAINING_COMPLETED,
+    LOG_XUANCE_WORKER_CHECKPOINT_SAVED,
+    LOG_XUANCE_WORKER_RUNNER_CREATED,
+    LOG_XUANCE_WORKER_CONFIG_LOADED,
+    LOG_XUANCE_WORKER_BENCHMARK_STARTED,
+    LOG_XUANCE_WORKER_DEBUG,
 )
 
 
@@ -2502,6 +3044,16 @@ __all__ = (
     "LOG_ENV_MINIGRID_RENDER_WARNING",
     "LOG_ADAPTER_ALE_NAMESPACE_IMPORT_FAILED",
     "LOG_ADAPTER_ALE_METADATA_PROBE_FAILED",
+    "LOG_ENV_CRAFTER_BOOT",
+    "LOG_ENV_CRAFTER_STEP",
+    "LOG_ENV_CRAFTER_ERROR",
+    "LOG_ENV_CRAFTER_RENDER_WARNING",
+    "LOG_ENV_CRAFTER_ACHIEVEMENT",
+    "LOG_ENV_PROCGEN_BOOT",
+    "LOG_ENV_PROCGEN_STEP",
+    "LOG_ENV_PROCGEN_ERROR",
+    "LOG_ENV_PROCGEN_RENDER_WARNING",
+    "LOG_ENV_PROCGEN_LEVEL_COMPLETE",
     "LOG_SERVICE_TELEMETRY_STEP_REJECTED",
     "LOG_SERVICE_TELEMETRY_ASYNC_ERROR",
     "LOG_SERVICE_DB_SINK_INITIALIZED",
@@ -2610,6 +3162,31 @@ __all__ = (
     "LOG_UI_MULTI_AGENT_TRAIN_REQUESTED",
     "LOG_UI_MULTI_AGENT_EVALUATE_REQUESTED",
     "LOG_UI_MULTI_AGENT_ENV_NOT_LOADED",
+    "LOG_UI_POLICY_ASSIGNMENT_REQUESTED",
+    "LOG_UI_POLICY_ASSIGNMENT_LOADED",
+    "LOG_UI_POLICY_DISCOVERY_SCAN",
+    "LOG_UI_POLICY_DISCOVERY_FOUND",
+    # LLM Chat UI
+    "LOG_UI_CHAT_GPU_DETECTION_STARTED",
+    "LOG_UI_CHAT_GPU_DETECTION_COMPLETED",
+    "LOG_UI_CHAT_GPU_DETECTION_ERROR",
+    "LOG_UI_CHAT_HF_TOKEN_SAVE_STARTED",
+    "LOG_UI_CHAT_HF_TOKEN_SAVED",
+    "LOG_UI_CHAT_HF_TOKEN_SAVE_ERROR",
+    "LOG_UI_CHAT_HF_TOKEN_VALIDATION_STARTED",
+    "LOG_UI_CHAT_HF_TOKEN_VALIDATED",
+    "LOG_UI_CHAT_HF_TOKEN_VALIDATION_ERROR",
+    "LOG_UI_CHAT_MODEL_DOWNLOAD_STARTED",
+    "LOG_UI_CHAT_MODEL_DOWNLOAD_PROGRESS",
+    "LOG_UI_CHAT_MODEL_DOWNLOADED",
+    "LOG_UI_CHAT_MODEL_DOWNLOAD_ERROR",
+    "LOG_UI_CHAT_REQUEST_STARTED",
+    "LOG_UI_CHAT_REQUEST_COMPLETED",
+    "LOG_UI_CHAT_REQUEST_ERROR",
+    "LOG_UI_CHAT_REQUEST_CANCELLED",
+    "LOG_UI_CHAT_PROXY_ENABLED",
+    "LOG_UI_CHAT_PROXY_DISABLED",
+    "LOG_UI_CHAT_CLEANUP_WARNING",
     "LOG_UI_PRESENTER_SIGNAL_CONNECTION_WARNING",
     "LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING",
     "LOG_UI_TENSORBOARD_KILL_WARNING",
@@ -2672,6 +3249,28 @@ __all__ = (
     "LOG_RAY_WORKER_ENV_WRAPPED",
     "LOG_RAY_WORKER_POLICY_LOADED",
     "LOG_RAY_WORKER_ANALYTICS_WRITTEN",
+    # Ray Evaluation
+    "LOG_RAY_EVAL_REQUESTED",
+    "LOG_RAY_EVAL_SETUP_STARTED",
+    "LOG_RAY_EVAL_SETUP_COMPLETED",
+    "LOG_RAY_EVAL_EPISODE_STARTED",
+    "LOG_RAY_EVAL_EPISODE_COMPLETED",
+    "LOG_RAY_EVAL_RUN_COMPLETED",
+    "LOG_RAY_EVAL_ERROR",
+    "LOG_RAY_EVAL_FASTLANE_CONNECTED",
+    "LOG_RAY_EVAL_POLICY_LOADED",
+    "LOG_RAY_EVAL_TAB_CREATED",
+    # XuanCe Worker
+    "LOG_XUANCE_WORKER_RUNTIME_STARTED",
+    "LOG_XUANCE_WORKER_RUNTIME_STOPPED",
+    "LOG_XUANCE_WORKER_RUNTIME_ERROR",
+    "LOG_XUANCE_WORKER_TRAINING_STARTED",
+    "LOG_XUANCE_WORKER_TRAINING_COMPLETED",
+    "LOG_XUANCE_WORKER_CHECKPOINT_SAVED",
+    "LOG_XUANCE_WORKER_RUNNER_CREATED",
+    "LOG_XUANCE_WORKER_CONFIG_LOADED",
+    "LOG_XUANCE_WORKER_BENCHMARK_STARTED",
+    "LOG_XUANCE_WORKER_DEBUG",
     # Worker Availability Messages
     "GODOT_NOT_INSTALLED_TITLE",
     "GODOT_NOT_INSTALLED_MSG",

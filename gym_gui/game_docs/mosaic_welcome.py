@@ -21,35 +21,114 @@ A unified platform that orchestrates diverse agents, paradigms, and workers
 to create cohesive intelligent systems — like tiles in a mosaic forming a complete picture.
 </p>
 
-<h3 style="color: #333; margin-top: 20px; margin-bottom: 10px;">Supported Paradigms</h3>
-<table cellpadding="4" cellspacing="3">
+<h3 style="color: #333; margin-top: 15px; margin-bottom: 10px;">Supported Frameworks</h3>
+<table width="100%" cellpadding="8" cellspacing="4">
 <tr>
-    <td style="background-color: #5b4b8a; color: white; padding: 4px 10px; border-radius: 10px; font-size: 11px;">Gymnasium</td>
-    <td style="background-color: #2e7d32; color: white; padding: 4px 10px; border-radius: 10px; font-size: 11px;">PettingZoo AEC</td>
-    <td style="background-color: #1565c0; color: white; padding: 4px 10px; border-radius: 10px; font-size: 11px;">PettingZoo Parallel</td>
-    <td style="background-color: #ef6c00; color: white; padding: 4px 10px; border-radius: 10px; font-size: 11px;">MiniGrid</td>
+    <td style="background-color: #f5f0ff; border-left: 4px solid #5b4b8a; width: 33%;">
+        <b style="color: #5b4b8a;">Gymnasium</b><br/>
+        <span style="color: #666; font-size: 11px;">Standard RL environment API</span><br/>
+        <a href="https://gymnasium.farama.org/" style="color: #1565c0; font-size: 10px;">Docs</a> |
+        <a href="https://github.com/Farama-Foundation/Gymnasium" style="color: #1565c0; font-size: 10px;">GitHub</a>
+    </td>
+    <td style="background-color: #e8f5e9; border-left: 4px solid #2e7d32; width: 33%;">
+        <b style="color: #2e7d32;">PettingZoo</b><br/>
+        <span style="color: #666; font-size: 11px;">Multi-agent environments (AEC & Parallel)</span><br/>
+        <a href="https://pettingzoo.farama.org/" style="color: #1565c0; font-size: 10px;">Docs</a> |
+        <a href="https://github.com/Farama-Foundation/PettingZoo" style="color: #1565c0; font-size: 10px;">GitHub</a>
+    </td>
+    <td style="background-color: #e0f7fa; border-left: 4px solid #00bcd4; width: 33%;">
+        <b style="color: #00838f;">Ray RLlib</b><br/>
+        <span style="color: #666; font-size: 11px;">Scalable RL library</span><br/>
+        <a href="https://docs.ray.io/en/latest/rllib/" style="color: #1565c0; font-size: 10px;">Docs</a> |
+        <a href="https://github.com/ray-project/ray" style="color: #1565c0; font-size: 10px;">GitHub</a>
+    </td>
 </tr>
 <tr>
-    <td style="background-color: #c62828; color: white; padding: 4px 10px; border-radius: 10px; font-size: 11px;">ViZDoom</td>
-    <td style="background-color: #00838f; color: white; padding: 4px 10px; border-radius: 10px; font-size: 11px;">MuJoCo MPC</td>
-    <td style="background-color: #7b1fa2; color: white; padding: 4px 10px; border-radius: 10px; font-size: 11px;">Godot UE</td>
-    <td style="background-color: #455a64; color: white; padding: 4px 10px; border-radius: 10px; font-size: 11px;">ALE Atari</td>
+    <td style="background-color: #e0f2f1; border-left: 4px solid #00838f; width: 33%;">
+        <b style="color: #00695c;">MuJoCo</b><br/>
+        <span style="color: #666; font-size: 11px;">Physics simulation for robotics</span><br/>
+        <a href="https://mujoco.org/" style="color: #1565c0; font-size: 10px;">Docs</a> |
+        <a href="https://github.com/google-deepmind/mujoco" style="color: #1565c0; font-size: 10px;">GitHub</a>
+    </td>
+    <td style="background-color: #f3e5f5; border-left: 4px solid #7b1fa2; width: 33%;">
+        <b style="color: #7b1fa2;">Godot Engine</b><br/>
+        <span style="color: #666; font-size: 11px;">Free & open source 2D/3D game engine</span><br/>
+        <a href="https://docs.godotengine.org/en/stable/" style="color: #1565c0; font-size: 10px;">Docs</a> |
+        <a href="https://github.com/godotengine/godot" style="color: #1565c0; font-size: 10px;">GitHub</a>
+    </td>
+    <td style="background-color: #efebe9; border-left: 4px solid #37474f; width: 33%;">
+        <b style="color: #37474f;">CleanRL</b><br/>
+        <span style="color: #666; font-size: 11px;">Single-file RL implementations</span><br/>
+        <a href="https://docs.cleanrl.dev/" style="color: #1565c0; font-size: 10px;">Docs</a> |
+        <a href="https://github.com/vwxyzjn/cleanrl" style="color: #1565c0; font-size: 10px;">GitHub</a>
+    </td>
+</tr>
+<tr>
+    <td style="background-color: #e3f2fd; border-left: 4px solid #1976d2; width: 33%;">
+        <b style="color: #1976d2;">XuanCe</b><br/>
+        <span style="color: #666; font-size: 11px;">Comprehensive DRL library (PyTorch/TF/MS)</span><br/>
+        <a href="https://xuance.readthedocs.io/" style="color: #1565c0; font-size: 10px;">Docs</a> |
+        <a href="https://github.com/agi-brain/xuance" style="color: #1565c0; font-size: 10px;">GitHub</a>
+    </td>
+    <td style="background-color: #f5f5f5; width: 33%;"></td>
+    <td style="background-color: #f5f5f5; width: 33%;"></td>
 </tr>
 </table>
 
-<h3 style="color: #333; margin-top: 20px; margin-bottom: 10px;">Core Features</h3>
+<h3 style="color: #333; margin-top: 15px; margin-bottom: 10px;">Research Environments</h3>
+<table width="100%" cellpadding="8" cellspacing="4">
+<tr>
+    <td style="background-color: #fff5f5; border-left: 4px solid #8b0000; width: 33%;">
+        <b style="color: #8b0000;">NetHack (NLE)</b><br/>
+        <span style="color: #666; font-size: 11px;">Procedurally generated roguelike for hard exploration</span><br/>
+        <a href="https://github.com/facebookresearch/nle" style="color: #1565c0; font-size: 10px;">GitHub</a>
+    </td>
+    <td style="background-color: #fff8f0; border-left: 4px solid #ff6600; width: 33%;">
+        <b style="color: #ff6600;">MiniHack</b><br/>
+        <span style="color: #666; font-size: 11px;">Customizable sandbox built on NLE</span><br/>
+        <a href="https://github.com/facebookresearch/minihack" style="color: #1565c0; font-size: 10px;">GitHub</a> |
+        <a href="https://minihack.readthedocs.io/" style="color: #1565c0; font-size: 10px;">Docs</a>
+    </td>
+    <td style="background-color: #f0fff0; border-left: 4px solid #228b22; width: 33%;">
+        <b style="color: #228b22;">Crafter</b><br/>
+        <span style="color: #666; font-size: 11px;">Open world survival for agent capabilities</span><br/>
+        <a href="https://github.com/danijar/crafter" style="color: #1565c0; font-size: 10px;">GitHub</a> |
+        <a href="https://danijar.com/project/crafter/" style="color: #1565c0; font-size: 10px;">Project</a>
+    </td>
+</tr>
+<tr>
+    <td style="background-color: #fff3e0; border-left: 4px solid #ef6c00; width: 33%;">
+        <b style="color: #ef6c00;">MiniGrid</b><br/>
+        <span style="color: #666; font-size: 11px;">Minimalistic gridworld environments</span><br/>
+        <a href="https://minigrid.farama.org/" style="color: #1565c0; font-size: 10px;">Docs</a> |
+        <a href="https://github.com/Farama-Foundation/Minigrid" style="color: #1565c0; font-size: 10px;">GitHub</a>
+    </td>
+    <td style="background-color: #ffebee; border-left: 4px solid #c62828; width: 33%;">
+        <b style="color: #c62828;">ViZDoom</b><br/>
+        <span style="color: #666; font-size: 11px;">Doom-based visual RL platform</span><br/>
+        <a href="https://vizdoom.farama.org/" style="color: #1565c0; font-size: 10px;">Docs</a> |
+        <a href="https://github.com/Farama-Foundation/ViZDoom" style="color: #1565c0; font-size: 10px;">GitHub</a>
+    </td>
+    <td style="background-color: #eceff1; border-left: 4px solid #455a64; width: 33%;">
+        <b style="color: #455a64;">ALE / Atari</b><br/>
+        <span style="color: #666; font-size: 11px;">Arcade Learning Environment</span><br/>
+        <a href="https://github.com/Farama-Foundation/Arcade-Learning-Environment" style="color: #1565c0; font-size: 10px;">GitHub</a>
+    </td>
+</tr>
+</table>
 
-<table width="100%" cellpadding="10" cellspacing="5">
+<h3 style="color: #333; margin-top: 15px; margin-bottom: 10px;">Core Features</h3>
+<table width="100%" cellpadding="8" cellspacing="4">
 <tr>
     <td style="background-color: #f5f5f5; border-left: 4px solid #5b4b8a;">
         <b style="color: #333;">Multi-Paradigm Support</b><br/>
-        <span style="color: #666; font-size: 12px;">Seamlessly switch between single-agent, multi-agent (AEC/Parallel), and hybrid environments</span>
+        <span style="color: #666; font-size: 12px;">Single-agent, multi-agent (AEC/Parallel), and hybrid environments</span>
     </td>
 </tr>
 <tr>
     <td style="background-color: #f5f5f5; border-left: 4px solid #2e7d32;">
         <b style="color: #333;">Agent Integration</b><br/>
-        <span style="color: #666; font-size: 12px;">Human, RL (CleanRL, Ray), BDI (SPADE, Jason), and future LLM agents in the same framework</span>
+        <span style="color: #666; font-size: 12px;">Human, RL (CleanRL, Ray RLlib), BDI (SPADE, Jason), and LLM agents</span>
     </td>
 </tr>
 <tr>
@@ -58,18 +137,12 @@ to create cohesive intelligent systems — like tiles in a mosaic forming a comp
         <span style="color: #666; font-size: 12px;">Assign different policies to different agents with flexible configuration</span>
     </td>
 </tr>
-<tr>
-    <td style="background-color: #f5f5f5; border-left: 4px solid #ef6c00;">
-        <b style="color: #333;">3D Engine Support</b><br/>
-        <span style="color: #666; font-size: 12px;">MuJoCo MPC for robotics, Godot for game environments, AirSim planned</span>
-    </td>
-</tr>
 </table>
 
-<table width="100%" cellpadding="12" cellspacing="0" style="background-color: #e8f5e9; margin-top: 15px;">
+<table width="100%" cellpadding="10" cellspacing="0" style="background-color: #e8f5e9; margin-top: 12px;">
 <tr><td>
-    <b style="color: #2e7d32; font-size: 14px;">Getting Started</b>
-    <ol style="margin: 10px 0 0 0; padding-left: 20px; color: #444; font-size: 13px;">
+    <b style="color: #2e7d32; font-size: 13px;">Getting Started</b>
+    <ol style="margin: 8px 0 0 0; padding-left: 20px; color: #444; font-size: 12px;">
         <li><b>Select Environment</b> — Choose from the dropdown in the sidebar</li>
         <li><b>Configure Settings</b> — Adjust parameters for your environment</li>
         <li><b>Load Environment</b> — Click "Load" to initialize</li>
@@ -78,7 +151,7 @@ to create cohesive intelligent systems — like tiles in a mosaic forming a comp
 </td></tr>
 </table>
 
-<p style="color: #888; font-size: 11px; margin-top: 15px; text-align: center;">
+<p style="color: #888; font-size: 11px; margin-top: 12px; text-align: center;">
     <i>Select an environment from the sidebar to see detailed documentation.</i>
 </p>
 """

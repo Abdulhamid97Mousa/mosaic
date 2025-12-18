@@ -1,40 +1,55 @@
-# LLM Worker Dependencies (Ollama + LangChain)
+# LLM Worker Dependencies (vLLM)
 # Install with: pip install -r requirements/llm_worker.txt
 #
-# This file contains dependencies for LLM-based agents using Ollama
-# for local model inference and LangChain for agent workflows.
+# This file contains dependencies for LLM-powered agents that use
+# vLLM for local GPU inference (like BALROG-style agentic LLM evaluation).
+#
+# vLLM provides OpenAI-compatible API for local model serving.
+# See: https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html
 
 # Include base requirements
 -r base.txt
 
 # ═══════════════════════════════════════════════════════════════
-# Core Ollama Integration
+# vLLM Server (Local GPU Inference)
 # ═══════════════════════════════════════════════════════════════
 
-# Ollama Python SDK (official client)
-# https://github.com/ollama/ollama-python
-ollama>=0.3.0
+# HTTP client for vLLM OpenAI-compatible API
+requests>=2.31.0
 
-# Async HTTP client (used by ollama internally)
+# Async HTTP client (for concurrent requests)
 httpx>=0.27.0
 
-# Configuration file support
-pyyaml>=6.0
-
-# JSON schema validation for LLM outputs
-jsonschema>=4.20.0
+# vLLM for local GPU inference
+# See: https://docs.vllm.ai/en/latest/
+# Note: Requires NVIDIA GPU with CUDA support
+vllm>=0.6.0
 
 # ═══════════════════════════════════════════════════════════════
-# LangChain Integration (for PettingZoo multi-agent games)
+# vLLM Server Setup
 # ═══════════════════════════════════════════════════════════════
-
-# LangChain core framework
-langchain>=0.3.0
-langchain-core>=0.3.0
-
-# LangChain Ollama integration (local LLM backend)
-langchain-ollama>=0.2.0
-
+#
+# Start vLLM server with a HuggingFace model:
+#
+#   vllm serve meta-llama/Llama-3.1-8B-Instruct \
+#     --host 0.0.0.0 \
+#     --port 8000 \
+#     --api-key token-abc123
+#
+# With GPU memory optimization:
+#
+#   vllm serve mistralai/Mistral-7B-Instruct-v0.2 \
+#     --dtype float16 \
+#     --gpu-memory-utilization 0.9
+#
+# ═══════════════════════════════════════════════════════════════
+# Configuration
+# ═══════════════════════════════════════════════════════════════
+#
+# Set in .env:
+#   VLLM_BASE_URL=http://localhost:8000/v1
+#   VLLM_API_KEY=token-abc123  (or EMPTY for no auth)
+#
 # ═══════════════════════════════════════════════════════════════
 # PettingZoo Integration (multi-agent environments)
 # ═══════════════════════════════════════════════════════════════
@@ -44,13 +59,11 @@ langchain-ollama>=0.2.0
 pettingzoo>=1.24.0
 
 # ═══════════════════════════════════════════════════════════════
-# Optional Dependencies
+# Optional: Install vLLM itself (requires CUDA)
 # ═══════════════════════════════════════════════════════════════
-
-# Optional: For vision models (processing screenshots)
-# Uncomment if using llama3.2-vision or similar:
-# opencv-python>=4.8.0
-
-# Optional: LangChain community integrations
-# Uncomment for additional tools and integrations:
-# langchain-community>=0.3.0
+#
+# vLLM is typically installed separately as it requires CUDA:
+#   pip install vllm
+#
+# Or with specific CUDA version:
+#   pip install vllm --extra-index-url https://download.pytorch.org/whl/cu118

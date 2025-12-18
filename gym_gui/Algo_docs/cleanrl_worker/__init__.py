@@ -10,7 +10,6 @@ from .ddpg import ALGO_DOCS as DDPG_DOCS
 from .td3 import ALGO_DOCS as TD3_DOCS
 from .sac import ALGO_DOCS as SAC_DOCS
 from .rainbow import ALGO_DOCS as RAINBOW_DOCS
-from .ppg import ALGO_DOCS as PPG_DOCS
 from .dqn import ALGO_DOCS as DQN_DOCS, DEFAULT_DQN_DOC
 
 ALGO_DOCS: Dict[str, str] = {}
@@ -20,7 +19,6 @@ ALGO_DOCS.update(DDPG_DOCS)
 ALGO_DOCS.update(TD3_DOCS)
 ALGO_DOCS.update(SAC_DOCS)
 ALGO_DOCS.update(RAINBOW_DOCS)
-ALGO_DOCS.update(PPG_DOCS)
 ALGO_DOCS.update(DQN_DOCS)
 
 DEFAULT_DOC = (

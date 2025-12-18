@@ -79,6 +79,12 @@ from .policy_actor import (
     create_ray_actor,
     list_checkpoint_policies,
 )
+from .policy_evaluator import (
+    EvaluationConfig,
+    EpisodeMetrics,
+    PolicyEvaluator,
+    run_evaluation,
+)
 
 # Lazy import for CLI to avoid circular import warning
 def main(*args, **kwargs):
@@ -118,6 +124,11 @@ __all__ = [
     "RayPolicyController",
     "create_ray_actor",
     "list_checkpoint_policies",
+    # Policy Evaluator (for visualization)
+    "EvaluationConfig",
+    "EpisodeMetrics",
+    "PolicyEvaluator",
+    "run_evaluation",
     # CLI
     "main",
 ]

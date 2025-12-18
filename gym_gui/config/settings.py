@@ -2,8 +2,7 @@ from __future__ import annotations
 
 """Runtime configuration management for the Gym GUI project."""
 
-from dataclasses import dataclass, field
-from functools import lru_cache
+from dataclasses import dataclass
 import os
 from pathlib import Path
 import yaml  # type: ignore[import-not-found]
@@ -29,12 +28,6 @@ def _normalize_bool(value: str | None, *, default: bool = False) -> bool:
     if value is None:
         return default
     return value.strip().lower() in {"1", "true", "yes", "on"}
-
-
-def _split_csv(value: str | None) -> tuple[str, ...]:
-    if not value:
-        return ()
-    return tuple(part.strip() for part in value.split(",") if part.strip())
 
 
 def _parse_control_mode(raw: str | None) -> ControlMode:
@@ -64,11 +57,8 @@ class Settings:
     qt_api: str = "PyQt6"
     gym_default_env: str = "FrozenLake-v1"
     gym_video_dir: Path | None = None
-    enable_agent_autostart: bool = False
     log_level: str = "INFO"
-    use_gpu: bool = False
     default_control_mode: ControlMode = ControlMode.HUMAN_ONLY
-    agent_ids: tuple[str, ...] = field(default_factory=tuple)
     default_seed: int = 1
     allow_seed_reuse: bool = False
 
@@ -100,16 +90,11 @@ def get_settings() -> Settings:
     qt_api = os.getenv("QT_API", defaults.qt_api)
     gym_default_env = os.getenv("GYM_DEFAULT_ENV", defaults.gym_default_env)
     gym_video_dir = _resolve_video_dir(os.getenv("GYM_VIDEO_DIR"))
-    enable_agent_autostart = _normalize_bool(
-        os.getenv("ENABLE_AGENT_AUTOSTART"), default=defaults.enable_agent_autostart
-    )
     log_level = os.getenv("GYM_LOG_LEVEL", os.getenv("LOG_LEVEL", defaults.log_level))
-    use_gpu = _normalize_bool(os.getenv("USE_GPU"), default=defaults.use_gpu)
     default_control_mode = _parse_control_mode(
         os.getenv("DEFAULT_CONTROL_MODE")
         or os.getenv("GYM_CONTROL_MODE")
     )
-    agent_ids = _split_csv(os.getenv("AGENT_IDS"))
     default_seed_raw = os.getenv("GYM_DEFAULT_SEED") or os.getenv("DEFAULT_SEED")
     try:
         default_seed = int(default_seed_raw) if default_seed_raw is not None else defaults.default_seed
@@ -124,11 +109,8 @@ def get_settings() -> Settings:
         qt_api=qt_api,
         gym_default_env=gym_default_env,
         gym_video_dir=gym_video_dir,
-        enable_agent_autostart=enable_agent_autostart,
         log_level=log_level,
-        use_gpu=use_gpu,
         default_control_mode=default_control_mode,
-        agent_ids=agent_ids,
         default_seed=max(1, default_seed),
         allow_seed_reuse=allow_seed_reuse,
     )

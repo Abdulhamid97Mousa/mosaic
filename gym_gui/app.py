@@ -34,14 +34,9 @@ _log = partial(log_constant, LOGGER)
 def _format_settings(settings: Settings) -> str:
     payload: dict[str, Any] = {
         "qt_api": settings.qt_api,
-        "gym_default_env": settings.gym_default_env,
-        "gym_video_dir": str(settings.gym_video_dir) if settings.gym_video_dir else None,
-        "enable_agent_autostart": settings.enable_agent_autostart,
         "log_level": settings.log_level,
-        "use_gpu": settings.use_gpu,
         "default_control_mode": settings.default_control_mode.value,
         "default_seed": settings.default_seed,
-        "agent_ids": settings.agent_ids,
     }
     return json.dumps(payload, indent=2)
 

@@ -5,12 +5,13 @@ This widget allows users to:
 2. Assign trained policies (checkpoints) to each agent
 3. Run evaluation with mixed policies (e.g., Policy A vs Policy B)
 
-Checkpoints are scanned from var/trainer/runs/{run_id}/checkpoints/
+Checkpoints are discovered from:
+- Ray RLlib: var/trainer/runs/{run_id}/checkpoints/ (via ray_policy_metadata)
+- CleanRL: var/trainer/runs/{run_id}/runs/*/*.cleanrl_model (via cleanrl_policy_metadata)
 """
 
 from __future__ import annotations
 
-import json
 import logging
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
@@ -19,6 +20,14 @@ from PyQt6.QtCore import pyqtSignal
 from qtpy import QtCore, QtWidgets
 
 from gym_gui.config.paths import VAR_TRAINER_DIR
+from gym_gui.policy_discovery.ray_policy_metadata import (
+    RayRLlibCheckpoint,
+    discover_ray_checkpoints,
+)
+from gym_gui.policy_discovery.cleanrl_policy_metadata import (
+    CleanRlCheckpoint,
+    discover_policies as discover_cleanrl_policies,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -38,7 +47,9 @@ class PolicyAssignmentPanel(QtWidgets.QGroupBox):
         super().__init__("Policy Assignment", parent)
         self._agent_ids: List[str] = []
         self._policy_combos: Dict[str, QtWidgets.QComboBox] = {}
-        self._available_checkpoints: List[Tuple[str, str, str]] = []  # (display, path, run_id)
+        # (display, path, run_id, checkpoint_type)
+        # checkpoint_type: "ray", "cleanrl", or "random"
+        self._available_checkpoints: List[Tuple[str, str, str, str]] = []
 
         self._build_ui()
         self._scan_checkpoints()
@@ -97,57 +108,64 @@ class PolicyAssignmentPanel(QtWidgets.QGroupBox):
         layout.addWidget(self._checkpoint_count_label)
 
     def _scan_checkpoints(self) -> None:
-        """Scan var/trainer/runs for available checkpoints."""
+        """Scan var/trainer/runs for available checkpoints.
+
+        Discovers both Ray RLlib and CleanRL checkpoints using their
+        respective metadata modules.
+        """
         self._available_checkpoints = []
 
         # Add "Random" option
-        self._available_checkpoints.append(("Random (no policy)", "", ""))
+        self._available_checkpoints.append(("Random (no policy)", "", "", "random"))
 
-        runs_dir = VAR_TRAINER_DIR / "runs"
-        if not runs_dir.exists():
-            self._update_checkpoint_count()
-            self._update_combos()
-            return
+        # Discover Ray RLlib checkpoints
+        ray_checkpoints = discover_ray_checkpoints()
+        for checkpoint in ray_checkpoints:
+            # Create display name: "run_id - env_id - algorithm [paradigm]"
+            display = f"[Ray] {checkpoint.run_id[:12]} - {checkpoint.env_id} ({checkpoint.algorithm})"
+            if checkpoint.paradigm:
+                display += f" [{checkpoint.paradigm}]"
 
-        for run_dir in sorted(runs_dir.iterdir(), reverse=True):
-            if not run_dir.is_dir():
-                continue
+            # Store checkpoint path (to checkpoints/ directory)
+            path = str(checkpoint.checkpoint_path)
+            self._available_checkpoints.append(
+                (display, path, checkpoint.run_id, "ray")
+            )
 
-            checkpoint_dir = run_dir / "checkpoints"
-            if not checkpoint_dir.exists():
-                continue
+            _LOGGER.debug(
+                "Found Ray checkpoint: %s (env=%s, algo=%s)",
+                checkpoint.run_id,
+                checkpoint.env_id,
+                checkpoint.algorithm,
+            )
 
-            # Look for Ray checkpoints
-            checkpoints = list(checkpoint_dir.glob("checkpoint_*"))
-            if not checkpoints:
-                continue
-
-            # Get latest checkpoint
-            latest = sorted(checkpoints)[-1]
-
-            # Try to get metadata from analytics.json
-            env_id = "unknown"
-            paradigm = ""
-            analytics_file = run_dir / "analytics.json"
-            if analytics_file.exists():
-                try:
-                    data = json.loads(analytics_file.read_text())
-                    ray_meta = data.get("ray_metadata", {})
-                    env_id = ray_meta.get("env_id", "unknown")
-                    paradigm = ray_meta.get("paradigm", "")
-                except Exception:
-                    pass
-
+        # Discover CleanRL checkpoints
+        cleanrl_policies = discover_cleanrl_policies()
+        for policy in cleanrl_policies:
             # Create display name
-            display = f"{run_dir.name} ({env_id})"
-            if paradigm:
-                display += f" [{paradigm}]"
+            env_name = policy.env_id or "unknown"
+            algo_name = policy.algo or "unknown"
+            display = f"[CleanRL] {policy.run_id[:12]} - {env_name} ({algo_name})"
 
-            self._available_checkpoints.append((display, str(latest), run_dir.name))
+            path = str(policy.policy_path)
+            self._available_checkpoints.append(
+                (display, path, policy.run_id, "cleanrl")
+            )
+
+            _LOGGER.debug(
+                "Found CleanRL checkpoint: %s (env=%s, algo=%s)",
+                policy.run_id,
+                policy.env_id,
+                policy.algo,
+            )
 
         self._update_checkpoint_count()
         self._update_combos()
-        _LOGGER.debug("Scanned %d checkpoints", len(self._available_checkpoints) - 1)
+        _LOGGER.info(
+            "Scanned checkpoints: %d Ray, %d CleanRL",
+            len(ray_checkpoints),
+            len(cleanrl_policies),
+        )
 
     def _update_checkpoint_count(self) -> None:
         """Update the checkpoint count label."""
@@ -162,7 +180,7 @@ class PolicyAssignmentPanel(QtWidgets.QGroupBox):
         for agent_id, combo in self._policy_combos.items():
             current_path = combo.currentData()
             combo.clear()
-            for display, path, run_id in self._available_checkpoints:
+            for display, path, run_id, ckpt_type in self._available_checkpoints:
                 combo.addItem(display, path)
             # Restore selection if still available
             if current_path:
@@ -239,7 +257,7 @@ class PolicyAssignmentPanel(QtWidgets.QGroupBox):
             QtWidgets.QSizePolicy.Policy.Expanding,
             QtWidgets.QSizePolicy.Policy.Fixed,
         )
-        for display, path, run_id in self._available_checkpoints:
+        for display, path, run_id, ckpt_type in self._available_checkpoints:
             combo.addItem(display, path)
         combo.currentIndexChanged.connect(self._on_policy_changed)
         layout.addWidget(combo)
@@ -253,17 +271,70 @@ class PolicyAssignmentPanel(QtWidgets.QGroupBox):
         self.policies_changed.emit(assignments)
 
     def _on_evaluate(self) -> None:
-        """Handle evaluate button click."""
+        """Handle evaluate button click.
+
+        If Ray policies are selected, opens the RayEvaluationForm for
+        detailed configuration. Otherwise, emits basic config.
+        """
         assignments = self.get_policy_assignments()
+        policy_types = self.get_policy_types()
 
-        config = {
-            "mode": "evaluate",
-            "agent_policies": assignments,
-            "agents": self._agent_ids,
-        }
+        # Check if any Ray policies are assigned
+        has_ray_policies = any(t == "ray" for t in policy_types.values())
 
-        self.evaluate_requested.emit(config)
-        _LOGGER.info("Evaluation requested with policies: %s", assignments)
+        if has_ray_policies:
+            # Open RayEvaluationForm for detailed configuration
+            self._show_ray_evaluation_form(assignments, policy_types)
+        else:
+            # Emit basic config for non-Ray policies
+            config = {
+                "mode": "evaluate",
+                "agent_policies": assignments,
+                "policy_types": policy_types,
+                "agents": self._agent_ids,
+            }
+            self.evaluate_requested.emit(config)
+            _LOGGER.info("Evaluation requested with policies: %s", assignments)
+
+    def _show_ray_evaluation_form(
+        self, assignments: Dict[str, str], policy_types: Dict[str, str]
+    ) -> None:
+        """Show the Ray evaluation form for detailed configuration.
+
+        Args:
+            assignments: Agent to checkpoint path mapping
+            policy_types: Agent to checkpoint type mapping
+        """
+        try:
+            from gym_gui.ui.widgets.ray_evaluation_form import RayEvaluationForm
+
+            form = RayEvaluationForm(parent=self)
+            result = form.exec()
+
+            if result == QtWidgets.QDialog.DialogCode.Accepted:
+                config = form.get_config()
+                if config:
+                    # Merge with agent assignments
+                    config["agent_policies"] = assignments
+                    config["policy_types"] = policy_types
+                    config["agents"] = self._agent_ids
+
+                    self.evaluate_requested.emit(config)
+                    _LOGGER.info(
+                        "Ray evaluation requested with %d episodes, deterministic=%s",
+                        config.get("num_episodes", 10),
+                        config.get("deterministic", True),
+                    )
+        except ImportError as e:
+            _LOGGER.error("Failed to import RayEvaluationForm: %s", e)
+            # Fall back to basic config
+            config = {
+                "mode": "evaluate",
+                "agent_policies": assignments,
+                "policy_types": policy_types,
+                "agents": self._agent_ids,
+            }
+            self.evaluate_requested.emit(config)
 
     def get_policy_assignments(self) -> Dict[str, str]:
         """Get current policy assignments.
@@ -276,6 +347,24 @@ class PolicyAssignmentPanel(QtWidgets.QGroupBox):
             path = combo.currentData() or ""
             assignments[agent_id] = path
         return assignments
+
+    def get_policy_types(self) -> Dict[str, str]:
+        """Get checkpoint types for current assignments.
+
+        Returns:
+            Dict mapping agent_id to checkpoint type ("ray", "cleanrl", or "random")
+        """
+        types = {}
+        for agent_id, combo in self._policy_combos.items():
+            path = combo.currentData() or ""
+            # Find the checkpoint type for this path
+            ckpt_type = "random"
+            for display, ckpt_path, run_id, checkpoint_type in self._available_checkpoints:
+                if ckpt_path == path:
+                    ckpt_type = checkpoint_type
+                    break
+            types[agent_id] = ckpt_type
+        return types
 
     def set_policy_assignments(self, assignments: Dict[str, str]) -> None:
         """Set policy assignments programmatically.

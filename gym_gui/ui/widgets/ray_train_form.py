@@ -26,8 +26,16 @@ from gym_gui.core.pettingzoo_enums import (
 )
 
 # Import algorithm parameter schema functions
+# Type stubs for when imports fail
+get_available_algorithms: Any = None
+get_algorithm_info: Any = None
+get_algorithm_fields: Any = None
+get_default_params: Any = None
+filter_params_for_algorithm: Any = None
+_HAS_ALGO_PARAMS = False
+
 try:
-    from ray_worker.algo_params import (
+    from ray_worker.algo_params import (  # type: ignore[import-not-found]
         get_available_algorithms,
         get_algorithm_info,
         get_algorithm_fields,
@@ -36,7 +44,7 @@ try:
     )
     _HAS_ALGO_PARAMS = True
 except ImportError:
-    _HAS_ALGO_PARAMS = False
+    pass
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -404,7 +412,9 @@ class RayRLlibTrainForm(QtWidgets.QDialog):
             layout.addWidget(desc_label)
 
         # Default to parameter sharing
-        self._paradigm_group.button(0).setChecked(True)
+        first_button = self._paradigm_group.button(0)
+        if first_button is not None:
+            first_button.setChecked(True)
 
         return group
 
@@ -501,8 +511,8 @@ class RayRLlibTrainForm(QtWidgets.QDialog):
         # remove from layout, then deleteLater() for proper cleanup
         while self._algo_params_layout.count():
             item = self._algo_params_layout.takeAt(0)
-            widget = item.widget()
-            if widget:
+            widget = item.widget() if item else None
+            if widget is not None:
                 widget.setParent(None)  # Immediately remove from parent
                 widget.deleteLater()    # Schedule for deletion
         self._algo_param_widgets.clear()
@@ -514,18 +524,18 @@ class RayRLlibTrainForm(QtWidgets.QDialog):
         self._algo_params_label.setText(f"Algorithm Parameters ({algorithm}):")
 
         # Get fields for this algorithm from schema
+        fields: List[Dict[str, Any]] = []
+        defaults: Dict[str, Any] = {}
         if _HAS_ALGO_PARAMS:
             try:
                 fields = get_algorithm_fields(algorithm)
                 defaults = get_default_params(algorithm)
             except Exception as e:
                 _LOGGER.warning(f"Failed to get algo params for {algorithm}: {e}")
-                fields = []
-                defaults = {}
+                fields = self._get_fallback_fields(algorithm)
         else:
             # Fallback if algo_params not available
             fields = self._get_fallback_fields(algorithm)
-            defaults = {}
 
         # Create widgets for each field
         row = 0
@@ -1175,9 +1185,10 @@ class RayRLlibTrainForm(QtWidgets.QDialog):
         throttle_ms = self._throttle_spin.value()
 
         # Build environment variables for multi-agent FastLane
+        # NOTE: RAY_FASTLANE_RUN_ID is NOT set here - it will be set by dispatcher
+        # using the actual ULID run_id, not the human-readable run_name
         environment: Dict[str, str] = {
             "RAY_FASTLANE_ENABLED": "1" if fastlane_enabled else "0",
-            "RAY_FASTLANE_RUN_ID": run_id,
             "RAY_FASTLANE_ENV_NAME": env_id,
             "RAY_FASTLANE_THROTTLE_MS": str(throttle_ms),
             "GYM_GUI_FASTLANE_ONLY": "1" if fastlane_only else "0",
@@ -1218,7 +1229,6 @@ class RayRLlibTrainForm(QtWidgets.QDialog):
                     "use_grpc": True,
                     "grpc_target": "127.0.0.1:50055",
                     "config": {
-                        "run_id": run_id,
                         "environment": {
                             "family": family,
                             "env_id": env_id,

@@ -25,7 +25,7 @@ from gym_gui.core.pettingzoo_enums import (
     get_envs_by_family,
     is_aec_env,
 )
-from gym_gui.workers.pettingzoo_policy_metadata import (
+from gym_gui.policy_discovery.pettingzoo_policy_metadata import (
     PettingZooCheckpoint,
     discover_policies,
     load_metadata_for_policy,

@@ -65,6 +65,11 @@ FAMILY_METADATA = {
         "paradigm": SteppingParadigm.SINGLE_AGENT,
         "description": "Grid-world environments for goal-oriented tasks.",
     },
+    "crafter": {
+        "label": "Crafter",
+        "paradigm": SteppingParadigm.SINGLE_AGENT,
+        "description": "Open-world survival benchmark (22 achievements, exploration, crafting).",
+    },
 }
 
 # Environments per family
@@ -122,6 +127,10 @@ FAMILY_ENVIRONMENTS = {
         ("MiniGrid-DoorKey-5x5-v0", "DoorKey 5x5", "Find key, open door"),
         ("MiniGrid-LavaGapS5-v0", "Lava Gap S5", "Cross lava gaps"),
     ],
+    "crafter": [
+        ("CrafterReward-v1", "Crafter (Reward)", "Survival game with 22 achievements and rewards"),
+        ("CrafterNoReward-v1", "Crafter (No Reward)", "Reward-free variant for unsupervised learning"),
+    ],
 }
 
 # Agent counts per environment
@@ -171,6 +180,9 @@ AGENT_COUNTS = {
     "MiniGrid-Empty-5x5-v0": ["agent_0"],
     "MiniGrid-DoorKey-5x5-v0": ["agent_0"],
     "MiniGrid-LavaGapS5-v0": ["agent_0"],
+    # Crafter (single-agent)
+    "CrafterReward-v1": ["agent_0"],
+    "CrafterNoReward-v1": ["agent_0"],
 }
 
 

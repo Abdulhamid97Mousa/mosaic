@@ -336,6 +336,8 @@ class TrainerDispatcher:
             if worker_cmd is not None:
                 if module and module.startswith("cleanrl_worker"):
                     self._ensure_cleanrl_worker_available(run.run_id, module)
+                elif module and module.startswith("xuance_worker"):
+                    self._ensure_xuance_worker_available(run.run_id, module)
                 if config_path is not None and "--config" not in args:
                     args.extend(["--config", str(config_path)])
                 if use_grpc:
@@ -477,6 +479,23 @@ class TrainerDispatcher:
             "3rd_party/cleanrl_worker before launching the trainer."
         )
 
+    def _ensure_xuance_worker_available(self, run_id: str, module: str) -> None:
+        """Log a structured error if xuance_worker cannot be imported."""
+
+        if importlib.util.find_spec("xuance_worker") is not None:
+            return
+
+        extra = {
+            "run_id": run_id,
+            "module": module,
+            "pythonpath": os.environ.get("PYTHONPATH", ""),
+        }
+        log_constant(_LOGGER, LOG_TRAINER_WORKER_IMPORT_ERROR, extra=extra)
+        raise RuntimeError(
+            "xuance_worker module not importable. Install with: "
+            "pip install -e 3rd_party/xuance_worker"
+        )
+
     def _build_worker_env(self, run: RunRecord) -> dict[str, str]:
         """Build environment variables for the worker subprocess."""
         env = os.environ.copy()
@@ -503,14 +522,15 @@ class TrainerDispatcher:
                 if key and value is not None:
                     env[str(key)] = str(value)
 
-        # CRITICAL: Override RAY_FASTLANE_RUN_ID to use the actual run_id (ULID)
+        # CRITICAL: Set RAY_FASTLANE_RUN_ID to use the actual run_id (ULID)
         # The form generates a human-readable run_name but the trainer assigns the actual ULID.
         # FastLane requires the actual run_id to match between UI and worker.
-        if "RAY_FASTLANE_RUN_ID" in env:
+        # We set this whenever FastLane is enabled (RAY_FASTLANE_ENABLED=1)
+        if env.get("RAY_FASTLANE_ENABLED") == "1":
             env["RAY_FASTLANE_RUN_ID"] = run.run_id
             _LOGGER.debug(
-                "Updated RAY_FASTLANE_RUN_ID to actual run_id",
-                extra={"run_id": run.run_id, "original": env_overrides.get("RAY_FASTLANE_RUN_ID") if env_overrides else None},
+                "Set RAY_FASTLANE_RUN_ID to actual run_id",
+                extra={"run_id": run.run_id},
             )
 
         worker_meta = config_json.get("metadata", {}).get("worker", {}) if isinstance(config_json, dict) else {}

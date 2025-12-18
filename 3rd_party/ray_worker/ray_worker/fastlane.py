@@ -119,7 +119,7 @@ class FastLaneRayConfig:
     Each Ray rollout worker gets its own FastLane stream, identified by
     worker_index. This allows the UI to tile multiple workers' views together.
 
-    Stream naming: {run_id}-worker-{worker_index}
+    Stream naming: {run_id}-w{worker_index}
     """
     enabled: bool
     run_id: str
@@ -131,11 +131,12 @@ class FastLaneRayConfig:
     def stream_id(self) -> str:
         """Get the unique stream ID for this worker.
 
-        Format: {run_id}-worker-{worker_index}
+        Format: {run_id}-w{worker_index}
 
         All workers use the same naming pattern for consistency.
+        Worker naming: w0, w1, w2, ... (worker-0 is reserved for coordination)
         """
-        return f"{self.run_id}-worker-{self.worker_index}"
+        return f"{self.run_id}-w{self.worker_index}"
 
     @classmethod
     def from_env(cls, worker_index: Optional[int] = None) -> "FastLaneRayConfig":

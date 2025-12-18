@@ -11,7 +11,9 @@ from gym_gui.ui.widgets.cleanrl_resume_form import CleanRlResumeForm  # noqa: F4
 from gym_gui.ui.widgets.pettingzoo_train_form import PettingZooTrainForm  # noqa: F401
 from gym_gui.ui.widgets import pettingzoo_policy_form  # noqa: F401
 from gym_gui.ui.widgets.ray_train_form import RayRLlibTrainForm  # noqa: F401
-from gym_gui.ui.widgets.ray_policy_form import RayPolicyForm  # noqa: F401
+from gym_gui.ui.widgets import ray_policy_form  # noqa: F401  # registration side-effect
+from gym_gui.ui.widgets.ray_evaluation_form import RayEvaluationForm  # noqa: F401
+from gym_gui.ui.widgets.xuance_train_form import XuanCeTrainForm  # noqa: F401
 
 __all__ = [
     "WorkerFormFactory",
@@ -20,5 +22,6 @@ __all__ = [
     "CleanRlResumeForm",
     "PettingZooTrainForm",
     "RayRLlibTrainForm",
-    "RayPolicyForm",
+    "RayEvaluationForm",
+    "XuanCeTrainForm",
 ]

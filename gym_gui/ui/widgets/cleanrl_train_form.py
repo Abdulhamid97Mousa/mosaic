@@ -44,10 +44,7 @@ _LEGACY_ALGOS: tuple[str, ...] = (
     "ppo_atari_envpool",
     "ppo_atari_envpool_xla_jax",
     "ppo_atari_envpool_xla_jax_scan",
-    "ppo_procgen",
     "ppo_pettingzoo_ma_atari",
-    "ppo_rnd_envpool",
-    "ppg_procgen",
     "pqn",
     "pqn_atari_envpool",
     "pqn_atari_envpool_lstm",
@@ -166,14 +163,11 @@ _SUPPORTED_FAMILIES: set[EnvironmentFamily] = {
     EnvironmentFamily.MINIGRID,
     EnvironmentFamily.ATARI,
     EnvironmentFamily.ALE,
-    EnvironmentFamily.OTHER,
 }
 
 _ADDITIONAL_SUPPORTED_GAMES: set[GameId] = {
     GameId.PONG_NO_FRAMESKIP,
     GameId.BREAKOUT_NO_FRAMESKIP,
-    GameId.PROCGEN_COINRUN,
-    GameId.PROCGEN_MAZE,
 }
 
 _PREFERRED_GAME_ORDER: Sequence[GameId] = (
@@ -201,16 +195,12 @@ _PREFERRED_GAME_ORDER: Sequence[GameId] = (
     GameId.SWIMMER,
     GameId.PONG_NO_FRAMESKIP,
     GameId.BREAKOUT_NO_FRAMESKIP,
-    GameId.PROCGEN_COINRUN,
-    GameId.PROCGEN_MAZE,
 )
 
 
 def _format_cleanrl_family_label(family: EnvironmentFamily | None) -> str:
     if family is None:
         return "General"
-    if family == EnvironmentFamily.OTHER:
-        return "Other"
     return family.value.replace("_", " ").title()
 
 
@@ -233,12 +223,9 @@ def _build_environment_choices() -> tuple[tuple[str, str], ...]:
     for game in ordered:
         family = ENVIRONMENT_FAMILY_BY_GAME.get(game)
         label = f"{game.value} ({_format_cleanrl_family_label(family)})"
-        # Special-case for Procgen and Atari where get_game_display_name already includes prefix
+        # Special-case for Atari where get_game_display_name already includes prefix
         if family == EnvironmentFamily.ATARI:
             label = f"{game.value} (Atari)"
-        elif game in _ADDITIONAL_SUPPORTED_GAMES and family == EnvironmentFamily.OTHER:
-            if "procgen" in game.value:
-                label = f"{game.value} (Procgen)"
         choices.append((label, game.value))
     return tuple(choices)
 

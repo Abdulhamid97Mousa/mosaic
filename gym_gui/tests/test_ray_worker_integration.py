@@ -90,7 +90,7 @@ class TestRayWorkerCatalog:
 
     def test_ray_worker_in_catalog(self):
         """Test that ray_worker is listed in worker catalog."""
-        from gym_gui.ui.workers import get_worker_catalog
+        from gym_gui.ui.worker_catalog import get_worker_catalog
 
         catalog = get_worker_catalog()
         worker_ids = [w.worker_id for w in catalog]
@@ -99,7 +99,7 @@ class TestRayWorkerCatalog:
 
     def test_ray_worker_definition(self):
         """Test ray_worker definition properties."""
-        from gym_gui.ui.workers import get_worker_catalog
+        from gym_gui.ui.worker_catalog import get_worker_catalog
 
         catalog = get_worker_catalog()
         ray_worker = next((w for w in catalog if w.worker_id == "ray_worker"), None)
@@ -287,14 +287,14 @@ class TestTrainFormConfiguration:
         # Build config without accepting dialog
         config = form._build_config()
 
-        # Verify structure
-        assert "run_id" in config
+        # Verify structure - run_name is at top level, run_id is in worker config
         assert "run_name" in config
         assert "metadata" in config
         assert "worker" in config["metadata"]
         assert "config" in config["metadata"]["worker"]
 
         worker_config = config["metadata"]["worker"]["config"]
+        assert "run_id" in worker_config  # run_id moved inside worker config
         assert "environment" in worker_config
         assert "paradigm" in worker_config
         assert "training" in worker_config
