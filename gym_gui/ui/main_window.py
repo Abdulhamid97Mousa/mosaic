@@ -323,7 +323,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         root_logger.addHandler(self._log_handler)
 
     def _build_ui(self) -> None:
-        self.setWindowTitle("Gym GUI – Qt Shell")
+        self.setWindowTitle("MOSAIC - Qt Shell")
         self.resize(800, 600)
 
         central = QtWidgets.QWidget(self)
@@ -482,18 +482,20 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self.addToolBar(QtCore.Qt.ToolBarArea.TopToolBarArea, self._view_toolbar)
 
         self._view_actions: dict[str, QAction] = {}
+
+        # Add Settings action as first item
+        self._settings_action = QAction("Settings...", self)
+        self._settings_action.triggered.connect(self._on_settings_clicked)
+        self._view_toolbar.addAction(self._settings_action)
+        self._view_toolbar.addSeparator()
+
+        # Add panel view toggles
         self._add_view_toggle("Control Panel", self._control_panel_scroll)
         self._add_view_toggle("Render View", self._render_group)
         self._add_view_toggle("Game Info", self._info_group)
         self._add_view_toggle("Runtime Log", self._log_group)
         if self._chat_group is not None:
             self._add_view_toggle("Chat", self._chat_group)
-
-        # Add separator and Settings action
-        self._view_toolbar.addSeparator()
-        self._settings_action = QAction("Settings...", self)
-        self._settings_action.triggered.connect(self._on_settings_clicked)
-        self._view_toolbar.addAction(self._settings_action)
 
         # Add spacer to push theme toggle to the right
         spacer = QtWidgets.QWidget()
