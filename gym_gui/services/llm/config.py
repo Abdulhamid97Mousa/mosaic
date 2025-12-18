@@ -51,8 +51,10 @@ class LLMConfig:
         ModelIdentity(LLMProvider.OPENROUTER, "meta-llama/llama-3.1-70b-instruct", "Llama 3.1 70B"),
         ModelIdentity(LLMProvider.OPENROUTER, "mistralai/mistral-7b-instruct", "Mistral 7B"),
         # vLLM local models (user must configure)
-        ModelIdentity(LLMProvider.VLLM, "mistral-7b-instruct-v0.2", "Mistral 7B (local)"),
-        ModelIdentity(LLMProvider.VLLM, "llama-2-7b-chat", "Llama 2 7B (local)"),
+        # Use HuggingFace model IDs - vLLM will download automatically
+        ModelIdentity(LLMProvider.VLLM, "meta-llama/Llama-3.1-8B-Instruct", "Llama 3.1 8B (local)"),
+        ModelIdentity(LLMProvider.VLLM, "meta-llama/Llama-3.2-3B-Instruct", "Llama 3.2 3B (local)"),
+        ModelIdentity(LLMProvider.VLLM, "mistralai/Mistral-7B-Instruct-v0.3", "Mistral 7B (local)"),
     ])
 
     # Chat settings

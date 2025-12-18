@@ -1748,6 +1748,190 @@ LOG_UI_POLICY_DISCOVERY_FOUND = _constant(
 
 
 # ---------------------------------------------------------------------------
+# LLM Chat UI constants (LOG770–LOG789)
+# ---------------------------------------------------------------------------
+LOG_UI_CHAT_GPU_DETECTION_STARTED = _constant(
+    "LOG770",
+    "INFO",
+    "GPU detection worker started",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "gpu", "detection", "thread"),
+)
+
+LOG_UI_CHAT_GPU_DETECTION_COMPLETED = _constant(
+    "LOG771",
+    "INFO",
+    "GPU detection completed",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "gpu", "detection"),
+)
+
+LOG_UI_CHAT_GPU_DETECTION_ERROR = _constant(
+    "LOG772",
+    "ERROR",
+    "GPU detection failed",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "gpu", "detection", "error"),
+)
+
+LOG_UI_CHAT_HF_TOKEN_SAVE_STARTED = _constant(
+    "LOG773",
+    "INFO",
+    "HuggingFace token save worker started",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "huggingface", "token", "save", "thread"),
+)
+
+LOG_UI_CHAT_HF_TOKEN_SAVED = _constant(
+    "LOG774",
+    "INFO",
+    "HuggingFace token saved successfully",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "huggingface", "token", "save"),
+)
+
+LOG_UI_CHAT_HF_TOKEN_SAVE_ERROR = _constant(
+    "LOG775",
+    "ERROR",
+    "HuggingFace token save failed",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "huggingface", "token", "save", "error"),
+)
+
+LOG_UI_CHAT_HF_TOKEN_VALIDATION_STARTED = _constant(
+    "LOG776",
+    "INFO",
+    "HuggingFace token validation worker started",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "huggingface", "token", "validation", "thread"),
+)
+
+LOG_UI_CHAT_HF_TOKEN_VALIDATED = _constant(
+    "LOG777",
+    "INFO",
+    "HuggingFace token validated successfully",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "huggingface", "token", "validation"),
+)
+
+LOG_UI_CHAT_HF_TOKEN_VALIDATION_ERROR = _constant(
+    "LOG778",
+    "ERROR",
+    "HuggingFace token validation failed",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "huggingface", "token", "validation", "error"),
+)
+
+LOG_UI_CHAT_MODEL_DOWNLOAD_STARTED = _constant(
+    "LOG779",
+    "INFO",
+    "Model download worker started",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "model", "download", "thread"),
+)
+
+LOG_UI_CHAT_MODEL_DOWNLOAD_PROGRESS = _constant(
+    "LOG780",
+    "DEBUG",
+    "Model download progress update",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "model", "download", "progress"),
+)
+
+LOG_UI_CHAT_MODEL_DOWNLOADED = _constant(
+    "LOG781",
+    "INFO",
+    "Model downloaded successfully",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "model", "download"),
+)
+
+LOG_UI_CHAT_MODEL_DOWNLOAD_ERROR = _constant(
+    "LOG782",
+    "ERROR",
+    "Model download failed",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "model", "download", "error"),
+)
+
+LOG_UI_CHAT_REQUEST_STARTED = _constant(
+    "LOG783",
+    "INFO",
+    "Chat completion request worker started",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "completion", "request", "thread"),
+)
+
+LOG_UI_CHAT_REQUEST_COMPLETED = _constant(
+    "LOG784",
+    "INFO",
+    "Chat completion request completed",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "completion", "request"),
+)
+
+LOG_UI_CHAT_REQUEST_ERROR = _constant(
+    "LOG785",
+    "ERROR",
+    "Chat completion request failed",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "completion", "request", "error"),
+)
+
+LOG_UI_CHAT_REQUEST_CANCELLED = _constant(
+    "LOG786",
+    "WARNING",
+    "Chat completion request cancelled by user",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "completion", "cancelled"),
+)
+
+LOG_UI_CHAT_PROXY_ENABLED = _constant(
+    "LOG787",
+    "INFO",
+    "Proxy settings enabled for LLM operations",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "proxy", "enabled"),
+)
+
+LOG_UI_CHAT_PROXY_DISABLED = _constant(
+    "LOG788",
+    "INFO",
+    "Proxy settings disabled for LLM operations",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "proxy", "disabled"),
+)
+
+LOG_UI_CHAT_CLEANUP_WARNING = _constant(
+    "LOG789",
+    "WARNING",
+    "Chat panel cleanup warning",
+    component="UI",
+    subcomponent="ChatPanel",
+    tags=_tags("ui", "chat", "cleanup", "warning"),
+)
+
+
+# ---------------------------------------------------------------------------
 # Fast Lane / RunBus telemetry constants (LOG950–LOG959)
 # ---------------------------------------------------------------------------
 LOG_FASTLANE_CONNECTED = _constant(
@@ -2982,6 +3166,27 @@ __all__ = (
     "LOG_UI_POLICY_ASSIGNMENT_LOADED",
     "LOG_UI_POLICY_DISCOVERY_SCAN",
     "LOG_UI_POLICY_DISCOVERY_FOUND",
+    # LLM Chat UI
+    "LOG_UI_CHAT_GPU_DETECTION_STARTED",
+    "LOG_UI_CHAT_GPU_DETECTION_COMPLETED",
+    "LOG_UI_CHAT_GPU_DETECTION_ERROR",
+    "LOG_UI_CHAT_HF_TOKEN_SAVE_STARTED",
+    "LOG_UI_CHAT_HF_TOKEN_SAVED",
+    "LOG_UI_CHAT_HF_TOKEN_SAVE_ERROR",
+    "LOG_UI_CHAT_HF_TOKEN_VALIDATION_STARTED",
+    "LOG_UI_CHAT_HF_TOKEN_VALIDATED",
+    "LOG_UI_CHAT_HF_TOKEN_VALIDATION_ERROR",
+    "LOG_UI_CHAT_MODEL_DOWNLOAD_STARTED",
+    "LOG_UI_CHAT_MODEL_DOWNLOAD_PROGRESS",
+    "LOG_UI_CHAT_MODEL_DOWNLOADED",
+    "LOG_UI_CHAT_MODEL_DOWNLOAD_ERROR",
+    "LOG_UI_CHAT_REQUEST_STARTED",
+    "LOG_UI_CHAT_REQUEST_COMPLETED",
+    "LOG_UI_CHAT_REQUEST_ERROR",
+    "LOG_UI_CHAT_REQUEST_CANCELLED",
+    "LOG_UI_CHAT_PROXY_ENABLED",
+    "LOG_UI_CHAT_PROXY_DISABLED",
+    "LOG_UI_CHAT_CLEANUP_WARNING",
     "LOG_UI_PRESENTER_SIGNAL_CONNECTION_WARNING",
     "LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING",
     "LOG_UI_TENSORBOARD_KILL_WARNING",

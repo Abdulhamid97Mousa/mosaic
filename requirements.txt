@@ -54,3 +54,6 @@
 
 # SPADE BDI agents
 -r requirements/spade_bdi_worker.txt
+
+# LLM Chat UI (OpenRouter cloud + vLLM local)
+-r requirements/chat.txt

@@ -163,8 +163,10 @@ spade-bdi = [
 # LLM Chat UI (OpenRouter cloud + vLLM local)
 # Enables the Chat panel in the GUI for interacting with LLMs
 # vLLM is the standard for local GPU inference (like BALROG)
+# HuggingFace Hub for model download and authentication
 chat = [
     "requests>=2.31.0",
+    "huggingface_hub>=0.20.0",
 ]
 
 # Ray/RLlib worker for distributed RL training

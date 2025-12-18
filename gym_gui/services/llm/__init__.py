@@ -41,6 +41,21 @@ if LLM_CHAT_AVAILABLE:
         CompletionResult,
         LLMServiceError,
     )
+    from gym_gui.services.llm.model_manager import (
+        ModelStatus,
+        ModelInfo,
+        HuggingFaceAuth,
+        ProxyConfig,
+        ModelDownloader,
+        VLLMServerManager,
+        ModelManager,
+        MODEL_SIZES_GB,
+    )
+    from gym_gui.services.llm.gpu_detector import (
+        GPUInfo,
+        GPUDetectionResult,
+        GPUDetector,
+    )
 
     __all__ = [
         "LLM_CHAT_AVAILABLE",
@@ -51,6 +66,17 @@ if LLM_CHAT_AVAILABLE:
         "ChatMessage",
         "CompletionResult",
         "LLMServiceError",
+        "ModelStatus",
+        "ModelInfo",
+        "HuggingFaceAuth",
+        "ProxyConfig",
+        "ModelDownloader",
+        "VLLMServerManager",
+        "ModelManager",
+        "MODEL_SIZES_GB",
+        "GPUInfo",
+        "GPUDetectionResult",
+        "GPUDetector",
     ]
 else:
     # Placeholder exports when dependencies not available
@@ -61,6 +87,17 @@ else:
     ChatMessage = None  # type: ignore[misc, assignment]
     CompletionResult = None  # type: ignore[misc, assignment]
     LLMServiceError = None  # type: ignore[misc, assignment]
+    ModelStatus = None  # type: ignore[misc, assignment]
+    ModelInfo = None  # type: ignore[misc, assignment]
+    HuggingFaceAuth = None  # type: ignore[misc, assignment]
+    ProxyConfig = None  # type: ignore[misc, assignment]
+    ModelDownloader = None  # type: ignore[misc, assignment]
+    VLLMServerManager = None  # type: ignore[misc, assignment]
+    ModelManager = None  # type: ignore[misc, assignment]
+    MODEL_SIZES_GB = None  # type: ignore[misc, assignment]
+    GPUInfo = None  # type: ignore[misc, assignment]
+    GPUDetectionResult = None  # type: ignore[misc, assignment]
+    GPUDetector = None  # type: ignore[misc, assignment]
 
     __all__ = [
         "LLM_CHAT_AVAILABLE",
@@ -71,4 +108,15 @@ else:
         "ChatMessage",
         "CompletionResult",
         "LLMServiceError",
+        "ModelStatus",
+        "ModelInfo",
+        "HuggingFaceAuth",
+        "ProxyConfig",
+        "ModelDownloader",
+        "VLLMServerManager",
+        "ModelManager",
+        "MODEL_SIZES_GB",
+        "GPUInfo",
+        "GPUDetectionResult",
+        "GPUDetector",
     ]

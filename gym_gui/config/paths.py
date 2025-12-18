@@ -20,7 +20,8 @@ VAR_TENSORBOARD_DIR = VAR_TRAINER_DIR / "runs"
 VAR_WANDB_DIR = VAR_TRAINER_DIR / "runs"  # WANDB manifests stored per-run like TensorBoard
 VAR_TRAINER_DB = VAR_TRAINER_DIR / "trainer.sqlite"
 VAR_DATA_DIR = VAR_ROOT / "data"
-
+VAR_MODELS_DIR = VAR_ROOT / "models"  # LLM models for vLLM serving
+VAR_MODELS_HF_CACHE = VAR_MODELS_DIR / "huggingface"  # HuggingFace cache
 
 
 def ensure_var_directories() -> None:
@@ -37,6 +38,8 @@ def ensure_var_directories() -> None:
         VAR_TENSORBOARD_DIR,
         VAR_WANDB_DIR,
         VAR_DATA_DIR,
+        VAR_MODELS_DIR,
+        VAR_MODELS_HF_CACHE,
     ):
         path.mkdir(parents=True, exist_ok=True)
 
@@ -53,5 +56,7 @@ __all__ = [
     "VAR_TENSORBOARD_DIR",
     "VAR_WANDB_DIR",
     "VAR_DATA_DIR",
+    "VAR_MODELS_DIR",
+    "VAR_MODELS_HF_CACHE",
     "ensure_var_directories",
 ]

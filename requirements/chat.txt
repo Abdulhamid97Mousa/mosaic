@@ -20,6 +20,15 @@
 requests>=2.31.0
 
 # ═══════════════════════════════════════════════════════════════
+# HuggingFace Hub (for local model download)
+# ═══════════════════════════════════════════════════════════════
+
+# HuggingFace Hub for model authentication and download
+# Required for downloading gated models (Llama, etc.)
+# See: https://huggingface.co/docs/huggingface_hub/en/quick-start
+huggingface_hub>=0.20.0
+
+# ═══════════════════════════════════════════════════════════════
 # Supported Providers
 # ═══════════════════════════════════════════════════════════════
 #
@@ -32,11 +41,22 @@ requests>=2.31.0
 #   - Base URL: http://localhost:8000/v1
 #   - Start server: vllm serve <model> --api-key token-abc123
 #   - Models: Any HuggingFace model
+#   - Requires: NVIDIA GPU with CUDA support
+#   - Install: pip install vllm
 #
 # ═══════════════════════════════════════════════════════════════
 # Configuration
 # ═══════════════════════════════════════════════════════════════
 #
-# Set in .env or enter API key directly in the Chat panel UI:
+# OpenRouter API Key:
+#   Set in .env or enter directly in the Chat panel UI:
 #   OPENROUTER_API_KEY=sk-or-v1-your_api_key_here
+#
+# HuggingFace Token (for gated models like Llama):
+#   1. Create account at https://huggingface.co
+#   2. Get token at https://huggingface.co/settings/tokens
+#   3. Accept model license (e.g., https://huggingface.co/meta-llama)
+#   4. Enter token in Chat panel or set HF_TOKEN env variable
+#
+# vLLM Server:
 #   VLLM_BASE_URL=http://localhost:8000/v1

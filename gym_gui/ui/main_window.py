@@ -88,6 +88,7 @@ if LLM_CHAT_AVAILABLE:
     from gym_gui.ui.widgets.chat_panel import ChatPanel
 else:
     ChatPanel = None  # type: ignore[misc, assignment]
+from gym_gui.ui.widgets.settings import SettingsDialog
 from gym_gui.ui.panels.analytics_tabs import AnalyticsTabManager
 from gym_gui.ui.forms import get_worker_form_factory
 from gym_gui.ui.handlers import (
@@ -195,6 +196,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._run_metadata: Dict[tuple[str, str], Dict[str, Any]] = {}
         # Note: FastLane tab tracking moved to FastLaneTabHandler
         # Note: Run watch/poll state moved to TrainingMonitorHandler
+
+        # Settings dialog (created on demand, lazy initialization)
+        self._settings_dialog: Optional[SettingsDialog] = None
 
         # MuJoCo MPC launcher (optional)
         try:
@@ -484,6 +488,12 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._add_view_toggle("Runtime Log", self._log_group)
         if self._chat_group is not None:
             self._add_view_toggle("Chat", self._chat_group)
+
+        # Add separator and Settings action
+        self._view_toolbar.addSeparator()
+        self._settings_action = QAction("Settings...", self)
+        self._settings_action.triggered.connect(self._on_settings_clicked)
+        self._view_toolbar.addAction(self._settings_action)
 
         # Add spacer to push theme toggle to the right
         spacer = QtWidgets.QWidget()
@@ -1953,6 +1963,46 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             outcome_timestamp=timers.outcome_wall_clock_formatted(),
         )
 
+    def _on_settings_clicked(self) -> None:
+        """Handle Settings toolbar action click.
+
+        Creates dialog on first use (lazy initialization).
+        Shows non-modal dialog allowing interaction with main window.
+        """
+        if self._settings_dialog is None:
+            self._settings_dialog = SettingsDialog(parent=self)
+            self._settings_dialog.setting_changed.connect(self._on_setting_changed)
+            self._settings_dialog.settings_reset.connect(self._on_settings_reset)
+
+        # Show non-modal dialog (user can interact with main window)
+        self._settings_dialog.show()
+        self._settings_dialog.raise_()
+        self._settings_dialog.activateWindow()
+
+    def _on_setting_changed(self, key: str, value: str) -> None:
+        """Handle individual setting change from Settings dialog.
+
+        Logs the change but does not reload settings (requires restart).
+
+        Args:
+            key: Setting key
+            value: New value
+        """
+        self.log_constant(
+            LOG_UI_MAINWINDOW_INFO,
+            message=f"Setting changed: {key}",
+            extra={"setting_key": key, "setting_value_length": len(value)},
+        )
+        self._status_bar.showMessage(f"Setting saved: {key}", 3000)
+
+    def _on_settings_reset(self) -> None:
+        """Handle reset of all settings to defaults."""
+        self.log_constant(
+            LOG_UI_MAINWINDOW_INFO,
+            message="All settings reset to defaults",
+        )
+        self._status_bar.showMessage("All settings reset to defaults (restart required)", 5000)
+
     def closeEvent(self, a0: QtGui.QCloseEvent | None) -> None:
         logging.getLogger().removeHandler(self._log_handler)
 
@@ -1980,6 +2030,11 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # Clean up chat panel (optional - requires [chat] extra)
         if hasattr(self, "_chat_panel") and self._chat_panel is not None:
             self._chat_panel.cleanup()
+
+        # Close settings dialog if open
+        if hasattr(self, "_settings_dialog") and self._settings_dialog is not None:
+            self._settings_dialog.close()
+            self._settings_dialog = None
 
         # Shutdown session
         self._session.shutdown()
