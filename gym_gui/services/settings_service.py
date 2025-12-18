@@ -152,44 +152,445 @@ class SettingsService:
             enum_options=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
         )
 
-        # Category 3: Environment Overrides (5 variables)
+        # Category 3: Environment Overrides - Generic Defaults (3 variables)
+        metadata["DEFAULT_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="DEFAULT_MAX_EPISODE_STEPS",
+            category="Environment Overrides",
+            description="Default max episode steps for all environments (0=use gym defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["DEFAULT_MAX_EPISODE_SECONDS"] = SettingMetadata(
+            key="DEFAULT_MAX_EPISODE_SECONDS",
+            category="Environment Overrides",
+            description="Default max episode seconds for all environments (0=use gym defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["DEFAULT_RENDER_FPS"] = SettingMetadata(
+            key="DEFAULT_RENDER_FPS",
+            category="Environment Overrides",
+            description="Default rendering FPS for all environments",
+            default_value="30",
+            value_type=SettingType.INTEGER,
+        )
+
+        # Category 4: Classic Control Environments (4 variables)
+        metadata["CART_POLE_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="CART_POLE_MAX_EPISODE_STEPS",
+            category="Classic Control",
+            description="CartPole max episode steps (0=use gym defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["ACROBOT_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="ACROBOT_MAX_EPISODE_STEPS",
+            category="Classic Control",
+            description="Acrobot max episode steps (0=use gym defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["MOUNTAIN_CAR_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="MOUNTAIN_CAR_MAX_EPISODE_STEPS",
+            category="Classic Control",
+            description="MountainCar max episode steps (0=use gym defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["PENDULUM_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="PENDULUM_MAX_EPISODE_STEPS",
+            category="Classic Control",
+            description="Pendulum max episode steps (0=use gym defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+
+        # Category 5: Box2D Environments (9 variables)
         metadata["CAR_RACING_MAX_EPISODE_STEPS"] = SettingMetadata(
             key="CAR_RACING_MAX_EPISODE_STEPS",
-            category="Environment Overrides",
+            category="Box2D Environments",
             description="CarRacing max episode steps (0=use gym defaults)",
             default_value="0",
             value_type=SettingType.INTEGER,
         )
         metadata["CAR_RACING_MAX_EPISODE_SECONDS"] = SettingMetadata(
             key="CAR_RACING_MAX_EPISODE_SECONDS",
-            category="Environment Overrides",
+            category="Box2D Environments",
             description="CarRacing max episode seconds (0=use gym defaults)",
             default_value="0",
             value_type=SettingType.INTEGER,
         )
+        metadata["CAR_RACING_LAP_COMPLETE_PERCENT"] = SettingMetadata(
+            key="CAR_RACING_LAP_COMPLETE_PERCENT",
+            category="Box2D Environments",
+            description="CarRacing lap completion threshold (0.0-1.0)",
+            default_value="0.95",
+            value_type=SettingType.STRING,  # Float as string
+        )
         metadata["BIPEDAL_MAX_EPISODE_STEPS"] = SettingMetadata(
             key="BIPEDAL_MAX_EPISODE_STEPS",
-            category="Environment Overrides",
+            category="Box2D Environments",
             description="Bipedal Walker max episode steps (0=use gym defaults)",
             default_value="0",
             value_type=SettingType.INTEGER,
         )
         metadata["BIPEDAL_MAX_EPISODE_SECONDS"] = SettingMetadata(
             key="BIPEDAL_MAX_EPISODE_SECONDS",
-            category="Environment Overrides",
+            category="Box2D Environments",
             description="Bipedal Walker max episode seconds (0=use gym defaults)",
             default_value="0",
             value_type=SettingType.INTEGER,
         )
         metadata["BIPEDAL_HARDCORE"] = SettingMetadata(
             key="BIPEDAL_HARDCORE",
-            category="Environment Overrides",
-            description="Enable hardcore mode for Bipedal Walker (true/false)",
+            category="Box2D Environments",
+            description="Enable hardcore mode for Bipedal Walker",
+            default_value="false",
+            value_type=SettingType.BOOLEAN,
+        )
+        metadata["LUNAR_LANDER_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="LUNAR_LANDER_MAX_EPISODE_STEPS",
+            category="Box2D Environments",
+            description="Lunar Lander max episode steps (0=use gym defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["LUNAR_LANDER_CONTINUOUS"] = SettingMetadata(
+            key="LUNAR_LANDER_CONTINUOUS",
+            category="Box2D Environments",
+            description="Use continuous action space for Lunar Lander",
             default_value="false",
             value_type=SettingType.BOOLEAN,
         )
 
-        # Category 4: Platform & Graphics (2 variables)
+        # Category 6: Toy Text Environments (7 variables)
+        metadata["FROZEN_LAKE_IS_SLIPPERY"] = SettingMetadata(
+            key="FROZEN_LAKE_IS_SLIPPERY",
+            category="Toy Text Environments",
+            description="Enable slippery ice in FrozenLake",
+            default_value="true",
+            value_type=SettingType.BOOLEAN,
+        )
+        metadata["FROZEN_LAKE_MAP_NAME"] = SettingMetadata(
+            key="FROZEN_LAKE_MAP_NAME",
+            category="Toy Text Environments",
+            description="FrozenLake map size (4x4 or 8x8)",
+            default_value="4x4",
+            value_type=SettingType.ENUM,
+            enum_options=["4x4", "8x8"],
+        )
+        metadata["CLIFF_WALKING_IS_SLIPPERY"] = SettingMetadata(
+            key="CLIFF_WALKING_IS_SLIPPERY",
+            category="Toy Text Environments",
+            description="Enable slippery movement in CliffWalking",
+            default_value="false",
+            value_type=SettingType.BOOLEAN,
+        )
+        metadata["TAXI_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="TAXI_MAX_EPISODE_STEPS",
+            category="Toy Text Environments",
+            description="Taxi max episode steps (0=use gym defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["BLACKJACK_NATURAL"] = SettingMetadata(
+            key="BLACKJACK_NATURAL",
+            category="Toy Text Environments",
+            description="Blackjack natural (21 from first two cards) rule",
+            default_value="false",
+            value_type=SettingType.BOOLEAN,
+        )
+        metadata["BLACKJACK_SAB"] = SettingMetadata(
+            key="BLACKJACK_SAB",
+            category="Toy Text Environments",
+            description="Blackjack SAB (stick and bust) rule",
+            default_value="false",
+            value_type=SettingType.BOOLEAN,
+        )
+
+        # Category 7: MuJoCo Environments (10 variables)
+        metadata["MUJOCO_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="MUJOCO_MAX_EPISODE_STEPS",
+            category="MuJoCo Environments",
+            description="MuJoCo environments max episode steps (0=use gym defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["MUJOCO_FRAME_SKIP"] = SettingMetadata(
+            key="MUJOCO_FRAME_SKIP",
+            category="MuJoCo Environments",
+            description="MuJoCo frame skip (physics steps per action)",
+            default_value="5",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["MUJOCO_RENDER_FPS"] = SettingMetadata(
+            key="MUJOCO_RENDER_FPS",
+            category="MuJoCo Environments",
+            description="MuJoCo rendering FPS",
+            default_value="67",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["ANT_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="ANT_MAX_EPISODE_STEPS",
+            category="MuJoCo Environments",
+            description="Ant max episode steps (0=use defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["HALF_CHEETAH_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="HALF_CHEETAH_MAX_EPISODE_STEPS",
+            category="MuJoCo Environments",
+            description="HalfCheetah max episode steps (0=use defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["HOPPER_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="HOPPER_MAX_EPISODE_STEPS",
+            category="MuJoCo Environments",
+            description="Hopper max episode steps (0=use defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["HUMANOID_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="HUMANOID_MAX_EPISODE_STEPS",
+            category="MuJoCo Environments",
+            description="Humanoid max episode steps (0=use defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["WALKER2D_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="WALKER2D_MAX_EPISODE_STEPS",
+            category="MuJoCo Environments",
+            description="Walker2d max episode steps (0=use defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["SWIMMER_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="SWIMMER_MAX_EPISODE_STEPS",
+            category="MuJoCo Environments",
+            description="Swimmer max episode steps (0=use defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["REACHER_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="REACHER_MAX_EPISODE_STEPS",
+            category="MuJoCo Environments",
+            description="Reacher max episode steps (0=use defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+
+        # Category 8: Atari Environments (5 variables)
+        metadata["ATARI_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="ATARI_MAX_EPISODE_STEPS",
+            category="Atari Environments",
+            description="Atari environments max episode steps (0=use gym defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["ATARI_FRAMESKIP"] = SettingMetadata(
+            key="ATARI_FRAMESKIP",
+            category="Atari Environments",
+            description="Atari frame skip (frames to repeat each action)",
+            default_value="4",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["ATARI_REPEAT_ACTION_PROBABILITY"] = SettingMetadata(
+            key="ATARI_REPEAT_ACTION_PROBABILITY",
+            category="Atari Environments",
+            description="Atari sticky actions probability (0.0-1.0)",
+            default_value="0.0",
+            value_type=SettingType.STRING,  # Float as string
+        )
+        metadata["ATARI_FULL_ACTION_SPACE"] = SettingMetadata(
+            key="ATARI_FULL_ACTION_SPACE",
+            category="Atari Environments",
+            description="Use full action space (18 actions) instead of minimal",
+            default_value="false",
+            value_type=SettingType.BOOLEAN,
+        )
+        metadata["ATARI_RENDER_MODE"] = SettingMetadata(
+            key="ATARI_RENDER_MODE",
+            category="Atari Environments",
+            description="Atari render mode",
+            default_value="rgb_array",
+            value_type=SettingType.ENUM,
+            enum_options=["rgb_array", "human"],
+        )
+
+        # Category 9: MiniGrid Environments (5 variables)
+        metadata["MINIGRID_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="MINIGRID_MAX_EPISODE_STEPS",
+            category="MiniGrid Environments",
+            description="MiniGrid max episode steps (0=use defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["MINIGRID_TILE_SIZE"] = SettingMetadata(
+            key="MINIGRID_TILE_SIZE",
+            category="MiniGrid Environments",
+            description="MiniGrid tile size in pixels",
+            default_value="32",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["MINIGRID_AGENT_VIEW_SIZE"] = SettingMetadata(
+            key="MINIGRID_AGENT_VIEW_SIZE",
+            category="MiniGrid Environments",
+            description="MiniGrid agent's view size (grid cells)",
+            default_value="7",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["MINIGRID_HIGHLIGHT"] = SettingMetadata(
+            key="MINIGRID_HIGHLIGHT",
+            category="MiniGrid Environments",
+            description="Highlight agent's view area in MiniGrid",
+            default_value="true",
+            value_type=SettingType.BOOLEAN,
+        )
+        metadata["MINIGRID_AGENT_PNOV"] = SettingMetadata(
+            key="MINIGRID_AGENT_PNOV",
+            category="MiniGrid Environments",
+            description="MiniGrid partially observable view",
+            default_value="false",
+            value_type=SettingType.BOOLEAN,
+        )
+
+        # Category 10: ViZDoom Environments (5 variables)
+        metadata["VIZDOOM_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="VIZDOOM_MAX_EPISODE_STEPS",
+            category="ViZDoom Environments",
+            description="ViZDoom max episode steps (0=use defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["VIZDOOM_FRAME_SKIP"] = SettingMetadata(
+            key="VIZDOOM_FRAME_SKIP",
+            category="ViZDoom Environments",
+            description="ViZDoom frame skip",
+            default_value="4",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["VIZDOOM_RENDER_HUD"] = SettingMetadata(
+            key="VIZDOOM_RENDER_HUD",
+            category="ViZDoom Environments",
+            description="Render HUD (heads-up display) in ViZDoom",
+            default_value="false",
+            value_type=SettingType.BOOLEAN,
+        )
+        metadata["VIZDOOM_RENDER_CROSSHAIR"] = SettingMetadata(
+            key="VIZDOOM_RENDER_CROSSHAIR",
+            category="ViZDoom Environments",
+            description="Render crosshair in ViZDoom",
+            default_value="false",
+            value_type=SettingType.BOOLEAN,
+        )
+        metadata["VIZDOOM_RENDER_WEAPON"] = SettingMetadata(
+            key="VIZDOOM_RENDER_WEAPON",
+            category="ViZDoom Environments",
+            description="Render weapon in ViZDoom",
+            default_value="true",
+            value_type=SettingType.BOOLEAN,
+        )
+
+        # Category 11: MiniHack/NetHack Environments (3 variables)
+        metadata["MINIHACK_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="MINIHACK_MAX_EPISODE_STEPS",
+            category="MiniHack/NetHack",
+            description="MiniHack max episode steps (0=use defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["NETHACK_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="NETHACK_MAX_EPISODE_STEPS",
+            category="MiniHack/NetHack",
+            description="NetHack max episode steps (0=use defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["NETHACK_OBSERVATION_KEYS"] = SettingMetadata(
+            key="NETHACK_OBSERVATION_KEYS",
+            category="MiniHack/NetHack",
+            description="NetHack observation keys (comma-separated)",
+            default_value="glyphs,blstats,message",
+            value_type=SettingType.STRING,
+        )
+
+        # Category 12: Crafter Environment (3 variables)
+        metadata["CRAFTER_MAX_EPISODE_STEPS"] = SettingMetadata(
+            key="CRAFTER_MAX_EPISODE_STEPS",
+            category="Crafter",
+            description="Crafter max episode steps (0=use defaults)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["CRAFTER_AREA_SIZE"] = SettingMetadata(
+            key="CRAFTER_AREA_SIZE",
+            category="Crafter",
+            description="Crafter world area size (e.g., 64x64)",
+            default_value="64x64",
+            value_type=SettingType.STRING,
+        )
+        metadata["CRAFTER_VIEW_SIZE"] = SettingMetadata(
+            key="CRAFTER_VIEW_SIZE",
+            category="Crafter",
+            description="Crafter agent view size (e.g., 9x9)",
+            default_value="9x9",
+            value_type=SettingType.STRING,
+        )
+
+        # Category 13: Procgen Environments (7 variables)
+        metadata["PROCGEN_NUM_LEVELS"] = SettingMetadata(
+            key="PROCGEN_NUM_LEVELS",
+            category="Procgen",
+            description="Procgen number of unique levels (0=unlimited)",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["PROCGEN_START_LEVEL"] = SettingMetadata(
+            key="PROCGEN_START_LEVEL",
+            category="Procgen",
+            description="Procgen starting level seed",
+            default_value="0",
+            value_type=SettingType.INTEGER,
+        )
+        metadata["PROCGEN_PAINT_VEL_INFO"] = SettingMetadata(
+            key="PROCGEN_PAINT_VEL_INFO",
+            category="Procgen",
+            description="Paint velocity info on Procgen observations",
+            default_value="false",
+            value_type=SettingType.BOOLEAN,
+        )
+        metadata["PROCGEN_USE_GENERATED_ASSETS"] = SettingMetadata(
+            key="PROCGEN_USE_GENERATED_ASSETS",
+            category="Procgen",
+            description="Use procedurally generated assets in Procgen",
+            default_value="false",
+            value_type=SettingType.BOOLEAN,
+        )
+        metadata["PROCGEN_CENTER_AGENT"] = SettingMetadata(
+            key="PROCGEN_CENTER_AGENT",
+            category="Procgen",
+            description="Center agent in Procgen view",
+            default_value="true",
+            value_type=SettingType.BOOLEAN,
+        )
+        metadata["PROCGEN_USE_SEQUENTIAL_LEVELS"] = SettingMetadata(
+            key="PROCGEN_USE_SEQUENTIAL_LEVELS",
+            category="Procgen",
+            description="Use sequential Procgen levels instead of random",
+            default_value="false",
+            value_type=SettingType.BOOLEAN,
+        )
+        metadata["PROCGEN_DISTRIBUTION_MODE"] = SettingMetadata(
+            key="PROCGEN_DISTRIBUTION_MODE",
+            category="Procgen",
+            description="Procgen difficulty distribution mode",
+            default_value="easy",
+            value_type=SettingType.ENUM,
+            enum_options=["easy", "hard", "extreme", "memory", "exploration"],
+        )
+
+        # Category 14: Platform & Graphics (2 variables)
         metadata["PLATFORM"] = SettingMetadata(
             key="PLATFORM",
             category="Platform & Graphics",
@@ -345,7 +746,17 @@ class SettingsService:
         return [
             "Qt Configuration",
             "Gymnasium Defaults",
-            "Environment Overrides",
+            "Environment Overrides",  # Generic defaults
+            "Classic Control",
+            "Box2D Environments",
+            "Toy Text Environments",
+            "MuJoCo Environments",
+            "Atari Environments",
+            "MiniGrid Environments",
+            "ViZDoom Environments",
+            "MiniHack/NetHack",
+            "Crafter",
+            "Procgen",
             "Platform & Graphics",
             "gRPC",
             "LLM & Chat",

@@ -510,7 +510,12 @@ class VLLMServerManager:
 
             except FileNotFoundError:
                 raise RuntimeError(
-                    "vLLM not found. Install with: pip install vllm"
+                    "vLLM not found. Install with: pip install vllm\n\n"
+                    "Installation is in progress in the background.\n"
+                    "Please wait 5-10 minutes and try again.\n\n"
+                    "Or use OpenRouter (cloud) provider instead:\n"
+                    "1. Switch Provider to 'OpenRouter'\n"
+                    "2. Enter your API key from https://openrouter.ai/keys"
                 )
             except Exception as e:
                 self._process = None

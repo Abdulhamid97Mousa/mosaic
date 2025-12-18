@@ -29,6 +29,15 @@ requests>=2.31.0
 huggingface_hub>=0.20.0
 
 # ═══════════════════════════════════════════════════════════════
+# vLLM (Local Model Serving)
+# ═══════════════════════════════════════════════════════════════
+
+# vLLM for local GPU inference
+# See: https://docs.vllm.ai/en/latest/
+# Note: Requires NVIDIA GPU with CUDA support
+vllm>=0.6.0
+
+# ═══════════════════════════════════════════════════════════════
 # Supported Providers
 # ═══════════════════════════════════════════════════════════════
 #

@@ -167,6 +167,7 @@ spade-bdi = [
 chat = [
     "requests>=2.31.0",
     "huggingface_hub>=0.20.0",
+    "vllm>=0.6.0",
 ]
 
 # Ray/RLlib worker for distributed RL training
