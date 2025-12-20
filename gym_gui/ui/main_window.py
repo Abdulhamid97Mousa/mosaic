@@ -70,7 +70,12 @@ from gym_gui.game_docs.mosaic_welcome import MOSAIC_WELCOME_HTML
 from gym_gui.services.actor import ActorService
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
-from gym_gui.services.trainer import TrainerClient, TrainerClientRunner
+from gym_gui.services.trainer import (
+    TrainerClient,
+    TrainerClientRunner,
+    TrainingRunManager,
+    RunRegistry,
+)
 from gym_gui.services.trainer.streams import TelemetryAsyncHub
 from gym_gui.ui.widgets.live_telemetry_tab import LiveTelemetryTab
 from gym_gui.ui.widgets.fastlane_tab import FastLaneTab
@@ -178,6 +183,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._awaiting_human = False
         self._latest_fps: float | None = None
         self._human_input = HumanInputController(self, self._session)
+        self._session.set_input_controller(self._human_input)
         locator = get_service_locator()
         telemetry_service = locator.resolve(TelemetryService)
         actor_service = locator.resolve(ActorService)
@@ -189,6 +195,19 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._actor_service: ActorService = actor_service
         self._trainer_client: TrainerClient = trainer_client
         self._telemetry_hub: TelemetryAsyncHub = telemetry_hub
+
+        # Create TrainingRunManager for the Management tab
+        run_registry = locator.resolve(RunRegistry)
+        client_runner = locator.resolve(TrainerClientRunner)
+        if run_registry is not None:
+            self._run_manager: TrainingRunManager | None = TrainingRunManager(
+                registry=run_registry,
+                client_runner=client_runner,
+                telemetry_service=telemetry_service,
+            )
+        else:
+            _LOGGER.warning("RunRegistry not available; Management tab will be disabled")
+            self._run_manager = None
         
         # Track dynamic agent tabs by (run_id, agent_id)
         self._agent_tab_index: set[tuple[str, str]] = set()
@@ -369,6 +388,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._render_tabs = RenderTabs(
             self._render_group,
             telemetry_service=self._telemetry_service,
+            run_manager=self._run_manager,
         )
         # Note: Chess move signal connected in _connect_signals after handlers init
         self._analytics_tabs = AnalyticsTabManager(self._render_tabs, self)
@@ -1137,7 +1157,20 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._game_paused = False
         self._awaiting_human = False
         self._latest_fps = None
-        self._human_input.configure(self._session.game_id, self._session.action_space)
+        # Get overrides to pass input_mode setting to human input controller
+        current_game = self._session.game_id
+        overrides = None
+        if current_game is not None:
+            try:
+                gid = GameId(current_game) if isinstance(current_game, str) else current_game
+                overrides = self._control_panel.get_overrides(gid)
+            except Exception:
+                pass
+        self._human_input.configure(
+            self._session.game_id,
+            self._session.action_space,
+            overrides=overrides,
+        )
         self._configure_mouse_capture()  # Configure FPS-style mouse capture for ViZDoom
         self._control_panel.set_auto_running(False)
         self._control_panel.set_game_started(False)  # Reset game state on new load

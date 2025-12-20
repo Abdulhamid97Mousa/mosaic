@@ -703,6 +703,39 @@ class RunRegistry:
                 (run_id,),
             )
 
+    def delete_run(self, run_id: str) -> bool:
+        """Delete a run from the registry and release its GPU slots.
+
+        This permanently removes the run record from the database. Associated
+        disk artifacts (logs, tensorboard, configs) must be cleaned up separately.
+
+        Args:
+            run_id: The unique identifier of the run to delete.
+
+        Returns:
+            True if the run was deleted, False if the run was not found.
+        """
+        with self._lock:
+            conn = self._connect()
+            try:
+                # Release GPU slots first (set them to available)
+                conn.execute(
+                    "UPDATE gpu_slots SET run_id = NULL, locked_at = NULL WHERE run_id = ?",
+                    (run_id,),
+                )
+                # Delete the run record
+                cursor = conn.execute("DELETE FROM runs WHERE run_id = ?", (run_id,))
+                conn.commit()
+                deleted = cursor.rowcount > 0
+                if deleted:
+                    _LOGGER.info("Deleted run from registry", extra={"run_id": run_id})
+                return deleted
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+
     def wal_checkpoint(self, mode: str = "TRUNCATE") -> WALCheckpointStats:
         """Runs a WAL checkpoint and returns statistics.
 

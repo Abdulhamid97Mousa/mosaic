@@ -17,7 +17,7 @@ from gym_gui.services.actor import (
 )
 from gym_gui.services.policy_mapping import PolicyMappingService
 from gym_gui.services.service_locator import ServiceLocator, get_service_locator
-from gym_gui.services.trainer import TrainerClient, TrainerClientConfig, TrainerClientRunner
+from gym_gui.services.trainer import TrainerClient, TrainerClientConfig, TrainerClientRunner, RunRegistry
 from gym_gui.services.trainer.launcher import TrainerDaemonHandle, ensure_trainer_daemon_running
 from gym_gui.services.trainer.streams import TelemetryAsyncHub
 from gym_gui.services.storage import StorageRecorderService
@@ -124,7 +124,11 @@ def bootstrap_default_services() -> ServiceLocator:
 
     trainer_client = TrainerClient(client_config)
     trainer_runner = TrainerClientRunner(trainer_client)
-    
+
+    # Create run registry for training run management
+    # Uses the same database as the trainer daemon (VAR_TRAINER_DIR/trainer.sqlite)
+    run_registry = RunRegistry()
+
     # Initialize telemetry hub for live streaming
     # Increased buffer_size from 256 to 512 to handle high-frequency training (episode 658+)
     # max_queue=2048 handles gRPC stream buffering, buffer_size=512 handles UI processing lag
@@ -164,6 +168,7 @@ def bootstrap_default_services() -> ServiceLocator:
     locator.register(RendererRegistry, renderer_registry)
     locator.register(TrainerClient, trainer_client)
     locator.register(TrainerClientRunner, trainer_runner)
+    locator.register(RunRegistry, run_registry)
     locator.register(TelemetryAsyncHub, telemetry_hub)
     locator.register(LiveTelemetryController, live_controller)
     locator.register(TelemetryDBSink, db_sink)
@@ -180,6 +185,7 @@ def bootstrap_default_services() -> ServiceLocator:
     locator.register("renderer_registry", renderer_registry)
     locator.register("trainer_client", trainer_client)
     locator.register("trainer_client_runner", trainer_runner)
+    locator.register("run_registry", run_registry)
     locator.register("telemetry_hub", telemetry_hub)
     locator.register("live_telemetry_controller", live_controller)
     locator.register("trainer_daemon_handle", daemon_handle)

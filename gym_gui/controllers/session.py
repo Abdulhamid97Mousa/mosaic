@@ -46,6 +46,7 @@ from gym_gui.controllers.interaction import (
     TurnBasedInteractionController,
     AleInteractionController,
     ViZDoomInteractionController,
+    ProcgenInteractionController,
 )
 from gym_gui.logging_config.log_constants import (
     LOG_NORMALIZATION_STATS_DROPPED,
@@ -167,6 +168,15 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._current_seed = self._next_seed
         self._game_config: GameConfig | None = None
         self._interaction: InteractionController | None = None
+        self._input_controller: Any = None  # HumanInputController, set via set_input_controller
+
+    def set_input_controller(self, controller: Any) -> None:
+        """Set the HumanInputController for querying key state during idle ticks.
+
+        Args:
+            controller: The HumanInputController instance.
+        """
+        self._input_controller = controller
 
     # ------------------------------------------------------------------
     # Public API
@@ -360,6 +370,9 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             # ViZDoom runs at 35 FPS by default - game advances continuously
             # like ALE, enemies move and projectiles fly even without player input
             return ViZDoomInteractionController(self, target_hz=35)
+        if family == EnvironmentFamily.PROCGEN:
+            # Procgen docs suggest 15 Hz, but 30 FPS feels more responsive in a GUI
+            return ProcgenInteractionController(self, target_hz=30)
         return TurnBasedInteractionController()
 
     def perform_human_action(self, action: int, *, key_label: str | None = None) -> None:
@@ -976,17 +989,33 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             self._stop_idle_tick()
             return
         interaction = getattr(self, "_interaction", None)
-        # For ALE and ViZDoom, do not gate on awaiting_human; always advance with NOOP when idle tick fires
+        # For ALE, ViZDoom, and Procgen, do not gate on awaiting_human; always advance with NOOP when idle tick fires
         # These are continuous games where the world should keep moving regardless of player input
-        require_awaiting = not isinstance(interaction, (AleInteractionController, ViZDoomInteractionController))
+        require_awaiting = not isinstance(interaction, (AleInteractionController, ViZDoomInteractionController, ProcgenInteractionController))
         if require_awaiting and not self._awaiting_human:
             return
-        # Determine idle action
+
+        # Determine idle action - prioritize input controller's key state
         action = None
-        if interaction is not None:
-            action = interaction.maybe_passive_action()
+        input_label = "idle_tick"
+
+        # Check if the input controller has keys pressed (state-based input)
+        if self._input_controller is not None:
+            # Check if using state-based input and has keys pressed
+            if hasattr(self._input_controller, 'is_state_based') and self._input_controller.is_state_based():
+                if hasattr(self._input_controller, 'get_current_action'):
+                    key_action = self._input_controller.get_current_action()
+                    if key_action is not None:
+                        action = key_action
+                        input_label = "key_combo"
+
+        # Fall back to passive action if no key action
         if action is None:
-            action = self._passive_action
+            if interaction is not None:
+                action = interaction.maybe_passive_action()
+            if action is None:
+                action = self._passive_action
+
         if action is None:
             _LOGGER.debug("Idle timer active but passive action unavailable")
             self._stop_idle_tick()
@@ -994,7 +1023,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         if require_awaiting:
             self._awaiting_human = False
             self.awaiting_human.emit(False, "Passive idle step")
-        self._pending_input_label = "idle_tick"
+        self._pending_input_label = input_label
         self._apply_action(action)
 
     def _determine_idle_interval(self) -> int:

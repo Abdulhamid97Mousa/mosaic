@@ -15,7 +15,7 @@ import logging
 from typing import List, Optional, TYPE_CHECKING
 
 from qtpy import QtCore, QtGui, QtWidgets
-
+from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 from gym_gui.services.llm import (
     LLMConfig,
     LLMProvider,
@@ -67,7 +67,7 @@ class GPUDetectionWorker(QtCore.QThread):
     Detects NVIDIA GPUs in the background to avoid blocking UI.
     """
 
-    finished = QtCore.Signal(object)  # GPUDetectionResult
+    finished = pyqtSignal(object)  # GPUDetectionResult
 
     def __init__(self, parent: Optional[QtCore.QObject] = None) -> None:
         super().__init__(parent)
@@ -106,7 +106,7 @@ class HFTokenValidationWorker(QtCore.QThread):
     Validates token with HuggingFace API in background.
     """
 
-    finished = QtCore.Signal(bool, str)  # (is_valid, message)
+    finished = pyqtSignal(bool, str)  # (is_valid, message)
 
     def __init__(
         self,
@@ -145,7 +145,7 @@ class HFTokenSaveWorker(QtCore.QThread):
     several seconds depending on network conditions.
     """
 
-    finished = QtCore.Signal(bool, str)  # (success, message)
+    finished = pyqtSignal(bool, str)  # (success, message)
 
     def __init__(
         self,
@@ -181,9 +181,9 @@ class ModelDownloadWorker(QtCore.QThread):
     Handles model download with progress updates.
     """
 
-    progress = QtCore.Signal(float, str)  # (percentage, message)
-    finished = QtCore.Signal(str)  # model path
-    error = QtCore.Signal(str)
+    progress = pyqtSignal(float, str)  # (percentage, message)
+    finished = pyqtSignal(str)  # model path
+    error = pyqtSignal(str)
 
     def __init__(
         self,
@@ -247,8 +247,8 @@ class ChatWorker(QtCore.QThread):
     Runs HTTP requests in a background thread to avoid blocking Qt UI.
     """
 
-    finished = QtCore.Signal(object)  # CompletionResult
-    error = QtCore.Signal(str)
+    finished = pyqtSignal(object)  # CompletionResult
+    error = pyqtSignal(str)
 
     def __init__(
         self,
@@ -325,9 +325,9 @@ class ChatPanel(QtWidgets.QWidget):
     """
 
     # Signals
-    api_key_changed = QtCore.Signal(str)
-    model_changed = QtCore.Signal(object)  # ModelIdentity
-    message_sent = QtCore.Signal(str)
+    api_key_changed = pyqtSignal(str)
+    model_changed = pyqtSignal(object)  # ModelIdentity
+    message_sent = pyqtSignal(str)
 
     def __init__(
         self,
@@ -382,8 +382,10 @@ class ChatPanel(QtWidgets.QWidget):
         provider_row.addWidget(self._model_combo, 1)
         layout.addLayout(provider_row)
 
-        # API Key section (collapsible)
+        # API Key section (collapsible) - for OpenRouter
         self._api_key_group = QtWidgets.QGroupBox("API Configuration")
+        self._api_key_group.setCheckable(True)
+        self._api_key_group.setChecked(False)  # Start collapsed
         api_layout = QtWidgets.QVBoxLayout(self._api_key_group)
         api_layout.setContentsMargins(4, 4, 4, 4)
         api_layout.setSpacing(4)
@@ -414,20 +416,34 @@ class ChatPanel(QtWidgets.QWidget):
         self._api_status_label.setStyleSheet("font-size: 10px;")
         api_layout.addWidget(self._api_status_label)
 
+        # Content widget for collapsible behavior
+        self._api_content = QtWidgets.QWidget()
+        self._api_content.setLayout(api_layout)
+        api_group_layout = QtWidgets.QVBoxLayout(self._api_key_group)
+        api_group_layout.setContentsMargins(0, 0, 0, 0)
+        api_group_layout.addWidget(self._api_content)
+        self._api_content.setVisible(False)
+
         layout.addWidget(self._api_key_group)
 
-        # HuggingFace Token section (for vLLM local models)
-        self._hf_token_group = QtWidgets.QGroupBox("HuggingFace Authentication")
-        hf_layout = QtWidgets.QVBoxLayout(self._hf_token_group)
-        hf_layout.setContentsMargins(4, 4, 4, 4)
-        hf_layout.setSpacing(4)
+        # vLLM Settings section (collapsible) - contains HF, GPU, Proxy
+        self._vllm_settings_group = QtWidgets.QGroupBox("vLLM Settings")
+        self._vllm_settings_group.setCheckable(True)
+        self._vllm_settings_group.setChecked(False)  # Start collapsed
+        vllm_main_layout = QtWidgets.QVBoxLayout()
+        vllm_main_layout.setContentsMargins(4, 4, 4, 4)
+        vllm_main_layout.setSpacing(4)
 
-        # HF Token input row
+        # --- HuggingFace Token subsection ---
+        hf_header = QtWidgets.QLabel("HuggingFace Token")
+        hf_header.setStyleSheet("font-weight: bold; font-size: 11px; color: #4a9eff;")
+        vllm_main_layout.addWidget(hf_header)
+
         hf_row = QtWidgets.QHBoxLayout()
-        self._hf_label = QtWidgets.QLabel("HF Token:")
+        self._hf_label = QtWidgets.QLabel("Token:")
         self._hf_token_input = QtWidgets.QLineEdit()
         self._hf_token_input.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
-        self._hf_token_input.setPlaceholderText("hf_... (from huggingface.co/settings/tokens)")
+        self._hf_token_input.setPlaceholderText("hf_...")
 
         self._show_hf_btn = QtWidgets.QPushButton("Show")
         self._show_hf_btn.setCheckable(True)
@@ -438,117 +454,111 @@ class ChatPanel(QtWidgets.QWidget):
 
         self._validate_hf_btn = QtWidgets.QPushButton("Validate")
         self._validate_hf_btn.setMaximumWidth(60)
-        self._validate_hf_btn.setToolTip("Validate token with HuggingFace API")
 
         hf_row.addWidget(self._hf_label)
         hf_row.addWidget(self._hf_token_input, 1)
         hf_row.addWidget(self._show_hf_btn)
         hf_row.addWidget(self._save_hf_btn)
         hf_row.addWidget(self._validate_hf_btn)
-        hf_layout.addLayout(hf_row)
+        vllm_main_layout.addLayout(hf_row)
 
-        # HF Token status and source
         self._hf_status_label = QtWidgets.QLabel("")
         self._hf_status_label.setStyleSheet("font-size: 10px;")
-        hf_layout.addWidget(self._hf_status_label)
+        vllm_main_layout.addWidget(self._hf_status_label)
 
         self._hf_source_label = QtWidgets.QLabel("")
         self._hf_source_label.setStyleSheet("font-size: 9px; color: gray;")
-        hf_layout.addWidget(self._hf_source_label)
+        vllm_main_layout.addWidget(self._hf_source_label)
 
         # Model download progress
         self._download_progress = QtWidgets.QProgressBar()
         self._download_progress.setVisible(False)
         self._download_progress.setTextVisible(True)
-        hf_layout.addWidget(self._download_progress)
+        vllm_main_layout.addWidget(self._download_progress)
 
-        self._hf_token_group.setVisible(False)  # Hidden by default, shown when vLLM selected
-        layout.addWidget(self._hf_token_group)
+        # Separator
+        sep1 = QtWidgets.QFrame()
+        sep1.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+        sep1.setStyleSheet("color: #555;")
+        vllm_main_layout.addWidget(sep1)
 
-        # GPU Status section (for vLLM local models)
-        self._gpu_group = QtWidgets.QGroupBox("GPU Status")
-        gpu_layout = QtWidgets.QVBoxLayout(self._gpu_group)
-        gpu_layout.setContentsMargins(4, 4, 4, 4)
-        gpu_layout.setSpacing(2)
-
-        # GPU status header
+        # --- GPU Status subsection ---
         gpu_header_row = QtWidgets.QHBoxLayout()
-        self._gpu_status_label = QtWidgets.QLabel("Detecting GPUs...")
-        self._gpu_status_label.setStyleSheet("font-weight: bold;")
+        gpu_header = QtWidgets.QLabel("GPU Status")
+        gpu_header.setStyleSheet("font-weight: bold; font-size: 11px; color: #4a9eff;")
         self._gpu_refresh_btn = QtWidgets.QPushButton("Refresh")
         self._gpu_refresh_btn.setMaximumWidth(60)
-        self._gpu_refresh_btn.setToolTip("Refresh GPU detection")
-        gpu_header_row.addWidget(self._gpu_status_label)
+        gpu_header_row.addWidget(gpu_header)
         gpu_header_row.addStretch()
         gpu_header_row.addWidget(self._gpu_refresh_btn)
-        gpu_layout.addLayout(gpu_header_row)
+        vllm_main_layout.addLayout(gpu_header_row)
 
-        # GPU list (scrollable for multiple GPUs)
+        self._gpu_status_label = QtWidgets.QLabel("Detecting GPUs...")
+        self._gpu_status_label.setStyleSheet("font-size: 10px;")
+        vllm_main_layout.addWidget(self._gpu_status_label)
+
         self._gpu_list = QtWidgets.QListWidget()
-        self._gpu_list.setMaximumHeight(80)
+        self._gpu_list.setMaximumHeight(60)
         self._gpu_list.setStyleSheet("font-size: 10px;")
-        self._gpu_list.setAlternatingRowColors(True)
-        gpu_layout.addWidget(self._gpu_list)
+        vllm_main_layout.addWidget(self._gpu_list)
 
-        # GPU recommendation label
         self._gpu_recommendation_label = QtWidgets.QLabel("")
-        self._gpu_recommendation_label.setStyleSheet("font-size: 10px; color: gray;")
+        self._gpu_recommendation_label.setStyleSheet("font-size: 9px; color: gray;")
         self._gpu_recommendation_label.setWordWrap(True)
-        gpu_layout.addWidget(self._gpu_recommendation_label)
+        vllm_main_layout.addWidget(self._gpu_recommendation_label)
 
-        self._gpu_group.setVisible(False)  # Hidden by default, shown when vLLM selected
-        layout.addWidget(self._gpu_group)
+        # Separator
+        sep2 = QtWidgets.QFrame()
+        sep2.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+        sep2.setStyleSheet("color: #555;")
+        vllm_main_layout.addWidget(sep2)
 
-        # Proxy Configuration section (for vLLM local models)
-        self._proxy_group = QtWidgets.QGroupBox("Proxy Configuration")
-        proxy_layout = QtWidgets.QVBoxLayout(self._proxy_group)
-        proxy_layout.setContentsMargins(4, 4, 4, 4)
-        proxy_layout.setSpacing(4)
+        # --- Proxy subsection ---
+        proxy_header_row = QtWidgets.QHBoxLayout()
+        proxy_header = QtWidgets.QLabel("Proxy")
+        proxy_header.setStyleSheet("font-weight: bold; font-size: 11px; color: #4a9eff;")
+        self._proxy_toggle = QtWidgets.QCheckBox("Enable")
+        self._proxy_status_label = QtWidgets.QLabel("Disabled")
+        self._proxy_status_label.setStyleSheet("font-size: 9px; color: gray;")
+        proxy_header_row.addWidget(proxy_header)
+        proxy_header_row.addWidget(self._proxy_toggle)
+        proxy_header_row.addStretch()
+        proxy_header_row.addWidget(self._proxy_status_label)
+        vllm_main_layout.addLayout(proxy_header_row)
 
-        # Proxy toggle row
-        proxy_toggle_row = QtWidgets.QHBoxLayout()
-        self._proxy_toggle = QtWidgets.QCheckBox("Enable Proxy")
-        self._proxy_toggle.setToolTip("Enable proxy for HuggingFace downloads")
-        self._proxy_status_label = QtWidgets.QLabel("Proxy disabled")
-        self._proxy_status_label.setStyleSheet("font-size: 10px; color: gray;")
-        proxy_toggle_row.addWidget(self._proxy_toggle)
-        proxy_toggle_row.addStretch()
-        proxy_toggle_row.addWidget(self._proxy_status_label)
-        proxy_layout.addLayout(proxy_toggle_row)
-
-        # HTTP Proxy row
-        http_proxy_row = QtWidgets.QHBoxLayout()
-        self._http_proxy_label = QtWidgets.QLabel("HTTP Proxy:")
-        self._http_proxy_label.setMinimumWidth(80)
+        proxy_inputs_row = QtWidgets.QHBoxLayout()
         self._http_proxy_input = QtWidgets.QLineEdit()
-        self._http_proxy_input.setPlaceholderText("http://127.0.0.1:7890")
+        self._http_proxy_input.setPlaceholderText("HTTP: http://127.0.0.1:7890")
         self._http_proxy_input.setEnabled(False)
-        http_proxy_row.addWidget(self._http_proxy_label)
-        http_proxy_row.addWidget(self._http_proxy_input, 1)
-        proxy_layout.addLayout(http_proxy_row)
-
-        # HTTPS Proxy row
-        https_proxy_row = QtWidgets.QHBoxLayout()
-        self._https_proxy_label = QtWidgets.QLabel("HTTPS Proxy:")
-        self._https_proxy_label.setMinimumWidth(80)
         self._https_proxy_input = QtWidgets.QLineEdit()
-        self._https_proxy_input.setPlaceholderText("https://127.0.0.1:7890")
+        self._https_proxy_input.setPlaceholderText("HTTPS: https://127.0.0.1:7890")
         self._https_proxy_input.setEnabled(False)
-        https_proxy_row.addWidget(self._https_proxy_label)
-        https_proxy_row.addWidget(self._https_proxy_input, 1)
-        proxy_layout.addLayout(https_proxy_row)
-
-        # Apply proxy button
-        proxy_btn_row = QtWidgets.QHBoxLayout()
-        proxy_btn_row.addStretch()
-        self._apply_proxy_btn = QtWidgets.QPushButton("Apply Proxy Settings")
+        self._apply_proxy_btn = QtWidgets.QPushButton("Apply")
         self._apply_proxy_btn.setEnabled(False)
-        self._apply_proxy_btn.setMaximumWidth(150)
-        proxy_btn_row.addWidget(self._apply_proxy_btn)
-        proxy_layout.addLayout(proxy_btn_row)
+        self._apply_proxy_btn.setMaximumWidth(60)
+        proxy_inputs_row.addWidget(self._http_proxy_input)
+        proxy_inputs_row.addWidget(self._https_proxy_input)
+        proxy_inputs_row.addWidget(self._apply_proxy_btn)
+        vllm_main_layout.addLayout(proxy_inputs_row)
 
-        self._proxy_group.setVisible(False)  # Hidden by default, shown when vLLM selected
-        layout.addWidget(self._proxy_group)
+        # Content widget for collapsible behavior
+        self._vllm_content = QtWidgets.QWidget()
+        self._vllm_content.setLayout(vllm_main_layout)
+        vllm_group_layout = QtWidgets.QVBoxLayout(self._vllm_settings_group)
+        vllm_group_layout.setContentsMargins(0, 0, 0, 0)
+        vllm_group_layout.addWidget(self._vllm_content)
+        self._vllm_content.setVisible(False)
+
+        self._vllm_settings_group.setVisible(False)  # Hidden by default
+        layout.addWidget(self._vllm_settings_group)
+
+        # Legacy group boxes (hidden, kept for compatibility)
+        self._hf_token_group = QtWidgets.QWidget()
+        self._hf_token_group.setVisible(False)
+        self._gpu_group = QtWidgets.QWidget()
+        self._gpu_group.setVisible(False)
+        self._proxy_group = QtWidgets.QWidget()
+        self._proxy_group.setVisible(False)
 
         # Chat history display
         self._chat_display = QtWidgets.QTextEdit()
@@ -557,7 +567,7 @@ class ChatPanel(QtWidgets.QWidget):
         self._chat_display.setPlaceholderText(
             "Chat with MOSAIC Assistant...\n\n"
             "OpenRouter (Cloud): Enter API key from openrouter.ai/keys\n"
-            "vLLM (Local): Start server with 'vllm serve <model>'"
+            "vLLM (Local): Select model and send a message to auto-download"
         )
         layout.addWidget(self._chat_display, 1)
 
@@ -597,6 +607,9 @@ class ChatPanel(QtWidgets.QWidget):
         self._input_field.returnPressed.connect(self._on_send_clicked)
         self._cancel_btn.clicked.connect(self._on_cancel_clicked)
         self._clear_btn.clicked.connect(self._on_clear_clicked)
+        # Collapsible group signals
+        self._api_key_group.toggled.connect(self._on_api_group_toggled)
+        self._vllm_settings_group.toggled.connect(self._on_vllm_group_toggled)
         # HuggingFace token signals
         self._show_hf_btn.toggled.connect(self._on_show_hf_toggled)
         self._save_hf_btn.clicked.connect(self._on_save_hf_token)
@@ -606,6 +619,14 @@ class ChatPanel(QtWidgets.QWidget):
         # Proxy signals
         self._proxy_toggle.toggled.connect(self._on_proxy_toggled)
         self._apply_proxy_btn.clicked.connect(self._on_apply_proxy)
+
+    def _on_api_group_toggled(self, checked: bool) -> None:
+        """Toggle API configuration visibility."""
+        self._api_content.setVisible(checked)
+
+    def _on_vllm_group_toggled(self, checked: bool) -> None:
+        """Toggle vLLM settings visibility."""
+        self._vllm_content.setVisible(checked)
 
     def _populate_models(self) -> None:
         """Populate model dropdown based on selected provider."""
@@ -638,14 +659,12 @@ class ChatPanel(QtWidgets.QWidget):
         # Update models for new provider
         self._populate_models()
 
-        # Update API key section based on provider
+        # Update settings sections based on provider
         if provider == LLMProvider.OPENROUTER:
             self._key_label.setText("OpenRouter API Key:")
             self._api_key_input.setPlaceholderText("sk-or-v1-...")
             self._api_key_group.setVisible(True)
-            self._hf_token_group.setVisible(False)
-            self._gpu_group.setVisible(False)
-            self._proxy_group.setVisible(False)
+            self._vllm_settings_group.setVisible(False)
             # Load OpenRouter key
             existing_key = self._config.openrouter_api_key
             if existing_key:
@@ -653,14 +672,10 @@ class ChatPanel(QtWidgets.QWidget):
             else:
                 self._api_key_input.clear()
         elif provider == LLMProvider.VLLM:
-            self._key_label.setText("vLLM API Key (optional):")
-            self._api_key_input.setPlaceholderText("EMPTY (default)")
-            # vLLM doesn't require API key, hide or minimize
+            # vLLM doesn't require API key, hide API config
             self._api_key_group.setVisible(False)
-            # Show HuggingFace token, GPU, and Proxy sections for local models
-            self._hf_token_group.setVisible(True)
-            self._gpu_group.setVisible(True)
-            self._proxy_group.setVisible(True)
+            # Show consolidated vLLM settings
+            self._vllm_settings_group.setVisible(True)
             self._update_hf_status()
             self._update_proxy_status()
             # Refresh GPU info if we have results
@@ -971,7 +986,9 @@ class ChatPanel(QtWidgets.QWidget):
         Returns:
             True if model is ready, False if download needed or error.
         """
-        model_info = self._model_manager.get_model_info(model.model_id, model.display_name)
+        model_info = self._model_manager.get_model_info(
+            model.model_id, model.display_name or model.model_id
+        )
 
         # Check if server is already running with this model
         if self._model_manager.server.is_running:
@@ -1141,22 +1158,36 @@ class ChatPanel(QtWidgets.QWidget):
         cursor = self._chat_display.textCursor()
         cursor.movePosition(QtGui.QTextCursor.MoveOperation.End)
 
-        # Format based on role
-        if role == "user":
-            cursor.insertHtml('<p style="color: #0066cc; margin: 8px 0;"><b>You:</b></p>')
-        else:
-            cursor.insertHtml(
-                '<p style="color: #006600; margin: 8px 0;"><b>Assistant:</b></p>'
-            )
-
         # Escape HTML and preserve newlines
         escaped = self._escape_html(content)
-        cursor.insertHtml(f'<p style="margin: 0 0 12px 0;">{escaped}</p>')
+
+        # Format based on role with distinct visual styling
+        if role == "user":
+            # User message - right-aligned blue bubble style
+            cursor.insertHtml(
+                '<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">'
+                '<tr><td align="right">'
+                '<div style="background-color: #2563eb; color: white; padding: 8px 12px; '
+                'border-radius: 12px 12px 0 12px; display: inline-block; max-width: 80%;">'
+                f'<b style="color: #93c5fd;">You</b><br/>{escaped}'
+                '</div></td></tr></table>'
+            )
+        else:
+            # Assistant message - left-aligned green bubble style
+            cursor.insertHtml(
+                '<table width="100%" cellpadding="0" cellspacing="0" style="margin-bottom: 12px;">'
+                '<tr><td align="left">'
+                '<div style="background-color: #1e3a2f; color: #d1fae5; padding: 8px 12px; '
+                'border-radius: 12px 12px 12px 0; display: inline-block; max-width: 80%;">'
+                '<b style="color: #34d399;">MOSAIC Assistant</b><br/>'
+                f'{escaped}'
+                '</div></td></tr></table>'
+            )
 
         # Scroll to bottom
-        self._chat_display.verticalScrollBar().setValue(
-            self._chat_display.verticalScrollBar().maximum()
-        )
+        scrollbar = self._chat_display.verticalScrollBar()
+        if scrollbar is not None:
+            scrollbar.setValue(scrollbar.maximum())
 
     def _show_error(self, error: str) -> None:
         """Show error in chat display."""
@@ -1165,9 +1196,9 @@ class ChatPanel(QtWidgets.QWidget):
         cursor.insertHtml(
             f'<p style="color: red; margin: 8px 0;"><b>Error:</b> {self._escape_html(error)}</p>'
         )
-        self._chat_display.verticalScrollBar().setValue(
-            self._chat_display.verticalScrollBar().maximum()
-        )
+        scrollbar = self._chat_display.verticalScrollBar()
+        if scrollbar is not None:
+            scrollbar.setValue(scrollbar.maximum())
         self._status_label.setText("Error occurred")
 
     @staticmethod

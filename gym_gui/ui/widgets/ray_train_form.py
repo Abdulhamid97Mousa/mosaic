@@ -787,12 +787,109 @@ class RayRLlibTrainForm(QtWidgets.QDialog):
         self._wandb_checkbox = QtWidgets.QCheckBox("Export WandB", group)
         self._wandb_checkbox.setChecked(False)
         self._wandb_checkbox.setToolTip("Requires wandb login on the trainer host")
+        self._wandb_checkbox.toggled.connect(self._on_wandb_toggled)
         checkbox_layout.addWidget(self._wandb_checkbox)
 
         checkbox_layout.addStretch(1)
         layout.addLayout(checkbox_layout)
 
+        # WandB configuration section
+        wandb_container = QtWidgets.QWidget(group)
+        wandb_layout = QtWidgets.QFormLayout(wandb_container)
+        wandb_layout.setContentsMargins(0, 4, 0, 0)
+        wandb_layout.setSpacing(4)
+
+        self._wandb_project_input = QtWidgets.QLineEdit(wandb_container)
+        self._wandb_project_input.setPlaceholderText("e.g. ray-marl")
+        self._wandb_project_input.setToolTip(
+            "Project name inside wandb.ai where runs will be grouped."
+        )
+        wandb_layout.addRow("Project:", self._wandb_project_input)
+
+        self._wandb_entity_input = QtWidgets.QLineEdit(wandb_container)
+        self._wandb_entity_input.setPlaceholderText("e.g. your-username")
+        self._wandb_entity_input.setToolTip(
+            "WandB entity (team or user namespace) to publish to."
+        )
+        wandb_layout.addRow("Entity:", self._wandb_entity_input)
+
+        self._wandb_run_name_input = QtWidgets.QLineEdit(wandb_container)
+        self._wandb_run_name_input.setPlaceholderText("Optional custom run name")
+        self._wandb_run_name_input.setToolTip(
+            "Custom run name (defaults to run_id if not specified)."
+        )
+        wandb_layout.addRow("Run Name:", self._wandb_run_name_input)
+
+        self._wandb_api_key_input = QtWidgets.QLineEdit(wandb_container)
+        self._wandb_api_key_input.setPlaceholderText("Optional API key override")
+        self._wandb_api_key_input.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+        self._wandb_api_key_input.setToolTip(
+            "Override the default WandB API key (from wandb login)."
+        )
+        wandb_layout.addRow("API Key:", self._wandb_api_key_input)
+
+        # VPN proxy settings
+        self._wandb_use_vpn_checkbox = QtWidgets.QCheckBox(
+            "Route WandB traffic through VPN proxy", wandb_container
+        )
+        self._wandb_use_vpn_checkbox.toggled.connect(self._on_wandb_vpn_toggled)
+        wandb_layout.addRow("", self._wandb_use_vpn_checkbox)
+
+        self._wandb_http_proxy_input = QtWidgets.QLineEdit(wandb_container)
+        self._wandb_http_proxy_input.setPlaceholderText(
+            "e.g. http://127.0.0.1:7890"
+        )
+        self._wandb_http_proxy_input.setToolTip("HTTP proxy for WandB traffic.")
+        wandb_layout.addRow("HTTP Proxy:", self._wandb_http_proxy_input)
+
+        self._wandb_https_proxy_input = QtWidgets.QLineEdit(wandb_container)
+        self._wandb_https_proxy_input.setPlaceholderText(
+            "e.g. http://127.0.0.1:7890"
+        )
+        self._wandb_https_proxy_input.setToolTip("HTTPS proxy for WandB traffic.")
+        wandb_layout.addRow("HTTPS Proxy:", self._wandb_https_proxy_input)
+
+        layout.addWidget(wandb_container)
+        self._wandb_container = wandb_container
+
+        # Initialize WandB control states
+        self._update_wandb_controls()
+
         return group
+
+    def _on_wandb_toggled(self, checked: bool) -> None:
+        """Handle WandB checkbox toggle."""
+        _ = checked
+        self._update_wandb_controls()
+
+    def _on_wandb_vpn_toggled(self, checked: bool) -> None:
+        """Handle WandB VPN checkbox toggle."""
+        _ = checked
+        self._update_wandb_controls()
+
+    def _update_wandb_controls(self) -> None:
+        """Update WandB control enabled states based on checkbox state."""
+        wandb_enabled = self._wandb_checkbox.isChecked()
+
+        # Base WandB fields
+        base_fields = (
+            self._wandb_project_input,
+            self._wandb_entity_input,
+            self._wandb_run_name_input,
+            self._wandb_api_key_input,
+        )
+        for field in base_fields:
+            field.setEnabled(wandb_enabled)
+
+        # VPN checkbox
+        self._wandb_use_vpn_checkbox.setEnabled(wandb_enabled)
+        if not wandb_enabled:
+            self._wandb_use_vpn_checkbox.setChecked(False)
+
+        # Proxy fields (only enabled if VPN is checked)
+        vpn_enabled = wandb_enabled and self._wandb_use_vpn_checkbox.isChecked()
+        self._wandb_http_proxy_input.setEnabled(vpn_enabled)
+        self._wandb_https_proxy_input.setEnabled(vpn_enabled)
 
     def _create_fastlane_group(self) -> QtWidgets.QGroupBox:
         """Create FastLane live visualization configuration group.
@@ -995,6 +1092,7 @@ class RayRLlibTrainForm(QtWidgets.QDialog):
         self._family_combo.addItem("Classic (Turn-based)", PettingZooFamily.CLASSIC.value)
         self._family_combo.addItem("MPE (Particle)", PettingZooFamily.MPE.value)
         self._family_combo.addItem("Butterfly (Visual)", PettingZooFamily.BUTTERFLY.value)
+        self._family_combo.addItem("Atari (2-Player)", PettingZooFamily.ATARI.value)
 
     def _select_family(self, family: str) -> None:
         """Select a family by value."""
@@ -1184,6 +1282,16 @@ class RayRLlibTrainForm(QtWidgets.QDialog):
         fastlane_only = self._fastlane_only_checkbox.isChecked()
         throttle_ms = self._throttle_spin.value()
 
+        # Get WandB settings
+        track_wandb = self._wandb_checkbox.isChecked()
+        wandb_project = self._wandb_project_input.text().strip() or None
+        wandb_entity = self._wandb_entity_input.text().strip() or None
+        wandb_run_name = self._wandb_run_name_input.text().strip() or None
+        wandb_api_key = self._wandb_api_key_input.text().strip() or None
+        use_wandb_vpn = self._wandb_use_vpn_checkbox.isChecked()
+        wandb_http_proxy = self._wandb_http_proxy_input.text().strip() or None
+        wandb_https_proxy = self._wandb_https_proxy_input.text().strip() or None
+
         # Build environment variables for multi-agent FastLane
         # NOTE: RAY_FASTLANE_RUN_ID is NOT set here - it will be set by dispatcher
         # using the actual ULID run_id, not the human-readable run_name
@@ -1193,6 +1301,22 @@ class RayRLlibTrainForm(QtWidgets.QDialog):
             "RAY_FASTLANE_THROTTLE_MS": str(throttle_ms),
             "GYM_GUI_FASTLANE_ONLY": "1" if fastlane_only else "0",
         }
+
+        # Add WandB environment variables
+        if track_wandb:
+            environment["WANDB_MODE"] = "online"
+            if wandb_api_key:
+                environment["WANDB_API_KEY"] = wandb_api_key
+            if use_wandb_vpn and wandb_http_proxy:
+                environment["WANDB_HTTP_PROXY"] = wandb_http_proxy
+                environment["HTTP_PROXY"] = wandb_http_proxy
+                environment["http_proxy"] = wandb_http_proxy
+            if use_wandb_vpn and wandb_https_proxy:
+                environment["WANDB_HTTPS_PROXY"] = wandb_https_proxy
+                environment["HTTPS_PROXY"] = wandb_https_proxy
+                environment["https_proxy"] = wandb_https_proxy
+        else:
+            environment["WANDB_MODE"] = "offline"
 
         config = {
             "run_name": run_id,
@@ -1254,10 +1378,18 @@ class RayRLlibTrainForm(QtWidgets.QDialog):
                         "fastlane_throttle_ms": throttle_ms,
                         "seed": self._seed_spin.value() if self._seed_spin.value() > 0 else None,
                         "tensorboard": self._tensorboard_checkbox.isChecked(),
-                        "wandb": self._wandb_checkbox.isChecked(),
+                        "wandb": track_wandb,
+                        "wandb_project": wandb_project,
+                        "wandb_entity": wandb_entity,
+                        "wandb_run_name": wandb_run_name,
                         "extras": {
                             "fastlane_only": fastlane_only,
                             "save_model": self._save_model_checkbox.isChecked(),
+                            "track_wandb": track_wandb,
+                            "wandb_project": wandb_project,
+                            "wandb_entity": wandb_entity,
+                            "wandb_run_name": wandb_run_name,
+                            "wandb_use_vpn_proxy": use_wandb_vpn,
                         },
                     },
                 },
@@ -1267,8 +1399,13 @@ class RayRLlibTrainForm(QtWidgets.QDialog):
                         "relative_path": "tensorboard",
                     },
                     "wandb": {
-                        "enabled": self._wandb_checkbox.isChecked(),
-                        "project": "ray-marl",
+                        "enabled": track_wandb,
+                        "project": wandb_project or "ray-marl",
+                        "entity": wandb_entity,
+                        "run_name": wandb_run_name,
+                        "use_vpn_proxy": use_wandb_vpn,
+                        "http_proxy": wandb_http_proxy if use_wandb_vpn else None,
+                        "https_proxy": wandb_https_proxy if use_wandb_vpn else None,
                     },
                     "fastlane": {
                         "enabled": fastlane_enabled,
@@ -1280,11 +1417,12 @@ class RayRLlibTrainForm(QtWidgets.QDialog):
         }
 
         _LOGGER.info(
-            "Built Ray RLlib training config: env=%s, algo=%s, paradigm=%s, timesteps=%d",
+            "Built Ray RLlib training config: env=%s, algo=%s, paradigm=%s, timesteps=%d, wandb=%s",
             env_id,
             algorithm,
             paradigm,
             self._timesteps_spin.value(),
+            track_wandb,
         )
 
         return config

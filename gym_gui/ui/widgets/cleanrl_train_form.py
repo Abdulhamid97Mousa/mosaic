@@ -156,13 +156,22 @@ _SCHEMA_EXCLUDED_FIELDS: set[str] = {
 
 
 _SUPPORTED_FAMILIES: set[EnvironmentFamily] = {
+    # Basic Gymnasium environments
     EnvironmentFamily.CLASSIC_CONTROL,
     EnvironmentFamily.BOX2D,
     EnvironmentFamily.MUJOCO,
     EnvironmentFamily.TOY_TEXT,
+    # Grid-based environments
     EnvironmentFamily.MINIGRID,
+    # Atari environments
     EnvironmentFamily.ATARI,
     EnvironmentFamily.ALE,
+    # Advanced RL benchmarks
+    EnvironmentFamily.VIZDOOM,
+    EnvironmentFamily.MINIHACK,
+    EnvironmentFamily.NETHACK,
+    EnvironmentFamily.CRAFTER,
+    EnvironmentFamily.PROCGEN,
 }
 
 _ADDITIONAL_SUPPORTED_GAMES: set[GameId] = {

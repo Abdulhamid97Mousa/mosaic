@@ -1,22 +1,372 @@
 from __future__ import annotations
 
-"""Keyboard shortcut management for human control within the Qt shell."""
+"""Keyboard shortcut management for human control within the Qt shell.
+
+This module provides two input modes:
+1. **Shortcut-based** (QShortcut): For turn-based games where single key presses trigger actions
+2. **State-based** (key tracking): For real-time games requiring simultaneous key combinations
+
+The state-based mode tracks all currently pressed keys and computes combined actions
+(e.g., Up+Right → diagonal movement) on each game tick.
+"""
 
 from dataclasses import dataclass
 import logging
-from typing import Callable, Dict, Iterable, List, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 import gymnasium.spaces as spaces
 from qtpy import QtCore, QtWidgets
-from qtpy.QtGui import QKeySequence, QShortcut
+from qtpy.QtCore import Qt
+from qtpy.QtGui import QKeyEvent, QKeySequence, QShortcut
 
-from gym_gui.core.enums import ControlMode, GameId
+from gym_gui.core.enums import ControlMode, EnvironmentFamily, GameId, InputMode
 from gym_gui.controllers.session import SessionController
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import LOG_INPUT_CONTROLLER_ERROR
 
 
 _LOGGER = logging.getLogger(__name__)
+
+
+# =============================================================================
+# Key Constants for State-Based Tracking
+# =============================================================================
+def _get_qt_key(name: str) -> int:
+    """Get Qt key constant by name, handling Qt5/Qt6 differences."""
+    key_enum = getattr(Qt, "Key", None)
+    if key_enum is not None and hasattr(key_enum, name):
+        return int(getattr(key_enum, name))
+    legacy = getattr(Qt, name, None)
+    if legacy is not None:
+        return int(legacy)
+    raise AttributeError(f"Qt key '{name}' not available")
+
+
+# Direction keys (both arrow keys and WASD)
+_KEY_UP = _get_qt_key("Key_Up")
+_KEY_DOWN = _get_qt_key("Key_Down")
+_KEY_LEFT = _get_qt_key("Key_Left")
+_KEY_RIGHT = _get_qt_key("Key_Right")
+_KEY_W = _get_qt_key("Key_W")
+_KEY_A = _get_qt_key("Key_A")
+_KEY_S = _get_qt_key("Key_S")
+_KEY_D = _get_qt_key("Key_D")
+_KEY_SPACE = _get_qt_key("Key_Space")
+_KEY_Q = _get_qt_key("Key_Q")
+_KEY_E = _get_qt_key("Key_E")
+_KEY_Z = _get_qt_key("Key_Z")
+_KEY_C = _get_qt_key("Key_C")
+_KEY_1 = _get_qt_key("Key_1")
+_KEY_2 = _get_qt_key("Key_2")
+
+# Sets for direction detection
+_KEYS_UP = {_KEY_UP, _KEY_W}
+_KEYS_DOWN = {_KEY_DOWN, _KEY_S}
+_KEYS_LEFT = {_KEY_LEFT, _KEY_A}
+_KEYS_RIGHT = {_KEY_RIGHT, _KEY_D}
+
+
+# =============================================================================
+# Key Combination Resolvers for Different Game Families
+# =============================================================================
+class KeyCombinationResolver:
+    """Base class for resolving key combinations to game actions."""
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        """Resolve currently pressed keys to a single game action.
+
+        Args:
+            pressed_keys: Set of currently pressed Qt key codes.
+
+        Returns:
+            Action index, or None if no recognized action.
+        """
+        raise NotImplementedError
+
+
+class ProcgenKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for Procgen environments.
+
+    Procgen action space (15 actions):
+    0: down_left, 1: left, 2: up_left, 3: down, 4: noop, 5: up,
+    6: down_right, 7: right, 8: up_right,
+    9: action_d (fire), 10: action_a, 11: action_w, 12: action_s,
+    13: action_q, 14: action_e
+    """
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        # Check directions
+        up = bool(pressed_keys & _KEYS_UP)
+        down = bool(pressed_keys & _KEYS_DOWN)
+        left = bool(pressed_keys & _KEYS_LEFT)
+        right = bool(pressed_keys & _KEYS_RIGHT)
+
+        # Cancel out opposing directions
+        if up and down:
+            up = down = False
+        if left and right:
+            left = right = False
+
+        # Diagonal combinations (check first - more specific)
+        if up and right:
+            return 8  # up_right
+        if up and left:
+            return 2  # up_left
+        if down and right:
+            return 6  # down_right
+        if down and left:
+            return 0  # down_left
+
+        # Cardinal directions
+        if up:
+            return 5  # up
+        if down:
+            return 3  # down
+        if left:
+            return 1  # left
+        if right:
+            return 7  # right
+
+        # Action buttons (D is primary fire/interact)
+        if _KEY_SPACE in pressed_keys or _KEY_D in pressed_keys:
+            return 9  # action_d (fire)
+
+        # Secondary action buttons
+        if _KEY_1 in pressed_keys:
+            return 13  # action_q
+        if _KEY_2 in pressed_keys:
+            return 14  # action_e
+
+        return None  # No action - will use NOOP (4) from idle tick
+
+
+class AleKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for ALE/Atari environments.
+
+    Standard ALE action space (18 actions):
+    0: NOOP, 1: FIRE, 2: UP, 3: RIGHT, 4: LEFT, 5: DOWN,
+    6: UPRIGHT, 7: UPLEFT, 8: DOWNRIGHT, 9: DOWNLEFT,
+    10: UPFIRE, 11: RIGHTFIRE, 12: LEFTFIRE, 13: DOWNFIRE,
+    14: UPRIGHTFIRE, 15: UPLEFTFIRE, 16: DOWNRIGHTFIRE, 17: DOWNLEFTFIRE
+    """
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        up = bool(pressed_keys & _KEYS_UP)
+        down = bool(pressed_keys & _KEYS_DOWN)
+        left = bool(pressed_keys & _KEYS_LEFT)
+        right = bool(pressed_keys & _KEYS_RIGHT)
+        fire = _KEY_SPACE in pressed_keys
+
+        # Cancel opposing directions
+        if up and down:
+            up = down = False
+        if left and right:
+            left = right = False
+
+        # Diagonal + fire combinations
+        if fire:
+            if up and right:
+                return 14  # UPRIGHTFIRE
+            if up and left:
+                return 15  # UPLEFTFIRE
+            if down and right:
+                return 16  # DOWNRIGHTFIRE
+            if down and left:
+                return 17  # DOWNLEFTFIRE
+            if up:
+                return 10  # UPFIRE
+            if right:
+                return 11  # RIGHTFIRE
+            if left:
+                return 12  # LEFTFIRE
+            if down:
+                return 13  # DOWNFIRE
+            return 1  # FIRE only
+
+        # Diagonal combinations (no fire)
+        if up and right:
+            return 6  # UPRIGHT
+        if up and left:
+            return 7  # UPLEFT
+        if down and right:
+            return 8  # DOWNRIGHT
+        if down and left:
+            return 9  # DOWNLEFT
+
+        # Cardinal directions
+        if up:
+            return 2  # UP
+        if right:
+            return 3  # RIGHT
+        if left:
+            return 4  # LEFT
+        if down:
+            return 5  # DOWN
+
+        return None  # NOOP
+
+
+class LunarLanderKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for LunarLander environment."""
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        # LunarLander: 0=idle, 1=left engine, 2=main engine, 3=right engine
+        up = bool(pressed_keys & _KEYS_UP)
+        left = bool(pressed_keys & _KEYS_LEFT)
+        right = bool(pressed_keys & _KEYS_RIGHT)
+
+        # Priority: main engine > side engines
+        if up:
+            return 2  # Fire main engine
+        if left:
+            return 1  # Fire left engine
+        if right:
+            return 3  # Fire right engine
+
+        return None  # Idle
+
+
+# Backwards compatibility alias
+Box2DKeyCombinationResolver = LunarLanderKeyCombinationResolver
+
+
+class CarRacingKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for CarRacing environment.
+
+    CarRacing action mapping (discrete indices to continuous presets):
+    0: idle/coast (Space)
+    1: steer right (Right/D)
+    2: steer left (Left/A)
+    3: accelerate (Up/W)
+    4: brake (Down/S)
+    """
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        up = bool(pressed_keys & _KEYS_UP)
+        down = bool(pressed_keys & _KEYS_DOWN)
+        left = bool(pressed_keys & _KEYS_LEFT)
+        right = bool(pressed_keys & _KEYS_RIGHT)
+        space = _KEY_SPACE in pressed_keys
+
+        # Priority: acceleration/brake > steering > idle
+        if up:
+            return 3  # Accelerate
+        if down:
+            return 4  # Brake
+        if right:
+            return 1  # Steer right
+        if left:
+            return 2  # Steer left
+        if space:
+            return 0  # Idle/coast
+
+        return None  # No action
+
+
+class BipedalWalkerKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for BipedalWalker environment.
+
+    BipedalWalker action mapping:
+    0: neutral stance (Space)
+    1: lean forward/step (Right/D)
+    2: lean backward/step back (Left/A)
+    3: crouch/prepare jump (Up/W)
+    4: extend legs/hop (Down/S)
+    """
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        up = bool(pressed_keys & _KEYS_UP)
+        down = bool(pressed_keys & _KEYS_DOWN)
+        left = bool(pressed_keys & _KEYS_LEFT)
+        right = bool(pressed_keys & _KEYS_RIGHT)
+        space = _KEY_SPACE in pressed_keys
+
+        if right:
+            return 1  # Lean forward
+        if left:
+            return 2  # Lean backward
+        if up:
+            return 3  # Crouch
+        if down:
+            return 4  # Extend legs
+        if space:
+            return 0  # Neutral
+
+        return None
+
+
+class ViZDoomKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for ViZDoom environments.
+
+    Note: ViZDoom action spaces vary by scenario. This resolver handles common patterns.
+    """
+
+    def __init__(self, game_id: GameId):
+        self._game_id = game_id
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        # Basic actions for most scenarios
+        fire = _KEY_SPACE in pressed_keys
+        up = bool(pressed_keys & _KEYS_UP)
+        left = bool(pressed_keys & _KEYS_LEFT)
+        right = bool(pressed_keys & _KEYS_RIGHT)
+
+        # For now, return single actions (ViZDoom handles combos differently)
+        if fire:
+            return 0  # ATTACK (common index)
+        if up:
+            return 3 if self._game_id == GameId.VIZDOOM_DEADLY_CORRIDOR else 0  # MOVE_FORWARD
+        if left:
+            return 1  # TURN_LEFT / MOVE_LEFT
+        if right:
+            return 2  # TURN_RIGHT / MOVE_RIGHT
+
+        return None
+
+
+# Map environment families to their resolvers
+def get_key_combination_resolver(game_id: GameId) -> Optional[KeyCombinationResolver]:
+    """Get the appropriate key combination resolver for a game.
+
+    Returns a resolver that maps key combinations to game actions, or None
+    if no resolver is available for this game type.
+
+    The resolver is determined by:
+    1. Checking for game-specific resolvers (e.g., CarRacing, LunarLander)
+    2. Looking up the game's family in ENVIRONMENT_FAMILY_BY_GAME
+    3. Falling back to checking game ID prefixes/patterns
+    """
+    from gym_gui.core.enums import ENVIRONMENT_FAMILY_BY_GAME
+
+    # Game-specific resolvers for Box2D (each has unique action space)
+    if game_id == GameId.CAR_RACING:
+        return CarRacingKeyCombinationResolver()
+    if game_id == GameId.LUNAR_LANDER:
+        return LunarLanderKeyCombinationResolver()
+    if game_id == GameId.BIPEDAL_WALKER:
+        return BipedalWalkerKeyCombinationResolver()
+
+    # First, try to get the family from the mapping
+    family = ENVIRONMENT_FAMILY_BY_GAME.get(game_id)
+
+    if family == EnvironmentFamily.PROCGEN:
+        return ProcgenKeyCombinationResolver()
+    if family in (EnvironmentFamily.ALE, EnvironmentFamily.ATARI):
+        return AleKeyCombinationResolver()
+    if family == EnvironmentFamily.VIZDOOM:
+        return ViZDoomKeyCombinationResolver(game_id)
+
+    # Fallback: check by game ID prefix/name for games not in the mapping
+    game_name = game_id.value if hasattr(game_id, 'value') else str(game_id)
+
+    if game_name.startswith("procgen:") or game_name.startswith("procgen/"):
+        return ProcgenKeyCombinationResolver()
+    if game_name.startswith("ALE/") or game_name.endswith("-v4") or game_name.endswith("-v5"):
+        return AleKeyCombinationResolver()
+    if game_name.startswith("ViZDoom"):
+        return ViZDoomKeyCombinationResolver(game_id)
+
+    return None
 
 
 @dataclass(frozen=True)
@@ -680,7 +1030,23 @@ _ALE_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
 
 
 class HumanInputController(QtCore.QObject, LogConstantMixin):
-    """Registers keyboard shortcuts and forwards them to the session controller."""
+    """Registers keyboard shortcuts and forwards them to the session controller.
+
+    This controller supports two input modes:
+
+    1. **Shortcut-based** (turn-based games): Uses Qt's QShortcut mechanism for
+       single-key actions. Each key press immediately triggers an action.
+
+    2. **State-based** (real-time games): Tracks all currently pressed keys and
+       computes combined actions (e.g., Up+Right → diagonal movement) on each
+       game tick. This is essential for games requiring simultaneous key presses.
+
+    The mode is automatically selected based on the environment family.
+    """
+
+    # Signal emitted when a key combination is detected in state-based mode
+    # The session controller listens to this to apply actions during idle ticks
+    key_action_available = QtCore.Signal(int)  # action index
 
     def __init__(self, widget: QtWidgets.QWidget, session: SessionController) -> None:
         super().__init__(widget)
@@ -691,11 +1057,140 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
         self._mode_allows_input = True
         self._requested_enabled = True
 
-    def configure(self, game_id: GameId | None, action_space: object | None) -> None:
+        # State-based key tracking
+        self._pressed_keys: Set[int] = set()
+        self._use_state_based_input = False
+        self._key_resolver: Optional[KeyCombinationResolver] = None
+        self._current_game_id: Optional[GameId] = None
+
+        # Install event filter for state-based input
+        self._widget.installEventFilter(self)
+
+    def eventFilter(self, obj: QtCore.QObject, event: QtCore.QEvent) -> bool:
+        """Filter key events for state-based input tracking.
+
+        This captures keyPressEvent and keyReleaseEvent to maintain a set of
+        currently pressed keys, enabling simultaneous key combination detection.
+        """
+        if not self._use_state_based_input:
+            return False  # Let shortcuts handle it
+
+        if not self._mode_allows_input or not self._requested_enabled:
+            return False
+
+        event_type = event.type()
+
+        if event_type == QtCore.QEvent.Type.KeyPress:
+            key_event = event  # type: QKeyEvent
+            if hasattr(key_event, 'isAutoRepeat') and key_event.isAutoRepeat():
+                return False  # Ignore OS auto-repeat
+            key = key_event.key()
+            if key not in self._pressed_keys:
+                self._pressed_keys.add(key)
+                _LOGGER.debug("Key pressed: %s, pressed_keys=%s", key, self._pressed_keys)
+                # Emit immediate action for responsive feel
+                self._emit_current_action()
+            return True  # Consume the event
+
+        if event_type == QtCore.QEvent.Type.KeyRelease:
+            key_event = event  # type: QKeyEvent
+            if hasattr(key_event, 'isAutoRepeat') and key_event.isAutoRepeat():
+                return False  # Ignore OS auto-repeat
+            key = key_event.key()
+            self._pressed_keys.discard(key)
+            _LOGGER.debug("Key released: %s, pressed_keys=%s", key, self._pressed_keys)
+            return True  # Consume the event
+
+        # Handle focus loss - clear all keys
+        if event_type == QtCore.QEvent.Type.FocusOut:
+            if self._pressed_keys:
+                _LOGGER.debug("Focus lost, clearing pressed keys")
+                self._pressed_keys.clear()
+
+        return False
+
+    def _emit_current_action(self) -> None:
+        """Compute and emit action from currently pressed keys."""
+        action = self.get_current_action()
+        if action is not None:
+            self._session.perform_human_action(action, key_label="combo")
+
+    def get_current_action(self) -> Optional[int]:
+        """Get the action corresponding to currently pressed keys.
+
+        Returns:
+            Action index if keys are pressed and recognized, None otherwise.
+        """
+        if not self._pressed_keys or self._key_resolver is None:
+            return None
+        return self._key_resolver.resolve(self._pressed_keys)
+
+    def has_keys_pressed(self) -> bool:
+        """Return True if any tracked keys are currently pressed."""
+        return bool(self._pressed_keys)
+
+    def clear_pressed_keys(self) -> None:
+        """Clear all tracked pressed keys (e.g., on game pause/stop)."""
+        self._pressed_keys.clear()
+
+    def configure(
+        self,
+        game_id: GameId | None,
+        action_space: object | None,
+        *,
+        overrides: Optional[Dict[str, object]] = None,
+    ) -> None:
+        """Configure input handling for a specific game.
+
+        Args:
+            game_id: The game to configure for, or None to disable.
+            action_space: The game's action space.
+            overrides: Optional dict of game config overrides, may include 'input_mode'.
+
+        The input mode is determined by the 'input_mode' key in overrides:
+        - 'state_based': Track all pressed keys, compute combined actions (for diagonals)
+        - 'shortcut_based' (default): Each key triggers immediate action
+        """
         self._clear_shortcuts()
+        self._pressed_keys.clear()
+        self._current_game_id = game_id
+        self._key_resolver = None
+        self._use_state_based_input = False
+
         if game_id is None or action_space is None:
             return
 
+        # Get input mode from game configuration (user's choice)
+        # Default to shortcut_based for backward compatibility
+        input_mode = InputMode.SHORTCUT_BASED.value
+        if overrides:
+            input_mode = overrides.get("input_mode", InputMode.SHORTCUT_BASED.value)
+
+        use_state_based = (input_mode == InputMode.STATE_BASED.value)
+
+        _LOGGER.info(
+            "Configuring input for %s: mode=%s",
+            game_id.value if hasattr(game_id, 'value') else game_id,
+            input_mode,
+        )
+
+        if use_state_based:
+            # Try to get a key combination resolver for this game
+            self._key_resolver = get_key_combination_resolver(game_id)
+            if self._key_resolver is not None:
+                self._use_state_based_input = True
+                _LOGGER.info(
+                    "Using state-based input with %s resolver",
+                    type(self._key_resolver).__name__,
+                )
+                return  # Don't set up shortcuts for state-based games
+            else:
+                _LOGGER.warning(
+                    "No key combination resolver available for %s, falling back to shortcuts",
+                    game_id.value if hasattr(game_id, 'value') else game_id,
+                )
+
+        # Fall back to shortcut-based input for turn-based games
         try:
             mappings = _TOY_TEXT_MAPPINGS.get(game_id)
             if mappings is None:
@@ -739,9 +1234,15 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
             )
             self._clear_shortcuts()
 
+    def is_state_based(self) -> bool:
+        """Return True if using state-based input for current game."""
+        return self._use_state_based_input
+
     def set_enabled(self, enabled: bool) -> None:
         self._requested_enabled = enabled
         self._update_shortcuts_enabled()
+        if not enabled:
+            self._pressed_keys.clear()
 
     def _make_activation(self, action: int, shortcut_label: str) -> Callable[[], None]:
         def trigger() -> None:
@@ -780,14 +1281,27 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
             ControlMode.HYBRID_HUMAN_AGENT,
         }
         self._update_shortcuts_enabled()
+        if not self._mode_allows_input:
+            self._pressed_keys.clear()
 
     def _update_shortcuts_enabled(self) -> None:
         """Enable or disable all shortcuts based on current state."""
         enabled = self._mode_allows_input and self._requested_enabled
         for shortcut in self._shortcuts:
             shortcut.setEnabled(enabled)
-        _LOGGER.debug("Shortcuts enabled=%s (mode_allows=%s, requested=%s)", 
+        _LOGGER.debug("Shortcuts enabled=%s (mode_allows=%s, requested=%s)",
                           enabled, self._mode_allows_input, self._requested_enabled)
 
 
-__all__ = ["HumanInputController", "get_vizdoom_mouse_turn_actions"]
+__all__ = [
+    "HumanInputController",
+    "get_vizdoom_mouse_turn_actions",
+    "get_key_combination_resolver",
+    "KeyCombinationResolver",
+    "ProcgenKeyCombinationResolver",
+    "AleKeyCombinationResolver",
+    "LunarLanderKeyCombinationResolver",
+    "CarRacingKeyCombinationResolver",
+    "BipedalWalkerKeyCombinationResolver",
+    "Box2DKeyCombinationResolver",  # Backwards compatibility alias
+]

@@ -74,11 +74,11 @@ LUNAR_LANDER_CONTINUOUS_PRESETS: Mapping[int, Sequence[float]] = {
 }
 
 CAR_RACING_CONTINUOUS_PRESETS: Mapping[int, Sequence[float]] = {
-    0: (0.0, 0.0, 0.0),
-    1: (1.0, 0.3, 0.0),
-    2: (-1.0, 0.3, 0.0),
-    3: (0.0, 1.0, 0.0),
-    4: (0.0, 0.0, 0.8),
+    0: (0.0, 0.0, 0.0),      # idle / coast
+    1: (1.0, 0.3, 0.0),      # steer right: steering +1.0
+    2: (-1.0, 0.3, 0.0),     # steer left: steering -1.0
+    3: (0.0, 1.0, 0.0),      # accelerate
+    4: (0.0, 0.0, 0.8),      # brake
 }
 
 BIPEDAL_WALKER_CONTINUOUS_PRESETS: Mapping[int, Sequence[float]] = {

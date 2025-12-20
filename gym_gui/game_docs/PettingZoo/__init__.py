@@ -529,6 +529,147 @@ COMBAT_PLANE_HTML = (
     "PettingZoo Combat Plane</a></p>"
 )
 
+ENTOMBED_COMPETITIVE_HTML = (
+    "<h3>PettingZoo: Entombed Competitive (Atari)</h3>"
+    "<p>A competitive survival game where two players race to outlast each other "
+    "in a constantly generating maze. Navigate while avoiding zombies and dead-ends.</p>"
+    "<h4>Environment Details</h4>"
+    "<ul>"
+    "<li><strong>API Type:</strong> Parallel (simultaneous)</li>"
+    "<li><strong>Players:</strong> 2 (first_0, second_0)</li>"
+    "<li><strong>Game Type:</strong> Competitive (zero-sum)</li>"
+    "<li><strong>Observation:</strong> RGB image (210x160x3)</li>"
+    "<li><strong>Actions:</strong> Discrete (18)</li>"
+    "</ul>"
+    "<h4>Rewards</h4>"
+    "<ul>"
+    "<li>Opponent dies: <strong>+1</strong></li>"
+    "<li>You die: <strong>-1</strong></li>"
+    "</ul>"
+    "<h4>Make</h4>"
+    "<pre><code>from pettingzoo.atari import entombed_competitive_v3\nenv = entombed_competitive_v3.parallel_env()</code></pre>"
+    "<p>Docs: <a href='https://pettingzoo.farama.org/environments/atari/entombed_competitive/'>"
+    "PettingZoo Entombed Competitive</a></p>"
+)
+
+ENTOMBED_COOPERATIVE_HTML = (
+    "<h3>PettingZoo: Entombed Cooperative (Atari)</h3>"
+    "<p>A cooperative exploration game where players work together to progress as far "
+    "as possible into a constantly generating maze. Use power-ups strategically.</p>"
+    "<h4>Environment Details</h4>"
+    "<ul>"
+    "<li><strong>API Type:</strong> Parallel (simultaneous)</li>"
+    "<li><strong>Players:</strong> 2 (first_0, second_0)</li>"
+    "<li><strong>Game Type:</strong> Cooperative</li>"
+    "<li><strong>Observation:</strong> RGB image (210x160x3)</li>"
+    "<li><strong>Actions:</strong> Discrete (18)</li>"
+    "</ul>"
+    "<h4>Game Mechanics</h4>"
+    "<ul>"
+    "<li>Progress through five invisible maze sections</li>"
+    "<li>Power-ups break walls symmetrically on both screen halves</li>"
+    "<li>Optimal play requires agents on opposite sides</li>"
+    "</ul>"
+    "<h4>Make</h4>"
+    "<pre><code>from pettingzoo.atari import entombed_cooperative_v3\nenv = entombed_cooperative_v3.parallel_env()</code></pre>"
+    "<p>Docs: <a href='https://pettingzoo.farama.org/environments/atari/entombed_cooperative/'>"
+    "PettingZoo Entombed Cooperative</a></p>"
+)
+
+FLAG_CAPTURE_HTML = (
+    "<h3>PettingZoo: Flag Capture (Atari)</h3>"
+    "<p>A battle of memory and information. Players search a map to find a hidden flag "
+    "while gathering clues from exploration and opponent movements.</p>"
+    "<h4>Environment Details</h4>"
+    "<ul>"
+    "<li><strong>API Type:</strong> Parallel (simultaneous)</li>"
+    "<li><strong>Players:</strong> 2 (first_0, second_0)</li>"
+    "<li><strong>Game Type:</strong> Competitive</li>"
+    "<li><strong>Observation:</strong> RGB image (210x160x3)</li>"
+    "<li><strong>Actions:</strong> Discrete (10)</li>"
+    "</ul>"
+    "<h4>Game Mechanics</h4>"
+    "<ul>"
+    "<li>Check squares to find the hidden flag</li>"
+    "<li>Bombs return you to starting position</li>"
+    "<li>Other squares provide directional/distance hints</li>"
+    "</ul>"
+    "<h4>Make</h4>"
+    "<pre><code>from pettingzoo.atari import flag_capture_v2\nenv = flag_capture_v2.parallel_env()</code></pre>"
+    "<p>Docs: <a href='https://pettingzoo.farama.org/environments/atari/flag_capture/'>"
+    "PettingZoo Flag Capture</a></p>"
+)
+
+MAZE_CRAZE_HTML = (
+    "<h3>PettingZoo: Maze Craze (Atari)</h3>"
+    "<p>A competitive game of memory and planning where players race to escape a maze. "
+    "Features three game modes with increasing complexity.</p>"
+    "<h4>Environment Details</h4>"
+    "<ul>"
+    "<li><strong>API Type:</strong> Parallel (simultaneous)</li>"
+    "<li><strong>Players:</strong> 2 (first_0, second_0)</li>"
+    "<li><strong>Game Type:</strong> Competitive</li>"
+    "<li><strong>Observation:</strong> RGB image (250x160x3)</li>"
+    "<li><strong>Actions:</strong> Discrete (18)</li>"
+    "</ul>"
+    "<h4>Game Versions</h4>"
+    "<ul>"
+    "<li><strong>Race:</strong> First to exit wins</li>"
+    "<li><strong>Robbers:</strong> Avoid robbers or be eliminated</li>"
+    "<li><strong>Capture:</strong> Capture all robbers before exiting</li>"
+    "</ul>"
+    "<h4>Make</h4>"
+    "<pre><code>from pettingzoo.atari import maze_craze_v3\nenv = maze_craze_v3.parallel_env()</code></pre>"
+    "<p>Docs: <a href='https://pettingzoo.farama.org/environments/atari/maze_craze/'>"
+    "PettingZoo Maze Craze</a></p>"
+)
+
+QUADRAPONG_HTML = (
+    "<h3>PettingZoo: Quadrapong (Atari)</h3>"
+    "<p>A four-player team-based Pong variant. Players control paddles to defend "
+    "scoring areas while coordinating with their teammate.</p>"
+    "<h4>Environment Details</h4>"
+    "<ul>"
+    "<li><strong>API Type:</strong> Parallel (simultaneous)</li>"
+    "<li><strong>Players:</strong> 4 (Team 1: first_0 + third_0, Team 2: second_0 + fourth_0)</li>"
+    "<li><strong>Game Type:</strong> Team Competitive (2v2)</li>"
+    "<li><strong>Observation:</strong> RGB image (210x160x3)</li>"
+    "<li><strong>Actions:</strong> Discrete (6)</li>"
+    "</ul>"
+    "<h4>Rules</h4>"
+    "<ul>"
+    "<li>Each player defends one scoring area</li>"
+    "<li>Timed serves: Must serve within 2 seconds or lose 1 point</li>"
+    "</ul>"
+    "<h4>Make</h4>"
+    "<pre><code>from pettingzoo.atari import quadrapong_v4\nenv = quadrapong_v4.parallel_env()</code></pre>"
+    "<p>Docs: <a href='https://pettingzoo.farama.org/environments/atari/quadrapong/'>"
+    "PettingZoo Quadrapong</a></p>"
+)
+
+SPACE_WAR_HTML = (
+    "<h3>PettingZoo: Space War (Atari)</h3>"
+    "<p>Competitive space combat where prediction and positioning are key. Features "
+    "advanced physics with acceleration and momentum.</p>"
+    "<h4>Environment Details</h4>"
+    "<ul>"
+    "<li><strong>API Type:</strong> Parallel (simultaneous)</li>"
+    "<li><strong>Players:</strong> 2 (first_0, second_0)</li>"
+    "<li><strong>Game Type:</strong> Competitive</li>"
+    "<li><strong>Observation:</strong> RGB image (250x160x3)</li>"
+    "<li><strong>Actions:</strong> Discrete (18)</li>"
+    "</ul>"
+    "<h4>Rewards (Zero-Sum)</h4>"
+    "<ul>"
+    "<li>Hit opponent: <strong>+1</strong></li>"
+    "<li>Get hit: <strong>-1</strong></li>"
+    "</ul>"
+    "<h4>Make</h4>"
+    "<pre><code>from pettingzoo.atari import space_war_v2\nenv = space_war_v2.parallel_env()</code></pre>"
+    "<p>Docs: <a href='https://pettingzoo.farama.org/environments/atari/space_war/'>"
+    "PettingZoo Space War</a></p>"
+)
+
 __all__ = [
     # Classic
     "CLASSIC_FAMILY_HTML",
@@ -567,4 +708,10 @@ __all__ = [
     "WARLORDS_HTML",
     "COMBAT_TANK_HTML",
     "COMBAT_PLANE_HTML",
+    "ENTOMBED_COMPETITIVE_HTML",
+    "ENTOMBED_COOPERATIVE_HTML",
+    "FLAG_CAPTURE_HTML",
+    "MAZE_CRAZE_HTML",
+    "QUADRAPONG_HTML",
+    "SPACE_WAR_HTML",
 ]

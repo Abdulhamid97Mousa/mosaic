@@ -57,6 +57,111 @@ class GameId(StrEnum):
     ALE_AIR_RAID_V5 = "ALE/AirRaid-v5"
     ASSAULT_V4 = "Assault-v4"
     ALE_ASSAULT_V5 = "ALE/Assault-v5"
+    # ─────────────────────────────────────────────────────────────────────────
+    # ALE (Arcade Learning Environment) - Complete 128 Game Library
+    # Using ALE/{GameName}-v5 format (recommended for new projects)
+    # ─────────────────────────────────────────────────────────────────────────
+    ALE_ALIEN_V5 = "ALE/Alien-v5"
+    ALE_AMIDAR_V5 = "ALE/Amidar-v5"
+    ALE_ASTERIX_V5 = "ALE/Asterix-v5"
+    ALE_ASTEROIDS_V5 = "ALE/Asteroids-v5"
+    ALE_ATLANTIS_V5 = "ALE/Atlantis-v5"
+    ALE_ATLANTIS2_V5 = "ALE/Atlantis2-v5"
+    ALE_BACKGAMMON_V5 = "ALE/Backgammon-v5"
+    ALE_BANK_HEIST_V5 = "ALE/BankHeist-v5"
+    ALE_BASIC_MATH_V5 = "ALE/BasicMath-v5"
+    ALE_BATTLE_ZONE_V5 = "ALE/BattleZone-v5"
+    ALE_BEAM_RIDER_V5 = "ALE/BeamRider-v5"
+    ALE_BERZERK_V5 = "ALE/Berzerk-v5"
+    ALE_BLACKJACK_V5 = "ALE/Blackjack-v5"
+    ALE_BOWLING_V5 = "ALE/Bowling-v5"
+    ALE_BOXING_V5 = "ALE/Boxing-v5"
+    ALE_BREAKOUT_V5 = "ALE/Breakout-v5"
+    ALE_CARNIVAL_V5 = "ALE/Carnival-v5"
+    ALE_CASINO_V5 = "ALE/Casino-v5"
+    ALE_CENTIPEDE_V5 = "ALE/Centipede-v5"
+    ALE_CHOPPER_COMMAND_V5 = "ALE/ChopperCommand-v5"
+    ALE_CRAZY_CLIMBER_V5 = "ALE/CrazyClimber-v5"
+    ALE_CROSSBOW_V5 = "ALE/Crossbow-v5"
+    ALE_DARKCHAMBERS_V5 = "ALE/Darkchambers-v5"
+    ALE_DEFENDER_V5 = "ALE/Defender-v5"
+    ALE_DEMON_ATTACK_V5 = "ALE/DemonAttack-v5"
+    ALE_DONKEY_KONG_V5 = "ALE/DonkeyKong-v5"
+    ALE_DOUBLE_DUNK_V5 = "ALE/DoubleDunk-v5"
+    ALE_EARTHWORLD_V5 = "ALE/Earthworld-v5"
+    ALE_ELEVATOR_ACTION_V5 = "ALE/ElevatorAction-v5"
+    ALE_ENDURO_V5 = "ALE/Enduro-v5"
+    ALE_ENTOMBED_V5 = "ALE/Entombed-v5"
+    ALE_ET_V5 = "ALE/Et-v5"
+    ALE_FISHING_DERBY_V5 = "ALE/FishingDerby-v5"
+    ALE_FLAG_CAPTURE_V5 = "ALE/FlagCapture-v5"
+    ALE_FREEWAY_V5 = "ALE/Freeway-v5"
+    ALE_FROGGER_V5 = "ALE/Frogger-v5"
+    ALE_FROSTBITE_V5 = "ALE/Frostbite-v5"
+    ALE_GALAXIAN_V5 = "ALE/Galaxian-v5"
+    ALE_GOPHER_V5 = "ALE/Gopher-v5"
+    ALE_GRAVITAR_V5 = "ALE/Gravitar-v5"
+    ALE_HANGMAN_V5 = "ALE/Hangman-v5"
+    ALE_HAUNTED_HOUSE_V5 = "ALE/HauntedHouse-v5"
+    ALE_HERO_V5 = "ALE/Hero-v5"
+    ALE_HUMAN_CANNONBALL_V5 = "ALE/HumanCannonball-v5"
+    ALE_ICE_HOCKEY_V5 = "ALE/IceHockey-v5"
+    ALE_JAMESBOND_V5 = "ALE/Jamesbond-v5"
+    ALE_JOURNEY_ESCAPE_V5 = "ALE/JourneyEscape-v5"
+    ALE_KABOOM_V5 = "ALE/Kaboom-v5"
+    ALE_KANGAROO_V5 = "ALE/Kangaroo-v5"
+    ALE_KEYSTONE_KAPERS_V5 = "ALE/KeystoneKapers-v5"
+    ALE_KING_KONG_V5 = "ALE/KingKong-v5"
+    ALE_KLAX_V5 = "ALE/Klax-v5"
+    ALE_KOOLAID_V5 = "ALE/Koolaid-v5"
+    ALE_KRULL_V5 = "ALE/Krull-v5"
+    ALE_KUNG_FU_MASTER_V5 = "ALE/KungFuMaster-v5"
+    ALE_LASER_GATES_V5 = "ALE/LaserGates-v5"
+    ALE_LOST_LUGGAGE_V5 = "ALE/LostLuggage-v5"
+    ALE_MARIO_BROS_V5 = "ALE/MarioBros-v5"
+    ALE_MINIATURE_GOLF_V5 = "ALE/MiniatureGolf-v5"
+    ALE_MONTEZUMA_REVENGE_V5 = "ALE/MontezumaRevenge-v5"
+    ALE_MR_DO_V5 = "ALE/MrDo-v5"
+    ALE_MS_PACMAN_V5 = "ALE/MsPacman-v5"
+    ALE_NAME_THIS_GAME_V5 = "ALE/NameThisGame-v5"
+    ALE_OTHELLO_V5 = "ALE/Othello-v5"
+    ALE_PACMAN_V5 = "ALE/Pacman-v5"
+    ALE_PHOENIX_V5 = "ALE/Phoenix-v5"
+    ALE_PITFALL_V5 = "ALE/Pitfall-v5"
+    ALE_PITFALL2_V5 = "ALE/Pitfall2-v5"
+    ALE_PONG_V5 = "ALE/Pong-v5"
+    ALE_POOYAN_V5 = "ALE/Pooyan-v5"
+    ALE_PRIVATE_EYE_V5 = "ALE/PrivateEye-v5"
+    ALE_QBERT_V5 = "ALE/Qbert-v5"
+    ALE_RIVERRAID_V5 = "ALE/Riverraid-v5"
+    ALE_ROAD_RUNNER_V5 = "ALE/RoadRunner-v5"
+    ALE_ROBOTANK_V5 = "ALE/Robotank-v5"
+    ALE_SEAQUEST_V5 = "ALE/Seaquest-v5"
+    ALE_SIR_LANCELOT_V5 = "ALE/SirLancelot-v5"
+    ALE_SKIING_V5 = "ALE/Skiing-v5"
+    ALE_SOLARIS_V5 = "ALE/Solaris-v5"
+    ALE_SPACE_INVADERS_V5 = "ALE/SpaceInvaders-v5"
+    ALE_SPACE_WAR_V5 = "ALE/SpaceWar-v5"
+    ALE_STAR_GUNNER_V5 = "ALE/StarGunner-v5"
+    ALE_SUPERMAN_V5 = "ALE/Superman-v5"
+    ALE_SURROUND_V5 = "ALE/Surround-v5"
+    ALE_TENNIS_V5 = "ALE/Tennis-v5"
+    ALE_TETRIS_V5 = "ALE/Tetris-v5"
+    ALE_TIC_TAC_TOE_3D_V5 = "ALE/TicTacToe3D-v5"
+    ALE_TIME_PILOT_V5 = "ALE/TimePilot-v5"
+    ALE_TRONDEAD_V5 = "ALE/Trondead-v5"
+    ALE_TURMOIL_V5 = "ALE/Turmoil-v5"
+    ALE_TUTANKHAM_V5 = "ALE/Tutankham-v5"
+    ALE_UP_N_DOWN_V5 = "ALE/UpNDown-v5"
+    ALE_VENTURE_V5 = "ALE/Venture-v5"
+    ALE_VIDEO_CHECKERS_V5 = "ALE/VideoCheckers-v5"
+    ALE_VIDEO_CHESS_V5 = "ALE/VideoChess-v5"
+    ALE_VIDEO_CUBE_V5 = "ALE/VideoCube-v5"
+    ALE_VIDEO_PINBALL_V5 = "ALE/VideoPinball-v5"
+    ALE_WIZARD_OF_WOR_V5 = "ALE/WizardOfWor-v5"
+    ALE_WORD_ZAPPER_V5 = "ALE/WordZapper-v5"
+    ALE_YARS_REVENGE_V5 = "ALE/YarsRevenge-v5"
+    ALE_ZAXXON_V5 = "ALE/Zaxxon-v5"
     ANT = "Ant-v5"
     HALF_CHEETAH = "HalfCheetah-v5"
     HOPPER = "Hopper-v5"
@@ -288,6 +393,47 @@ class ControlMode(StrEnum):
     MULTI_AGENT_COMPETITIVE = "multi_agent_competitive"
 
 
+class InputMode(StrEnum):
+    """Input mode for keyboard controls.
+
+    Controls how keyboard input is processed for human gameplay.
+    Users can choose between these modes in the Game Configuration panel.
+    """
+
+    STATE_BASED = "state_based"
+    """Tracks all currently pressed keys and computes combined actions.
+
+    - Enables simultaneous key presses (e.g., Up+Right for diagonal movement)
+    - Best for real-time arcade games (Procgen, Atari, ViZDoom, etc.)
+    - Keys are sampled on each game tick
+    - Supports WASD and arrow keys interchangeably
+    """
+
+    SHORTCUT_BASED = "shortcut_based"
+    """Uses Qt's QShortcut mechanism for single-key actions.
+
+    - Each key press immediately triggers an action
+    - Best for turn-based or step-by-step games
+    - Traditional input mode with immediate response
+    - No simultaneous key combination support
+    """
+
+
+# Human-readable labels and descriptions for InputMode
+INPUT_MODE_INFO: dict[InputMode, tuple[str, str]] = {
+    InputMode.STATE_BASED: (
+        "State-Based (Real-time)",
+        "Enables simultaneous key combinations (e.g., Up+Right for diagonal). "
+        "Best for arcade games where you hold multiple keys at once.",
+    ),
+    InputMode.SHORTCUT_BASED: (
+        "Shortcut-Based (Immediate)",
+        "Each key press triggers an immediate action. "
+        "Best for turn-based games or step-by-step control.",
+    ),
+}
+
+
 class RenderMode(StrEnum):
     """Rendering strategies supported by the UI."""
 
@@ -386,6 +532,108 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.ALE_AIR_RAID_V5: EnvironmentFamily.ALE,
     GameId.ASSAULT_V4: EnvironmentFamily.ALE,
     GameId.ALE_ASSAULT_V5: EnvironmentFamily.ALE,
+    # ALE Complete Game Library
+    GameId.ALE_ALIEN_V5: EnvironmentFamily.ALE,
+    GameId.ALE_AMIDAR_V5: EnvironmentFamily.ALE,
+    GameId.ALE_ASTERIX_V5: EnvironmentFamily.ALE,
+    GameId.ALE_ASTEROIDS_V5: EnvironmentFamily.ALE,
+    GameId.ALE_ATLANTIS_V5: EnvironmentFamily.ALE,
+    GameId.ALE_ATLANTIS2_V5: EnvironmentFamily.ALE,
+    GameId.ALE_BACKGAMMON_V5: EnvironmentFamily.ALE,
+    GameId.ALE_BANK_HEIST_V5: EnvironmentFamily.ALE,
+    GameId.ALE_BASIC_MATH_V5: EnvironmentFamily.ALE,
+    GameId.ALE_BATTLE_ZONE_V5: EnvironmentFamily.ALE,
+    GameId.ALE_BEAM_RIDER_V5: EnvironmentFamily.ALE,
+    GameId.ALE_BERZERK_V5: EnvironmentFamily.ALE,
+    GameId.ALE_BLACKJACK_V5: EnvironmentFamily.ALE,
+    GameId.ALE_BOWLING_V5: EnvironmentFamily.ALE,
+    GameId.ALE_BOXING_V5: EnvironmentFamily.ALE,
+    GameId.ALE_BREAKOUT_V5: EnvironmentFamily.ALE,
+    GameId.ALE_CARNIVAL_V5: EnvironmentFamily.ALE,
+    GameId.ALE_CASINO_V5: EnvironmentFamily.ALE,
+    GameId.ALE_CENTIPEDE_V5: EnvironmentFamily.ALE,
+    GameId.ALE_CHOPPER_COMMAND_V5: EnvironmentFamily.ALE,
+    GameId.ALE_CRAZY_CLIMBER_V5: EnvironmentFamily.ALE,
+    GameId.ALE_CROSSBOW_V5: EnvironmentFamily.ALE,
+    GameId.ALE_DARKCHAMBERS_V5: EnvironmentFamily.ALE,
+    GameId.ALE_DEFENDER_V5: EnvironmentFamily.ALE,
+    GameId.ALE_DEMON_ATTACK_V5: EnvironmentFamily.ALE,
+    GameId.ALE_DONKEY_KONG_V5: EnvironmentFamily.ALE,
+    GameId.ALE_DOUBLE_DUNK_V5: EnvironmentFamily.ALE,
+    GameId.ALE_EARTHWORLD_V5: EnvironmentFamily.ALE,
+    GameId.ALE_ELEVATOR_ACTION_V5: EnvironmentFamily.ALE,
+    GameId.ALE_ENDURO_V5: EnvironmentFamily.ALE,
+    GameId.ALE_ENTOMBED_V5: EnvironmentFamily.ALE,
+    GameId.ALE_ET_V5: EnvironmentFamily.ALE,
+    GameId.ALE_FISHING_DERBY_V5: EnvironmentFamily.ALE,
+    GameId.ALE_FLAG_CAPTURE_V5: EnvironmentFamily.ALE,
+    GameId.ALE_FREEWAY_V5: EnvironmentFamily.ALE,
+    GameId.ALE_FROGGER_V5: EnvironmentFamily.ALE,
+    GameId.ALE_FROSTBITE_V5: EnvironmentFamily.ALE,
+    GameId.ALE_GALAXIAN_V5: EnvironmentFamily.ALE,
+    GameId.ALE_GOPHER_V5: EnvironmentFamily.ALE,
+    GameId.ALE_GRAVITAR_V5: EnvironmentFamily.ALE,
+    GameId.ALE_HANGMAN_V5: EnvironmentFamily.ALE,
+    GameId.ALE_HAUNTED_HOUSE_V5: EnvironmentFamily.ALE,
+    GameId.ALE_HERO_V5: EnvironmentFamily.ALE,
+    GameId.ALE_HUMAN_CANNONBALL_V5: EnvironmentFamily.ALE,
+    GameId.ALE_ICE_HOCKEY_V5: EnvironmentFamily.ALE,
+    GameId.ALE_JAMESBOND_V5: EnvironmentFamily.ALE,
+    GameId.ALE_JOURNEY_ESCAPE_V5: EnvironmentFamily.ALE,
+    GameId.ALE_KABOOM_V5: EnvironmentFamily.ALE,
+    GameId.ALE_KANGAROO_V5: EnvironmentFamily.ALE,
+    GameId.ALE_KEYSTONE_KAPERS_V5: EnvironmentFamily.ALE,
+    GameId.ALE_KING_KONG_V5: EnvironmentFamily.ALE,
+    GameId.ALE_KLAX_V5: EnvironmentFamily.ALE,
+    GameId.ALE_KOOLAID_V5: EnvironmentFamily.ALE,
+    GameId.ALE_KRULL_V5: EnvironmentFamily.ALE,
+    GameId.ALE_KUNG_FU_MASTER_V5: EnvironmentFamily.ALE,
+    GameId.ALE_LASER_GATES_V5: EnvironmentFamily.ALE,
+    GameId.ALE_LOST_LUGGAGE_V5: EnvironmentFamily.ALE,
+    GameId.ALE_MARIO_BROS_V5: EnvironmentFamily.ALE,
+    GameId.ALE_MINIATURE_GOLF_V5: EnvironmentFamily.ALE,
+    GameId.ALE_MONTEZUMA_REVENGE_V5: EnvironmentFamily.ALE,
+    GameId.ALE_MR_DO_V5: EnvironmentFamily.ALE,
+    GameId.ALE_MS_PACMAN_V5: EnvironmentFamily.ALE,
+    GameId.ALE_NAME_THIS_GAME_V5: EnvironmentFamily.ALE,
+    GameId.ALE_OTHELLO_V5: EnvironmentFamily.ALE,
+    GameId.ALE_PACMAN_V5: EnvironmentFamily.ALE,
+    GameId.ALE_PHOENIX_V5: EnvironmentFamily.ALE,
+    GameId.ALE_PITFALL_V5: EnvironmentFamily.ALE,
+    GameId.ALE_PITFALL2_V5: EnvironmentFamily.ALE,
+    GameId.ALE_PONG_V5: EnvironmentFamily.ALE,
+    GameId.ALE_POOYAN_V5: EnvironmentFamily.ALE,
+    GameId.ALE_PRIVATE_EYE_V5: EnvironmentFamily.ALE,
+    GameId.ALE_QBERT_V5: EnvironmentFamily.ALE,
+    GameId.ALE_RIVERRAID_V5: EnvironmentFamily.ALE,
+    GameId.ALE_ROAD_RUNNER_V5: EnvironmentFamily.ALE,
+    GameId.ALE_ROBOTANK_V5: EnvironmentFamily.ALE,
+    GameId.ALE_SEAQUEST_V5: EnvironmentFamily.ALE,
+    GameId.ALE_SIR_LANCELOT_V5: EnvironmentFamily.ALE,
+    GameId.ALE_SKIING_V5: EnvironmentFamily.ALE,
+    GameId.ALE_SOLARIS_V5: EnvironmentFamily.ALE,
+    GameId.ALE_SPACE_INVADERS_V5: EnvironmentFamily.ALE,
+    GameId.ALE_SPACE_WAR_V5: EnvironmentFamily.ALE,
+    GameId.ALE_STAR_GUNNER_V5: EnvironmentFamily.ALE,
+    GameId.ALE_SUPERMAN_V5: EnvironmentFamily.ALE,
+    GameId.ALE_SURROUND_V5: EnvironmentFamily.ALE,
+    GameId.ALE_TENNIS_V5: EnvironmentFamily.ALE,
+    GameId.ALE_TETRIS_V5: EnvironmentFamily.ALE,
+    GameId.ALE_TIC_TAC_TOE_3D_V5: EnvironmentFamily.ALE,
+    GameId.ALE_TIME_PILOT_V5: EnvironmentFamily.ALE,
+    GameId.ALE_TRONDEAD_V5: EnvironmentFamily.ALE,
+    GameId.ALE_TURMOIL_V5: EnvironmentFamily.ALE,
+    GameId.ALE_TUTANKHAM_V5: EnvironmentFamily.ALE,
+    GameId.ALE_UP_N_DOWN_V5: EnvironmentFamily.ALE,
+    GameId.ALE_VENTURE_V5: EnvironmentFamily.ALE,
+    GameId.ALE_VIDEO_CHECKERS_V5: EnvironmentFamily.ALE,
+    GameId.ALE_VIDEO_CHESS_V5: EnvironmentFamily.ALE,
+    GameId.ALE_VIDEO_CUBE_V5: EnvironmentFamily.ALE,
+    GameId.ALE_VIDEO_PINBALL_V5: EnvironmentFamily.ALE,
+    GameId.ALE_WIZARD_OF_WOR_V5: EnvironmentFamily.ALE,
+    GameId.ALE_WORD_ZAPPER_V5: EnvironmentFamily.ALE,
+    GameId.ALE_YARS_REVENGE_V5: EnvironmentFamily.ALE,
+    GameId.ALE_ZAXXON_V5: EnvironmentFamily.ALE,
     GameId.ANT: EnvironmentFamily.MUJOCO,
     GameId.HALF_CHEETAH: EnvironmentFamily.MUJOCO,
     GameId.HOPPER: EnvironmentFamily.MUJOCO,
@@ -1237,6 +1485,8 @@ __all__ = [
     "EnvironmentFamily",
     "GameId",
     "ControlMode",
+    "InputMode",
+    "INPUT_MODE_INFO",
     "RenderMode",
     "ActionSpaceType",
     "AgentRole",

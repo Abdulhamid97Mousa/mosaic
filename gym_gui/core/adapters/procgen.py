@@ -304,12 +304,14 @@ class ProcgenAdapter(EnvironmentAdapter[np.ndarray, int]):
 
         # Apply additional scaling if render_scale > 1
         # render_scale=4 with 512x512 base = 2048x2048 output
+        # NOTE: Use NEAREST for fast real-time rendering during gameplay
+        # LANCZOS is too slow and causes input lag
         scale = self._config.render_scale
         if scale > 1:
             img = Image.fromarray(frame)
             new_size = (frame.shape[1] * scale, frame.shape[0] * scale)
-            # Use LANCZOS for high-quality upscaling from 512x512 base
-            img = img.resize(new_size, Image.Resampling.LANCZOS)
+            # Use NEAREST for fast real-time rendering (no interpolation lag)
+            img = img.resize(new_size, Image.Resampling.NEAREST)
             frame = np.array(img)
 
         return {

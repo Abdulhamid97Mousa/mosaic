@@ -36,6 +36,9 @@ from gym_gui.logging_config.log_constants import (
 )
 from gym_gui.ui.widgets.mosaic_welcome_widget import MosaicWelcomeWidget
 
+if TYPE_CHECKING:
+    from gym_gui.services.trainer.run_manager import TrainingRunManager
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -59,6 +62,7 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
         parent: QtWidgets.QWidget | None = None,
         *,
         telemetry_service: TelemetryService | None = None,
+        run_manager: "TrainingRunManager | None" = None,
     ) -> None:
         super().__init__(parent)
         self._logger = _LOGGER
@@ -72,6 +76,7 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
 
         self._mode_hosts: dict[RenderMode, _RendererHost] = {}
         self._telemetry_service = telemetry_service
+        self._run_manager = run_manager
         self._current_game = None
 
         self._raw_tab = _RawTab(parent=self)
@@ -109,6 +114,12 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
         )
         self._replay_tab_index = self.addTab(self._replay_tab, "Human Replay")
         self.setTabToolTip(self._replay_tab_index, "Review episodes from manual gameplay sessions only")
+
+        # Management tab for training runs (optional, requires run_manager)
+        self._management_tab: Optional[QtWidgets.QWidget] = None
+        self._management_tab_index = -1
+        if run_manager is not None:
+            self._setup_management_tab(run_manager)
 
         # Board game strategy (integrated into Grid tab, created on demand)
         self._board_game_strategy: BoardGameRendererStrategy | None = None
@@ -395,6 +406,58 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
             self.log_constant(LOG_UI_RENDER_TABS_INFO, message="remove_dynamic_tabs_for_run: COMPLETE")
         except Exception as e:
             self.log_constant(LOG_UI_RENDER_TABS_ERROR, message=f"remove_dynamic_tabs_for_run: FATAL ERROR - {e}", exc_info=e)
+
+    # ------------------------------------------------------------------
+    # Management Tab
+    # ------------------------------------------------------------------
+    def _setup_management_tab(self, run_manager: "TrainingRunManager") -> None:
+        """Set up the management tab for training runs."""
+        from gym_gui.ui.widgets.management_tab import ManagementTab
+
+        self._management_tab = ManagementTab(run_manager, parent=self)
+        self._management_tab_index = self.addTab(self._management_tab, "Management")
+        self.setTabToolTip(
+            self._management_tab_index,
+            "Manage training runs: stop jobs, delete artifacts, clean up tabs"
+        )
+
+        # Connect signals to close associated dynamic tabs
+        self._management_tab.runs_deleted.connect(self._on_runs_deleted)
+        self._management_tab.tabs_closed.connect(self._on_tabs_closed)
+
+        # Initial refresh
+        self._management_tab.refresh()
+
+    def _on_runs_deleted(self, run_ids: list[str]) -> None:
+        """Handle deletion of runs by closing associated dynamic tabs.
+
+        Args:
+            run_ids: List of run IDs that were deleted.
+        """
+        self.log_constant(
+            LOG_UI_RENDER_TABS_INFO,
+            message=f"_on_runs_deleted: Closing tabs for {len(run_ids)} deleted run(s)",
+        )
+        for run_id in run_ids:
+            self.remove_dynamic_tabs_for_run(run_id)
+
+    def _on_tabs_closed(self, run_ids: list[str]) -> None:
+        """Handle request to close tabs without deleting run data.
+
+        Args:
+            run_ids: List of run IDs whose tabs should be closed.
+        """
+        self.log_constant(
+            LOG_UI_RENDER_TABS_INFO,
+            message=f"_on_tabs_closed: Closing tabs for {len(run_ids)} run(s) (data preserved)",
+        )
+        for run_id in run_ids:
+            self.remove_dynamic_tabs_for_run(run_id)
+
+    def refresh_management_tab(self) -> None:
+        """Refresh the management tab's run list."""
+        if self._management_tab is not None and hasattr(self._management_tab, 'refresh'):
+            self._management_tab.refresh()
 
     # ------------------------------------------------------------------
     # Public API

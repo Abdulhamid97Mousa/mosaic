@@ -23,6 +23,8 @@ from gym_gui.core.enums import (
     ControlMode,
     EnvironmentFamily,
     GameId,
+    InputMode,
+    INPUT_MODE_INFO,
     ENVIRONMENT_FAMILY_BY_GAME,
     get_game_display_name,
 )
@@ -670,21 +672,25 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._config_scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
         self._config_scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)  # type: ignore[attr-defined]
         self._config_scroll.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)  # type: ignore[attr-defined]
-        # Set minimum height so the config panel isn't too small
-        self._config_scroll.setMinimumHeight(200)
+        # Set minimum height so the config panel isn't too small - expanded by default
+        self._config_scroll.setMinimumHeight(350)
         sp = self._config_scroll.sizePolicy()
         sp.setVerticalPolicy(QtWidgets.QSizePolicy.Policy.Expanding)
         sp.setHorizontalPolicy(QtWidgets.QSizePolicy.Policy.Preferred)
         self._config_scroll.setSizePolicy(sp)
         self._config_scroll.setWidget(cfg_group)
-        human_layout.addWidget(self._config_scroll, stretch=2)  # Give more stretch weight
+        # Ensure the config group is visible and expanded
+        cfg_group.setVisible(True)
+        cfg_group.setMinimumHeight(300)
+        human_layout.addWidget(self._config_scroll, stretch=3)  # Give more stretch weight
 
         human_layout.addWidget(self._create_mode_group(self._human_tab))
         self._control_buttons_widget = self._create_control_group(self._human_tab)
         human_layout.addWidget(self._control_buttons_widget)
         human_layout.addWidget(self._create_telemetry_mode_group(self._human_tab))
         human_layout.addWidget(self._create_status_group(self._human_tab))
-        human_layout.addStretch(1)
+        # Minimal stretch at end so Game Configuration gets more space
+        human_layout.addStretch(0)
         human_index = self._tab_widget.addTab(self._human_tab, "Human Control")
         self._tab_to_mode[human_index] = ControlMode.HUMAN_ONLY
 
@@ -1462,6 +1468,56 @@ class ControlPanelWidget(QtWidgets.QWidget):
             if layout is not None:
                 layout.deleteLater()
 
+    def _build_input_mode_controls(self) -> None:
+        """Build the Input Mode controls (common to all games).
+
+        This adds a combo box to select between state-based (real-time) and
+        shortcut-based (immediate) keyboard input modes.
+        """
+        if self._current_game is None:
+            return
+
+        current_game = self._current_game
+        overrides = self._game_overrides.setdefault(current_game, {})
+
+        # Create combo box
+        input_mode_combo = QtWidgets.QComboBox(self._config_group)
+        for mode in InputMode:
+            label, _ = INPUT_MODE_INFO[mode]
+            input_mode_combo.addItem(label, mode.value)
+
+        # Set current input mode (default to shortcut_based for safety)
+        current_input_mode = overrides.get("input_mode", InputMode.SHORTCUT_BASED.value)
+        for i in range(input_mode_combo.count()):
+            if input_mode_combo.itemData(i) == current_input_mode:
+                input_mode_combo.setCurrentIndex(i)
+                break
+
+        # Description label that updates based on selection
+        input_mode_desc = QtWidgets.QLabel(self._config_group)
+        input_mode_desc.setWordWrap(True)
+        input_mode_desc.setStyleSheet("color: #666; font-size: 11px; padding: 4px;")
+
+        def update_description(index: int) -> None:
+            mode_value = input_mode_combo.itemData(index)
+            try:
+                mode = InputMode(mode_value)
+                _, description = INPUT_MODE_INFO[mode]
+                input_mode_desc.setText(description)
+            except (ValueError, KeyError):
+                input_mode_desc.setText("")
+
+        def on_input_mode_changed(index: int) -> None:
+            mode_value = input_mode_combo.itemData(index)
+            overrides["input_mode"] = mode_value
+            update_description(index)
+
+        input_mode_combo.currentIndexChanged.connect(on_input_mode_changed)
+        update_description(input_mode_combo.currentIndex())
+
+        self._config_layout.addRow("Input Mode", input_mode_combo)
+        self._config_layout.addRow("", input_mode_desc)
+
     def _refresh_game_config_ui(self) -> None:
         self._clear_config_layout()
         if self._frozen_slippery_checkbox is not None:
@@ -1479,6 +1535,15 @@ class ControlPanelWidget(QtWidgets.QWidget):
             label.setWordWrap(True)
             self._config_layout.addRow("", label)
             return
+
+        # -------- Input Mode (common to ALL games) --------
+        self._build_input_mode_controls()
+
+        # Add a separator line
+        separator = QtWidgets.QFrame(self._config_group)
+        separator.setFrameShape(QtWidgets.QFrame.Shape.HLine)
+        separator.setFrameShadow(QtWidgets.QFrame.Shadow.Sunken)
+        self._config_layout.addRow(separator)
 
         if self._current_game == GameId.FROZEN_LAKE:
             overrides = self._game_overrides.setdefault(GameId.FROZEN_LAKE, {})

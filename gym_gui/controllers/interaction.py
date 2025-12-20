@@ -156,3 +156,53 @@ class ViZDoomInteractionController(InteractionController):
 
     def step_dt(self) -> float:
         return 0.0
+
+
+class ProcgenInteractionController(InteractionController):
+    """Idle controller for Procgen: step continuously with NOOP when idle.
+
+    Procgen games are real-time arcade-style games (like Atari) where the
+    world should continue advancing even without player input. Enemies move,
+    projectiles fly, and timers count down regardless of human action.
+
+    Default 30 FPS gives responsive gameplay in a GUI environment.
+    """
+
+    def __init__(self, owner, target_hz: int = 30):
+        """Initialize Procgen interaction controller.
+
+        Args:
+            owner: SessionController instance.
+            target_hz: Target frame rate (default 30 FPS for responsive play).
+        """
+        self._owner = owner
+        self._interval_ms = max(1, int(1000 / float(target_hz)))  # ~33ms for 30 FPS
+
+    def idle_interval_ms(self) -> Optional[int]:
+        return self._interval_ms
+
+    def should_idle_tick(self) -> bool:
+        """Check if we should advance the game this tick."""
+        o = self._owner
+        if o._adapter is None or o._game_id is None:
+            return False
+        if not getattr(o, "_game_started", False):
+            return False
+        if o._game_paused:
+            return False
+        if getattr(o._control_mode, "name", "") != "HUMAN_ONLY":
+            return False
+        if o._last_step is not None and (o._last_step.terminated or o._last_step.truncated):
+            return False
+        return True
+
+    def maybe_passive_action(self) -> Optional[Any]:
+        """Return NOOP action for Procgen.
+
+        Procgen uses Discrete(15) action space. Action 4 is NOOP
+        (no movement, no action). Action 0 is actually DOWN_LEFT!
+        """
+        return 4
+
+    def step_dt(self) -> float:
+        return 0.0

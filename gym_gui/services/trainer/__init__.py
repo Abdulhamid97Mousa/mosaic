@@ -9,6 +9,7 @@ from .registry import RunRecord, RunRegistry, RunStatus
 from .gpu import GPUAllocator, GPUReservation, GPUReservationError
 from .dispatcher import TrainerDispatcher, WorkerHandle
 from .signals import TrainerSignals, get_trainer_signals
+from .run_manager import TrainingRunManager
 
 __all__ = [
     "TrainRunConfig",
@@ -30,4 +31,5 @@ __all__ = [
     "WorkerHandle",
     "TrainerSignals",
     "get_trainer_signals",
+    "TrainingRunManager",
 ]

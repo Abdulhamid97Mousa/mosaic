@@ -52,12 +52,17 @@ class LLMConfig:
         ModelIdentity(LLMProvider.OPENROUTER, "mistralai/mistral-7b-instruct", "Mistral 7B"),
         # vLLM local models (user must configure)
         # Use HuggingFace model IDs - vLLM will download automatically
-        ModelIdentity(LLMProvider.VLLM, "meta-llama/Llama-3.1-8B-Instruct", "Llama 3.1 8B (local)"),
-        ModelIdentity(LLMProvider.VLLM, "meta-llama/Llama-3.2-3B-Instruct", "Llama 3.2 3B (local)"),
-        ModelIdentity(LLMProvider.VLLM, "meta-llama/Llama-3.2-1B-Instruct", "Llama 3.2 1B (local)"),
+        # Models with permissive licenses (no gating) - recommended for easy setup
+        ModelIdentity(LLMProvider.VLLM, "Qwen/Qwen2.5-1.5B-Instruct", "Qwen 2.5 1.5B (local, fast)"),
+        ModelIdentity(LLMProvider.VLLM, "Qwen/Qwen2.5-3B-Instruct", "Qwen 2.5 3B (local)"),
         ModelIdentity(LLMProvider.VLLM, "mistralai/Mistral-7B-Instruct-v0.3", "Mistral 7B (local)"),
+        ModelIdentity(LLMProvider.VLLM, "microsoft/Phi-3-mini-4k-instruct", "Phi-3 Mini 4K (local)"),
         ModelIdentity(LLMProvider.VLLM, "Qwen/Qwen2.5-Coder-7B-Instruct", "Qwen 2.5 Coder 7B (local)"),
         ModelIdentity(LLMProvider.VLLM, "deepseek-ai/deepseek-coder-6.7b-instruct", "DeepSeek Coder 6.7B (local)"),
+        # Gated models (require HuggingFace license approval)
+        ModelIdentity(LLMProvider.VLLM, "meta-llama/Llama-3.2-3B-Instruct", "Llama 3.2 3B (local, gated)"),
+        ModelIdentity(LLMProvider.VLLM, "meta-llama/Llama-3.2-1B-Instruct", "Llama 3.2 1B (local, gated)"),
+        ModelIdentity(LLMProvider.VLLM, "meta-llama/Llama-3.1-8B-Instruct", "Llama 3.1 8B (local, gated)"),
     ])
 
     # Chat settings

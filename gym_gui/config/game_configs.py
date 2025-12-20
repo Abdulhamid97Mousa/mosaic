@@ -508,8 +508,8 @@ class ProcgenConfig:
     render_mode: str = "rgb_array"
     """Render mode requested during environment creation."""
 
-    render_scale: int = 4
-    """Scale factor for 512x512 info["rgb"] (4 = 2048x2048 display)."""
+    render_scale: int = 1
+    """Scale factor for 512x512 info["rgb"] (1 = no scaling, fast rendering)."""
 
     seed: int | None = None
     """Default seed forwarded to :meth:`gymnasium.Env.reset`."""
