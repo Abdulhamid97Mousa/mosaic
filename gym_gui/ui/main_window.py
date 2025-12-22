@@ -223,6 +223,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # Settings dialog (created on demand, lazy initialization)
         self._settings_dialog: Optional[SettingsDialog] = None
 
+        # Stockfish service (may be set by handlers, cleaned up on close)
+        self._stockfish_service: Any = None
+
         # MuJoCo MPC launcher (optional)
         try:
             self._mjpc_launcher = get_mjpc_launcher()
