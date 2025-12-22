@@ -68,27 +68,27 @@ dependencies = [
 # =============================================================================
 
 # Gymnasium core (needed for most environment families)
-gymnasium = ["gymnasium>=0.29.0"]
+gymnasium = ["gymnasium>=1.1.0"]
 
 # Box2D environments (LunarLander, BipedalWalker, CarRacing)
 box2d = [
-    "gymnasium[box2d]>=0.29.0",
+    "gymnasium[box2d]>=1.1.0",
 ]
 
 # MuJoCo environments (Ant, HalfCheetah, Humanoid, etc.)
 mujoco = [
-    "gymnasium[mujoco]>=0.29.0",
+    "gymnasium[mujoco]>=1.1.0",
 ]
 
 # Atari environments (Breakout, Pong, SpaceInvaders, etc.)
 atari = [
-    "gymnasium[atari]>=0.29.0",
+    "gymnasium[atari]>=1.1.0",
     "autorom[accept-rom-license]>=0.6.0",
 ]
 
 # MiniGrid environments (grid-world navigation)
 minigrid = [
-    "gymnasium>=0.29.0",
+    "gymnasium>=1.1.0",
     "minigrid>=2.0.0,<3.0.0",
 ]
 
@@ -192,6 +192,15 @@ xuance = [
     "imageio>=2.9.0",
     "opencv-python>=4.5.0",
     "mpi4py>=3.1.0",
+]
+
+# BARLOG worker for LLM-based agents on BALROG benchmarks
+# Supports BabyAI, MiniHack, Crafter environments with OpenAI/Claude/Gemini
+barlog = [
+    "omegaconf>=2.3.0",
+    "openai>=1.0.0",
+    "anthropic>=0.18.0",
+    "google-generativeai>=0.3.0",
 ]
 
 # =============================================================================

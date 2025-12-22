@@ -15,6 +15,11 @@ from gym_gui.services.actor import (
     XuanCeWorkerActor,
     RayRLlibWorkerActor,
 )
+from gym_gui.services.operator import (
+    OperatorService,
+    HumanOperator,
+    WorkerOperator,
+)
 from gym_gui.services.policy_mapping import PolicyMappingService
 from gym_gui.services.service_locator import ServiceLocator, get_service_locator
 from gym_gui.services.trainer import TrainerClient, TrainerClientConfig, TrainerClientRunner, RunRegistry
@@ -33,6 +38,14 @@ from gym_gui.constants import (
     DB_SINK_CHECKPOINT_INTERVAL,
     DB_SINK_WRITER_QUEUE_SIZE,
     HEALTH_MONITOR_HEARTBEAT_INTERVAL_S,
+    OPERATOR_CATEGORY_HUMAN,
+    OPERATOR_CATEGORY_LLM,
+    OPERATOR_CATEGORY_RL,
+    WORKER_ID_BARLOG,
+    OPERATOR_DISPLAY_NAME_HUMAN,
+    OPERATOR_DISPLAY_NAME_BARLOG_LLM,
+    OPERATOR_DESCRIPTION_HUMAN,
+    OPERATOR_DESCRIPTION_BARLOG_LLM,
 )
 from gym_gui.controllers.live_telemetry_controllers import LiveTelemetryController
 
@@ -105,6 +118,51 @@ def bootstrap_default_services() -> ServiceLocator:
         backend_label="Ray distributed runtime",
     )
 
+    # -------------------------------------------------------------------------
+    # Operator Service (new abstraction replacing actors in the UI)
+    # -------------------------------------------------------------------------
+    operators = OperatorService()
+    operators.register_operator(
+        HumanOperator(),
+        display_name=OPERATOR_DISPLAY_NAME_HUMAN,
+        description=OPERATOR_DESCRIPTION_HUMAN,
+        category=OPERATOR_CATEGORY_HUMAN,
+        activate=True,
+    )
+    operators.register_operator(
+        WorkerOperator(
+            id="barlog_llm",
+            name="BARLOG LLM",
+            worker_id=WORKER_ID_BARLOG,
+        ),
+        display_name=OPERATOR_DISPLAY_NAME_BARLOG_LLM,
+        description=OPERATOR_DESCRIPTION_BARLOG_LLM,
+        category=OPERATOR_CATEGORY_LLM,
+        requires_api_key=True,
+    )
+    # Register existing workers as operators for backward compatibility
+    operators.register_operator(
+        WorkerOperator(id="cleanrl_worker", name="CleanRL Worker", worker_id="cleanrl_worker"),
+        display_name="CleanRL Worker",
+        description="Delegates decisions to a CleanRL policy running in the worker process.",
+        category=OPERATOR_CATEGORY_RL,
+        supports_training=True,
+    )
+    operators.register_operator(
+        WorkerOperator(id="xuance_worker", name="XuanCe Worker", worker_id="xuance_worker"),
+        display_name="XuanCe Worker",
+        description="Comprehensive RL library with 46+ algorithms (DQN, PPO, SAC, MAPPO, QMIX).",
+        category=OPERATOR_CATEGORY_RL,
+        supports_training=True,
+    )
+    operators.register_operator(
+        WorkerOperator(id="ray_worker", name="Ray RLlib Worker", worker_id="ray_worker"),
+        display_name="Ray RLlib Worker",
+        description="Distributed multi-agent RL with various training paradigms.",
+        category=OPERATOR_CATEGORY_RL,
+        supports_training=True,
+    )
+
     action_mapper: ContinuousActionMapper = create_default_action_mapper()
     renderer_registry: RendererRegistry = create_default_renderer_registry()  # default strategies
 
@@ -115,6 +173,7 @@ def bootstrap_default_services() -> ServiceLocator:
     locator.register(TelemetryService, telemetry)
     locator.register(TelemetrySQLiteStore, telemetry_store)
     locator.register(ActorService, actors)
+    locator.register(OperatorService, operators)
     locator.register(PolicyMappingService, policy_mapping)
     locator.register(ContinuousActionMapper, action_mapper)
 
@@ -180,6 +239,7 @@ def bootstrap_default_services() -> ServiceLocator:
     locator.register("telemetry", telemetry)
     locator.register("telemetry_store", telemetry_store)
     locator.register("actors", actors)
+    locator.register("operators", operators)
     locator.register("policy_mapping", policy_mapping)
     locator.register("action_mapper", action_mapper)
     locator.register("renderer_registry", renderer_registry)

@@ -120,3 +120,7 @@
 [submodule "Shimmy"]
   path = 3rd_party/shimmy_worker/Shimmy
   url = https://github.com/Farama-Foundation/Shimmy.git
+
+[submodule "BALROG"]
+  path = 3rd_party/balrog_worker/BALROG
+  url = https://github.com/balrog-ai/BALROG.git

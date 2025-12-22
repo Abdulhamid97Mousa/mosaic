@@ -25,6 +25,7 @@ class EnvironmentFamily(StrEnum):
     ALE = "ale"
     MUJOCO = "mujoco"
     MINIGRID = "minigrid"
+    BABYAI = "babyai"  # BabyAI language-grounded instruction following (built on MiniGrid)
     VIZDOOM = "vizdoom"
     MINIHACK = "minihack"  # MiniHack sandbox environments (built on NLE)
     NETHACK = "nethack"  # Full NetHack game (via NLE)
@@ -208,6 +209,58 @@ class GameId(StrEnum):
     MINIGRID_SIMPLE_CROSSING_S11N5 = "MiniGrid-SimpleCrossingS11N5-v0"
     MINIGRID_REDBLUE_DOORS_6x6 = "MiniGrid-RedBlueDoors-6x6-v0"
     MINIGRID_REDBLUE_DOORS_8x8 = "MiniGrid-RedBlueDoors-8x8-v0"
+    # ─────────────────────────────────────────────────────────────────────────
+    # BabyAI Environments (language-grounded instruction following on MiniGrid)
+    # ─────────────────────────────────────────────────────────────────────────
+    # GoTo family
+    BABYAI_GOTO_REDBALL_GREY = "BabyAI-GoToRedBallGrey-v0"
+    BABYAI_GOTO_REDBALL = "BabyAI-GoToRedBall-v0"
+    BABYAI_GOTO_REDBALL_NODISTS = "BabyAI-GoToRedBallNoDists-v0"
+    BABYAI_GOTO_OBJ = "BabyAI-GoToObj-v0"
+    BABYAI_GOTO_LOCAL = "BabyAI-GoToLocal-v0"
+    BABYAI_GOTO = "BabyAI-GoTo-v0"
+    BABYAI_GOTO_IMPUNLOCK = "BabyAI-GoToImpUnlock-v0"
+    BABYAI_GOTO_SEQ = "BabyAI-GoToSeq-v0"
+    BABYAI_GOTO_REDBLUEBALL = "BabyAI-GoToRedBlueBall-v0"
+    BABYAI_GOTO_DOOR = "BabyAI-GoToDoor-v0"
+    BABYAI_GOTO_OBJDOOR = "BabyAI-GoToObjDoor-v0"
+    # Open family
+    BABYAI_OPEN = "BabyAI-Open-v0"
+    BABYAI_OPEN_REDDOOR = "BabyAI-OpenRedDoor-v0"
+    BABYAI_OPEN_DOOR = "BabyAI-OpenDoor-v0"
+    BABYAI_OPEN_TWODOORS = "BabyAI-OpenTwoDoors-v0"
+    BABYAI_OPEN_DOORSORDER_N2 = "BabyAI-OpenDoorsOrderN2-v0"
+    BABYAI_OPEN_DOORSORDER_N4 = "BabyAI-OpenDoorsOrderN4-v0"
+    # Pickup family
+    BABYAI_PICKUP = "BabyAI-Pickup-v0"
+    BABYAI_UNBLOCK_PICKUP = "BabyAI-UnblockPickup-v0"
+    BABYAI_PICKUP_LOC = "BabyAI-PickupLoc-v0"
+    BABYAI_PICKUP_DIST = "BabyAI-PickupDist-v0"
+    BABYAI_PICKUP_ABOVE = "BabyAI-PickupAbove-v0"
+    # Unlock family
+    BABYAI_UNLOCK = "BabyAI-Unlock-v0"
+    BABYAI_UNLOCK_LOCAL = "BabyAI-UnlockLocal-v0"
+    BABYAI_KEY_INBOX = "BabyAI-KeyInBox-v0"
+    BABYAI_UNLOCK_PICKUP = "BabyAI-UnlockPickup-v0"
+    BABYAI_BLOCKED_UNLOCK_PICKUP = "BabyAI-BlockedUnlockPickup-v0"
+    BABYAI_UNLOCK_TO_UNLOCK = "BabyAI-UnlockToUnlock-v0"
+    # PutNext family
+    BABYAI_PUTNEXT_LOCAL = "BabyAI-PutNextLocal-v0"
+    BABYAI_PUTNEXT = "BabyAI-PutNext-v0"
+    # Complex environments
+    BABYAI_ACTION_OBJDOOR = "BabyAI-ActionObjDoor-v0"
+    BABYAI_FINDOBJ_S5 = "BabyAI-FindObjS5-v0"
+    BABYAI_KEYCORRIDOR_S3R1 = "BabyAI-KeyCorridorS3R1-v0"
+    BABYAI_KEYCORRIDOR_S3R2 = "BabyAI-KeyCorridorS3R2-v0"
+    BABYAI_KEYCORRIDOR_S3R3 = "BabyAI-KeyCorridorS3R3-v0"
+    BABYAI_ONEROOM_S8 = "BabyAI-OneRoomS8-v0"
+    BABYAI_MOVETWOACROSS_S8N9 = "BabyAI-MoveTwoAcrossS8N9-v0"
+    BABYAI_SYNTH = "BabyAI-Synth-v0"
+    BABYAI_SYNTHLOC = "BabyAI-SynthLoc-v0"
+    BABYAI_SYNTHSEQ = "BabyAI-SynthSeq-v0"
+    BABYAI_MINIBOSSLEVEL = "BabyAI-MiniBossLevel-v0"
+    BABYAI_BOSSLEVEL = "BabyAI-BossLevel-v0"
+    BABYAI_BOSSLEVEL_NOUNLOCK = "BabyAI-BossLevelNoUnlock-v0"
     VIZDOOM_BASIC = "ViZDoom-Basic-v0"
     VIZDOOM_DEADLY_CORRIDOR = "ViZDoom-DeadlyCorridor-v0"
     VIZDOOM_DEFEND_THE_CENTER = "ViZDoom-DefendTheCenter-v0"
@@ -668,6 +721,50 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.MINIGRID_SIMPLE_CROSSING_S11N5: EnvironmentFamily.MINIGRID,
     GameId.MINIGRID_REDBLUE_DOORS_6x6: EnvironmentFamily.MINIGRID,
     GameId.MINIGRID_REDBLUE_DOORS_8x8: EnvironmentFamily.MINIGRID,
+    # BabyAI environments
+    GameId.BABYAI_GOTO_REDBALL_GREY: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_GOTO_REDBALL: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_GOTO_REDBALL_NODISTS: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_GOTO_OBJ: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_GOTO_LOCAL: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_GOTO: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_GOTO_IMPUNLOCK: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_GOTO_SEQ: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_GOTO_REDBLUEBALL: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_GOTO_DOOR: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_GOTO_OBJDOOR: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_OPEN: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_OPEN_REDDOOR: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_OPEN_DOOR: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_OPEN_TWODOORS: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_OPEN_DOORSORDER_N2: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_OPEN_DOORSORDER_N4: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_PICKUP: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_UNBLOCK_PICKUP: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_PICKUP_LOC: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_PICKUP_DIST: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_PICKUP_ABOVE: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_UNLOCK: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_UNLOCK_LOCAL: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_KEY_INBOX: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_UNLOCK_PICKUP: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_BLOCKED_UNLOCK_PICKUP: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_UNLOCK_TO_UNLOCK: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_PUTNEXT_LOCAL: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_PUTNEXT: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_ACTION_OBJDOOR: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_FINDOBJ_S5: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_KEYCORRIDOR_S3R1: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_KEYCORRIDOR_S3R2: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_KEYCORRIDOR_S3R3: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_ONEROOM_S8: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_MOVETWOACROSS_S8N9: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_SYNTH: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_SYNTHLOC: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_SYNTHSEQ: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_MINIBOSSLEVEL: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_BOSSLEVEL: EnvironmentFamily.BABYAI,
+    GameId.BABYAI_BOSSLEVEL_NOUNLOCK: EnvironmentFamily.BABYAI,
     GameId.VIZDOOM_BASIC: EnvironmentFamily.VIZDOOM,
     GameId.VIZDOOM_DEADLY_CORRIDOR: EnvironmentFamily.VIZDOOM,
     GameId.VIZDOOM_DEFEND_THE_CENTER: EnvironmentFamily.VIZDOOM,
@@ -795,6 +892,50 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.MINIGRID_SIMPLE_CROSSING_S11N5: RenderMode.RGB_ARRAY,
     GameId.MINIGRID_REDBLUE_DOORS_6x6: RenderMode.RGB_ARRAY,
     GameId.MINIGRID_REDBLUE_DOORS_8x8: RenderMode.RGB_ARRAY,
+    # BabyAI environments
+    GameId.BABYAI_GOTO_REDBALL_GREY: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_GOTO_REDBALL: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_GOTO_REDBALL_NODISTS: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_GOTO_OBJ: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_GOTO_LOCAL: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_GOTO: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_GOTO_IMPUNLOCK: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_GOTO_SEQ: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_GOTO_REDBLUEBALL: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_GOTO_DOOR: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_GOTO_OBJDOOR: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_OPEN: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_OPEN_REDDOOR: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_OPEN_DOOR: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_OPEN_TWODOORS: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_OPEN_DOORSORDER_N2: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_OPEN_DOORSORDER_N4: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_PICKUP: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_UNBLOCK_PICKUP: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_PICKUP_LOC: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_PICKUP_DIST: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_PICKUP_ABOVE: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_UNLOCK: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_UNLOCK_LOCAL: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_KEY_INBOX: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_UNLOCK_PICKUP: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_BLOCKED_UNLOCK_PICKUP: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_UNLOCK_TO_UNLOCK: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_PUTNEXT_LOCAL: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_PUTNEXT: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_ACTION_OBJDOOR: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_FINDOBJ_S5: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_KEYCORRIDOR_S3R1: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_KEYCORRIDOR_S3R2: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_KEYCORRIDOR_S3R3: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_ONEROOM_S8: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_MOVETWOACROSS_S8N9: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_SYNTH: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_SYNTHLOC: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_SYNTHSEQ: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_MINIBOSSLEVEL: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_BOSSLEVEL: RenderMode.RGB_ARRAY,
+    GameId.BABYAI_BOSSLEVEL_NOUNLOCK: RenderMode.RGB_ARRAY,
     GameId.VIZDOOM_BASIC: RenderMode.RGB_ARRAY,
     GameId.VIZDOOM_DEADLY_CORRIDOR: RenderMode.RGB_ARRAY,
     GameId.VIZDOOM_DEFEND_THE_CENTER: RenderMode.RGB_ARRAY,
@@ -1440,6 +1581,50 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
     GameId.PROCGEN_NINJA: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     GameId.PROCGEN_PLUNDER: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     GameId.PROCGEN_STARPILOT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    # BabyAI - language-grounded instruction following (same controls as MiniGrid)
+    GameId.BABYAI_GOTO_REDBALL_GREY: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_GOTO_REDBALL: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_GOTO_REDBALL_NODISTS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_GOTO_OBJ: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_GOTO_LOCAL: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_GOTO: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_GOTO_IMPUNLOCK: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_GOTO_SEQ: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_GOTO_REDBLUEBALL: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_GOTO_DOOR: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_GOTO_OBJDOOR: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_OPEN: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_OPEN_REDDOOR: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_OPEN_DOOR: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_OPEN_TWODOORS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_OPEN_DOORSORDER_N2: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_OPEN_DOORSORDER_N4: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_PICKUP: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_UNBLOCK_PICKUP: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_PICKUP_LOC: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_PICKUP_DIST: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_PICKUP_ABOVE: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_UNLOCK: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_UNLOCK_LOCAL: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_KEY_INBOX: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_UNLOCK_PICKUP: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_BLOCKED_UNLOCK_PICKUP: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_UNLOCK_TO_UNLOCK: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_PUTNEXT_LOCAL: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_PUTNEXT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_ACTION_OBJDOOR: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_FINDOBJ_S5: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_KEYCORRIDOR_S3R1: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_KEYCORRIDOR_S3R2: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_KEYCORRIDOR_S3R3: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_ONEROOM_S8: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_MOVETWOACROSS_S8N9: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_SYNTH: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_SYNTHLOC: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_SYNTHSEQ: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_MINIBOSSLEVEL: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_BOSSLEVEL: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.BABYAI_BOSSLEVEL_NOUNLOCK: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
 }
 
 
@@ -1457,6 +1642,7 @@ DEFAULT_PARADIGM_BY_FAMILY: dict[EnvironmentFamily, SteppingParadigm] = {
     EnvironmentFamily.ALE: SteppingParadigm.SINGLE_AGENT,
     EnvironmentFamily.MUJOCO: SteppingParadigm.SINGLE_AGENT,
     EnvironmentFamily.MINIGRID: SteppingParadigm.SINGLE_AGENT,
+    EnvironmentFamily.BABYAI: SteppingParadigm.SINGLE_AGENT,  # Language-grounded MiniGrid
     EnvironmentFamily.VIZDOOM: SteppingParadigm.SINGLE_AGENT,
     EnvironmentFamily.MINIHACK: SteppingParadigm.SINGLE_AGENT,  # Turn-based roguelike
     EnvironmentFamily.NETHACK: SteppingParadigm.SINGLE_AGENT,  # Turn-based roguelike

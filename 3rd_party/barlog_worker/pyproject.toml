@@ -1,0 +1,96 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "barlog-worker"
+version = "0.1.0"
+description = "BARLOG Worker - LLM-based agent for BALROG benchmark environments"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "MOSAIC Team"}
+]
+keywords = ["llm", "reinforcement-learning", "benchmark", "balrog", "minigrid", "babyai"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    # Core
+    "omegaconf>=2.3.0",
+    # LLM clients
+    "openai>=1.0.0",
+    "anthropic>=0.18.0",
+    "google-generativeai>=0.3.0",
+    # Environment dependencies (optional, installed via BALROG)
+    # "minigrid>=2.3.0",
+    # "gymnasium>=0.29.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+    "mypy>=1.0.0",
+]
+babyai = [
+    "minigrid>=2.3.0",
+    "gymnasium>=0.29.0",
+]
+minihack = [
+    "minihack>=0.1.0",
+    "nle>=0.9.0",
+]
+crafter = [
+    "crafter>=1.8.0",
+]
+all = [
+    "barlog-worker[babyai,minihack,crafter]",
+]
+
+[project.scripts]
+barlog-worker = "barlog_worker.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/MOSAIC-RL/GUI_BDI_RL"
+Repository = "https://github.com/MOSAIC-RL/GUI_BDI_RL"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["barlog_worker*"]
+
+[tool.setuptools.package-data]
+barlog_worker = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"
+
+[tool.black]
+line-length = 100
+target-version = ["py310", "py311", "py312"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py310"
+select = ["E", "F", "W", "I", "UP", "B", "C4"]
+ignore = ["E501"]
+
+[tool.mypy]
+python_version = "3.10"
+warn_return_any = true
+warn_unused_ignores = true
+disallow_untyped_defs = true

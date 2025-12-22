@@ -284,6 +284,40 @@ from gym_gui.constants.optional_deps import (
 )
 
 # ================================================================
+# Operator Constants
+# ================================================================
+
+from gym_gui.constants.constants_operator import (
+    OPERATOR_CATEGORY_HUMAN,
+    OPERATOR_CATEGORY_LLM,
+    OPERATOR_CATEGORY_RL,
+    OPERATOR_CATEGORY_HYBRID,
+    OPERATOR_CATEGORIES,
+    DEFAULT_OPERATOR_ID_HUMAN,
+    DEFAULT_OPERATOR_ID_BARLOG_LLM,
+    WORKER_ID_BARLOG,
+    OPERATOR_DISPLAY_NAME_HUMAN,
+    OPERATOR_DISPLAY_NAME_BARLOG_LLM,
+    OPERATOR_DESCRIPTION_HUMAN,
+    OPERATOR_DESCRIPTION_BARLOG_LLM,
+    BARLOG_SUPPORTED_ENVS,
+    BARLOG_SUPPORTED_CLIENTS,
+    BARLOG_AGENT_TYPES,
+    BARLOG_DEFAULT_ENV,
+    BARLOG_DEFAULT_TASK,
+    BARLOG_DEFAULT_CLIENT,
+    BARLOG_DEFAULT_MODEL,
+    BARLOG_DEFAULT_AGENT_TYPE,
+    BARLOG_DEFAULT_NUM_EPISODES,
+    BARLOG_DEFAULT_MAX_STEPS,
+    BARLOG_DEFAULT_TEMPERATURE,
+    OperatorCategoryDefaults,
+    BarlogDefaults,
+    OperatorDefaults,
+    OPERATOR_DEFAULTS,
+)
+
+# ================================================================
 # Pre-existing Constants (game_constants.py)
 # ================================================================
 
@@ -448,6 +482,34 @@ __all__: list[str] = [
     "require_cleanrl",
     "is_torch_available",
     "require_torch",
+    # Operator
+    "OPERATOR_CATEGORY_HUMAN",
+    "OPERATOR_CATEGORY_LLM",
+    "OPERATOR_CATEGORY_RL",
+    "OPERATOR_CATEGORY_HYBRID",
+    "OPERATOR_CATEGORIES",
+    "DEFAULT_OPERATOR_ID_HUMAN",
+    "DEFAULT_OPERATOR_ID_BARLOG_LLM",
+    "WORKER_ID_BARLOG",
+    "OPERATOR_DISPLAY_NAME_HUMAN",
+    "OPERATOR_DISPLAY_NAME_BARLOG_LLM",
+    "OPERATOR_DESCRIPTION_HUMAN",
+    "OPERATOR_DESCRIPTION_BARLOG_LLM",
+    "BARLOG_SUPPORTED_ENVS",
+    "BARLOG_SUPPORTED_CLIENTS",
+    "BARLOG_AGENT_TYPES",
+    "BARLOG_DEFAULT_ENV",
+    "BARLOG_DEFAULT_TASK",
+    "BARLOG_DEFAULT_CLIENT",
+    "BARLOG_DEFAULT_MODEL",
+    "BARLOG_DEFAULT_AGENT_TYPE",
+    "BARLOG_DEFAULT_NUM_EPISODES",
+    "BARLOG_DEFAULT_MAX_STEPS",
+    "BARLOG_DEFAULT_TEMPERATURE",
+    "OperatorCategoryDefaults",
+    "BarlogDefaults",
+    "OperatorDefaults",
+    "OPERATOR_DEFAULTS",
     # Game (will be extended if game_constants has __all__)
 ]
 

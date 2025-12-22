@@ -49,7 +49,6 @@ from __future__ import annotations
 
 from .config import XuanCeWorkerConfig
 from .runtime import XuanCeRuntimeSummary, XuanCeWorkerRuntime
-from .cli import main
 from .algorithm_registry import (
     Backend,
     Paradigm,
@@ -65,6 +64,13 @@ from .algorithm_registry import (
 )
 
 __version__ = "0.1.0"
+
+
+def main(args: list[str] | None = None) -> int:
+    """Main entry point for xuance-worker CLI (lazy import to avoid circular imports)."""
+    from .cli import main as _main
+    return _main(args)
+
 
 __all__ = [
     "__version__",

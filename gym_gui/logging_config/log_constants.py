@@ -1157,6 +1157,54 @@ LOG_NORMALIZATION_STATS_DROPPED = _constant(
 )
 
 # ---------------------------------------------------------------------------
+# Operator Service constants (LOG685–LOG689)
+# ---------------------------------------------------------------------------
+LOG_SERVICE_OPERATOR_REGISTERED = _constant(
+    "LOG685",
+    "INFO",
+    "Operator registered with OperatorService",
+    component="Service",
+    subcomponent="Operator",
+    tags=_tags("operator", "service", "registration"),
+)
+
+LOG_SERVICE_OPERATOR_ACTIVATED = _constant(
+    "LOG686",
+    "INFO",
+    "Operator activated as current action selector",
+    component="Service",
+    subcomponent="Operator",
+    tags=_tags("operator", "service", "activation"),
+)
+
+LOG_SERVICE_OPERATOR_DEACTIVATED = _constant(
+    "LOG687",
+    "INFO",
+    "Operator deactivated",
+    component="Service",
+    subcomponent="Operator",
+    tags=_tags("operator", "service", "deactivation"),
+)
+
+LOG_SERVICE_OPERATOR_ACTION_SELECTED = _constant(
+    "LOG688",
+    "DEBUG",
+    "Operator selected action",
+    component="Service",
+    subcomponent="Operator",
+    tags=_tags("operator", "service", "action"),
+)
+
+LOG_SERVICE_OPERATOR_ERROR = _constant(
+    "LOG689",
+    "ERROR",
+    "Operator encountered an error",
+    component="Service",
+    subcomponent="Operator",
+    tags=_tags("operator", "service", "error"),
+)
+
+# ---------------------------------------------------------------------------
 # Runtime/application constants (LOG680–LOG683)
 # ---------------------------------------------------------------------------
 LOG_RUNTIME_APP_DEBUG = _constant(
@@ -2635,6 +2683,145 @@ LOG_XUANCE_WORKER_DEBUG = _constant(
 )
 
 
+# ---------------------------------------------------------------------------
+# BARLOG Worker constants (LOG1001–LOG1015)
+# ---------------------------------------------------------------------------
+LOG_WORKER_BARLOG_RUNTIME_STARTED = _constant(
+    "LOG1001",
+    "INFO",
+    "BARLOG worker runtime started",
+    component="Worker",
+    subcomponent="BarlogRuntime",
+    tags=_tags("barlog", "worker", "runtime", "lifecycle"),
+)
+
+LOG_WORKER_BARLOG_RUNTIME_STOPPED = _constant(
+    "LOG1002",
+    "INFO",
+    "BARLOG worker runtime stopped",
+    component="Worker",
+    subcomponent="BarlogRuntime",
+    tags=_tags("barlog", "worker", "runtime", "lifecycle"),
+)
+
+LOG_WORKER_BARLOG_RUNTIME_ERROR = _constant(
+    "LOG1003",
+    "ERROR",
+    "BARLOG worker runtime error",
+    component="Worker",
+    subcomponent="BarlogRuntime",
+    tags=_tags("barlog", "worker", "runtime", "error"),
+)
+
+LOG_WORKER_BARLOG_EPISODE_STARTED = _constant(
+    "LOG1004",
+    "INFO",
+    "BARLOG episode started",
+    component="Worker",
+    subcomponent="BarlogRuntime",
+    tags=_tags("barlog", "worker", "episode", "start"),
+)
+
+LOG_WORKER_BARLOG_EPISODE_COMPLETED = _constant(
+    "LOG1005",
+    "INFO",
+    "BARLOG episode completed",
+    component="Worker",
+    subcomponent="BarlogRuntime",
+    tags=_tags("barlog", "worker", "episode", "complete"),
+)
+
+LOG_WORKER_BARLOG_LLM_REQUEST = _constant(
+    "LOG1006",
+    "DEBUG",
+    "BARLOG LLM request sent",
+    component="Worker",
+    subcomponent="BarlogRuntime",
+    tags=_tags("barlog", "worker", "llm", "request"),
+)
+
+LOG_WORKER_BARLOG_LLM_RESPONSE = _constant(
+    "LOG1007",
+    "DEBUG",
+    "BARLOG LLM response received",
+    component="Worker",
+    subcomponent="BarlogRuntime",
+    tags=_tags("barlog", "worker", "llm", "response"),
+)
+
+LOG_WORKER_BARLOG_LLM_ERROR = _constant(
+    "LOG1008",
+    "ERROR",
+    "BARLOG LLM request failed",
+    component="Worker",
+    subcomponent="BarlogRuntime",
+    tags=_tags("barlog", "worker", "llm", "error"),
+)
+
+LOG_WORKER_BARLOG_ACTION_SELECTED = _constant(
+    "LOG1009",
+    "DEBUG",
+    "BARLOG agent selected action",
+    component="Worker",
+    subcomponent="BarlogRuntime",
+    tags=_tags("barlog", "worker", "action"),
+)
+
+LOG_WORKER_BARLOG_STEP_TELEMETRY = _constant(
+    "LOG1010",
+    "DEBUG",
+    "BARLOG step telemetry emitted",
+    component="Worker",
+    subcomponent="BarlogRuntime",
+    tags=_tags("barlog", "worker", "telemetry", "step"),
+)
+
+LOG_WORKER_BARLOG_EPISODE_TELEMETRY = _constant(
+    "LOG1011",
+    "INFO",
+    "BARLOG episode telemetry emitted",
+    component="Worker",
+    subcomponent="BarlogRuntime",
+    tags=_tags("barlog", "worker", "telemetry", "episode"),
+)
+
+LOG_WORKER_BARLOG_CONFIG_LOADED = _constant(
+    "LOG1012",
+    "INFO",
+    "BARLOG configuration loaded",
+    component="Worker",
+    subcomponent="BarlogRuntime",
+    tags=_tags("barlog", "worker", "config", "loaded"),
+)
+
+LOG_WORKER_BARLOG_ENV_CREATED = _constant(
+    "LOG1013",
+    "INFO",
+    "BARLOG environment created",
+    component="Worker",
+    subcomponent="BarlogRuntime",
+    tags=_tags("barlog", "worker", "environment", "created"),
+)
+
+LOG_WORKER_BARLOG_AGENT_CREATED = _constant(
+    "LOG1014",
+    "INFO",
+    "BARLOG agent created",
+    component="Worker",
+    subcomponent="BarlogRuntime",
+    tags=_tags("barlog", "worker", "agent", "created"),
+)
+
+LOG_WORKER_BARLOG_DEBUG = _constant(
+    "LOG1015",
+    "DEBUG",
+    "BARLOG worker debug event",
+    component="Worker",
+    subcomponent="BarlogRuntime",
+    tags=_tags("barlog", "worker", "debug"),
+)
+
+
 # =========================================================================
 # Helper Functions for Runtime Discovery & Validation
 # =========================================================================
@@ -2848,6 +3035,11 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_VECTOR_AUTORESET_MODE,
     LOG_SPACE_DESCRIPTOR_MISSING,
     LOG_NORMALIZATION_STATS_DROPPED,
+    LOG_SERVICE_OPERATOR_REGISTERED,
+    LOG_SERVICE_OPERATOR_ACTIVATED,
+    LOG_SERVICE_OPERATOR_DEACTIVATED,
+    LOG_SERVICE_OPERATOR_ACTION_SELECTED,
+    LOG_SERVICE_OPERATOR_ERROR,
     LOG_SERVICE_ACTOR_SEED_ERROR,
     LOG_RUNTIME_APP_DEBUG,
     LOG_RUNTIME_APP_INFO,
@@ -2985,6 +3177,22 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_XUANCE_WORKER_CONFIG_LOADED,
     LOG_XUANCE_WORKER_BENCHMARK_STARTED,
     LOG_XUANCE_WORKER_DEBUG,
+    # BARLOG Worker
+    LOG_WORKER_BARLOG_RUNTIME_STARTED,
+    LOG_WORKER_BARLOG_RUNTIME_STOPPED,
+    LOG_WORKER_BARLOG_RUNTIME_ERROR,
+    LOG_WORKER_BARLOG_EPISODE_STARTED,
+    LOG_WORKER_BARLOG_EPISODE_COMPLETED,
+    LOG_WORKER_BARLOG_LLM_REQUEST,
+    LOG_WORKER_BARLOG_LLM_RESPONSE,
+    LOG_WORKER_BARLOG_LLM_ERROR,
+    LOG_WORKER_BARLOG_ACTION_SELECTED,
+    LOG_WORKER_BARLOG_STEP_TELEMETRY,
+    LOG_WORKER_BARLOG_EPISODE_TELEMETRY,
+    LOG_WORKER_BARLOG_CONFIG_LOADED,
+    LOG_WORKER_BARLOG_ENV_CREATED,
+    LOG_WORKER_BARLOG_AGENT_CREATED,
+    LOG_WORKER_BARLOG_DEBUG,
 )
 
 
@@ -3107,6 +3315,11 @@ __all__ = (
     "LOG_SERVICE_VALIDATION_DEBUG",
     "LOG_SERVICE_VALIDATION_WARNING",
     "LOG_SERVICE_VALIDATION_ERROR",
+    "LOG_SERVICE_OPERATOR_REGISTERED",
+    "LOG_SERVICE_OPERATOR_ACTIVATED",
+    "LOG_SERVICE_OPERATOR_DEACTIVATED",
+    "LOG_SERVICE_OPERATOR_ACTION_SELECTED",
+    "LOG_SERVICE_OPERATOR_ERROR",
     "LOG_SERVICE_ACTOR_SEED_ERROR",
     "LOG_RUNTIME_APP_DEBUG",
     "LOG_RUNTIME_APP_INFO",
@@ -3271,6 +3484,22 @@ __all__ = (
     "LOG_XUANCE_WORKER_CONFIG_LOADED",
     "LOG_XUANCE_WORKER_BENCHMARK_STARTED",
     "LOG_XUANCE_WORKER_DEBUG",
+    # BARLOG Worker
+    "LOG_WORKER_BARLOG_RUNTIME_STARTED",
+    "LOG_WORKER_BARLOG_RUNTIME_STOPPED",
+    "LOG_WORKER_BARLOG_RUNTIME_ERROR",
+    "LOG_WORKER_BARLOG_EPISODE_STARTED",
+    "LOG_WORKER_BARLOG_EPISODE_COMPLETED",
+    "LOG_WORKER_BARLOG_LLM_REQUEST",
+    "LOG_WORKER_BARLOG_LLM_RESPONSE",
+    "LOG_WORKER_BARLOG_LLM_ERROR",
+    "LOG_WORKER_BARLOG_ACTION_SELECTED",
+    "LOG_WORKER_BARLOG_STEP_TELEMETRY",
+    "LOG_WORKER_BARLOG_EPISODE_TELEMETRY",
+    "LOG_WORKER_BARLOG_CONFIG_LOADED",
+    "LOG_WORKER_BARLOG_ENV_CREATED",
+    "LOG_WORKER_BARLOG_AGENT_CREATED",
+    "LOG_WORKER_BARLOG_DEBUG",
     # Worker Availability Messages
     "GODOT_NOT_INSTALLED_TITLE",
     "GODOT_NOT_INSTALLED_MSG",

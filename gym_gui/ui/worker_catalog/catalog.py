@@ -49,8 +49,24 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
     - XuanCe: Comprehensive RL library with 46+ algorithms for single/multi-agent
     - Ray RLlib: Multi-agent distributed RL with various paradigms
     - PettingZoo: Multi-agent environments with AEC and Parallel APIs
+    - BARLOG: LLM-based agents using BALROG benchmark framework
     """
     return (
+        WorkerDefinition(
+            worker_id="barlog_worker",
+            display_name="BARLOG LLM Worker",
+            description=(
+                "LLM-based agents using the BALROG benchmark framework. "
+                "Supports OpenAI, Anthropic Claude, Google Gemini, and local vLLM backends. "
+                "Works with BabyAI/MiniGrid, MiniHack, Crafter, and TextWorld environments. "
+                "Agent reasoning strategies: naive, chain-of-thought (cot), few-shot."
+            ),
+            supports_training=False,  # LLM inference only, no RL training
+            supports_policy_load=True,  # Can load LLM configuration
+            requires_live_telemetry=True,  # Emits step/episode telemetry
+            provides_fast_analytics=False,  # No pre-computed analytics
+            supports_multi_agent=False,  # Single-agent LLM interaction
+        ),
         WorkerDefinition(
             worker_id="cleanrl_worker",
             display_name="CleanRL Worker",

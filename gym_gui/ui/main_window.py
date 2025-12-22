@@ -68,6 +68,7 @@ from gym_gui.ui.widgets.render_tabs import RenderTabs
 from gym_gui.game_docs import get_game_info
 from gym_gui.game_docs.mosaic_welcome import MOSAIC_WELCOME_HTML
 from gym_gui.services.actor import ActorService
+from gym_gui.services.operator import OperatorConfig, OperatorDescriptor, MultiOperatorService
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
 from gym_gui.services.trainer import (
@@ -208,7 +209,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         else:
             _LOGGER.warning("RunRegistry not available; Management tab will be disabled")
             self._run_manager = None
-        
+
+        # Multi-operator service for parallel operator execution
+        self._multi_operator_service = MultiOperatorService()
+
         # Track dynamic agent tabs by (run_id, agent_id)
         self._agent_tab_index: set[tuple[str, str]] = set()
         self._selected_policy_path: Optional[Path] = None
@@ -252,8 +256,19 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             available_modes[game] = SessionController.supported_control_modes(game)
 
         actor_descriptors = self._actor_service.describe_actors()
-        default_actor_id = self._actor_service.get_active_actor_id()
-        
+        default_operator_id = self._actor_service.get_active_actor_id()
+
+        # Convert ActorDescriptor to OperatorDescriptor for the UI migration
+        operator_descriptors = tuple(
+            OperatorDescriptor(
+                operator_id=ad.actor_id,
+                display_name=ad.display_name,
+                description=ad.description,
+                category="default",
+            )
+            for ad in actor_descriptors
+        )
+
         control_config = ControlPanelConfig(
             available_modes=available_modes,
             default_mode=settings.default_control_mode,
@@ -273,13 +288,13 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             minigrid_redbluedoors_8x8_config=DEFAULT_MINIGRID_REDBLUE_DOORS_8x8_CONFIG,  # Added new config
             default_seed=settings.default_seed,
             allow_seed_reuse=settings.allow_seed_reuse,
-            actors=actor_descriptors,
-            default_actor_id=default_actor_id,
+            operators=operator_descriptors,
+            default_operator_id=default_operator_id,
         )
-        
+
         self._control_panel = ControlPanelWidget(config=control_config, parent=self)
-        if default_actor_id is not None:
-            self._control_panel.set_active_actor(default_actor_id)
+        if default_operator_id is not None:
+            self._control_panel.set_active_operator(default_operator_id)
         
         # Create presenter to coordinate
         self._presenter = MainWindowPresenter(self._session, self._human_input, parent=self)
@@ -728,7 +743,11 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._control_panel._fastlane_only_checkbox.toggled.connect(self._on_fastlane_only_toggled)
         self._control_panel.game_changed.connect(self._on_game_changed)
         self._control_panel.control_mode_changed.connect(self._on_mode_changed)
-        self._control_panel.actor_changed.connect(self._on_actor_changed)
+        self._control_panel.operator_changed.connect(self._on_operator_changed)
+        # Multi-operator signals (Phase 6)
+        self._control_panel.operators_changed.connect(self._on_operators_changed)
+        self._control_panel.start_operators_requested.connect(self._on_start_operators)
+        self._control_panel.stop_operators_requested.connect(self._on_stop_operators)
         # Game configuration handlers (delegated)
         self._control_panel.slippery_toggled.connect(self._game_config_handler.on_slippery_toggled)
         self._control_panel.frozen_v2_config_changed.connect(self._game_config_handler.on_frozen_v2_config_changed)
@@ -852,22 +871,130 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         else:
             self._status_bar.showMessage("Slow lane re-enabled")
 
-    def _on_actor_changed(self, actor_id: str) -> None:
-        """Handle active actor selection from the control panel."""
+    def _on_operator_changed(self, operator_id: str) -> None:
+        """Handle active operator selection from the control panel."""
         try:
-            self._actor_service.set_active_actor(actor_id)
+            self._actor_service.set_active_actor(operator_id)
         except KeyError:
-            self.log_constant( 
+            self.log_constant(
                 LOG_UI_MAINWINDOW_ERROR,
-                message=f"Attempted to activate unknown actor '{actor_id}'",
-                extra={"actor_id": actor_id},
+                message=f"Attempted to activate unknown operator '{operator_id}'",
+                extra={"operator_id": operator_id},
             )
-            self._status_bar.showMessage(f"Unknown actor '{actor_id}'", 5000)
+            self._status_bar.showMessage(f"Unknown operator '{operator_id}'", 5000)
             return
 
-        descriptor = self._actor_service.get_actor_descriptor(actor_id)
-        label = descriptor.display_name if descriptor is not None else actor_id
-        self._status_bar.showMessage(f"Active actor set to {label}", 4000)
+        descriptor = self._actor_service.get_actor_descriptor(operator_id)
+        label = descriptor.display_name if descriptor is not None else operator_id
+        self._status_bar.showMessage(f"Active operator set to {label}", 4000)
+
+    # ------------------------------------------------------------------
+    # Multi-Operator Signal Handlers (Phase 6)
+    # ------------------------------------------------------------------
+
+    def _on_operators_changed(self, configs: list) -> None:
+        """Handle operator configuration changes from the control panel.
+
+        Syncs render view containers with operator configurations:
+        - Removes containers for deleted operators
+        - Adds containers for new operators
+        - Updates existing operator configurations
+
+        Args:
+            configs: List of OperatorConfig instances representing current operator set.
+        """
+        current_ids = set(self._multi_operator_service.get_active_operators().keys())
+        new_ids = {c.operator_id for c in configs}
+
+        # Remove deleted operators
+        for operator_id in current_ids - new_ids:
+            self._render_tabs.remove_operator_view(operator_id)
+            self._multi_operator_service.remove_operator(operator_id)
+            self.log_constant(
+                LOG_UI_MAINWINDOW_TRACE,
+                message=f"Removed operator from multi-operator view: {operator_id}",
+            )
+
+        # Add or update operators
+        for config in configs:
+            if config.operator_id not in current_ids:
+                # New operator
+                self._render_tabs.add_operator_view(config)
+                self._multi_operator_service.add_operator(config)
+                self.log_constant(
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message=f"Added operator to multi-operator view: {config.operator_id}",
+                    extra={"operator_type": config.operator_type, "worker_id": config.worker_id},
+                )
+            else:
+                # Existing operator - update config if needed
+                self._multi_operator_service.add_operator(config)  # Will update if exists
+
+        count = len(configs)
+        self._status_bar.showMessage(
+            f"Multi-operator configuration updated: {count} operator{'s' if count != 1 else ''}",
+            3000
+        )
+
+    def _on_start_operators(self) -> None:
+        """Start all configured operators.
+
+        Launches worker subprocesses for each operator and switches
+        to the Multi-Operator tab for viewing.
+        """
+        active_operators = self._multi_operator_service.get_active_operators()
+        if not active_operators:
+            self._status_bar.showMessage("No operators configured to start", 3000)
+            return
+
+        # Start all operators via the service
+        started_ids = self._multi_operator_service.start_all()
+
+        # Update status indicators
+        for operator_id in started_ids:
+            self._render_tabs.set_operator_status(operator_id, "running")
+
+        # Switch to Multi-Operator tab
+        self._render_tabs.switch_to_multi_operator_tab()
+
+        count = len(started_ids)
+        self._status_bar.showMessage(
+            f"Started {count} operator{'s' if count != 1 else ''}",
+            3000
+        )
+        self.log_constant(
+            LOG_UI_MAINWINDOW_INFO,
+            message=f"Started {count} operators",
+            extra={"operator_ids": started_ids},
+        )
+
+    def _on_stop_operators(self) -> None:
+        """Stop all running operators.
+
+        Terminates all worker subprocesses and updates status indicators.
+        """
+        active_operators = self._multi_operator_service.get_active_operators()
+        if not active_operators:
+            self._status_bar.showMessage("No operators running", 3000)
+            return
+
+        # Stop all operators via the service
+        stopped_ids = self._multi_operator_service.stop_all()
+
+        # Update status indicators
+        for operator_id in stopped_ids:
+            self._render_tabs.set_operator_status(operator_id, "stopped")
+
+        count = len(stopped_ids)
+        self._status_bar.showMessage(
+            f"Stopped {count} operator{'s' if count != 1 else ''}",
+            3000
+        )
+        self.log_constant(
+            LOG_UI_MAINWINDOW_INFO,
+            message=f"Stopped {count} operators",
+            extra={"operator_ids": stopped_ids},
+        )
 
     def _on_load_requested(self, game_id: GameId, mode: ControlMode, seed: int) -> None:
         """Handle load request from control panel."""

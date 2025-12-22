@@ -80,6 +80,56 @@ from gym_gui.game_docs.Procgen import (
     PROCGEN_STARPILOT_HTML,
 )
 
+from gym_gui.game_docs import BabyAI
+from gym_gui.game_docs.BabyAI import (
+    # GoTo family
+    BABYAI_GOTO_REDBALL_GREY_HTML, get_goto_redball_grey_html,
+    BABYAI_GOTO_REDBALL_HTML, get_goto_redball_html,
+    BABYAI_GOTO_REDBALL_NODISTS_HTML, get_goto_redball_nodists_html,
+    BABYAI_GOTO_OBJ_HTML, get_goto_obj_html,
+    BABYAI_GOTO_LOCAL_HTML, get_goto_local_html,
+    BABYAI_GOTO_HTML, get_goto_html,
+    BABYAI_GOTO_IMPUNLOCK_HTML, get_goto_impunlock_html,
+    BABYAI_GOTO_SEQ_HTML, get_goto_seq_html,
+    BABYAI_GOTO_REDBLUEBALL_HTML, get_goto_redblueball_html,
+    BABYAI_GOTO_DOOR_HTML, get_goto_door_html,
+    BABYAI_GOTO_OBJDOOR_HTML, get_goto_objdoor_html,
+    # Open family
+    BABYAI_OPEN_HTML, get_open_html,
+    BABYAI_OPEN_REDDOOR_HTML, get_open_reddoor_html,
+    BABYAI_OPEN_DOOR_HTML, get_open_door_html,
+    BABYAI_OPEN_TWODOORS_HTML, get_open_twodoors_html,
+    BABYAI_OPEN_DOORSORDER_HTML, get_open_doorsorder_html,
+    # Pickup family
+    BABYAI_PICKUP_HTML, get_pickup_html,
+    BABYAI_UNBLOCK_PICKUP_HTML, get_unblock_pickup_html,
+    BABYAI_PICKUP_LOC_HTML, get_pickup_loc_html,
+    BABYAI_PICKUP_DIST_HTML, get_pickup_dist_html,
+    BABYAI_PICKUP_ABOVE_HTML, get_pickup_above_html,
+    # Unlock family
+    BABYAI_UNLOCK_HTML, get_unlock_html,
+    BABYAI_UNLOCK_LOCAL_HTML, get_unlock_local_html,
+    BABYAI_KEY_INBOX_HTML, get_key_inbox_html,
+    BABYAI_UNLOCK_PICKUP_HTML, get_unlock_pickup_html,
+    BABYAI_BLOCKED_UNLOCK_PICKUP_HTML, get_blocked_unlock_pickup_html,
+    BABYAI_UNLOCK_TO_UNLOCK_HTML, get_unlock_to_unlock_html,
+    # PutNext family
+    BABYAI_PUTNEXT_LOCAL_HTML, get_putnext_local_html,
+    BABYAI_PUTNEXT_HTML, get_putnext_html,
+    # Complex environments
+    BABYAI_ACTION_OBJDOOR_HTML, get_action_objdoor_html,
+    BABYAI_FINDOBJ_HTML, get_findobj_html,
+    BABYAI_KEYCORRIDOR_HTML, get_keycorridor_html,
+    BABYAI_ONEROOM_HTML, get_oneroom_html,
+    BABYAI_MOVETWOACROSS_HTML, get_movetwoacross_html,
+    BABYAI_SYNTH_HTML, get_synth_html,
+    BABYAI_SYNTHLOC_HTML, get_synthloc_html,
+    BABYAI_SYNTHSEQ_HTML, get_synthseq_html,
+    BABYAI_MINIBOSSLEVEL_HTML, get_minibosslevel_html,
+    BABYAI_BOSSLEVEL_HTML, get_bosslevel_html,
+    BABYAI_BOSSLEVEL_NOUNLOCK_HTML, get_bosslevel_nounlock_html,
+)
+
 try:  # Optional dependency for ViZDoom docs (kept lightweight)
     from gym_gui.game_docs.ViZDoom import (  # pragma: no cover - documentation only
         VIZDOOM_BASIC_HTML,
@@ -248,6 +298,59 @@ GAME_INFO.update({
     GameId.PROCGEN_NINJA: PROCGEN_NINJA_HTML,
     GameId.PROCGEN_PLUNDER: PROCGEN_PLUNDER_HTML,
     GameId.PROCGEN_STARPILOT: PROCGEN_STARPILOT_HTML,
+})
+
+# BabyAI mappings (language-grounded instruction following)
+GAME_INFO.update({
+    # GoTo family
+    GameId.BABYAI_GOTO_REDBALL_GREY: BABYAI_GOTO_REDBALL_GREY_HTML,
+    GameId.BABYAI_GOTO_REDBALL: BABYAI_GOTO_REDBALL_HTML,
+    GameId.BABYAI_GOTO_REDBALL_NODISTS: BABYAI_GOTO_REDBALL_NODISTS_HTML,
+    GameId.BABYAI_GOTO_OBJ: BABYAI_GOTO_OBJ_HTML,
+    GameId.BABYAI_GOTO_LOCAL: BABYAI_GOTO_LOCAL_HTML,
+    GameId.BABYAI_GOTO: BABYAI_GOTO_HTML,
+    GameId.BABYAI_GOTO_IMPUNLOCK: BABYAI_GOTO_IMPUNLOCK_HTML,
+    GameId.BABYAI_GOTO_SEQ: BABYAI_GOTO_SEQ_HTML,
+    GameId.BABYAI_GOTO_REDBLUEBALL: BABYAI_GOTO_REDBLUEBALL_HTML,
+    GameId.BABYAI_GOTO_DOOR: BABYAI_GOTO_DOOR_HTML,
+    GameId.BABYAI_GOTO_OBJDOOR: BABYAI_GOTO_OBJDOOR_HTML,
+    # Open family
+    GameId.BABYAI_OPEN: BABYAI_OPEN_HTML,
+    GameId.BABYAI_OPEN_REDDOOR: BABYAI_OPEN_REDDOOR_HTML,
+    GameId.BABYAI_OPEN_DOOR: BABYAI_OPEN_DOOR_HTML,
+    GameId.BABYAI_OPEN_TWODOORS: BABYAI_OPEN_TWODOORS_HTML,
+    GameId.BABYAI_OPEN_DOORSORDER_N2: BABYAI_OPEN_DOORSORDER_HTML,
+    GameId.BABYAI_OPEN_DOORSORDER_N4: BABYAI_OPEN_DOORSORDER_HTML,
+    # Pickup family
+    GameId.BABYAI_PICKUP: BABYAI_PICKUP_HTML,
+    GameId.BABYAI_UNBLOCK_PICKUP: BABYAI_UNBLOCK_PICKUP_HTML,
+    GameId.BABYAI_PICKUP_LOC: BABYAI_PICKUP_LOC_HTML,
+    GameId.BABYAI_PICKUP_DIST: BABYAI_PICKUP_DIST_HTML,
+    GameId.BABYAI_PICKUP_ABOVE: BABYAI_PICKUP_ABOVE_HTML,
+    # Unlock family
+    GameId.BABYAI_UNLOCK: BABYAI_UNLOCK_HTML,
+    GameId.BABYAI_UNLOCK_LOCAL: BABYAI_UNLOCK_LOCAL_HTML,
+    GameId.BABYAI_KEY_INBOX: BABYAI_KEY_INBOX_HTML,
+    GameId.BABYAI_UNLOCK_PICKUP: BABYAI_UNLOCK_PICKUP_HTML,
+    GameId.BABYAI_BLOCKED_UNLOCK_PICKUP: BABYAI_BLOCKED_UNLOCK_PICKUP_HTML,
+    GameId.BABYAI_UNLOCK_TO_UNLOCK: BABYAI_UNLOCK_TO_UNLOCK_HTML,
+    # PutNext family
+    GameId.BABYAI_PUTNEXT_LOCAL: BABYAI_PUTNEXT_LOCAL_HTML,
+    GameId.BABYAI_PUTNEXT: BABYAI_PUTNEXT_HTML,
+    # Complex environments
+    GameId.BABYAI_ACTION_OBJDOOR: BABYAI_ACTION_OBJDOOR_HTML,
+    GameId.BABYAI_FINDOBJ_S5: BABYAI_FINDOBJ_HTML,
+    GameId.BABYAI_KEYCORRIDOR_S3R1: BABYAI_KEYCORRIDOR_HTML,
+    GameId.BABYAI_KEYCORRIDOR_S3R2: BABYAI_KEYCORRIDOR_HTML,
+    GameId.BABYAI_KEYCORRIDOR_S3R3: BABYAI_KEYCORRIDOR_HTML,
+    GameId.BABYAI_ONEROOM_S8: BABYAI_ONEROOM_HTML,
+    GameId.BABYAI_MOVETWOACROSS_S8N9: BABYAI_MOVETWOACROSS_HTML,
+    GameId.BABYAI_SYNTH: BABYAI_SYNTH_HTML,
+    GameId.BABYAI_SYNTHLOC: BABYAI_SYNTHLOC_HTML,
+    GameId.BABYAI_SYNTHSEQ: BABYAI_SYNTHSEQ_HTML,
+    GameId.BABYAI_MINIBOSSLEVEL: BABYAI_MINIBOSSLEVEL_HTML,
+    GameId.BABYAI_BOSSLEVEL: BABYAI_BOSSLEVEL_HTML,
+    GameId.BABYAI_BOSSLEVEL_NOUNLOCK: BABYAI_BOSSLEVEL_NOUNLOCK_HTML,
 })
 
 

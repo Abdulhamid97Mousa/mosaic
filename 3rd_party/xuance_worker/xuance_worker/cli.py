@@ -134,6 +134,25 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
         help="Logging level",
     )
 
+    # MOSAIC integration arguments (passed by trainer dispatcher)
+    parser.add_argument(
+        "--grpc",
+        action="store_true",
+        help="Enable gRPC telemetry (passed by MOSAIC dispatcher)",
+    )
+    parser.add_argument(
+        "--grpc-target",
+        type=str,
+        default="127.0.0.1:50055",
+        help="gRPC telemetry server address",
+    )
+    parser.add_argument(
+        "--worker-id",
+        type=str,
+        default=None,
+        help="Worker identifier (for multi-worker training)",
+    )
+
     return parser.parse_args(args)
 
 
@@ -163,6 +182,23 @@ def main(args: list[str] | None = None) -> int:
             return 1
         try:
             config = XuanCeWorkerConfig.from_json_file(parsed.config)
+            # Override worker_id from CLI if provided
+            if parsed.worker_id:
+                config = XuanCeWorkerConfig(
+                    run_id=config.run_id,
+                    method=config.method,
+                    env=config.env,
+                    env_id=config.env_id,
+                    dl_toolbox=config.dl_toolbox,
+                    running_steps=config.running_steps,
+                    seed=config.seed,
+                    device=config.device,
+                    parallels=config.parallels,
+                    test_mode=config.test_mode,
+                    config_path=config.config_path,
+                    worker_id=parsed.worker_id,
+                    extras=config.extras,
+                )
             logger.info("Loaded config from: %s", parsed.config)
         except Exception as e:
             logger.error("Failed to load config: %s", e)
@@ -181,7 +217,12 @@ def main(args: list[str] | None = None) -> int:
             parallels=parsed.parallels,
             test_mode=parsed.test,
             config_path=parsed.config_path,
+            worker_id=parsed.worker_id,
         )
+
+    # Log gRPC settings if enabled
+    if parsed.grpc:
+        logger.info("gRPC telemetry enabled, target: %s", parsed.grpc_target)
 
     logger.info(
         "XuanCe Worker Config: method=%s env=%s env_id=%s backend=%s steps=%d device=%s",

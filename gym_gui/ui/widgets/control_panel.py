@@ -28,7 +28,8 @@ from gym_gui.core.enums import (
     ENVIRONMENT_FAMILY_BY_GAME,
     get_game_display_name,
 )
-from gym_gui.services.actor import ActorDescriptor
+from gym_gui.services.operator import OperatorDescriptor, OperatorConfig
+from gym_gui.ui.widgets.operator_config_widget import OperatorConfigWidget
 from gym_gui.ui.config_panels.single_agent.gym import (
     build_bipedal_controls,
     build_car_racing_controls,
@@ -93,11 +94,11 @@ class ControlPanelConfig:
     minigrid_lavagap_config: MiniGridConfig
     default_seed: int
     allow_seed_reuse: bool
-    actors: tuple[ActorDescriptor, ...]
+    operators: tuple[OperatorDescriptor, ...]
     # Optional configs for additional MiniGrid variants
     minigrid_redbluedoors_6x6_config: MiniGridConfig | None = None
     minigrid_redbluedoors_8x8_config: MiniGridConfig | None = None
-    default_actor_id: Optional[str] = None
+    default_operator_id: Optional[str] = None
     workers: Tuple[WorkerDefinition, ...] = tuple()
 
 
@@ -120,7 +121,11 @@ class ControlPanelWidget(QtWidgets.QWidget):
     continue_game_requested = pyqtSignal()
     terminate_game_requested = pyqtSignal()
     agent_step_requested = pyqtSignal()
-    actor_changed = pyqtSignal(str)
+    operator_changed = pyqtSignal(str)
+    # Multi-Operator Mode signals - for parallel LLM/RL agent comparison
+    operators_changed = pyqtSignal(list)  # List[OperatorConfig] - when operator configs change
+    start_operators_requested = pyqtSignal()  # Start all configured operators
+    stop_operators_requested = pyqtSignal()  # Stop all running operators
     train_agent_requested = pyqtSignal(str)  # Start fresh headless training
     trained_agent_requested = pyqtSignal(str)  # Load trained policy for evaluation
     resume_training_requested = pyqtSignal(str)  # Resume training from checkpoint
@@ -167,8 +172,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
                 minigrid_redbluedoors_8x8_config=config.minigrid_redbluedoors_8x8_config,
                 default_seed=config.default_seed,
                 allow_seed_reuse=config.allow_seed_reuse,
-                actors=config.actors,
-                default_actor_id=config.default_actor_id,
+                operators=config.operators,
+                default_operator_id=config.default_operator_id,
                 workers=get_worker_catalog(),
             )
 
@@ -306,14 +311,14 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._auto_running: bool = False
         self._game_started: bool = False
         self._game_paused: bool = False
-        self._actor_descriptors: Dict[str, ActorDescriptor] = {
-            descriptor.actor_id: descriptor for descriptor in config.actors
+        self._operator_descriptors: Dict[str, OperatorDescriptor] = {
+            descriptor.operator_id: descriptor for descriptor in config.operators
         }
-        self._actor_order: tuple[ActorDescriptor, ...] = config.actors
-        default_actor = config.default_actor_id
-        if default_actor is None and self._actor_order:
-            default_actor = self._actor_order[0].actor_id
-        self._active_actor_id: Optional[str] = default_actor
+        self._operator_order: tuple[OperatorDescriptor, ...] = config.operators
+        default_operator = config.default_operator_id
+        if default_operator is None and self._operator_order:
+            default_operator = self._operator_order[0].operator_id
+        self._active_operator_id: Optional[str] = default_operator
 
         # Store game configurations
         self._game_configs: Dict[GameId, Dict[str, object]] = {
@@ -422,7 +427,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._apply_current_mode_selection()
         self._connect_signals()
         self._update_control_states()
-        self._populate_actor_combo()
+        self._populate_operator_combo()
         self._populate_worker_combo()
 
     # ------------------------------------------------------------------
@@ -449,8 +454,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._populate_family_combo(chosen_family)
         self._rebuild_game_combo(chosen_family, chosen_game)
 
-    def current_actor(self) -> Optional[str]:
-        return self._active_actor_id
+    def current_operator(self) -> Optional[str]:
+        return self._active_operator_id
 
     def current_worker_id(self) -> Optional[str]:
         return self._current_worker_id
@@ -458,17 +463,17 @@ class ControlPanelWidget(QtWidgets.QWidget):
     def current_worker(self) -> Optional[WorkerDefinition]:
         return self._current_worker_definition()
 
-    def set_active_actor(self, actor_id: str) -> None:
-        if actor_id == self._active_actor_id:
+    def set_active_operator(self, operator_id: str) -> None:
+        if operator_id == self._active_operator_id:
             return
-        index = self._actor_combo.findData(actor_id)
+        index = self._operator_combo.findData(operator_id)
         if index < 0:
             return
-        self._actor_combo.blockSignals(True)
-        self._actor_combo.setCurrentIndex(index)
-        self._actor_combo.blockSignals(False)
-        self._active_actor_id = actor_id
-        self._update_actor_description()
+        self._operator_combo.blockSignals(True)
+        self._operator_combo.setCurrentIndex(index)
+        self._operator_combo.blockSignals(False)
+        self._active_operator_id = operator_id
+        self._update_operator_description()
 
     def update_modes(self, game_id: GameId) -> None:
         supported = tuple(self._available_modes.get(game_id, ()))
@@ -698,7 +703,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         single_layout = QtWidgets.QVBoxLayout(self._single_agent_tab)
         single_layout.setContentsMargins(0, 0, 0, 0)
         single_layout.setSpacing(12)
-        single_layout.addWidget(self._create_actor_group(self._single_agent_tab))
+        single_layout.addWidget(self._create_operator_group(self._single_agent_tab))
         single_layout.addWidget(self._create_worker_group(self._single_agent_tab))
         single_layout.addWidget(self._create_training_group(self._single_agent_tab))
         single_layout.addStretch(1)
@@ -904,16 +909,75 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._dual_path_radio.toggled.connect(self._update_telemetry_status_label)
         return group
 
-    def _create_actor_group(self, parent: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
-        group = QtWidgets.QGroupBox("Active Actor", parent)
+    def _create_operator_group(self, parent: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
+        group = QtWidgets.QGroupBox("Operators", parent)
         layout = QtWidgets.QVBoxLayout(group)
-        self._actor_combo = QtWidgets.QComboBox(group)
-        self._actor_combo.setEnabled(bool(self._actor_order))
-        layout.addWidget(self._actor_combo)
-        self._actor_description = QtWidgets.QLabel("—", group)
-        self._actor_description.setWordWrap(True)
-        layout.addWidget(self._actor_description)
+
+        # Legacy single-operator combo (hidden by default, for backward compatibility)
+        self._operator_combo = QtWidgets.QComboBox(group)
+        self._operator_combo.setEnabled(bool(self._operator_order))
+        self._operator_combo.hide()  # Hidden - replaced by multi-operator widget
+        layout.addWidget(self._operator_combo)
+
+        self._operator_description = QtWidgets.QLabel("—", group)
+        self._operator_description.setWordWrap(True)
+        self._operator_description.hide()  # Hidden - integrated into multi-operator rows
+        layout.addWidget(self._operator_description)
+
+        # Multi-operator configuration widget
+        self._operator_config_widget = OperatorConfigWidget(max_operators=8, parent=group)
+        self._operator_config_widget.operators_changed.connect(self._on_operators_config_changed)
+        layout.addWidget(self._operator_config_widget)
+
+        # Start All / Stop All buttons
+        button_row = QtWidgets.QHBoxLayout()
+        button_row.setSpacing(8)
+
+        self._start_operators_button = QtWidgets.QPushButton("Start All", group)
+        self._start_operators_button.setToolTip("Start all configured operators")
+        self._start_operators_button.setStyleSheet(
+            "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #4CAF50; color: white; }"
+            "QPushButton:hover { background-color: #45a049; }"
+            "QPushButton:pressed { background-color: #388E3C; }"
+            "QPushButton:disabled { background-color: #A5D6A7; color: #E8F5E9; }"
+        )
+        self._start_operators_button.clicked.connect(self._on_start_operators_clicked)
+        button_row.addWidget(self._start_operators_button)
+
+        self._stop_operators_button = QtWidgets.QPushButton("Stop All", group)
+        self._stop_operators_button.setToolTip("Stop all running operators")
+        self._stop_operators_button.setStyleSheet(
+            "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #F44336; color: white; }"
+            "QPushButton:hover { background-color: #E53935; }"
+            "QPushButton:pressed { background-color: #D32F2F; }"
+            "QPushButton:disabled { background-color: #EF9A9A; color: #FFEBEE; }"
+        )
+        self._stop_operators_button.setEnabled(False)  # Disabled until operators are running
+        self._stop_operators_button.clicked.connect(self._on_stop_operators_clicked)
+        button_row.addWidget(self._stop_operators_button)
+
+        layout.addLayout(button_row)
+
         return group
+
+    def _on_operators_config_changed(self, configs: list) -> None:
+        """Handle operator configuration changes from the multi-operator widget."""
+        self.operators_changed.emit(configs)
+        # Enable/disable start button based on operator count
+        has_operators = len(configs) > 0
+        self._start_operators_button.setEnabled(has_operators)
+
+    def _on_start_operators_clicked(self) -> None:
+        """Handle Start All button click."""
+        self.start_operators_requested.emit()
+        self._start_operators_button.setEnabled(False)
+        self._stop_operators_button.setEnabled(True)
+
+    def _on_stop_operators_clicked(self) -> None:
+        """Handle Stop All button click."""
+        self.stop_operators_requested.emit()
+        self._start_operators_button.setEnabled(True)
+        self._stop_operators_button.setEnabled(False)
 
     def _create_worker_group(self, parent: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
         group = QtWidgets.QGroupBox("Worker Integration", parent)
@@ -1090,7 +1154,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._terminate_button.clicked.connect(self._on_terminate_clicked)
         self._step_button.clicked.connect(self._on_step_clicked)
         self._reset_button.clicked.connect(self._on_reset_clicked)
-        self._actor_combo.currentIndexChanged.connect(self._on_actor_selection_changed)
+        self._operator_combo.currentIndexChanged.connect(self._on_operator_selection_changed)
 
     def _update_telemetry_status_label(self) -> None:
         if not hasattr(self, "_telemetry_status_label"):
@@ -1301,10 +1365,10 @@ class ControlPanelWidget(QtWidgets.QWidget):
         # Reset: always enabled (can reset even during active game)
         self._reset_button.setEnabled(True)
 
-        # Enable actor selector only when an agent can participate
+        # Enable operator selector only when an agent can participate
         has_agent_component = self._current_mode != ControlMode.HUMAN_ONLY
         agent_only_mode = self._current_mode == ControlMode.AGENT_ONLY
-        self._actor_combo.setEnabled(has_agent_component and self._actor_combo.count() > 0)
+        self._operator_combo.setEnabled(has_agent_component and self._operator_combo.count() > 0)
         
         worker_def = self._current_worker_definition()
         supports_training = bool(worker_def and worker_def.supports_training)
@@ -1313,7 +1377,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._trained_agent_button.setEnabled(agent_only_mode and supports_policy)
         self._resume_training_button.setEnabled(agent_only_mode and supports_training)
 
-        self._update_actor_description()
+        self._update_operator_description()
         self._update_worker_description()
 
     def _apply_current_mode_selection(self) -> None:
@@ -1342,25 +1406,25 @@ class ControlPanelWidget(QtWidgets.QWidget):
             except ValueError:
                 return fallback
 
-    def _populate_actor_combo(self) -> None:
-        self._actor_combo.blockSignals(True)
-        self._actor_combo.clear()
-        for descriptor in self._actor_order:
-            self._actor_combo.addItem(descriptor.display_name, descriptor.actor_id)
-        self._actor_combo.blockSignals(False)
+    def _populate_operator_combo(self) -> None:
+        self._operator_combo.blockSignals(True)
+        self._operator_combo.clear()
+        for descriptor in self._operator_order:
+            self._operator_combo.addItem(descriptor.display_name, descriptor.operator_id)
+        self._operator_combo.blockSignals(False)
 
-        if not self._actor_order:
-            self._actor_description.setText("No actors registered")
+        if not self._operator_order:
+            self._operator_description.setText("No operators registered")
             return
 
-        default_id = self._active_actor_id or self._actor_order[0].actor_id
-        index = self._actor_combo.findData(default_id)
+        default_id = self._active_operator_id or self._operator_order[0].operator_id
+        index = self._operator_combo.findData(default_id)
         if index < 0:
             index = 0
-        self._actor_combo.setCurrentIndex(index)
-        current_data = self._actor_combo.currentData()
-        self._active_actor_id = current_data if isinstance(current_data, str) else None
-        self._update_actor_description()
+        self._operator_combo.setCurrentIndex(index)
+        current_data = self._operator_combo.currentData()
+        self._active_operator_id = current_data if isinstance(current_data, str) else None
+        self._update_operator_description()
 
     def _populate_worker_combo(self) -> None:
         self._worker_combo.blockSignals(True)
@@ -1384,15 +1448,15 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._worker_combo.blockSignals(False)
         self._on_worker_selection_changed(self._worker_combo.currentIndex())
 
-    def _on_actor_selection_changed(self, index: int) -> None:
-        actor_id = self._actor_combo.itemData(index)
-        if not isinstance(actor_id, str):
+    def _on_operator_selection_changed(self, index: int) -> None:
+        operator_id = self._operator_combo.itemData(index)
+        if not isinstance(operator_id, str):
             return
-        if actor_id == self._active_actor_id:
+        if operator_id == self._active_operator_id:
             return
-        self._active_actor_id = actor_id
-        self._update_actor_description()
-        self.actor_changed.emit(actor_id)
+        self._active_operator_id = operator_id
+        self._update_operator_description()
+        self.operator_changed.emit(operator_id)
 
     def _on_worker_selection_changed(self, index: int) -> None:
         worker_id = self._worker_combo.itemData(index)
@@ -1424,15 +1488,15 @@ class ControlPanelWidget(QtWidgets.QWidget):
             return
         self.trained_agent_requested.emit(worker_id)
 
-    def _update_actor_description(self) -> None:
-        if self._active_actor_id is None:
-            self._actor_description.setText("—")
+    def _update_operator_description(self) -> None:
+        if self._active_operator_id is None:
+            self._operator_description.setText("—")
             return
-        descriptor = self._actor_descriptors.get(self._active_actor_id)
+        descriptor = self._operator_descriptors.get(self._active_operator_id)
         if descriptor is None or descriptor.description is None:
-            self._actor_description.setText("—")
+            self._operator_description.setText("—")
             return
-        self._actor_description.setText(descriptor.description)
+        self._operator_description.setText(descriptor.description)
 
     def _current_worker_definition(self) -> Optional[WorkerDefinition]:
         if self._current_worker_id is None:

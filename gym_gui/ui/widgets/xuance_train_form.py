@@ -21,7 +21,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
@@ -29,20 +29,16 @@ from gym_gui.logging_config.log_constants import (
     LOG_UI_TRAIN_FORM_ERROR,
 )
 
-# Import algorithm registry from xuance_worker
-try:
-    from xuance_worker import (
-        Backend,
-        Paradigm,
-        get_algorithm_choices,
-        get_algorithms_by_category,
-        get_backend_summary,
-    )
-    _XUANCE_WORKER_AVAILABLE = True
-except ImportError:
-    _XUANCE_WORKER_AVAILABLE = False
-    Backend = None  # type: ignore
-    Paradigm = None  # type: ignore
+from xuance_worker import (
+    Backend,
+    Paradigm,
+    get_algorithm_choices,
+    get_algorithms_by_category,
+    get_backend_summary,
+)
+
+from gym_gui.telemetry.semconv import VIDEO_MODE_DESCRIPTORS, VideoModes
+from gym_gui.fastlane.worker_helpers import apply_fastlane_environment
 
 
 _LOGGER = logging.getLogger("gym_gui.ui.xuance_train_form")
@@ -305,6 +301,12 @@ class _FormState:
     worker_id: Optional[str]
     notes: Optional[str]
     algo_params: Dict[str, Any] = field(default_factory=dict)
+    # FastLane settings
+    fastlane_enabled: bool = False
+    fastlane_only: bool = True
+    fastlane_slot: int = 0
+    fastlane_video_mode: str = "single"
+    fastlane_grid_limit: int = 4
 
 
 class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
@@ -326,10 +328,8 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._last_config: Optional[Dict[str, Any]] = None
         self._algo_param_inputs: Dict[str, QtWidgets.QWidget] = {}
 
-        # Check if xuance_worker is available
-        if not _XUANCE_WORKER_AVAILABLE:
-            self._show_not_available_dialog()
-            return
+        # Detect available GPUs
+        self._gpu_count, self._gpu_name = self._detect_gpus()
 
         self._setup_ui(default_env_id)
 
@@ -339,21 +339,39 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
             extra={"default_env_id": default_env_id},
         )
 
-    def _show_not_available_dialog(self) -> None:
-        """Show message when xuance_worker is not installed."""
-        layout = QtWidgets.QVBoxLayout(self)
-        message = QtWidgets.QLabel(
-            "XuanCe Worker is not installed.\n\n"
-            "Install with:\n"
-            "  pip install -e 3rd_party/xuance_worker\n\n"
-            "Then restart the application."
-        )
-        message.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        layout.addWidget(message)
+    def _detect_gpus(self) -> Tuple[int, str]:
+        """Detect available GPUs on the system.
 
-        close_btn = QtWidgets.QPushButton("Close", self)
-        close_btn.clicked.connect(self.reject)
-        layout.addWidget(close_btn)
+        Returns:
+            Tuple of (gpu_count, gpu_name). gpu_name is the name of the first GPU.
+        """
+        # Try torch first (most reliable for XuanCe since it's the primary backend)
+        try:
+            import torch
+            if torch.cuda.is_available():
+                count = torch.cuda.device_count()
+                name = torch.cuda.get_device_name(0) if count > 0 else ""
+                return count, name
+        except ImportError:
+            pass
+
+        # Fallback: check nvidia-smi
+        try:
+            import subprocess
+            result = subprocess.run(
+                ["nvidia-smi", "--query-gpu=name", "--format=csv,noheader"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            if result.returncode == 0:
+                gpus = [g.strip() for g in result.stdout.strip().split("\n") if g.strip()]
+                if gpus:
+                    return len(gpus), gpus[0]
+        except Exception:
+            pass
+
+        return 0, ""
 
     def _setup_ui(self, default_env_id: Optional[str]) -> None:
         """Set up the form UI."""
@@ -389,6 +407,9 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
 
         # Analytics section
         self._setup_analytics(form_layout)
+
+        # FastLane section
+        self._setup_fastlane_section(form_layout)
 
         form_layout.addStretch(1)
 
@@ -549,16 +570,35 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
         params_layout.addWidget(seed_label, 0, 2)
         params_layout.addWidget(self._seed_spin, 0, 3)
 
-        # Device
+        # Device - auto-detect and select GPU if available
         device_label = QtWidgets.QLabel("Device:", self)
         self._device_combo = QtWidgets.QComboBox(self)
         self._device_combo.addItem("CPU", "cpu")
         self._device_combo.addItem("CUDA (GPU)", "cuda")
         self._device_combo.addItem("CUDA:0", "cuda:0")
         self._device_combo.addItem("CUDA:1", "cuda:1")
-        self._device_combo.setToolTip("Computing device")
+
+        # Auto-select GPU if available, and update tooltip
+        if self._gpu_count > 0:
+            # Select cuda:0 by default when GPU is detected
+            self._device_combo.setCurrentIndex(2)  # cuda:0
+            self._device_combo.setToolTip(
+                f"Computing device\n✓ Detected: {self._gpu_name} ({self._gpu_count} GPU{'s' if self._gpu_count > 1 else ''} available)"
+            )
+        else:
+            self._device_combo.setToolTip("Computing device\nNo GPU detected - using CPU")
+
         params_layout.addWidget(device_label, 1, 0)
         params_layout.addWidget(self._device_combo, 1, 1)
+
+        # GPU info indicator
+        if self._gpu_count > 0:
+            gpu_info = QtWidgets.QLabel(f"✓ {self._gpu_name}", self)
+            gpu_info.setStyleSheet("color: green; font-size: 10px;")
+        else:
+            gpu_info = QtWidgets.QLabel("No GPU detected", self)
+            gpu_info.setStyleSheet("color: #888; font-size: 10px;")
+        params_layout.addWidget(gpu_info, 1, 2, 1, 2)
 
         # Parallels
         parallels_label = QtWidgets.QLabel("Parallel Envs:", self)
@@ -733,6 +773,119 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
         self._wandb_http_proxy_input.setEnabled(vpn_enabled)
         self._wandb_https_proxy_input.setEnabled(vpn_enabled)
 
+    def _setup_fastlane_section(self, layout: QtWidgets.QVBoxLayout) -> None:
+        """Set up FastLane live visualization section."""
+        group = QtWidgets.QGroupBox("FastLane Live Visualization", self)
+        group_layout = QtWidgets.QVBoxLayout(group)
+        group_layout.setContentsMargins(8, 8, 8, 8)
+        group_layout.setSpacing(6)
+
+        # Hint label
+        hint_label = QtWidgets.QLabel(
+            "Stream live training frames to the GUI for real-time visualization.",
+            group,
+        )
+        hint_label.setStyleSheet("color: #777777; font-size: 11px;")
+        hint_label.setWordWrap(True)
+        group_layout.addWidget(hint_label)
+
+        # Enable checkbox row
+        checkbox_layout = QtWidgets.QHBoxLayout()
+
+        self._fastlane_checkbox = QtWidgets.QCheckBox("Enable FastLane streaming", group)
+        self._fastlane_checkbox.setChecked(False)
+        self._fastlane_checkbox.setToolTip(
+            "Stream live frames from training environment to the GUI"
+        )
+        self._fastlane_checkbox.toggled.connect(self._on_fastlane_toggled)
+        checkbox_layout.addWidget(self._fastlane_checkbox)
+
+        self._fastlane_only_checkbox = QtWidgets.QCheckBox("FastLane Only", group)
+        self._fastlane_only_checkbox.setChecked(True)
+        self._fastlane_only_checkbox.setToolTip(
+            "Skip telemetry persistence (gRPC/SQLite) - only stream to FastLane"
+        )
+        checkbox_layout.addWidget(self._fastlane_only_checkbox)
+
+        checkbox_layout.addStretch(1)
+        group_layout.addLayout(checkbox_layout)
+
+        # FastLane configuration section
+        fastlane_container = QtWidgets.QWidget(group)
+        fastlane_layout = QtWidgets.QGridLayout(fastlane_container)
+        fastlane_layout.setContentsMargins(0, 4, 0, 0)
+        fastlane_layout.setSpacing(6)
+
+        # Video Mode dropdown
+        video_mode_label = QtWidgets.QLabel("Video Mode:", fastlane_container)
+        self._video_mode_combo = QtWidgets.QComboBox(fastlane_container)
+        for mode_key, mode_descriptor in VIDEO_MODE_DESCRIPTORS.items():
+            self._video_mode_combo.addItem(mode_descriptor.label, mode_key)
+            # Set tooltip for each item
+            idx = self._video_mode_combo.count() - 1
+            self._video_mode_combo.setItemData(
+                idx, mode_descriptor.description, QtCore.Qt.ItemDataRole.ToolTipRole
+            )
+        self._video_mode_combo.setToolTip(
+            "Single: Show one environment\n"
+            "Grid: Show multiple parallel environments in a grid\n"
+            "Off: Disable video streaming"
+        )
+        fastlane_layout.addWidget(video_mode_label, 0, 0)
+        fastlane_layout.addWidget(self._video_mode_combo, 0, 1)
+
+        # Grid Limit spinner
+        grid_limit_label = QtWidgets.QLabel("Grid Limit:", fastlane_container)
+        self._grid_limit_spin = QtWidgets.QSpinBox(fastlane_container)
+        self._grid_limit_spin.setRange(1, 16)
+        self._grid_limit_spin.setValue(4)
+        self._grid_limit_spin.setToolTip(
+            "Maximum number of parallel environments to show in grid mode (1-16)"
+        )
+        fastlane_layout.addWidget(grid_limit_label, 0, 2)
+        fastlane_layout.addWidget(self._grid_limit_spin, 0, 3)
+
+        # Probe Env spinner
+        probe_env_label = QtWidgets.QLabel("Probe Env:", fastlane_container)
+        self._fastlane_slot_spin = QtWidgets.QSpinBox(fastlane_container)
+        self._fastlane_slot_spin.setRange(0, 64)
+        self._fastlane_slot_spin.setValue(0)
+        self._fastlane_slot_spin.setToolTip(
+            "Environment index to probe in single mode (0-64)"
+        )
+        fastlane_layout.addWidget(probe_env_label, 1, 0)
+        fastlane_layout.addWidget(self._fastlane_slot_spin, 1, 1)
+
+        # Stretch column
+        fastlane_layout.setColumnStretch(4, 1)
+
+        group_layout.addWidget(fastlane_container)
+        self._fastlane_container = fastlane_container
+
+        # Initialize control states
+        self._update_fastlane_controls()
+
+        layout.addWidget(group)
+
+    def _on_fastlane_toggled(self, checked: bool) -> None:
+        """Handle FastLane checkbox toggle."""
+        _ = checked
+        self._update_fastlane_controls()
+
+    def _update_fastlane_controls(self) -> None:
+        """Update FastLane control enabled states based on checkbox state."""
+        fastlane_enabled = self._fastlane_checkbox.isChecked()
+
+        # Enable/disable all FastLane controls
+        self._fastlane_only_checkbox.setEnabled(fastlane_enabled)
+        self._video_mode_combo.setEnabled(fastlane_enabled)
+        self._grid_limit_spin.setEnabled(fastlane_enabled)
+        self._fastlane_slot_spin.setEnabled(fastlane_enabled)
+
+        if not fastlane_enabled:
+            # Reset to defaults when disabled
+            self._fastlane_only_checkbox.setChecked(True)
+
     def _setup_buttons(self, layout: QtWidgets.QVBoxLayout) -> None:
         """Set up dialog buttons."""
         buttons = QtWidgets.QDialogButtonBox(
@@ -807,20 +960,26 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
         combo.clear()
 
         try:
-            # Get algorithms grouped by category
+            # Get algorithms grouped by category, then flatten with inline category notes
             categories = get_algorithms_by_category(backend, paradigm)
-            for category, algos in sorted(categories.items()):
-                # Add category header (disabled item)
-                combo.addItem(f"── {category} ──", None)
-                model = combo.model()
-                if model is not None:
-                    item = model.item(combo.count() - 1)
-                    if item is not None:
-                        item.setEnabled(False)
 
-                # Add algorithms in category
+            # Flatten all algorithms with category as inline note
+            all_algos: List[Tuple[str, str, str]] = []  # (display_text, key, description)
+            for category, algos in categories.items():
                 for algo in algos:
-                    combo.addItem(f"  {algo.display_name}", algo.key)
+                    # Format: "PPO (Clip) - Policy Optimization"
+                    display_text = f"{algo.display_name} - {category}"
+                    all_algos.append((display_text, algo.key, algo.description))
+
+            # Sort by display name
+            all_algos.sort(key=lambda x: x[0])
+
+            # Add items to combo with tooltip showing description
+            for display_text, key, description in all_algos:
+                combo.addItem(display_text, key)
+                # Set tooltip for this item
+                idx = combo.count() - 1
+                combo.setItemData(idx, description, QtCore.Qt.ItemDataRole.ToolTipRole)
 
         except Exception as e:
             _LOGGER.warning("Failed to populate algorithms: %s", e)
@@ -828,11 +987,9 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
 
         combo.blockSignals(False)
 
-        # Select first enabled item and trigger parameter update
-        for i in range(combo.count()):
-            if combo.itemData(i) is not None:
-                combo.setCurrentIndex(i)
-                break
+        # Select first item and trigger parameter update
+        if combo.count() > 0:
+            combo.setCurrentIndex(0)
 
         # Trigger parameter update
         self._on_algorithm_changed(combo)
@@ -1030,6 +1187,10 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
             elif isinstance(widget, QtWidgets.QLineEdit):
                 algo_params[key] = widget.text().strip()
 
+        # Collect FastLane settings
+        video_mode_data = self._video_mode_combo.currentData()
+        video_mode = video_mode_data if isinstance(video_mode_data, str) else VideoModes.SINGLE
+
         return _FormState(
             backend=self._backend_combo.currentData() or "torch",
             paradigm=paradigm,
@@ -1045,6 +1206,12 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
             worker_id=self._worker_id_input.text().strip() or None,
             notes=self._notes_edit.toPlainText().strip() or None,
             algo_params=algo_params,
+            # FastLane settings
+            fastlane_enabled=self._fastlane_checkbox.isChecked(),
+            fastlane_only=self._fastlane_only_checkbox.isChecked(),
+            fastlane_slot=self._fastlane_slot_spin.value(),
+            fastlane_video_mode=video_mode,
+            fastlane_grid_limit=self._grid_limit_spin.value(),
         )
 
     def _build_config(
@@ -1092,6 +1259,12 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
             "wandb_entity": wandb_entity,
             "wandb_run_name": wandb_run_name,
             "wandb_use_vpn_proxy": use_wandb_vpn,
+            # FastLane settings
+            "fastlane_enabled": state.fastlane_enabled,
+            "fastlane_only": state.fastlane_only,
+            "fastlane_slot": state.fastlane_slot,
+            "fastlane_video_mode": state.fastlane_video_mode,
+            "fastlane_grid_limit": state.fastlane_grid_limit,
         }
         if state.notes:
             extras["notes"] = state.notes
@@ -1108,6 +1281,12 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 "env_id": state.env_id,
                 "backend": state.backend,
                 "paradigm": state.paradigm,
+                # FastLane UI settings
+                "fastlane_enabled": state.fastlane_enabled,
+                "fastlane_only": state.fastlane_only,
+                "fastlane_slot": state.fastlane_slot,
+                "fastlane_video_mode": state.fastlane_video_mode,
+                "fastlane_grid_limit": state.fastlane_grid_limit,
             },
             "worker": {
                 "worker_id": state.worker_id or "xuance_worker",
@@ -1162,6 +1341,18 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 environment["https_proxy"] = wandb_https_proxy
         else:
             environment["WANDB_MODE"] = "offline"
+
+        # FastLane environment variables
+        if state.fastlane_enabled:
+            apply_fastlane_environment(
+                environment,
+                fastlane_only=state.fastlane_only,
+                fastlane_slot=state.fastlane_slot,
+                video_mode=state.fastlane_video_mode,
+                grid_limit=state.fastlane_grid_limit,
+            )
+            # Also set the master switch for XuanCe sitecustomize
+            environment["MOSAIC_FASTLANE_ENABLED"] = "1"
 
         config: Dict[str, Any] = {
             "run_name": run_id,

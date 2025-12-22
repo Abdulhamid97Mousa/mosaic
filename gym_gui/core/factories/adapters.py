@@ -20,6 +20,7 @@ from gym_gui.core.adapters.base import AdapterContext, EnvironmentAdapter
 from gym_gui.core.adapters.toy_text import TOY_TEXT_ADAPTERS
 from gym_gui.core.adapters.box2d import BOX2D_ADAPTERS
 from gym_gui.core.adapters.minigrid import MINIGRID_ADAPTERS
+from gym_gui.core.adapters.babyai import BABYAI_ADAPTERS
 from gym_gui.core.adapters.ale import ALE_ADAPTERS, ALEAdapter
 
 if TYPE_CHECKING:
@@ -112,6 +113,7 @@ def _registry() -> Mapping[GameId, type[EnvironmentAdapter]]:
         **TOY_TEXT_ADAPTERS,
         **BOX2D_ADAPTERS,
         **MINIGRID_ADAPTERS,
+        **BABYAI_ADAPTERS,
         **ALE_ADAPTERS,
         **VIZDOOM_ADAPTERS,
         **PETTINGZOO_CLASSIC_ADAPTERS,

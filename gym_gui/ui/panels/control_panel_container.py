@@ -23,6 +23,7 @@ from gym_gui.config.game_configs import (
     DEFAULT_MINIGRID_REDBLUE_DOORS_8x8_CONFIG,
 )
 from gym_gui.core.factories.adapters import available_games
+from gym_gui.services.operator import OperatorDescriptor
 from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWidget
 
 if TYPE_CHECKING:
@@ -52,7 +53,18 @@ class ControlPanelContainer(QtWidgets.QWidget):
             available_modes[game] = SessionController.supported_control_modes(game)
 
         actor_descriptors = self._actor_service.describe_actors()
-        default_actor_id = self._actor_service.get_active_actor_id()
+        default_operator_id = self._actor_service.get_active_actor_id()
+
+        # Convert ActorDescriptor to OperatorDescriptor for the UI migration
+        operator_descriptors = tuple(
+            OperatorDescriptor(
+                operator_id=ad.actor_id,
+                display_name=ad.display_name,
+                description=ad.description,
+                category="default",
+            )
+            for ad in actor_descriptors
+        )
 
         control_config = ControlPanelConfig(
             available_modes=available_modes,
@@ -73,13 +85,13 @@ class ControlPanelContainer(QtWidgets.QWidget):
             minigrid_redbluedoors_8x8_config=DEFAULT_MINIGRID_REDBLUE_DOORS_8x8_CONFIG,
             default_seed=settings.default_seed,
             allow_seed_reuse=settings.allow_seed_reuse,
-            actors=actor_descriptors,
-            default_actor_id=default_actor_id,
+            operators=operator_descriptors,
+            default_operator_id=default_operator_id,
         )
 
         self._control_panel = ControlPanelWidget(config=control_config, parent=self)
-        if default_actor_id is not None:
-            self._control_panel.set_active_actor(default_actor_id)
+        if default_operator_id is not None:
+            self._control_panel.set_active_operator(default_operator_id)
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
@@ -105,13 +117,13 @@ class ControlPanelContainer(QtWidgets.QWidget):
         """Get currently selected control mode."""
         return self._control_panel.current_mode()
 
-    def current_actor(self):
-        """Get currently selected actor."""
-        return self._control_panel.current_actor()
+    def current_operator(self):
+        """Get currently selected operator."""
+        return self._control_panel.current_operator()
 
-    def set_active_actor(self, actor_id: str) -> None:
-        """Set the active actor."""
-        self._control_panel.set_active_actor(actor_id)
+    def set_active_operator(self, operator_id: str) -> None:
+        """Set the active operator."""
+        self._control_panel.set_active_operator(operator_id)
 
     def set_turn(self, turn: str) -> None:
         """Set the turn label."""
@@ -174,9 +186,9 @@ class ControlPanelContainer(QtWidgets.QWidget):
         return self._control_panel.control_mode_changed
 
     @property
-    def actor_changed(self):
-        """Signal: actor changed."""
-        return self._control_panel.actor_changed
+    def operator_changed(self):
+        """Signal: operator changed."""
+        return self._control_panel.operator_changed
 
     @property
     def agent_form_requested(self):

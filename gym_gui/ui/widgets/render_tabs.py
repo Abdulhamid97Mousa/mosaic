@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 from datetime import datetime, timezone
 import logging
-from typing import Any, Callable, List, Mapping, Optional, Tuple, TYPE_CHECKING
+from typing import Any, Callable, List, Mapping, Optional, Protocol, Tuple, TYPE_CHECKING, cast
 
 from qtpy import QtCore, QtGui, QtWidgets
 
@@ -24,6 +24,8 @@ from gym_gui.services.telemetry import TelemetryService
 from gym_gui.ui.indicators.busy_indicator import modal_busy_indicator
 from gym_gui.ui.indicators import RunSummary, TabClosureChoice, TabClosureDialog
 from gym_gui.ui.widgets.live_telemetry_tab import LiveTelemetryTab
+from gym_gui.ui.widgets.multi_operator_render_view import MultiOperatorRenderView
+from gym_gui.services.operator import OperatorConfig
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
     LOG_UI_RENDER_TABS_TRACE,
@@ -38,6 +40,17 @@ from gym_gui.ui.widgets.mosaic_welcome_widget import MosaicWelcomeWidget
 
 if TYPE_CHECKING:
     from gym_gui.services.trainer.run_manager import TrainingRunManager
+    from gym_gui.ui.widgets.management_tab import ManagementTab
+
+
+# Protocol for mouse capture capable strategies (e.g., RgbRendererStrategy)
+class MouseCaptureStrategy(Protocol):
+    """Protocol for renderer strategies that support mouse capture."""
+
+    def set_mouse_capture_enabled(self, enabled: bool) -> None: ...
+    def set_mouse_delta_callback(self, callback: Callable[[float, float], None] | None) -> None: ...
+    def set_mouse_delta_scale(self, scale: float) -> None: ...
+    def set_mouse_action_callback(self, callback: Callable[[int], None] | None) -> None: ...
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -47,13 +60,13 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
     """Tab widget combining grid, raw text, video, and replay views."""
 
     # Signal emitted when a chess move is made (from_sq, to_sq)
-    chess_move_made = QtCore.Signal(str, str)
+    chess_move_made: "QtCore.SignalInstance" = QtCore.Signal(str, str)  # type: ignore[assignment]
     # Signal emitted when a Connect Four column is clicked
-    connect_four_column_clicked = QtCore.Signal(int)
+    connect_four_column_clicked: "QtCore.SignalInstance" = QtCore.Signal(int)  # type: ignore[assignment]
     # Signal emitted when a Go intersection is clicked (row, col)
-    go_intersection_clicked = QtCore.Signal(int, int)
+    go_intersection_clicked: "QtCore.SignalInstance" = QtCore.Signal(int, int)  # type: ignore[assignment]
     # Signal emitted when Go pass is requested
-    go_pass_requested = QtCore.Signal()
+    go_pass_requested: "QtCore.SignalInstance" = QtCore.Signal()  # type: ignore[assignment]
 
     _current_game: GameId | None
 
@@ -116,10 +129,18 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
         self.setTabToolTip(self._replay_tab_index, "Review episodes from manual gameplay sessions only")
 
         # Management tab for training runs (optional, requires run_manager)
-        self._management_tab: Optional[QtWidgets.QWidget] = None
+        self._management_tab: Optional["ManagementTab"] = None
         self._management_tab_index = -1
         if run_manager is not None:
             self._setup_management_tab(run_manager)
+
+        # Multi-Operator tab for side-by-side agent comparison
+        self._multi_operator_view = MultiOperatorRenderView(parent=self)
+        self._multi_operator_tab_index = self.addTab(self._multi_operator_view, "Multi-Operator")
+        self.setTabToolTip(
+            self._multi_operator_tab_index,
+            "Side-by-side comparison of multiple operators (LLM, RL)"
+        )
 
         # Board game strategy (integrated into Grid tab, created on demand)
         self._board_game_strategy: BoardGameRendererStrategy | None = None
@@ -428,6 +449,86 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
         # Initial refresh
         self._management_tab.refresh()
 
+    # ------------------------------------------------------------------
+    # Multi-Operator Tab
+    # ------------------------------------------------------------------
+    def add_operator_view(self, config: OperatorConfig) -> None:
+        """Add a render container for an operator.
+
+        Args:
+            config: The operator configuration.
+        """
+        self._multi_operator_view.add_operator(config)
+        self.log_constant(
+            LOG_UI_RENDER_TABS_INFO,
+            message=f"Added operator view: {config.operator_id}",
+        )
+
+    def remove_operator_view(self, operator_id: str) -> None:
+        """Remove a render container for an operator.
+
+        Args:
+            operator_id: ID of the operator to remove.
+        """
+        self._multi_operator_view.remove_operator(operator_id)
+        self.log_constant(
+            LOG_UI_RENDER_TABS_INFO,
+            message=f"Removed operator view: {operator_id}",
+        )
+
+    def update_operator_view(self, config: OperatorConfig) -> None:
+        """Update an operator's configuration in the view.
+
+        Args:
+            config: The updated operator configuration.
+        """
+        self._multi_operator_view.update_operator(config)
+
+    def set_operator_status(self, operator_id: str, status: str) -> None:
+        """Set the status of an operator in the multi-operator view.
+
+        Args:
+            operator_id: The operator ID.
+            status: One of "pending", "running", "stopped", "error".
+        """
+        self._multi_operator_view.set_operator_status(operator_id, status)
+
+    def display_operator_payload(self, operator_id: str, payload: dict) -> None:
+        """Route payload to the correct operator container.
+
+        Args:
+            operator_id: The operator to display the payload for.
+            payload: The telemetry payload containing render data.
+        """
+        self._multi_operator_view.display_payload(operator_id, payload)
+
+    def display_operator_payload_by_run_id(self, run_id: str, payload: dict) -> None:
+        """Route payload to operator container by run_id lookup.
+
+        Args:
+            run_id: The run ID associated with an operator.
+            payload: The telemetry payload containing render data.
+        """
+        self._multi_operator_view.display_payload_by_run_id(run_id, payload)
+
+    def switch_to_multi_operator_tab(self) -> None:
+        """Switch to the Multi-Operator tab."""
+        self.setCurrentIndex(self._multi_operator_tab_index)
+
+    def clear_multi_operator_view(self) -> None:
+        """Clear all operator containers from the multi-operator view."""
+        self._multi_operator_view.clear()
+
+    @property
+    def multi_operator_tab_index(self) -> int:
+        """Get the index of the Multi-Operator tab."""
+        return self._multi_operator_tab_index
+
+    @property
+    def multi_operator_view(self) -> MultiOperatorRenderView:
+        """Get the multi-operator render view widget."""
+        return self._multi_operator_view
+
     def _on_runs_deleted(self, run_ids: list[str]) -> None:
         """Handle deletion of runs by closing associated dynamic tabs.
 
@@ -456,7 +557,7 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
 
     def refresh_management_tab(self) -> None:
         """Refresh the management tab's run list."""
-        if self._management_tab is not None and hasattr(self._management_tab, 'refresh'):
+        if self._management_tab is not None:
             self._management_tab.refresh()
 
     # ------------------------------------------------------------------
@@ -637,16 +738,19 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
             return
         strategy = self._video_host._strategy
         # Check if the strategy supports mouse capture (RgbRendererStrategy)
-        if hasattr(strategy, "set_mouse_capture_enabled"):
-            strategy.set_mouse_capture_enabled(enabled)
+        if not hasattr(strategy, "set_mouse_capture_enabled"):
+            return
+
+        # Cast to MouseCaptureStrategy for proper type checking
+        mouse_strategy = cast(MouseCaptureStrategy, strategy)
+        mouse_strategy.set_mouse_capture_enabled(enabled)
 
         # Prefer delta callback (continuous mode) if provided
-        if delta_callback is not None and hasattr(strategy, "set_mouse_delta_callback"):
-            strategy.set_mouse_delta_callback(delta_callback)
-            if hasattr(strategy, "set_mouse_delta_scale"):
-                strategy.set_mouse_delta_scale(delta_scale)
-        elif action_callback is not None and hasattr(strategy, "set_mouse_action_callback"):
-            strategy.set_mouse_action_callback(action_callback)
+        if delta_callback is not None:
+            mouse_strategy.set_mouse_delta_callback(delta_callback)
+            mouse_strategy.set_mouse_delta_scale(delta_scale)
+        elif action_callback is not None:
+            mouse_strategy.set_mouse_action_callback(action_callback)
             # Configure turn action indices and sensitivity on the underlying view
             view = getattr(strategy, "_view", None)
             if view is not None:
