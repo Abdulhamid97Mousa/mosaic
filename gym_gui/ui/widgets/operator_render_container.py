@@ -57,7 +57,11 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         self._config = config
         self._status = "pending"
         self._renderer_registry = renderer_registry or create_default_renderer_registry()
-        self._renderer_strategy: Optional[Any] = None
+        # Support multiple renderer types (GRID for text environments, RGB for visual)
+        self._grid_renderer: Optional[Any] = None
+        self._rgb_renderer: Optional[Any] = None
+        self._renderer_strategy: Optional[Any] = None  # Currently active renderer
+        self._active_render_mode: Optional[RenderMode] = None
 
         # Stats tracking
         self._current_step = 0
@@ -113,15 +117,15 @@ class OperatorRenderContainer(QtWidgets.QFrame):
 
         layout.addWidget(self._header)
 
-        # Render area
+        # Render area - should expand to fill available space
         self._render_container = QtWidgets.QWidget(self)
-        self._render_container.setMinimumHeight(200)
+        self._render_container.setMinimumSize(200, 200)
         self._render_container.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding,
             QtWidgets.QSizePolicy.Policy.Expanding
         )
         self._render_layout = QtWidgets.QVBoxLayout(self._render_container)
-        self._render_layout.setContentsMargins(0, 0, 0, 0)
+        self._render_layout.setContentsMargins(2, 2, 2, 2)
         self._render_layout.setSpacing(0)
 
         # Placeholder label
@@ -210,16 +214,17 @@ class OperatorRenderContainer(QtWidgets.QFrame):
             # Update stats from payload
             self._update_stats_from_payload(payload)
 
-            # Initialize renderer if needed
-            if self._renderer_strategy is None:
-                self._init_renderer()
-
             # Extract render data
             render_payload = self._extract_render_payload(payload)
             if render_payload is None:
                 return
 
-            # Render
+            # Detect payload type and initialize appropriate renderer
+            required_mode = self._detect_render_mode(render_payload)
+            if required_mode != self._active_render_mode:
+                self._init_renderer(required_mode)
+
+            # Render using the active strategy
             if self._renderer_strategy and self._renderer_strategy.supports(render_payload):
                 context = RendererContext()
                 self._renderer_strategy.render(render_payload, context=context)
@@ -227,34 +232,84 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         except Exception as e:
             _LOGGER.error(f"Error displaying payload: {e}")
 
-    def _init_renderer(self) -> None:
-        """Initialize the renderer strategy."""
+    def _detect_render_mode(self, payload: Dict[str, Any]) -> RenderMode:
+        """Detect which render mode is needed for this payload.
+
+        Args:
+            payload: The render payload to analyze.
+
+        Returns:
+            RenderMode.RGB_ARRAY for RGB frames, RenderMode.GRID otherwise.
+        """
+        # Check for RGB payload (used by BabyAI, MiniHack, Crafter, etc.)
+        if "rgb" in payload or "frame" in payload:
+            return RenderMode.RGB_ARRAY
+        # Check for grid payload (used by FrozenLake, Taxi, etc.)
+        if "grid" in payload:
+            return RenderMode.GRID
+        # Default to GRID (most basic)
+        return RenderMode.GRID
+
+    def _init_renderer(self, mode: RenderMode = RenderMode.GRID) -> None:
+        """Initialize the renderer strategy.
+
+        Args:
+            mode: Which render mode to initialize (GRID or RGB_ARRAY).
+        """
         try:
-            if not self._renderer_registry.is_registered(RenderMode.GRID):
-                _LOGGER.warning("GRID renderer not registered")
+            # Check if already initialized with this mode
+            if mode == RenderMode.GRID and self._grid_renderer:
+                self._switch_to_renderer(self._grid_renderer, mode)
+                return
+            if mode == RenderMode.RGB_ARRAY and self._rgb_renderer:
+                self._switch_to_renderer(self._rgb_renderer, mode)
                 return
 
-            self._renderer_strategy = self._renderer_registry.create(
-                RenderMode.GRID, self._render_container
-            )
+            # Create new renderer
+            if not self._renderer_registry.is_registered(mode):
+                _LOGGER.warning(f"{mode} renderer not registered")
+                return
 
-            # Remove placeholder and add renderer widget
-            if self._placeholder and self._placeholder.parent():
-                self._render_layout.removeWidget(self._placeholder)
-                self._placeholder.deleteLater()
-                self._placeholder = None
+            new_renderer = self._renderer_registry.create(mode, self._render_container)
 
-            if self._renderer_strategy and hasattr(self._renderer_strategy, 'widget'):
-                widget = self._renderer_strategy.widget
-                widget.setSizePolicy(
-                    QtWidgets.QSizePolicy.Policy.Expanding,
-                    QtWidgets.QSizePolicy.Policy.Expanding
-                )
-                self._render_layout.addWidget(widget)
-                _LOGGER.info(f"Renderer initialized for {self._config.operator_id}")
+            # Store in appropriate slot
+            if mode == RenderMode.GRID:
+                self._grid_renderer = new_renderer
+            elif mode == RenderMode.RGB_ARRAY:
+                self._rgb_renderer = new_renderer
+
+            self._switch_to_renderer(new_renderer, mode)
+            _LOGGER.info(f"Renderer {mode} initialized for {self._config.operator_id}")
 
         except Exception as e:
-            _LOGGER.error(f"Failed to initialize renderer: {e}")
+            _LOGGER.error(f"Failed to initialize renderer {mode}: {e}")
+
+    def _switch_to_renderer(self, renderer: Any, mode: RenderMode) -> None:
+        """Switch the active renderer displayed in the container."""
+        # Hide current renderer widget if any
+        if self._renderer_strategy and hasattr(self._renderer_strategy, 'widget'):
+            self._renderer_strategy.widget.hide()
+
+        # Remove placeholder if present
+        if self._placeholder and self._placeholder.parent():
+            self._render_layout.removeWidget(self._placeholder)
+            self._placeholder.deleteLater()
+            self._placeholder = None
+
+        # Set new active renderer
+        self._renderer_strategy = renderer
+        self._active_render_mode = mode
+
+        if renderer and hasattr(renderer, 'widget'):
+            widget = renderer.widget
+            widget.setSizePolicy(
+                QtWidgets.QSizePolicy.Policy.Expanding,
+                QtWidgets.QSizePolicy.Policy.Expanding
+            )
+            # Add widget if not already in layout
+            if widget.parent() != self._render_container:
+                self._render_layout.addWidget(widget)
+            widget.show()
 
     def _extract_render_payload(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Extract render payload from telemetry payload."""

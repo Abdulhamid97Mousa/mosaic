@@ -96,9 +96,6 @@
 #   Jason BDI (Belief-Desire-Intention) agents
 #   Requires: Java runtime for Jason AgentSpeak
 #
-# requirements/spade_bdi_worker.txt
-#   SPADE BDI agents (Python-based BDI framework)
-#   XMPP-based multi-agent systems
 #
 # requirements/llm_worker.txt
 #   LLM agents with vLLM (BALROG-style agentic evaluation)
@@ -181,9 +178,6 @@
 
 # Jason BDI agent bridge
 -r requirements/jason_worker.txt
-
-# SPADE BDI agents
--r requirements/spade_bdi_worker.txt
 
 # LLM Chat UI (OpenRouter cloud + vLLM local)
 -r requirements/chat.txt

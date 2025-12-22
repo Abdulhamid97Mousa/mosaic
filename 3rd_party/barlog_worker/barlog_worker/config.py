@@ -16,7 +16,8 @@ from typing import Any, Dict, Literal, Optional
 ENV_NAMES = ("babyai", "minigrid", "minihack", "crafter", "nle", "textworld")
 
 # Valid LLM client names
-CLIENT_NAMES = ("openai", "anthropic", "google", "vllm")
+# OpenRouter provides unified access to all major model providers
+CLIENT_NAMES = ("openrouter", "openai", "anthropic", "google", "vllm")
 
 # Valid agent types
 AGENT_TYPES = ("naive", "cot", "robust_naive", "robust_cot", "few_shot", "dummy")
@@ -50,8 +51,8 @@ class BarlogWorkerConfig:
     run_id: str
     env_name: Literal["babyai", "minigrid", "minihack", "crafter", "nle", "textworld"] = "babyai"
     task: str = "BabyAI-GoToRedBall-v0"
-    client_name: Literal["openai", "anthropic", "google", "vllm"] = "openai"
-    model_id: str = "gpt-4o-mini"
+    client_name: Literal["openrouter", "openai", "anthropic", "google", "vllm"] = "openrouter"
+    model_id: str = "openai/gpt-4o-mini"  # OpenRouter format: provider/model
     agent_type: Literal["naive", "cot", "robust_naive", "robust_cot", "few_shot", "dummy"] = "naive"
     num_episodes: int = 5
     max_steps: int = 100
@@ -154,6 +155,9 @@ class BarlogWorkerConfig:
             "agent": {
                 "type": self.agent_type,
                 "max_icl_history": 5,  # For few_shot agent
+                "max_text_history": 10,  # Max text history entries
+                "max_image_history": 5,  # Max image history entries
+                "max_cot_history": 5,  # Max chain-of-thought history entries
             },
             "envs": {
                 "names": self.env_name,

@@ -65,6 +65,7 @@ from gym_gui.config.game_configs import ProcgenConfig
 from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
 from gym_gui.ui.widgets.mujoco_mpc_tab import MuJoCoMPCTab
 from gym_gui.ui.widgets.multi_agent_tab import MultiAgentTab
+from gym_gui.ui.widgets.single_agent_tab import SingleAgentTab
 from gym_gui.ui.widgets.advanced_config import AdvancedConfigTab
 from gym_gui.ui.widgets.godot_ue_tab import GodotUETab
 from gym_gui.telemetry.semconv import (
@@ -126,6 +127,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
     operators_changed = pyqtSignal(list)  # List[OperatorConfig] - when operator configs change
     start_operators_requested = pyqtSignal()  # Start all configured operators
     stop_operators_requested = pyqtSignal()  # Stop all running operators
+    initialize_operator_requested = pyqtSignal(str, object)  # operator_id, config - preview env
     train_agent_requested = pyqtSignal(str)  # Start fresh headless training
     trained_agent_requested = pyqtSignal(str)  # Load trained policy for evaluation
     resume_training_requested = pyqtSignal(str)  # Resume training from checkpoint
@@ -428,7 +430,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._connect_signals()
         self._update_control_states()
         self._populate_operator_combo()
-        self._populate_worker_combo()
+        # Note: Worker combo is now populated by SingleAgentTab
+        self._sync_worker_state()
 
     # ------------------------------------------------------------------
     # Public API
@@ -699,16 +702,21 @@ class ControlPanelWidget(QtWidgets.QWidget):
         human_index = self._tab_widget.addTab(self._human_tab, "Human Control")
         self._tab_to_mode[human_index] = ControlMode.HUMAN_ONLY
 
-        self._single_agent_tab = QtWidgets.QWidget(self)
-        single_layout = QtWidgets.QVBoxLayout(self._single_agent_tab)
-        single_layout.setContentsMargins(0, 0, 0, 0)
-        single_layout.setSpacing(12)
-        single_layout.addWidget(self._create_operator_group(self._single_agent_tab))
-        single_layout.addWidget(self._create_worker_group(self._single_agent_tab))
-        single_layout.addWidget(self._create_training_group(self._single_agent_tab))
-        single_layout.addStretch(1)
+        # Single-Agent Mode Tab with subtabs (Operators, Workers)
+        self._single_agent_tab = SingleAgentTab(self)
         single_index = self._tab_widget.addTab(self._single_agent_tab, "Single-Agent Mode")
         self._tab_to_mode[single_index] = ControlMode.AGENT_ONLY
+        # Initialize legacy operator widgets (hidden, for backward compatibility)
+        self._init_legacy_operator_widgets()
+        # Connect single-agent signals
+        self._single_agent_tab.operators_changed.connect(self._on_operators_config_changed)
+        self._single_agent_tab.start_operators_requested.connect(self._on_start_operators_clicked)
+        self._single_agent_tab.stop_operators_requested.connect(self._on_stop_operators_clicked)
+        self._single_agent_tab.initialize_operator_requested.connect(self._on_initialize_operator_requested)
+        self._single_agent_tab.worker_changed.connect(self._on_single_agent_worker_changed)
+        self._single_agent_tab.train_requested.connect(self._emit_train_agent_requested)
+        self._single_agent_tab.evaluate_requested.connect(self._emit_trained_agent_requested)
+        self._single_agent_tab.resume_requested.connect(self._emit_resume_training_requested)
 
         # Multi-Agent Mode Tab with subtabs
         self._multi_agent_tab = MultiAgentTab(self)
@@ -909,131 +917,73 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._dual_path_radio.toggled.connect(self._update_telemetry_status_label)
         return group
 
-    def _create_operator_group(self, parent: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
-        group = QtWidgets.QGroupBox("Operators", parent)
-        layout = QtWidgets.QVBoxLayout(group)
+    def _init_legacy_operator_widgets(self) -> None:
+        """Initialize legacy operator widgets for backward compatibility.
 
-        # Legacy single-operator combo (hidden by default, for backward compatibility)
-        self._operator_combo = QtWidgets.QComboBox(group)
+        These widgets are hidden but still used by other code paths
+        (e.g., set_active_operator, _populate_operator_combo).
+        """
+        # Legacy single-operator combo (hidden, for backward compatibility)
+        self._operator_combo = QtWidgets.QComboBox(self)
         self._operator_combo.setEnabled(bool(self._operator_order))
-        self._operator_combo.hide()  # Hidden - replaced by multi-operator widget
-        layout.addWidget(self._operator_combo)
+        self._operator_combo.hide()
 
-        self._operator_description = QtWidgets.QLabel("—", group)
+        self._operator_description = QtWidgets.QLabel("—", self)
         self._operator_description.setWordWrap(True)
-        self._operator_description.hide()  # Hidden - integrated into multi-operator rows
-        layout.addWidget(self._operator_description)
-
-        # Multi-operator configuration widget
-        self._operator_config_widget = OperatorConfigWidget(max_operators=8, parent=group)
-        self._operator_config_widget.operators_changed.connect(self._on_operators_config_changed)
-        layout.addWidget(self._operator_config_widget)
-
-        # Start All / Stop All buttons
-        button_row = QtWidgets.QHBoxLayout()
-        button_row.setSpacing(8)
-
-        self._start_operators_button = QtWidgets.QPushButton("Start All", group)
-        self._start_operators_button.setToolTip("Start all configured operators")
-        self._start_operators_button.setStyleSheet(
-            "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #4CAF50; color: white; }"
-            "QPushButton:hover { background-color: #45a049; }"
-            "QPushButton:pressed { background-color: #388E3C; }"
-            "QPushButton:disabled { background-color: #A5D6A7; color: #E8F5E9; }"
-        )
-        self._start_operators_button.clicked.connect(self._on_start_operators_clicked)
-        button_row.addWidget(self._start_operators_button)
-
-        self._stop_operators_button = QtWidgets.QPushButton("Stop All", group)
-        self._stop_operators_button.setToolTip("Stop all running operators")
-        self._stop_operators_button.setStyleSheet(
-            "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #F44336; color: white; }"
-            "QPushButton:hover { background-color: #E53935; }"
-            "QPushButton:pressed { background-color: #D32F2F; }"
-            "QPushButton:disabled { background-color: #EF9A9A; color: #FFEBEE; }"
-        )
-        self._stop_operators_button.setEnabled(False)  # Disabled until operators are running
-        self._stop_operators_button.clicked.connect(self._on_stop_operators_clicked)
-        button_row.addWidget(self._stop_operators_button)
-
-        layout.addLayout(button_row)
-
-        return group
+        self._operator_description.hide()
 
     def _on_operators_config_changed(self, configs: list) -> None:
         """Handle operator configuration changes from the multi-operator widget."""
         self.operators_changed.emit(configs)
-        # Enable/disable start button based on operator count
-        has_operators = len(configs) > 0
-        self._start_operators_button.setEnabled(has_operators)
 
     def _on_start_operators_clicked(self) -> None:
         """Handle Start All button click."""
         self.start_operators_requested.emit()
-        self._start_operators_button.setEnabled(False)
-        self._stop_operators_button.setEnabled(True)
 
     def _on_stop_operators_clicked(self) -> None:
         """Handle Stop All button click."""
         self.stop_operators_requested.emit()
-        self._start_operators_button.setEnabled(True)
-        self._stop_operators_button.setEnabled(False)
 
-    def _create_worker_group(self, parent: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
-        group = QtWidgets.QGroupBox("Worker Integration", parent)
-        layout = QtWidgets.QVBoxLayout(group)
-        self._worker_combo = QtWidgets.QComboBox(group)
-        self._worker_combo.setEnabled(bool(self._worker_definitions))
-        layout.addWidget(self._worker_combo)
-        self._worker_description = QtWidgets.QLabel("Select a worker to view capabilities.", group)
-        self._worker_description.setWordWrap(True)
-        layout.addWidget(self._worker_description)
-        return group
+    def _on_initialize_operator_requested(self, operator_id: str, config: OperatorConfig) -> None:
+        """Handle Initialize button click - preview environment before running."""
+        self.initialize_operator_requested.emit(operator_id, config)
 
-    def _create_training_group(self, parent: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
-        group = QtWidgets.QGroupBox("Headless Training", parent)
-        layout = QtWidgets.QVBoxLayout(group)
+    def _on_single_agent_worker_changed(self, worker_id: str) -> None:
+        """Handle worker selection change from SingleAgentTab."""
+        self.worker_changed.emit(worker_id)
 
-        self._train_agent_button = QtWidgets.QPushButton("🤖 Train Agent", group)
-        self._train_agent_button.setToolTip(
-            "Start a fresh headless training run.\n"
-            "Training will run in the background with live telemetry streaming."
-        )
-        self._train_agent_button.setEnabled(False)
-        self._train_agent_button.setStyleSheet(
-            "QPushButton { font-weight: bold; padding: 8px; background-color: #1976d2; color: white; }"
-            "QPushButton:hover { background-color: #1565c0; }"
-            "QPushButton:pressed { background-color: #0d47a1; }"
-            "QPushButton:disabled { background-color: #90caf9; color: #E3F2FD; }"
-        )
-        layout.addWidget(self._train_agent_button)
+    # ------------------------------------------------------------------
+    # Backward-compatible widget accessors (redirect to SingleAgentTab)
+    # ------------------------------------------------------------------
+    @property
+    def _worker_combo(self) -> QtWidgets.QComboBox:
+        """Get worker combo from SingleAgentTab."""
+        return self._single_agent_tab.worker_combo
 
-        self._trained_agent_button = QtWidgets.QPushButton("📦 Evaluate Policy", group)
-        self._trained_agent_button.setToolTip(
-            "Select an existing policy or checkpoint to evaluate inside the GUI."
-        )
-        self._trained_agent_button.setEnabled(False)
-        self._trained_agent_button.setStyleSheet(
-            "QPushButton { padding: 8px; font-weight: bold; background-color: #388e3c; color: white; }"
-            "QPushButton:hover { background-color: #2e7d32; }"
-            "QPushButton:pressed { background-color: #1b5e20; }"
-            "QPushButton:disabled { background-color: #a5d6a7; color: #E8F5E9; }"
-        )
-        layout.addWidget(self._trained_agent_button)
+    @property
+    def _worker_description(self) -> QtWidgets.QLabel:
+        """Get worker description from SingleAgentTab."""
+        return self._single_agent_tab.worker_description
 
-        self._resume_training_button = QtWidgets.QPushButton("🔄 Resume Training", group)
-        self._resume_training_button.setToolTip(
-            "Load a checkpoint and continue training from where it left off."
-        )
-        self._resume_training_button.setEnabled(False)
-        self._resume_training_button.setStyleSheet(
-            "QPushButton { padding: 8px; font-weight: bold; background-color: #f57c00; color: white; }"
-            "QPushButton:hover { background-color: #ef6c00; }"
-            "QPushButton:pressed { background-color: #e65100; }"
-            "QPushButton:disabled { background-color: #ffcc80; color: #FFF3E0; }"
-        )
-        layout.addWidget(self._resume_training_button)
-        return group
+    @property
+    def _train_agent_button(self) -> QtWidgets.QPushButton:
+        """Get train agent button from SingleAgentTab."""
+        return self._single_agent_tab.train_agent_button
+
+    @property
+    def _trained_agent_button(self) -> QtWidgets.QPushButton:
+        """Get evaluate policy button from SingleAgentTab."""
+        return self._single_agent_tab.evaluate_policy_button
+
+    @property
+    def _resume_training_button(self) -> QtWidgets.QPushButton:
+        """Get resume training button from SingleAgentTab."""
+        return self._single_agent_tab.resume_training_button
+
+    @property
+    def _operator_config_widget(self) -> OperatorConfigWidget:
+        """Get operator config widget from SingleAgentTab."""
+        return self._single_agent_tab.operator_config_widget
 
 
     def _create_control_group(self, parent: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
@@ -1142,12 +1092,10 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._game_combo.currentIndexChanged.connect(self._on_game_changed)
         self._seed_spin.valueChanged.connect(lambda _: self._update_control_states())
         self._wire_mode_combo()
-        self._worker_combo.currentIndexChanged.connect(self._on_worker_selection_changed)
+        # Note: Worker combo signals are now handled by SingleAgentTab
 
         self._load_button.clicked.connect(self._on_load_clicked)
-        self._train_agent_button.clicked.connect(self._emit_train_agent_requested)
-        self._trained_agent_button.clicked.connect(self._emit_trained_agent_requested)
-        self._resume_training_button.clicked.connect(self._emit_resume_training_requested)
+        # Note: Training button signals are now handled by SingleAgentTab
         self._start_button.clicked.connect(self._on_start_clicked)
         self._pause_button.clicked.connect(self._on_pause_clicked)
         self._continue_button.clicked.connect(self._on_continue_clicked)
@@ -1426,27 +1374,21 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._active_operator_id = current_data if isinstance(current_data, str) else None
         self._update_operator_description()
 
-    def _populate_worker_combo(self) -> None:
-        self._worker_combo.blockSignals(True)
-        self._worker_combo.clear()
-        for definition in self._worker_definitions:
-            self._worker_combo.addItem(definition.display_name, definition.worker_id)
+    def _sync_worker_state(self) -> None:
+        """Sync worker state from SingleAgentTab without repopulating.
 
+        SingleAgentTab's WorkersSubTab handles its own combo population.
+        This method just syncs the _current_worker_id state.
+        """
         if not self._worker_definitions:
-            self._worker_combo.setEnabled(False)
-            self._worker_combo.blockSignals(False)
-            self._worker_description.setText(
-                "No worker integrations are registered. Configure a worker to enable training."
-            )
             self._current_worker_id = None
             self._update_control_states()
             return
 
-        # Select the first worker by default without emitting cascaded signals
-        self._worker_combo.setEnabled(True)
-        self._worker_combo.setCurrentIndex(0)
-        self._worker_combo.blockSignals(False)
-        self._on_worker_selection_changed(self._worker_combo.currentIndex())
+        # Get current worker from SingleAgentTab
+        worker_id = self._single_agent_tab.workers_subtab.current_worker_id
+        self._current_worker_id = worker_id
+        self._update_control_states()
 
     def _on_operator_selection_changed(self, index: int) -> None:
         operator_id = self._operator_combo.itemData(index)
@@ -1801,6 +1743,11 @@ class ControlPanelWidget(QtWidgets.QWidget):
     # ------------------------------------------------------------------
     # Property accessors
     # ------------------------------------------------------------------
+    @property
+    def single_agent_tab(self) -> SingleAgentTab:
+        """Get the Single-Agent tab widget."""
+        return self._single_agent_tab
+
     @property
     def multi_agent_tab(self) -> MultiAgentTab:
         """Get the Multi-Agent tab widget."""

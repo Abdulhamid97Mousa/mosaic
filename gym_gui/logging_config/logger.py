@@ -45,7 +45,6 @@ class _ComponentRegistry:
             "gym_gui.services": "Service",
             "gym_gui.telemetry": "Telemetry",
             "gym_gui.logging": "Logging",
-            "spade_bdi_worker": "Worker",
         }
         for prefix, component in defaults.items():
             self.register_prefix(prefix, component)
@@ -199,7 +198,7 @@ def _level_name(level: int) -> str:
 
 
 def _project_loggers() -> Iterable[str]:
-    return ("gym_gui", "spade_bdi_worker")
+    return ("gym_gui",)
 
 
 def configure_logging(

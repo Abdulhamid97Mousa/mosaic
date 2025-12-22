@@ -22,6 +22,7 @@ VAR_TRAINER_DB = VAR_TRAINER_DIR / "trainer.sqlite"
 VAR_DATA_DIR = VAR_ROOT / "data"
 VAR_MODELS_DIR = VAR_ROOT / "models"  # LLM models for vLLM serving
 VAR_MODELS_HF_CACHE = VAR_MODELS_DIR / "huggingface"  # HuggingFace cache
+VAR_OPERATORS_DIR = VAR_ROOT / "operators"  # Operator subprocess logs and state
 
 
 def ensure_var_directories() -> None:
@@ -40,6 +41,7 @@ def ensure_var_directories() -> None:
         VAR_DATA_DIR,
         VAR_MODELS_DIR,
         VAR_MODELS_HF_CACHE,
+        VAR_OPERATORS_DIR,
     ):
         path.mkdir(parents=True, exist_ok=True)
 
@@ -58,5 +60,6 @@ __all__ = [
     "VAR_DATA_DIR",
     "VAR_MODELS_DIR",
     "VAR_MODELS_HF_CACHE",
+    "VAR_OPERATORS_DIR",
     "ensure_var_directories",
 ]

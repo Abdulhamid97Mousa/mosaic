@@ -11,7 +11,7 @@ def _sample_train_config() -> dict:
     return {
         "run_name": "frozenlake-v2-q-learning-20251101-151440",
         "entry_point": "python",
-        "arguments": ["-m", "spade_bdi_worker.worker"],
+        "arguments": ["-m", "cleanrl_worker.cli"],
         "environment": {},
         "resources": {
             "cpus": 2,

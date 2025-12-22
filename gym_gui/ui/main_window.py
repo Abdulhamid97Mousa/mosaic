@@ -69,6 +69,7 @@ from gym_gui.game_docs import get_game_info
 from gym_gui.game_docs.mosaic_welcome import MOSAIC_WELCOME_HTML
 from gym_gui.services.actor import ActorService
 from gym_gui.services.operator import OperatorConfig, OperatorDescriptor, MultiOperatorService
+from gym_gui.services.operator_launcher import OperatorLauncher, OperatorLaunchError
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
 from gym_gui.services.trainer import (
@@ -83,9 +84,6 @@ from gym_gui.ui.widgets.fastlane_tab import FastLaneTab
 from gym_gui.ui.widgets.ray_multi_worker_fastlane_tab import RayMultiWorkerFastLaneTab
 from gym_gui.ui.presenters.workers import (
     get_worker_presenter_registry,
-)
-from gym_gui.ui.widgets.spade_bdi_worker_tabs import (
-    AgentReplayTab,
 )
 from gym_gui.services.llm import LLM_CHAT_AVAILABLE
 from gym_gui.ui.themes import apply_theme, DARK_THEME, LIGHT_THEME
@@ -126,9 +124,6 @@ from gym_gui.constants.optional_deps import (
     OptionalDependencyError,
 )
 
-if TYPE_CHECKING:  # pragma: no cover - typing only
-    from gym_gui.ui.widgets.spade_bdi_train_form import SpadeBdiTrainForm
-    from gym_gui.ui.widgets.spade_bdi_policy_selection_form import SpadeBdiPolicySelectionForm
 from gym_gui.services.trainer.signals import get_trainer_signals
 
 TRAINER_SUBMIT_DEADLINE_MULTIPLIER = 6
@@ -212,6 +207,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         # Multi-operator service for parallel operator execution
         self._multi_operator_service = MultiOperatorService()
+        self._operator_launcher = OperatorLauncher()
 
         # Track dynamic agent tabs by (run_id, agent_id)
         self._agent_tab_index: set[tuple[str, str]] = set()
@@ -751,6 +747,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._control_panel.operators_changed.connect(self._on_operators_changed)
         self._control_panel.start_operators_requested.connect(self._on_start_operators)
         self._control_panel.stop_operators_requested.connect(self._on_stop_operators)
+        self._control_panel.initialize_operator_requested.connect(self._on_initialize_operator)
         # Game configuration handlers (delegated)
         self._control_panel.slippery_toggled.connect(self._game_config_handler.on_slippery_toggled)
         self._control_panel.frozen_v2_config_changed.connect(self._game_config_handler.on_frozen_v2_config_changed)
@@ -950,25 +947,73 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._status_bar.showMessage("No operators configured to start", 3000)
             return
 
-        # Start all operators via the service
-        started_ids = self._multi_operator_service.start_all()
+        # Get operators that are pending (not yet started)
+        pending_ids = self._multi_operator_service.start_all()
+        if not pending_ids:
+            self._status_bar.showMessage("All operators already running", 3000)
+            return
+
+        # Launch subprocess workers for each operator
+        started_ids = []
+        failed_ids = []
+        for operator_id in pending_ids:
+            config = self._multi_operator_service.get_operator(operator_id)
+            if config is None:
+                continue
+
+            try:
+                # Launch the subprocess
+                handle = self._operator_launcher.launch_operator(config)
+
+                # Assign run_id to the service for telemetry routing
+                self._multi_operator_service.assign_run_id(operator_id, handle.run_id)
+                self._multi_operator_service.set_operator_state(operator_id, "running")
+
+                started_ids.append(operator_id)
+
+                self.log_constant(
+                    LOG_UI_MAINWINDOW_INFO,
+                    message=f"Launched operator subprocess",
+                    extra={
+                        "operator_id": operator_id,
+                        "run_id": handle.run_id,
+                        "pid": handle.pid,
+                        "log_path": str(handle.log_path),
+                    },
+                )
+            except OperatorLaunchError as e:
+                self._multi_operator_service.set_operator_state(operator_id, "error")
+                failed_ids.append(operator_id)
+                self.log_constant(
+                    LOG_UI_MAINWINDOW_ERROR,
+                    message=f"Failed to launch operator: {e}",
+                    extra={"operator_id": operator_id},
+                )
 
         # Update status indicators
         for operator_id in started_ids:
             self._render_tabs.set_operator_status(operator_id, "running")
+        for operator_id in failed_ids:
+            self._render_tabs.set_operator_status(operator_id, "error")
 
         # Switch to Multi-Operator tab
         self._render_tabs.switch_to_multi_operator_tab()
 
         count = len(started_ids)
-        self._status_bar.showMessage(
-            f"Started {count} operator{'s' if count != 1 else ''}",
-            3000
-        )
+        if failed_ids:
+            self._status_bar.showMessage(
+                f"Started {count} operator{'s' if count != 1 else ''}, {len(failed_ids)} failed",
+                5000
+            )
+        else:
+            self._status_bar.showMessage(
+                f"Started {count} operator{'s' if count != 1 else ''}",
+                3000
+            )
         self.log_constant(
             LOG_UI_MAINWINDOW_INFO,
             message=f"Started {count} operators",
-            extra={"operator_ids": started_ids},
+            extra={"operator_ids": started_ids, "failed_ids": failed_ids},
         )
 
     def _on_stop_operators(self) -> None:
@@ -976,19 +1021,24 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         Terminates all worker subprocesses and updates status indicators.
         """
-        active_operators = self._multi_operator_service.get_active_operators()
-        if not active_operators:
+        # First stop via the launcher (actually terminates subprocesses)
+        stopped_launcher_ids = self._operator_launcher.stop_all()
+
+        # Then update the service state
+        stopped_service_ids = self._multi_operator_service.stop_all()
+
+        # Combine stopped IDs (may differ if launcher had extras)
+        all_stopped = set(stopped_launcher_ids) | set(stopped_service_ids)
+
+        if not all_stopped:
             self._status_bar.showMessage("No operators running", 3000)
             return
 
-        # Stop all operators via the service
-        stopped_ids = self._multi_operator_service.stop_all()
-
         # Update status indicators
-        for operator_id in stopped_ids:
+        for operator_id in all_stopped:
             self._render_tabs.set_operator_status(operator_id, "stopped")
 
-        count = len(stopped_ids)
+        count = len(all_stopped)
         self._status_bar.showMessage(
             f"Stopped {count} operator{'s' if count != 1 else ''}",
             3000
@@ -996,8 +1046,108 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self.log_constant(
             LOG_UI_MAINWINDOW_INFO,
             message=f"Stopped {count} operators",
-            extra={"operator_ids": stopped_ids},
+            extra={"operator_ids": list(all_stopped)},
         )
+
+    def _on_initialize_operator(self, operator_id: str, config: OperatorConfig) -> None:
+        """Initialize environment for operator preview without starting the agent.
+
+        Creates the environment, resets it, and displays the initial observation
+        in the render container so users can preview before running.
+        """
+        env_name = config.env_name
+        task = config.task
+
+        self._status_bar.showMessage(f"Initializing {task}...", 2000)
+
+        try:
+            # Create and reset environment to get initial observation
+            import numpy as np
+
+            env = None
+            rgb_frame = None
+
+            if env_name in ("babyai", "minigrid"):
+                # Use MiniGrid/BabyAI via gymnasium
+                try:
+                    import minigrid
+                    minigrid.register_minigrid_envs()
+                except ImportError:
+                    self._status_bar.showMessage(
+                        f"MiniGrid not installed - cannot preview {task}",
+                        5000
+                    )
+                    return
+
+                import gymnasium as gym
+                env = gym.make(task, render_mode="rgb_array")
+                env.reset()
+                rgb_frame = env.render()
+                env.close()
+
+            elif env_name == "crafter":
+                # Use Crafter environment
+                try:
+                    import crafter
+                    env = crafter.Env()
+                    env.reset()
+                    rgb_frame = env.render()
+                    env.close()
+                except ImportError:
+                    self._status_bar.showMessage(
+                        "Crafter not installed - cannot preview",
+                        5000
+                    )
+                    return
+
+            else:
+                # Generic gymnasium environment
+                try:
+                    import gymnasium as gym
+                    env = gym.make(task, render_mode="rgb_array")
+                    env.reset()
+                    rgb_frame = env.render()
+                    env.close()
+                except Exception as e:
+                    self._status_bar.showMessage(
+                        f"Cannot preview {env_name}/{task}: {e}",
+                        5000
+                    )
+                    return
+
+            if rgb_frame is not None:
+                # Build payload for the render container
+                payload = {
+                    "render_payload": {
+                        "mode": "rgb",
+                        "rgb": rgb_frame.tolist() if isinstance(rgb_frame, np.ndarray) else rgb_frame,
+                        "width": rgb_frame.shape[1] if hasattr(rgb_frame, "shape") else 0,
+                        "height": rgb_frame.shape[0] if hasattr(rgb_frame, "shape") else 0,
+                    },
+                    "episode_index": 0,
+                    "step_index": 0,
+                    "reward": 0.0,
+                }
+
+                # Display in the operator's container
+                self._render_tabs.display_operator_payload(operator_id, payload)
+                self._render_tabs.switch_to_multi_operator_tab()
+                self._status_bar.showMessage(
+                    f"Previewing {task} - ready to start",
+                    3000
+                )
+            else:
+                self._status_bar.showMessage(
+                    f"No render available for {task}",
+                    3000
+                )
+
+        except Exception as e:
+            _LOGGER.exception(f"Failed to initialize operator {operator_id}")
+            self._status_bar.showMessage(
+                f"Failed to initialize: {e}",
+                5000
+            )
 
     def _on_load_requested(self, game_id: GameId, mode: ControlMode, seed: int) -> None:
         """Handle load request from control panel."""
@@ -2005,35 +2155,13 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                         extra={"run_id": run_id, "tab_name": replay_tab_name},
                     )
             else:
-                # Create new replay tab for this agent
-                self.log_constant( 
+                # TODO: Replay tab creation removed (AgentReplayTab was part of spade_bdi_worker_tabs)
+                # Workers should implement their own replay tab via their presenter's create_tabs method
+                self.log_constant(
                     LOG_UI_MAINWINDOW_TRACE,
-                    message="_on_training_finished: replay tab does not exist, creating new",
+                    message="_on_training_finished: replay tab not available for this worker",
                     extra={"run_id": run_id, "agent_id": agent_id, "replay_tab_name": replay_tab_name},
                 )
-                try:
-                    replay = AgentReplayTab(run_id, agent_id, parent=self)
-                    self._render_tabs.add_dynamic_tab(run_id, replay_tab_name, replay)
-                    self.log_constant( 
-                        LOG_UI_MAINWINDOW_INFO,
-                        message="Created replay tab for agent",
-                        extra={"run_id": run_id, "agent_id": agent_id, "tab_name": replay_tab_name},
-                    )
-                    # Record the tab index for switching later (add_dynamic_tab already switches, but we track it)
-                    if first_replay_tab_index is None:
-                        first_replay_tab_index = self._render_tabs.indexOf(replay)
-                        self.log_constant( 
-                            LOG_UI_MAINWINDOW_TRACE,
-                            message="_on_training_finished: recorded new replay tab index",
-                            extra={"run_id": run_id, "agent_id": agent_id, "tab_index": first_replay_tab_index},
-                        )
-                except Exception as e:
-                    self.log_constant( 
-                        LOG_UI_MAINWINDOW_WARNING,
-                        message="Failed to create replay tab",
-                        exc_info=e,
-                        extra={"run_id": run_id, "agent_id": agent_id},
-                    )
         
         self.log_constant( 
             LOG_UI_MAINWINDOW_TRACE,
@@ -2200,6 +2328,16 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         if hasattr(self, "_settings_dialog") and self._settings_dialog is not None:
             self._settings_dialog.close()
             self._settings_dialog = None
+
+        # Stop all operator subprocesses
+        if hasattr(self, "_operator_launcher"):
+            stopped = self._operator_launcher.stop_all()
+            if stopped:
+                self.log_constant(
+                    LOG_UI_MAINWINDOW_INFO,
+                    message=f"Stopped {len(stopped)} operator(s) on shutdown",
+                    extra={"operator_ids": stopped},
+                )
 
         # Shutdown session
         self._session.shutdown()

@@ -29,8 +29,9 @@ openai>=1.0.0
 # Anthropic client (Claude 3.5 Sonnet, Claude 3 Opus, etc.)
 anthropic>=0.18.0
 
-# Google Generative AI client (Gemini Pro, etc.)
-google-generativeai>=0.3.0
+# Google GenAI client (Gemini Pro, etc.)
+# Note: BALROG uses the newer google-genai SDK (not google-generativeai)
+google-genai>=1.0.0
 
 # ═══════════════════════════════════════════════════════════════
 # Environment Dependencies (install based on which envs you use)

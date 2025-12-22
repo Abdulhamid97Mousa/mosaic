@@ -146,8 +146,12 @@ class BarlogWorkerRuntime:
         return factory.create_agent()
 
     def _create_env(self) -> Any:
-        """Create BALROG environment based on config."""
-        from balrog.environments import make_env
+        """Create BALROG environment based on config.
+
+        Uses our own environment wrapper (barlog_worker.environments)
+        which fixes compatibility issues with standard Gymnasium environments.
+        """
+        from barlog_worker.environments import make_env
 
         balrog_config = OmegaConf.create(self.config.to_balrog_config())
         return make_env(

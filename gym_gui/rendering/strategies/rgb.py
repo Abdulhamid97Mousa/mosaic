@@ -83,20 +83,21 @@ class _RgbView(QtWidgets.QWidget):
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        container = QtWidgets.QScrollArea(self)
-        container.setWidgetResizable(True)
-        container.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
-
-        label = QtWidgets.QLabel(container)
+        # Use a simple label that expands to fill available space
+        label = QtWidgets.QLabel(self)
         label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        label.setMinimumSize(320, 240)
+        label.setMinimumSize(100, 100)
         label.setStyleSheet("background-color: #111; color: #eee;")
+        label.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Expanding
+        )
+        label.setScaledContents(False)  # We handle scaling ourselves
 
-        container.setWidget(label)
-        layout.addWidget(container)
+        layout.addWidget(label)
 
         self._label = label
-        self._container = container
+        self._container = None  # No longer using scroll area
         self._current_pixmap: QtGui.QPixmap | None = None
 
         # Mouse capture state
@@ -261,6 +262,9 @@ class _RgbView(QtWidgets.QWidget):
         self._current_pixmap = QtGui.QPixmap.fromImage(image)
         self._scale_pixmap()
 
+        # Schedule a re-scale after layout settles (handles initial render)
+        QtCore.QTimer.singleShot(50, self._scale_pixmap)
+
         tooltip = ""
         if tooltip_payload is not None:
             ansi = tooltip_payload.get("ansi")
@@ -280,11 +284,21 @@ class _RgbView(QtWidgets.QWidget):
     def _scale_pixmap(self) -> None:
         if self._current_pixmap is None:
             return
-        if self._label.width() <= 0 or self._label.height() <= 0:
-            self._label.setPixmap(self._current_pixmap)
-            return
+
+        # Get the best available size - try widget size first, then label
+        target_size = self.size()
+
+        # If widget size is too small, try the label
+        if target_size.width() < 100 or target_size.height() < 100:
+            target_size = self._label.size()
+
+        # If still too small, use a reasonable minimum
+        if target_size.width() < 100 or target_size.height() < 100:
+            target_size = QtCore.QSize(300, 300)
+
+        # Scale the pixmap to fill the available space while keeping aspect ratio
         scaled = self._current_pixmap.scaled(
-            self._label.size(),
+            target_size,
             QtCore.Qt.AspectRatioMode.KeepAspectRatio,
             QtCore.Qt.TransformationMode.SmoothTransformation,
         )

@@ -18,7 +18,7 @@ class WorkerPresenter(Protocol):
     3. Extracting metadata for DTO/API contracts
 
     Example:
-        SpadeBdiWorkerPresenter handles SPADE-BDI specific configuration,
+        RayWorkerPresenter handles Ray RLlib specific configuration,
         tab creation, and metadata composition.
     """
 

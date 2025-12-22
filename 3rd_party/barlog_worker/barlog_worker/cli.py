@@ -3,7 +3,17 @@
 Entry point: barlog-worker
 
 Example usage:
-    barlog-worker --run-id test123 --env babyai --task BabyAI-GoToRedBall-v0 --model gpt-4o-mini
+    # Using OpenRouter (default, supports all major models)
+    export OPENROUTER_API_KEY=sk-or-...
+    barlog-worker --run-id test123 --env babyai --task BabyAI-GoToRedBall-v0
+
+    # Using specific model via OpenRouter
+    barlog-worker --run-id test123 --model anthropic/claude-3.5-sonnet
+
+    # Using local vLLM
+    barlog-worker --run-id test123 --client vllm --model meta-llama/Llama-3.1-8B-Instruct
+
+    # Load from config file
     barlog-worker --config config.json
 """
 
@@ -124,28 +134,28 @@ Examples:
         "--client",
         type=str,
         choices=CLIENT_NAMES,
-        default="openai",
+        default="openrouter",
         dest="client_name",
-        help="LLM client to use (default: openai)",
+        help="LLM client to use (default: openrouter). OpenRouter provides unified access to all major models.",
     )
     llm_group.add_argument(
         "--model",
         type=str,
-        default="gpt-4o-mini",
+        default="openai/gpt-4o-mini",
         dest="model_id",
-        help="Model identifier (default: gpt-4o-mini)",
+        help="Model identifier (default: openai/gpt-4o-mini). For OpenRouter use format: provider/model",
     )
     llm_group.add_argument(
         "--api-key",
         type=str,
         default=None,
-        help="API key (defaults to OPENAI_API_KEY, ANTHROPIC_API_KEY, etc.)",
+        help="API key (defaults to OPENROUTER_API_KEY, OPENAI_API_KEY, etc.)",
     )
     llm_group.add_argument(
         "--base-url",
         type=str,
         default=None,
-        help="Custom base URL for API (for vLLM or proxies)",
+        help="Custom base URL for API (OpenRouter: https://openrouter.ai/api/v1)",
     )
     llm_group.add_argument(
         "--temperature",
