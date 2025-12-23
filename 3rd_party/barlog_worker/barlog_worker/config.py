@@ -68,6 +68,10 @@ class BarlogWorkerConfig:
     retry_delay: float = 1.0
     timeout: float = 60.0
     alternate_roles: bool = True
+    # VLM (Vision-Language Model) settings
+    # Set to 0 for text-only models (e.g., Qwen2.5-1.5B-Instruct)
+    # Set to >= 1 for multimodal models (e.g., GPT-4V, Claude 3)
+    max_image_history: int = 0
 
     def __post_init__(self) -> None:
         """Validate configuration after initialization."""
@@ -156,7 +160,7 @@ class BarlogWorkerConfig:
                 "type": self.agent_type,
                 "max_icl_history": 5,  # For few_shot agent
                 "max_text_history": 10,  # Max text history entries
-                "max_image_history": 5,  # Max image history entries
+                "max_image_history": self.max_image_history,  # 0 for text-only, >= 1 for VLM
                 "max_cot_history": 5,  # Max chain-of-thought history entries
             },
             "envs": {

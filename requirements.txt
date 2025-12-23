@@ -46,6 +46,7 @@
 #   - nethack        : NetHack/MiniHack roguelike environments
 #   - crafter        : Crafter open-world survival benchmark
 #   - procgen        : Procgen procedurally generated benchmark
+#   - textworld      : TextWorld text-based game environments (Microsoft Research)
 #   - ray-rllib      : Ray/RLlib distributed training
 #   - xuance         : XuanCe MARL algorithms
 #   - jason          : Jason BDI agents
@@ -82,6 +83,11 @@
 # requirements/crafter.txt
 #   Crafter open-world survival benchmark (Hafner 2022, ICLR)
 #   Survival tasks in procedurally generated worlds
+#
+# requirements/textworld.txt
+#   TextWorld text-based game environment (Microsoft Research)
+#   Language understanding and sequential decision making
+#   Requires: Linux or macOS (Windows not supported)
 #
 # requirements/ray_worker.txt
 #   Ray/RLlib distributed training framework

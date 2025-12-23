@@ -290,6 +290,27 @@ except Exception:  # pragma: no cover - crafter optional
     CRAFTER_ACTIONS = []  # type: ignore
     _CRAFTER_AVAILABLE = False
 
+try:  # Optional dependency - TextWorld (text-based game environments)
+    from .textworld import (  # pragma: no cover - textworld optional
+        TextWorldAdapter,
+        TextWorldSimpleAdapter,
+        TextWorldCoinCollectorAdapter,
+        TextWorldTreasureHunterAdapter,
+        TextWorldCookingAdapter,
+        TEXTWORLD_ADAPTERS,
+        TEXTWORLD_CHALLENGES,
+    )
+    _TEXTWORLD_AVAILABLE = True
+except Exception:  # pragma: no cover - textworld optional
+    TextWorldAdapter = None  # type: ignore
+    TextWorldSimpleAdapter = None  # type: ignore
+    TextWorldCoinCollectorAdapter = None  # type: ignore
+    TextWorldTreasureHunterAdapter = None  # type: ignore
+    TextWorldCookingAdapter = None  # type: ignore
+    TEXTWORLD_ADAPTERS = {}
+    TEXTWORLD_CHALLENGES = []  # type: ignore
+    _TEXTWORLD_AVAILABLE = False
+
 # Standalone adapters for Human vs Agent mode (simplified state-based interfaces)
 from .chess_adapter import ChessAdapter as ChessHvAAdapter, ChessState
 from .connect_four_adapter import ConnectFourAdapter as ConnectFourHvAAdapter, ConnectFourState
@@ -490,6 +511,16 @@ if _CRAFTER_AVAILABLE:
         "CRAFTER_ADAPTERS",
         "CRAFTER_ACHIEVEMENTS",
         "CRAFTER_ACTIONS",
+    ]
+
+if _TEXTWORLD_AVAILABLE:
+    __all__ += [
+        "TextWorldAdapter",
+        "TextWorldSimpleAdapter",
+        "TextWorldCoinCollectorAdapter",
+        "TextWorldTreasureHunterAdapter",
+        "TextWorldCookingAdapter",
+        "TEXTWORLD_CHALLENGES",
     ]
 
 # Human vs Agent mode adapters (always available)

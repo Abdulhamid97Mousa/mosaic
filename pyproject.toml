@@ -129,6 +129,14 @@ procgen = [
     "procgen-mirror>=0.10.7; python_version >= '3.11'",
 ]
 
+# TextWorld text-based game environment (Microsoft Research)
+# Paper: Cote et al. (2018). "TextWorld: A Learning Environment for Text-based Games"
+# Repository: https://github.com/microsoft/TextWorld
+# NOTE: Linux/macOS only (Windows not supported), Python 3.9-3.12
+textworld = [
+    "textworld>=1.6.0",
+]
+
 # =============================================================================
 # Workers (training backends)
 # =============================================================================
@@ -224,7 +232,7 @@ all-gymnasium = [
 
 # All environment families (single + multi-agent)
 all-envs = [
-    "mosaic[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom,nethack,crafter,procgen]",
+    "mosaic[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom,nethack,crafter,procgen,textworld]",
 ]
 
 # Full development setup

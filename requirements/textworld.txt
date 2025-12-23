@@ -1,0 +1,36 @@
+# =============================================================================
+# TextWorld Environment Dependencies
+# =============================================================================
+# TextWorld is a Microsoft Research sandbox for training RL agents on
+# text-based games. It generates and simulates text-based adventure games
+# for research in language understanding and sequential decision making.
+#
+# USAGE:
+#   pip install -r requirements/textworld.txt
+#
+# FEATURES:
+#   - Procedural text-based game generation
+#   - Language understanding and sequential decision making
+#   - Multiple game types (Treasure Hunter, Coin Collector, Cooking)
+#   - Customizable difficulty levels
+#   - Gymnasium-compatible environment interface
+#
+# SYSTEM REQUIREMENTS:
+#   - Python 3.9-3.12
+#   - Linux or macOS only (Windows not supported)
+#
+# DOCUMENTATION:
+#   Repository: https://github.com/microsoft/TextWorld
+#   Project: https://www.microsoft.com/en-us/research/project/textworld/
+#   Docs: https://textworld.readthedocs.io/
+#
+# RESEARCH:
+#   Cote et al. (2018). "TextWorld: A Learning Environment for Text-based Games"
+#   https://arxiv.org/abs/1806.11532
+# =============================================================================
+
+# Include core GUI + shared dependencies
+-r base.txt
+
+# TextWorld text-based game environment
+textworld>=1.6.0

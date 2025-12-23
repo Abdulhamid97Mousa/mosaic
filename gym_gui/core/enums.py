@@ -31,6 +31,7 @@ class EnvironmentFamily(StrEnum):
     NETHACK = "nethack"  # Full NetHack game (via NLE)
     CRAFTER = "crafter"  # Crafter open world survival benchmark
     PROCGEN = "procgen"  # Procgen procedural benchmark (16 environments)
+    TEXTWORLD = "textworld"  # TextWorld text-based game environment (Microsoft Research)
     PETTINGZOO = "pettingzoo"
     PETTINGZOO_CLASSIC = "pettingzoo_classic"  # PettingZoo Classic: turn-based games (Chess, Go, Connect Four, etc.)
     OTHER = "other"  # Fallback for unknown environments (not displayed in UI)
@@ -329,6 +330,15 @@ class GameId(StrEnum):
     CRAFTER_NO_REWARD = "CrafterNoReward-v1"
 
     # ─────────────────────────────────────────────────────────────────────────
+    # TextWorld (Text-Based Game Environment - Microsoft Research)
+    # ─────────────────────────────────────────────────────────────────────────
+    TEXTWORLD_SIMPLE = "TextWorld-Simple-v0"
+    TEXTWORLD_COIN_COLLECTOR = "TextWorld-CoinCollector-v0"
+    TEXTWORLD_TREASURE_HUNTER = "TextWorld-TreasureHunter-v0"
+    TEXTWORLD_COOKING = "TextWorld-Cooking-v0"
+    TEXTWORLD_CUSTOM = "TextWorld-Custom-v0"
+
+    # ─────────────────────────────────────────────────────────────────────────
     # Procgen (Procedurally Generated Benchmark - 16 environments)
     # ─────────────────────────────────────────────────────────────────────────
     PROCGEN_BIGFISH = "procgen:procgen-bigfish-v0"
@@ -490,6 +500,7 @@ INPUT_MODE_INFO: dict[InputMode, tuple[str, str]] = {
 class RenderMode(StrEnum):
     """Rendering strategies supported by the UI."""
 
+    ANSI = "ansi"
     ASCII = "ascii"
     GRID = "grid"
     RGB_ARRAY = "rgb_array"
@@ -818,6 +829,12 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     # Crafter environments
     GameId.CRAFTER_REWARD: EnvironmentFamily.CRAFTER,
     GameId.CRAFTER_NO_REWARD: EnvironmentFamily.CRAFTER,
+    # TextWorld environments (text-based games)
+    GameId.TEXTWORLD_SIMPLE: EnvironmentFamily.TEXTWORLD,
+    GameId.TEXTWORLD_COIN_COLLECTOR: EnvironmentFamily.TEXTWORLD,
+    GameId.TEXTWORLD_TREASURE_HUNTER: EnvironmentFamily.TEXTWORLD,
+    GameId.TEXTWORLD_COOKING: EnvironmentFamily.TEXTWORLD,
+    GameId.TEXTWORLD_CUSTOM: EnvironmentFamily.TEXTWORLD,
     # Procgen environments (16 procedurally generated games)
     GameId.PROCGEN_BIGFISH: EnvironmentFamily.PROCGEN,
     GameId.PROCGEN_BOSSFIGHT: EnvironmentFamily.PROCGEN,
@@ -990,6 +1007,12 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     # Crafter - RGB observation (64x64x3)
     GameId.CRAFTER_REWARD: RenderMode.RGB_ARRAY,
     GameId.CRAFTER_NO_REWARD: RenderMode.RGB_ARRAY,
+    # TextWorld - ANSI text output
+    GameId.TEXTWORLD_SIMPLE: RenderMode.ANSI,
+    GameId.TEXTWORLD_COIN_COLLECTOR: RenderMode.ANSI,
+    GameId.TEXTWORLD_TREASURE_HUNTER: RenderMode.ANSI,
+    GameId.TEXTWORLD_COOKING: RenderMode.ANSI,
+    GameId.TEXTWORLD_CUSTOM: RenderMode.ANSI,
     # Procgen - RGB observation (64x64x3)
     GameId.PROCGEN_BIGFISH: RenderMode.RGB_ARRAY,
     GameId.PROCGEN_BOSSFIGHT: RenderMode.RGB_ARRAY,
@@ -1564,6 +1587,12 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
         ControlMode.AGENT_ONLY,
         ControlMode.HYBRID_TURN_BASED,
     ),
+    # TextWorld - text-based adventure games (text command input)
+    GameId.TEXTWORLD_SIMPLE: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.TEXTWORLD_COIN_COLLECTOR: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.TEXTWORLD_TREASURE_HUNTER: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.TEXTWORLD_COOKING: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.TEXTWORLD_CUSTOM: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     # Procgen - procedurally generated games (supports Human Control)
     GameId.PROCGEN_BIGFISH: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     GameId.PROCGEN_BOSSFIGHT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
@@ -1648,6 +1677,7 @@ DEFAULT_PARADIGM_BY_FAMILY: dict[EnvironmentFamily, SteppingParadigm] = {
     EnvironmentFamily.NETHACK: SteppingParadigm.SINGLE_AGENT,  # Turn-based roguelike
     EnvironmentFamily.CRAFTER: SteppingParadigm.SINGLE_AGENT,  # Turn-based survival game
     EnvironmentFamily.PROCGEN: SteppingParadigm.SINGLE_AGENT,  # Procedurally generated games
+    EnvironmentFamily.TEXTWORLD: SteppingParadigm.SINGLE_AGENT,  # Text-based adventure games
     EnvironmentFamily.PETTINGZOO: SteppingParadigm.SEQUENTIAL,  # AEC by default
     EnvironmentFamily.PETTINGZOO_CLASSIC: SteppingParadigm.SEQUENTIAL,  # Chess, Go, etc.
     EnvironmentFamily.OTHER: SteppingParadigm.SINGLE_AGENT,  # Fallback

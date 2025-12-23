@@ -179,6 +179,13 @@ Examples:
         default="naive",
         help="Agent reasoning strategy (default: naive)",
     )
+    agent_group.add_argument(
+        "--max-image-history",
+        type=int,
+        default=0,
+        help="Max images in history. 0=text-only (default), >=1=VLM mode. "
+             "Use 0 for text-only models like Qwen2.5. Use >=1 for multimodal models like GPT-4V.",
+    )
 
     # Output settings
     output_group = parser.add_argument_group("Output")
@@ -197,6 +204,14 @@ Examples:
         "-v", "--verbose",
         action="store_true",
         help="Enable verbose (DEBUG) logging",
+    )
+
+    # Interactive mode for GUI step-by-step control
+    output_group.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Run in interactive mode - read commands from stdin, emit telemetry to stdout. "
+             "Enables step-by-step control from GUI for scientific comparison.",
     )
 
     return parser
@@ -235,6 +250,7 @@ def build_config_from_args(args: argparse.Namespace) -> BarlogWorkerConfig:
         emit_jsonl=not args.no_jsonl,
         seed=args.seed,
         timeout=args.timeout,
+        max_image_history=args.max_image_history,
     )
 
 
@@ -271,11 +287,20 @@ def main(argv: list[str] | None = None) -> int:
 
     try:
         # Lazy import to avoid dependency issues when just parsing args
-        from barlog_worker.runtime import BarlogWorkerRuntime
+        if args.interactive:
+            # Interactive mode for GUI step-by-step control
+            from barlog_worker.runtime import InteractiveRuntime
 
-        runtime = BarlogWorkerRuntime(config)
-        runtime.run()
-        logger.info("BARLOG Worker completed successfully")
+            runtime = InteractiveRuntime(config)
+            runtime.run()
+            logger.info("Interactive mode completed")
+        else:
+            # Autonomous mode - run all episodes
+            from barlog_worker.runtime import BarlogWorkerRuntime
+
+            runtime = BarlogWorkerRuntime(config)
+            runtime.run()
+            logger.info("BARLOG Worker completed successfully")
         return 0
     except KeyboardInterrupt:
         logger.warning("Interrupted by user")

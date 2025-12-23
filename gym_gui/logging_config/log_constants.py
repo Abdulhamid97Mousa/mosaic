@@ -620,6 +620,55 @@ LOG_ENV_PROCGEN_LEVEL_COMPLETE = _constant(
 
 
 # ---------------------------------------------------------------------------
+# TextWorld adapter specific constants (LOG550–LOG554)
+# ---------------------------------------------------------------------------
+LOG_ENV_TEXTWORLD_BOOT = _constant(
+    "LOG550",
+    "INFO",
+    "TextWorld adapter bootstrapped",
+    component="Adapter",
+    subcomponent="TextWorld",
+    tags=_tags("textworld", "bootstrap", "lifecycle"),
+)
+
+LOG_ENV_TEXTWORLD_STEP = _constant(
+    "LOG551",
+    "DEBUG",
+    "TextWorld step checkpoint",
+    component="Adapter",
+    subcomponent="TextWorld",
+    tags=_tags("textworld", "step", "checkpoint"),
+)
+
+LOG_ENV_TEXTWORLD_ERROR = _constant(
+    "LOG552",
+    "ERROR",
+    "TextWorld environment error",
+    component="Adapter",
+    subcomponent="TextWorld",
+    tags=_tags("textworld", "error"),
+)
+
+LOG_ENV_TEXTWORLD_GAME_GENERATED = _constant(
+    "LOG553",
+    "INFO",
+    "TextWorld game generated",
+    component="Adapter",
+    subcomponent="TextWorld",
+    tags=_tags("textworld", "game", "generation"),
+)
+
+LOG_ENV_TEXTWORLD_COMMAND = _constant(
+    "LOG554",
+    "DEBUG",
+    "TextWorld command executed",
+    component="Adapter",
+    subcomponent="TextWorld",
+    tags=_tags("textworld", "command", "action"),
+)
+
+
+# ---------------------------------------------------------------------------
 # Service and telemetry constants (LOG601–LOG650)
 # ---------------------------------------------------------------------------
 LOG_SERVICE_TELEMETRY_STEP_REJECTED = _constant(
@@ -1202,6 +1251,81 @@ LOG_SERVICE_OPERATOR_ERROR = _constant(
     component="Service",
     subcomponent="Operator",
     tags=_tags("operator", "service", "error"),
+)
+
+# ---------------------------------------------------------------------------
+# Operator Launcher Interactive Mode constants (LOG690–LOG697)
+# ---------------------------------------------------------------------------
+LOG_OPERATOR_INTERACTIVE_LAUNCHED = _constant(
+    "LOG690",
+    "INFO",
+    "Operator launched in interactive mode",
+    component="Service",
+    subcomponent="OperatorLauncher",
+    tags=_tags("operator", "launcher", "interactive", "launch"),
+)
+
+LOG_OPERATOR_RESET_COMMAND_SENT = _constant(
+    "LOG691",
+    "INFO",
+    "Reset command sent to interactive operator",
+    component="Service",
+    subcomponent="OperatorLauncher",
+    tags=_tags("operator", "launcher", "interactive", "reset"),
+)
+
+LOG_OPERATOR_STEP_COMMAND_SENT = _constant(
+    "LOG692",
+    "DEBUG",
+    "Step command sent to interactive operator",
+    component="Service",
+    subcomponent="OperatorLauncher",
+    tags=_tags("operator", "launcher", "interactive", "step"),
+)
+
+LOG_OPERATOR_STOP_COMMAND_SENT = _constant(
+    "LOG693",
+    "INFO",
+    "Stop command sent to interactive operator",
+    component="Service",
+    subcomponent="OperatorLauncher",
+    tags=_tags("operator", "launcher", "interactive", "stop"),
+)
+
+LOG_OPERATOR_COMMAND_FAILED = _constant(
+    "LOG694",
+    "WARNING",
+    "Failed to send command to interactive operator",
+    component="Service",
+    subcomponent="OperatorLauncher",
+    tags=_tags("operator", "launcher", "interactive", "error"),
+)
+
+LOG_OPERATOR_RESET_ALL_STARTED = _constant(
+    "LOG695",
+    "INFO",
+    "Reset All operators started with shared seed",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("operator", "interactive", "reset", "seed"),
+)
+
+LOG_OPERATOR_STEP_ALL_COMPLETED = _constant(
+    "LOG696",
+    "DEBUG",
+    "Step All operators completed",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("operator", "interactive", "step"),
+)
+
+LOG_OPERATOR_STOP_ALL_COMPLETED = _constant(
+    "LOG697",
+    "INFO",
+    "Stop All operators completed",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("operator", "interactive", "stop"),
 )
 
 # ---------------------------------------------------------------------------
@@ -3040,6 +3164,14 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_SERVICE_OPERATOR_DEACTIVATED,
     LOG_SERVICE_OPERATOR_ACTION_SELECTED,
     LOG_SERVICE_OPERATOR_ERROR,
+    LOG_OPERATOR_INTERACTIVE_LAUNCHED,
+    LOG_OPERATOR_RESET_COMMAND_SENT,
+    LOG_OPERATOR_STEP_COMMAND_SENT,
+    LOG_OPERATOR_STOP_COMMAND_SENT,
+    LOG_OPERATOR_COMMAND_FAILED,
+    LOG_OPERATOR_RESET_ALL_STARTED,
+    LOG_OPERATOR_STEP_ALL_COMPLETED,
+    LOG_OPERATOR_STOP_ALL_COMPLETED,
     LOG_SERVICE_ACTOR_SEED_ERROR,
     LOG_RUNTIME_APP_DEBUG,
     LOG_RUNTIME_APP_INFO,
@@ -3320,6 +3452,14 @@ __all__ = (
     "LOG_SERVICE_OPERATOR_DEACTIVATED",
     "LOG_SERVICE_OPERATOR_ACTION_SELECTED",
     "LOG_SERVICE_OPERATOR_ERROR",
+    "LOG_OPERATOR_INTERACTIVE_LAUNCHED",
+    "LOG_OPERATOR_RESET_COMMAND_SENT",
+    "LOG_OPERATOR_STEP_COMMAND_SENT",
+    "LOG_OPERATOR_STOP_COMMAND_SENT",
+    "LOG_OPERATOR_COMMAND_FAILED",
+    "LOG_OPERATOR_RESET_ALL_STARTED",
+    "LOG_OPERATOR_STEP_ALL_COMPLETED",
+    "LOG_OPERATOR_STOP_ALL_COMPLETED",
     "LOG_SERVICE_ACTOR_SEED_ERROR",
     "LOG_RUNTIME_APP_DEBUG",
     "LOG_RUNTIME_APP_INFO",

@@ -29,6 +29,7 @@ if TYPE_CHECKING:
     from gym_gui.core.adapters.nethack import NetHackConfig as _NetHackConfigType
     from gym_gui.config.game_configs import CrafterConfig as _CrafterConfigType
     from gym_gui.config.game_configs import ProcgenConfig as _ProcgenConfigType
+    from gym_gui.config.game_configs import TextWorldConfig as _TextWorldConfigType
 
 try:  # Optional dependency
     from gym_gui.core.adapters.vizdoom import (  # pragma: no cover - optional
@@ -92,6 +93,17 @@ except Exception:  # pragma: no cover - procgen optional
     ProcgenAdapter = None  # type: ignore[misc, assignment]
     ProcgenConfig = None  # type: ignore[misc, assignment]
 
+try:  # Optional dependency - TextWorld (text-based game environments)
+    from gym_gui.core.adapters.textworld import (  # pragma: no cover - optional
+        TEXTWORLD_ADAPTERS,
+        TextWorldAdapter,
+    )
+    from gym_gui.config.game_configs import TextWorldConfig
+except Exception:  # pragma: no cover - textworld optional
+    TEXTWORLD_ADAPTERS: dict[Any, Any] = {}
+    TextWorldAdapter = None  # type: ignore[misc, assignment]
+    TextWorldConfig = None  # type: ignore[misc, assignment]
+
 from gym_gui.core.enums import GameId
 
 AdapterT = TypeVar("AdapterT", bound=EnvironmentAdapter)
@@ -121,6 +133,7 @@ def _registry() -> Mapping[GameId, type[EnvironmentAdapter]]:
         **NETHACK_ADAPTERS,
         **CRAFTER_ADAPTERS,
         **PROCGEN_ADAPTERS,
+        **TEXTWORLD_ADAPTERS,
     }
 
 
@@ -158,6 +171,7 @@ def create_adapter(
         | "_NetHackConfigType"
         | "_CrafterConfigType"
         | "_ProcgenConfigType"
+        | "_TextWorldConfigType"
         | None
     ) = None,
 ) -> EnvironmentAdapter:
@@ -254,6 +268,13 @@ def create_adapter(
             and issubclass(adapter_cls, ProcgenAdapter)
             and ProcgenConfig is not None
             and isinstance(game_config, ProcgenConfig)
+        ):
+            adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
+        elif (
+            TextWorldAdapter is not None
+            and issubclass(adapter_cls, TextWorldAdapter)
+            and TextWorldConfig is not None
+            and isinstance(game_config, TextWorldConfig)
         ):
             adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
         else:

@@ -70,6 +70,11 @@ FAMILY_METADATA = {
         "paradigm": SteppingParadigm.SINGLE_AGENT,
         "description": "Open-world survival benchmark (22 achievements, exploration, crafting).",
     },
+    "textworld": {
+        "label": "TextWorld",
+        "paradigm": SteppingParadigm.SINGLE_AGENT,
+        "description": "Text-based adventure games for language understanding and decision making.",
+    },
 }
 
 # Environments per family
@@ -131,6 +136,12 @@ FAMILY_ENVIRONMENTS = {
         ("CrafterReward-v1", "Crafter (Reward)", "Survival game with 22 achievements and rewards"),
         ("CrafterNoReward-v1", "Crafter (No Reward)", "Reward-free variant for unsupervised learning"),
     ],
+    "textworld": [
+        ("textworld-simple", "Simple", "Basic text adventure with simple objectives"),
+        ("textworld-coin_collector", "Coin Collector", "Collect coins across multiple rooms"),
+        ("textworld-treasure_hunter", "Treasure Hunter", "Find treasure in procedural dungeons"),
+        ("textworld-cooking", "Cooking", "Follow recipes in a kitchen environment"),
+    ],
 }
 
 # Agent counts per environment
@@ -183,6 +194,11 @@ AGENT_COUNTS = {
     # Crafter (single-agent)
     "CrafterReward-v1": ["agent_0"],
     "CrafterNoReward-v1": ["agent_0"],
+    # TextWorld (single-agent)
+    "textworld-simple": ["agent_0"],
+    "textworld-coin_collector": ["agent_0"],
+    "textworld-treasure_hunter": ["agent_0"],
+    "textworld-cooking": ["agent_0"],
 }
 
 

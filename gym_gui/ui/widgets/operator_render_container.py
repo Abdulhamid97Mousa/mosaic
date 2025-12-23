@@ -36,6 +36,7 @@ class OperatorRenderContainer(QtWidgets.QFrame):
     # Status colors
     STATUS_COLORS = {
         "pending": "#9E9E9E",    # Gray
+        "loaded": "#2196F3",     # Blue - environment loaded/ready
         "running": "#4CAF50",    # Green
         "stopped": "#F44336",    # Red
         "error": "#FF9800",      # Orange
@@ -76,6 +77,14 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         self.setFrameStyle(QtWidgets.QFrame.Shape.Box | QtWidgets.QFrame.Shadow.Raised)
         self.setLineWidth(1)
         self.setStyleSheet("QFrame { border: 1px solid #ccc; border-radius: 4px; }")
+
+        # Container should expand to fill grid cell (Qt6 best practice)
+        self.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Expanding
+        )
+        # Start with a large minimum size for better initial display
+        self.setMinimumSize(400, 350)
 
         layout = QtWidgets.QVBoxLayout(self)
         layout.setContentsMargins(4, 4, 4, 4)
@@ -119,7 +128,7 @@ class OperatorRenderContainer(QtWidgets.QFrame):
 
         # Render area - should expand to fill available space
         self._render_container = QtWidgets.QWidget(self)
-        self._render_container.setMinimumSize(200, 200)
+        self._render_container.setMinimumSize(350, 280)  # Larger minimum for better display
         self._render_container.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding,
             QtWidgets.QSizePolicy.Policy.Expanding
@@ -302,14 +311,35 @@ class OperatorRenderContainer(QtWidgets.QFrame):
 
         if renderer and hasattr(renderer, 'widget'):
             widget = renderer.widget
+            # Qt6 best practice: Use Expanding policy for widgets that should fill space
             widget.setSizePolicy(
                 QtWidgets.QSizePolicy.Policy.Expanding,
                 QtWidgets.QSizePolicy.Policy.Expanding
             )
-            # Add widget if not already in layout
+            # Add widget with stretch factor=1 to ensure it expands (Qt6 layout docs)
             if widget.parent() != self._render_container:
-                self._render_layout.addWidget(widget)
+                self._render_layout.addWidget(widget, 1)
             widget.show()
+
+            # Qt6 best practice: Schedule deferred resize after layout settles
+            # This ensures proper geometry before scaling pixmap
+            QtCore.QTimer.singleShot(100, lambda: self._trigger_renderer_resize(widget))
+
+    def _trigger_renderer_resize(self, widget: QtWidgets.QWidget) -> None:
+        """Trigger a resize on the renderer widget after layout settles.
+
+        This follows Qt6 documentation recommendation for handling initial geometry.
+        """
+        try:
+            # Force the widget to update its geometry
+            widget.updateGeometry()
+            # If the renderer has a resize handler, trigger it
+            if hasattr(widget, 'resizeEvent'):
+                from qtpy.QtGui import QResizeEvent
+                event = QResizeEvent(widget.size(), widget.size())
+                widget.resizeEvent(event)
+        except Exception as e:
+            _LOGGER.debug(f"Renderer resize trigger: {e}")
 
     def _extract_render_payload(self, payload: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """Extract render payload from telemetry payload."""

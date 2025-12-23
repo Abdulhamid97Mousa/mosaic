@@ -444,8 +444,8 @@ class CrafterConfig:
     view: tuple[int, int] = (9, 9)
     """Agent viewport dimensions (width, height). Default is 9x9."""
 
-    size: tuple[int, int] = (512, 512)
-    """Rendered image size (width, height). Default is 512x512 for GUI visibility."""
+    size: tuple[int, int] = (4096, 4096)
+    """Rendered image size (width, height). Default is 4096x4096 for high resolution."""
 
     reward: bool = True
     """Enable rewards. Set to False for CrafterNoReward-v1 variant."""
@@ -570,6 +570,61 @@ class ALEConfig:
         return kwargs
 
 
+@dataclass(frozen=True)
+class TextWorldConfig:
+    """Configuration payload for TextWorld text-based game environments.
+
+    TextWorld is a Microsoft Research sandbox for training RL agents on
+    text-based games. It generates and simulates text-based adventure games
+    for research in language understanding and sequential decision making.
+
+    Paper: Cote et al. (2018). TextWorld: A Learning Environment for Text-based Games.
+    Repository: https://github.com/microsoft/TextWorld
+    """
+
+    env_id: str = "TextWorld-Simple-v0"
+    """Environment identifier for the TextWorld game type."""
+
+    challenge_type: str = "simple"
+    """Challenge type: 'simple', 'coin_collector', 'treasure_hunter', 'cooking'."""
+
+    level: int = 1
+    """Difficulty level for built-in challenges (1-300 for coin_collector)."""
+
+    nb_rooms: int = 5
+    """Number of rooms for custom game generation."""
+
+    nb_objects: int = 10
+    """Number of objects for custom game generation."""
+
+    quest_length: int = 5
+    """Quest length for custom game generation."""
+
+    max_episode_steps: int = 100
+    """Maximum steps per episode."""
+
+    gamefile: str | None = None
+    """Path to a pre-generated game file (.ulx or .z8). If provided, skips generation."""
+
+    seed: int | None = None
+    """Random seed for game generation and reproducibility."""
+
+    reward_multiplier: float = 1.0
+    """Scalar applied to environment rewards."""
+
+    intermediate_reward: bool = True
+    """Enable intermediate rewards for making progress toward the goal."""
+
+    render_mode: str = "ansi"
+    """Render mode (TextWorld uses 'ansi' for text output)."""
+
+    def to_gym_kwargs(self) -> Dict[str, Any]:
+        """Convert to Gymnasium environment kwargs."""
+        return {
+            "render_mode": self.render_mode,
+        }
+
+
 # Type alias for all game configuration types
 GameConfig: TypeAlias = (
     FrozenLakeConfig
@@ -582,6 +637,7 @@ GameConfig: TypeAlias = (
     | CrafterConfig
     | ProcgenConfig
     | ALEConfig
+    | TextWorldConfig
 )
 
 
@@ -597,6 +653,7 @@ __all__ = [
     "CrafterConfig",
     "ProcgenConfig",
     "ALEConfig",
+    "TextWorldConfig",
     "GameConfig",
     "DEFAULT_FROZEN_LAKE_CONFIG",
     "DEFAULT_FROZEN_LAKE_V2_CONFIG",

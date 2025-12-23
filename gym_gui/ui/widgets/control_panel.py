@@ -123,9 +123,10 @@ class ControlPanelWidget(QtWidgets.QWidget):
     terminate_game_requested = pyqtSignal()
     agent_step_requested = pyqtSignal()
     operator_changed = pyqtSignal(str)
-    # Multi-Operator Mode signals - for parallel LLM/RL agent comparison
+    # Multi-Operator Mode signals - scientific execution for fair LLM/RL comparison
     operators_changed = pyqtSignal(list)  # List[OperatorConfig] - when operator configs change
-    start_operators_requested = pyqtSignal()  # Start all configured operators
+    step_all_requested = pyqtSignal(int)  # Step all operators with seed (lock-step execution)
+    reset_all_requested = pyqtSignal(int)  # Reset all operators with seed (fair comparison)
     stop_operators_requested = pyqtSignal()  # Stop all running operators
     initialize_operator_requested = pyqtSignal(str, object)  # operator_id, config - preview env
     train_agent_requested = pyqtSignal(str)  # Start fresh headless training
@@ -708,9 +709,10 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._tab_to_mode[single_index] = ControlMode.AGENT_ONLY
         # Initialize legacy operator widgets (hidden, for backward compatibility)
         self._init_legacy_operator_widgets()
-        # Connect single-agent signals
+        # Connect single-agent signals - scientific execution for fair comparison
         self._single_agent_tab.operators_changed.connect(self._on_operators_config_changed)
-        self._single_agent_tab.start_operators_requested.connect(self._on_start_operators_clicked)
+        self._single_agent_tab.step_all_requested.connect(self._on_step_all_clicked)
+        self._single_agent_tab.reset_all_requested.connect(self._on_reset_all_clicked)
         self._single_agent_tab.stop_operators_requested.connect(self._on_stop_operators_clicked)
         self._single_agent_tab.initialize_operator_requested.connect(self._on_initialize_operator_requested)
         self._single_agent_tab.worker_changed.connect(self._on_single_agent_worker_changed)
@@ -936,9 +938,21 @@ class ControlPanelWidget(QtWidgets.QWidget):
         """Handle operator configuration changes from the multi-operator widget."""
         self.operators_changed.emit(configs)
 
-    def _on_start_operators_clicked(self) -> None:
-        """Handle Start All button click."""
-        self.start_operators_requested.emit()
+    def _on_step_all_clicked(self, seed: int) -> None:
+        """Handle Step All button click - advance all operators by one step.
+
+        This implements lock-step execution for scientific comparison.
+        Each operator's agent selects one action simultaneously.
+        """
+        self.step_all_requested.emit(seed)
+
+    def _on_reset_all_clicked(self, seed: int) -> None:
+        """Handle Reset All button click - reset all operators with shared seed.
+
+        This ensures all environments start with identical initial conditions
+        for fair, reproducible side-by-side comparison (BALROG methodology).
+        """
+        self.reset_all_requested.emit(seed)
 
     def _on_stop_operators_clicked(self) -> None:
         """Handle Stop All button click."""

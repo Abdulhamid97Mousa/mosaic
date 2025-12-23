@@ -44,13 +44,29 @@ def scan_local_models() -> List[Tuple[str, str]]:
         if model_dir.name.startswith("."):
             continue
 
+        # Skip non-model directories
+        if model_dir.name in ("hub", "xet", "datasets"):
+            continue
+
         # Convert directory name to HuggingFace model ID format
-        # e.g. "Qwen--Qwen2.5-Coder-7B-Instruct" -> "Qwen/Qwen2.5-Coder-7B-Instruct"
-        # e.g. "Llama-3.1-8B-Instruct" -> "meta-llama/Llama-3.1-8B-Instruct"
+        # HuggingFace cache format: "models--Org--ModelName" -> "Org/ModelName"
+        # Simple format: "Org--ModelName" -> "Org/ModelName"
         dir_name = model_dir.name
 
-        if "--" in dir_name:
-            # Format: "org--model-name"
+        # Handle HuggingFace cache format: models--Org--ModelName
+        if dir_name.startswith("models--"):
+            # Strip "models--" prefix and split remaining by first "--"
+            remainder = dir_name[len("models--"):]
+            if "--" in remainder:
+                org, model_name = remainder.split("--", 1)
+                model_id = f"{org}/{model_name}"
+                display_name = model_name
+            else:
+                # Malformed, skip
+                _LOGGER.debug("Skipping malformed cache dir: %s", dir_name)
+                continue
+        elif "--" in dir_name:
+            # Simple format: "Org--ModelName"
             org, model_name = dir_name.split("--", 1)
             model_id = f"{org}/{model_name}"
             display_name = model_name
@@ -91,17 +107,42 @@ def get_vllm_models() -> List[Tuple[str, str]]:
 # Maximum number of operators allowed
 MAX_OPERATORS = 8
 
-# Default environments for RL workers (Gymnasium)
-RL_SUPPORTED_ENVS = (
-    "FrozenLake-v1",
-    "CartPole-v1",
-    "MountainCar-v0",
-    "Acrobot-v1",
-    "LunarLander-v2",
-    "BipedalWalker-v3",
-    "Taxi-v3",
-    "CliffWalking-v0",
-)
+# All environment families with their environments
+# Used by both RL and LLM operators
+ENV_FAMILIES: Dict[str, Tuple[str, ...]] = {
+    "babyai": (),  # Loaded dynamically from gymnasium
+    "minigrid": (),  # Loaded dynamically from gymnasium
+    "minihack": (),  # Loaded dynamically from gymnasium
+    "crafter": ("crafter-reward-v1", "crafter-nonreward-v1"),
+    "nle": (),  # Loaded dynamically from gymnasium
+    "textworld": ("tw-simple", "tw-cooking"),
+    "toytext": (
+        "FrozenLake-v1",
+        "Taxi-v3",
+        "CliffWalking-v0",
+        "Blackjack-v1",
+    ),
+    "classic_control": (
+        "CartPole-v1",
+        "MountainCar-v0",
+        "MountainCarContinuous-v0",
+        "Pendulum-v1",
+        "Acrobot-v1",
+    ),
+    "box2d": (
+        "LunarLander-v3",
+        "LunarLanderContinuous-v3",
+        "BipedalWalker-v3",
+        "BipedalWalkerHardcore-v3",
+        "CarRacing-v3",
+    ),
+}
+
+# RL has access to ALL environment families
+RL_ENV_FAMILIES = tuple(ENV_FAMILIES.keys())
+
+# LLM has access to all families EXCEPT classic_control and box2d
+LLM_ENV_FAMILIES = tuple(f for f in ENV_FAMILIES.keys() if f not in ("classic_control", "box2d"))
 
 # LLM Client configurations
 # Maps client_name -> (display_name, requires_api_key, default_base_url)
@@ -171,6 +212,53 @@ def _get_rl_workers() -> List[WorkerDefinition]:
     return [w for w in get_worker_catalog() if w.supports_training]
 
 
+def _get_registered_envs(prefix: str) -> List[str]:
+    """Get registered gymnasium environments matching a prefix.
+
+    Args:
+        prefix: Environment name prefix (e.g., "MiniGrid-", "BabyAI-", "MiniHack-", "NetHack").
+
+    Returns:
+        Sorted list of environment IDs matching the prefix.
+    """
+    try:
+        import gymnasium
+
+        # Import the package that registers environments with gymnasium
+        # MiniGrid and BabyAI environments are registered by the minigrid package
+        if prefix in ("MiniGrid-", "BabyAI-"):
+            try:
+                import minigrid  # noqa: F401 - registers envs on import
+            except ImportError:
+                _LOGGER.debug("minigrid package not installed")
+                return []
+
+        # MiniHack environments are registered by the minihack package
+        if prefix == "MiniHack-":
+            try:
+                import minihack  # noqa: F401 - registers envs on import
+            except ImportError:
+                _LOGGER.debug("minihack package not installed")
+                return []
+
+        # NetHack environments are registered by the nle package
+        if prefix == "NetHack":
+            try:
+                import nle  # noqa: F401 - registers envs on import
+            except ImportError:
+                _LOGGER.debug("nle package not installed")
+                return []
+
+        envs = [
+            env_id for env_id in gymnasium.envs.registry.keys()
+            if env_id.startswith(prefix)
+        ]
+        return sorted(envs)
+    except Exception as e:
+        _LOGGER.warning(f"Could not load {prefix} environments: {e}")
+        return []
+
+
 class OperatorConfigRow(QtWidgets.QWidget):
     """Single row in the operator configuration list.
 
@@ -211,15 +299,19 @@ class OperatorConfigRow(QtWidgets.QWidget):
         row1 = QtWidgets.QHBoxLayout()
         row1.setSpacing(8)
 
-        # Operator index label
-        self._index_label = QtWidgets.QLabel(f"#{self._operator_id[-1]}", self)
+        # Operator index label (1-indexed for UI, updated by _update_ui_state)
+        try:
+            idx = int(self._operator_id.split("_")[-1]) + 1
+        except (ValueError, IndexError):
+            idx = 1
+        self._index_label = QtWidgets.QLabel(f"#{idx}", self)
         self._index_label.setFixedWidth(20)
         self._index_label.setStyleSheet("font-weight: bold; color: #666;")
         row1.addWidget(self._index_label)
 
-        # Display name
+        # Display name - shows default "Operator N" when empty
         self._name_edit = QtWidgets.QLineEdit(self)
-        self._name_edit.setPlaceholderText("Name")
+        self._name_edit.setPlaceholderText(f"Operator {idx}")
         self._name_edit.setFixedWidth(120)
         row1.addWidget(self._name_edit)
 
@@ -231,7 +323,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
 
         # Worker dropdown
         self._worker_combo = QtWidgets.QComboBox(self)
-        self._worker_combo.setMinimumWidth(130)
+        self._worker_combo.setMinimumWidth(160)
         row1.addWidget(self._worker_combo)
 
         row1.addStretch()
@@ -249,19 +341,19 @@ class OperatorConfigRow(QtWidgets.QWidget):
         main_layout.addLayout(row1)
 
         # ============================================================
-        # Row 2: Environment - Env dropdown, Task dropdown, Load button
+        # Row 2: Environment Family & Environment dropdowns, Load button
         # ============================================================
         row2 = QtWidgets.QHBoxLayout()
         row2.setSpacing(8)
 
-        row2.addWidget(QtWidgets.QLabel("Environment:", self))
+        row2.addWidget(QtWidgets.QLabel("Env Family:", self))
         self._env_combo = QtWidgets.QComboBox(self)
         self._env_combo.setMinimumWidth(100)
         row2.addWidget(self._env_combo)
 
-        row2.addWidget(QtWidgets.QLabel("Task:", self))
+        row2.addWidget(QtWidgets.QLabel("Environment:", self))
         self._task_combo = QtWidgets.QComboBox(self)
-        self._task_combo.setMinimumWidth(180)
+        self._task_combo.setMinimumWidth(200)
         row2.addWidget(self._task_combo)
 
         # Load Environment button - mandatory to initialize the environment
@@ -310,7 +402,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._api_key_edit = QtWidgets.QLineEdit(self._llm_container)
         self._api_key_edit.setPlaceholderText("Set env var or enter key")
         self._api_key_edit.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
-        self._api_key_edit.setMinimumWidth(160)
+        self._api_key_edit.setMinimumWidth(180)
         llm_layout.addWidget(self._api_key_edit)
 
         # Show/hide API key toggle
@@ -320,6 +412,16 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._show_key_btn.setCheckable(True)
         self._show_key_btn.clicked.connect(self._toggle_api_key_visibility)
         llm_layout.addWidget(self._show_key_btn)
+
+        # VLM (Vision Mode) toggle - enables image observations for multimodal models
+        self._vlm_checkbox = QtWidgets.QCheckBox("VLM", self._llm_container)
+        self._vlm_checkbox.setToolTip(
+            "Enable Vision Mode for multimodal models (GPT-4V, Claude 3, Qwen2-VL).\n"
+            "Disabled = text-only observations (works with any LLM).\n"
+            "Enabled = image observations sent to model (requires VLM)."
+        )
+        self._vlm_checkbox.setChecked(False)  # Default: LLM mode (text-only)
+        llm_layout.addWidget(self._vlm_checkbox)
 
         main_layout.addWidget(self._llm_container)
 
@@ -363,6 +465,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._client_combo.currentIndexChanged.connect(self._on_client_changed)
         self._model_combo.currentIndexChanged.connect(self._on_config_changed)
         self._api_key_edit.textChanged.connect(self._on_config_changed)
+        self._vlm_checkbox.stateChanged.connect(self._on_config_changed)
 
         # RL-specific signals
         self._policy_path_edit.textChanged.connect(self._on_config_changed)
@@ -503,16 +606,18 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._updating = False
 
     def _update_env_dropdown(self) -> None:
-        """Update environment dropdown based on selected type."""
+        """Update environment family dropdown based on selected type."""
         self._updating = True
         current_env = self._env_combo.currentText()
         self._env_combo.clear()
 
         operator_type = self._type_combo.currentText().lower()
         if operator_type == "llm":
-            envs = BARLOG_SUPPORTED_ENVS
+            # LLM: all families except classic_control and box2d
+            envs = LLM_ENV_FAMILIES
         else:
-            envs = RL_SUPPORTED_ENVS
+            # RL: all environment families
+            envs = RL_ENV_FAMILIES
 
         self._env_combo.addItems(envs)
 
@@ -525,53 +630,44 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._updating = False
 
     def _update_task_dropdown(self) -> None:
-        """Update task dropdown based on selected environment."""
+        """Update environment dropdown based on selected environment family."""
         self._updating = True
         current_task = self._task_combo.currentText()
         self._task_combo.clear()
 
-        env_name = self._env_combo.currentText()
-        operator_type = self._type_combo.currentText().lower()
+        env_family = self._env_combo.currentText()
 
-        # Define tasks for each environment
-        tasks: List[str] = []
-        if operator_type == "llm":
-            if env_name == "babyai":
-                tasks = [
-                    "BabyAI-GoToRedBall-v0",
-                    "BabyAI-GoToRedBallGrey-v0",
-                    "BabyAI-GoToRedBallNoDists-v0",
-                    "BabyAI-GoToObj-v0",
-                    "BabyAI-GoToLocal-v0",
-                    "BabyAI-PutNextLocal-v0",
-                ]
-            elif env_name == "minigrid":
-                tasks = [
-                    "MiniGrid-Empty-5x5-v0",
-                    "MiniGrid-DoorKey-5x5-v0",
-                    "MiniGrid-DoorKey-6x6-v0",
-                    "MiniGrid-DoorKey-8x8-v0",
-                    "MiniGrid-LavaGapS5-v0",
-                    "MiniGrid-LavaGapS7-v0",
-                ]
-            elif env_name == "minihack":
-                tasks = [
-                    "MiniHack-Room-5x5-v0",
-                    "MiniHack-Room-15x15-v0",
-                    "MiniHack-Corridor-R5-v0",
-                    "MiniHack-Quest-Easy-v0",
-                ]
-            elif env_name == "crafter":
-                tasks = ["crafter-reward-v1", "crafter-nonreward-v1"]
-            elif env_name == "textworld":
-                tasks = ["tw-simple", "tw-cooking"]
-            else:
-                tasks = [BARLOG_DEFAULT_TASK]
+        # Get environments for this family
+        # Some families load dynamically from gymnasium, others use static lists
+        envs: List[str] = []
+
+        if env_family == "babyai":
+            # Dynamically load all BabyAI environments from gymnasium registry
+            envs = _get_registered_envs("BabyAI-")
+            if not envs:
+                envs = ["BabyAI-GoToRedBall-v0", "BabyAI-GoToObj-v0", "BabyAI-GoToLocal-v0"]
+        elif env_family == "minigrid":
+            # Dynamically load all MiniGrid environments from gymnasium registry
+            envs = _get_registered_envs("MiniGrid-")
+            if not envs:
+                envs = ["MiniGrid-Empty-5x5-v0", "MiniGrid-DoorKey-5x5-v0"]
+        elif env_family == "minihack":
+            # Dynamically load all MiniHack environments from gymnasium registry
+            envs = _get_registered_envs("MiniHack-")
+            if not envs:
+                envs = ["MiniHack-Room-5x5-v0", "MiniHack-Corridor-R5-v0"]
+        elif env_family == "nle":
+            # Dynamically load all NetHack environments from gymnasium registry
+            envs = _get_registered_envs("NetHack")
+            if not envs:
+                envs = ["NetHackScore-v0", "NetHackStaircase-v0", "NetHackEat-v0"]
+        elif env_family in ENV_FAMILIES:
+            # Use static list from ENV_FAMILIES
+            envs = list(ENV_FAMILIES[env_family])
         else:
-            # RL environments typically have a single variant
-            tasks = [env_name]
+            envs = [BARLOG_DEFAULT_TASK]
 
-        self._task_combo.addItems(tasks if tasks else ["default"])
+        self._task_combo.addItems(envs if envs else ["default"])
 
         # Restore selection if possible
         if current_task:
@@ -579,8 +675,8 @@ class OperatorConfigRow(QtWidgets.QWidget):
             if idx >= 0:
                 self._task_combo.setCurrentIndex(idx)
 
-        # Show/hide task dropdown based on whether there are options
-        self._task_combo.setVisible(len(tasks) > 1 or operator_type == "llm")
+        # Always show environment dropdown
+        self._task_combo.setVisible(True)
 
         self._updating = False
 
@@ -634,6 +730,10 @@ class OperatorConfigRow(QtWidgets.QWidget):
             api_key = config.settings.get("api_key", "")
             self._api_key_edit.setText(api_key)
 
+            # Set VLM mode (max_image_history > 0 means VLM mode)
+            max_image_history = config.settings.get("max_image_history", 0)
+            self._vlm_checkbox.setChecked(max_image_history > 0)
+
         # Load RL-specific settings
         elif config.operator_type == "rl" and config.settings:
             policy_path = config.settings.get("policy_path", "")
@@ -648,7 +748,12 @@ class OperatorConfigRow(QtWidgets.QWidget):
         """Get current configuration from UI elements."""
         operator_type = self._type_combo.currentText().lower()
         worker_id = self._worker_combo.currentData() or ""
-        display_name = self._name_edit.text() or f"Operator {self._operator_id[-1]}"
+        # Extract index from operator_id (e.g., "operator_0" -> 0) and make 1-indexed for display
+        try:
+            idx = int(self._operator_id.split("_")[-1]) + 1
+        except (ValueError, IndexError):
+            idx = 1
+        display_name = self._name_edit.text() or f"Operator {idx}"
         env_name = self._env_combo.currentText() or "babyai"
         task = self._task_combo.currentText() or BARLOG_DEFAULT_TASK
 
@@ -663,6 +768,9 @@ class OperatorConfigRow(QtWidgets.QWidget):
 
             settings["client_name"] = client_name
             settings["model_id"] = model_id
+
+            # VLM mode: 0 = text-only (LLM), 1 = vision mode (VLM)
+            settings["max_image_history"] = 1 if self._vlm_checkbox.isChecked() else 0
 
             # Only include API key if provided
             if api_key:
@@ -730,12 +838,17 @@ class OperatorConfigWidget(QtWidgets.QWidget):
         header.setStyleSheet("font-weight: bold; font-size: 12px;")
         layout.addWidget(header)
 
-        # Scroll area for operator rows
+        # Scroll area for operator rows - expands to fill available space
         scroll = QtWidgets.QScrollArea(self)
         scroll.setWidgetResizable(True)
-        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-        scroll.setMinimumHeight(100)
-        scroll.setMaximumHeight(250)
+        scroll.setHorizontalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        scroll.setMinimumHeight(300)
+        # No maximum height - let it fill available space
+        scroll.setMinimumWidth(450)
+        scroll.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Expanding
+        )
 
         self._rows_container = QtWidgets.QWidget(scroll)
         self._rows_layout = QtWidgets.QVBoxLayout(self._rows_container)
@@ -744,7 +857,7 @@ class OperatorConfigWidget(QtWidgets.QWidget):
         self._rows_layout.addStretch()
 
         scroll.setWidget(self._rows_container)
-        layout.addWidget(scroll)
+        layout.addWidget(scroll, 1)  # Stretch factor 1 to fill available space
 
         # Add button
         self._add_btn = QtWidgets.QPushButton("+ Add Operator", self)

@@ -28,11 +28,20 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
+import json
 from typing import IO, Any, Dict, Optional
 
 from gym_gui.config.paths import VAR_OPERATORS_DIR, VAR_TELEMETRY_DIR, ensure_var_directories
 from gym_gui.core.subprocess_validation import validated_popen
 from gym_gui.services.operator import OperatorConfig
+from gym_gui.logging_config.helpers import log_constant
+from gym_gui.logging_config.log_constants import (
+    LOG_OPERATOR_INTERACTIVE_LAUNCHED,
+    LOG_OPERATOR_RESET_COMMAND_SENT,
+    LOG_OPERATOR_STEP_COMMAND_SENT,
+    LOG_OPERATOR_STOP_COMMAND_SENT,
+    LOG_OPERATOR_COMMAND_FAILED,
+)
 
 
 LOGGER = logging.getLogger("gym_gui.services.operator_launcher")
@@ -52,6 +61,7 @@ class OperatorProcessHandle:
         process: The subprocess.Popen handle.
         log_path: Path to the operator's log file.
         config: The operator configuration used to launch.
+        interactive: Whether this operator is in interactive mode.
     """
 
     operator_id: str
@@ -59,6 +69,7 @@ class OperatorProcessHandle:
     process: subprocess.Popen[str]
     log_path: Path
     config: OperatorConfig
+    interactive: bool = False
     _log_file: Optional[IO[str]] = field(default=None, repr=False)
 
     @property
@@ -75,6 +86,90 @@ class OperatorProcessHandle:
     def return_code(self) -> Optional[int]:
         """Return the exit code if terminated, None if still running."""
         return self.process.poll()
+
+    def send_command(self, cmd: Dict[str, Any]) -> bool:
+        """Send a JSON command to the interactive subprocess.
+
+        Args:
+            cmd: Command dictionary, e.g. {"cmd": "step"} or {"cmd": "reset", "seed": 42}
+
+        Returns:
+            True if command was sent, False if process not running or not interactive.
+        """
+        if not self.interactive:
+            log_constant(
+                LOGGER, LOG_OPERATOR_COMMAND_FAILED,
+                message="Cannot send command to non-interactive operator",
+                extra={"operator_id": self.operator_id, "cmd": cmd.get("cmd")},
+            )
+            return False
+
+        if not self.is_running:
+            log_constant(
+                LOGGER, LOG_OPERATOR_COMMAND_FAILED,
+                message="Cannot send command to terminated operator",
+                extra={"operator_id": self.operator_id, "cmd": cmd.get("cmd")},
+            )
+            return False
+
+        if self.process.stdin is None:
+            log_constant(
+                LOGGER, LOG_OPERATOR_COMMAND_FAILED,
+                message="Operator has no stdin pipe",
+                extra={"operator_id": self.operator_id, "cmd": cmd.get("cmd")},
+            )
+            return False
+
+        try:
+            line = json.dumps(cmd) + "\n"
+            self.process.stdin.write(line)
+            self.process.stdin.flush()
+            LOGGER.debug("Sent command to operator %s: %s", self.operator_id, cmd)
+            return True
+        except Exception as exc:
+            log_constant(
+                LOGGER, LOG_OPERATOR_COMMAND_FAILED,
+                message=f"Failed to send command: {exc}",
+                extra={"operator_id": self.operator_id, "cmd": cmd.get("cmd")},
+                exc_info=exc,
+            )
+            return False
+
+    def send_reset(self, seed: Optional[int] = None) -> bool:
+        """Send reset command to initialize environment with seed."""
+        cmd: Dict[str, Any] = {"cmd": "reset"}
+        if seed is not None:
+            cmd["seed"] = seed
+        result = self.send_command(cmd)
+        if result:
+            log_constant(
+                LOGGER, LOG_OPERATOR_RESET_COMMAND_SENT,
+                message=f"Reset command sent with seed={seed}",
+                extra={"operator_id": self.operator_id, "seed": seed},
+            )
+        return result
+
+    def send_step(self) -> bool:
+        """Send step command to execute one environment step."""
+        result = self.send_command({"cmd": "step"})
+        if result:
+            log_constant(
+                LOGGER, LOG_OPERATOR_STEP_COMMAND_SENT,
+                message="Step command sent",
+                extra={"operator_id": self.operator_id},
+            )
+        return result
+
+    def send_stop(self) -> bool:
+        """Send stop command to terminate gracefully."""
+        result = self.send_command({"cmd": "stop"})
+        if result:
+            log_constant(
+                LOGGER, LOG_OPERATOR_STOP_COMMAND_SENT,
+                message="Stop command sent",
+                extra={"operator_id": self.operator_id},
+            )
+        return result
 
     def stop(self, timeout: float = 5.0) -> None:
         """Terminate the operator subprocess.
@@ -169,12 +264,16 @@ class OperatorLauncher:
         config: OperatorConfig,
         *,
         run_id: Optional[str] = None,
+        interactive: bool = False,
     ) -> OperatorProcessHandle:
         """Launch an operator subprocess based on its configuration.
 
         Args:
             config: The operator configuration.
             run_id: Optional run ID (auto-generated if not provided).
+            interactive: If True, launch in interactive mode for step-by-step control.
+                        The subprocess will read commands from stdin and emit telemetry
+                        to stdout, enabling scientific comparison with lock-step execution.
 
         Returns:
             A handle for managing the launched subprocess.
@@ -194,9 +293,9 @@ class OperatorLauncher:
 
         # Build command based on operator type
         if config.operator_type == "llm":
-            cmd = self._build_llm_command(config, run_id)
+            cmd = self._build_llm_command(config, run_id, interactive=interactive)
         elif config.operator_type == "rl":
-            cmd = self._build_rl_command(config, run_id)
+            cmd = self._build_rl_command(config, run_id, interactive=interactive)
         else:
             log_file.close()
             raise OperatorLaunchError(f"Unknown operator type: {config.operator_type}")
@@ -211,22 +310,36 @@ class OperatorLauncher:
         env["OPERATOR_ID"] = config.operator_id
 
         LOGGER.info(
-            "Launching operator %s (%s) with run_id=%s",
+            "Launching operator %s (%s) with run_id=%s interactive=%s",
             config.operator_id,
             config.operator_type,
-            run_id
+            run_id,
+            interactive
         )
         LOGGER.debug("Command: %s", " ".join(cmd))
 
         try:
-            process = validated_popen(
-                cmd,
-                stdout=log_file,
-                stderr=subprocess.STDOUT,
-                text=True,
-                bufsize=1,
-                env=env,
-            )
+            # In interactive mode, we need stdin pipe for sending commands
+            # and stdout pipe for receiving telemetry
+            if interactive:
+                process = validated_popen(
+                    cmd,
+                    stdin=subprocess.PIPE,
+                    stdout=subprocess.PIPE,
+                    stderr=log_file,
+                    text=True,
+                    bufsize=1,
+                    env=env,
+                )
+            else:
+                process = validated_popen(
+                    cmd,
+                    stdout=log_file,
+                    stderr=subprocess.STDOUT,
+                    text=True,
+                    bufsize=1,
+                    env=env,
+                )
         except Exception as exc:
             log_file.close()
             raise OperatorLaunchError(
@@ -238,25 +351,48 @@ class OperatorLauncher:
             run_id=run_id,
             process=process,
             log_path=log_path,
+            interactive=interactive,
             config=config,
             _log_file=log_file,
         )
         self._handles[config.operator_id] = handle
 
-        LOGGER.info(
-            "Operator %s launched successfully (pid=%s, log=%s)",
-            config.operator_id,
-            process.pid,
-            log_path
-        )
+        if interactive:
+            log_constant(
+                LOGGER, LOG_OPERATOR_INTERACTIVE_LAUNCHED,
+                message=f"Operator launched in interactive mode",
+                extra={
+                    "operator_id": config.operator_id,
+                    "run_id": run_id,
+                    "pid": process.pid,
+                    "log_path": str(log_path),
+                    "operator_type": config.operator_type,
+                    "env_name": config.env_name,
+                    "task": config.task,
+                },
+            )
+        else:
+            LOGGER.info(
+                "Operator %s launched successfully (pid=%s, log=%s)",
+                config.operator_id,
+                process.pid,
+                log_path
+            )
         return handle
 
-    def _build_llm_command(self, config: OperatorConfig, run_id: str) -> list[str]:
+    def _build_llm_command(
+        self,
+        config: OperatorConfig,
+        run_id: str,
+        *,
+        interactive: bool = False,
+    ) -> list[str]:
         """Build command line for LLM operator.
 
         Args:
             config: Operator configuration with LLM settings.
             run_id: Run ID for telemetry.
+            interactive: If True, add --interactive flag for step-by-step control.
 
         Returns:
             Command arguments list.
@@ -289,6 +425,10 @@ class OperatorLauncher:
             "-v",  # Verbose logging
         ]
 
+        # Add interactive mode flag for step-by-step GUI control
+        if interactive:
+            cmd.append("--interactive")
+
         # Add optional base URL (for vLLM)
         if base_url:
             cmd.extend(["--base-url", base_url])
@@ -297,14 +437,25 @@ class OperatorLauncher:
         if api_key:
             cmd.extend(["--api-key", api_key])
 
+        # Add max_image_history (VLM mode: 0=text-only, >=1=vision)
+        max_image_history = settings.get("max_image_history", 0)
+        cmd.extend(["--max-image-history", str(max_image_history)])
+
         return cmd
 
-    def _build_rl_command(self, config: OperatorConfig, run_id: str) -> list[str]:
+    def _build_rl_command(
+        self,
+        config: OperatorConfig,
+        run_id: str,
+        *,
+        interactive: bool = False,
+    ) -> list[str]:
         """Build command line for RL operator.
 
         Args:
             config: Operator configuration with RL settings.
             run_id: Run ID for telemetry.
+            interactive: If True, add --interactive flag for step-by-step control.
 
         Returns:
             Command arguments list.

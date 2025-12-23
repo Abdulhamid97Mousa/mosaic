@@ -78,7 +78,7 @@ OPERATOR_DESCRIPTION_BARLOG_LLM: str = (
 # BARLOG Worker Specific Constants
 # ================================================================
 
-# Supported environments for BARLOG LLM worker
+# Supported environment families for BARLOG LLM worker
 # Note: "minigrid" uses the same wrapper as "babyai" (BabyAI is built on MiniGrid)
 BARLOG_SUPPORTED_ENVS: Tuple[str, ...] = (
     "babyai",
@@ -87,6 +87,7 @@ BARLOG_SUPPORTED_ENVS: Tuple[str, ...] = (
     "crafter",
     "nle",
     "textworld",
+    "toytext",
 )
 
 # Supported LLM clients

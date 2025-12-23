@@ -6,6 +6,7 @@ import logging
 from typing import Callable, Mapping
 
 import numpy as np
+from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 from qtpy import QtCore, QtGui, QtWidgets
 
 from gym_gui.core.enums import RenderMode
@@ -73,32 +74,35 @@ class RgbRendererStrategy(RendererStrategy):
 
 
 class _RgbView(QtWidgets.QWidget):
-    """Widget that displays RGB frames with optional FPS-style mouse capture."""
+    """Widget that displays RGB frames with optional FPS-style mouse capture.
+
+    Uses paintEvent for rendering instead of QLabel to ensure proper expansion
+    and aspect ratio preservation (Qt6 best practice for custom image widgets).
+    """
 
     # Signal emitted when mouse capture state changes (captured: bool)
-    mouse_capture_changed = QtCore.Signal(bool)
+    mouse_capture_changed = pyqtSignal(bool)
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
 
-        # Use a simple label that expands to fill available space
-        label = QtWidgets.QLabel(self)
-        label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
-        label.setMinimumSize(100, 100)
-        label.setStyleSheet("background-color: #111; color: #eee;")
-        label.setSizePolicy(
+        # Qt6 best practice: Use Expanding policy for widgets that should fill space
+        # Combined with paintEvent rendering, this ensures proper expansion
+        self.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding,
             QtWidgets.QSizePolicy.Policy.Expanding
         )
-        label.setScaledContents(False)  # We handle scaling ourselves
+        # Large minimum size to start big and ensure good visibility
+        self.setMinimumSize(300, 250)
 
-        layout.addWidget(label)
+        # Dark background for the render area
+        self.setAutoFillBackground(True)
+        palette = self.palette()
+        palette.setColor(self.backgroundRole(), QtGui.QColor(17, 17, 17))  # #111
+        self.setPalette(palette)
 
-        self._label = label
-        self._container = None  # No longer using scroll area
         self._current_pixmap: QtGui.QPixmap | None = None
+        self._tooltip_text: str = ""
 
         # Mouse capture state
         self._mouse_capture_enabled = False
@@ -118,6 +122,18 @@ class _RgbView(QtWidgets.QWidget):
         # Enable focus and mouse tracking
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
         self.setMouseTracking(True)
+
+    def sizeHint(self) -> QtCore.QSize:
+        """Return preferred size - large value to encourage expansion.
+
+        Qt uses sizeHint along with sizePolicy to determine widget size.
+        With Expanding policy and large sizeHint, layout will give max space.
+        """
+        return QtCore.QSize(600, 500)
+
+    def minimumSizeHint(self) -> QtCore.QSize:
+        """Return minimum acceptable size."""
+        return QtCore.QSize(200, 200)
 
     def set_mouse_action_callback(self, callback: Callable[[int], None] | None) -> None:
         """Set callback for mouse-triggered discrete actions (legacy mode)."""
@@ -180,7 +196,7 @@ class _RgbView(QtWidgets.QWidget):
         self.mouse_capture_changed.emit(False)
         _LOGGER.debug("Mouse released from FPS control")
 
-    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
+    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:  # type: ignore[override]
         """Handle mouse press - capture mouse on click."""
         if not self._mouse_capture_enabled:
             super().mousePressEvent(event)
@@ -193,7 +209,7 @@ class _RgbView(QtWidgets.QWidget):
         else:
             super().mousePressEvent(event)
 
-    def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:
+    def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:  # type: ignore[override]
         """Handle mouse move - convert to turn/look actions when captured."""
         if not self._mouse_captured or self._last_mouse_pos is None:
             super().mouseMoveEvent(event)
@@ -230,7 +246,7 @@ class _RgbView(QtWidgets.QWidget):
 
         event.accept()
 
-    def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
+    def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:  # type: ignore[override]
         """Handle key press - ESC releases mouse capture."""
         if self._mouse_captured and event.key() == QtCore.Qt.Key.Key_Escape:
             self._release_mouse_capture()
@@ -238,71 +254,89 @@ class _RgbView(QtWidgets.QWidget):
             return
         super().keyPressEvent(event)
 
-    def focusOutEvent(self, event: QtGui.QFocusEvent) -> None:
+    def focusOutEvent(self, event: QtGui.QFocusEvent) -> None:  # type: ignore[override]
         """Release mouse capture when focus is lost."""
         if self._mouse_captured:
             self._release_mouse_capture()
         super().focusOutEvent(event)
 
     def render_frame(self, frame: object, *, tooltip_payload: Mapping[str, object] | None = None) -> None:
-        array = np.asarray(frame)
+        """Render an RGB frame array."""
+        # IMPORTANT: Must specify dtype=np.uint8 because when frame comes from
+        # JSON/list conversion (e.g., tolist() -> np.asarray()), numpy defaults
+        # to int64 which corrupts the image data for QImage
+        array = np.asarray(frame, dtype=np.uint8)
         if array.ndim != 3 or array.shape[2] not in (3, 4):
-            self._label.setText("Unsupported RGB frame format")
             self._current_pixmap = None
+            self._tooltip_text = "Unsupported RGB frame format"
+            self.update()
             return
 
-        array = np.ascontiguousarray(array)
+        # Ensure contiguous memory layout for QImage
+        array = np.ascontiguousarray(array, dtype=np.uint8)
         height, width, channels = array.shape
         if channels == 3:
             fmt = QtGui.QImage.Format.Format_RGB888
         else:
             fmt = QtGui.QImage.Format.Format_RGBA8888
 
-        image = QtGui.QImage(array.data, width, height, width * channels, fmt).copy()
+        # Cast array.data (memoryview) to bytes for QImage compatibility
+        image = QtGui.QImage(bytes(array.data), width, height, width * channels, fmt).copy()
         self._current_pixmap = QtGui.QPixmap.fromImage(image)
-        self._scale_pixmap()
 
-        # Schedule a re-scale after layout settles (handles initial render)
-        QtCore.QTimer.singleShot(50, self._scale_pixmap)
-
+        # Update tooltip
         tooltip = ""
         if tooltip_payload is not None:
             ansi = tooltip_payload.get("ansi")
             if isinstance(ansi, str) and ansi:
                 tooltip = _strip_ansi_codes(ansi)
-        self._label.setToolTip(tooltip)
+        self._tooltip_text = tooltip
+        self.setToolTip(tooltip)
+
+        # Trigger repaint - paintEvent will handle scaling and drawing
+        self.update()
 
     def reset(self) -> None:
-        self._label.clear()
-        self._label.setText("No RGB frame available")
+        """Reset to show no frame message."""
         self._current_pixmap = None
+        self._tooltip_text = ""
+        self.setToolTip("")
+        self.update()
 
-    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:  # pragma: no cover - GUI only
-        super().resizeEvent(event)
-        self._scale_pixmap()
+    def paintEvent(self, event: QtGui.QPaintEvent) -> None:  # type: ignore[override]
+        """Paint the pixmap scaled to fill widget while preserving aspect ratio.
 
-    def _scale_pixmap(self) -> None:
-        if self._current_pixmap is None:
+        This is the Qt6 recommended approach for custom image rendering widgets
+        that need to expand to fill available space while maintaining aspect ratio.
+        """
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform)
+
+        # Get widget dimensions
+        widget_rect = self.rect()
+
+        if self._current_pixmap is None or self._current_pixmap.isNull():
+            # Draw placeholder text when no frame available
+            painter.setPen(QtGui.QColor(153, 153, 153))  # #999
+            painter.drawText(widget_rect, QtCore.Qt.AlignmentFlag.AlignCenter, "No RGB frame available")
+            painter.end()
             return
 
-        # Get the best available size - try widget size first, then label
-        target_size = self.size()
-
-        # If widget size is too small, try the label
-        if target_size.width() < 100 or target_size.height() < 100:
-            target_size = self._label.size()
-
-        # If still too small, use a reasonable minimum
-        if target_size.width() < 100 or target_size.height() < 100:
-            target_size = QtCore.QSize(300, 300)
-
-        # Scale the pixmap to fill the available space while keeping aspect ratio
-        scaled = self._current_pixmap.scaled(
-            target_size,
-            QtCore.Qt.AspectRatioMode.KeepAspectRatio,
-            QtCore.Qt.TransformationMode.SmoothTransformation,
+        # Scale pixmap to fit widget while keeping aspect ratio
+        pixmap_size = self._current_pixmap.size()
+        scaled_size = pixmap_size.scaled(
+            widget_rect.size(),
+            QtCore.Qt.AspectRatioMode.KeepAspectRatio
         )
-        self._label.setPixmap(scaled)
+
+        # Center the scaled pixmap in the widget
+        x = (widget_rect.width() - scaled_size.width()) // 2
+        y = (widget_rect.height() - scaled_size.height()) // 2
+
+        # Draw the scaled pixmap
+        target_rect = QtCore.QRect(x, y, scaled_size.width(), scaled_size.height())
+        painter.drawPixmap(target_rect, self._current_pixmap)
+        painter.end()
 
 
 def _strip_ansi_codes(value: str) -> str:

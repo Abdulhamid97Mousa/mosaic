@@ -11,6 +11,7 @@ Human vs Agent, Cooperation, and Competition modes.
 
 from __future__ import annotations
 
+import random
 from typing import Optional, List
 
 from PyQt6 import QtCore, QtWidgets
@@ -26,16 +27,25 @@ class OperatorsSubTab(QtWidgets.QWidget):
 
     Operators are the action-selecting entities in MOSAIC - they represent
     who or what controls the agent in an environment.
+
+    Scientific Execution Model (inspired by BALROG):
+    - Shared seed ensures all operators start with identical initial conditions
+    - Step All advances all operators by exactly one step (lock-step execution)
+    - Reset All resets all operators to the same seed for fair comparison
+    - No arbitrary timing delays - steps are explicitly controlled
     """
 
     # Signals
     operators_changed = pyqtSignal(list)  # List[OperatorConfig]
-    start_operators_requested = pyqtSignal()
+    step_all_requested = pyqtSignal(int)  # Emit with current seed
+    reset_all_requested = pyqtSignal(int)  # Emit with current seed
     stop_operators_requested = pyqtSignal()
     initialize_operator_requested = pyqtSignal(str, object)  # operator_id, config
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
+        self._step_count = 0
+        self._is_running = False
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -74,23 +84,77 @@ class OperatorsSubTab(QtWidgets.QWidget):
         self._operator_config_widget.initialize_requested.connect(self._on_initialize_requested)
         config_layout.addWidget(self._operator_config_widget)
 
-        # Start All / Stop All buttons
+        layout.addWidget(config_group)
+
+        # Scientific Execution Controls (inspired by BALROG methodology)
+        exec_group = QtWidgets.QGroupBox("Execution Controls (Scientific Comparison)", self)
+        exec_layout = QtWidgets.QVBoxLayout(exec_group)
+
+        # Seed row - for reproducibility like BALROG
+        seed_row = QtWidgets.QHBoxLayout()
+        seed_row.setSpacing(8)
+
+        seed_label = QtWidgets.QLabel("Shared Seed:", exec_group)
+        seed_label.setToolTip(
+            "All operators use this seed for identical initial conditions.\n"
+            "This ensures fair, reproducible side-by-side comparison."
+        )
+        seed_row.addWidget(seed_label)
+
+        self._seed_spin = QtWidgets.QSpinBox(exec_group)
+        self._seed_spin.setRange(0, 2147483647)  # Max int32
+        self._seed_spin.setValue(42)  # Default seed like BALROG
+        self._seed_spin.setToolTip(
+            "Seed for random number generators.\n"
+            "Same seed = same initial environment state for all operators."
+        )
+        seed_row.addWidget(self._seed_spin, 1)
+
+        self._random_seed_button = QtWidgets.QPushButton("Random", exec_group)
+        self._random_seed_button.setToolTip("Generate a new random seed")
+        self._random_seed_button.setStyleSheet("QPushButton { padding: 4px 8px; }")
+        self._random_seed_button.clicked.connect(self._on_random_seed_clicked)
+        seed_row.addWidget(self._random_seed_button)
+
+        exec_layout.addLayout(seed_row)
+
+        # Control buttons row
         button_row = QtWidgets.QHBoxLayout()
         button_row.setSpacing(8)
 
-        self._start_operators_button = QtWidgets.QPushButton("Start All", config_group)
-        self._start_operators_button.setToolTip("Start all configured operators")
-        self._start_operators_button.setStyleSheet(
+        self._reset_all_button = QtWidgets.QPushButton("Reset All", exec_group)
+        self._reset_all_button.setToolTip(
+            "Reset all operators to initial state with the shared seed.\n"
+            "All environments will have identical starting conditions."
+        )
+        self._reset_all_button.setStyleSheet(
+            "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #FF9800; color: white; }"
+            "QPushButton:hover { background-color: #F57C00; }"
+            "QPushButton:pressed { background-color: #EF6C00; }"
+            "QPushButton:disabled { background-color: #FFCC80; color: #FFF3E0; }"
+        )
+        self._reset_all_button.setEnabled(False)
+        self._reset_all_button.clicked.connect(self._on_reset_all_clicked)
+        button_row.addWidget(self._reset_all_button)
+
+        self._step_all_button = QtWidgets.QPushButton("Step All", exec_group)
+        self._step_all_button.setToolTip(
+            "Advance ALL operators by exactly one step (lock-step execution).\n"
+            "Each operator's agent selects one action simultaneously.\n"
+            "This ensures scientifically fair side-by-side comparison."
+        )
+        self._step_all_button.setStyleSheet(
             "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #4CAF50; color: white; }"
             "QPushButton:hover { background-color: #45a049; }"
             "QPushButton:pressed { background-color: #388E3C; }"
             "QPushButton:disabled { background-color: #A5D6A7; color: #E8F5E9; }"
         )
-        self._start_operators_button.clicked.connect(self._on_start_operators_clicked)
-        button_row.addWidget(self._start_operators_button)
+        self._step_all_button.setEnabled(False)
+        self._step_all_button.clicked.connect(self._on_step_all_clicked)
+        button_row.addWidget(self._step_all_button)
 
-        self._stop_operators_button = QtWidgets.QPushButton("Stop All", config_group)
-        self._stop_operators_button.setToolTip("Stop all running operators")
+        self._stop_operators_button = QtWidgets.QPushButton("Stop All", exec_group)
+        self._stop_operators_button.setToolTip("Stop all running operators and release resources")
         self._stop_operators_button.setStyleSheet(
             "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #F44336; color: white; }"
             "QPushButton:hover { background-color: #E53935; }"
@@ -101,8 +165,30 @@ class OperatorsSubTab(QtWidgets.QWidget):
         self._stop_operators_button.clicked.connect(self._on_stop_operators_clicked)
         button_row.addWidget(self._stop_operators_button)
 
-        config_layout.addLayout(button_row)
-        layout.addWidget(config_group)
+        exec_layout.addLayout(button_row)
+
+        # Step counter and status row
+        status_row = QtWidgets.QHBoxLayout()
+        status_row.setSpacing(12)
+
+        self._step_count_label = QtWidgets.QLabel("Steps: 0", exec_group)
+        self._step_count_label.setStyleSheet(
+            "QLabel { font-weight: bold; color: #1976D2; padding: 4px 8px; "
+            "background-color: #E3F2FD; border-radius: 4px; }"
+        )
+        status_row.addWidget(self._step_count_label)
+
+        self._status_label = QtWidgets.QLabel("Ready", exec_group)
+        self._status_label.setStyleSheet(
+            "QLabel { color: #666; padding: 4px; font-style: italic; }"
+        )
+        status_row.addWidget(self._status_label)
+
+        status_row.addStretch(1)
+
+        exec_layout.addLayout(status_row)
+
+        layout.addWidget(exec_group)
 
         layout.addStretch(1)
 
@@ -110,23 +196,63 @@ class OperatorsSubTab(QtWidgets.QWidget):
         """Handle operator configuration changes."""
         self.operators_changed.emit(configs)
         has_operators = len(configs) > 0
-        self._start_operators_button.setEnabled(has_operators)
+        self._reset_all_button.setEnabled(has_operators)
+        # Step All only enabled after Reset All is done
+        if not has_operators:
+            self._step_all_button.setEnabled(False)
+            self._stop_operators_button.setEnabled(False)
 
-    def _on_start_operators_clicked(self) -> None:
-        """Handle Start All button click."""
-        self.start_operators_requested.emit()
-        self._start_operators_button.setEnabled(False)
+    def _on_random_seed_clicked(self) -> None:
+        """Generate a random seed."""
+        new_seed = random.randint(0, 2147483647)
+        self._seed_spin.setValue(new_seed)
+
+    def _on_reset_all_clicked(self) -> None:
+        """Handle Reset All button click."""
+        seed = self._seed_spin.value()
+        self._step_count = 0
+        self._step_count_label.setText("Steps: 0")
+        self._status_label.setText(f"Resetting with seed {seed}...")
+        self._is_running = True
+        self.reset_all_requested.emit(seed)
+        # Enable step button after reset
+        self._step_all_button.setEnabled(True)
         self._stop_operators_button.setEnabled(True)
+        self._status_label.setText(f"Running (seed={seed})")
+
+    def _on_step_all_clicked(self) -> None:
+        """Handle Step All button click."""
+        if not self._is_running:
+            return
+        seed = self._seed_spin.value()
+        self._step_count += 1
+        self._step_count_label.setText(f"Steps: {self._step_count}")
+        self.step_all_requested.emit(seed)
 
     def _on_stop_operators_clicked(self) -> None:
         """Handle Stop All button click."""
         self.stop_operators_requested.emit()
-        self._start_operators_button.setEnabled(True)
+        self._is_running = False
+        self._step_all_button.setEnabled(False)
         self._stop_operators_button.setEnabled(False)
+        self._status_label.setText("Stopped")
 
     def _on_initialize_requested(self, operator_id: str, config) -> None:
         """Handle initialize request from an operator row."""
         self.initialize_operator_requested.emit(operator_id, config)
+
+    def set_step_count(self, count: int) -> None:
+        """Set the step count (called externally when steps complete)."""
+        self._step_count = count
+        self._step_count_label.setText(f"Steps: {count}")
+
+    def set_status(self, status: str) -> None:
+        """Set the status label text."""
+        self._status_label.setText(status)
+
+    def get_current_seed(self) -> int:
+        """Get the current seed value."""
+        return self._seed_spin.value()
 
     @property
     def operator_config_widget(self) -> OperatorConfigWidget:
@@ -349,11 +475,16 @@ class SingleAgentTab(QtWidgets.QWidget):
 
     This follows the same pattern as MultiAgentTab which has subtabs for
     Human vs Agent, Cooperation, and Competition modes.
+
+    Scientific Execution Model (forwarded from OperatorsSubTab):
+    - step_all_requested: Advance all operators by one step (lock-step)
+    - reset_all_requested: Reset all operators with shared seed
     """
 
     # Forwarded signals from Operators subtab
     operators_changed = pyqtSignal(list)  # List[OperatorConfig]
-    start_operators_requested = pyqtSignal()
+    step_all_requested = pyqtSignal(int)  # Emit with seed for lock-step execution
+    reset_all_requested = pyqtSignal(int)  # Emit with seed for fair reset
     stop_operators_requested = pyqtSignal()
     initialize_operator_requested = pyqtSignal(str, object)  # operator_id, config
 
@@ -390,9 +521,10 @@ class SingleAgentTab(QtWidgets.QWidget):
 
     def _connect_signals(self) -> None:
         """Connect signals from subtabs."""
-        # Operators subtab
+        # Operators subtab - scientific execution controls
         self._operators_tab.operators_changed.connect(self.operators_changed)
-        self._operators_tab.start_operators_requested.connect(self.start_operators_requested)
+        self._operators_tab.step_all_requested.connect(self.step_all_requested)
+        self._operators_tab.reset_all_requested.connect(self.reset_all_requested)
         self._operators_tab.stop_operators_requested.connect(self.stop_operators_requested)
         self._operators_tab.initialize_operator_requested.connect(self.initialize_operator_requested)
 

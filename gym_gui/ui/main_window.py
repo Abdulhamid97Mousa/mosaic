@@ -17,22 +17,7 @@ try:
 except ImportError:
     from qtpy.QtWidgets import QAction  # type: ignore[attr-defined]
 
-from gym_gui.config.game_configs import (
-    CliffWalkingConfig,
-    CarRacingConfig,
-    BipedalWalkerConfig,
-    FrozenLakeConfig,
-    LunarLanderConfig,
-    TaxiConfig,
-    DEFAULT_MINIGRID_EMPTY_5x5_CONFIG,
-    DEFAULT_MINIGRID_DOORKEY_5x5_CONFIG,
-    DEFAULT_MINIGRID_DOORKEY_6x6_CONFIG,
-    DEFAULT_MINIGRID_DOORKEY_8x8_CONFIG,
-    DEFAULT_MINIGRID_DOORKEY_16x16_CONFIG,
-    DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG,
-    DEFAULT_MINIGRID_REDBLUE_DOORS_6x6_CONFIG,  # Added new config
-    DEFAULT_MINIGRID_REDBLUE_DOORS_8x8_CONFIG,  # Added new config
-)
+from gym_gui.config import game_configs
 from gym_gui.constants import UI_DEFAULTS, TRAINER_DEFAULTS
 from gym_gui.config.game_config_builder import GameConfigBuilder
 from gym_gui.config.paths import VAR_TRAINER_DIR
@@ -56,6 +41,9 @@ from gym_gui.logging_config.log_constants import (
     LOG_UI_WORKER_TABS_INFO,
     LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING,
     LOG_UI_MULTI_AGENT_ENV_LOAD_REQUESTED,
+    LOG_OPERATOR_RESET_ALL_STARTED,
+    LOG_OPERATOR_STEP_ALL_COMPLETED,
+    LOG_OPERATOR_STOP_ALL_COMPLETED,
 )
 from gym_gui.constants import DEFAULT_RENDER_DELAY_MS
 from gym_gui.logging_config.logger import list_known_components
@@ -271,20 +259,20 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         control_config = ControlPanelConfig(
             available_modes=available_modes,
             default_mode=settings.default_control_mode,
-            frozen_lake_config=FrozenLakeConfig(is_slippery=False),
-            taxi_config=TaxiConfig(is_raining=False, fickle_passenger=False),
-            cliff_walking_config=CliffWalkingConfig(is_slippery=False),
-            lunar_lander_config=LunarLanderConfig(),
-            car_racing_config=CarRacingConfig.from_env(),
-            bipedal_walker_config=BipedalWalkerConfig.from_env(),
-            minigrid_empty_config=DEFAULT_MINIGRID_EMPTY_5x5_CONFIG,
-            minigrid_doorkey_5x5_config=DEFAULT_MINIGRID_DOORKEY_5x5_CONFIG,
-            minigrid_doorkey_6x6_config=DEFAULT_MINIGRID_DOORKEY_6x6_CONFIG,
-            minigrid_doorkey_8x8_config=DEFAULT_MINIGRID_DOORKEY_8x8_CONFIG,
-            minigrid_doorkey_16x16_config=DEFAULT_MINIGRID_DOORKEY_16x16_CONFIG,
-            minigrid_lavagap_config=DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG,
-            minigrid_redbluedoors_6x6_config=DEFAULT_MINIGRID_REDBLUE_DOORS_6x6_CONFIG,  # Added new config
-            minigrid_redbluedoors_8x8_config=DEFAULT_MINIGRID_REDBLUE_DOORS_8x8_CONFIG,  # Added new config
+            frozen_lake_config=game_configs.FrozenLakeConfig(is_slippery=False),
+            taxi_config=game_configs.TaxiConfig(is_raining=False, fickle_passenger=False),
+            cliff_walking_config=game_configs.CliffWalkingConfig(is_slippery=False),
+            lunar_lander_config=game_configs.LunarLanderConfig(),
+            car_racing_config=game_configs.CarRacingConfig.from_env(),
+            bipedal_walker_config=game_configs.BipedalWalkerConfig.from_env(),
+            minigrid_empty_config=game_configs.DEFAULT_MINIGRID_EMPTY_5x5_CONFIG,
+            minigrid_doorkey_5x5_config=game_configs.DEFAULT_MINIGRID_DOORKEY_5x5_CONFIG,
+            minigrid_doorkey_6x6_config=game_configs.DEFAULT_MINIGRID_DOORKEY_6x6_CONFIG,
+            minigrid_doorkey_8x8_config=game_configs.DEFAULT_MINIGRID_DOORKEY_8x8_CONFIG,
+            minigrid_doorkey_16x16_config=game_configs.DEFAULT_MINIGRID_DOORKEY_16x16_CONFIG,
+            minigrid_lavagap_config=game_configs.DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG,
+            minigrid_redbluedoors_6x6_config=game_configs.DEFAULT_MINIGRID_REDBLUE_DOORS_6x6_CONFIG,
+            minigrid_redbluedoors_8x8_config=game_configs.DEFAULT_MINIGRID_REDBLUE_DOORS_8x8_CONFIG,
             default_seed=settings.default_seed,
             allow_seed_reuse=settings.allow_seed_reuse,
             operators=operator_descriptors,
@@ -743,9 +731,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._control_panel.game_changed.connect(self._on_game_changed)
         self._control_panel.control_mode_changed.connect(self._on_mode_changed)
         self._control_panel.operator_changed.connect(self._on_operator_changed)
-        # Multi-operator signals (Phase 6)
+        # Multi-operator signals - scientific execution for fair comparison
         self._control_panel.operators_changed.connect(self._on_operators_changed)
-        self._control_panel.start_operators_requested.connect(self._on_start_operators)
+        self._control_panel.step_all_requested.connect(self._on_step_all_operators)
+        self._control_panel.reset_all_requested.connect(self._on_reset_all_operators)
         self._control_panel.stop_operators_requested.connect(self._on_stop_operators)
         self._control_panel.initialize_operator_requested.connect(self._on_initialize_operator)
         # Game configuration handlers (delegated)
@@ -936,24 +925,24 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             3000
         )
 
-    def _on_start_operators(self) -> None:
-        """Start all configured operators.
+    def _on_reset_all_operators(self, seed: int) -> None:
+        """Reset all configured operators with shared seed.
 
-        Launches worker subprocesses for each operator and switches
-        to the Multi-Operator tab for viewing.
+        Scientific Execution Model (inspired by BALROG):
+        - All environments reset with identical seed for fair comparison
+        - Launches worker subprocesses in interactive mode if not already running
+        - Sends reset command with seed to each subprocess
+        - Switches to Multi-Operator tab for viewing
         """
         active_operators = self._multi_operator_service.get_active_operators()
         if not active_operators:
-            self._status_bar.showMessage("No operators configured to start", 3000)
+            self._status_bar.showMessage("No operators configured to reset", 3000)
             return
 
         # Get operators that are pending (not yet started)
         pending_ids = self._multi_operator_service.start_all()
-        if not pending_ids:
-            self._status_bar.showMessage("All operators already running", 3000)
-            return
 
-        # Launch subprocess workers for each operator
+        # Launch subprocess workers for each operator that needs to be started
         started_ids = []
         failed_ids = []
         for operator_id in pending_ids:
@@ -962,8 +951,14 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 continue
 
             try:
-                # Launch the subprocess
-                handle = self._operator_launcher.launch_operator(config)
+                # Launch the subprocess in interactive mode for step-by-step control
+                handle = self._operator_launcher.launch_operator(
+                    config,
+                    interactive=True,  # Enable step-by-step control
+                )
+
+                # Send reset command with seed
+                handle.send_reset(seed)
 
                 # Assign run_id to the service for telemetry routing
                 self._multi_operator_service.assign_run_id(operator_id, handle.run_id)
@@ -973,12 +968,14 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
                 self.log_constant(
                     LOG_UI_MAINWINDOW_INFO,
-                    message=f"Launched operator subprocess",
+                    message=f"Launched interactive operator subprocess with seed",
                     extra={
                         "operator_id": operator_id,
+                        "seed": seed,
                         "run_id": handle.run_id,
                         "pid": handle.pid,
                         "log_path": str(handle.log_path),
+                        "interactive": True,
                     },
                 )
             except OperatorLaunchError as e:
@@ -987,7 +984,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 self.log_constant(
                     LOG_UI_MAINWINDOW_ERROR,
                     message=f"Failed to launch operator: {e}",
-                    extra={"operator_id": operator_id},
+                    extra={"operator_id": operator_id, "seed": seed},
                 )
 
         # Update status indicators
@@ -1002,18 +999,77 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         count = len(started_ids)
         if failed_ids:
             self._status_bar.showMessage(
-                f"Started {count} operator{'s' if count != 1 else ''}, {len(failed_ids)} failed",
+                f"Reset {count} operator{'s' if count != 1 else ''} (seed={seed}), {len(failed_ids)} failed",
                 5000
             )
         else:
             self._status_bar.showMessage(
-                f"Started {count} operator{'s' if count != 1 else ''}",
+                f"Reset all operators with seed={seed}",
                 3000
             )
         self.log_constant(
-            LOG_UI_MAINWINDOW_INFO,
-            message=f"Started {count} operators",
-            extra={"operator_ids": started_ids, "failed_ids": failed_ids},
+            LOG_OPERATOR_RESET_ALL_STARTED,
+            message=f"Reset {count} operators with shared seed",
+            extra={"operator_ids": started_ids, "failed_ids": failed_ids, "seed": seed},
+        )
+
+    def _on_step_all_operators(self, seed: int) -> None:
+        """Step all running operators by exactly one step.
+
+        Scientific Execution Model (inspired by BALROG):
+        - Lock-step execution: each operator's agent selects one action
+        - This ensures scientifically fair side-by-side comparison
+        - No arbitrary timing delays between operators
+        """
+        active_operators = self._multi_operator_service.get_active_operators()
+        if not active_operators:
+            self._status_bar.showMessage("No operators to step", 3000)
+            return
+
+        # Send step command to each running operator subprocess
+        stepped_count = 0
+        for operator_id in active_operators:
+            handle = self._operator_launcher.get_handle(operator_id)
+            if handle is None:
+                self.log_constant(
+                    LOG_UI_MAINWINDOW_WARNING,
+                    message=f"No process handle for operator",
+                    extra={"operator_id": operator_id},
+                )
+                continue
+
+            if not handle.is_running:
+                self.log_constant(
+                    LOG_UI_MAINWINDOW_WARNING,
+                    message=f"Operator process not running",
+                    extra={"operator_id": operator_id, "return_code": handle.return_code},
+                )
+                self._multi_operator_service.set_operator_state(operator_id, "stopped")
+                continue
+
+            # Send step command
+            if handle.send_step():
+                stepped_count += 1
+                self.log_constant(
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message=f"Sent step command to operator",
+                    extra={"operator_id": operator_id},
+                )
+            else:
+                self.log_constant(
+                    LOG_UI_MAINWINDOW_WARNING,
+                    message=f"Failed to send step command to operator",
+                    extra={"operator_id": operator_id},
+                )
+
+        self.log_constant(
+            LOG_OPERATOR_STEP_ALL_COMPLETED,
+            message=f"Step all operators completed",
+            extra={"stepped_count": stepped_count, "total_active": len(active_operators)},
+        )
+        self._status_bar.showMessage(
+            f"Stepped {stepped_count} operator{'s' if stepped_count != 1 else ''}",
+            2000
         )
 
     def _on_stop_operators(self) -> None:
@@ -1044,7 +1100,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             3000
         )
         self.log_constant(
-            LOG_UI_MAINWINDOW_INFO,
+            LOG_OPERATOR_STOP_ALL_COMPLETED,
             message=f"Stopped {count} operators",
             extra={"operator_ids": list(all_stopped)},
         )
@@ -1086,16 +1142,65 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 env.close()
 
             elif env_name == "crafter":
-                # Use Crafter environment
+                # Use Crafter environment with high resolution from config
                 try:
                     import crafter
-                    env = crafter.Env()
+                    cfg = game_configs.CrafterConfig()
+                    env = crafter.Env(size=cfg.size)
                     env.reset()
                     rgb_frame = env.render()
                     env.close()
                 except ImportError:
                     self._status_bar.showMessage(
                         "Crafter not installed - cannot preview",
+                        5000
+                    )
+                    return
+
+            elif env_name == "nle":
+                # NLE (NetHack) uses TTY rendering - convert to RGB via nle_render
+                try:
+                    import nle  # noqa: F401
+                    import gymnasium as gym
+                    from gym_gui.core.adapters.nle_render import render_tty_to_rgb
+
+                    # NLE doesn't support rgb_array mode - use default and get tty_chars
+                    env = gym.make(
+                        task,
+                        observation_keys=("tty_chars", "tty_colors", "blstats"),
+                    )
+                    obs, _ = env.reset()
+                    tty_chars = obs.get("tty_chars")
+                    tty_colors = obs.get("tty_colors")
+                    env.close()
+
+                    # Convert TTY to RGB using the existing renderer
+                    if tty_chars is not None:
+                        rgb_frame = render_tty_to_rgb(tty_chars, tty_colors)
+                        # Scale up for better visibility (3x)
+                        rgb_frame = np.repeat(np.repeat(rgb_frame, 3, axis=0), 3, axis=1)
+                except ImportError:
+                    self._status_bar.showMessage(
+                        "NLE not installed - cannot preview",
+                        5000
+                    )
+                    return
+                except Exception as e:
+                    self._status_bar.showMessage(f"Cannot preview NLE: {e}", 5000)
+                    return
+
+            elif env_name == "minihack":
+                # MiniHack supports 'rgb_array' mode
+                try:
+                    import minihack  # noqa: F401
+                    import gymnasium as gym
+                    env = gym.make(task, render_mode="rgb_array")
+                    env.reset()
+                    rgb_frame = env.render()
+                    env.close()
+                except ImportError:
+                    self._status_bar.showMessage(
+                        "MiniHack not installed - cannot preview",
                         5000
                     )
                     return
@@ -1117,20 +1222,32 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
             if rgb_frame is not None:
                 # Build payload for the render container
+                # Extract dimensions safely for type checker
+                if isinstance(rgb_frame, np.ndarray) and rgb_frame.ndim >= 2:
+                    shape = cast(tuple[int, ...], rgb_frame.shape)
+                    frame_height, frame_width = shape[0], shape[1]
+                    frame_data = rgb_frame.tolist()
+                else:
+                    frame_height, frame_width = 0, 0
+                    frame_data = rgb_frame
                 payload = {
                     "render_payload": {
                         "mode": "rgb",
-                        "rgb": rgb_frame.tolist() if isinstance(rgb_frame, np.ndarray) else rgb_frame,
-                        "width": rgb_frame.shape[1] if hasattr(rgb_frame, "shape") else 0,
-                        "height": rgb_frame.shape[0] if hasattr(rgb_frame, "shape") else 0,
+                        "rgb": frame_data,
+                        "width": frame_width,
+                        "height": frame_height,
                     },
                     "episode_index": 0,
                     "step_index": 0,
                     "reward": 0.0,
                 }
 
+                # Update the operator's config (updates header: name, type badge, env/task)
+                self._render_tabs.update_operator_view(config)
                 # Display in the operator's container
                 self._render_tabs.display_operator_payload(operator_id, payload)
+                # Update status to "loaded" to indicate environment is ready
+                self._render_tabs.set_operator_status(operator_id, "loaded")
                 self._render_tabs.switch_to_multi_operator_tab()
                 self._status_bar.showMessage(
                     f"Previewing {task} - ready to start",
