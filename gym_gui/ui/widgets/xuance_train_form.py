@@ -570,7 +570,12 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
         params_layout.addWidget(seed_label, 0, 2)
         params_layout.addWidget(self._seed_spin, 0, 3)
 
-        # Device - auto-detect and select GPU if available
+        # Device with GPU indicator inline
+        device_container = QtWidgets.QWidget(self)
+        device_layout = QtWidgets.QHBoxLayout(device_container)
+        device_layout.setContentsMargins(0, 0, 0, 0)
+        device_layout.setSpacing(4)
+
         device_label = QtWidgets.QLabel("Device:", self)
         self._device_combo = QtWidgets.QComboBox(self)
         self._device_combo.addItem("CPU", "cpu")
@@ -580,25 +585,23 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
 
         # Auto-select GPU if available, and update tooltip
         if self._gpu_count > 0:
-            # Select cuda:0 by default when GPU is detected
             self._device_combo.setCurrentIndex(2)  # cuda:0
             self._device_combo.setToolTip(
                 f"Computing device\n✓ Detected: {self._gpu_name} ({self._gpu_count} GPU{'s' if self._gpu_count > 1 else ''} available)"
             )
-        else:
-            self._device_combo.setToolTip("Computing device\nNo GPU detected - using CPU")
-
-        params_layout.addWidget(device_label, 1, 0)
-        params_layout.addWidget(self._device_combo, 1, 1)
-
-        # GPU info indicator
-        if self._gpu_count > 0:
             gpu_info = QtWidgets.QLabel(f"✓ {self._gpu_name}", self)
             gpu_info.setStyleSheet("color: green; font-size: 10px;")
         else:
-            gpu_info = QtWidgets.QLabel("No GPU detected", self)
+            self._device_combo.setToolTip("Computing device\nNo GPU detected - using CPU")
+            gpu_info = QtWidgets.QLabel("(No GPU)", self)
             gpu_info.setStyleSheet("color: #888; font-size: 10px;")
-        params_layout.addWidget(gpu_info, 1, 2, 1, 2)
+
+        device_layout.addWidget(self._device_combo)
+        device_layout.addWidget(gpu_info)
+        device_layout.addStretch()
+
+        params_layout.addWidget(device_label, 1, 0)
+        params_layout.addWidget(device_container, 1, 1)
 
         # Parallels
         parallels_label = QtWidgets.QLabel("Parallel Envs:", self)
@@ -1275,7 +1278,7 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
 
         metadata = {
             "ui": {
-                "worker_id": state.worker_id or "xuance_worker",
+                "worker_id": "xuance_worker",  # Always xuance_worker for tab naming
                 "method": state.method,
                 "env": state.env,
                 "env_id": state.env_id,
@@ -1289,14 +1292,14 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 "fastlane_grid_limit": state.fastlane_grid_limit,
             },
             "worker": {
-                "worker_id": state.worker_id or "xuance_worker",
+                "worker_id": "xuance_worker",  # Always xuance_worker for detection
                 "module": "xuance_worker.cli",
                 "config": worker_config,
             },
             "artifacts": {
                 "tensorboard": {
                     "enabled": track_tensorboard,
-                    "relative_path": "tensorboard",
+                    "relative_path": f"var/trainer/runs/{run_id}/tensorboard" if track_tensorboard else None,
                 },
                 "wandb": {
                     "enabled": track_wandb,

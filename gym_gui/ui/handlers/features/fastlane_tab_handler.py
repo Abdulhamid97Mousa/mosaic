@@ -201,11 +201,12 @@ class FastLaneTabHandler:
             )
             return
 
-        # CleanRL or other workers: CleanRL-Live-{agent_id}
-        if run_mode == "policy_eval":
-            title = f"CleanRL-Eval-{agent_id or 'agent'}"
-        else:
-            title = f"CleanRL-Live-{agent_id or 'agent'}"
+        # Worker-specific tab naming: {Prefix}-{Mode}-{env_id or agent_id}
+        prefix = self._get_worker_prefix(worker_id)
+        mode_suffix = "Eval" if run_mode == "policy_eval" else "Live"
+        # Prefer env_id for XuanCe, fall back to agent_id for CleanRL compatibility
+        label = env_id if env_id else (agent_id or "default")
+        title = f"{prefix}-{mode_suffix}-{label}"
 
         self._render_tabs.add_dynamic_tab(run_id, title, tab)
         self._fastlane_tabs_open.add(key)
@@ -213,6 +214,20 @@ class FastLaneTabHandler:
             message="Opened FastLane tab",
             extra={"run_id": run_id, "agent_id": agent_id, "title": title},
         )
+
+    # -------------------------------------------------------------------------
+    # Worker prefix mapping
+    # -------------------------------------------------------------------------
+
+    _WORKER_PREFIXES: Dict[str, str] = {
+        "cleanrl_worker": "CleanRL",
+        "xuance_worker": "XuanCe",
+        "ray_worker": "Ray",
+    }
+
+    def _get_worker_prefix(self, worker_id: str) -> str:
+        """Get display prefix for a worker type."""
+        return self._WORKER_PREFIXES.get(worker_id, "Worker")
 
     # -------------------------------------------------------------------------
     # Metadata extraction methods
@@ -329,6 +344,10 @@ class FastLaneTabHandler:
 
         # Ray worker detection
         if "ray_worker" in module_name or worker_kind == "ray" or worker_identifier == "ray_worker":
+            return True
+
+        # XuanCe worker detection
+        if "xuance_worker" in module_name or worker_kind == "xuance" or worker_identifier == "xuance_worker":
             return True
 
         worker_config = worker_meta.get("config")

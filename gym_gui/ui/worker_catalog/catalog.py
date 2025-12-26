@@ -46,7 +46,7 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
 
     Workers available:
     - CleanRL: Single/multi-agent RL with clean implementations (PPO, DQN, SAC, TD3, etc.)
-    - XuanCe: Comprehensive RL library with 46+ algorithms for single/multi-agent
+    - XuanCe: Comprehensive deep RL library with 50+ algorithms for single/multi-agent
     - Ray RLlib: Multi-agent distributed RL with various paradigms
     - PettingZoo: Multi-agent environments with AEC and Parallel APIs
     - BARLOG: LLM-based agents using BALROG benchmark framework
@@ -86,7 +86,7 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
             worker_id="xuance_worker",
             display_name="XuanCe Worker",
             description=(
-                "Comprehensive RL library with 46+ algorithms. "
+                "Comprehensive deep RL library with 50+ algorithms. "
                 "Single-agent: DQN, PPO, SAC, TD3, DreamerV3. Multi-agent: MAPPO, QMIX, MADDPG, VDN, COMA. "
                 "Works with Gymnasium, PettingZoo, SMAC, and Google Football environments. "
                 "PyTorch backend with TensorBoard/WandB logging."

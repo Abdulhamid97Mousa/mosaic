@@ -49,7 +49,7 @@ def _parse_control_mode(raw: str | None) -> ControlMode:
 @dataclass(frozen=True, slots=True)
 class Settings:
     """Typed view over the environment configuration.
-    
+
     Note: Game-specific configurations (like FrozenLake's is_slippery or
     Taxi's is_raining) are now in gym_gui.config.game_configs module.
     """
@@ -61,6 +61,10 @@ class Settings:
     default_control_mode: ControlMode = ControlMode.HUMAN_ONLY
     default_seed: int = 1
     allow_seed_reuse: bool = False
+
+    # vLLM Server settings
+    vllm_max_servers: int = 4  # Maximum number of vLLM server instances
+    vllm_gpu_memory_utilization: float = 0.4  # GPU memory fraction per server (0.4 = 40%)
 
     @property
     def video_dir(self) -> Path | None:
@@ -105,6 +109,19 @@ def get_settings() -> Settings:
         default=defaults.allow_seed_reuse,
     )
 
+    # vLLM settings
+    vllm_max_servers_raw = os.getenv("VLLM_MAX_SERVERS")
+    try:
+        vllm_max_servers = int(vllm_max_servers_raw) if vllm_max_servers_raw else defaults.vllm_max_servers
+    except (TypeError, ValueError):
+        vllm_max_servers = defaults.vllm_max_servers
+
+    vllm_gpu_memory_raw = os.getenv("VLLM_GPU_MEMORY_UTILIZATION")
+    try:
+        vllm_gpu_memory_utilization = float(vllm_gpu_memory_raw) if vllm_gpu_memory_raw else defaults.vllm_gpu_memory_utilization
+    except (TypeError, ValueError):
+        vllm_gpu_memory_utilization = defaults.vllm_gpu_memory_utilization
+
     return Settings(
         qt_api=qt_api,
         gym_default_env=gym_default_env,
@@ -113,6 +130,8 @@ def get_settings() -> Settings:
         default_control_mode=default_control_mode,
         default_seed=max(1, default_seed),
         allow_seed_reuse=allow_seed_reuse,
+        vllm_max_servers=max(1, min(8, vllm_max_servers)),  # Clamp to 1-8
+        vllm_gpu_memory_utilization=max(0.1, min(0.95, vllm_gpu_memory_utilization)),  # Clamp to 0.1-0.95
     )
 
 

@@ -128,12 +128,6 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
         self._replay_tab_index = self.addTab(self._replay_tab, "Human Replay")
         self.setTabToolTip(self._replay_tab_index, "Review episodes from manual gameplay sessions only")
 
-        # Management tab for training runs (optional, requires run_manager)
-        self._management_tab: Optional["ManagementTab"] = None
-        self._management_tab_index = -1
-        if run_manager is not None:
-            self._setup_management_tab(run_manager)
-
         # Multi-Operator tab for side-by-side agent comparison
         self._multi_operator_view = MultiOperatorRenderView(parent=self)
         self._multi_operator_tab_index = self.addTab(self._multi_operator_view, "Multi-Operator")
@@ -141,6 +135,12 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
             self._multi_operator_tab_index,
             "Side-by-side comparison of multiple operators (LLM, RL)"
         )
+
+        # Management tab for training runs (optional, requires run_manager)
+        self._management_tab: Optional["ManagementTab"] = None
+        self._management_tab_index = -1
+        if run_manager is not None:
+            self._setup_management_tab(run_manager)
 
         # Board game strategy (integrated into Grid tab, created on demand)
         self._board_game_strategy: BoardGameRendererStrategy | None = None

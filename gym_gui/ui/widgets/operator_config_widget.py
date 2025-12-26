@@ -250,7 +250,7 @@ def _get_registered_envs(prefix: str) -> List[str]:
                 return []
 
         envs = [
-            env_id for env_id in gymnasium.envs.registry.keys()
+            env_id for env_id in gymnasium.registry.keys()
             if env_id.startswith(prefix)
         ]
         return sorted(envs)
@@ -315,10 +315,10 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._name_edit.setFixedWidth(120)
         row1.addWidget(self._name_edit)
 
-        # Type selector (LLM / RL)
+        # Type selector (LLM / VLM / RL)
         self._type_combo = QtWidgets.QComboBox(self)
-        self._type_combo.addItems(["LLM", "RL"])
-        self._type_combo.setFixedWidth(60)
+        self._type_combo.addItems(["LLM", "VLM", "RL"])
+        self._type_combo.setFixedWidth(70)
         row1.addWidget(self._type_combo)
 
         # Worker dropdown
@@ -413,16 +413,6 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._show_key_btn.clicked.connect(self._toggle_api_key_visibility)
         llm_layout.addWidget(self._show_key_btn)
 
-        # VLM (Vision Mode) toggle - enables image observations for multimodal models
-        self._vlm_checkbox = QtWidgets.QCheckBox("VLM", self._llm_container)
-        self._vlm_checkbox.setToolTip(
-            "Enable Vision Mode for multimodal models (GPT-4V, Claude 3, Qwen2-VL).\n"
-            "Disabled = text-only observations (works with any LLM).\n"
-            "Enabled = image observations sent to model (requires VLM)."
-        )
-        self._vlm_checkbox.setChecked(False)  # Default: LLM mode (text-only)
-        llm_layout.addWidget(self._vlm_checkbox)
-
         main_layout.addWidget(self._llm_container)
 
         # === RL-specific widgets ===
@@ -465,7 +455,6 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._client_combo.currentIndexChanged.connect(self._on_client_changed)
         self._model_combo.currentIndexChanged.connect(self._on_config_changed)
         self._api_key_edit.textChanged.connect(self._on_config_changed)
-        self._vlm_checkbox.stateChanged.connect(self._on_config_changed)
 
         # RL-specific signals
         self._policy_path_edit.textChanged.connect(self._on_config_changed)
@@ -523,14 +512,15 @@ class OperatorConfigRow(QtWidgets.QWidget):
             self._policy_path_edit.setText(file_path)
 
     def _update_type_specific_visibility(self) -> None:
-        """Show/hide LLM or RL specific widgets based on operator type."""
+        """Show/hide LLM/VLM or RL specific widgets based on operator type."""
         operator_type = self._type_combo.currentText().lower()
-        is_llm = operator_type == "llm"
+        # Both LLM and VLM show the LLM container (they both use language models)
+        is_llm_or_vlm = operator_type in ("llm", "vlm")
 
-        self._llm_container.setVisible(is_llm)
-        self._rl_container.setVisible(not is_llm)
+        self._llm_container.setVisible(is_llm_or_vlm)
+        self._rl_container.setVisible(not is_llm_or_vlm)
 
-        if is_llm:
+        if is_llm_or_vlm:
             self._update_api_key_visibility()
 
     def _update_api_key_visibility(self) -> None:
@@ -589,7 +579,8 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._worker_combo.clear()
 
         operator_type = self._type_combo.currentText().lower()
-        if operator_type == "llm":
+        # LLM and VLM both use LLM workers (same BARLOG worker, different image settings)
+        if operator_type in ("llm", "vlm"):
             workers = _get_llm_workers()
         else:
             workers = _get_rl_workers()
@@ -612,8 +603,8 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._env_combo.clear()
 
         operator_type = self._type_combo.currentText().lower()
-        if operator_type == "llm":
-            # LLM: all families except classic_control and box2d
+        # LLM and VLM use same env families (text-based reasoning environments)
+        if operator_type in ("llm", "vlm"):
             envs = LLM_ENV_FAMILIES
         else:
             # RL: all environment families
@@ -686,8 +677,19 @@ class OperatorConfigRow(QtWidgets.QWidget):
 
         self._name_edit.setText(config.display_name)
 
-        # Set type
-        type_idx = 0 if config.operator_type == "llm" else 1
+        # Determine type: check if it's VLM based on max_image_history setting
+        operator_type = config.operator_type
+        if operator_type in ("llm", "vlm") and config.settings:
+            # If max_image_history > 0, it's VLM mode
+            max_image_history = config.settings.get("max_image_history", 0)
+            if max_image_history > 0:
+                operator_type = "vlm"
+            else:
+                operator_type = "llm"
+
+        # Set type: LLM=0, VLM=1, RL=2
+        type_map = {"llm": 0, "vlm": 1, "rl": 2}
+        type_idx = type_map.get(operator_type, 0)
         self._type_combo.setCurrentIndex(type_idx)
 
         # Update dropdowns for type
@@ -710,8 +712,8 @@ class OperatorConfigRow(QtWidgets.QWidget):
         if task_idx >= 0:
             self._task_combo.setCurrentIndex(task_idx)
 
-        # Load LLM-specific settings
-        if config.operator_type == "llm" and config.settings:
+        # Load LLM/VLM-specific settings
+        if operator_type in ("llm", "vlm") and config.settings:
             # Set client
             client_name = config.settings.get("client_name", "openai")
             client_idx = self._client_combo.findData(client_name)
@@ -730,12 +732,8 @@ class OperatorConfigRow(QtWidgets.QWidget):
             api_key = config.settings.get("api_key", "")
             self._api_key_edit.setText(api_key)
 
-            # Set VLM mode (max_image_history > 0 means VLM mode)
-            max_image_history = config.settings.get("max_image_history", 0)
-            self._vlm_checkbox.setChecked(max_image_history > 0)
-
         # Load RL-specific settings
-        elif config.operator_type == "rl" and config.settings:
+        elif operator_type == "rl" and config.settings:
             policy_path = config.settings.get("policy_path", "")
             self._policy_path_edit.setText(policy_path)
 
@@ -760,8 +758,8 @@ class OperatorConfigRow(QtWidgets.QWidget):
         # Build settings based on operator type
         settings: Dict[str, Any] = {}
 
-        if operator_type == "llm":
-            # LLM-specific settings
+        if operator_type in ("llm", "vlm"):
+            # LLM/VLM-specific settings
             client_name = self._client_combo.currentData() or "openai"
             model_id = self._model_combo.currentData() or ""
             api_key = self._api_key_edit.text().strip()
@@ -770,7 +768,8 @@ class OperatorConfigRow(QtWidgets.QWidget):
             settings["model_id"] = model_id
 
             # VLM mode: 0 = text-only (LLM), 1 = vision mode (VLM)
-            settings["max_image_history"] = 1 if self._vlm_checkbox.isChecked() else 0
+            # The type dropdown now directly controls this
+            settings["max_image_history"] = 1 if operator_type == "vlm" else 0
 
             # Only include API key if provided
             if api_key:

@@ -157,7 +157,9 @@ def make_babyai_env(
         Wrapped environment with descriptions in info
     """
     import minigrid
-    minigrid.register_minigrid_envs()
+    # Only register if not already in registry
+    if "MiniGrid-Empty-5x5-v0" not in gym.envs.registry:
+        minigrid.register_minigrid_envs()
 
     # Handle special MixedTrainLocal tasks
     if task.startswith("BabyAI-MixedTrainLocal-v0/"):

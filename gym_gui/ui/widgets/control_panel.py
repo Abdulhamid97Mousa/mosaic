@@ -128,7 +128,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
     step_all_requested = pyqtSignal(int)  # Step all operators with seed (lock-step execution)
     reset_all_requested = pyqtSignal(int)  # Reset all operators with seed (fair comparison)
     stop_operators_requested = pyqtSignal()  # Stop all running operators
-    initialize_operator_requested = pyqtSignal(str, object)  # operator_id, config - preview env
+    initialize_operator_requested = pyqtSignal(str, object, int)  # operator_id, config, seed - preview env
     train_agent_requested = pyqtSignal(str)  # Start fresh headless training
     trained_agent_requested = pyqtSignal(str)  # Load trained policy for evaluation
     resume_training_requested = pyqtSignal(str)  # Resume training from checkpoint
@@ -958,12 +958,13 @@ class ControlPanelWidget(QtWidgets.QWidget):
         """Handle Stop All button click."""
         self.stop_operators_requested.emit()
 
-    def _on_initialize_operator_requested(self, operator_id: str, config: OperatorConfig) -> None:
-        """Handle Initialize button click - preview environment before running."""
-        self.initialize_operator_requested.emit(operator_id, config)
+    def _on_initialize_operator_requested(self, operator_id: str, config: OperatorConfig, seed: int) -> None:
+        """Handle Initialize button click - preview environment with shared seed."""
+        self.initialize_operator_requested.emit(operator_id, config, seed)
 
     def _on_single_agent_worker_changed(self, worker_id: str) -> None:
         """Handle worker selection change from SingleAgentTab."""
+        self._current_worker_id = worker_id
         self.worker_changed.emit(worker_id)
 
     # ------------------------------------------------------------------

@@ -19,6 +19,7 @@ from PyQt6.QtCore import pyqtSignal
 
 from gym_gui.services.operator import OperatorConfig
 from gym_gui.ui.widgets.operator_config_widget import OperatorConfigWidget
+from gym_gui.ui.widgets.vllm_server_widget import VLLMServerWidget
 from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
 
 
@@ -40,7 +41,7 @@ class OperatorsSubTab(QtWidgets.QWidget):
     step_all_requested = pyqtSignal(int)  # Emit with current seed
     reset_all_requested = pyqtSignal(int)  # Emit with current seed
     stop_operators_requested = pyqtSignal()
-    initialize_operator_requested = pyqtSignal(str, object)  # operator_id, config
+    initialize_operator_requested = pyqtSignal(str, object, int)  # operator_id, config, seed
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
@@ -73,6 +74,11 @@ class OperatorsSubTab(QtWidgets.QWidget):
         explanation_text.setStyleSheet("QLabel { color: #555; padding: 4px; }")
         explanation_layout.addWidget(explanation_text)
         layout.addWidget(explanation_group)
+
+        # vLLM Servers section (for local LLM/VLM inference)
+        self._vllm_server_widget = VLLMServerWidget(max_servers=2, parent=self)
+        self._vllm_server_widget.server_status_changed.connect(self._on_vllm_server_status_changed)
+        layout.addWidget(self._vllm_server_widget)
 
         # Configure Operators section
         config_group = QtWidgets.QGroupBox("Configure Operators", self)
@@ -238,8 +244,12 @@ class OperatorsSubTab(QtWidgets.QWidget):
         self._status_label.setText("Stopped")
 
     def _on_initialize_requested(self, operator_id: str, config) -> None:
-        """Handle initialize request from an operator row."""
-        self.initialize_operator_requested.emit(operator_id, config)
+        """Handle initialize request from an operator row.
+
+        Passes the shared seed for controlled scientific comparison.
+        """
+        seed = self.get_current_seed()
+        self.initialize_operator_requested.emit(operator_id, config, seed)
 
     def set_step_count(self, count: int) -> None:
         """Set the step count (called externally when steps complete)."""
@@ -253,6 +263,21 @@ class OperatorsSubTab(QtWidgets.QWidget):
     def get_current_seed(self) -> int:
         """Get the current seed value."""
         return self._seed_spin.value()
+
+    def _on_vllm_server_status_changed(self, server_id: int, status: str, base_url: str) -> None:
+        """Handle vLLM server status changes.
+
+        This allows the UI to update operator indicators when servers start/stop.
+        """
+        # Log the status change
+        import logging
+        _LOGGER = logging.getLogger(__name__)
+        _LOGGER.info(f"vLLM Server {server_id} status: {status}, URL: {base_url}")
+
+    @property
+    def vllm_server_widget(self) -> VLLMServerWidget:
+        """Get the vLLM server management widget."""
+        return self._vllm_server_widget
 
     @property
     def operator_config_widget(self) -> OperatorConfigWidget:
@@ -295,7 +320,7 @@ class WorkersSubTab(QtWidgets.QWidget):
             "<ul>"
             "<li><b>BARLOG LLM Worker</b> - LLM agents using BALROG (OpenAI, Claude, Gemini)</li>"
             "<li><b>CleanRL Worker</b> - Single-file RL implementations (PPO, DQN, SAC)</li>"
-            "<li><b>XuanCe Worker</b> - Comprehensive RL library with 50+ algorithms</li>"
+            "<li><b>XuanCe Worker</b> - Comprehensive deep RL library with 50+ algorithms</li>"
             "<li><b>Ray RLlib Worker</b> - Scalable distributed RL training</li>"
             "</ul>"
             "<p>Workers run as isolated subprocesses, providing process isolation, "
@@ -486,7 +511,7 @@ class SingleAgentTab(QtWidgets.QWidget):
     step_all_requested = pyqtSignal(int)  # Emit with seed for lock-step execution
     reset_all_requested = pyqtSignal(int)  # Emit with seed for fair reset
     stop_operators_requested = pyqtSignal()
-    initialize_operator_requested = pyqtSignal(str, object)  # operator_id, config
+    initialize_operator_requested = pyqtSignal(str, object, int)  # operator_id, config, seed
 
     # Forwarded signals from Workers subtab
     worker_changed = pyqtSignal(str)  # worker_id
@@ -543,6 +568,11 @@ class SingleAgentTab(QtWidgets.QWidget):
     def workers_subtab(self) -> WorkersSubTab:
         """Get the Workers subtab."""
         return self._workers_tab
+
+    @property
+    def vllm_server_widget(self) -> VLLMServerWidget:
+        """Get the vLLM server management widget."""
+        return self._operators_tab.vllm_server_widget
 
     # Backward compatibility properties for control_panel.py
     @property

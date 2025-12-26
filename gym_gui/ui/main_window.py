@@ -1105,16 +1105,22 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             extra={"operator_ids": list(all_stopped)},
         )
 
-    def _on_initialize_operator(self, operator_id: str, config: OperatorConfig) -> None:
-        """Initialize environment for operator preview without starting the agent.
+    def _on_initialize_operator(self, operator_id: str, config: OperatorConfig, seed: int) -> None:
+        """Initialize environment for operator preview with shared seed.
 
-        Creates the environment, resets it, and displays the initial observation
-        in the render container so users can preview before running.
+        Creates the environment, resets it with the shared seed, and displays
+        the initial observation. Using the same seed for all operators ensures
+        identical environments for controlled scientific comparison.
+
+        Args:
+            operator_id: The operator's unique ID
+            config: Operator configuration with env_name and task
+            seed: Shared seed for reproducible environment initialization
         """
         env_name = config.env_name
         task = config.task
 
-        self._status_bar.showMessage(f"Initializing {task}...", 2000)
+        self._status_bar.showMessage(f"Initializing {task} with seed={seed}...", 2000)
 
         try:
             # Create and reset environment to get initial observation
@@ -1126,8 +1132,11 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             if env_name in ("babyai", "minigrid"):
                 # Use MiniGrid/BabyAI via gymnasium
                 try:
+                    import gymnasium as gym
                     import minigrid
-                    minigrid.register_minigrid_envs()
+                    # Only register if not already in registry
+                    if "MiniGrid-Empty-5x5-v0" not in gym.envs.registry:
+                        minigrid.register_minigrid_envs()
                 except ImportError:
                     self._status_bar.showMessage(
                         f"MiniGrid not installed - cannot preview {task}",
@@ -1135,18 +1144,18 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     )
                     return
 
-                import gymnasium as gym
                 env = gym.make(task, render_mode="rgb_array")
-                env.reset()
+                env.reset(seed=seed)
                 rgb_frame = env.render()
                 env.close()
 
             elif env_name == "crafter":
                 # Use Crafter environment with high resolution from config
+                # Note: Crafter takes seed in __init__, not reset()
                 try:
                     import crafter
                     cfg = game_configs.CrafterConfig()
-                    env = crafter.Env(size=cfg.size)
+                    env = crafter.Env(size=cfg.size, seed=seed)
                     env.reset()
                     rgb_frame = env.render()
                     env.close()
@@ -1169,7 +1178,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                         task,
                         observation_keys=("tty_chars", "tty_colors", "blstats"),
                     )
-                    obs, _ = env.reset()
+                    obs, _ = env.reset(seed=seed)
                     tty_chars = obs.get("tty_chars")
                     tty_colors = obs.get("tty_colors")
                     env.close()
@@ -1195,7 +1204,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     import minihack  # noqa: F401
                     import gymnasium as gym
                     env = gym.make(task, render_mode="rgb_array")
-                    env.reset()
+                    env.reset(seed=seed)
                     rgb_frame = env.render()
                     env.close()
                 except ImportError:
@@ -1210,7 +1219,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 try:
                     import gymnasium as gym
                     env = gym.make(task, render_mode="rgb_array")
-                    env.reset()
+                    env.reset(seed=seed)
                     rgb_frame = env.render()
                     env.close()
                 except Exception as e:

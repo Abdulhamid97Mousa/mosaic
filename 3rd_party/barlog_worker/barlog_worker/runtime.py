@@ -399,6 +399,14 @@ class InteractiveRuntime:
             effective_seed = seed if seed is not None else self.config.seed
             self._obs, info = self._env.reset(seed=effective_seed)
 
+            # Set instruction prompt with valid actions (critical for LLM to know valid actions)
+            instructions = None
+            if self.config.env_name == "babyai":
+                instructions = self._obs.get("mission") if isinstance(self._obs, dict) else None
+            self._agent.prompt_builder.update_instruction_prompt(
+                self._env.get_instruction_prompt(instructions=instructions)
+            )
+
             # Reset episode state
             self._episode_idx = 0
             self._step_idx = 0
