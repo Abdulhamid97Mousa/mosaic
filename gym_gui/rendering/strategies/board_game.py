@@ -37,7 +37,10 @@ class BoardGameRendererStrategy(RendererStrategy):
     mode = RenderMode.GRID  # Rendered in Grid tab
 
     # Supported game IDs
-    SUPPORTED_GAMES = frozenset({GameId.CHESS, GameId.CONNECT_FOUR, GameId.GO, GameId.TIC_TAC_TOE})
+    SUPPORTED_GAMES = frozenset({
+        GameId.CHESS, GameId.CONNECT_FOUR, GameId.GO, GameId.TIC_TAC_TOE,
+        GameId.JUMANJI_SUDOKU,
+    })
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         self._widget = _BoardGameWidget(parent)
@@ -73,6 +76,21 @@ class BoardGameRendererStrategy(RendererStrategy):
         """Signal: Tic-Tac-Toe cell clicked (row: int, col: int)."""
         return self._widget.tictactoe_cell_clicked
 
+    @property
+    def sudoku_cell_selected(self) -> QtCore.SignalInstance:
+        """Signal: Sudoku cell selected (row: int, col: int)."""
+        return self._widget.sudoku_cell_selected
+
+    @property
+    def sudoku_digit_entered(self) -> QtCore.SignalInstance:
+        """Signal: Sudoku digit entered (row: int, col: int, digit: int)."""
+        return self._widget.sudoku_digit_entered
+
+    @property
+    def sudoku_cell_cleared(self) -> QtCore.SignalInstance:
+        """Signal: Sudoku cell cleared (row: int, col: int)."""
+        return self._widget.sudoku_cell_cleared
+
     def render(
         self, payload: Mapping[str, object], *, context: RendererContext | None = None
     ) -> None:
@@ -93,6 +111,8 @@ class BoardGameRendererStrategy(RendererStrategy):
         if "connect_four" in payload:
             return True
         if "go" in payload:
+            return True
+        if "sudoku" in payload:
             return True
         # Check game_id
         game_id = payload.get("game_id")
@@ -141,6 +161,8 @@ class BoardGameRendererStrategy(RendererStrategy):
             return GameId.CONNECT_FOUR
         if "go" in payload:
             return GameId.GO
+        if "sudoku" in payload:
+            return GameId.JUMANJI_SUDOKU
 
         # Detect from game_type value (adapter payloads use this)
         game_type = payload.get("game_type")
@@ -150,6 +172,8 @@ class BoardGameRendererStrategy(RendererStrategy):
             return GameId.CONNECT_FOUR
         if game_type == "go":
             return GameId.GO
+        if game_type == "sudoku":
+            return GameId.JUMANJI_SUDOKU
 
         return None
 
@@ -162,6 +186,8 @@ class BoardGameRendererStrategy(RendererStrategy):
             return GameId.CONNECT_FOUR
         if "go" in payload:
             return GameId.GO
+        if "sudoku" in payload:
+            return GameId.JUMANJI_SUDOKU
 
         # Detect from game_type value (adapter payloads use this)
         game_type = payload.get("game_type")
@@ -171,6 +197,8 @@ class BoardGameRendererStrategy(RendererStrategy):
             return GameId.CONNECT_FOUR
         if game_type == "go":
             return GameId.GO
+        if game_type == "sudoku":
+            return GameId.JUMANJI_SUDOKU
 
         return None
 
@@ -193,6 +221,9 @@ class _BoardGameWidget(QtWidgets.QStackedWidget):
     go_intersection_clicked = QtCore.Signal(int, int)  # row, col
     go_pass_requested = QtCore.Signal()
     tictactoe_cell_clicked = QtCore.Signal(int, int)  # row, col
+    sudoku_cell_selected = QtCore.Signal(int, int)  # row, col
+    sudoku_digit_entered = QtCore.Signal(int, int, int)  # row, col, digit
+    sudoku_cell_cleared = QtCore.Signal(int, int)  # row, col
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
@@ -202,6 +233,7 @@ class _BoardGameWidget(QtWidgets.QStackedWidget):
         self._connect_four_renderer: _ConnectFourBoardRenderer | None = None
         self._go_renderer: _GoBoardRenderer | None = None
         self._tictactoe_renderer: _TicTacToeBoardRenderer | None = None
+        self._sudoku_renderer: _SudokuBoardRenderer | None = None
 
         # Placeholder for empty state
         self._placeholder = QtWidgets.QLabel("No board game loaded", self)
@@ -228,6 +260,12 @@ class _BoardGameWidget(QtWidgets.QStackedWidget):
         elif game_id == GameId.TIC_TAC_TOE:
             renderer = self._get_tictactoe_renderer()
             renderer.update_from_payload(payload)
+            self.setCurrentWidget(renderer)
+        elif game_id == GameId.JUMANJI_SUDOKU:
+            renderer = self._get_sudoku_renderer()
+            # Extract sudoku data from wrapped or flat payload
+            sudoku_data = payload.get("sudoku", payload)
+            renderer.update_from_payload(sudoku_data)
             self.setCurrentWidget(renderer)
         else:
             self.setCurrentWidget(self._placeholder)
@@ -273,6 +311,16 @@ class _BoardGameWidget(QtWidgets.QStackedWidget):
             self._tictactoe_renderer.cell_clicked.connect(self.tictactoe_cell_clicked)
             self.addWidget(self._tictactoe_renderer)
         return self._tictactoe_renderer
+
+    def _get_sudoku_renderer(self) -> "_SudokuBoardRenderer":
+        """Lazy-load Sudoku renderer."""
+        if self._sudoku_renderer is None:
+            self._sudoku_renderer = _SudokuBoardRenderer(self)
+            self._sudoku_renderer.cell_selected.connect(self.sudoku_cell_selected)
+            self._sudoku_renderer.digit_entered.connect(self.sudoku_digit_entered)
+            self._sudoku_renderer.cell_cleared.connect(self.sudoku_cell_cleared)
+            self.addWidget(self._sudoku_renderer)
+        return self._sudoku_renderer
 
 
 # =============================================================================
@@ -1413,6 +1461,406 @@ class _TicTacToeBoardRenderer(QtWidgets.QWidget):
         self._hover_pos = None
         self.update()
         super().leaveEvent(event)
+
+
+# =============================================================================
+# Sudoku Board Renderer
+# =============================================================================
+
+# Sudoku colors
+_SUDOKU_BG = QtGui.QColor(255, 255, 255)
+_SUDOKU_GRID_THIN = QtGui.QColor(200, 200, 200)
+_SUDOKU_GRID_THICK = QtGui.QColor(0, 0, 0)
+_SUDOKU_FIXED = QtGui.QColor(20, 20, 20)  # Pre-filled clues
+_SUDOKU_PLACED = QtGui.QColor(50, 100, 200)  # Player-placed digits
+_SUDOKU_SELECTED = QtGui.QColor(187, 222, 251)  # Selected cell
+_SUDOKU_SAME_ROW_COL_BOX = QtGui.QColor(232, 245, 253)  # Same row/col/box as selected
+_SUDOKU_SAME_NUMBER = QtGui.QColor(200, 230, 255)  # Same number highlighted
+_SUDOKU_INVALID = QtGui.QColor(255, 200, 200)  # Invalid cell (conflict)
+_SUDOKU_HOVER = QtGui.QColor(220, 220, 255)
+
+
+class _SudokuBoardRenderer(QtWidgets.QWidget):
+    """Sudoku board renderer with interactive cell selection and number input.
+
+    Interaction:
+    - Click a cell to select it
+    - Press 1-9 to enter a digit in the selected cell
+    - Press Delete/Backspace to clear a cell (if allowed)
+    """
+
+    cell_selected = QtCore.Signal(int, int)  # row, col
+    digit_entered = QtCore.Signal(int, int, int)  # row, col, digit (1-9)
+    cell_cleared = QtCore.Signal(int, int)  # row, col
+
+    SIZE = 9  # 9x9 grid
+    BOX_SIZE = 3  # 3x3 boxes
+
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        super().__init__(parent)
+
+        # Board state (0 = empty, 1-9 = digit)
+        self._board: List[List[int]] = [[0] * self.SIZE for _ in range(self.SIZE)]
+        self._fixed_cells: Set[tuple[int, int]] = set()  # Pre-filled clue positions
+        self._invalid_cells: Set[tuple[int, int]] = set()  # Cells with conflicts
+
+        # Action mask from Jumanji (shape: 9*9*9 = 729)
+        self._action_mask: Optional[List[bool]] = None
+
+        # Interaction state
+        self._selected_cell: Optional[tuple[int, int]] = None
+        self._hover_cell: Optional[tuple[int, int]] = None
+        self._enabled: bool = True
+
+        # Visual settings
+        self._cell_size: int = 50
+        self._margin: int = 30
+        self._thin_line: int = 1
+        self._thick_line: int = 3
+
+        # Widget setup
+        self.setMouseTracking(True)
+        self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
+        self.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Expanding,
+        )
+        self._update_minimum_size()
+
+    def _update_minimum_size(self) -> None:
+        size = self.SIZE * self._cell_size + 2 * self._margin
+        self.setMinimumSize(size, size)
+
+    def update_from_payload(self, payload: Dict[str, Any]) -> None:
+        """Update Sudoku board from adapter payload."""
+        # Get board (9x9 array, 0 = empty, 1-9 = digit)
+        board = payload.get("board")
+        if isinstance(board, (list, tuple)):
+            # Handle nested list or numpy array
+            new_board = []
+            for row in board:
+                if hasattr(row, "tolist"):
+                    new_board.append(list(row.tolist()))
+                else:
+                    new_board.append(list(row))
+            self._board = new_board
+
+        # Get fixed cells (clues that can't be changed)
+        fixed = payload.get("fixed_cells")
+        if isinstance(fixed, (list, set)):
+            self._fixed_cells = set(tuple(c) for c in fixed)
+        elif fixed is None:
+            # Infer fixed cells from initial non-zero values
+            # Only do this on first load
+            if not self._fixed_cells:
+                for r in range(self.SIZE):
+                    for c in range(self.SIZE):
+                        if self._board[r][c] != 0:
+                            self._fixed_cells.add((r, c))
+
+        # Get action mask (729 bools)
+        action_mask = payload.get("action_mask")
+        if action_mask is not None:
+            if hasattr(action_mask, "tolist"):
+                self._action_mask = action_mask.tolist()
+            else:
+                self._action_mask = list(action_mask)
+
+        # Get invalid cells (conflicts)
+        invalid = payload.get("invalid_cells")
+        if isinstance(invalid, (list, set)):
+            self._invalid_cells = set(tuple(c) for c in invalid)
+        else:
+            self._invalid_cells = set()
+
+        self.update()
+
+    def get_valid_digits(self, row: int, col: int) -> List[int]:
+        """Get list of valid digits for a cell based on action mask."""
+        if self._action_mask is None:
+            return list(range(1, 10))
+
+        valid = []
+        for digit in range(1, 10):
+            action = row * 81 + col * 9 + (digit - 1)
+            if action < len(self._action_mask) and self._action_mask[action]:
+                valid.append(digit)
+        return valid
+
+    def is_cell_editable(self, row: int, col: int) -> bool:
+        """Check if a cell can be edited (not a fixed clue)."""
+        return (row, col) not in self._fixed_cells
+
+    def _pixel_to_cell(self, pos: QtCore.QPointF) -> Optional[tuple[int, int]]:
+        """Convert pixel position to cell coordinates."""
+        x = int(pos.x()) - self._margin
+        y = int(pos.y()) - self._margin
+
+        if x < 0 or y < 0:
+            return None
+
+        col = x // self._cell_size
+        row = y // self._cell_size
+
+        if row >= self.SIZE or col >= self.SIZE:
+            return None
+
+        return (row, col)
+
+    def _cell_to_pixel(self, row: int, col: int) -> tuple[int, int]:
+        """Convert cell coordinates to top-left pixel position."""
+        x = self._margin + col * self._cell_size
+        y = self._margin + row * self._cell_size
+        return (x, y)
+
+    # -------------------------------------------------------------------------
+    # Event Handlers
+    # -------------------------------------------------------------------------
+
+    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
+        if not self._enabled:
+            return super().mousePressEvent(event)
+        if event.button() != QtCore.Qt.MouseButton.LeftButton:
+            return super().mousePressEvent(event)
+
+        cell = self._pixel_to_cell(event.position())
+        if cell is not None:
+            row, col = cell
+            self._selected_cell = (row, col)
+            self.cell_selected.emit(row, col)
+            self.update()
+
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:
+        cell = self._pixel_to_cell(event.position())
+        if cell != self._hover_cell:
+            self._hover_cell = cell
+            self.update()
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event: QtCore.QEvent) -> None:
+        self._hover_cell = None
+        self.update()
+        super().leaveEvent(event)
+
+    def keyPressEvent(self, event: QtGui.QKeyEvent) -> None:
+        """Handle number key input for selected cell."""
+        if not self._enabled or self._selected_cell is None:
+            return super().keyPressEvent(event)
+
+        row, col = self._selected_cell
+
+        # Check if cell is editable
+        if not self.is_cell_editable(row, col):
+            return super().keyPressEvent(event)
+
+        key = event.key()
+
+        # Number keys 1-9
+        if QtCore.Qt.Key.Key_1 <= key <= QtCore.Qt.Key.Key_9:
+            digit = key - QtCore.Qt.Key.Key_1 + 1
+            valid_digits = self.get_valid_digits(row, col)
+            if digit in valid_digits:
+                self.digit_entered.emit(row, col, digit)
+            return
+
+        # Numpad 1-9
+        if QtCore.Qt.Key.Key_1 <= key - 0x30 <= QtCore.Qt.Key.Key_9 - 0x30:
+            # Numpad offset
+            pass  # Handle numpad if needed
+
+        # Delete/Backspace to clear
+        if key in (QtCore.Qt.Key.Key_Delete, QtCore.Qt.Key.Key_Backspace):
+            if self._board[row][col] != 0:
+                self.cell_cleared.emit(row, col)
+            return
+
+        # Arrow keys to navigate selection
+        if key == QtCore.Qt.Key.Key_Up and row > 0:
+            self._selected_cell = (row - 1, col)
+            self.cell_selected.emit(row - 1, col)
+            self.update()
+            return
+        if key == QtCore.Qt.Key.Key_Down and row < self.SIZE - 1:
+            self._selected_cell = (row + 1, col)
+            self.cell_selected.emit(row + 1, col)
+            self.update()
+            return
+        if key == QtCore.Qt.Key.Key_Left and col > 0:
+            self._selected_cell = (row, col - 1)
+            self.cell_selected.emit(row, col - 1)
+            self.update()
+            return
+        if key == QtCore.Qt.Key.Key_Right and col < self.SIZE - 1:
+            self._selected_cell = (row, col + 1)
+            self.cell_selected.emit(row, col + 1)
+            self.update()
+            return
+
+        super().keyPressEvent(event)
+
+    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
+        """Handle resize to keep board square and centered."""
+        super().resizeEvent(event)
+        available = min(self.width(), self.height())
+        self._cell_size = (available - 2 * self._margin) // self.SIZE
+        self._margin = (available - self._cell_size * self.SIZE) // 2
+
+    # -------------------------------------------------------------------------
+    # Painting
+    # -------------------------------------------------------------------------
+
+    def paintEvent(self, event: QtGui.QPaintEvent) -> None:
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+
+        # Background
+        painter.fillRect(self.rect(), _SUDOKU_BG)
+
+        # Draw highlights (before grid lines)
+        self._draw_highlights(painter)
+
+        # Draw grid
+        self._draw_grid(painter)
+
+        # Draw digits
+        self._draw_digits(painter)
+
+        # Draw valid digit hints for selected cell
+        self._draw_hints(painter)
+
+        painter.end()
+
+    def _draw_highlights(self, painter: QtGui.QPainter) -> None:
+        """Draw cell highlights (selection, same row/col/box, hover)."""
+        if self._selected_cell is not None:
+            sel_row, sel_col = self._selected_cell
+            selected_value = self._board[sel_row][sel_col]
+
+            # Highlight same row, column, and 3x3 box
+            for r in range(self.SIZE):
+                for c in range(self.SIZE):
+                    x, y = self._cell_to_pixel(r, c)
+
+                    # Same row, column, or box
+                    same_row = r == sel_row
+                    same_col = c == sel_col
+                    same_box = (r // 3 == sel_row // 3) and (c // 3 == sel_col // 3)
+
+                    if same_row or same_col or same_box:
+                        if (r, c) != self._selected_cell:
+                            painter.fillRect(
+                                x, y, self._cell_size, self._cell_size,
+                                _SUDOKU_SAME_ROW_COL_BOX
+                            )
+
+                    # Highlight same number
+                    if selected_value != 0 and self._board[r][c] == selected_value:
+                        if (r, c) != self._selected_cell:
+                            painter.fillRect(
+                                x, y, self._cell_size, self._cell_size,
+                                _SUDOKU_SAME_NUMBER
+                            )
+
+            # Selected cell highlight
+            x, y = self._cell_to_pixel(sel_row, sel_col)
+            painter.fillRect(x, y, self._cell_size, self._cell_size, _SUDOKU_SELECTED)
+
+        # Hover highlight
+        if self._hover_cell is not None and self._hover_cell != self._selected_cell:
+            hx, hy = self._cell_to_pixel(*self._hover_cell)
+            painter.fillRect(hx, hy, self._cell_size, self._cell_size, _SUDOKU_HOVER)
+
+        # Invalid cell highlights
+        for r, c in self._invalid_cells:
+            x, y = self._cell_to_pixel(r, c)
+            painter.fillRect(x, y, self._cell_size, self._cell_size, _SUDOKU_INVALID)
+
+    def _draw_grid(self, painter: QtGui.QPainter) -> None:
+        """Draw Sudoku grid lines (thin for cells, thick for 3x3 boxes)."""
+        board_size = self.SIZE * self._cell_size
+
+        # Draw thin lines first
+        thin_pen = QtGui.QPen(_SUDOKU_GRID_THIN, self._thin_line)
+        painter.setPen(thin_pen)
+
+        for i in range(self.SIZE + 1):
+            if i % 3 != 0:  # Skip thick line positions
+                # Vertical
+                x = self._margin + i * self._cell_size
+                painter.drawLine(x, self._margin, x, self._margin + board_size)
+                # Horizontal
+                y = self._margin + i * self._cell_size
+                painter.drawLine(self._margin, y, self._margin + board_size, y)
+
+        # Draw thick lines (3x3 box boundaries)
+        thick_pen = QtGui.QPen(_SUDOKU_GRID_THICK, self._thick_line)
+        painter.setPen(thick_pen)
+
+        for i in range(0, self.SIZE + 1, 3):
+            # Vertical
+            x = self._margin + i * self._cell_size
+            painter.drawLine(x, self._margin, x, self._margin + board_size)
+            # Horizontal
+            y = self._margin + i * self._cell_size
+            painter.drawLine(self._margin, y, self._margin + board_size, y)
+
+    def _draw_digits(self, painter: QtGui.QPainter) -> None:
+        """Draw placed digits on the board."""
+        font = QtGui.QFont("Arial", int(self._cell_size * 0.55), QtGui.QFont.Weight.Bold)
+        painter.setFont(font)
+
+        for row in range(self.SIZE):
+            for col in range(self.SIZE):
+                digit = self._board[row][col]
+                if digit == 0:
+                    continue
+
+                x, y = self._cell_to_pixel(row, col)
+                rect = QtCore.QRect(x, y, self._cell_size, self._cell_size)
+
+                # Fixed clues are darker, player-placed are blue
+                if (row, col) in self._fixed_cells:
+                    painter.setPen(_SUDOKU_FIXED)
+                else:
+                    painter.setPen(_SUDOKU_PLACED)
+
+                painter.drawText(rect, QtCore.Qt.AlignmentFlag.AlignCenter, str(digit))
+
+    def _draw_hints(self, painter: QtGui.QPainter) -> None:
+        """Draw small candidate digits in empty cells (pencil marks style)."""
+        if self._selected_cell is None:
+            return
+
+        sel_row, sel_col = self._selected_cell
+        if self._board[sel_row][sel_col] != 0:
+            return  # Cell already has a digit
+
+        if not self.is_cell_editable(sel_row, sel_col):
+            return
+
+        valid = self.get_valid_digits(sel_row, sel_col)
+        if not valid:
+            return
+
+        # Draw small digits at bottom of selected cell
+        font = QtGui.QFont("Arial", int(self._cell_size * 0.18))
+        painter.setFont(font)
+        painter.setPen(QtGui.QColor(100, 100, 100))
+
+        x, y = self._cell_to_pixel(sel_row, sel_col)
+
+        # Layout valid digits in a 3x3 mini-grid within the cell
+        mini_size = self._cell_size // 3
+        for digit in valid:
+            d_row = (digit - 1) // 3
+            d_col = (digit - 1) % 3
+            dx = x + d_col * mini_size
+            dy = y + d_row * mini_size
+            rect = QtCore.QRect(dx, dy, mini_size, mini_size)
+            painter.drawText(rect, QtCore.Qt.AlignmentFlag.AlignCenter, str(digit))
 
 
 # =============================================================================

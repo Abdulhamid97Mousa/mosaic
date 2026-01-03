@@ -85,7 +85,7 @@ Preconditions: these components do not exist yet, so the fast-lane GUI must be a
 
 - Shared memory API: `gym_gui/fastlane/buffer.py` (`FastLaneReader`, `FastLaneMetrics`).
 - Telemetry plumbing: `gym_gui/controllers/live_telemetry_controllers.py`, `gym_gui/ui/widgets/live_telemetry_tab.py`, `gym_gui/ui/widgets/render_tabs.py`.
-- Presenter integration: `gym_gui/ui/presenters/workers/cleanrl_worker_presenter.py`, `gym_gui/ui/presenters/workers/spade_bdi_worker_presenter.py`, `gym_gui/ui/presenters/workers/registry.py`.
+- Presenter integration: `gym_gui/ui/presenters/workers/cleanrl_worker_presenter.py`, `gym_gui/ui/presenters/workers/registry.py`.
 - UI resource layout: keep new assets under `gym_gui/ui/...` to match existing module organization.
 - Qt QML / Qt Quick references: `docs/1.0_DAY_24/TASK_3/QtQml`, `docs/1.0_DAY_24/TASK_3/QtQuick.md`.
 

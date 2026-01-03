@@ -206,3 +206,56 @@ class ProcgenInteractionController(InteractionController):
 
     def step_dt(self) -> float:
         return 0.0
+
+
+class JumanjiArcadeInteractionController(InteractionController):
+    """Idle controller for arcade-style Jumanji games (PacMan, Snake, Tetris).
+
+    These games have continuous simulation where enemies/pieces move even when
+    the player doesn't provide input. Ghosts chase PacMan, the snake auto-moves,
+    and Tetris blocks fall automatically.
+
+    Default 10 FPS gives arcade-like gameplay without being too hectic.
+    Jumanji games are JAX-based and step quickly.
+    """
+
+    def __init__(self, owner, target_hz: int = 10):
+        """Initialize Jumanji arcade interaction controller.
+
+        Args:
+            owner: SessionController instance.
+            target_hz: Target frame rate (default 10 FPS for arcade feel).
+        """
+        self._owner = owner
+        self._interval_ms = max(1, int(1000 / float(target_hz)))  # 100ms for 10 FPS
+
+    def idle_interval_ms(self) -> Optional[int]:
+        return self._interval_ms
+
+    def should_idle_tick(self) -> bool:
+        """Check if we should advance the game this tick."""
+        o = self._owner
+        if o._adapter is None or o._game_id is None:
+            return False
+        if not getattr(o, "_game_started", False):
+            return False
+        if o._game_paused:
+            return False
+        if getattr(o._control_mode, "name", "") != "HUMAN_ONLY":
+            return False
+        if o._last_step is not None and (o._last_step.terminated or o._last_step.truncated):
+            return False
+        return True
+
+    def maybe_passive_action(self) -> Optional[Any]:
+        """Return NOOP/stay action for Jumanji arcade games.
+
+        Most Jumanji games use Discrete action space where:
+        - PacMan: action 0 is "no-op/stay"
+        - Snake: action 0 is "no-op/continue"
+        - Tetris: action 0 is "no-op" (block falls)
+        """
+        return 0
+
+    def step_dt(self) -> float:
+        return 0.0

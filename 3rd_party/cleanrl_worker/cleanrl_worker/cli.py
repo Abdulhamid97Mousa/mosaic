@@ -13,7 +13,6 @@ from typing import Any, Dict, Optional
 from gym_gui.config.paths import VAR_TRAINER_DIR
 from .config import WorkerConfig, load_worker_config
 from .runtime import CleanRLWorkerRuntime
-from .telemetry import LifecycleEmitter
 
 
 def _bootstrap_vendor_packages() -> None:
@@ -81,38 +80,19 @@ def main(argv: Optional[list[str]] = None) -> int:
         dry_run=args.dry_run,
     )
 
-    emitter = LifecycleEmitter()
-
     if runtime.dry_run:
         summary = runtime.run()
         if args.emit_summary:
-            print(json.dumps(summary.config, indent=2, sort_keys=True), file=sys.stdout)
+            print(json.dumps(summary["config"], indent=2, sort_keys=True), file=sys.stdout)
         return 0
 
-    emitter.run_started(overrides.run_id, {"algo": overrides.algo, "env_id": overrides.env_id})
     try:
-        runtime.run(emitter)
-    except subprocess.CalledProcessError as exc:
-        emitter.run_failed(
-            overrides.run_id,
-            {
-                "reason": "cleanrl_process_failed",
-                "return_code": exc.returncode,
-            },
-        )
-        return int(exc.returncode or 1)
-    except Exception as exc:  # noqa: BLE001
-        emitter.run_failed(overrides.run_id, {"reason": str(exc)})
-        raise
-    else:
-        run_dir = (VAR_TRAINER_DIR / "runs" / overrides.run_id).resolve()
-        manifest_path = run_dir / "analytics.json"
-        if manifest_path.exists():
-            payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        else:
-            payload = {}
-        emitter.run_completed(overrides.run_id, payload)
+        runtime.run()
         return 0
+    except subprocess.CalledProcessError as exc:
+        return int(exc.returncode or 1)
+    except Exception:  # noqa: BLE001
+        raise
 
 
 if __name__ == "__main__":  # pragma: no cover

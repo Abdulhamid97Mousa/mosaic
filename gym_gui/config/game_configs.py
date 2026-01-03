@@ -444,8 +444,8 @@ class CrafterConfig:
     view: tuple[int, int] = (9, 9)
     """Agent viewport dimensions (width, height). Default is 9x9."""
 
-    size: tuple[int, int] = (4096, 4096)
-    """Rendered image size (width, height). Default is 4096x4096 for high resolution."""
+    size: tuple[int, int] = (512, 512)
+    """Rendered image size (width, height). Default is 512x512 for balanced quality/performance."""
 
     reward: bool = True
     """Enable rewards. Set to False for CrafterNoReward-v1 variant."""
@@ -625,6 +625,42 @@ class TextWorldConfig:
         }
 
 
+@dataclass(frozen=True)
+class JumanjiConfig:
+    """Configuration payload for Jumanji JAX-based logic puzzle environments.
+
+    Jumanji is a suite of JAX-based reinforcement learning environments that
+    provides logic puzzle games like 2048, Minesweeper, Rubik's Cube, Sudoku,
+    and more.
+
+    Repository: https://github.com/google-deepmind/jumanji
+    """
+
+    env_id: str = "jumanji/Game2048-v1"
+    """Gymnasium environment identifier (e.g., ``jumanji/Game2048-v1``)."""
+
+    seed: int | None = None
+    """Random seed for JAX PRNG reproducibility."""
+
+    flatten_obs: bool = False
+    """If True, flatten structured observations to 1D arrays for RL training."""
+
+    backend: str | None = None
+    """JAX backend ('cpu', 'gpu', 'tpu') or None for auto-detection."""
+
+    render_mode: str = "rgb_array"
+    """Render mode (Jumanji supports 'rgb_array' for visualization)."""
+
+    def to_gym_kwargs(self) -> Dict[str, Any]:
+        """Convert to jumanji_worker.gymnasium_adapter.make_jumanji_gym_env kwargs."""
+        return {
+            "seed": self.seed or 0,
+            "flatten_obs": self.flatten_obs,
+            "backend": self.backend,
+            "render_mode": self.render_mode,
+        }
+
+
 # Type alias for all game configuration types
 GameConfig: TypeAlias = (
     FrozenLakeConfig
@@ -638,7 +674,17 @@ GameConfig: TypeAlias = (
     | ProcgenConfig
     | ALEConfig
     | TextWorldConfig
+    | JumanjiConfig
 )
+
+
+# Default Jumanji configurations for each logic puzzle environment
+DEFAULT_JUMANJI_GAME2048_CONFIG = JumanjiConfig(env_id="jumanji/Game2048-v1")
+DEFAULT_JUMANJI_MINESWEEPER_CONFIG = JumanjiConfig(env_id="jumanji/Minesweeper-v0")
+DEFAULT_JUMANJI_RUBIKS_CUBE_CONFIG = JumanjiConfig(env_id="jumanji/RubiksCube-v0")
+DEFAULT_JUMANJI_SLIDING_PUZZLE_CONFIG = JumanjiConfig(env_id="jumanji/SlidingTilePuzzle-v0")
+DEFAULT_JUMANJI_SUDOKU_CONFIG = JumanjiConfig(env_id="jumanji/Sudoku-v0")
+DEFAULT_JUMANJI_GRAPH_COLORING_CONFIG = JumanjiConfig(env_id="jumanji/GraphColoring-v1")
 
 
 __all__ = [
@@ -654,6 +700,7 @@ __all__ = [
     "ProcgenConfig",
     "ALEConfig",
     "TextWorldConfig",
+    "JumanjiConfig",
     "GameConfig",
     "DEFAULT_FROZEN_LAKE_CONFIG",
     "DEFAULT_FROZEN_LAKE_V2_CONFIG",
@@ -676,4 +723,10 @@ __all__ = [
     "DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG",
     "DEFAULT_MINIGRID_REDBLUE_DOORS_6x6_CONFIG",
     "DEFAULT_MINIGRID_REDBLUE_DOORS_8x8_CONFIG",
+    "DEFAULT_JUMANJI_GAME2048_CONFIG",
+    "DEFAULT_JUMANJI_MINESWEEPER_CONFIG",
+    "DEFAULT_JUMANJI_RUBIKS_CUBE_CONFIG",
+    "DEFAULT_JUMANJI_SLIDING_PUZZLE_CONFIG",
+    "DEFAULT_JUMANJI_SUDOKU_CONFIG",
+    "DEFAULT_JUMANJI_GRAPH_COLORING_CONFIG",
 ]

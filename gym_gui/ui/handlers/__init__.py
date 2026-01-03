@@ -49,6 +49,7 @@ from gym_gui.ui.handlers.game_moves import (
     ChessHandler,
     GoHandler,
     ConnectFourHandler,
+    SudokuHandler,
 )
 
 # Feature handlers (cross-cutting concerns)
@@ -79,6 +80,7 @@ __all__ = [
     "ChessHandler",
     "GoHandler",
     "ConnectFourHandler",
+    "SudokuHandler",
     # Feature handlers
     "GameConfigHandler",
     "MPCHandler",

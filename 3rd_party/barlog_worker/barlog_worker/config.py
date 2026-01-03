@@ -13,7 +13,9 @@ from typing import Any, Dict, Literal, Optional
 
 # Valid environment names supported by BALROG
 # Note: "minigrid" uses the same wrapper as "babyai" (BabyAI is built on MiniGrid)
-ENV_NAMES = ("babyai", "minigrid", "minihack", "crafter", "nle", "textworld")
+# Note: "pettingzoo" is used for multi-agent games (chess, go, connect-four, etc.)
+#       In pettingzoo mode, the worker acts as action-selector (doesn't own env)
+ENV_NAMES = ("babyai", "minigrid", "minihack", "crafter", "nle", "textworld", "pettingzoo")
 
 # Valid LLM client names
 # OpenRouter provides unified access to all major model providers
@@ -97,6 +99,15 @@ class BarlogWorkerConfig:
         if not 0.0 <= self.temperature <= 2.0:
             raise ValueError("temperature must be between 0.0 and 2.0")
 
+        # Protocol compliance assertion (only if gym_gui available)
+        try:
+            from gym_gui.core.worker import WorkerConfig as WorkerConfigProtocol
+            assert isinstance(self, WorkerConfigProtocol), (
+                "BarlogWorkerConfig must implement WorkerConfig protocol"
+            )
+        except ImportError:
+            pass  # gym_gui not available, skip protocol check
+
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary."""
         return {
@@ -174,8 +185,39 @@ class BarlogWorkerConfig:
         }
 
 
+def load_worker_config(config_path: str) -> BarlogWorkerConfig:
+    """Load worker configuration from a JSON file path.
+
+    This is the main entry point for loading config from CLI.
+    Handles both direct config format and nested metadata.worker.config structure.
+
+    Args:
+        config_path: Path to the JSON configuration file
+
+    Returns:
+        Parsed BarlogWorkerConfig object
+    """
+    path = Path(config_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    with open(path) as f:
+        raw_data = json.load(f)
+
+    # Handle nested metadata.worker.config structure from UI
+    if "metadata" in raw_data and "worker" in raw_data["metadata"]:
+        worker_data = raw_data["metadata"]["worker"]
+        config_data = worker_data.get("config", {})
+    else:
+        # Direct config format
+        config_data = raw_data
+
+    return BarlogWorkerConfig.from_dict(config_data)
+
+
 __all__ = [
     "BarlogWorkerConfig",
+    "load_worker_config",
     "ENV_NAMES",
     "CLIENT_NAMES",
     "AGENT_TYPES",

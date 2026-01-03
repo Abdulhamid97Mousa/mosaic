@@ -337,5 +337,175 @@ class TestCLIInteractiveFlag(unittest.TestCase):
         mock_batch_runtime.run.assert_called_once()
 
 
+class TestMultiAgentCommands(unittest.TestCase):
+    """Test multi-agent commands for PettingZoo game support.
+
+    These commands allow the worker to act as an action-selector where
+    the GUI owns the environment and workers just provide actions.
+    """
+
+    def _make_config(self) -> BarlogWorkerConfig:
+        """Create a test config."""
+        return BarlogWorkerConfig(
+            run_id="test_multiagent",
+            env_name="pettingzoo",
+            task="chess_v6",
+            client_name="openai",
+            model_id="gpt-4o-mini",
+            telemetry_dir="/tmp/test_telemetry",
+            emit_jsonl=False,
+        )
+
+    @unittest.skipUnless(_has_runtime_deps(), "Requires omegaconf")
+    def test_init_agent_command(self) -> None:
+        """Should handle init_agent command and respond with agent_ready."""
+        from barlog_worker.runtime import InteractiveRuntime
+
+        config = self._make_config()
+        captured_stdout = io.StringIO()
+
+        # Mock agent creation to avoid actual LLM initialization
+        with patch("barlog_worker.runtime.InteractiveRuntime._create_agent") as mock_create:
+            mock_agent = MagicMock()
+            mock_agent.prompt_builder = MagicMock()
+            mock_create.return_value = mock_agent
+
+            commands = (
+                '{"cmd": "init_agent", "game_name": "chess_v6", "player_id": "player_0"}\n'
+                '{"cmd": "stop"}\n'
+            )
+            with patch.object(sys, 'stdin', io.StringIO(commands)):
+                with patch.object(sys, 'stdout', captured_stdout):
+                    runtime = InteractiveRuntime(config)
+                    runtime.run()
+
+        output = captured_stdout.getvalue()
+        lines = [l for l in output.strip().split('\n') if l]
+
+        # Should have agent_ready message
+        agent_ready_found = False
+        for line in lines:
+            try:
+                msg = json.loads(line)
+                if msg.get("type") == "agent_ready":
+                    agent_ready_found = True
+                    self.assertEqual(msg["mode"], "action_selector")
+                    self.assertEqual(msg["game_name"], "chess_v6")
+                    self.assertEqual(msg["player_id"], "player_0")
+                    break
+            except json.JSONDecodeError:
+                pass
+        self.assertTrue(agent_ready_found, "Expected agent_ready message")
+
+    @unittest.skipUnless(_has_runtime_deps(), "Requires omegaconf")
+    def test_select_action_without_init_returns_error(self) -> None:
+        """Should return error if select_action called without init_agent."""
+        from barlog_worker.runtime import InteractiveRuntime
+
+        config = self._make_config()
+        captured_stdout = io.StringIO()
+
+        commands = (
+            '{"cmd": "select_action", "observation": "test", "player_id": "player_0"}\n'
+            '{"cmd": "stop"}\n'
+        )
+        with patch.object(sys, 'stdin', io.StringIO(commands)):
+            with patch.object(sys, 'stdout', captured_stdout):
+                runtime = InteractiveRuntime(config)
+                runtime.run()
+
+        output = captured_stdout.getvalue()
+        lines = [l for l in output.strip().split('\n') if l]
+
+        # Should have error message
+        error_found = False
+        for line in lines:
+            try:
+                msg = json.loads(line)
+                if msg.get("type") == "error" and "not initialized" in msg.get("message", "").lower():
+                    error_found = True
+                    break
+            except json.JSONDecodeError:
+                pass
+        self.assertTrue(error_found, "Expected error about agent not initialized")
+
+    @unittest.skipUnless(_has_runtime_deps(), "Requires omegaconf")
+    def test_select_action_returns_action(self) -> None:
+        """Should return action_selected after init_agent and select_action."""
+        from barlog_worker.runtime import InteractiveRuntime
+
+        config = self._make_config()
+        captured_stdout = io.StringIO()
+
+        # Mock agent and its act method
+        mock_response = MagicMock()
+        mock_response.completion = "e2e4"
+        mock_response.input_tokens = 100
+        mock_response.output_tokens = 5
+
+        with patch("barlog_worker.runtime.InteractiveRuntime._create_agent") as mock_create:
+            mock_agent = MagicMock()
+            mock_agent.prompt_builder = MagicMock()
+            mock_agent.act.return_value = mock_response
+            mock_create.return_value = mock_agent
+
+            commands = (
+                '{"cmd": "init_agent", "game_name": "chess_v6", "player_id": "player_0"}\n'
+                '{"cmd": "select_action", "observation": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR", '
+                '"info": {"legal_moves": ["e2e4", "d2d4", "g1f3"]}, "player_id": "player_0"}\n'
+                '{"cmd": "stop"}\n'
+            )
+            with patch.object(sys, 'stdin', io.StringIO(commands)):
+                with patch.object(sys, 'stdout', captured_stdout):
+                    runtime = InteractiveRuntime(config)
+                    runtime.run()
+
+        output = captured_stdout.getvalue()
+        lines = [l for l in output.strip().split('\n') if l]
+
+        # Should have action_selected message
+        action_found = False
+        for line in lines:
+            try:
+                msg = json.loads(line)
+                if msg.get("type") == "action_selected":
+                    action_found = True
+                    self.assertEqual(msg["action_str"], "e2e4")
+                    self.assertEqual(msg["player_id"], "player_0")
+                    self.assertEqual(msg["input_tokens"], 100)
+                    self.assertEqual(msg["output_tokens"], 5)
+                    break
+            except json.JSONDecodeError:
+                pass
+        self.assertTrue(action_found, "Expected action_selected message")
+
+    @unittest.skipUnless(_has_runtime_deps(), "Requires omegaconf")
+    def test_game_instruction_prompts(self) -> None:
+        """Should have game-specific instruction prompts."""
+        from barlog_worker.runtime import InteractiveRuntime
+
+        config = self._make_config()
+        runtime = InteractiveRuntime(config)
+
+        # Chess prompt
+        chess_prompt = runtime._get_game_instruction_prompt("chess_v6", "player_0")
+        self.assertIn("chess", chess_prompt.lower())
+        self.assertIn("uci", chess_prompt.lower())
+
+        # Connect Four prompt
+        c4_prompt = runtime._get_game_instruction_prompt("connect_four_v3", "player_1")
+        self.assertIn("connect four", c4_prompt.lower())
+        self.assertIn("column", c4_prompt.lower())
+
+        # Go prompt
+        go_prompt = runtime._get_game_instruction_prompt("go_v5", "black_0")
+        self.assertIn("go", go_prompt.lower())
+
+        # Unknown game gets generic prompt
+        unknown_prompt = runtime._get_game_instruction_prompt("unknown_game", "player_x")
+        self.assertIn("unknown_game", unknown_prompt)
+        self.assertIn("player_x", unknown_prompt)
+
+
 if __name__ == "__main__":
     unittest.main()

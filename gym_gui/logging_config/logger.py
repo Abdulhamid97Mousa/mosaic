@@ -282,6 +282,17 @@ def configure_logging(
                 "propagate": True,
                 "filters": ["grpc_blocking_io"],
             },
+            # Suppress noisy third-party loggers
+            "jax": {"level": "WARNING", "propagate": True},
+            "jax._src": {"level": "WARNING", "propagate": True},
+            "flax": {"level": "WARNING", "propagate": True},
+            "chex": {"level": "WARNING", "propagate": True},
+            "absl": {"level": "WARNING", "propagate": True},
+            "tensorflow": {"level": "WARNING", "propagate": True},
+            "matplotlib": {"level": "WARNING", "propagate": True},
+            "PIL": {"level": "WARNING", "propagate": True},
+            "urllib3": {"level": "WARNING", "propagate": True},
+            "numba": {"level": "WARNING", "propagate": True},
         },
         "root": {
             "level": _level_name(root_level),

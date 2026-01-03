@@ -16,7 +16,7 @@ class InfoLogContainer(QtWidgets.QWidget):
         "UI": "gym_gui.ui",
         "Controller": "gym_gui.controllers",
         "Adapter": "gym_gui.core.adapters",
-        "Worker": "spade_bdi_rl.worker",
+        "Worker": "gym_gui.workers",
     }
 
     # Severity-level filters

@@ -174,10 +174,10 @@ class TestOperatorLauncherInteractive(unittest.TestCase):
 
     def _make_config(self) -> OperatorConfig:
         """Create a test operator config."""
-        return OperatorConfig(
+        return OperatorConfig.single_agent(
             operator_id="test_operator",
-            operator_type="llm",
             worker_id="barlog_worker",
+            worker_type="llm",
             display_name="Test Operator",
             env_name="babyai",
             task="BabyAI-GoToRedBall-v0",
@@ -315,6 +315,268 @@ class TestOperatorProcessHandleDataclass(unittest.TestCase):
         )
 
         self.assertTrue(handle.interactive)
+
+
+@unittest.skipUnless(_has_pyqt6(), "Requires PyQt6")
+class TestOperatorProcessHandleStdoutReader(unittest.TestCase):
+    """Test OperatorProcessHandle stdout reading methods."""
+
+    def _make_mock_handle(
+        self,
+        interactive: bool = True,
+        is_running: bool = True,
+        stdout_data: str = "",
+    ) -> OperatorProcessHandle:
+        """Create a mock OperatorProcessHandle with configurable stdout.
+
+        Args:
+            interactive: Whether the handle is in interactive mode.
+            is_running: Whether the process is running.
+            stdout_data: Data to return from stdout.readline().
+        """
+        import io
+
+        mock_process = MagicMock(spec=subprocess.Popen)
+        mock_process.poll.return_value = None if is_running else 0
+
+        # Create a real StringIO for stdout so select() can work with it
+        if stdout_data:
+            mock_stdout = io.StringIO(stdout_data)
+        else:
+            mock_stdout = io.StringIO("")
+        mock_process.stdout = mock_stdout
+
+        mock_config = MagicMock(spec=OperatorConfig)
+
+        return OperatorProcessHandle(
+            operator_id="test_op",
+            run_id="test_run",
+            process=mock_process,
+            log_path=Path("/tmp/test.log"),
+            config=mock_config,
+            interactive=interactive,
+        )
+
+    def test_try_read_response_not_interactive(self) -> None:
+        """Should return None for non-interactive operator."""
+        handle = self._make_mock_handle(interactive=False)
+
+        result = handle.try_read_response(timeout=0.0)
+
+        self.assertIsNone(result)
+
+    def test_try_read_response_no_stdout(self) -> None:
+        """Should return None if stdout is None."""
+        handle = self._make_mock_handle(interactive=True)
+        handle.process.stdout = None
+
+        result = handle.try_read_response(timeout=0.0)
+
+        self.assertIsNone(result)
+
+    def test_try_read_response_process_not_running_no_stdout(self) -> None:
+        """Should return None if process not running and no stdout."""
+        handle = self._make_mock_handle(interactive=True, is_running=False)
+        handle.process.stdout = None
+
+        result = handle.try_read_response(timeout=0.0)
+
+        self.assertIsNone(result)
+
+    @patch("select.select")
+    def test_try_read_response_parses_json(self, mock_select: MagicMock) -> None:
+        """Should parse JSON response from stdout."""
+        json_line = '{"type": "step", "step_index": 5, "reward": 0.5}\n'
+        handle = self._make_mock_handle(interactive=True, stdout_data=json_line)
+
+        # Mock select to indicate data is available
+        mock_select.return_value = ([handle.process.stdout], [], [])
+
+        result = handle.try_read_response(timeout=0.1)
+
+        self.assertIsNotNone(result)
+        self.assertEqual(result["type"], "step")
+        self.assertEqual(result["step_index"], 5)
+        self.assertEqual(result["reward"], 0.5)
+
+    @patch("select.select")
+    def test_try_read_response_no_data_available(self, mock_select: MagicMock) -> None:
+        """Should return None when no data available."""
+        handle = self._make_mock_handle(interactive=True, stdout_data="")
+
+        # Mock select to indicate no data
+        mock_select.return_value = ([], [], [])
+
+        result = handle.try_read_response(timeout=0.0)
+
+        self.assertIsNone(result)
+
+    @patch("select.select")
+    def test_try_read_response_invalid_json(self, mock_select: MagicMock) -> None:
+        """Should return None and not crash on invalid JSON."""
+        handle = self._make_mock_handle(interactive=True, stdout_data="not valid json\n")
+
+        mock_select.return_value = ([handle.process.stdout], [], [])
+
+        result = handle.try_read_response(timeout=0.1)
+
+        self.assertIsNone(result)
+
+    @patch("select.select")
+    def test_poll_responses_reads_multiple(self, mock_select: MagicMock) -> None:
+        """Should read all available responses."""
+        json_lines = '{"type": "step", "step_index": 0}\n{"type": "step", "step_index": 1}\n'
+        handle = self._make_mock_handle(interactive=True, stdout_data=json_lines)
+
+        # First two calls have data, third doesn't
+        call_count = [0]
+        def select_side_effect(*args, **kwargs):
+            call_count[0] += 1
+            if call_count[0] <= 2:
+                return ([handle.process.stdout], [], [])
+            return ([], [], [])
+
+        mock_select.side_effect = select_side_effect
+
+        results = handle.poll_responses(max_responses=10)
+
+        self.assertEqual(len(results), 2)
+        self.assertEqual(results[0]["step_index"], 0)
+        self.assertEqual(results[1]["step_index"], 1)
+
+    @patch("select.select")
+    def test_poll_responses_respects_max(self, mock_select: MagicMock) -> None:
+        """Should stop at max_responses even if more data available."""
+        # Lots of JSON lines
+        json_lines = ''.join([f'{{"type": "step", "step_index": {i}}}\n' for i in range(20)])
+        handle = self._make_mock_handle(interactive=True, stdout_data=json_lines)
+
+        mock_select.return_value = ([handle.process.stdout], [], [])
+
+        results = handle.poll_responses(max_responses=3)
+
+        self.assertEqual(len(results), 3)
+
+    def test_read_response_calls_try_read_with_timeout(self) -> None:
+        """read_response should delegate to try_read_response with timeout."""
+        handle = self._make_mock_handle(interactive=True)
+
+        with patch.object(handle, 'try_read_response', return_value={"type": "test"}) as mock_try:
+            result = handle.read_response(timeout=15.0)
+
+            mock_try.assert_called_once_with(timeout=15.0)
+            self.assertEqual(result["type"], "test")
+
+
+@unittest.skipUnless(_has_pyqt6(), "Requires PyQt6")
+class TestOperatorStdoutReaderIntegration(unittest.TestCase):
+    """Integration tests for stdout reading with real subprocess."""
+
+    def test_read_from_echo_subprocess(self) -> None:
+        """Should read JSON from a real subprocess stdout."""
+        import sys
+
+        # Create a subprocess that echoes JSON to stdout
+        echo_script = '''
+import sys
+import json
+print(json.dumps({"type": "step", "step_index": 42, "reward": 1.0}))
+sys.stdout.flush()
+'''
+        process = subprocess.Popen(
+            [sys.executable, "-c", echo_script],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
+
+        mock_config = MagicMock(spec=OperatorConfig)
+        handle = OperatorProcessHandle(
+            operator_id="test_echo",
+            run_id="test_run",
+            process=process,
+            log_path=Path("/tmp/test.log"),
+            config=mock_config,
+            interactive=True,
+        )
+
+        try:
+            # Wait for subprocess to produce output
+            response = handle.read_response(timeout=5.0)
+
+            self.assertIsNotNone(response)
+            self.assertEqual(response["type"], "step")
+            self.assertEqual(response["step_index"], 42)
+            self.assertEqual(response["reward"], 1.0)
+        finally:
+            process.terminate()
+            process.wait(timeout=2.0)
+
+    def test_bidirectional_communication(self) -> None:
+        """Should send command and receive response."""
+        import sys
+
+        # Interactive echo subprocess
+        echo_script = '''
+import sys
+import json
+for line in sys.stdin:
+    try:
+        cmd = json.loads(line.strip())
+        if cmd.get("cmd") == "step":
+            response = {"type": "step", "step_index": 0, "action": "forward"}
+            print(json.dumps(response))
+            sys.stdout.flush()
+        elif cmd.get("cmd") == "stop":
+            print(json.dumps({"type": "stopped"}))
+            sys.stdout.flush()
+            break
+    except:
+        pass
+'''
+        process = subprocess.Popen(
+            [sys.executable, "-c", echo_script],
+            stdin=subprocess.PIPE,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.PIPE,
+            text=True,
+            bufsize=1,
+        )
+
+        mock_config = MagicMock(spec=OperatorConfig)
+        handle = OperatorProcessHandle(
+            operator_id="test_bidir",
+            run_id="test_run",
+            process=process,
+            log_path=Path("/tmp/test.log"),
+            config=mock_config,
+            interactive=True,
+        )
+
+        try:
+            # Send step command
+            result = handle.send_step()
+            self.assertTrue(result)
+
+            # Read response
+            response = handle.read_response(timeout=5.0)
+            self.assertIsNotNone(response)
+            self.assertEqual(response["type"], "step")
+            self.assertEqual(response["action"], "forward")
+
+            # Send stop
+            handle.send_stop()
+            stop_response = handle.read_response(timeout=5.0)
+            self.assertIsNotNone(stop_response)
+            self.assertEqual(stop_response["type"], "stopped")
+        finally:
+            process.terminate()
+            try:
+                process.wait(timeout=2.0)
+            except subprocess.TimeoutExpired:
+                process.kill()
 
 
 if __name__ == "__main__":

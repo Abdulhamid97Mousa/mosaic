@@ -1329,6 +1329,186 @@ LOG_OPERATOR_STOP_ALL_COMPLETED = _constant(
 )
 
 # ---------------------------------------------------------------------------
+# Multi-Agent Operator constants (LOG698–LOG702)
+# ---------------------------------------------------------------------------
+LOG_OPERATOR_INIT_AGENT_SENT = _constant(
+    "LOG698",
+    "INFO",
+    "Init agent command sent to interactive operator",
+    component="Service",
+    subcomponent="OperatorLauncher",
+    tags=_tags("operator", "launcher", "multiagent", "init"),
+)
+
+LOG_OPERATOR_SELECT_ACTION_SENT = _constant(
+    "LOG699",
+    "DEBUG",
+    "Select action command sent to interactive operator",
+    component="Service",
+    subcomponent="OperatorLauncher",
+    tags=_tags("operator", "launcher", "multiagent", "action"),
+)
+
+LOG_OPERATOR_MULTIAGENT_LAUNCHED = _constant(
+    "LOG700",
+    "INFO",
+    "Multi-agent operator launched with player workers",
+    component="Service",
+    subcomponent="OperatorLauncher",
+    tags=_tags("operator", "launcher", "multiagent", "launch"),
+)
+
+LOG_OPERATOR_MULTIAGENT_INIT_FAILED = _constant(
+    "LOG701",
+    "ERROR",
+    "Failed to initialize agent for multi-agent operator",
+    component="Service",
+    subcomponent="OperatorLauncher",
+    tags=_tags("operator", "launcher", "multiagent", "error"),
+)
+
+LOG_OPERATOR_MULTIAGENT_ACTION_FAILED = _constant(
+    "LOG702",
+    "ERROR",
+    "Failed to send select action to multi-agent operator",
+    component="Service",
+    subcomponent="OperatorLauncher",
+    tags=_tags("operator", "launcher", "multiagent", "error"),
+)
+
+# ---------------------------------------------------------------------------
+# Operator Environment Preview constants (LOG703–LOG706)
+# ---------------------------------------------------------------------------
+LOG_OPERATOR_ENV_PREVIEW_STARTED = _constant(
+    "LOG703",
+    "INFO",
+    "Operator environment preview started",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("operator", "environment", "preview", "start"),
+)
+
+LOG_OPERATOR_ENV_PREVIEW_SUCCESS = _constant(
+    "LOG704",
+    "INFO",
+    "Operator environment preview loaded successfully",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("operator", "environment", "preview", "success"),
+)
+
+LOG_OPERATOR_ENV_PREVIEW_IMPORT_ERROR = _constant(
+    "LOG705",
+    "WARNING",
+    "Operator environment preview failed due to missing package",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("operator", "environment", "preview", "import", "error"),
+)
+
+LOG_OPERATOR_ENV_PREVIEW_ERROR = _constant(
+    "LOG706",
+    "ERROR",
+    "Operator environment preview failed",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("operator", "environment", "preview", "error"),
+)
+
+# ---------------------------------------------------------------------------
+# vLLM Server Widget constants (LOG710–LOG719)
+# ---------------------------------------------------------------------------
+LOG_VLLM_SERVER_COUNT_CHANGED = _constant(
+    "LOG710",
+    "INFO",
+    "vLLM server count changed",
+    component="UI",
+    subcomponent="VLLMServerWidget",
+    tags=_tags("vllm", "server", "config"),
+)
+
+LOG_VLLM_SERVER_STARTING = _constant(
+    "LOG711",
+    "INFO",
+    "vLLM server starting",
+    component="UI",
+    subcomponent="VLLMServerWidget",
+    tags=_tags("vllm", "server", "start"),
+)
+
+LOG_VLLM_SERVER_RUNNING = _constant(
+    "LOG712",
+    "INFO",
+    "vLLM server is running",
+    component="UI",
+    subcomponent="VLLMServerWidget",
+    tags=_tags("vllm", "server", "running"),
+)
+
+LOG_VLLM_SERVER_STOPPING = _constant(
+    "LOG713",
+    "INFO",
+    "vLLM server stopping",
+    component="UI",
+    subcomponent="VLLMServerWidget",
+    tags=_tags("vllm", "server", "stop"),
+)
+
+LOG_VLLM_SERVER_START_FAILED = _constant(
+    "LOG714",
+    "ERROR",
+    "vLLM server failed to start",
+    component="UI",
+    subcomponent="VLLMServerWidget",
+    tags=_tags("vllm", "server", "error"),
+)
+
+LOG_VLLM_SERVER_PROCESS_EXITED = _constant(
+    "LOG715",
+    "WARNING",
+    "vLLM server process exited unexpectedly",
+    component="UI",
+    subcomponent="VLLMServerWidget",
+    tags=_tags("vllm", "server", "error"),
+)
+
+LOG_VLLM_SERVER_NOT_RESPONDING = _constant(
+    "LOG716",
+    "WARNING",
+    "vLLM server stopped responding",
+    component="UI",
+    subcomponent="VLLMServerWidget",
+    tags=_tags("vllm", "server", "error"),
+)
+
+LOG_VLLM_ORPHAN_PROCESS_KILLED = _constant(
+    "LOG717",
+    "INFO",
+    "Killed orphan vLLM process",
+    component="UI",
+    subcomponent="VLLMServerWidget",
+    tags=_tags("vllm", "server", "cleanup"),
+)
+
+LOG_VLLM_GPU_MEMORY_FREED = _constant(
+    "LOG718",
+    "INFO",
+    "GPU memory verified freed",
+    component="UI",
+    subcomponent="VLLMServerWidget",
+    tags=_tags("vllm", "server", "gpu", "memory"),
+)
+
+LOG_VLLM_GPU_MEMORY_NOT_FREED = _constant(
+    "LOG719",
+    "WARNING",
+    "GPU memory may not be fully freed",
+    component="UI",
+    subcomponent="VLLMServerWidget",
+    tags=_tags("vllm", "server", "gpu", "memory", "warning"),
+)
+
+# ---------------------------------------------------------------------------
 # Runtime/application constants (LOG680–LOG683)
 # ---------------------------------------------------------------------------
 LOG_RUNTIME_APP_DEBUG = _constant(
@@ -2808,6 +2988,284 @@ LOG_XUANCE_WORKER_DEBUG = _constant(
 
 
 # ---------------------------------------------------------------------------
+# CleanRL Worker constants (LOG431–LOG445)
+# ---------------------------------------------------------------------------
+LOG_WORKER_CLEANRL_RUNTIME_STARTED = _constant(
+    "LOG431",
+    "INFO",
+    "CleanRL worker runtime started",
+    component="Worker",
+    subcomponent="CleanRLRuntime",
+    tags=_tags("cleanrl", "worker", "runtime", "lifecycle"),
+)
+
+LOG_WORKER_CLEANRL_RUNTIME_COMPLETED = _constant(
+    "LOG432",
+    "INFO",
+    "CleanRL worker runtime completed",
+    component="Worker",
+    subcomponent="CleanRLRuntime",
+    tags=_tags("cleanrl", "worker", "runtime", "lifecycle"),
+)
+
+LOG_WORKER_CLEANRL_RUNTIME_FAILED = _constant(
+    "LOG433",
+    "ERROR",
+    "CleanRL worker runtime failed",
+    component="Worker",
+    subcomponent="CleanRLRuntime",
+    tags=_tags("cleanrl", "worker", "runtime", "error"),
+)
+
+LOG_WORKER_CLEANRL_MODULE_RESOLVED = _constant(
+    "LOG434",
+    "DEBUG",
+    "CleanRL algorithm module resolved",
+    component="Worker",
+    subcomponent="CleanRLRuntime",
+    tags=_tags("cleanrl", "worker", "module", "resolution"),
+)
+
+LOG_WORKER_CLEANRL_CONFIG_LOADED = _constant(
+    "LOG435",
+    "INFO",
+    "CleanRL configuration loaded",
+    component="Worker",
+    subcomponent="CleanRLRuntime",
+    tags=_tags("cleanrl", "worker", "config"),
+)
+
+LOG_WORKER_CLEANRL_TENSORBOARD_ENABLED = _constant(
+    "LOG436",
+    "INFO",
+    "CleanRL TensorBoard logging enabled",
+    component="Worker",
+    subcomponent="CleanRLRuntime",
+    tags=_tags("cleanrl", "worker", "tensorboard", "analytics"),
+)
+
+LOG_WORKER_CLEANRL_WANDB_ENABLED = _constant(
+    "LOG437",
+    "INFO",
+    "CleanRL Weights & Biases tracking enabled",
+    component="Worker",
+    subcomponent="CleanRLRuntime",
+    tags=_tags("cleanrl", "worker", "wandb", "analytics"),
+)
+
+LOG_WORKER_CLEANRL_HEARTBEAT = _constant(
+    "LOG438",
+    "DEBUG",
+    "CleanRL worker heartbeat",
+    component="Worker",
+    subcomponent="CleanRLRuntime",
+    tags=_tags("cleanrl", "worker", "heartbeat"),
+)
+
+LOG_WORKER_CLEANRL_SUBPROCESS_STARTED = _constant(
+    "LOG439",
+    "INFO",
+    "CleanRL subprocess started",
+    component="Worker",
+    subcomponent="CleanRLRuntime",
+    tags=_tags("cleanrl", "worker", "subprocess"),
+)
+
+LOG_WORKER_CLEANRL_SUBPROCESS_FAILED = _constant(
+    "LOG440",
+    "ERROR",
+    "CleanRL subprocess failed",
+    component="Worker",
+    subcomponent="CleanRLRuntime",
+    tags=_tags("cleanrl", "worker", "subprocess", "error"),
+)
+
+LOG_WORKER_CLEANRL_CHECKPOINT_SAVED = _constant(
+    "LOG441",
+    "INFO",
+    "CleanRL checkpoint saved",
+    component="Worker",
+    subcomponent="CleanRLRuntime",
+    tags=_tags("cleanrl", "worker", "checkpoint", "save"),
+)
+
+LOG_WORKER_CLEANRL_CHECKPOINT_LOADED = _constant(
+    "LOG442",
+    "INFO",
+    "CleanRL checkpoint loaded",
+    component="Worker",
+    subcomponent="CleanRLRuntime",
+    tags=_tags("cleanrl", "worker", "checkpoint", "load"),
+)
+
+LOG_WORKER_CLEANRL_ANALYTICS_MANIFEST_CREATED = _constant(
+    "LOG443",
+    "INFO",
+    "CleanRL analytics manifest created",
+    component="Worker",
+    subcomponent="CleanRLRuntime",
+    tags=_tags("cleanrl", "worker", "analytics", "manifest"),
+)
+
+LOG_WORKER_CLEANRL_EVAL_MODE_STARTED = _constant(
+    "LOG444",
+    "INFO",
+    "CleanRL evaluation mode started",
+    component="Worker",
+    subcomponent="CleanRLRuntime",
+    tags=_tags("cleanrl", "worker", "eval", "mode"),
+)
+
+LOG_WORKER_CLEANRL_EVAL_MODE_COMPLETED = _constant(
+    "LOG445",
+    "INFO",
+    "CleanRL evaluation mode completed",
+    component="Worker",
+    subcomponent="CleanRLRuntime",
+    tags=_tags("cleanrl", "worker", "eval", "mode"),
+)
+
+
+# ---------------------------------------------------------------------------
+# Ray Worker constants (LOG446–LOG460)
+# ---------------------------------------------------------------------------
+LOG_WORKER_RAY_RUNTIME_STARTED = _constant(
+    "LOG446",
+    "INFO",
+    "Ray worker runtime started",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "runtime", "lifecycle"),
+)
+
+LOG_WORKER_RAY_RUNTIME_COMPLETED = _constant(
+    "LOG447",
+    "INFO",
+    "Ray worker runtime completed",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "runtime", "lifecycle"),
+)
+
+LOG_WORKER_RAY_RUNTIME_FAILED = _constant(
+    "LOG448",
+    "ERROR",
+    "Ray worker runtime failed",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "runtime", "error"),
+)
+
+LOG_WORKER_RAY_CLUSTER_STARTED = _constant(
+    "LOG449",
+    "INFO",
+    "Ray cluster initialized",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "cluster"),
+)
+
+LOG_WORKER_RAY_CLUSTER_SHUTDOWN = _constant(
+    "LOG450",
+    "INFO",
+    "Ray cluster shutdown",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "cluster"),
+)
+
+LOG_WORKER_RAY_TUNE_STARTED = _constant(
+    "LOG451",
+    "INFO",
+    "Ray Tune experiment started",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "tune", "experiment"),
+)
+
+LOG_WORKER_RAY_TUNE_COMPLETED = _constant(
+    "LOG452",
+    "INFO",
+    "Ray Tune experiment completed",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "tune", "experiment"),
+)
+
+LOG_WORKER_RAY_RLLIB_TRAINING_STARTED = _constant(
+    "LOG453",
+    "INFO",
+    "Ray RLlib training started",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "rllib", "training"),
+)
+
+LOG_WORKER_RAY_RLLIB_TRAINING_ITERATION = _constant(
+    "LOG454",
+    "DEBUG",
+    "Ray RLlib training iteration",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "rllib", "iteration"),
+)
+
+LOG_WORKER_RAY_CHECKPOINT_SAVED = _constant(
+    "LOG455",
+    "INFO",
+    "Ray checkpoint saved",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "checkpoint", "save"),
+)
+
+LOG_WORKER_RAY_CHECKPOINT_LOADED = _constant(
+    "LOG456",
+    "INFO",
+    "Ray checkpoint loaded",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "checkpoint", "load"),
+)
+
+LOG_WORKER_RAY_TENSORBOARD_ENABLED = _constant(
+    "LOG457",
+    "INFO",
+    "Ray TensorBoard logging enabled",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "tensorboard", "analytics"),
+)
+
+LOG_WORKER_RAY_WANDB_ENABLED = _constant(
+    "LOG458",
+    "INFO",
+    "Ray Weights & Biases tracking enabled",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "wandb", "analytics"),
+)
+
+LOG_WORKER_RAY_HEARTBEAT = _constant(
+    "LOG459",
+    "DEBUG",
+    "Ray worker heartbeat",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "heartbeat"),
+)
+
+LOG_WORKER_RAY_ANALYTICS_MANIFEST_CREATED = _constant(
+    "LOG460",
+    "INFO",
+    "Ray analytics manifest created",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "analytics", "manifest"),
+)
+
+
+# ---------------------------------------------------------------------------
 # BARLOG Worker constants (LOG1001–LOG1015)
 # ---------------------------------------------------------------------------
 LOG_WORKER_BARLOG_RUNTIME_STARTED = _constant(
@@ -2943,6 +3401,136 @@ LOG_WORKER_BARLOG_DEBUG = _constant(
     component="Worker",
     subcomponent="BarlogRuntime",
     tags=_tags("barlog", "worker", "debug"),
+)
+
+
+# ---------------------------------------------------------------------------
+# XuanCe Worker constants (LOG1016–LOG1029)
+# ---------------------------------------------------------------------------
+LOG_WORKER_XUANCE_RUNTIME_STARTED = _constant(
+    "LOG1016",
+    "INFO",
+    "XuanCe worker runtime started",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "runtime", "lifecycle"),
+)
+
+LOG_WORKER_XUANCE_RUNTIME_STOPPED = _constant(
+    "LOG1017",
+    "INFO",
+    "XuanCe worker runtime stopped",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "runtime", "lifecycle"),
+)
+
+LOG_WORKER_XUANCE_RUNTIME_ERROR = _constant(
+    "LOG1018",
+    "ERROR",
+    "XuanCe worker runtime error",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "runtime", "error"),
+)
+
+LOG_WORKER_XUANCE_EPISODE_STARTED = _constant(
+    "LOG1019",
+    "INFO",
+    "XuanCe episode started",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "episode", "start"),
+)
+
+LOG_WORKER_XUANCE_EPISODE_COMPLETED = _constant(
+    "LOG1020",
+    "INFO",
+    "XuanCe episode completed",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "episode", "complete"),
+)
+
+LOG_WORKER_XUANCE_TRAINING_STARTED = _constant(
+    "LOG1021",
+    "INFO",
+    "XuanCe training started",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "training", "start"),
+)
+
+LOG_WORKER_XUANCE_TRAINING_STEP = _constant(
+    "LOG1022",
+    "DEBUG",
+    "XuanCe training step completed",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "training", "step"),
+)
+
+LOG_WORKER_XUANCE_TRAINING_COMPLETED = _constant(
+    "LOG1023",
+    "INFO",
+    "XuanCe training completed",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "training", "complete"),
+)
+
+LOG_WORKER_XUANCE_CONFIG_LOADED = _constant(
+    "LOG1024",
+    "INFO",
+    "XuanCe configuration loaded",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "config", "loaded"),
+)
+
+LOG_WORKER_XUANCE_ENV_CREATED = _constant(
+    "LOG1025",
+    "INFO",
+    "XuanCe environment created",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "environment", "created"),
+)
+
+LOG_WORKER_XUANCE_AGENT_CREATED = _constant(
+    "LOG1026",
+    "INFO",
+    "XuanCe agent created",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "agent", "created"),
+)
+
+LOG_WORKER_XUANCE_CHECKPOINT_SAVED = _constant(
+    "LOG1027",
+    "INFO",
+    "XuanCe checkpoint saved",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "checkpoint", "saved"),
+)
+
+LOG_WORKER_XUANCE_METRICS_LOGGED = _constant(
+    "LOG1028",
+    "INFO",
+    "XuanCe metrics logged",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "metrics", "logged"),
+)
+
+LOG_WORKER_XUANCE_DEBUG = _constant(
+    "LOG1029",
+    "DEBUG",
+    "XuanCe worker debug event",
+    component="Worker",
+    subcomponent="XuanCeRuntime",
+    tags=_tags("xuance", "worker", "debug"),
 )
 
 
@@ -3172,6 +3760,25 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_OPERATOR_RESET_ALL_STARTED,
     LOG_OPERATOR_STEP_ALL_COMPLETED,
     LOG_OPERATOR_STOP_ALL_COMPLETED,
+    LOG_OPERATOR_INIT_AGENT_SENT,
+    LOG_OPERATOR_SELECT_ACTION_SENT,
+    LOG_OPERATOR_MULTIAGENT_LAUNCHED,
+    LOG_OPERATOR_MULTIAGENT_INIT_FAILED,
+    LOG_OPERATOR_MULTIAGENT_ACTION_FAILED,
+    LOG_OPERATOR_ENV_PREVIEW_STARTED,
+    LOG_OPERATOR_ENV_PREVIEW_SUCCESS,
+    LOG_OPERATOR_ENV_PREVIEW_IMPORT_ERROR,
+    LOG_OPERATOR_ENV_PREVIEW_ERROR,
+    LOG_VLLM_SERVER_COUNT_CHANGED,
+    LOG_VLLM_SERVER_STARTING,
+    LOG_VLLM_SERVER_RUNNING,
+    LOG_VLLM_SERVER_STOPPING,
+    LOG_VLLM_SERVER_START_FAILED,
+    LOG_VLLM_SERVER_PROCESS_EXITED,
+    LOG_VLLM_SERVER_NOT_RESPONDING,
+    LOG_VLLM_ORPHAN_PROCESS_KILLED,
+    LOG_VLLM_GPU_MEMORY_FREED,
+    LOG_VLLM_GPU_MEMORY_NOT_FREED,
     LOG_SERVICE_ACTOR_SEED_ERROR,
     LOG_RUNTIME_APP_DEBUG,
     LOG_RUNTIME_APP_INFO,
@@ -3325,6 +3932,21 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_WORKER_BARLOG_ENV_CREATED,
     LOG_WORKER_BARLOG_AGENT_CREATED,
     LOG_WORKER_BARLOG_DEBUG,
+    # XuanCe Worker
+    LOG_WORKER_XUANCE_RUNTIME_STARTED,
+    LOG_WORKER_XUANCE_RUNTIME_STOPPED,
+    LOG_WORKER_XUANCE_RUNTIME_ERROR,
+    LOG_WORKER_XUANCE_EPISODE_STARTED,
+    LOG_WORKER_XUANCE_EPISODE_COMPLETED,
+    LOG_WORKER_XUANCE_TRAINING_STARTED,
+    LOG_WORKER_XUANCE_TRAINING_STEP,
+    LOG_WORKER_XUANCE_TRAINING_COMPLETED,
+    LOG_WORKER_XUANCE_CONFIG_LOADED,
+    LOG_WORKER_XUANCE_ENV_CREATED,
+    LOG_WORKER_XUANCE_AGENT_CREATED,
+    LOG_WORKER_XUANCE_CHECKPOINT_SAVED,
+    LOG_WORKER_XUANCE_METRICS_LOGGED,
+    LOG_WORKER_XUANCE_DEBUG,
 )
 
 
@@ -3460,6 +4082,25 @@ __all__ = (
     "LOG_OPERATOR_RESET_ALL_STARTED",
     "LOG_OPERATOR_STEP_ALL_COMPLETED",
     "LOG_OPERATOR_STOP_ALL_COMPLETED",
+    "LOG_OPERATOR_INIT_AGENT_SENT",
+    "LOG_OPERATOR_SELECT_ACTION_SENT",
+    "LOG_OPERATOR_MULTIAGENT_LAUNCHED",
+    "LOG_OPERATOR_MULTIAGENT_INIT_FAILED",
+    "LOG_OPERATOR_MULTIAGENT_ACTION_FAILED",
+    "LOG_OPERATOR_ENV_PREVIEW_STARTED",
+    "LOG_OPERATOR_ENV_PREVIEW_SUCCESS",
+    "LOG_OPERATOR_ENV_PREVIEW_IMPORT_ERROR",
+    "LOG_OPERATOR_ENV_PREVIEW_ERROR",
+    "LOG_VLLM_SERVER_COUNT_CHANGED",
+    "LOG_VLLM_SERVER_STARTING",
+    "LOG_VLLM_SERVER_RUNNING",
+    "LOG_VLLM_SERVER_STOPPING",
+    "LOG_VLLM_SERVER_START_FAILED",
+    "LOG_VLLM_SERVER_PROCESS_EXITED",
+    "LOG_VLLM_SERVER_NOT_RESPONDING",
+    "LOG_VLLM_ORPHAN_PROCESS_KILLED",
+    "LOG_VLLM_GPU_MEMORY_FREED",
+    "LOG_VLLM_GPU_MEMORY_NOT_FREED",
     "LOG_SERVICE_ACTOR_SEED_ERROR",
     "LOG_RUNTIME_APP_DEBUG",
     "LOG_RUNTIME_APP_INFO",
@@ -3640,6 +4281,21 @@ __all__ = (
     "LOG_WORKER_BARLOG_ENV_CREATED",
     "LOG_WORKER_BARLOG_AGENT_CREATED",
     "LOG_WORKER_BARLOG_DEBUG",
+    # XuanCe Worker
+    "LOG_WORKER_XUANCE_RUNTIME_STARTED",
+    "LOG_WORKER_XUANCE_RUNTIME_STOPPED",
+    "LOG_WORKER_XUANCE_RUNTIME_ERROR",
+    "LOG_WORKER_XUANCE_EPISODE_STARTED",
+    "LOG_WORKER_XUANCE_EPISODE_COMPLETED",
+    "LOG_WORKER_XUANCE_TRAINING_STARTED",
+    "LOG_WORKER_XUANCE_TRAINING_STEP",
+    "LOG_WORKER_XUANCE_TRAINING_COMPLETED",
+    "LOG_WORKER_XUANCE_CONFIG_LOADED",
+    "LOG_WORKER_XUANCE_ENV_CREATED",
+    "LOG_WORKER_XUANCE_AGENT_CREATED",
+    "LOG_WORKER_XUANCE_CHECKPOINT_SAVED",
+    "LOG_WORKER_XUANCE_METRICS_LOGGED",
+    "LOG_WORKER_XUANCE_DEBUG",
     # Worker Availability Messages
     "GODOT_NOT_INSTALLED_TITLE",
     "GODOT_NOT_INSTALLED_MSG",

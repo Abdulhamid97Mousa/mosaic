@@ -269,6 +269,16 @@ SATELLITES = [
         features=["16 diverse environments", "Tests generalization", "Procedural level generation", "github.com/openai/procgen"],
         ring_index=5
     ),
+    SatelliteConfig(
+        name="Jumanji",
+        color=(233, 30, 99),  # Pink/Magenta (matches welcome page)
+        orbit_radius=1.0,
+        speed=0.38,
+        phase=180,
+        description="Jumanji - JAX-based Logic Puzzle Environments",
+        features=["Hardware-accelerated (JAX)", "2048, Sudoku, Rubik's Cube", "Minesweeper, Graph Coloring", "github.com/instadeepai/jumanji"],
+        ring_index=4
+    ),
 ]
 
 # Satellite visual settings

@@ -12,7 +12,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 
-@dataclass(frozen=True)
+@dataclass
 class XuanCeWorkerConfig:
     """Configuration for a single XuanCe training run.
 
@@ -58,6 +58,33 @@ class XuanCeWorkerConfig:
 
     # Extra parameters to pass to XuanCe
     extras: Mapping[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Validate configuration and assert protocol compliance."""
+        # Validate run_id
+        if not self.run_id:
+            raise ValueError("run_id is required")
+
+        # Validate method
+        if not self.method:
+            raise ValueError("method is required")
+
+        # Validate env
+        if not self.env:
+            raise ValueError("env is required")
+
+        # Validate env_id
+        if not self.env_id:
+            raise ValueError("env_id is required")
+
+        # Protocol compliance assertion (only if gym_gui available)
+        try:
+            from gym_gui.core.worker import WorkerConfig as WorkerConfigProtocol
+            assert isinstance(self, WorkerConfigProtocol), (
+                "XuanCeWorkerConfig must implement WorkerConfig protocol"
+            )
+        except ImportError:
+            pass  # gym_gui not available, skip protocol check
 
     @classmethod
     def from_json_file(cls, path: Path) -> "XuanCeWorkerConfig":
@@ -142,4 +169,34 @@ class XuanCeWorkerConfig:
         return json.dumps(self.to_dict(), indent=indent)
 
 
-__all__ = ["XuanCeWorkerConfig"]
+def load_worker_config(config_path: str) -> XuanCeWorkerConfig:
+    """Load worker configuration from a JSON file path.
+
+    This is the main entry point for loading config from CLI.
+    Handles both direct config format and nested metadata.worker.config structure.
+
+    Args:
+        config_path: Path to the JSON configuration file
+
+    Returns:
+        Parsed XuanCeWorkerConfig object
+    """
+    path = Path(config_path)
+    if not path.exists():
+        raise FileNotFoundError(f"Config file not found: {config_path}")
+
+    with open(path) as f:
+        raw_data = json.load(f)
+
+    # Handle nested metadata.worker.config structure from UI
+    if "metadata" in raw_data and "worker" in raw_data["metadata"]:
+        worker_data = raw_data["metadata"]["worker"]
+        config_data = worker_data.get("config", {})
+    else:
+        # Direct config format
+        config_data = raw_data
+
+    return XuanCeWorkerConfig.from_dict(config_data)
+
+
+__all__ = ["XuanCeWorkerConfig", "load_worker_config"]

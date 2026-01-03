@@ -71,6 +71,55 @@ try:  # pragma: no cover - gym optional
 except Exception:  # pragma: no cover - gym optional
     pass
 
+# --- XuanCe FastLane environment wrapping ---------------------------------
+try:  # pragma: no cover - xuance optional
+    import logging as _logging
+    from xuance.environment.utils import XuanCeEnvWrapper, XuanCeAtariEnvWrapper, XuanCeMultiAgentEnvWrapper
+    from xuance_worker.fastlane import maybe_wrap_env, is_fastlane_enabled
+
+    _logger = _logging.getLogger("xuance_worker.sitecustomize")
+
+    # Only patch if FastLane is enabled
+    if is_fastlane_enabled():
+        # Patch XuanCeEnvWrapper
+        _ORIG_XUANCE_ENV_INIT = XuanCeEnvWrapper.__init__
+
+        def _patched_xuance_env_init(self, env):
+            """Wrap XuanCe environments with FastLane telemetry."""
+            # Call original __init__
+            _ORIG_XUANCE_ENV_INIT(self, env)
+            # Wrap the internal env with FastLane
+            self.env = maybe_wrap_env(self.env)
+
+        XuanCeEnvWrapper.__init__ = _patched_xuance_env_init
+
+        # Patch XuanCeAtariEnvWrapper
+        _ORIG_ATARI_ENV_INIT = XuanCeAtariEnvWrapper.__init__
+
+        def _patched_atari_env_init(self, env):
+            """Wrap XuanCe Atari environments with FastLane telemetry."""
+            _ORIG_ATARI_ENV_INIT(self, env)
+            self.env = maybe_wrap_env(self.env)
+
+        XuanCeAtariEnvWrapper.__init__ = _patched_atari_env_init
+
+        # Patch XuanCeMultiAgentEnvWrapper
+        _ORIG_MAENV_INIT = XuanCeMultiAgentEnvWrapper.__init__
+
+        def _patched_maenv_init(self, env):
+            """Wrap XuanCe multi-agent environments with FastLane telemetry."""
+            _ORIG_MAENV_INIT(self, env)
+            self.env = maybe_wrap_env(self.env)
+
+        XuanCeMultiAgentEnvWrapper.__init__ = _patched_maenv_init
+
+        _logger.info("XuanCe FastLane environment wrapping enabled")
+except Exception as e:  # pragma: no cover - xuance optional
+    _logging.getLogger("xuance_worker.sitecustomize").warning(
+        "XuanCe FastLane wrapping failed: %s", e, exc_info=True
+    )
+    pass
+
 # --- PyTorch save helper ----------------------------------------
 try:  # pragma: no cover - torch optional
     import torch

@@ -1029,6 +1029,104 @@ _ALE_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
 }
 
 
+# Jumanji Logic Puzzle Environments
+# Game2048: 4 actions (up=0, down=1, left=2, right=3)
+# Minesweeper: Cell indices (use mouse click, not keyboard for this one)
+# RubiksCube: 12 actions (6 faces x 2 directions)
+# SlidingPuzzle: 4 actions (move blank up/down/left/right)
+# Sudoku: 81 cells x 9 digits (complex, may need mouse)
+# GraphColoring: node x color combinations (complex, may need mouse)
+
+def _game2048_mappings() -> Tuple[ShortcutMapping, ...]:
+    """Arrow keys for 2048 tile sliding."""
+    return (
+        _mapping(("Key_Up", "Key_W"), 0),      # up
+        _mapping(("Key_Down", "Key_S"), 1),    # down
+        _mapping(("Key_Left", "Key_A"), 2),    # left
+        _mapping(("Key_Right", "Key_D"), 3),   # right
+    )
+
+
+def _sliding_puzzle_mappings() -> Tuple[ShortcutMapping, ...]:
+    """Arrow keys for sliding tile puzzle."""
+    return (
+        _mapping(("Key_Up", "Key_W"), 0),      # move blank up
+        _mapping(("Key_Down", "Key_S"), 1),    # move blank down
+        _mapping(("Key_Left", "Key_A"), 2),    # move blank left
+        _mapping(("Key_Right", "Key_D"), 3),   # move blank right
+    )
+
+
+def _rubiks_cube_mappings() -> Tuple[ShortcutMapping, ...]:
+    """Letter keys for Rubik's Cube face rotations.
+
+    Standard cube notation:
+    R=right, L=left, U=up, D=down, F=front, B=back
+    Shift+key for counter-clockwise (prime)
+    """
+    return (
+        _mapping(("Key_R",), 0),   # R (right clockwise)
+        _mapping(("Key_T",), 1),   # R' (right counter-clockwise, use T for shift-free)
+        _mapping(("Key_L",), 2),   # L (left clockwise)
+        _mapping(("Key_K",), 3),   # L' (left counter-clockwise)
+        _mapping(("Key_U",), 4),   # U (up clockwise)
+        _mapping(("Key_Y",), 5),   # U' (up counter-clockwise)
+        _mapping(("Key_D",), 6),   # D (down clockwise)
+        _mapping(("Key_E",), 7),   # D' (down counter-clockwise)
+        _mapping(("Key_F",), 8),   # F (front clockwise)
+        _mapping(("Key_G",), 9),   # F' (front counter-clockwise)
+        _mapping(("Key_B",), 10),  # B (back clockwise)
+        _mapping(("Key_N",), 11),  # B' (back counter-clockwise)
+    )
+
+
+def _pacman_mappings() -> Tuple[ShortcutMapping, ...]:
+    """Arrow keys for PacMan movement.
+
+    Jumanji PacMan action space: Discrete(5)
+    - 0: no-op (stay)
+    - 1: up
+    - 2: right
+    - 3: down
+    - 4: left
+    """
+    return (
+        _mapping(("Key_Up", "Key_W"), 1),      # up
+        _mapping(("Key_Right", "Key_D"), 2),   # right
+        _mapping(("Key_Down", "Key_S"), 3),    # down
+        _mapping(("Key_Left", "Key_A"), 4),    # left
+    )
+
+
+def _snake_mappings() -> Tuple[ShortcutMapping, ...]:
+    """Arrow keys for Snake movement.
+
+    Jumanji Snake action space: Discrete(4)
+    - 0: up
+    - 1: right
+    - 2: down
+    - 3: left
+    """
+    return (
+        _mapping(("Key_Up", "Key_W"), 0),      # up
+        _mapping(("Key_Right", "Key_D"), 1),   # right
+        _mapping(("Key_Down", "Key_S"), 2),    # down
+        _mapping(("Key_Left", "Key_A"), 3),    # left
+    )
+
+
+_JUMANJI_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
+    GameId.JUMANJI_GAME2048: _game2048_mappings(),
+    GameId.JUMANJI_SLIDING_PUZZLE: _sliding_puzzle_mappings(),
+    GameId.JUMANJI_RUBIKS_CUBE: _rubiks_cube_mappings(),
+    GameId.JUMANJI_PACMAN: _pacman_mappings(),
+    GameId.JUMANJI_SNAKE: _snake_mappings(),
+    # Minesweeper, Sudoku, and GraphColoring use complex action spaces
+    # that are better suited for mouse-based interaction
+    # Tetris uses MultiDiscrete which needs special handling
+}
+
+
 class HumanInputController(QtCore.QObject, LogConstantMixin):
     """Registers keyboard shortcuts and forwards them to the session controller.
 
@@ -1209,6 +1307,8 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
                 mappings = _CRAFTER_MAPPINGS.get(game_id)
             if mappings is None:
                 mappings = _PROCGEN_MAPPINGS.get(game_id)
+            if mappings is None:
+                mappings = _JUMANJI_MAPPINGS.get(game_id)
             if mappings is None and isinstance(action_space, spaces.Discrete):
                 mappings = self._fallback_mappings(action_space)
 

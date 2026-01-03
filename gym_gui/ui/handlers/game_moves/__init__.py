@@ -7,14 +7,17 @@ Available handlers:
 - ChessHandler: Chess move handling
 - GoHandler: Go move handling
 - ConnectFourHandler: Connect Four move handling
+- SudokuHandler: Sudoku cell selection and digit entry
 """
 
 from gym_gui.ui.handlers.game_moves.chess import ChessHandler
 from gym_gui.ui.handlers.game_moves.go import GoHandler
 from gym_gui.ui.handlers.game_moves.connect_four import ConnectFourHandler
+from gym_gui.ui.handlers.game_moves.sudoku import SudokuHandler
 
 __all__ = [
     "ChessHandler",
     "GoHandler",
     "ConnectFourHandler",
+    "SudokuHandler",
 ]

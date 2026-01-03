@@ -212,47 +212,231 @@ class OperatorDescriptor:
 
 
 @dataclass
+class WorkerAssignment:
+    """Configuration for a single worker assigned to a player in an operator.
+
+    This dataclass holds worker-specific settings for one player/agent slot
+    within an operator. For single-agent environments, there's one WorkerAssignment.
+    For multi-agent environments (e.g., chess), there's one per player.
+
+    Attributes:
+        worker_id: References WorkerDefinition (e.g., "barlog_worker", "cleanrl_worker").
+        worker_type: Type of worker - "llm", "vlm", "rl", or "human".
+        settings: Worker-specific settings (client_name, model_id, api_key, etc.).
+    """
+
+    worker_id: str  # References WorkerDefinition in worker catalog
+    worker_type: str  # "llm", "vlm", "rl", "human"
+    settings: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Validate worker assignment."""
+        valid_types = ("llm", "vlm", "rl", "human")
+        if self.worker_type not in valid_types:
+            raise ValueError(f"worker_type must be one of {valid_types}, got '{self.worker_type}'")
+
+
+@dataclass
 class OperatorConfig:
     """Configuration for a single operator instance in multi-operator mode.
 
     This dataclass holds all the information needed to configure and run
     an operator (LLM or RL worker) in the multi-operator comparison view.
 
+    An Operator binds one or more workers to a single environment:
+    - Single-agent envs (babyai, minigrid): 1 worker → 1 environment
+    - Multi-agent envs (chess, connect4): N workers → 1 environment
+
     Attributes:
         operator_id: Unique ID for this operator instance (e.g., "operator_0").
-        operator_type: Type of operator - "llm" or "rl".
-        worker_id: References WorkerDefinition (e.g., "barlog_worker", "cleanrl_worker").
-        display_name: User-visible name (e.g., "GPT-4 LLM", "PPO Agent").
-        env_name: Environment name (e.g., "babyai", "minigrid", "FrozenLake-v1").
-        task: Task/level within the environment (e.g., "BabyAI-GoToRedBall-v0").
-        settings: Worker-specific settings (model, algorithm, hyperparameters, etc.).
+        display_name: User-visible name (e.g., "GPT-4 LLM", "Chess Match").
+        env_name: Environment family (e.g., "babyai", "minigrid", "pettingzoo").
+        task: Task/level within the environment (e.g., "BabyAI-GoToRedBall-v0", "chess_v6").
+        workers: Dict mapping player_id to WorkerAssignment.
+                 Single-agent: {"agent": WorkerAssignment(...)}
+                 Multi-agent: {"player_0": WorkerAssignment(...), "player_1": WorkerAssignment(...)}
         run_id: Assigned run ID when operator is started (for telemetry routing).
+
+    Factory Methods:
+        Use OperatorConfig.single_agent() for single-agent environments.
+        Use OperatorConfig.multi_agent() for multi-agent environments (chess, Go, etc.).
+
+    Backwards Compatibility:
+        Properties operator_type, worker_id, settings read from workers["agent"]
+        for compatibility with existing code that expects single-worker operators.
     """
 
     operator_id: str
-    operator_type: str  # "llm" or "rl"
-    worker_id: str  # References WorkerDefinition in worker catalog
     display_name: str
     env_name: str = "babyai"
     task: str = "BabyAI-GoToRedBall-v0"
-    settings: Dict[str, Any] = field(default_factory=dict)
+    workers: Dict[str, WorkerAssignment] = field(default_factory=dict)
     run_id: str | None = None  # Assigned when operator starts
 
     def __post_init__(self) -> None:
-        """Validate operator configuration."""
-        if self.operator_type not in ("llm", "rl"):
-            raise ValueError(f"operator_type must be 'llm' or 'rl', got '{self.operator_type}'")
+        """Validate configuration and ensure workers dict is populated."""
+        # Ensure workers dict is not empty
+        if not self.workers:
+            # Default single-agent worker
+            self.workers = {
+                "agent": WorkerAssignment(
+                    worker_id="barlog_worker",
+                    worker_type="llm",
+                    settings={},
+                )
+            }
+
+    # -------------------------------------------------------------------------
+    # Backwards Compatibility Properties
+    # -------------------------------------------------------------------------
+
+    @property
+    def operator_type(self) -> str:
+        """Get operator type (for backwards compatibility).
+
+        Returns the worker_type of the first worker (single-agent mode)
+        or 'multiagent' if multiple workers are assigned.
+        """
+        if len(self.workers) > 1:
+            return "multiagent"
+        if self.workers:
+            return next(iter(self.workers.values())).worker_type
+        return "llm"
+
+    @property
+    def worker_id(self) -> str:
+        """Get worker ID (for backwards compatibility).
+
+        Returns the worker_id of the first worker.
+        """
+        if self.workers:
+            return next(iter(self.workers.values())).worker_id
+        return "barlog_worker"
+
+    @property
+    def settings(self) -> Dict[str, Any]:
+        """Get worker settings (for backwards compatibility).
+
+        Returns the settings of the first worker.
+        """
+        if self.workers:
+            return next(iter(self.workers.values())).settings
+        return {}
+
+    # -------------------------------------------------------------------------
+    # Multi-Agent Properties
+    # -------------------------------------------------------------------------
+
+    @property
+    def is_multiagent(self) -> bool:
+        """Check if this operator has multiple workers (multi-agent environment)."""
+        return len(self.workers) > 1
+
+    @property
+    def player_ids(self) -> list[str]:
+        """Get list of player IDs this operator manages."""
+        return list(self.workers.keys())
+
+    def get_worker_for_player(self, player_id: str) -> WorkerAssignment | None:
+        """Get the worker assignment for a specific player.
+
+        Args:
+            player_id: The player ID (e.g., "player_0", "agent").
+
+        Returns:
+            WorkerAssignment for that player, or None if not found.
+        """
+        return self.workers.get(player_id)
+
+    # -------------------------------------------------------------------------
+    # Factory Methods
+    # -------------------------------------------------------------------------
+
+    @classmethod
+    def single_agent(
+        cls,
+        operator_id: str,
+        display_name: str,
+        worker_id: str,
+        worker_type: str,
+        env_name: str = "babyai",
+        task: str = "BabyAI-GoToRedBall-v0",
+        settings: Dict[str, Any] | None = None,
+    ) -> "OperatorConfig":
+        """Create a single-agent operator config.
+
+        Args:
+            operator_id: Unique operator ID.
+            display_name: Display name for UI.
+            worker_id: Worker to use (e.g., "barlog_worker").
+            worker_type: Type of worker ("llm", "vlm", "rl", "human").
+            env_name: Environment family.
+            task: Specific task/level.
+            settings: Worker-specific settings.
+
+        Returns:
+            OperatorConfig with single worker assigned to "agent".
+        """
+        return cls(
+            operator_id=operator_id,
+            display_name=display_name,
+            env_name=env_name,
+            task=task,
+            workers={
+                "agent": WorkerAssignment(
+                    worker_id=worker_id,
+                    worker_type=worker_type,
+                    settings=settings or {},
+                )
+            },
+        )
+
+    @classmethod
+    def multi_agent(
+        cls,
+        operator_id: str,
+        display_name: str,
+        env_name: str,
+        task: str,
+        player_workers: Dict[str, WorkerAssignment],
+    ) -> "OperatorConfig":
+        """Create a multi-agent operator config.
+
+        Args:
+            operator_id: Unique operator ID.
+            display_name: Display name for UI.
+            env_name: Environment family (e.g., "pettingzoo").
+            task: Specific task (e.g., "chess_v6").
+            player_workers: Dict mapping player_id to WorkerAssignment.
+
+        Returns:
+            OperatorConfig with multiple workers for multi-agent env.
+        """
+        return cls(
+            operator_id=operator_id,
+            display_name=display_name,
+            env_name=env_name,
+            task=task,
+            workers=player_workers,
+        )
 
     def with_run_id(self, run_id: str) -> "OperatorConfig":
         """Return a copy of this config with the run_id set."""
+        # Deep copy workers
+        workers_copy = {
+            player_id: WorkerAssignment(
+                worker_id=wa.worker_id,
+                worker_type=wa.worker_type,
+                settings=wa.settings.copy(),
+            )
+            for player_id, wa in self.workers.items()
+        }
         return OperatorConfig(
             operator_id=self.operator_id,
-            operator_type=self.operator_type,
-            worker_id=self.worker_id,
             display_name=self.display_name,
             env_name=self.env_name,
             task=self.task,
-            settings=self.settings.copy(),
+            workers=workers_copy,
             run_id=run_id,
         )
 
@@ -539,6 +723,7 @@ class MultiOperatorService(LogConstantMixin):
         self._operator_runs: Dict[str, str] = {}  # operator_id -> run_id
         self._operator_states: Dict[str, str] = {}  # operator_id -> "pending"|"running"|"stopped"
         self._next_operator_index: int = 0
+        self._freed_indices: set[int] = set()  # Track freed indices for reuse
         self._logger = logging.getLogger("gym_gui.services.multi_operator")
 
     # ------------------------------------------------------------------
@@ -566,7 +751,23 @@ class MultiOperatorService(LogConstantMixin):
             del self._operator_runs[operator_id]
         if operator_id in self._operator_states:
             del self._operator_states[operator_id]
+
+        # Track freed index for reuse (extract number from "operator_N")
+        if operator_id.startswith("operator_"):
+            try:
+                freed_idx = int(operator_id.split("_")[1])
+                self._freed_indices.add(freed_idx)
+                self._logger.info(f"Freed operator index {freed_idx} for reuse")
+            except (IndexError, ValueError):
+                pass
+
         self._logger.info(f"Removed operator: {operator_id}")
+
+        # Reset everything when all operators are removed
+        if len(self._active_operators) == 0:
+            self._next_operator_index = 0
+            self._freed_indices.clear()
+            self._logger.info("All operators removed, reset operator index")
 
     def update_operator(self, config: OperatorConfig) -> None:
         """Update an existing operator configuration.
@@ -591,19 +792,29 @@ class MultiOperatorService(LogConstantMixin):
         return list(self._active_operators.keys())
 
     def clear_operators(self) -> None:
-        """Remove all operators."""
+        """Remove all operators and reset the operator index counter."""
         self._active_operators.clear()
         self._operator_runs.clear()
         self._operator_states.clear()
+        self._next_operator_index = 0  # Reset counter so next operator starts at 0
+        self._freed_indices.clear()  # Clear freed indices
         self._logger.info("Cleared all operators")
 
     # ------------------------------------------------------------------
     # Operator ID Generation
     # ------------------------------------------------------------------
     def generate_operator_id(self) -> str:
-        """Generate a unique operator ID."""
-        operator_id = f"operator_{self._next_operator_index}"
-        self._next_operator_index += 1
+        """Generate a unique operator ID, reusing freed indices when available."""
+        if self._freed_indices:
+            # Reuse the smallest freed index
+            reused_idx = min(self._freed_indices)
+            self._freed_indices.remove(reused_idx)
+            operator_id = f"operator_{reused_idx}"
+            self._logger.info(f"Reusing freed operator index {reused_idx}")
+        else:
+            # Use the next new index
+            operator_id = f"operator_{self._next_operator_index}"
+            self._next_operator_index += 1
         return operator_id
 
     # ------------------------------------------------------------------
@@ -698,6 +909,7 @@ __all__ = [
     "OperatorService",
     "OperatorDescriptor",
     "OperatorConfig",
+    "WorkerAssignment",
     "MultiOperatorService",
     "HumanOperator",
     "WorkerOperator",

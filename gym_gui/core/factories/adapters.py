@@ -30,6 +30,7 @@ if TYPE_CHECKING:
     from gym_gui.config.game_configs import CrafterConfig as _CrafterConfigType
     from gym_gui.config.game_configs import ProcgenConfig as _ProcgenConfigType
     from gym_gui.config.game_configs import TextWorldConfig as _TextWorldConfigType
+    from gym_gui.config.game_configs import JumanjiConfig as _JumanjiConfigType
 
 try:  # Optional dependency
     from gym_gui.core.adapters.vizdoom import (  # pragma: no cover - optional
@@ -104,6 +105,17 @@ except Exception:  # pragma: no cover - textworld optional
     TextWorldAdapter = None  # type: ignore[misc, assignment]
     TextWorldConfig = None  # type: ignore[misc, assignment]
 
+try:  # Optional dependency - Jumanji (JAX-based logic puzzle environments)
+    from gym_gui.core.adapters.jumanji import (  # pragma: no cover - optional
+        JUMANJI_ADAPTERS,
+        JumanjiAdapter,
+    )
+    from gym_gui.config.game_configs import JumanjiConfig
+except Exception:  # pragma: no cover - jumanji optional
+    JUMANJI_ADAPTERS: dict[Any, Any] = {}
+    JumanjiAdapter = None  # type: ignore[misc, assignment]
+    JumanjiConfig = None  # type: ignore[misc, assignment]
+
 from gym_gui.core.enums import GameId
 
 AdapterT = TypeVar("AdapterT", bound=EnvironmentAdapter)
@@ -134,6 +146,7 @@ def _registry() -> Mapping[GameId, type[EnvironmentAdapter]]:
         **CRAFTER_ADAPTERS,
         **PROCGEN_ADAPTERS,
         **TEXTWORLD_ADAPTERS,
+        **JUMANJI_ADAPTERS,
     }
 
 
@@ -172,6 +185,7 @@ def create_adapter(
         | "_CrafterConfigType"
         | "_ProcgenConfigType"
         | "_TextWorldConfigType"
+        | "_JumanjiConfigType"
         | None
     ) = None,
 ) -> EnvironmentAdapter:
@@ -275,6 +289,13 @@ def create_adapter(
             and issubclass(adapter_cls, TextWorldAdapter)
             and TextWorldConfig is not None
             and isinstance(game_config, TextWorldConfig)
+        ):
+            adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
+        elif (
+            JumanjiAdapter is not None
+            and issubclass(adapter_cls, JumanjiAdapter)
+            and JumanjiConfig is not None
+            and isinstance(game_config, JumanjiConfig)
         ):
             adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
         else:

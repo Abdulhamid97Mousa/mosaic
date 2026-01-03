@@ -22,6 +22,7 @@ Architecture Overview:
 
 import logging
 import os
+import select
 import subprocess
 import sys
 import uuid
@@ -29,7 +30,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 import json
-from typing import IO, Any, Dict, Optional
+from typing import IO, Any, Dict, List, Optional
 
 from gym_gui.config.paths import VAR_OPERATORS_DIR, VAR_TELEMETRY_DIR, ensure_var_directories
 from gym_gui.core.subprocess_validation import validated_popen
@@ -41,6 +42,11 @@ from gym_gui.logging_config.log_constants import (
     LOG_OPERATOR_STEP_COMMAND_SENT,
     LOG_OPERATOR_STOP_COMMAND_SENT,
     LOG_OPERATOR_COMMAND_FAILED,
+    LOG_OPERATOR_INIT_AGENT_SENT,
+    LOG_OPERATOR_SELECT_ACTION_SENT,
+    LOG_OPERATOR_MULTIAGENT_LAUNCHED,
+    LOG_OPERATOR_MULTIAGENT_INIT_FAILED,
+    LOG_OPERATOR_MULTIAGENT_ACTION_FAILED,
 )
 
 
@@ -160,6 +166,90 @@ class OperatorProcessHandle:
             )
         return result
 
+    def send_init_agent(
+        self,
+        game_name: str,
+        player_id: str,
+        instruction_prompt: Optional[str] = None,
+    ) -> bool:
+        """Send init_agent command for multi-agent action-selector mode.
+
+        In action-selector mode, the worker doesn't own the environment.
+        It just provides actions when given observations.
+
+        Args:
+            game_name: Name of the game (e.g., "chess_v6").
+            player_id: Which player this worker controls (e.g., "player_0").
+            instruction_prompt: Optional custom instruction for the LLM.
+
+        Returns:
+            True if command was sent successfully.
+        """
+        cmd: Dict[str, Any] = {
+            "cmd": "init_agent",
+            "game_name": game_name,
+            "player_id": player_id,
+        }
+        if instruction_prompt:
+            cmd["instruction_prompt"] = instruction_prompt
+
+        result = self.send_command(cmd)
+        if result:
+            log_constant(
+                LOGGER, LOG_OPERATOR_INIT_AGENT_SENT,
+                message=f"Init agent command sent to {self.operator_id} for {game_name} as {player_id}",
+                extra={
+                    "operator_id": self.operator_id,
+                    "game_name": game_name,
+                    "player_id": player_id,
+                },
+            )
+        return result
+
+    def send_select_action(
+        self,
+        observation: Any,
+        player_id: str,
+        info: Optional[Dict[str, Any]] = None,
+        action_mask: Optional[List[bool]] = None,
+    ) -> bool:
+        """Send select_action command for multi-agent games.
+
+        The worker will use its LLM to select an action based on the
+        observation and return it. The GUI then executes the action
+        on the shared environment.
+
+        Args:
+            observation: Current game state (string or dict).
+            player_id: Which player is acting.
+            info: Additional info (e.g., legal_moves).
+            action_mask: Optional boolean mask of valid actions.
+
+        Returns:
+            True if command was sent successfully.
+        """
+        cmd: Dict[str, Any] = {
+            "cmd": "select_action",
+            "observation": observation,
+            "player_id": player_id,
+        }
+        if info:
+            cmd["info"] = info
+        if action_mask:
+            cmd["action_mask"] = action_mask
+
+        result = self.send_command(cmd)
+        if result:
+            log_constant(
+                LOGGER, LOG_OPERATOR_SELECT_ACTION_SENT,
+                message=f"Select action command sent to {self.operator_id} for {player_id}",
+                extra={
+                    "operator_id": self.operator_id,
+                    "player_id": player_id,
+                },
+            )
+        return result
+
     def send_stop(self) -> bool:
         """Send stop command to terminate gracefully."""
         result = self.send_command({"cmd": "stop"})
@@ -170,6 +260,70 @@ class OperatorProcessHandle:
                 extra={"operator_id": self.operator_id},
             )
         return result
+
+    def try_read_response(self, timeout: float = 0.0) -> Optional[Dict[str, Any]]:
+        """Try to read one JSON response from stdout (non-blocking).
+
+        Args:
+            timeout: Seconds to wait for data (0 = no wait, instant check).
+
+        Returns:
+            Parsed JSON dict if available, None if no data or not interactive.
+        """
+        if not self.interactive:
+            return None
+
+        if not self.is_running and self.process.stdout is None:
+            return None
+
+        if self.process.stdout is None:
+            return None
+
+        try:
+            # Use select for non-blocking check (Unix only)
+            readable, _, _ = select.select([self.process.stdout], [], [], timeout)
+            if not readable:
+                return None
+
+            line = self.process.stdout.readline()
+            if not line:
+                return None
+
+            return json.loads(line.strip())
+        except (json.JSONDecodeError, OSError, ValueError) as exc:
+            LOGGER.debug(
+                "Failed to read response from operator %s: %s",
+                self.operator_id, exc
+            )
+            return None
+
+    def poll_responses(self, max_responses: int = 100) -> list[Dict[str, Any]]:
+        """Read all available responses from stdout (non-blocking).
+
+        Args:
+            max_responses: Maximum number of responses to read in one call.
+
+        Returns:
+            List of parsed JSON responses (may be empty).
+        """
+        responses = []
+        for _ in range(max_responses):
+            response = self.try_read_response(timeout=0.0)
+            if response is None:
+                break
+            responses.append(response)
+        return responses
+
+    def read_response(self, timeout: float = 30.0) -> Optional[Dict[str, Any]]:
+        """Read one JSON response from stdout (blocking with timeout).
+
+        Args:
+            timeout: Seconds to wait for response.
+
+        Returns:
+            Parsed JSON dict, or None on timeout/error.
+        """
+        return self.try_read_response(timeout=timeout)
 
     def stop(self, timeout: float = 5.0) -> None:
         """Terminate the operator subprocess.
@@ -215,6 +369,132 @@ class OperatorProcessHandle:
                     extra={"log_path": str(self.log_path)}
                 )
             self._log_file.close()
+
+
+@dataclass
+class MultiAgentOperatorHandle:
+    """Manages multiple worker processes for a multi-agent operator.
+
+    In multi-agent mode (e.g., chess, Go), one operator controls multiple
+    players, each with its own worker subprocess. The GUI owns the shared
+    environment and routes turns to the appropriate worker.
+
+    Attributes:
+        operator_id: The operator's unique ID.
+        config: The multi-agent operator configuration.
+        player_handles: Dict mapping player_id to OperatorProcessHandle.
+        game_name: The PettingZoo game being played.
+    """
+
+    operator_id: str
+    config: OperatorConfig
+    player_handles: Dict[str, OperatorProcessHandle] = field(default_factory=dict)
+    game_name: str = ""
+
+    @property
+    def is_running(self) -> bool:
+        """Check if all player workers are running."""
+        if not self.player_handles:
+            return False
+        return all(h.is_running for h in self.player_handles.values())
+
+    @property
+    def player_ids(self) -> List[str]:
+        """Get list of player IDs."""
+        return list(self.player_handles.keys())
+
+    def get_handle(self, player_id: str) -> Optional[OperatorProcessHandle]:
+        """Get the handle for a specific player."""
+        return self.player_handles.get(player_id)
+
+    def send_init_agents(self) -> bool:
+        """Send init_agent command to all player workers.
+
+        Returns:
+            True if all commands were sent successfully.
+        """
+        success = True
+        for player_id, handle in self.player_handles.items():
+            if not handle.send_init_agent(self.game_name, player_id):
+                log_constant(
+                    LOGGER, LOG_OPERATOR_MULTIAGENT_INIT_FAILED,
+                    message=f"Failed to init agent for {player_id} in operator {self.operator_id}",
+                    extra={
+                        "operator_id": self.operator_id,
+                        "player_id": player_id,
+                        "game_name": self.game_name,
+                    },
+                )
+                success = False
+        return success
+
+    def send_select_action(
+        self,
+        player_id: str,
+        observation: Any,
+        info: Optional[Dict[str, Any]] = None,
+        action_mask: Optional[List[bool]] = None,
+    ) -> bool:
+        """Send select_action command to a specific player's worker.
+
+        Args:
+            player_id: Which player should select an action.
+            observation: Current game state.
+            info: Additional info (e.g., legal_moves).
+            action_mask: Optional boolean mask of valid actions.
+
+        Returns:
+            True if command was sent successfully.
+        """
+        handle = self.player_handles.get(player_id)
+        if handle is None:
+            log_constant(
+                LOGGER, LOG_OPERATOR_MULTIAGENT_ACTION_FAILED,
+                message=f"No handle for player {player_id} in operator {self.operator_id}",
+                extra={
+                    "operator_id": self.operator_id,
+                    "player_id": player_id,
+                },
+            )
+            return False
+        return handle.send_select_action(observation, player_id, info, action_mask)
+
+    def read_response(
+        self,
+        player_id: str,
+        timeout: float = 30.0,
+    ) -> Optional[Dict[str, Any]]:
+        """Read response from a specific player's worker.
+
+        Args:
+            player_id: Which player to read from.
+            timeout: Seconds to wait for response.
+
+        Returns:
+            Parsed JSON response, or None on timeout/error.
+        """
+        handle = self.player_handles.get(player_id)
+        if handle is None:
+            return None
+        return handle.read_response(timeout=timeout)
+
+    def poll_all_responses(self, max_per_player: int = 10) -> Dict[str, List[Dict[str, Any]]]:
+        """Poll responses from all player workers.
+
+        Returns:
+            Dict mapping player_id to list of responses.
+        """
+        results = {}
+        for player_id, handle in self.player_handles.items():
+            results[player_id] = handle.poll_responses(max_responses=max_per_player)
+        return results
+
+    def stop_all(self, timeout: float = 5.0) -> None:
+        """Stop all player workers."""
+        for player_id, handle in self.player_handles.items():
+            LOGGER.debug("Stopping worker for %s", player_id)
+            handle.send_stop()
+            handle.stop(timeout=timeout)
 
 
 class OperatorLauncher:
@@ -296,6 +576,8 @@ class OperatorLauncher:
             cmd = self._build_llm_command(config, run_id, interactive=interactive)
         elif config.operator_type == "rl":
             cmd = self._build_rl_command(config, run_id, interactive=interactive)
+        elif config.operator_type == "human":
+            cmd = self._build_human_command(config, run_id)
         else:
             log_file.close()
             raise OperatorLaunchError(f"Unknown operator type: {config.operator_type}")
@@ -303,6 +585,15 @@ class OperatorLauncher:
         # Set up environment
         env = os.environ.copy()
         env.setdefault("QT_DEBUG_PLUGINS", "0")
+
+        # Clear proxy settings for vLLM (local inference on localhost)
+        # SOCKS proxies can block httpx calls even for localhost
+        # Keep proxy for remote providers like OpenRouter
+        settings = config.settings or {}
+        if settings.get("client_name") == "vllm":
+            for proxy_var in ["ALL_PROXY", "all_proxy", "HTTP_PROXY", "http_proxy",
+                              "HTTPS_PROXY", "https_proxy"]:
+                env.pop(proxy_var, None)
 
         # Pass telemetry directory
         env["TELEMETRY_DIR"] = str(VAR_TELEMETRY_DIR)
@@ -380,6 +671,99 @@ class OperatorLauncher:
             )
         return handle
 
+    def launch_multiagent_operator(
+        self,
+        config: OperatorConfig,
+        *,
+        run_id: Optional[str] = None,
+    ) -> MultiAgentOperatorHandle:
+        """Launch a multi-agent operator with one worker per player.
+
+        For multi-agent games (chess, Go, connect-four), the GUI owns the
+        shared environment. This method launches a worker subprocess for
+        each player, where each worker acts as an action-selector.
+
+        Args:
+            config: Multi-agent operator configuration with workers dict.
+            run_id: Optional base run ID (players get suffixed IDs).
+
+        Returns:
+            MultiAgentOperatorHandle for managing all player workers.
+
+        Raises:
+            OperatorLaunchError: If any worker fails to launch.
+            ValueError: If config is not a multi-agent configuration.
+        """
+        if not config.is_multiagent:
+            raise ValueError(
+                f"Operator {config.operator_id} is not multi-agent. "
+                f"Use launch_operator for single-agent operators."
+            )
+
+        base_run_id = run_id or f"{config.operator_id}_{uuid.uuid4().hex[:8]}"
+        game_name = config.task  # e.g., "chess_v6"
+
+        player_handles: Dict[str, OperatorProcessHandle] = {}
+
+        for player_id, worker_assignment in config.workers.items():
+            # Create a single-agent config for this player's worker
+            player_run_id = f"{base_run_id}_{player_id}"
+            player_config = OperatorConfig.single_agent(
+                operator_id=f"{config.operator_id}_{player_id}",
+                display_name=f"{config.display_name} - {player_id}",
+                worker_id=worker_assignment.worker_id,
+                worker_type=worker_assignment.worker_type,
+                env_name="pettingzoo",  # Worker knows it's action-selector mode
+                task=game_name,
+                settings=worker_assignment.settings,
+            )
+
+            try:
+                # Launch in interactive mode for IPC
+                handle = self.launch_operator(
+                    player_config,
+                    run_id=player_run_id,
+                    interactive=True,
+                )
+                player_handles[player_id] = handle
+            except OperatorLaunchError as e:
+                # Clean up already-launched workers on failure
+                log_constant(
+                    LOGGER, LOG_OPERATOR_MULTIAGENT_INIT_FAILED,
+                    message=f"Failed to launch worker for {player_id}: {e} - cleaning up",
+                    extra={
+                        "operator_id": config.operator_id,
+                        "player_id": player_id,
+                        "error": str(e),
+                    },
+                )
+                for launched_handle in player_handles.values():
+                    try:
+                        launched_handle.stop(timeout=2.0)
+                    except Exception:
+                        pass
+                raise
+
+        multi_handle = MultiAgentOperatorHandle(
+            operator_id=config.operator_id,
+            config=config,
+            player_handles=player_handles,
+            game_name=game_name,
+        )
+
+        log_constant(
+            LOGGER, LOG_OPERATOR_MULTIAGENT_LAUNCHED,
+            message=f"Multi-agent operator {config.operator_id} launched with {len(player_handles)} players",
+            extra={
+                "operator_id": config.operator_id,
+                "player_count": len(player_handles),
+                "player_ids": list(player_handles.keys()),
+                "game_name": game_name,
+            },
+        )
+
+        return multi_handle
+
     def _build_llm_command(
         self,
         config: OperatorConfig,
@@ -409,37 +793,72 @@ class OperatorLauncher:
         max_steps = settings.get("max_steps", 100)
         temperature = settings.get("temperature", 0.7)
 
-        cmd = [
-            self._python_executable,
-            "-m", "barlog_worker.cli",
-            "--run-id", run_id,
-            "--env", config.env_name,
-            "--task", config.task,
-            "--client", client_name,
-            "--model", model_id,
-            "--agent-type", agent_type,
-            "--num-episodes", str(num_episodes),
-            "--max-steps", str(max_steps),
-            "--temperature", str(temperature),
-            "--telemetry-dir", str(VAR_TELEMETRY_DIR),
-            "-v",  # Verbose logging
-        ]
+        # Use chess_worker for chess games (llm_chess prompting style)
+        # Use barlog_worker for other environments (BALROG benchmarks)
+        is_chess = config.task and "chess" in config.task.lower()
 
-        # Add interactive mode flag for step-by-step GUI control
-        if interactive:
-            cmd.append("--interactive")
+        if is_chess:
+            # Chess worker with multi-turn conversation and retry logic
+            cmd = [
+                self._python_executable,
+                "-m", "chess_worker.cli",
+                "--run-id", run_id,
+                "--client-name", client_name,
+                "--model-id", model_id,
+                "--temperature", str(temperature),
+                "--telemetry-dir", str(VAR_TELEMETRY_DIR),
+            ]
 
-        # Add optional base URL (for vLLM)
-        if base_url:
-            cmd.extend(["--base-url", base_url])
+            # Add optional base URL (for vLLM)
+            if base_url:
+                cmd.extend(["--base-url", base_url])
 
-        # Add API key if provided
-        if api_key:
-            cmd.extend(["--api-key", api_key])
+            # Add API key if provided
+            if api_key:
+                cmd.extend(["--api-key", api_key])
 
-        # Add max_image_history (VLM mode: 0=text-only, >=1=vision)
-        max_image_history = settings.get("max_image_history", 0)
-        cmd.extend(["--max-image-history", str(max_image_history)])
+            # Chess-specific settings
+            max_retries = settings.get("max_retries", 3)
+            max_dialog_turns = settings.get("max_dialog_turns", 10)
+            cmd.extend(["--max-retries", str(max_retries)])
+            cmd.extend(["--max-dialog-turns", str(max_dialog_turns)])
+
+        else:
+            # BARLOG worker for other environments
+            cmd = [
+                self._python_executable,
+                "-m", "barlog_worker.cli",
+                "--run-id", run_id,
+                "--env", config.env_name,
+                "--task", config.task,
+                "--client", client_name,
+                "--model", model_id,
+                "--agent-type", agent_type,
+                "--num-episodes", str(num_episodes),
+                "--max-steps", str(max_steps),
+                "--temperature", str(temperature),
+                "--telemetry-dir", str(VAR_TELEMETRY_DIR),
+                "-v",  # Verbose logging
+            ]
+
+            # Add interactive mode flag for step-by-step GUI control
+            if interactive:
+                cmd.append("--interactive")
+
+            # Add optional base URL (for vLLM)
+            if base_url:
+                cmd.extend(["--base-url", base_url])
+
+            # Add API key if provided
+            if api_key:
+                cmd.extend(["--api-key", api_key])
+
+            # Add max_image_history (VLM mode: 0=text-only, >=1=vision)
+            max_image_history = settings.get("max_image_history", 0)
+            cmd.extend(["--max-image-history", str(max_image_history)])
+
+            # Add render mode for GUI display
+            cmd.extend(["--render-mode", "rgb_array"])
 
         return cmd
 
@@ -483,6 +902,57 @@ class OperatorLauncher:
             "Operator %s will run a placeholder.",
             config.operator_id
         )
+        return cmd
+
+    def _build_human_command(
+        self,
+        config: OperatorConfig,
+        run_id: str,
+    ) -> list[str]:
+        """Build command line for Human operator.
+
+        Human operators wait for input from the GUI via stdin.
+        They emit 'waiting_for_human' when it's their turn, then
+        wait for 'human_input' commands with the selected move.
+
+        Args:
+            config: Operator configuration with human settings.
+            run_id: Run ID for telemetry.
+
+        Returns:
+            Command arguments list.
+        """
+        settings = config.settings or {}
+
+        # Get human-specific settings
+        player_name = settings.get("player_name", "Human")
+        show_legal_moves = settings.get("show_legal_moves", True)
+        confirm_moves = settings.get("confirm_moves", False)
+        timeout_seconds = settings.get("timeout_seconds", 0.0)
+
+        cmd = [
+            self._python_executable,
+            "-m", "human_worker.cli",
+            "--run-id", run_id,
+            "--player-name", player_name,
+            "--timeout", str(timeout_seconds),
+            "--telemetry-dir", str(VAR_TELEMETRY_DIR),
+        ]
+
+        if show_legal_moves:
+            cmd.append("--show-legal-moves")
+        else:
+            cmd.append("--no-show-legal-moves")
+
+        if confirm_moves:
+            cmd.append("--confirm-moves")
+
+        LOGGER.info(
+            "Building human operator command for %s (player: %s)",
+            config.operator_id,
+            player_name,
+        )
+
         return cmd
 
     def stop_operator(self, operator_id: str, timeout: float = 5.0) -> bool:

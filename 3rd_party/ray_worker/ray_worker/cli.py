@@ -169,7 +169,7 @@ def print_config_summary(config: RayWorkerConfig) -> None:
     print(f"Run ID:         {config.run_id}")
     print(f"Environment:    {config.environment.family}/{config.environment.env_id}")
     print(f"API Type:       {config.environment.api_type.value}")
-    print(f"Paradigm:       {config.paradigm.value}")
+    print(f"Policy Config:  {config.policy_configuration.value}")
     print(f"Algorithm:      {config.training.algorithm}")
     print(f"Total Steps:    {config.training.total_timesteps:,}")
     print(f"Batch Size:     {batch_size}")
@@ -217,7 +217,7 @@ def main(argv: Optional[list[str]] = None) -> int:
         config = RayWorkerConfig(
             run_id=config.run_id,
             environment=config.environment,
-            paradigm=config.paradigm,
+            policy_configuration=config.policy_configuration,
             training=config.training,
             resources=config.resources,
             checkpoint=config.checkpoint,

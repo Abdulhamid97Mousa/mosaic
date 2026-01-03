@@ -45,7 +45,6 @@ AVAILABLE_WORKERS = [
     ("xuance", "XuanCe", "Multi-agent RL with XuanCe MARL"),
     ("llm", "LLM", "Language model decision-making"),
     ("jason", "Jason BDI", "AgentSpeak BDI agents"),
-    ("spade_bdi", "SPADE BDI", "Python BDI with SPADE"),
 ]
 
 # Available modes

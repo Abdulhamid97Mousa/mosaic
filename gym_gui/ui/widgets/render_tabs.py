@@ -67,6 +67,12 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
     go_intersection_clicked: "QtCore.SignalInstance" = QtCore.Signal(int, int)  # type: ignore[assignment]
     # Signal emitted when Go pass is requested
     go_pass_requested: "QtCore.SignalInstance" = QtCore.Signal()  # type: ignore[assignment]
+    # Signal emitted when a Sudoku cell is selected (row, col)
+    sudoku_cell_selected: "QtCore.SignalInstance" = QtCore.Signal(int, int)  # type: ignore[assignment]
+    # Signal emitted when a digit is entered in Sudoku (row, col, digit)
+    sudoku_digit_entered: "QtCore.SignalInstance" = QtCore.Signal(int, int, int)  # type: ignore[assignment]
+    # Signal emitted when a Sudoku cell is cleared (row, col)
+    sudoku_cell_cleared: "QtCore.SignalInstance" = QtCore.Signal(int, int)  # type: ignore[assignment]
 
     _current_game: GameId | None
 
@@ -493,6 +499,16 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
         """
         self._multi_operator_view.set_operator_status(operator_id, status)
 
+    def set_operator_display_size(self, operator_id: str, width: int, height: int) -> None:
+        """Set the display size for an operator's render container.
+
+        Args:
+            operator_id: The operator ID.
+            width: Display width in pixels.
+            height: Display height in pixels.
+        """
+        self._multi_operator_view.set_operator_display_size(operator_id, width, height)
+
     def display_operator_payload(self, operator_id: str, payload: dict) -> None:
         """Route payload to the correct operator container.
 
@@ -632,6 +648,15 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
                 self.go_intersection_clicked
             )
             self._board_game_strategy.go_pass_requested.connect(self.go_pass_requested)
+            self._board_game_strategy.sudoku_cell_selected.connect(
+                self.sudoku_cell_selected
+            )
+            self._board_game_strategy.sudoku_digit_entered.connect(
+                self.sudoku_digit_entered
+            )
+            self._board_game_strategy.sudoku_cell_cleared.connect(
+                self.sudoku_cell_cleared
+            )
 
             # Add board game widget to the grid stack (index 2)
             self._grid_stack.addWidget(self._board_game_strategy.widget)
@@ -645,6 +670,7 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
             GameId.CHESS: "Grid - Chess",
             GameId.CONNECT_FOUR: "Grid - Connect Four",
             GameId.GO: "Grid - Go",
+            GameId.JUMANJI_SUDOKU: "Grid - Sudoku",
         }
         self.setTabText(self._grid_tab_index, game_names.get(game_id, "Grid"))
 

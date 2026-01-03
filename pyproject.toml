@@ -137,6 +137,18 @@ textworld = [
     "textworld>=1.6.0",
 ]
 
+# Jumanji JAX-based RL environments (Google DeepMind)
+# Paper: Bonnet et al. (2024). "Jumanji: Industry-Driven Hardware-Accelerated RL Environments"
+# Repository: https://github.com/google-deepmind/jumanji
+# Includes: Game2048, Minesweeper, RubiksCube, SlidingPuzzle, Sudoku, GraphColoring
+# NOTE: Requires JAX with compatible hardware backend (CPU/GPU/TPU)
+jumanji = [
+    "jax>=0.4.20",
+    "jaxlib>=0.4.20",
+    "chex>=0.1.82",
+    "flax>=0.7.0",
+]
+
 # =============================================================================
 # Workers (training backends)
 # =============================================================================
@@ -160,12 +172,6 @@ mujoco-mpc = [
 godot = [
     # Optional: godot-rl for Python RL bridge
     # "godot-rl>=0.6.0",
-]
-
-# SPADE BDI worker
-spade-bdi = [
-    "spade>=4.0.0",
-    "spade-bdi>=0.3.0",
 ]
 
 # LLM Chat UI (OpenRouter cloud + vLLM local)
@@ -232,7 +238,7 @@ all-gymnasium = [
 
 # All environment families (single + multi-agent)
 all-envs = [
-    "mosaic[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom,nethack,crafter,procgen,textworld]",
+    "mosaic[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom,nethack,crafter,procgen,textworld,jumanji]",
 ]
 
 # Full development setup

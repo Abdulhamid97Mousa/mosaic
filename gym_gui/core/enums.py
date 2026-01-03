@@ -31,6 +31,7 @@ class EnvironmentFamily(StrEnum):
     NETHACK = "nethack"  # Full NetHack game (via NLE)
     CRAFTER = "crafter"  # Crafter open world survival benchmark
     PROCGEN = "procgen"  # Procgen procedural benchmark (16 environments)
+    JUMANJI = "jumanji"  # Jumanji JAX-based logic puzzle environments
     TEXTWORLD = "textworld"  # TextWorld text-based game environment (Microsoft Research)
     PETTINGZOO = "pettingzoo"
     PETTINGZOO_CLASSIC = "pettingzoo_classic"  # PettingZoo Classic: turn-based games (Chess, Go, Connect Four, etc.)
@@ -357,6 +358,31 @@ class GameId(StrEnum):
     PROCGEN_NINJA = "procgen:procgen-ninja-v0"
     PROCGEN_PLUNDER = "procgen:procgen-plunder-v0"
     PROCGEN_STARPILOT = "procgen:procgen-starpilot-v0"
+    # Jumanji (JAX-based Logic Puzzle Environments)
+    JUMANJI_GAME2048 = "jumanji/Game2048-v1"
+    JUMANJI_MINESWEEPER = "jumanji/Minesweeper-v0"
+    JUMANJI_RUBIKS_CUBE = "jumanji/RubiksCube-v0"
+    JUMANJI_SLIDING_PUZZLE = "jumanji/SlidingTilePuzzle-v0"
+    JUMANJI_SUDOKU = "jumanji/Sudoku-v0"
+    JUMANJI_GRAPH_COLORING = "jumanji/GraphColoring-v1"
+    # Jumanji Phase 2: Packing Environments
+    JUMANJI_BINPACK = "jumanji/BinPack-v2"
+    JUMANJI_FLATPACK = "jumanji/FlatPack-v0"
+    JUMANJI_JOBSHOP = "jumanji/JobShop-v0"
+    JUMANJI_KNAPSACK = "jumanji/Knapsack-v1"
+    JUMANJI_TETRIS = "jumanji/Tetris-v0"
+    # Jumanji Phase 3: Routing Environments
+    JUMANJI_CLEANER = "jumanji/Cleaner-v0"
+    JUMANJI_CONNECTOR = "jumanji/Connector-v2"
+    JUMANJI_CVRP = "jumanji/CVRP-v1"
+    JUMANJI_MAZE = "jumanji/Maze-v0"
+    JUMANJI_MMST = "jumanji/MMST-v0"
+    JUMANJI_MULTI_CVRP = "jumanji/MultiCVRP-v0"
+    JUMANJI_PACMAN = "jumanji/PacMan-v1"
+    JUMANJI_ROBOT_WAREHOUSE = "jumanji/RobotWarehouse-v0"
+    JUMANJI_SNAKE = "jumanji/Snake-v1"
+    JUMANJI_SOKOBAN = "jumanji/Sokoban-v0"
+    JUMANJI_TSP = "jumanji/TSP-v1"
 
 
 def get_game_display_name(game_id: GameId) -> str:
@@ -852,6 +878,31 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.PROCGEN_NINJA: EnvironmentFamily.PROCGEN,
     GameId.PROCGEN_PLUNDER: EnvironmentFamily.PROCGEN,
     GameId.PROCGEN_STARPILOT: EnvironmentFamily.PROCGEN,
+    # Jumanji Logic Puzzle Environments
+    GameId.JUMANJI_GAME2048: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_MINESWEEPER: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_RUBIKS_CUBE: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_SLIDING_PUZZLE: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_SUDOKU: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_GRAPH_COLORING: EnvironmentFamily.JUMANJI,
+    # Jumanji Phase 2: Packing
+    GameId.JUMANJI_BINPACK: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_FLATPACK: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_JOBSHOP: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_KNAPSACK: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_TETRIS: EnvironmentFamily.JUMANJI,
+    # Jumanji Phase 3: Routing
+    GameId.JUMANJI_CLEANER: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_CONNECTOR: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_CVRP: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_MAZE: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_MMST: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_MULTI_CVRP: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_PACMAN: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_ROBOT_WAREHOUSE: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_SNAKE: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_SOKOBAN: EnvironmentFamily.JUMANJI,
+    GameId.JUMANJI_TSP: EnvironmentFamily.JUMANJI,
 }
 
 
@@ -1030,6 +1081,31 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.PROCGEN_NINJA: RenderMode.RGB_ARRAY,
     GameId.PROCGEN_PLUNDER: RenderMode.RGB_ARRAY,
     GameId.PROCGEN_STARPILOT: RenderMode.RGB_ARRAY,
+    # Jumanji Logic Puzzle Environments
+    GameId.JUMANJI_GAME2048: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_MINESWEEPER: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_RUBIKS_CUBE: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_SLIDING_PUZZLE: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_SUDOKU: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_GRAPH_COLORING: RenderMode.RGB_ARRAY,
+    # Jumanji Phase 2: Packing
+    GameId.JUMANJI_BINPACK: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_FLATPACK: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_JOBSHOP: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_KNAPSACK: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_TETRIS: RenderMode.RGB_ARRAY,
+    # Jumanji Phase 3: Routing
+    GameId.JUMANJI_CLEANER: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_CONNECTOR: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_CVRP: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_MAZE: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_MMST: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_MULTI_CVRP: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_PACMAN: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_ROBOT_WAREHOUSE: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_SNAKE: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_SOKOBAN: RenderMode.RGB_ARRAY,
+    GameId.JUMANJI_TSP: RenderMode.RGB_ARRAY,
 }
 
 
@@ -1610,6 +1686,31 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
     GameId.PROCGEN_NINJA: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     GameId.PROCGEN_PLUNDER: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     GameId.PROCGEN_STARPILOT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    # Jumanji - JAX-based logic puzzle environments (turn-based discrete actions)
+    GameId.JUMANJI_GAME2048: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_MINESWEEPER: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_RUBIKS_CUBE: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_SLIDING_PUZZLE: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_SUDOKU: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_GRAPH_COLORING: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    # Jumanji Phase 2: Packing (turn-based discrete actions)
+    GameId.JUMANJI_BINPACK: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_FLATPACK: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_JOBSHOP: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_KNAPSACK: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_TETRIS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    # Jumanji Phase 3: Routing (turn-based discrete actions)
+    GameId.JUMANJI_CLEANER: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_CONNECTOR: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_CVRP: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_MAZE: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_MMST: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_MULTI_CVRP: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_PACMAN: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_ROBOT_WAREHOUSE: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_SNAKE: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_SOKOBAN: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.JUMANJI_TSP: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     # BabyAI - language-grounded instruction following (same controls as MiniGrid)
     GameId.BABYAI_GOTO_REDBALL_GREY: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     GameId.BABYAI_GOTO_REDBALL: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
@@ -1677,6 +1778,7 @@ DEFAULT_PARADIGM_BY_FAMILY: dict[EnvironmentFamily, SteppingParadigm] = {
     EnvironmentFamily.NETHACK: SteppingParadigm.SINGLE_AGENT,  # Turn-based roguelike
     EnvironmentFamily.CRAFTER: SteppingParadigm.SINGLE_AGENT,  # Turn-based survival game
     EnvironmentFamily.PROCGEN: SteppingParadigm.SINGLE_AGENT,  # Procedurally generated games
+    EnvironmentFamily.JUMANJI: SteppingParadigm.SINGLE_AGENT,  # JAX-based logic puzzles (turn-based)
     EnvironmentFamily.TEXTWORLD: SteppingParadigm.SINGLE_AGENT,  # Text-based adventure games
     EnvironmentFamily.PETTINGZOO: SteppingParadigm.SEQUENTIAL,  # AEC by default
     EnvironmentFamily.PETTINGZOO_CLASSIC: SteppingParadigm.SEQUENTIAL,  # Chess, Go, etc.

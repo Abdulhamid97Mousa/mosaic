@@ -63,7 +63,6 @@ MOSAIC integrates multiple training backends through a worker architecture:
 | **XuanCe** | Multi-agent RL | MAPPO, QMIX, MADDPG algorithms |
 | **RLlib** | Distributed RL | Scalable training with Ray |
 | **Jason BDI** | Symbolic AI | AgentSpeak agents via Java/gRPC bridge |
-| **SPADE BDI** | Symbolic AI | Python-native BDI agents |
 | **MuJoCo MPC** | Control | Model Predictive Control worker |
 | **Godot** | 3D Engine | Game AI training integration |
 | **LLM** | Language Models | GPT/Claude agents (planned) |

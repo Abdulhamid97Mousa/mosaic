@@ -2,7 +2,7 @@
 
 This module provides the core training logic for multi-agent environments
 using Ray RLlib. It supports various PettingZoo environment families and
-multiple training paradigms.
+multiple policy configurations.
 
 Supported Environment Families:
 - SISL: Cooperative continuous control (Multiwalker, Waterworld, Pursuit)
@@ -10,7 +10,7 @@ Supported Environment Families:
 - Butterfly: Mixed cooperative/competitive
 - MPE: Multi-agent particle environments
 
-Supported Training Paradigms:
+Supported Policy Configurations:
 - Parameter Sharing: All agents share one policy (for homogeneous cooperative)
 - Independent: Each agent has its own policy
 - Self-Play: Agent plays against copies of itself
@@ -44,10 +44,23 @@ from ray.rllib.core.rl_module.rl_module import RLModuleSpec
 from ray.rllib.env.wrappers.pettingzoo_env import PettingZooEnv, ParallelPettingZooEnv
 from ray.tune.registry import register_env
 
+from gym_gui.core.worker import TelemetryEmitter
+from gym_gui.logging_config.helpers import log_constant
+from gym_gui.logging_config.log_constants import (
+    LOG_WORKER_RAY_RUNTIME_STARTED,
+    LOG_WORKER_RAY_RUNTIME_COMPLETED,
+    LOG_WORKER_RAY_RUNTIME_FAILED,
+    LOG_WORKER_RAY_HEARTBEAT,
+    LOG_WORKER_RAY_TENSORBOARD_ENABLED,
+    LOG_WORKER_RAY_WANDB_ENABLED,
+    LOG_WORKER_RAY_CHECKPOINT_SAVED,
+    LOG_WORKER_RAY_ANALYTICS_MANIFEST_CREATED,
+)
+
 from .config import (
     RayWorkerConfig,
     TrainingConfig,
-    TrainingParadigm,
+    PolicyConfiguration,
     PettingZooAPIType,
 )
 from .fastlane import maybe_wrap_env, set_fastlane_env_vars, is_fastlane_enabled, maybe_wrap_parallel_env
@@ -356,7 +369,7 @@ class RayWorkerRuntime:
 
     This class handles:
     - Environment registration with Ray
-    - Algorithm configuration based on training paradigm
+    - Algorithm configuration based on policy configuration
     - Training loop with checkpointing
     - Progress reporting for UI integration
     - TensorBoard and WandB logging
@@ -375,6 +388,8 @@ class RayWorkerRuntime:
         # Analytics/logging
         self._writer: Optional["SummaryWriter"] = None
         self._wandb_run: Optional[Any] = None
+        # Telemetry emitter for lifecycle events
+        self._emitter = TelemetryEmitter(run_id=config.run_id, logger=_LOGGER)
 
     def _create_env_factory(self) -> Callable:
         """Create environment factory function for Ray registration."""
@@ -450,7 +465,7 @@ class RayWorkerRuntime:
         return self._agent_ids
 
     def _build_multi_agent_config(self, base_config: PPOConfig) -> PPOConfig:
-        """Configure multi-agent settings based on training paradigm.
+        """Configure multi-agent settings based on policy configuration.
 
         Args:
             base_config: Base algorithm config
@@ -459,9 +474,9 @@ class RayWorkerRuntime:
             Configured algorithm config with multi-agent settings
         """
         agent_ids = self._get_agent_ids()
-        paradigm = self.config.paradigm
+        policy_config = self.config.policy_configuration
 
-        if paradigm == TrainingParadigm.PARAMETER_SHARING:
+        if policy_config == PolicyConfiguration.PARAMETER_SHARING:
             # All agents share a single policy
             return base_config.multi_agent(
                 policies={"shared"},
@@ -473,7 +488,7 @@ class RayWorkerRuntime:
                 model_config=DefaultModelConfig(vf_share_layers=True),
             )
 
-        elif paradigm == TrainingParadigm.INDEPENDENT:
+        elif policy_config == PolicyConfiguration.INDEPENDENT:
             # Each agent has its own policy (1:1 mapping)
             policies = {aid for aid in agent_ids}
             return base_config.multi_agent(
@@ -486,7 +501,7 @@ class RayWorkerRuntime:
                 model_config=DefaultModelConfig(vf_share_layers=True),
             )
 
-        elif paradigm == TrainingParadigm.SELF_PLAY:
+        elif policy_config == PolicyConfiguration.SELF_PLAY:
             # Self-play: main policy plays against frozen copies
             # For now, use simple self-play where all agents use same policy
             # Advanced league training would require more complex setup
@@ -500,7 +515,7 @@ class RayWorkerRuntime:
                 model_config=DefaultModelConfig(vf_share_layers=True),
             )
 
-        elif paradigm == TrainingParadigm.SHARED_VALUE_FUNCTION:
+        elif policy_config == PolicyConfiguration.SHARED_VALUE_FUNCTION:
             # CTDE: Shared critic, separate actor policies
             # Each agent has own policy but they share value function
             policies = {aid for aid in agent_ids}
@@ -515,7 +530,7 @@ class RayWorkerRuntime:
             )
 
         else:
-            raise ValueError(f"Unknown training paradigm: {paradigm}")
+            raise ValueError(f"Unknown policy configuration: {policy_config}")
 
     def _build_algorithm_config(self) -> AlgorithmConfig:
         """Build the complete algorithm configuration.
@@ -704,6 +719,14 @@ class RayWorkerRuntime:
                     from torch.utils.tensorboard import SummaryWriter
                     self._writer = SummaryWriter(log_dir=str(tb_dir))
                     _LOGGER.info(f"TensorBoard logging to: {tb_dir}")
+                    log_constant(
+                        _LOGGER,
+                        LOG_WORKER_RAY_TENSORBOARD_ENABLED,
+                        extra={
+                            "run_id": self.config.run_id,
+                            "tensorboard_dir": str(tb_dir),
+                        },
+                    )
                 except ImportError:
                     _LOGGER.warning(
                         "tensorboard not installed, TensorBoard logging disabled. "
@@ -719,7 +742,7 @@ class RayWorkerRuntime:
                 wandb_config = {
                     "run_id": self.config.run_id,
                     "environment": self.config.environment.full_env_id,
-                    "paradigm": self.config.paradigm.value,
+                    "policy_configuration": self.config.policy_configuration.value,
                     "algorithm": self.config.training.algorithm,
                     "total_timesteps": self.config.training.total_timesteps,
                 }
@@ -736,6 +759,15 @@ class RayWorkerRuntime:
                 )
                 wandb_run_path = self._wandb_run.path if self._wandb_run else None
                 _LOGGER.info(f"WandB run initialized: {wandb_run_path}")
+                log_constant(
+                    _LOGGER,
+                    LOG_WORKER_RAY_WANDB_ENABLED,
+                    extra={
+                        "run_id": self.config.run_id,
+                        "wandb_project": self.config.wandb_project or "ray-marl",
+                        "wandb_run_path": wandb_run_path,
+                    },
+                )
             except ImportError:
                 _LOGGER.warning(
                     "wandb not installed, WandB logging disabled. "
@@ -753,6 +785,15 @@ class RayWorkerRuntime:
             notes=f"Ray RLlib {self.config.training.algorithm} training on {self.config.environment.full_env_id}",
         )
         _LOGGER.info(f"Analytics manifest written: {manifest_path}")
+        log_constant(
+            _LOGGER,
+            LOG_WORKER_RAY_ANALYTICS_MANIFEST_CREATED,
+            extra={
+                "run_id": self.config.run_id,
+                "manifest_path": str(manifest_path),
+                "num_agents": num_agents,
+            },
+        )
 
     def _log_metrics(self, result: Dict[str, Any], global_step: int) -> None:
         """Log training metrics to TensorBoard and WandB.
@@ -788,7 +829,7 @@ class RayWorkerRuntime:
         learners = result.get("learners", {})
         if learners:
             # Try multiple possible policy names used by Ray
-            # - "shared" for parameter_sharing paradigm
+            # - "shared" for parameter_sharing policy configuration
             # - "default_policy" for default single policy
             # - "main" for self-play
             # - First key if none of those exist
@@ -952,8 +993,22 @@ class RayWorkerRuntime:
 
         _LOGGER.info(f"Starting Ray RLlib training: {self.config.run_id}")
         _LOGGER.info(f"Environment: {self.config.environment.family}/{self.config.environment.env_id}")
-        _LOGGER.info(f"Paradigm: {self.config.paradigm.value}")
+        _LOGGER.info(f"Policy Configuration: {self.config.policy_configuration.value}")
         _LOGGER.info(f"Total timesteps: {self.config.training.total_timesteps}")
+
+        # Emit run started event
+        self._emitter.run_started(
+            {
+                "worker_type": "ray",
+                "env_family": self.config.environment.family,
+                "env_id": self.config.environment.env_id,
+                "policy_configuration": self.config.policy_configuration.value,
+                "algorithm": self.config.training.algorithm,
+                "total_timesteps": self.config.training.total_timesteps,
+                "num_workers": self.config.resources.num_workers,
+            },
+            constant=LOG_WORKER_RAY_RUNTIME_STARTED,
+        )
 
         # Set up TensorBoard, WandB, and analytics manifest
         self._setup_analytics()
@@ -1023,6 +1078,19 @@ class RayWorkerRuntime:
                 # Log metrics to TensorBoard/WandB
                 self._log_metrics(result, current_timesteps)
 
+                # Emit heartbeat event
+                self._emitter.heartbeat(
+                    {
+                        "iteration": i + 1,
+                        "timesteps": current_timesteps,
+                        "episode_reward_mean": result.get("env_runners", {}).get(
+                            "episode_return_mean",
+                            result.get("episode_reward_mean", 0.0)
+                        ),
+                    },
+                    constant=LOG_WORKER_RAY_HEARTBEAT,
+                )
+
                 # Checkpoint (only if checkpoint_freq > 0)
                 if self.config.checkpoint.checkpoint_freq > 0 and (i + 1) % self.config.checkpoint.checkpoint_freq == 0:
                     ckpt_result = self._algorithm.save(str(checkpoint_dir))
@@ -1032,6 +1100,16 @@ class RayWorkerRuntime:
                     else:
                         checkpoint_path = str(ckpt_result)
                     _LOGGER.info(f"Checkpoint saved: {checkpoint_path}")
+                    log_constant(
+                        _LOGGER,
+                        LOG_WORKER_RAY_CHECKPOINT_SAVED,
+                        extra={
+                            "run_id": self.config.run_id,
+                            "checkpoint_path": str(checkpoint_path),
+                            "iteration": i + 1,
+                            "timesteps": current_timesteps,
+                        },
+                    )
                     print(f"[CHECKPOINT] path={checkpoint_path}")
                     sys.stdout.flush()
 
@@ -1049,6 +1127,15 @@ class RayWorkerRuntime:
                 else:
                     final_checkpoint = str(result)
                 _LOGGER.info(f"Final checkpoint saved: {final_checkpoint}")
+                log_constant(
+                    _LOGGER,
+                    LOG_WORKER_RAY_CHECKPOINT_SAVED,
+                    extra={
+                        "run_id": self.config.run_id,
+                        "checkpoint_path": str(final_checkpoint),
+                        "final": True,
+                    },
+                )
                 print(f"[CHECKPOINT] path={final_checkpoint} final=true")
                 sys.stdout.flush()
 
@@ -1056,12 +1143,28 @@ class RayWorkerRuntime:
             print(f"[COMPLETE] run_id={self.config.run_id} status=success")
             sys.stdout.flush()
 
+            # Emit run completed event
+            self._emitter.run_completed(
+                {
+                    "final_result": {
+                        k: v for k, v in final_result.items()
+                        if k in ["timesteps_total", "episode_reward_mean", "episodes_total"]
+                    }
+                },
+                constant=LOG_WORKER_RAY_RUNTIME_COMPLETED,
+            )
+
             return final_result
 
         except Exception as e:
             _LOGGER.error(f"Training failed: {e}", exc_info=True)
             print(f"[ERROR] run_id={self.config.run_id} error={str(e)}")
             sys.stdout.flush()
+            # Emit run failed event
+            self._emitter.run_failed(
+                {"error": str(e), "error_type": type(e).__name__},
+                constant=LOG_WORKER_RAY_RUNTIME_FAILED,
+            )
             raise
 
         finally:

@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import logging
 import os
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
@@ -15,12 +16,29 @@ from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 from qtpy import QtCore, QtWidgets
 
 from gym_gui.config.paths import VAR_MODELS_HF_CACHE
-from gym_gui.services.operator import OperatorConfig
+from gym_gui.services.operator import OperatorConfig, WorkerAssignment
 from gym_gui.ui.worker_catalog.catalog import get_worker_catalog, WorkerDefinition
 from gym_gui.constants.constants_operator import (
     BARLOG_SUPPORTED_ENVS,
     BARLOG_DEFAULT_TASK,
 )
+
+
+@dataclass
+class VLLMServerInfo:
+    """Information about a running vLLM server for operator assignment."""
+
+    server_id: int  # 1-indexed (Server 1, Server 2, etc.)
+    port: int
+    model_id: str
+    base_url: str
+    status: str  # "running", "stopped", etc.
+
+    @property
+    def display_name(self) -> str:
+        """Display name for dropdown: 'Server 1 - ModelName @ :8000'."""
+        model_short = self.model_id.split("/")[-1] if "/" in self.model_id else self.model_id
+        return f"Server {self.server_id} - {model_short} @ :{self.port}"
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -107,6 +125,47 @@ def get_vllm_models() -> List[Tuple[str, str]]:
 # Maximum number of operators allowed
 MAX_OPERATORS = 8
 
+# PettingZoo Classic Games - turn-based multi-agent environments
+# Each game has player IDs and human-readable labels
+PETTINGZOO_GAMES: Dict[str, Dict[str, Any]] = {
+    # Two-player board games
+    "chess_v6": {
+        "family": "classic",
+        "players": ["player_0", "player_1"],
+        "player_labels": {"player_0": "White", "player_1": "Black"},
+    },
+    "connect_four_v3": {
+        "family": "classic",
+        "players": ["player_0", "player_1"],
+        "player_labels": {"player_0": "Yellow", "player_1": "Red"},
+    },
+    "go_v5": {
+        "family": "classic",
+        "players": ["black_0", "white_0"],
+        "player_labels": {"black_0": "Black", "white_0": "White"},
+    },
+    "tictactoe_v3": {
+        "family": "classic",
+        "players": ["player_1", "player_2"],
+        "player_labels": {"player_1": "X", "player_2": "O"},
+    },
+    "backgammon_v3": {
+        "family": "classic",
+        "players": ["player_0", "player_1"],
+        "player_labels": {"player_0": "White", "player_1": "Black"},
+    },
+    "gin_rummy_v4": {
+        "family": "classic",
+        "players": ["player_0", "player_1"],
+        "player_labels": {"player_0": "Player 1", "player_1": "Player 2"},
+    },
+    "texas_holdem_v4": {
+        "family": "classic",
+        "players": ["player_0", "player_1"],
+        "player_labels": {"player_0": "Player 1", "player_1": "Player 2"},
+    },
+}
+
 # All environment families with their environments
 # Used by both RL and LLM operators
 ENV_FAMILIES: Dict[str, Tuple[str, ...]] = {
@@ -136,6 +195,8 @@ ENV_FAMILIES: Dict[str, Tuple[str, ...]] = {
         "BipedalWalkerHardcore-v3",
         "CarRacing-v3",
     ),
+    # PettingZoo multi-agent games - populated from PETTINGZOO_GAMES
+    "pettingzoo": tuple(PETTINGZOO_GAMES.keys()),
 }
 
 # RL has access to ALL environment families
@@ -259,6 +320,284 @@ def _get_registered_envs(prefix: str) -> List[str]:
         return []
 
 
+class PlayerAssignmentRow(QtWidgets.QWidget):
+    """Single player assignment row within a multi-agent operator.
+
+    Each row allows configuring a worker for one player in a multi-agent game.
+    Displays: Player label, Worker dropdown, Provider dropdown, Model dropdown, API Key.
+    """
+
+    assignment_changed = pyqtSignal()  # Emitted when any field changes
+
+    def __init__(
+        self,
+        player_id: str,
+        player_label: str,
+        parent: Optional[QtWidgets.QWidget] = None,
+    ) -> None:
+        """Initialize a player assignment row.
+
+        Args:
+            player_id: The internal player ID (e.g., "player_0", "black_0").
+            player_label: Human-readable label (e.g., "White", "Black").
+            parent: Parent widget.
+        """
+        super().__init__(parent)
+        self._player_id = player_id
+        self._player_label = player_label
+        self._updating = False
+        self._vllm_servers: List[VLLMServerInfo] = []
+
+        self._build_ui()
+        self._connect_signals()
+
+    def _build_ui(self) -> None:
+        # Main vertical layout with two rows
+        main_layout = QtWidgets.QVBoxLayout(self)
+        main_layout.setContentsMargins(4, 2, 4, 2)
+        main_layout.setSpacing(2)
+
+        # Row 1: Player label, Worker, Provider
+        row1 = QtWidgets.QHBoxLayout()
+        row1.setSpacing(6)
+
+        # Player label with ID
+        label_text = f"{self._player_label} ({self._player_id})"
+        player_label = QtWidgets.QLabel(label_text, self)
+        player_label.setFixedWidth(120)
+        player_label.setStyleSheet("font-weight: bold;")
+        row1.addWidget(player_label)
+
+        # Worker dropdown
+        row1.addWidget(QtWidgets.QLabel("Worker:", self))
+        self._worker_combo = QtWidgets.QComboBox(self)
+        self._worker_combo.setMinimumWidth(140)
+        for worker in _get_llm_workers():
+            self._worker_combo.addItem(worker.display_name, worker.worker_id)
+        row1.addWidget(self._worker_combo)
+
+        # Provider dropdown
+        row1.addWidget(QtWidgets.QLabel("Provider:", self))
+        self._client_combo = QtWidgets.QComboBox(self)
+        self._client_combo.setMinimumWidth(100)
+        for client_name, (display_name, _, _) in LLM_CLIENTS.items():
+            self._client_combo.addItem(display_name, client_name)
+        row1.addWidget(self._client_combo)
+
+        row1.addStretch()
+        main_layout.addLayout(row1)
+
+        # Row 2: Model/Server, API Key (indented to align with row1 controls)
+        row2 = QtWidgets.QHBoxLayout()
+        row2.setSpacing(6)
+
+        # Spacer to align with row1 (same width as player label)
+        spacer = QtWidgets.QWidget(self)
+        spacer.setFixedWidth(120)
+        row2.addWidget(spacer)
+
+        # Model dropdown
+        self._model_label = QtWidgets.QLabel("Model:", self)
+        row2.addWidget(self._model_label)
+        self._model_combo = QtWidgets.QComboBox(self)
+        self._model_combo.setMinimumWidth(160)
+        row2.addWidget(self._model_combo)
+
+        # API Key field
+        self._api_key_label = QtWidgets.QLabel("API Key:", self)
+        row2.addWidget(self._api_key_label)
+        self._api_key_edit = QtWidgets.QLineEdit(self)
+        self._api_key_edit.setPlaceholderText("API key")
+        self._api_key_edit.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
+        self._api_key_edit.setMinimumWidth(120)
+        row2.addWidget(self._api_key_edit)
+
+        row2.addStretch()
+        main_layout.addLayout(row2)
+
+        # Initialize model dropdown
+        self._update_model_dropdown()
+        self._update_api_key_visibility()
+
+    def _connect_signals(self) -> None:
+        self._worker_combo.currentIndexChanged.connect(self._on_changed)
+        self._client_combo.currentIndexChanged.connect(self._on_client_changed)
+        self._model_combo.currentIndexChanged.connect(self._on_changed)
+        self._api_key_edit.textChanged.connect(self._on_changed)
+
+    def _on_changed(self) -> None:
+        if not self._updating:
+            self.assignment_changed.emit()
+
+    def _on_client_changed(self) -> None:
+        if self._updating:
+            return
+        self._update_model_dropdown()
+        self._update_api_key_visibility()
+        self.assignment_changed.emit()
+
+    def _update_model_dropdown(self) -> None:
+        """Update model dropdown based on selected provider."""
+        self._updating = True
+        current_data = self._model_combo.currentData()
+        self._model_combo.clear()
+
+        client_name = self._client_combo.currentData()
+        if client_name:
+            if client_name == "vllm":
+                self._model_label.setText("Server:")
+                running_servers = [s for s in self._vllm_servers if s.status == "running"]
+                if running_servers:
+                    for server in running_servers:
+                        self._model_combo.addItem(server.display_name, server)
+                else:
+                    self._model_combo.addItem("(No running servers)", None)
+            else:
+                self._model_label.setText("Model:")
+                models = LLM_CLIENT_MODELS.get(client_name, [])
+                for model_id, display_name in models:
+                    self._model_combo.addItem(display_name, model_id)
+
+        # Restore selection if possible
+        if current_data:
+            if client_name == "vllm" and isinstance(current_data, VLLMServerInfo):
+                for i in range(self._model_combo.count()):
+                    item_data = self._model_combo.itemData(i)
+                    if isinstance(item_data, VLLMServerInfo) and item_data.server_id == current_data.server_id:
+                        self._model_combo.setCurrentIndex(i)
+                        break
+            else:
+                idx = self._model_combo.findData(current_data)
+                if idx >= 0:
+                    self._model_combo.setCurrentIndex(idx)
+
+        self._updating = False
+
+    def _update_api_key_visibility(self) -> None:
+        """Show/hide API key field based on selected provider."""
+        client_name = self._client_combo.currentData()
+        if client_name and client_name in LLM_CLIENTS:
+            _, requires_api_key, _ = LLM_CLIENTS[client_name]
+            self._api_key_label.setVisible(requires_api_key)
+            self._api_key_edit.setVisible(requires_api_key)
+
+    def set_vllm_servers(self, servers: List[VLLMServerInfo]) -> None:
+        """Update available vLLM servers."""
+        self._vllm_servers = servers
+        if self._client_combo.currentData() == "vllm":
+            self._update_model_dropdown()
+
+    def get_assignment(self) -> WorkerAssignment:
+        """Get the WorkerAssignment for this player.
+
+        Returns:
+            WorkerAssignment with worker_id, worker_type, and settings.
+        """
+        worker_id = self._worker_combo.currentData() or "barlog_worker"
+        client_name = self._client_combo.currentData() or "openrouter"
+        api_key = self._api_key_edit.text().strip()
+
+        settings: Dict[str, Any] = {"client_name": client_name}
+
+        if api_key:
+            settings["api_key"] = api_key
+
+        # Handle vLLM vs other providers
+        if client_name == "vllm":
+            server_info = self._model_combo.currentData()
+            if isinstance(server_info, VLLMServerInfo):
+                settings["model_id"] = server_info.model_id
+                settings["base_url"] = server_info.base_url
+            else:
+                settings["model_id"] = ""
+                settings["base_url"] = "http://localhost:8000/v1"
+        else:
+            settings["model_id"] = self._model_combo.currentData() or ""
+            if client_name in LLM_CLIENTS:
+                _, _, default_base_url = LLM_CLIENTS[client_name]
+                if default_base_url:
+                    settings["base_url"] = default_base_url
+
+        return WorkerAssignment(
+            worker_id=worker_id,
+            worker_type="llm",
+            settings=settings,
+        )
+
+    @property
+    def player_id(self) -> str:
+        return self._player_id
+
+
+class PlayerAssignmentPanel(QtWidgets.QWidget):
+    """Panel showing all player assignments for a multi-agent environment.
+
+    Contains a PlayerAssignmentRow for each player in the game.
+    """
+
+    assignments_changed = pyqtSignal()  # Emitted when any player assignment changes
+
+    def __init__(
+        self,
+        game_name: str,
+        parent: Optional[QtWidgets.QWidget] = None,
+    ) -> None:
+        """Initialize the player assignment panel.
+
+        Args:
+            game_name: Name of the PettingZoo game (e.g., "chess_v6").
+            parent: Parent widget.
+        """
+        super().__init__(parent)
+        self._game_name = game_name
+        self._rows: Dict[str, PlayerAssignmentRow] = {}
+
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setContentsMargins(0, 4, 0, 4)
+        layout.setSpacing(2)
+
+        # Header
+        header = QtWidgets.QLabel("Player Assignments:", self)
+        header.setStyleSheet("font-weight: bold; color: #555;")
+        layout.addWidget(header)
+
+        # Get player info from PETTINGZOO_GAMES
+        game_info = PETTINGZOO_GAMES.get(self._game_name, {})
+        players = game_info.get("players", ["player_0", "player_1"])
+        labels = game_info.get("player_labels", {})
+
+        # Create row for each player
+        for player_id in players:
+            player_label = labels.get(player_id, player_id)
+            row = PlayerAssignmentRow(player_id, player_label, self)
+            row.assignment_changed.connect(self.assignments_changed)
+            layout.addWidget(row)
+            self._rows[player_id] = row
+
+    def set_vllm_servers(self, servers: List[VLLMServerInfo]) -> None:
+        """Update all rows with available vLLM servers."""
+        for row in self._rows.values():
+            row.set_vllm_servers(servers)
+
+    def get_worker_assignments(self) -> Dict[str, WorkerAssignment]:
+        """Get all player -> worker assignments.
+
+        Returns:
+            Dict mapping player_id to WorkerAssignment.
+        """
+        return {
+            player_id: row.get_assignment()
+            for player_id, row in self._rows.items()
+        }
+
+    @property
+    def game_name(self) -> str:
+        return self._game_name
+
+
 class OperatorConfigRow(QtWidgets.QWidget):
     """Single row in the operator configuration list.
 
@@ -271,6 +610,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
     config_changed = pyqtSignal(str, object)  # operator_id, new_config
     remove_requested = pyqtSignal(str)  # operator_id
     initialize_requested = pyqtSignal(str)  # operator_id - request to preview env
+    vllm_refresh_requested = pyqtSignal()  # request parent to refresh vLLM servers
 
     def __init__(
         self,
@@ -281,6 +621,8 @@ class OperatorConfigRow(QtWidgets.QWidget):
         super().__init__(parent)
         self._operator_id = operator_id
         self._updating = False  # Prevent signal loops
+        self._vllm_servers: List[VLLMServerInfo] = []  # Available vLLM servers
+        self._player_panel: Optional[PlayerAssignmentPanel] = None  # Multi-agent panel
 
         self._build_ui()
         self._connect_signals()
@@ -356,6 +698,47 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._task_combo.setMinimumWidth(200)
         row2.addWidget(self._task_combo)
 
+        # Container size dropdown (operator card boundary)
+        row2.addWidget(QtWidgets.QLabel("Container:", self))
+        self._container_size_combo = QtWidgets.QComboBox(self)
+        self._container_size_combo.setToolTip(
+            "Operator container size.\n"
+            "Controls the size of the operator card boundary."
+        )
+        self._container_size_combo.addItem("Auto", 0)  # Auto-size based on image
+        self._container_size_combo.addItem("400px", 400)
+        self._container_size_combo.addItem("512px", 512)
+        self._container_size_combo.addItem("600px", 600)
+        self._container_size_combo.addItem("768px", 768)
+        self._container_size_combo.addItem("800px", 800)
+        self._container_size_combo.addItem("1024px", 1024)
+        self._container_size_combo.addItem("1280px", 1280)
+        self._container_size_combo.addItem("1440px", 1440)
+        self._container_size_combo.addItem("1600px", 1600)
+        self._container_size_combo.addItem("1920px", 1920)
+        self._container_size_combo.setCurrentIndex(5)  # Default to 800px
+        self._container_size_combo.setFixedWidth(80)
+        row2.addWidget(self._container_size_combo)
+
+        # Image scale dropdown (RGB image scaling)
+        row2.addWidget(QtWidgets.QLabel("Image:", self))
+        self._image_scale_combo = QtWidgets.QComboBox(self)
+        self._image_scale_combo.setToolTip(
+            "Image scaling resolution.\n"
+            "The RGB frame will be scaled to this size before display."
+        )
+        self._image_scale_combo.addItem("Native", 0)  # No scaling
+        self._image_scale_combo.addItem("256px", 256)
+        self._image_scale_combo.addItem("384px", 384)
+        self._image_scale_combo.addItem("512px", 512)
+        self._image_scale_combo.addItem("768px", 768)
+        self._image_scale_combo.addItem("1024px", 1024)
+        self._image_scale_combo.addItem("1280px", 1280)
+        self._image_scale_combo.addItem("1440px", 1440)
+        self._image_scale_combo.setCurrentIndex(0)  # Default to Native
+        self._image_scale_combo.setFixedWidth(80)
+        row2.addWidget(self._image_scale_combo)
+
         # Load Environment button - mandatory to initialize the environment
         self._init_btn = QtWidgets.QPushButton("Load Environment", self)
         self._init_btn.setToolTip("Load and initialize this environment for the operator")
@@ -365,6 +748,13 @@ class OperatorConfigRow(QtWidgets.QWidget):
             "QPushButton:hover { background-color: #388E3C; }"
         )
         row2.addWidget(self._init_btn)
+
+        # Environment size label (shown after loading)
+        self._size_label = QtWidgets.QLabel("", self)
+        self._size_label.setStyleSheet("color: #666; font-size: 10px;")
+        self._size_label.setToolTip("Actual displayed dimensions after scaling (width × height)")
+        self._size_label.hide()  # Hidden until environment is loaded
+        row2.addWidget(self._size_label)
 
         row2.addStretch()
 
@@ -388,10 +778,11 @@ class OperatorConfigRow(QtWidgets.QWidget):
             self._client_combo.addItem(display_name, client_name)
         llm_layout.addWidget(self._client_combo)
 
-        # LLM Model selector
-        llm_layout.addWidget(QtWidgets.QLabel("Model:", self._llm_container))
+        # LLM Model/Server selector (label changes based on provider)
+        self._model_label = QtWidgets.QLabel("Model:", self._llm_container)
+        llm_layout.addWidget(self._model_label)
         self._model_combo = QtWidgets.QComboBox(self._llm_container)
-        self._model_combo.setMinimumWidth(140)
+        self._model_combo.setMinimumWidth(200)  # Wider for server names
         llm_layout.addWidget(self._model_combo)
 
         llm_layout.addStretch()
@@ -435,6 +826,17 @@ class OperatorConfigRow(QtWidgets.QWidget):
 
         main_layout.addWidget(self._rl_container)
 
+        # === Multi-agent player assignment container ===
+        # Created dynamically when pettingzoo environment is selected
+        self._player_panel_container = QtWidgets.QWidget(self)
+        self._player_panel_layout = QtWidgets.QVBoxLayout(self._player_panel_container)
+        self._player_panel_layout.setContentsMargins(0, 0, 0, 0)
+        self._player_panel_container.hide()  # Hidden until pettingzoo selected
+        main_layout.addWidget(self._player_panel_container)
+
+        # Store main_layout reference for dynamic updates
+        self._main_layout = main_layout
+
         # Initialize dropdowns
         self._update_worker_dropdown()
         self._update_env_dropdown()
@@ -447,7 +849,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._type_combo.currentIndexChanged.connect(self._on_type_changed)
         self._worker_combo.currentIndexChanged.connect(self._on_config_changed)
         self._env_combo.currentIndexChanged.connect(self._on_env_changed)
-        self._task_combo.currentIndexChanged.connect(self._on_config_changed)
+        self._task_combo.currentIndexChanged.connect(self._on_task_changed)
         self._remove_btn.clicked.connect(lambda: self.remove_requested.emit(self._operator_id))
         self._init_btn.clicked.connect(lambda: self.initialize_requested.emit(self._operator_id))
 
@@ -470,16 +872,60 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._on_config_changed()
 
     def _on_env_changed(self) -> None:
-        """Handle environment change."""
+        """Handle environment family change."""
         if self._updating:
             return
         self._update_task_dropdown()
+        self._update_multiagent_panel()
+        self._update_type_specific_visibility()
         self._on_config_changed()
+
+    def _on_task_changed(self) -> None:
+        """Handle task/game change within an environment family."""
+        if self._updating:
+            return
+        # For pettingzoo, different games have different players
+        if self._is_pettingzoo_selected():
+            self._update_multiagent_panel()
+        self._on_config_changed()
+
+    def _is_pettingzoo_selected(self) -> bool:
+        """Check if pettingzoo environment family is selected."""
+        return self._env_combo.currentText() == "pettingzoo"
+
+    def _update_multiagent_panel(self) -> None:
+        """Update the multi-agent player assignment panel based on selected game."""
+        # Remove existing player panel
+        if self._player_panel is not None:
+            self._player_panel_layout.removeWidget(self._player_panel)
+            self._player_panel.deleteLater()
+            self._player_panel = None
+
+        # Only show for pettingzoo environments
+        if not self._is_pettingzoo_selected():
+            self._player_panel_container.hide()
+            return
+
+        # Get the selected game
+        game_name = self._task_combo.currentText()
+        if not game_name or game_name not in PETTINGZOO_GAMES:
+            self._player_panel_container.hide()
+            return
+
+        # Create new player panel for this game
+        self._player_panel = PlayerAssignmentPanel(game_name, self._player_panel_container)
+        self._player_panel.assignments_changed.connect(self._on_config_changed)
+        self._player_panel.set_vllm_servers(self._vllm_servers)
+        self._player_panel_layout.addWidget(self._player_panel)
+        self._player_panel_container.show()
 
     def _on_client_changed(self) -> None:
         """Handle LLM client change."""
         if self._updating:
             return
+        # If switching to vLLM, request parent to refresh server list
+        if self._client_combo.currentData() == "vllm":
+            self.vllm_refresh_requested.emit()
         self._update_model_dropdown()
         self._update_api_key_visibility()
         self._on_config_changed()
@@ -512,16 +958,31 @@ class OperatorConfigRow(QtWidgets.QWidget):
             self._policy_path_edit.setText(file_path)
 
     def _update_type_specific_visibility(self) -> None:
-        """Show/hide LLM/VLM or RL specific widgets based on operator type."""
+        """Show/hide LLM/VLM or RL specific widgets based on operator type and env.
+
+        For single-agent environments: Show single worker row (LLM or RL).
+        For multi-agent (pettingzoo): Hide single worker row, show player panel.
+        """
         operator_type = self._type_combo.currentText().lower()
-        # Both LLM and VLM show the LLM container (they both use language models)
         is_llm_or_vlm = operator_type in ("llm", "vlm")
+        is_pettingzoo = self._is_pettingzoo_selected()
 
-        self._llm_container.setVisible(is_llm_or_vlm)
-        self._rl_container.setVisible(not is_llm_or_vlm)
+        # For pettingzoo: hide single-worker UI, workers are per-player
+        if is_pettingzoo:
+            self._llm_container.hide()
+            self._rl_container.hide()
+            self._worker_combo.hide()
+            # Type dropdown should also be hidden - all players use LLM workers
+            self._type_combo.hide()
+        else:
+            # Single-agent mode: show appropriate container
+            self._worker_combo.show()
+            self._type_combo.show()
+            self._llm_container.setVisible(is_llm_or_vlm)
+            self._rl_container.setVisible(not is_llm_or_vlm)
 
-        if is_llm_or_vlm:
-            self._update_api_key_visibility()
+            if is_llm_or_vlm:
+                self._update_api_key_visibility()
 
     def _update_api_key_visibility(self) -> None:
         """Show/hide API key field based on selected client."""
@@ -546,31 +1007,69 @@ class OperatorConfigRow(QtWidgets.QWidget):
                     self._api_key_edit.setPlaceholderText(f"Enter key or set {env_var}")
 
     def _update_model_dropdown(self) -> None:
-        """Update model dropdown based on selected LLM client."""
+        """Update model/server dropdown based on selected LLM client.
+
+        For vLLM: Shows running servers from vLLM Server widget
+        For others: Shows predefined model list
+        """
         self._updating = True
-        current_model = self._model_combo.currentData()
+        current_data = self._model_combo.currentData()
         self._model_combo.clear()
 
         client_name = self._client_combo.currentData()
         if client_name:
-            # vLLM uses dynamically scanned local models
             if client_name == "vllm":
-                models = get_vllm_models()
-            elif client_name in LLM_CLIENT_MODELS:
-                models = LLM_CLIENT_MODELS[client_name]
+                # Show running vLLM servers instead of models
+                self._model_label.setText("Server:")
+                running_servers = [s for s in self._vllm_servers if s.status == "running"]
+                if running_servers:
+                    for server in running_servers:
+                        # Store full server info for base_url lookup
+                        self._model_combo.addItem(server.display_name, server)
+                else:
+                    # No running servers - show placeholder
+                    self._model_combo.addItem("(No running servers)", None)
             else:
-                models = []
-
-            for model_id, display_name in models:
-                self._model_combo.addItem(display_name, model_id)
+                # Other providers: show models as usual
+                self._model_label.setText("Model:")
+                if client_name in LLM_CLIENT_MODELS:
+                    models = LLM_CLIENT_MODELS[client_name]
+                else:
+                    models = []
+                for model_id, display_name in models:
+                    self._model_combo.addItem(display_name, model_id)
 
         # Restore selection if possible
-        if current_model:
-            idx = self._model_combo.findData(current_model)
-            if idx >= 0:
-                self._model_combo.setCurrentIndex(idx)
+        if current_data:
+            # For vLLM, match by server_id; for others, match by model_id
+            if client_name == "vllm" and isinstance(current_data, VLLMServerInfo):
+                for i in range(self._model_combo.count()):
+                    item_data = self._model_combo.itemData(i)
+                    if isinstance(item_data, VLLMServerInfo) and item_data.server_id == current_data.server_id:
+                        self._model_combo.setCurrentIndex(i)
+                        break
+            else:
+                idx = self._model_combo.findData(current_data)
+                if idx >= 0:
+                    self._model_combo.setCurrentIndex(idx)
 
         self._updating = False
+
+    def set_vllm_servers(self, servers: List[VLLMServerInfo]) -> None:
+        """Update the list of available vLLM servers.
+
+        Called by parent widget when vLLM server status changes.
+
+        Args:
+            servers: List of VLLMServerInfo from the vLLM server widget.
+        """
+        self._vllm_servers = servers
+        # Refresh dropdown if vLLM is currently selected
+        if self._client_combo.currentData() == "vllm":
+            self._update_model_dropdown()
+        # Also update player panel if it exists (for multi-agent mode)
+        if self._player_panel is not None:
+            self._player_panel.set_vllm_servers(servers)
 
     def _update_worker_dropdown(self) -> None:
         """Update worker dropdown based on selected type."""
@@ -743,10 +1242,13 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._updating = False
 
     def get_config(self) -> OperatorConfig:
-        """Get current configuration from UI elements."""
-        operator_type = self._type_combo.currentText().lower()
-        worker_id = self._worker_combo.currentData() or ""
-        # Extract index from operator_id (e.g., "operator_0" -> 0) and make 1-indexed for display
+        """Get current configuration from UI elements.
+
+        Returns:
+            OperatorConfig with single_agent or multi_agent configuration
+            depending on whether pettingzoo environment is selected.
+        """
+        # Extract index from operator_id (e.g., "operator_0" -> 0) for display name
         try:
             idx = int(self._operator_id.split("_")[-1]) + 1
         except (ValueError, IndexError):
@@ -755,17 +1257,40 @@ class OperatorConfigRow(QtWidgets.QWidget):
         env_name = self._env_combo.currentText() or "babyai"
         task = self._task_combo.currentText() or BARLOG_DEFAULT_TASK
 
+        # Multi-agent mode: pettingzoo with player assignments
+        if self._is_pettingzoo_selected() and self._player_panel is not None:
+            player_workers = self._player_panel.get_worker_assignments()
+            # Add container_size and image_scale to first worker's settings
+            # (accessed via config.settings property)
+            if player_workers:
+                first_player = next(iter(player_workers.keys()))
+                container_size = self._container_size_combo.currentData()
+                if container_size and container_size > 0:
+                    player_workers[first_player].settings["container_size"] = container_size
+                image_scale = self._image_scale_combo.currentData()
+                if image_scale and image_scale > 0:
+                    player_workers[first_player].settings["image_scale"] = image_scale
+            return OperatorConfig.multi_agent(
+                operator_id=self._operator_id,
+                display_name=display_name,
+                env_name=env_name,
+                task=task,
+                player_workers=player_workers,
+            )
+
+        # Single-agent mode: standard LLM/VLM/RL configuration
+        operator_type = self._type_combo.currentText().lower()
+        worker_id = self._worker_combo.currentData() or ""
+
         # Build settings based on operator type
         settings: Dict[str, Any] = {}
 
         if operator_type in ("llm", "vlm"):
             # LLM/VLM-specific settings
             client_name = self._client_combo.currentData() or "openai"
-            model_id = self._model_combo.currentData() or ""
             api_key = self._api_key_edit.text().strip()
 
             settings["client_name"] = client_name
-            settings["model_id"] = model_id
 
             # VLM mode: 0 = text-only (LLM), 1 = vision mode (VLM)
             # The type dropdown now directly controls this
@@ -775,11 +1300,25 @@ class OperatorConfigRow(QtWidgets.QWidget):
             if api_key:
                 settings["api_key"] = api_key
 
-            # Include base_url for vLLM
-            if client_name in LLM_CLIENTS:
-                _, _, default_base_url = LLM_CLIENTS[client_name]
-                if default_base_url:
-                    settings["base_url"] = default_base_url
+            # Handle vLLM server selection vs model selection
+            if client_name == "vllm":
+                # vLLM: get model_id and base_url from selected server
+                server_info = self._model_combo.currentData()
+                if isinstance(server_info, VLLMServerInfo):
+                    settings["model_id"] = server_info.model_id
+                    settings["base_url"] = server_info.base_url
+                else:
+                    # No server selected - use empty values
+                    settings["model_id"] = ""
+                    settings["base_url"] = "http://localhost:8000/v1"
+            else:
+                # Other providers: get model_id from dropdown
+                settings["model_id"] = self._model_combo.currentData() or ""
+                # Include default base_url if available
+                if client_name in LLM_CLIENTS:
+                    _, _, default_base_url = LLM_CLIENTS[client_name]
+                    if default_base_url:
+                        settings["base_url"] = default_base_url
 
         else:
             # RL-specific settings
@@ -787,15 +1326,44 @@ class OperatorConfigRow(QtWidgets.QWidget):
             if policy_path:
                 settings["policy_path"] = policy_path
 
-        return OperatorConfig(
+        # Common settings - container size and image scale
+        container_size = self._container_size_combo.currentData()
+        if container_size and container_size > 0:
+            settings["container_size"] = container_size
+        image_scale = self._image_scale_combo.currentData()
+        if image_scale and image_scale > 0:
+            settings["image_scale"] = image_scale
+
+        return OperatorConfig.single_agent(
             operator_id=self._operator_id,
-            operator_type=operator_type,
-            worker_id=worker_id,
             display_name=display_name,
+            worker_id=worker_id,
+            worker_type=operator_type,
             env_name=env_name,
             task=task,
             settings=settings,
         )
+
+    def set_environment_size(
+        self, width: int, height: int, container_size: Optional[int] = None
+    ) -> None:
+        """Set the environment size label after loading.
+
+        Args:
+            width: Rendered environment width in pixels (image size)
+            height: Rendered environment height in pixels (image size)
+            container_size: Optional container display size in pixels
+        """
+        if container_size:
+            self._size_label.setText(f"Image: {width}×{height} | Container: {container_size}px")
+        else:
+            self._size_label.setText(f"Image: {width}×{height}")
+        self._size_label.show()
+
+    def clear_environment_size(self) -> None:
+        """Clear the environment size label."""
+        self._size_label.setText("")
+        self._size_label.hide()
 
     @property
     def operator_id(self) -> str:
@@ -814,6 +1382,7 @@ class OperatorConfigWidget(QtWidgets.QWidget):
 
     operators_changed = pyqtSignal(list)  # List[OperatorConfig]
     initialize_requested = pyqtSignal(str, object)  # operator_id, config
+    vllm_refresh_requested = pyqtSignal()  # request to refresh vLLM server list
 
     def __init__(
         self,
@@ -824,6 +1393,7 @@ class OperatorConfigWidget(QtWidgets.QWidget):
         self._max_operators = max_operators
         self._rows: Dict[str, OperatorConfigRow] = {}
         self._next_index = 0
+        self._vllm_servers: List[VLLMServerInfo] = []  # Cache for new rows
 
         self._build_ui()
 
@@ -890,11 +1460,11 @@ class OperatorConfigWidget(QtWidgets.QWidget):
 
         # Create default config if not provided
         if config is None:
-            config = OperatorConfig(
+            config = OperatorConfig.single_agent(
                 operator_id=operator_id,
-                operator_type="llm",
-                worker_id="barlog_worker",
                 display_name=f"Operator {len(self._rows) + 1}",
+                worker_id="barlog_worker",
+                worker_type="llm",
                 env_name="babyai",
                 task="BabyAI-GoToRedBall-v0",
                 settings={
@@ -908,6 +1478,11 @@ class OperatorConfigWidget(QtWidgets.QWidget):
         row.config_changed.connect(self._on_row_config_changed)
         row.remove_requested.connect(self.remove_operator)
         row.initialize_requested.connect(self._on_initialize_requested)
+        row.vllm_refresh_requested.connect(self.vllm_refresh_requested)  # Propagate to parent
+
+        # Pass cached vLLM server list to new row
+        if self._vllm_servers:
+            row.set_vllm_servers(self._vllm_servers)
 
         # Insert before stretch
         self._rows_layout.insertWidget(self._rows_layout.count() - 1, row)
@@ -986,11 +1561,48 @@ class OperatorConfigWidget(QtWidgets.QWidget):
         """Get the number of configured operators."""
         return len(self._rows)
 
+    def set_vllm_servers(self, servers: List[VLLMServerInfo]) -> None:
+        """Update all operator rows with available vLLM servers.
+
+        Called when vLLM server status changes. Propagates the server list
+        to all OperatorConfigRow widgets so they can update their dropdowns.
+
+        Args:
+            servers: List of VLLMServerInfo from the vLLM server widget.
+        """
+        # Cache for new rows that will be added later
+        self._vllm_servers = servers
+        _LOGGER.debug(f"Updating operator rows with {len(servers)} vLLM servers")
+        for row in self._rows.values():
+            row.set_vllm_servers(servers)
+
+    def set_operator_environment_size(
+        self, operator_id: str, width: int, height: int, container_size: Optional[int] = None
+    ) -> None:
+        """Set the environment size for a specific operator.
+
+        Called after an environment is successfully loaded to display
+        the rendered dimensions in the operator config row.
+
+        Args:
+            operator_id: The operator's unique ID
+            width: Rendered environment width in pixels (image size)
+            height: Rendered environment height in pixels (image size)
+            container_size: Optional container display size in pixels
+        """
+        if operator_id in self._rows:
+            self._rows[operator_id].set_environment_size(width, height, container_size)
+            _LOGGER.debug(f"Set environment size for {operator_id}: {width}×{height}, container: {container_size}")
+
 
 __all__ = [
     "OperatorConfigRow",
     "OperatorConfigWidget",
+    "PlayerAssignmentRow",
+    "PlayerAssignmentPanel",
+    "VLLMServerInfo",
     "MAX_OPERATORS",
     "LLM_CLIENTS",
     "LLM_CLIENT_MODELS",
+    "PETTINGZOO_GAMES",
 ]

@@ -126,6 +126,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
     # Multi-Operator Mode signals - scientific execution for fair LLM/RL comparison
     operators_changed = pyqtSignal(list)  # List[OperatorConfig] - when operator configs change
     step_all_requested = pyqtSignal(int)  # Step all operators with seed (lock-step execution)
+    step_player_requested = pyqtSignal(str, int)  # Step specific player (player_id, seed)
     reset_all_requested = pyqtSignal(int)  # Reset all operators with seed (fair comparison)
     stop_operators_requested = pyqtSignal()  # Stop all running operators
     initialize_operator_requested = pyqtSignal(str, object, int)  # operator_id, config, seed - preview env
@@ -712,6 +713,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         # Connect single-agent signals - scientific execution for fair comparison
         self._single_agent_tab.operators_changed.connect(self._on_operators_config_changed)
         self._single_agent_tab.step_all_requested.connect(self._on_step_all_clicked)
+        self._single_agent_tab.step_player_requested.connect(self._on_step_player_clicked)
         self._single_agent_tab.reset_all_requested.connect(self._on_reset_all_clicked)
         self._single_agent_tab.stop_operators_requested.connect(self._on_stop_operators_clicked)
         self._single_agent_tab.initialize_operator_requested.connect(self._on_initialize_operator_requested)
@@ -946,6 +948,15 @@ class ControlPanelWidget(QtWidgets.QWidget):
         """
         self.step_all_requested.emit(seed)
 
+    def _on_step_player_clicked(self, player_id: str, seed: int) -> None:
+        """Handle player-specific step button click (PettingZoo mode).
+
+        Args:
+            player_id: Which player to step ("player_0" or "player_1").
+            seed: Current seed value.
+        """
+        self.step_player_requested.emit(player_id, seed)
+
     def _on_reset_all_clicked(self, seed: int) -> None:
         """Handle Reset All button click - reset all operators with shared seed.
 
@@ -1000,6 +1011,49 @@ class ControlPanelWidget(QtWidgets.QWidget):
         """Get operator config widget from SingleAgentTab."""
         return self._single_agent_tab.operator_config_widget
 
+    def set_operator_environment_size(
+        self, operator_id: str, width: int, height: int, container_size: int | None = None
+    ) -> None:
+        """Set the environment size for a specific operator.
+
+        Args:
+            operator_id: The operator's unique ID
+            width: Rendered environment width in pixels (image size)
+            height: Rendered environment height in pixels (image size)
+            container_size: Optional container display size in pixels
+        """
+        self._single_agent_tab.set_operator_environment_size(
+            operator_id, width, height, container_size
+        )
+
+    def set_turn_indicator(self, player_id: str, visible: bool = True) -> None:
+        """Set the turn indicator for PettingZoo multi-agent games.
+
+        Shows which player's turn is next (e.g., "Next: White (player_0)").
+
+        Args:
+            player_id: Current player (e.g., "player_0", "player_1").
+            visible: Whether to show the indicator.
+        """
+        self._single_agent_tab.set_turn_indicator(player_id, visible)
+
+    def set_pettingzoo_mode(self, enabled: bool) -> None:
+        """Enable or disable PettingZoo multi-agent mode.
+
+        When enabled, shows player-specific step buttons instead of Step All.
+
+        Args:
+            enabled: True to enable PettingZoo mode.
+        """
+        self._single_agent_tab.set_pettingzoo_mode(enabled)
+
+    def set_current_player(self, player_id: str) -> None:
+        """Set which player's turn it is (enables their step button).
+
+        Args:
+            player_id: The player whose turn it is ("player_0" or "player_1").
+        """
+        self._single_agent_tab.set_current_player(player_id)
 
     def _create_control_group(self, parent: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
         group = QtWidgets.QGroupBox("Game Control Flow", parent)

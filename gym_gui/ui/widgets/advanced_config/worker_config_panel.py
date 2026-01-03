@@ -211,30 +211,6 @@ WORKER_CONFIG_SCHEMAS = {
             },
         ],
     },
-    "spade_bdi": {
-        "display_name": "SPADE BDI Worker",
-        "description": "Python-based BDI agents with SPADE framework",
-        "fields": [
-            {
-                "name": "xmpp_server",
-                "label": "XMPP Server",
-                "type": "text",
-                "default": "localhost",
-            },
-            {
-                "name": "agent_jid",
-                "label": "Agent JID",
-                "type": "text",
-                "default": "agent@localhost",
-            },
-            {
-                "name": "debug_mode",
-                "label": "Debug Mode",
-                "type": "bool",
-                "default": False,
-            },
-        ],
-    },
 }
 
 

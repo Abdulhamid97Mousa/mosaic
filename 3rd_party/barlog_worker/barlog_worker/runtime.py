@@ -19,6 +19,34 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional
 
 from barlog_worker.config import BarlogWorkerConfig
+from barlog_worker.analytics import write_analytics_manifest
+
+# Import standardized telemetry from gym_gui
+try:
+    from gym_gui.core.worker import TelemetryEmitter as StandardTelemetryEmitter
+    from gym_gui.logging_config.helpers import log_constant
+    from gym_gui.logging_config.log_constants import (
+        LOG_WORKER_BARLOG_RUNTIME_STARTED,
+        LOG_WORKER_BARLOG_RUNTIME_STOPPED,
+        LOG_WORKER_BARLOG_RUNTIME_ERROR,
+        LOG_WORKER_BARLOG_EPISODE_STARTED,
+        LOG_WORKER_BARLOG_EPISODE_COMPLETED,
+        LOG_WORKER_BARLOG_LLM_REQUEST,
+        LOG_WORKER_BARLOG_LLM_RESPONSE,
+        LOG_WORKER_BARLOG_LLM_ERROR,
+        LOG_WORKER_BARLOG_ACTION_SELECTED,
+        LOG_WORKER_BARLOG_STEP_TELEMETRY,
+        LOG_WORKER_BARLOG_EPISODE_TELEMETRY,
+        LOG_WORKER_BARLOG_CONFIG_LOADED,
+        LOG_WORKER_BARLOG_ENV_CREATED,
+        LOG_WORKER_BARLOG_AGENT_CREATED,
+        LOG_WORKER_BARLOG_DEBUG,
+    )
+    _HAS_GYM_GUI = True
+except ImportError:
+    _HAS_GYM_GUI = False
+    StandardTelemetryEmitter = None
+    log_constant = None
 
 logger = logging.getLogger(__name__)
 
@@ -68,8 +96,12 @@ class EpisodeTelemetry:
     total_output_tokens: int = 0
 
 
-class TelemetryEmitter:
-    """Emits telemetry to JSONL files and stdout."""
+class BarlogTelemetryEmitter:
+    """Emits BARLOG-specific telemetry to JSONL files and stdout.
+
+    This is kept separate from the standardized TelemetryEmitter for backwards
+    compatibility with existing BARLOG telemetry format.
+    """
 
     def __init__(
         self,
@@ -122,11 +154,17 @@ class BarlogWorkerRuntime:
 
     def __init__(self, config: BarlogWorkerConfig) -> None:
         self.config = config
-        self.telemetry = TelemetryEmitter(
+        self.telemetry = BarlogTelemetryEmitter(
             run_id=config.run_id,
             telemetry_dir=config.telemetry_dir,
             emit_jsonl=config.emit_jsonl,
         )
+
+        # Create standardized telemetry emitter for lifecycle events
+        if _HAS_GYM_GUI:
+            self._lifecycle_emitter = StandardTelemetryEmitter(run_id=config.run_id)
+        else:
+            self._lifecycle_emitter = None
 
         # Add BALROG to Python path
         balrog_path = Path(__file__).parent.parent / "BALROG"
@@ -161,32 +199,149 @@ class BarlogWorkerRuntime:
             render_mode=self.config.render_mode,
         )
 
-    def run(self) -> None:
-        """Run all episodes."""
+    def run(self) -> Dict[str, Any]:
+        """Run all episodes.
+
+        Returns:
+            Dict[str, Any]: Summary of the run with total episodes, successes, etc.
+        """
         logger.info(f"Starting {self.config.num_episodes} episodes")
 
-        for episode_idx in range(self.config.num_episodes):
-            episode_id = f"{self.config.run_id}-ep{episode_idx:06d}"
-            logger.info(f"Starting episode {episode_idx + 1}/{self.config.num_episodes}: {episode_id}")
+        # Log config loaded
+        if _HAS_GYM_GUI and log_constant:
+            log_constant(
+                logger,
+                LOG_WORKER_BARLOG_CONFIG_LOADED,
+                extra={
+                    "run_id": self.config.run_id,
+                    "env_name": self.config.env_name,
+                    "task": self.config.task,
+                    "agent_type": self.config.agent_type,
+                },
+            )
 
+        # Emit run_started lifecycle event
+        if self._lifecycle_emitter:
+            self._lifecycle_emitter.run_started(
+                {
+                    "worker_type": "barlog",
+                    "env_name": self.config.env_name,
+                    "task": self.config.task,
+                    "client_name": self.config.client_name,
+                    "model_id": self.config.model_id,
+                    "agent_type": self.config.agent_type,
+                    "num_episodes": self.config.num_episodes,
+                    "max_steps": self.config.max_steps,
+                },
+                constant=LOG_WORKER_BARLOG_RUNTIME_STARTED,
+            )
+
+        # Track run statistics
+        total_episodes = 0
+        successful_episodes = 0
+        total_reward = 0.0
+        total_steps = 0
+        errors = []
+
+        try:
+            for episode_idx in range(self.config.num_episodes):
+                episode_id = f"{self.config.run_id}-ep{episode_idx:06d}"
+                logger.info(f"Starting episode {episode_idx + 1}/{self.config.num_episodes}: {episode_id}")
+
+                try:
+                    episode_result = self._run_episode(episode_idx, episode_id)
+                    total_episodes += 1
+                    if episode_result.get("success"):
+                        successful_episodes += 1
+                    total_reward += episode_result.get("total_reward", 0.0)
+                    total_steps += episode_result.get("num_steps", 0)
+
+                    # Emit heartbeat periodically
+                    if self._lifecycle_emitter and (episode_idx + 1) % 5 == 0:
+                        self._lifecycle_emitter.heartbeat(
+                            {
+                                "episodes_completed": total_episodes,
+                                "success_rate": successful_episodes / total_episodes if total_episodes > 0 else 0.0,
+                                "average_reward": total_reward / total_episodes if total_episodes > 0 else 0.0,
+                            },
+                            constant=LOG_WORKER_BARLOG_RUNTIME_STARTED,  # Using RUNTIME_STARTED for heartbeat
+                        )
+
+                except Exception as e:
+                    logger.exception(f"Episode {episode_id} failed: {e}")
+                    errors.append({"episode_id": episode_id, "error": str(e)})
+                    # Emit error telemetry
+                    print(json.dumps({
+                        "type": "error",
+                        "run_id": self.config.run_id,
+                        "episode_id": episode_id,
+                        "error": str(e),
+                    }), flush=True)
+
+            # Generate analytics manifest
             try:
-                self._run_episode(episode_idx, episode_id)
+                manifest_path = write_analytics_manifest(
+                    self.config,
+                    notes=f"BARLOG run with {total_episodes} episodes completed",
+                )
+                logger.info(f"Analytics manifest written to: {manifest_path}")
             except Exception as e:
-                logger.exception(f"Episode {episode_id} failed: {e}")
-                # Emit error telemetry
-                print(json.dumps({
-                    "type": "error",
+                logger.warning(f"Failed to write analytics manifest: {e}")
+
+            # Build run summary
+            summary = {
+                "run_id": self.config.run_id,
+                "worker_type": "barlog",
+                "total_episodes": total_episodes,
+                "successful_episodes": successful_episodes,
+                "success_rate": successful_episodes / total_episodes if total_episodes > 0 else 0.0,
+                "total_reward": total_reward,
+                "average_reward": total_reward / total_episodes if total_episodes > 0 else 0.0,
+                "total_steps": total_steps,
+                "average_steps": total_steps / total_episodes if total_episodes > 0 else 0.0,
+                "errors": errors,
+            }
+
+            # Emit run_completed lifecycle event
+            if self._lifecycle_emitter:
+                self._lifecycle_emitter.run_completed(
+                    summary,
+                    constant=LOG_WORKER_BARLOG_RUNTIME_STOPPED,
+                )
+
+            self.telemetry.close()
+            logger.info("All episodes completed")
+            return summary
+
+        except Exception as e:
+            # Emit run_failed lifecycle event
+            if self._lifecycle_emitter:
+                self._lifecycle_emitter.run_failed(
+                    {"error": str(e)},
+                    constant=LOG_WORKER_BARLOG_RUNTIME_ERROR,
+                )
+            self.telemetry.close()
+            raise
+
+    def _run_episode(self, episode_idx: int, episode_id: str) -> Dict[str, Any]:
+        """Run a single episode.
+
+        Returns:
+            Dict[str, Any]: Episode summary with success, total_reward, num_steps, etc.
+        """
+        start_time = datetime.utcnow()
+
+        # Log episode started
+        if _HAS_GYM_GUI and log_constant:
+            log_constant(
+                logger,
+                LOG_WORKER_BARLOG_EPISODE_STARTED,
+                extra={
                     "run_id": self.config.run_id,
                     "episode_id": episode_id,
-                    "error": str(e),
-                }), flush=True)
-
-        self.telemetry.close()
-        logger.info("All episodes completed")
-
-    def _run_episode(self, episode_idx: int, episode_id: str) -> None:
-        """Run a single episode."""
-        start_time = datetime.utcnow()
+                    "episode_index": episode_idx,
+                },
+            )
 
         # Create fresh agent and environment for each episode
         agent = self._create_agent()
@@ -274,6 +429,22 @@ class BarlogWorkerRuntime:
         )
         self.telemetry.emit_episode(episode_telemetry)
 
+        # Log episode completed
+        if _HAS_GYM_GUI and log_constant:
+            log_constant(
+                logger,
+                LOG_WORKER_BARLOG_EPISODE_COMPLETED,
+                extra={
+                    "run_id": self.config.run_id,
+                    "episode_id": episode_id,
+                    "episode_index": episode_idx,
+                    "success": bool(success),
+                    "total_reward": total_reward,
+                    "num_steps": step_idx + 1,
+                    "duration_seconds": duration,
+                },
+            )
+
         logger.info(
             f"Episode {episode_idx + 1} complete: "
             f"reward={total_reward:.2f}, steps={step_idx + 1}, "
@@ -282,6 +453,15 @@ class BarlogWorkerRuntime:
 
         # Close environment
         env.close()
+
+        # Return episode summary for run statistics
+        return {
+            "success": bool(success),
+            "total_reward": total_reward,
+            "num_steps": step_idx + 1,
+            "terminated": terminated,
+            "truncated": truncated,
+        }
 
     def _obs_to_str(self, obs: Any) -> str:
         """Convert observation to string for telemetry."""
@@ -330,11 +510,17 @@ class InteractiveRuntime:
 
     def __init__(self, config: BarlogWorkerConfig) -> None:
         self.config = config
-        self.telemetry = TelemetryEmitter(
+        self.telemetry = BarlogTelemetryEmitter(
             run_id=config.run_id,
             telemetry_dir=config.telemetry_dir,
             emit_jsonl=config.emit_jsonl,
         )
+
+        # Create standardized telemetry emitter for lifecycle events
+        if _HAS_GYM_GUI:
+            self._lifecycle_emitter = StandardTelemetryEmitter(run_id=config.run_id)
+        else:
+            self._lifecycle_emitter = None
 
         # Add BALROG to Python path
         balrog_path = Path(__file__).parent.parent / "BALROG"
@@ -401,7 +587,7 @@ class InteractiveRuntime:
 
             # Set instruction prompt with valid actions (critical for LLM to know valid actions)
             instructions = None
-            if self.config.env_name == "babyai":
+            if self.config.env_name in ["babyai", "minigrid"]:
                 instructions = self._obs.get("mission") if isinstance(self._obs, dict) else None
             self._agent.prompt_builder.update_instruction_prompt(
                 self._env.get_instruction_prompt(instructions=instructions)
@@ -463,18 +649,44 @@ class InteractiveRuntime:
                 "type": "step",
                 "run_id": self.config.run_id,
                 "episode_id": episode_id,
+                "episode_index": self._episode_idx,  # For GUI display
                 "step_index": self._step_idx,
+                # LLM/Provider metadata for verification (BALROG best practice)
+                "client_name": self.config.client_name,
+                "model_id": self.config.model_id,
+                "base_url": self.config.base_url,
+                "agent_type": self.config.agent_type,
+                # Environment state
                 "observation": self._obs_to_str(self._obs),
                 "action": action_str,
                 "reward": float(reward),
                 "terminated": terminated,
                 "truncated": truncated,
                 "info": self._sanitize_info(info),
+                # LLM response details
                 "llm_response": action_str,
                 "llm_input_tokens": input_tokens,
                 "llm_output_tokens": output_tokens,
                 "timestamp": datetime.utcnow().isoformat(),
             }
+
+            # Add render payload for GUI display if render_mode is rgb_array
+            if self.config.render_mode == "rgb_array":
+                try:
+                    rgb_frame = self._env.render()
+                    if rgb_frame is not None:
+                        import numpy as np
+                        if isinstance(rgb_frame, np.ndarray) and rgb_frame.ndim >= 2:
+                            h, w = rgb_frame.shape[0], rgb_frame.shape[1]
+                            step_data["render_payload"] = {
+                                "mode": "rgb",
+                                "rgb": rgb_frame.tolist(),
+                                "width": w,
+                                "height": h,
+                            }
+                except Exception as render_err:
+                    logger.debug(f"Failed to render frame: {render_err}")
+
             self._emit(step_data)
 
             # Also write to telemetry files
@@ -505,9 +717,232 @@ class InteractiveRuntime:
             # Check for episode end
             if terminated or truncated:
                 self._emit_episode_done(terminated, truncated, info)
+                # Auto-reset for next episode
+                self._episode_idx += 1
+                self._obs, _ = self._env.reset()
+                self._step_idx = 0
+                self._total_reward = 0.0
+                self._prev_action = None
+                self._episode_start_time = datetime.utcnow()
+                self._llm_calls = 0
+                self._total_input_tokens = 0
+                self._total_output_tokens = 0
+                logger.info(f"Auto-reset for episode {self._episode_idx + 1}")
 
         except Exception as e:
             logger.exception(f"Step failed: {e}")
+            self._emit({"type": "error", "message": str(e)})
+
+    def _handle_init_agent(self, cmd: Dict[str, Any]) -> None:
+        """Handle init_agent command - initialize agent for action-selector mode.
+
+        In action-selector mode, the worker doesn't own the environment.
+        The GUI owns the PettingZoo environment and sends observations to
+        multiple workers for action selection.
+
+        Args:
+            cmd: Command with optional fields:
+                - instruction_prompt: Game rules and valid move format
+                - game_name: Name of the game (e.g., "chess_v6")
+                - player_id: Which player this agent is (e.g., "player_0")
+        """
+        try:
+            # Create agent without environment
+            self._agent = self._create_agent()
+
+            # Get instruction prompt from command or use default
+            instruction_prompt = cmd.get("instruction_prompt")
+            game_name = cmd.get("game_name", "unknown")
+            player_id = cmd.get("player_id", "player")
+
+            if instruction_prompt:
+                # Update agent's prompt builder with custom instruction
+                self._agent.prompt_builder.update_instruction_prompt(instruction_prompt)
+            else:
+                # Use default game-specific prompt
+                default_prompt = self._get_game_instruction_prompt(game_name, player_id)
+                self._agent.prompt_builder.update_instruction_prompt(default_prompt)
+
+            # Reset state (no env in action-selector mode)
+            self._env = None
+            self._episode_idx = 0
+            self._step_idx = 0
+            self._total_reward = 0.0
+            self._prev_action = None
+            self._episode_start_time = datetime.utcnow()
+            self._llm_calls = 0
+            self._total_input_tokens = 0
+            self._total_output_tokens = 0
+
+            self._emit({
+                "type": "agent_ready",
+                "run_id": self.config.run_id,
+                "game_name": game_name,
+                "player_id": player_id,
+                "mode": "action_selector",
+            })
+            logger.info(f"Agent initialized for {game_name} as {player_id} (action-selector mode)")
+
+        except Exception as e:
+            logger.exception(f"Agent initialization failed: {e}")
+            self._emit({"type": "error", "message": str(e)})
+
+    def _get_game_instruction_prompt(self, game_name: str, player_id: str) -> str:
+        """Get default instruction prompt for a PettingZoo game.
+
+        Args:
+            game_name: Name of the game (e.g., "chess_v6", "connect_four_v3")
+            player_id: Which player (e.g., "player_0", "black_0")
+
+        Returns:
+            Instruction prompt string for the LLM.
+        """
+        # Game-specific prompts
+        prompts = {
+            "chess_v6": (
+                f"You are playing chess as {player_id}. "
+                "Analyze the board position and select your next move. "
+                "Output ONLY the move in UCI format (e.g., 'e2e4', 'g1f3', 'e1g1' for castling). "
+                "The legal moves will be provided in the observation."
+            ),
+            "connect_four_v3": (
+                f"You are playing Connect Four as {player_id}. "
+                "Select which column (0-6) to drop your piece. "
+                "Output ONLY a single number representing the column index."
+            ),
+            "go_v5": (
+                f"You are playing Go as {player_id}. "
+                "Output your move as coordinates (row, col) or 'pass'. "
+                "The legal moves will be provided."
+            ),
+            "tictactoe_v3": (
+                f"You are playing Tic-Tac-Toe as {player_id}. "
+                "Select a position (0-8) on the 3x3 grid. "
+                "Output ONLY a single number."
+            ),
+        }
+
+        # Get game-specific prompt or use generic
+        if game_name in prompts:
+            return prompts[game_name]
+
+        return (
+            f"You are playing {game_name} as {player_id}. "
+            "Analyze the game state and select your action. "
+            "Output ONLY the action, no explanation."
+        )
+
+    def _handle_select_action(self, cmd: Dict[str, Any]) -> None:
+        """Handle select_action command - select action for multi-agent game.
+
+        In action-selector mode, the GUI owns the environment and sends
+        observations to workers. Each worker uses its LLM to select an action
+        and returns it. The GUI then executes the action on the environment.
+
+        Args:
+            cmd: Command with fields:
+                - observation: Game state as string or dict
+                - info: Additional info (e.g., legal_moves)
+                - action_mask: Optional boolean mask of valid actions
+                - player_id: Which player is acting
+        """
+        if self._agent is None:
+            self._emit({
+                "type": "error",
+                "message": "Agent not initialized. Send init_agent or reset first."
+            })
+            return
+
+        try:
+            # Extract observation from command
+            observation = cmd.get("observation", "")
+            info = cmd.get("info", {})
+            action_mask = cmd.get("action_mask")
+            player_id = cmd.get("player_id", "unknown")
+
+            # Build observation string for LLM
+            if isinstance(observation, dict):
+                obs_str = str(observation)
+            else:
+                obs_str = str(observation)
+
+            # Add legal moves to observation if provided
+            legal_moves = info.get("legal_moves", [])
+            if legal_moves:
+                obs_str += f"\nLegal moves: {legal_moves}"
+
+            # Create observation object for agent
+            # The BALROG agent expects observation as a dict with nested structure:
+            # obs["text"]["long_term_context"] and obs["text"]["short_term_context"]
+            # (see HistoryPromptBuilder.update_observation in BALROG)
+            obs_for_agent = {
+                "text": {
+                    "long_term_context": "",  # No long-term context for action-selector mode
+                    "short_term_context": obs_str,  # Current observation
+                }
+            }
+
+            # Get action from LLM agent
+            input_tokens = 0
+            output_tokens = 0
+            action_str = ""
+            reasoning = ""
+
+            try:
+                response = self._agent.act(obs_for_agent, prev_action=self._prev_action)
+                self._llm_calls += 1
+                action_str = response.completion.strip()
+                input_tokens = response.input_tokens
+                output_tokens = response.output_tokens
+                self._total_input_tokens += input_tokens
+                self._total_output_tokens += output_tokens
+
+                # Extract reasoning if the response contains it
+                if "\n" in action_str:
+                    lines = action_str.split("\n")
+                    action_str = lines[-1].strip()  # Last line is the action
+                    reasoning = "\n".join(lines[:-1])  # Everything else is reasoning
+
+            except Exception as e:
+                logger.warning(f"Agent act failed: {e}")
+                # Try to return a random valid action if available
+                if legal_moves:
+                    import random
+                    action_str = str(random.choice(legal_moves))
+
+            # Convert action string to action index if action_mask provided
+            action_index = None
+            if action_mask is not None and legal_moves:
+                try:
+                    # Find the index of the selected action in legal moves
+                    if action_str in legal_moves:
+                        # Find the corresponding index in the action space
+                        for i, valid in enumerate(action_mask):
+                            if valid and legal_moves[list(action_mask[:i+1]).count(True) - 1] == action_str:
+                                action_index = i
+                                break
+                except Exception:
+                    pass
+
+            # Emit action selection result
+            self._emit({
+                "type": "action_selected",
+                "run_id": self.config.run_id,
+                "player_id": player_id,
+                "action": action_index if action_index is not None else action_str,
+                "action_str": action_str,
+                "reasoning": reasoning,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "timestamp": datetime.utcnow().isoformat(),
+            })
+
+            # Update state for next turn
+            self._prev_action = action_str
+            self._step_idx += 1
+
+        except Exception as e:
+            logger.exception(f"Action selection failed: {e}")
             self._emit({"type": "error", "message": str(e)})
 
     def _emit_episode_done(self, terminated: bool, truncated: bool, info: Dict[str, Any]) -> None:
@@ -595,6 +1030,12 @@ class InteractiveRuntime:
                     self._handle_reset(seed)
                 elif cmd_type == "step":
                     self._handle_step()
+                elif cmd_type == "init_agent":
+                    # Multi-agent mode: initialize agent without environment
+                    self._handle_init_agent(cmd)
+                elif cmd_type == "select_action":
+                    # Multi-agent mode: select action given external observation
+                    self._handle_select_action(cmd)
                 elif cmd_type == "stop":
                     logger.info("Stop command received")
                     self._emit({"type": "stopped"})
@@ -621,5 +1062,5 @@ __all__ = [
     "InteractiveRuntime",
     "StepTelemetry",
     "EpisodeTelemetry",
-    "TelemetryEmitter",
+    "BarlogTelemetryEmitter",
 ]

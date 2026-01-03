@@ -30,11 +30,22 @@ from gym_gui.logging_config.log_constants import (
     LOG_WORKER_POLICY_EVAL_COMPLETED,
     LOG_WORKER_POLICY_EVAL_BATCH_STARTED,
     LOG_WORKER_POLICY_EVAL_BATCH_COMPLETED,
+    LOG_WORKER_CLEANRL_RUNTIME_STARTED,
+    LOG_WORKER_CLEANRL_RUNTIME_COMPLETED,
+    LOG_WORKER_CLEANRL_RUNTIME_FAILED,
+    LOG_WORKER_CLEANRL_HEARTBEAT,
+    LOG_WORKER_CLEANRL_MODULE_RESOLVED,
+    LOG_WORKER_CLEANRL_CONFIG_LOADED,
+    LOG_WORKER_CLEANRL_TENSORBOARD_ENABLED,
+    LOG_WORKER_CLEANRL_WANDB_ENABLED,
+    LOG_WORKER_CLEANRL_SUBPROCESS_STARTED,
+    LOG_WORKER_CLEANRL_SUBPROCESS_FAILED,
+    LOG_WORKER_CLEANRL_ANALYTICS_MANIFEST_CREATED,
 )
 
 from .analytics import build_manifest
-from .config import WorkerConfig
-from .telemetry import LifecycleEmitter
+from .config import CleanRLWorkerConfig, WorkerConfig  # WorkerConfig is backwards compat alias
+from gym_gui.core.worker import TelemetryEmitter, WorkerAnalyticsManifest
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
@@ -209,6 +220,7 @@ class CleanRLWorkerRuntime:
         self._dry_run = dry_run
         self._algo_registry = dict(algo_registry)
         self._session_token: Optional[str] = None
+        self._emitter = TelemetryEmitter(run_id=config.run_id, logger=LOGGER)
 
     @property
     def config(self) -> WorkerConfig:
@@ -392,18 +404,49 @@ class CleanRLWorkerRuntime:
 
         self._session_token = getattr(response, "session_token", None)
 
-    def run(self, emitter: Optional[LifecycleEmitter] = None) -> RuntimeSummary:
-        """Execute (or dry-run) the configured CleanRL algorithm."""
+    def run(self) -> Dict[str, Any]:
+        """Execute (or dry-run) the configured CleanRL algorithm.
+
+        Implements the WorkerRuntime protocol.
+
+        Returns:
+            Dictionary containing execution results:
+            - status: "completed" | "failed" | "cancelled"
+            - module: Module name
+            - callable: Callable name
+            - config: Configuration dict
+            - extras: Extra parameters
+        """
 
         module_name, _ = self.resolve_entrypoint()
         if self._dry_run:
-            return self._prepare_summary(module_name)
+            summary = self._prepare_summary(module_name)
+            return {
+                "status": summary.status,
+                "module": summary.module,
+                "callable": summary.callable,
+                "config": summary.config,
+                "extras": summary.extras,
+            }
 
         ensure_var_directories()
         run_dir = (VAR_TRAINER_DIR / "runs" / self._config.run_id).resolve()
         run_dir.mkdir(parents=True, exist_ok=True)
         logs_dir = run_dir / "logs"
         logs_dir.mkdir(parents=True, exist_ok=True)
+
+        # Emit run_started lifecycle event
+        self._emitter.run_started(
+            {
+                "worker_type": "cleanrl",
+                "algo": self._config.algo,
+                "env_id": self._config.env_id,
+                "seed": self._config.seed,
+                "total_timesteps": self._config.total_timesteps,
+                "module": module_name,
+            },
+            constant=LOG_WORKER_CLEANRL_RUNTIME_STARTED,
+        )
 
         try:
             self._import_entrypoint(module_name)
@@ -421,7 +464,7 @@ class CleanRLWorkerRuntime:
         extras: Dict[str, Any] = dict(self._config.extras)
         mode = str(extras.get("mode") or "train")
         if mode == "policy_eval":
-            return self._run_policy_eval(module_name, run_dir, extras, emitter)
+            return self._run_policy_eval(module_name, run_dir, extras)
 
         args = self.build_cleanrl_args()
         cmd = _sanitize_launch_command(
@@ -455,6 +498,14 @@ class CleanRLWorkerRuntime:
             tb_path = (run_dir / tensorboard_dir).resolve()
             tb_path.mkdir(parents=True, exist_ok=True)
             extras["tensorboard_dir"] = str(tb_path)
+            log_constant(
+                LOGGER,
+                LOG_WORKER_CLEANRL_TENSORBOARD_ENABLED,
+                extra={
+                    "run_id": self._config.run_id,
+                    "tensorboard_dir": tensorboard_dirname_relative,
+                },
+            )
         else:
             extras.pop("tensorboard_dir", None)
 
@@ -465,6 +516,14 @@ class CleanRLWorkerRuntime:
             (wandb_root / "cache").mkdir(parents=True, exist_ok=True)
             (wandb_root / "config").mkdir(parents=True, exist_ok=True)
             (wandb_root / "logs").mkdir(parents=True, exist_ok=True)
+            log_constant(
+                LOGGER,
+                LOG_WORKER_CLEANRL_WANDB_ENABLED,
+                extra={
+                    "run_id": self._config.run_id,
+                    "wandb_root": str(wandb_root),
+                },
+            )
 
         stdout_path = logs_dir / "cleanrl.stdout.log"
         stderr_path = logs_dir / "cleanrl.stderr.log"
@@ -550,6 +609,16 @@ class CleanRLWorkerRuntime:
                 env=env,
             )
 
+            log_constant(
+                LOGGER,
+                LOG_WORKER_CLEANRL_SUBPROCESS_STARTED,
+                extra={
+                    "run_id": self._config.run_id,
+                    "pid": getattr(proc, "pid", None),
+                    "command": " ".join(cmd),
+                },
+            )
+
             last_heartbeat = time.monotonic()
             heartbeat_interval = 30.0
             while True:
@@ -558,19 +627,29 @@ class CleanRLWorkerRuntime:
                     return_code = rc
                     break
                 now = time.monotonic()
-                if emitter is not None and now - last_heartbeat >= heartbeat_interval:
-                    emitter.heartbeat(
-                        self._config.run_id,
+                if now - last_heartbeat >= heartbeat_interval:
+                    self._emitter.heartbeat(
                         {
                             "status": "running",
                             "algo": self._config.algo,
                             "env_id": self._config.env_id,
                         },
+                        constant=LOG_WORKER_CLEANRL_HEARTBEAT,
                     )
                     last_heartbeat = now
                 time.sleep(1.0)
 
         if return_code != 0:
+            error_msg = f"CleanRL process exited with code {return_code}"
+            self._emitter.run_failed(
+                {
+                    "error": error_msg,
+                    "error_type": "CalledProcessError",
+                    "return_code": return_code,
+                    "command": " ".join(cmd),
+                },
+                constant=LOG_WORKER_CLEANRL_RUNTIME_FAILED,
+            )
             raise subprocess.CalledProcessError(return_code, cmd)
 
         # Build manifest with relative paths for portability
@@ -583,13 +662,33 @@ class CleanRLWorkerRuntime:
         manifest_path = run_dir / "analytics.json"
         manifest_path.write_text(json.dumps(manifest.to_dict(), indent=2), encoding="utf-8")
 
-        return RuntimeSummary(
-            status="completed",
-            module=module_name,
-            callable=f"{module_name}.main",
-            config=asdict(self._config),
-            extras=extras,
+        log_constant(
+            LOGGER,
+            LOG_WORKER_CLEANRL_ANALYTICS_MANIFEST_CREATED,
+            extra={
+                "run_id": self._config.run_id,
+                "manifest_path": str(manifest_path),
+            },
         )
+
+        # Emit run_completed lifecycle event
+        self._emitter.run_completed(
+            {
+                "status": "completed",
+                "module": module_name,
+                "algo": self._config.algo,
+                "env_id": self._config.env_id,
+            },
+            constant=LOG_WORKER_CLEANRL_RUNTIME_COMPLETED,
+        )
+
+        return {
+            "status": "completed",
+            "module": module_name,
+            "callable": f"{module_name}.main",
+            "config": asdict(self._config),
+            "extras": extras,
+        }
 
     # ---------------------------------------------------------------------------
     # Local helpers
@@ -599,8 +698,7 @@ class CleanRLWorkerRuntime:
         module_name: str,
         run_dir: Path,
         extras: Dict[str, Any],
-        emitter: Optional[LifecycleEmitter],
-    ) -> RuntimeSummary:
+    ) -> Dict[str, Any]:
         logs_dir = run_dir / "logs"
         logs_dir.mkdir(parents=True, exist_ok=True)
         policy_path = extras.get("policy_path")
@@ -756,24 +854,23 @@ class CleanRLWorkerRuntime:
                 _write_manifest_payload(collected_returns)
             except Exception:  # pragma: no cover - manifest best effort
                 pass
-            if emitter is not None:
-                emitter.heartbeat(
-                    self._config.run_id,
-                    {
-                        "status": "policy_eval_batch",
-                        "algo": self._config.algo,
-                        "env_id": self._config.env_id,
-                        "mode": "policy_eval",
-                        "batch_index": summary.index,
-                        "episodes": summary.episodes,
-                        "avg_return": summary.avg_return,
-                        "min_return": summary.min_return,
-                        "max_return": summary.max_return,
-                        "median_return": summary.median_return,
-                        "std_return": summary.std_return,
-                        "duration_sec": summary.duration_sec,
-                    },
-                )
+            self._emitter.heartbeat(
+                {
+                    "status": "policy_eval_batch",
+                    "algo": self._config.algo,
+                    "env_id": self._config.env_id,
+                    "mode": "policy_eval",
+                    "batch_index": summary.index,
+                    "episodes": summary.episodes,
+                    "avg_return": summary.avg_return,
+                    "min_return": summary.min_return,
+                    "max_return": summary.max_return,
+                    "median_return": summary.median_return,
+                    "std_return": summary.std_return,
+                    "duration_sec": summary.duration_sec,
+                },
+                constant=LOG_WORKER_CLEANRL_HEARTBEAT,
+            )
 
         def _record_batch_start(batch_index: int) -> None:
             log_constant(
@@ -869,30 +966,31 @@ class CleanRLWorkerRuntime:
         )
         _write_manifest_payload(returns)
 
-        if emitter is not None:
-            emitter.heartbeat(
-                self._config.run_id,
-                {
-                    "status": "completed",
-                    "algo": self._config.algo,
-                    "env_id": self._config.env_id,
-                    "mode": "policy_eval",
-                },
-            )
+        self._emitter.run_completed(
+            {
+                "status": "completed",
+                "algo": self._config.algo,
+                "env_id": self._config.env_id,
+                "mode": "policy_eval",
+                "avg_return": sum(returns) / len(returns) if returns else 0.0,
+                "total_episodes": len(returns),
+            },
+            constant=LOG_WORKER_CLEANRL_RUNTIME_COMPLETED,
+        )
 
-        return RuntimeSummary(
-            status="completed",
-            module=module_name,
-            callable="policy_eval",
-            config=asdict(self._config),
-            extras={
+        return {
+            "status": "completed",
+            "module": module_name,
+            "callable": "policy_eval",
+            "config": asdict(self._config),
+            "extras": {
                 **extras,
                 "evaluation_returns": returns,
                 "tensorboard_dir": tensorboard_dirname,
                 "eval_batch_size": episodes_per_batch,
                 "eval_repeat": repeat_eval,
             },
-        )
+        }
 
     def _resolve_eval_helper(self):
         algo = self._config.algo

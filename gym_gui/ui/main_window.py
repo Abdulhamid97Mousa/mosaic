@@ -9,6 +9,7 @@ from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
 import json
 import threading
 import grpc
+import numpy as np
 
 from PyQt6.QtCore import pyqtSlot, pyqtSignal  # type: ignore[attr-defined]
 from qtpy import QtCore, QtGui, QtWidgets  # type: ignore[attr-defined]
@@ -44,6 +45,10 @@ from gym_gui.logging_config.log_constants import (
     LOG_OPERATOR_RESET_ALL_STARTED,
     LOG_OPERATOR_STEP_ALL_COMPLETED,
     LOG_OPERATOR_STOP_ALL_COMPLETED,
+    LOG_OPERATOR_ENV_PREVIEW_STARTED,
+    LOG_OPERATOR_ENV_PREVIEW_SUCCESS,
+    LOG_OPERATOR_ENV_PREVIEW_IMPORT_ERROR,
+    LOG_OPERATOR_ENV_PREVIEW_ERROR,
 )
 from gym_gui.constants import DEFAULT_RENDER_DELAY_MS
 from gym_gui.logging_config.logger import list_known_components
@@ -91,6 +96,7 @@ from gym_gui.ui.handlers import (
     ChessHandler,
     ConnectFourHandler,
     GoHandler,
+    SudokuHandler,
     HumanVsAgentHandler,
     ChessEnvLoader,
     ConnectFourEnvLoader,
@@ -196,6 +202,14 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # Multi-operator service for parallel operator execution
         self._multi_operator_service = MultiOperatorService()
         self._operator_launcher = OperatorLauncher()
+
+        # Shared PettingZoo environment for multi-agent games (LLM vs LLM)
+        # When env_name == "pettingzoo", the GUI owns ONE shared environment
+        # and coordinates turn-based action selection from multiple workers
+        self._shared_pettingzoo_env: Any = None
+        self._pettingzoo_multiagent_mode: bool = False
+        self._pettingzoo_player_handles: Dict[str, Any] = {}  # player_id -> handle
+        self._pettingzoo_current_seed: int = 42
 
         # Track dynamic agent tabs by (run_id, agent_id)
         self._agent_tab_index: set[tuple[str, str]] = set()
@@ -622,6 +636,11 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             render_tabs=self._render_tabs,
             status_bar=self._status_bar,
         )
+        self._sudoku_handler = SudokuHandler(
+            session=self._session,
+            render_tabs=self._render_tabs,
+            status_bar=self._status_bar,
+        )
 
         # Environment loaders (for Human vs Agent mode and environment-specific setup)
         self._chess_env_loader = ChessEnvLoader(
@@ -734,6 +753,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # Multi-operator signals - scientific execution for fair comparison
         self._control_panel.operators_changed.connect(self._on_operators_changed)
         self._control_panel.step_all_requested.connect(self._on_step_all_operators)
+        self._control_panel.step_player_requested.connect(self._on_step_player)
         self._control_panel.reset_all_requested.connect(self._on_reset_all_operators)
         self._control_panel.stop_operators_requested.connect(self._on_stop_operators)
         self._control_panel.initialize_operator_requested.connect(self._on_initialize_operator)
@@ -785,6 +805,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._render_tabs.connect_four_column_clicked.connect(self._connect_four_handler.on_column_clicked)
         self._render_tabs.go_intersection_clicked.connect(self._go_handler.on_intersection_clicked)
         self._render_tabs.go_pass_requested.connect(self._go_handler.on_pass_requested)
+        # Sudoku handlers (Jumanji environment with mouse selection + keyboard digit entry)
+        self._render_tabs.sudoku_cell_selected.connect(self._sudoku_handler.on_cell_selected)
+        self._render_tabs.sudoku_digit_entered.connect(self._sudoku_handler.on_digit_entered)
+        self._render_tabs.sudoku_cell_cleared.connect(self._sudoku_handler.on_cell_cleared)
 
         self._session.seed_applied.connect(self._on_seed_applied)
 
@@ -925,6 +949,151 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             3000
         )
 
+    def _is_pettingzoo_multiagent(self) -> tuple[bool, Optional["OperatorConfig"]]:
+        """Check if we're in PettingZoo multi-agent mode.
+
+        Returns:
+            Tuple of (is_multiagent, first_config) where first_config is used
+            to get env_name and task for creating the shared environment.
+        """
+        active_operators = self._multi_operator_service.get_active_operators()
+        if not active_operators:
+            return False, None
+
+        # Get first operator config to check env_name
+        first_id = next(iter(active_operators.keys()))
+        first_config = self._multi_operator_service.get_operator(first_id)
+        if first_config is None:
+            return False, None
+
+        # PettingZoo multi-agent: env_name == "pettingzoo" and multiple workers per operator
+        # or multiple operators assigned to different players
+        if first_config.env_name == "pettingzoo":
+            # Check if we have multiple workers (player assignments)
+            if len(first_config.workers) > 1:
+                return True, first_config
+            # Or check if multiple operators exist (each controlling one player)
+            if len(active_operators) > 1:
+                return True, first_config
+
+        return False, None
+
+    def _create_pettingzoo_env(self, task: str, seed: int) -> Any:
+        """Create a PettingZoo environment for multi-agent games.
+
+        Args:
+            task: The specific game (e.g., "chess_v6", "connect_four_v3").
+            seed: Random seed for initialization.
+
+        Returns:
+            The PettingZoo AEC environment.
+        """
+        from pettingzoo.classic import (
+            chess_v6,
+            connect_four_v3,
+            go_v5,
+            tictactoe_v3,
+        )
+
+        env_factories = {
+            "chess_v6": chess_v6.env,
+            "connect_four_v3": connect_four_v3.env,
+            "go_v5": go_v5.env,
+            "tictactoe_v3": tictactoe_v3.env,
+        }
+
+        if task not in env_factories:
+            raise ValueError(f"Unknown PettingZoo task: {task}")
+
+        env = env_factories[task](render_mode="rgb_array")
+        env.reset(seed=seed)
+        return env
+
+    def _get_chess_legal_moves(self, env: Any) -> list[str]:
+        """Get legal moves for the current player in chess.
+
+        Returns:
+            List of UCI move strings (e.g., ["e2e4", "g1f3", ...]).
+        """
+        try:
+            # PettingZoo chess uses python-chess internally
+            board = env.board
+            return [move.uci() for move in board.legal_moves]
+        except Exception as e:
+            self.log_constant(
+                LOG_UI_MAINWINDOW_WARNING,
+                message=f"Failed to get legal moves: {e}",
+            )
+            return []
+
+    def _convert_uci_to_action_index(self, env: Any, uci_move: str) -> Optional[int]:
+        """Convert UCI move string to PettingZoo action index.
+
+        Uses PettingZoo's chess_utils module for correct AlphaZero-style action encoding.
+
+        Args:
+            env: The PettingZoo chess environment.
+            uci_move: UCI move string (e.g., "e2e4").
+
+        Returns:
+            Action index for env.step(), or None if invalid.
+        """
+        try:
+            import chess
+            from pettingzoo.classic.chess import chess_utils
+
+            board = env.board
+            move = chess.Move.from_uci(uci_move)
+
+            if move not in board.legal_moves:
+                print(f"DEBUG _convert_uci_to_action_index: {uci_move} not in legal_moves")
+                return None
+
+            # Determine current player (0 = white, 1 = black)
+            current_agent = env.agent_selection
+            current_player = 0 if current_agent == "player_0" else 1
+
+            # For black, we need to mirror the move since PettingZoo encodes from white's perspective
+            if current_player == 1:
+                # Mirror the move for black's encoding
+                move_for_encoding = chess_utils.mirror_move(move)
+            else:
+                move_for_encoding = move
+
+            # Get the UCI string for the (possibly mirrored) move
+            move_uci = move_for_encoding.uci()
+
+            # Use PettingZoo's encoding: action = (col * 8 + row) * 73 + plane
+            source = move_for_encoding.from_square
+            coord = chess_utils.square_to_coord(source)
+            panel = chess_utils.get_move_plane(move_for_encoding)
+            action = (coord[0] * 8 + coord[1]) * 73 + panel
+
+            print(f"DEBUG _convert_uci_to_action_index: {uci_move} -> action={action}")
+            print(f"DEBUG   current_player={current_player}, coord={coord}, panel={panel}")
+
+            # Verify this action is legal
+            obs = env.observe(current_agent)
+            if isinstance(obs, dict) and "action_mask" in obs:
+                if obs["action_mask"][action] == 1:
+                    return action
+                else:
+                    print(f"DEBUG _convert_uci_to_action_index: action {action} not in action_mask!")
+                    return None
+            else:
+                # No action mask, return the computed action
+                return action
+
+        except Exception as e:
+            import traceback
+            print(f"DEBUG _convert_uci_to_action_index EXCEPTION: {e}")
+            traceback.print_exc()
+            self.log_constant(
+                LOG_UI_MAINWINDOW_WARNING,
+                message=f"Failed to convert UCI move '{uci_move}': {e}",
+            )
+            return None
+
     def _on_reset_all_operators(self, seed: int) -> None:
         """Reset all configured operators with shared seed.
 
@@ -933,12 +1102,30 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         - Launches worker subprocesses in interactive mode if not already running
         - Sends reset command with seed to each subprocess
         - Switches to Multi-Operator tab for viewing
+
+        For PettingZoo multi-agent games (chess, etc.):
+        - GUI creates ONE shared environment
+        - Workers are initialized in action_selector mode
+        - Turn-based coordination handled by _on_step_all_operators
         """
         active_operators = self._multi_operator_service.get_active_operators()
         if not active_operators:
             self._status_bar.showMessage("No operators configured to reset", 3000)
             return
 
+        # Check if this is PettingZoo multi-agent mode
+        is_multiagent, first_config = self._is_pettingzoo_multiagent()
+        print(f"DEBUG: _on_reset_all_operators - is_multiagent={is_multiagent}, first_config={first_config}")
+        if first_config:
+            print(f"DEBUG: env_name={first_config.env_name}, workers={list(first_config.workers.keys())}")
+
+        if is_multiagent and first_config is not None:
+            # PettingZoo multi-agent: GUI owns the shared environment
+            print("DEBUG: Taking PettingZoo path")
+            self._on_reset_pettingzoo_multiagent(seed, first_config)
+            return
+
+        # Standard single-agent flow: each worker owns its own environment
         # Get operators that are pending (not yet started)
         pending_ids = self._multi_operator_service.start_all()
 
@@ -987,9 +1174,17 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     extra={"operator_id": operator_id, "seed": seed},
                 )
 
-        # Update status indicators
+        # Update status indicators and set container display sizes
         for operator_id in started_ids:
             self._render_tabs.set_operator_status(operator_id, "running")
+            # Ensure container display size is set from config
+            op_config = self._multi_operator_service.get_operator(operator_id)
+            if op_config:
+                container_size = op_config.settings.get("container_size", 0)
+                if container_size and container_size > 0:
+                    self._render_tabs.set_operator_display_size(
+                        operator_id, container_size, container_size
+                    )
         for operator_id in failed_ids:
             self._render_tabs.set_operator_status(operator_id, "error")
 
@@ -1013,6 +1208,242 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             extra={"operator_ids": started_ids, "failed_ids": failed_ids, "seed": seed},
         )
 
+    def _on_reset_pettingzoo_multiagent(self, seed: int, config: "OperatorConfig") -> None:
+        """Reset for PettingZoo multi-agent mode.
+
+        In this mode:
+        1. GUI creates ONE shared PettingZoo environment
+        2. Each worker is initialized in action_selector mode (no env ownership)
+        3. Workers provide actions when asked, GUI executes them
+
+        Args:
+            seed: Random seed for environment.
+            config: The operator config with task and worker assignments.
+        """
+        task = config.task  # e.g., "chess_v6"
+
+        # Close existing shared environment if any
+        if self._shared_pettingzoo_env is not None:
+            try:
+                self._shared_pettingzoo_env.close()
+            except Exception:
+                pass
+
+        # Create the shared environment in the GUI
+        try:
+            self._shared_pettingzoo_env = self._create_pettingzoo_env(task, seed)
+            self._pettingzoo_multiagent_mode = True
+            self._pettingzoo_current_seed = seed
+            self._pettingzoo_player_handles.clear()
+
+            self.log_constant(
+                LOG_UI_MAINWINDOW_INFO,
+                message=f"Created shared PettingZoo environment: {task}",
+                extra={"task": task, "seed": seed},
+            )
+        except Exception as e:
+            self.log_constant(
+                LOG_UI_MAINWINDOW_ERROR,
+                message=f"Failed to create PettingZoo environment: {e}",
+                extra={"task": task, "seed": seed},
+            )
+            self._status_bar.showMessage(f"Failed to create {task}: {e}", 5000)
+            return
+
+        # Launch workers in action_selector mode
+        # Each worker controls one player (e.g., player_0 = White, player_1 = Black)
+        started_ids = []
+        failed_ids = []
+
+        # Get all operators and their player assignments
+        active_operators = self._multi_operator_service.get_active_operators()
+        print(f"DEBUG: active_operators count={len(active_operators)}")
+        pending_ids = self._multi_operator_service.start_all()
+        print(f"DEBUG: pending_ids={pending_ids}")
+
+        for operator_id in pending_ids:
+            print(f"DEBUG: Processing operator_id={operator_id}")
+            op_config = self._multi_operator_service.get_operator(operator_id)
+            if op_config is None:
+                print(f"DEBUG: op_config is None for {operator_id}")
+                continue
+
+            print(f"DEBUG: op_config.workers={list(op_config.workers.keys())}")
+            # Determine which player this operator controls
+            # If multiple workers in one operator, each controls a player
+            # If single worker per operator, operator controls one player
+            for player_id, worker_assignment in op_config.workers.items():
+                print(f"DEBUG: Launching worker for player_id={player_id}, worker_id={worker_assignment.worker_id}")
+                try:
+                    # Create single-agent config for this player's worker
+                    # (multiagent OperatorConfig has operator_type="multiagent" which
+                    #  the launcher doesn't handle directly)
+                    player_config = OperatorConfig.single_agent(
+                        operator_id=f"{operator_id}_{player_id}",
+                        display_name=f"{op_config.display_name} - {player_id}",
+                        worker_id=worker_assignment.worker_id,
+                        worker_type=worker_assignment.worker_type,
+                        env_name="pettingzoo",  # Action-selector mode
+                        task=task,
+                        settings=worker_assignment.settings,
+                    )
+
+                    # Launch subprocess
+                    handle = self._operator_launcher.launch_operator(
+                        player_config,
+                        interactive=True,
+                    )
+
+                    # Initialize in action_selector mode (not reset with env ownership)
+                    handle.send_init_agent(
+                        game_name=task,
+                        player_id=player_id,
+                    )
+
+                    # Store mapping for step coordination
+                    self._pettingzoo_player_handles[player_id] = handle
+                    print(f"DEBUG: Stored handle for {player_id}, total handles={len(self._pettingzoo_player_handles)}")
+
+                    # Assign run_id
+                    self._multi_operator_service.assign_run_id(operator_id, handle.run_id)
+                    self._multi_operator_service.set_operator_state(operator_id, "running")
+
+                    started_ids.append(operator_id)
+
+                    self.log_constant(
+                        LOG_UI_MAINWINDOW_INFO,
+                        message=f"Initialized worker in action_selector mode",
+                        extra={
+                            "operator_id": operator_id,
+                            "player_id": player_id,
+                            "game": task,
+                            "run_id": handle.run_id,
+                        },
+                    )
+                except OperatorLaunchError as e:
+                    self._multi_operator_service.set_operator_state(operator_id, "error")
+                    failed_ids.append(operator_id)
+                    self.log_constant(
+                        LOG_UI_MAINWINDOW_ERROR,
+                        message=f"Failed to launch operator: {e}",
+                        extra={"operator_id": operator_id, "player_id": player_id},
+                    )
+
+        # Update status indicators
+        for operator_id in started_ids:
+            self._render_tabs.set_operator_status(operator_id, "running")
+        for operator_id in failed_ids:
+            self._render_tabs.set_operator_status(operator_id, "error")
+
+        # Set the container display size for ALL active operators
+        # (In PettingZoo mode, all operators share the same environment rendering)
+        # Use active_operators instead of started_ids because the render uses active_ops
+        container_size = config.settings.get("container_size", 0)
+        if container_size and container_size > 0:
+            for op_id in active_operators.keys():
+                self._render_tabs.set_operator_display_size(
+                    op_id, container_size, container_size
+                )
+
+        # Render initial board state
+        self._render_pettingzoo_frame()
+
+        # Show turn indicator for first player
+        current_player = self._shared_pettingzoo_env.agent_selection
+        self._control_panel.set_turn_indicator(current_player, visible=True)
+
+        # Enable PettingZoo mode: show player step buttons instead of Step All
+        print(f"DEBUG: Enabling PettingZoo mode, current_player={current_player}")
+        self._control_panel.set_pettingzoo_mode(True)
+        self._control_panel.set_current_player(current_player)
+        print("DEBUG: PettingZoo mode enabled")
+
+        # Switch to Multi-Operator tab
+        self._render_tabs.switch_to_multi_operator_tab()
+
+        player_count = len(self._pettingzoo_player_handles)
+        self._status_bar.showMessage(
+            f"PettingZoo {task} ready: {player_count} players (seed={seed})",
+            3000
+        )
+        self.log_constant(
+            LOG_OPERATOR_RESET_ALL_STARTED,
+            message=f"PettingZoo multi-agent reset complete",
+            extra={
+                "task": task,
+                "seed": seed,
+                "players": list(self._pettingzoo_player_handles.keys()),
+            },
+        )
+
+    def _render_pettingzoo_frame(self) -> None:
+        """Render the current state of the shared PettingZoo environment."""
+        if self._shared_pettingzoo_env is None:
+            print("DEBUG _render_pettingzoo_frame: No environment!")
+            return
+
+        try:
+            env = self._shared_pettingzoo_env
+            active_ops = self._multi_operator_service.get_active_operators()
+            if not active_ops:
+                return
+
+            first_id = next(iter(active_ops.keys()))
+            first_config = active_ops[first_id]
+            task = first_config.task
+
+            # For chess, use board game renderer with FEN data
+            if task == "chess_v6" and hasattr(env, "board"):
+                import chess
+                board: chess.Board = env.board
+                print(f"DEBUG _render_pettingzoo_frame: Chess board FEN={board.fen()}")
+
+                legal_moves = [move.uci() for move in board.legal_moves]
+                current_player = "white" if board.turn == chess.WHITE else "black"
+
+                # Build chess-specific payload for BoardGameRendererStrategy
+                # Note: "render_payload" key is required for _extract_render_payload
+                payload = {
+                    "step_index": 0,
+                    "episode_index": 0,
+                    "render_payload": {
+                        "chess": {
+                            "fen": board.fen(),
+                            "legal_moves": legal_moves,
+                            "current_player": current_player,
+                            "is_check": board.is_check(),
+                        },
+                        "game_id": "chess",
+                    },
+                }
+                print(f"DEBUG _render_pettingzoo_frame: Sending payload to operator_id={first_id}")
+                print(f"DEBUG _render_pettingzoo_frame: payload keys={list(payload.keys())}")
+                self._render_tabs.display_operator_payload(first_id, payload)
+                print(f"DEBUG _render_pettingzoo_frame: Payload sent!")
+            else:
+                # Fallback to RGB rendering for other games
+                rgb_frame = env.render()
+                if rgb_frame is not None and isinstance(rgb_frame, np.ndarray):
+                    payload = {
+                        "step_index": 0,
+                        "episode_index": 0,
+                        "render_payload": {
+                            "mode": "rgb",
+                            "rgb": rgb_frame.tolist(),
+                            "width": rgb_frame.shape[1],
+                            "height": rgb_frame.shape[0],
+                        },
+                    }
+                    self._render_tabs.display_operator_payload(first_id, payload)
+        except Exception as e:
+            print(f"DEBUG _render_pettingzoo_frame EXCEPTION: {e}")
+            import traceback
+            traceback.print_exc()
+            self.log_constant(
+                LOG_UI_MAINWINDOW_WARNING,
+                message=f"Failed to render PettingZoo frame: {e}",
+            )
+
     def _on_step_all_operators(self, seed: int) -> None:
         """Step all running operators by exactly one step.
 
@@ -1020,14 +1451,27 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         - Lock-step execution: each operator's agent selects one action
         - This ensures scientifically fair side-by-side comparison
         - No arbitrary timing delays between operators
+
+        For PettingZoo multi-agent games:
+        - GUI owns the shared environment
+        - Gets current player from env.agent_selection
+        - Sends observation to that player's worker via select_action
+        - Executes returned action on shared environment
         """
         active_operators = self._multi_operator_service.get_active_operators()
         if not active_operators:
             self._status_bar.showMessage("No operators to step", 3000)
             return
 
+        # Check if we're in PettingZoo multi-agent mode
+        if self._pettingzoo_multiagent_mode and self._shared_pettingzoo_env is not None:
+            self._on_step_pettingzoo_multiagent()
+            return
+
+        # Standard single-agent flow: each worker owns its own environment
         # Send step command to each running operator subprocess
         stepped_count = 0
+        stepped_handles = []  # Track handles that received step command
         for operator_id in active_operators:
             handle = self._operator_launcher.get_handle(operator_id)
             if handle is None:
@@ -1050,6 +1494,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             # Send step command
             if handle.send_step():
                 stepped_count += 1
+                stepped_handles.append((operator_id, handle))
                 self.log_constant(
                     LOG_UI_MAINWINDOW_TRACE,
                     message=f"Sent step command to operator",
@@ -1062,6 +1507,11 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     extra={"operator_id": operator_id},
                 )
 
+        # Read responses from operators and update render view
+        # Use a short delay to allow LLM inference to complete
+        from PyQt6.QtCore import QTimer
+        QTimer.singleShot(100, lambda: self._poll_operator_responses(stepped_handles))
+
         self.log_constant(
             LOG_OPERATOR_STEP_ALL_COMPLETED,
             message=f"Step all operators completed",
@@ -1071,6 +1521,467 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             f"Stepped {stepped_count} operator{'s' if stepped_count != 1 else ''}",
             2000
         )
+
+    def _on_step_player(self, player_id: str, seed: int) -> None:
+        """Handle step request for a specific player (PettingZoo mode).
+
+        Called when user clicks one of the player-specific step buttons.
+
+        Args:
+            player_id: Which player to step (e.g., "player_0", "player_1").
+            seed: Random seed (currently unused for PettingZoo steps).
+        """
+        print(f"DEBUG _on_step_player: player_id={player_id}, seed={seed}")
+        env = self._shared_pettingzoo_env
+        if env is None:
+            print("DEBUG _on_step_player: No environment!")
+            self._status_bar.showMessage("No PettingZoo environment active", 3000)
+            return
+
+        # Validate it's actually this player's turn
+        current_player = env.agent_selection
+        print(f"DEBUG _on_step_player: current_player from env={current_player}")
+        if current_player != player_id:
+            self.log_constant(
+                LOG_UI_MAINWINDOW_WARNING,
+                message=f"Attempted to step wrong player",
+                extra={"requested": player_id, "current": current_player},
+            )
+            self._status_bar.showMessage(
+                f"Not {player_id}'s turn! Current: {current_player}",
+                3000
+            )
+            # Fix button states
+            self._control_panel.set_current_player(current_player)
+            return
+
+        # Delegate to existing step logic
+        self._on_step_pettingzoo_multiagent()
+
+    def _on_step_pettingzoo_multiagent(self) -> None:
+        """Step the shared PettingZoo environment with turn-based coordination.
+
+        Flow:
+        1. Get current player from env.agent_selection
+        2. Get observation and legal moves for that player
+        3. Send select_action to that player's worker
+        4. Wait for action response
+        5. Execute action on shared environment
+        6. Render updated board
+        """
+        print("DEBUG _on_step_pettingzoo_multiagent: Starting")
+        env = self._shared_pettingzoo_env
+        if env is None:
+            print("DEBUG _on_step_pettingzoo_multiagent: No environment!")
+            return
+
+        # Check if game is over
+        if env.terminations.get(env.agent_selection, False) or \
+           env.truncations.get(env.agent_selection, False):
+            print("DEBUG _on_step_pettingzoo_multiagent: Game over!")
+            self._status_bar.showMessage("Game over! Use Reset to start new game.", 3000)
+            return
+
+        # Get current player
+        current_player = env.agent_selection  # e.g., "player_0" or "player_1"
+        print(f"DEBUG _on_step_pettingzoo_multiagent: current_player={current_player}")
+
+        # Get handle for this player's worker
+        print(f"DEBUG _on_step_pettingzoo_multiagent: Available handles={list(self._pettingzoo_player_handles.keys())}")
+        handle = self._pettingzoo_player_handles.get(current_player)
+        if handle is None:
+            print(f"DEBUG _on_step_pettingzoo_multiagent: NO HANDLE for {current_player}!")
+            self.log_constant(
+                LOG_UI_MAINWINDOW_ERROR,
+                message=f"No worker handle for player: {current_player}",
+                extra={"player": current_player, "available": list(self._pettingzoo_player_handles.keys())},
+            )
+            self._status_bar.showMessage(f"No worker for {current_player}", 3000)
+            return
+
+        print(f"DEBUG _on_step_pettingzoo_multiagent: Got handle, is_running={handle.is_running}")
+        if not handle.is_running:
+            print(f"DEBUG _on_step_pettingzoo_multiagent: Handle not running!")
+            self.log_constant(
+                LOG_UI_MAINWINDOW_WARNING,
+                message=f"Worker not running for player: {current_player}",
+            )
+            self._status_bar.showMessage(f"Worker stopped for {current_player}", 3000)
+            return
+
+        # Get observation for current player
+        obs = env.observe(current_player)
+
+        # Get legal moves (for chess, convert to UCI strings)
+        legal_moves = self._get_chess_legal_moves(env)
+        print(f"DEBUG _on_step_pettingzoo_multiagent: legal_moves count={len(legal_moves)}")
+
+        # Build observation string for LLM
+        obs_str = f"Current player: {current_player}\n"
+        obs_str += f"Board state:\n{env.board}\n" if hasattr(env, "board") else str(obs)
+
+        # Send select_action command to worker
+        info = {"legal_moves": legal_moves}
+        print(f"DEBUG _on_step_pettingzoo_multiagent: Sending select_action to worker...")
+        if handle.send_select_action(obs_str, current_player, info):
+            print(f"DEBUG _on_step_pettingzoo_multiagent: select_action sent successfully")
+            self.log_constant(
+                LOG_UI_MAINWINDOW_TRACE,
+                message=f"Sent select_action to {current_player}",
+                extra={"player": current_player, "legal_moves_count": len(legal_moves)},
+            )
+
+            # Poll for response with timeout
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(100, lambda: self._poll_pettingzoo_action(handle, current_player))
+        else:
+            print(f"DEBUG _on_step_pettingzoo_multiagent: Failed to send select_action!")
+            self.log_constant(
+                LOG_UI_MAINWINDOW_ERROR,
+                message=f"Failed to send select_action to {current_player}",
+            )
+
+    def _poll_pettingzoo_action(
+        self,
+        handle: Any,
+        player_id: str,
+        attempts: int = 0,
+        max_attempts: int = 300,  # 30 seconds at 100ms intervals
+    ) -> None:
+        """Poll for action response from worker and execute on shared env.
+
+        Args:
+            handle: The worker process handle.
+            player_id: Which player we're waiting for.
+            attempts: Current attempt number.
+            max_attempts: Maximum polling attempts before timeout.
+        """
+        from PyQt6.QtCore import QTimer
+
+        if attempts >= max_attempts:
+            print(f"DEBUG _poll_pettingzoo_action: TIMEOUT for {player_id} after {max_attempts} attempts")
+            self.log_constant(
+                LOG_UI_MAINWINDOW_ERROR,
+                message=f"Timeout waiting for action from {player_id}",
+            )
+            self._status_bar.showMessage(f"Timeout: {player_id} didn't respond", 5000)
+            # Re-enable the current player's button after timeout
+            self._control_panel.set_current_player(player_id)
+            return
+
+        # Try to read response
+        response = handle.try_read_response(timeout=0.1)
+
+        if response is None:
+            # No response yet, poll again
+            QTimer.singleShot(100, lambda: self._poll_pettingzoo_action(
+                handle, player_id, attempts + 1, max_attempts
+            ))
+            return
+
+        response_type = response.get("type", "")
+
+        if response_type == "action_selected":
+            # Got the action!
+            action_str = response.get("action_str", "")
+            action_index = response.get("action")
+            print(f"DEBUG _poll_pettingzoo_action: Got action_selected from {player_id}: {action_str} (index={action_index})")
+
+            self.log_constant(
+                LOG_UI_MAINWINDOW_INFO,
+                message=f"Received action from {player_id}: {action_str}",
+                extra={"player": player_id, "action": action_str, "index": action_index},
+            )
+
+            # Execute action on shared environment
+            self._execute_pettingzoo_action(player_id, action_str, action_index)
+
+        elif response_type == "agent_ready":
+            # Worker just initialized, poll again for the actual action
+            QTimer.singleShot(100, lambda: self._poll_pettingzoo_action(
+                handle, player_id, attempts + 1, max_attempts
+            ))
+
+        elif response_type == "error":
+            error_msg = response.get("message", "Unknown error")
+            print(f"DEBUG _poll_pettingzoo_action: Got error from {player_id}: {error_msg}")
+            self.log_constant(
+                LOG_UI_MAINWINDOW_ERROR,
+                message=f"Worker error for {player_id}: {error_msg}",
+            )
+            self._status_bar.showMessage(f"Error: {error_msg}", 5000)
+            # Re-enable the current player's button after error
+            self._control_panel.set_current_player(player_id)
+
+        else:
+            # Unknown response, log and poll again
+            self.log_constant(
+                LOG_UI_MAINWINDOW_WARNING,
+                message=f"Unexpected response type from {player_id}: {response_type}",
+            )
+            QTimer.singleShot(100, lambda: self._poll_pettingzoo_action(
+                handle, player_id, attempts + 1, max_attempts
+            ))
+
+    def _execute_pettingzoo_action(
+        self,
+        player_id: str,
+        action_str: str,
+        action_index: Optional[int] = None,
+    ) -> None:
+        """Execute an action on the shared PettingZoo environment.
+
+        Args:
+            player_id: Which player made the move.
+            action_str: The action as a string (e.g., UCI move "e2e4").
+            action_index: Optional pre-computed action index.
+        """
+        print(f"DEBUG _execute_pettingzoo_action: player_id={player_id}, action_str={action_str}, action_index={action_index}")
+        env = self._shared_pettingzoo_env
+        if env is None:
+            print("DEBUG _execute_pettingzoo_action: No environment!")
+            return
+
+        # Convert action string to index if needed
+        if action_index is None or not isinstance(action_index, int):
+            print(f"DEBUG: action_index is not int ({type(action_index)}), converting UCI to index")
+            action_index = self._convert_uci_to_action_index(env, action_str)
+            print(f"DEBUG: Converted action_index = {action_index}")
+
+        if action_index is None:
+            # Invalid move - try to pick a random legal move using action mask
+            print(f"DEBUG: Invalid move '{action_str}', picking random legal move from action_mask")
+            self.log_constant(
+                LOG_UI_MAINWINDOW_WARNING,
+                message=f"Invalid move '{action_str}' from {player_id}, selecting random",
+            )
+            # Get legal actions from the environment's action mask
+            try:
+                # PettingZoo AEC environments provide action_mask
+                obs = env.observe(player_id)
+                if isinstance(obs, dict) and "action_mask" in obs:
+                    action_mask = obs["action_mask"]
+                else:
+                    # Try getting mask directly
+                    action_mask = env.action_mask(player_id) if hasattr(env, "action_mask") else None
+
+                if action_mask is not None:
+                    legal_action_indices = np.where(action_mask == 1)[0]
+                    print(f"DEBUG: legal_action_indices count = {len(legal_action_indices)}")
+                    if len(legal_action_indices) > 0:
+                        import random
+                        action_index = int(random.choice(legal_action_indices))
+                        print(f"DEBUG: Random legal action_index = {action_index}")
+                    else:
+                        print("DEBUG: No legal actions in action_mask!")
+                        self._status_bar.showMessage(f"No legal moves available", 3000)
+                        return
+                else:
+                    print("DEBUG: No action_mask available!")
+                    self._status_bar.showMessage(f"Cannot determine legal moves", 3000)
+                    return
+            except Exception as mask_err:
+                print(f"DEBUG: Error getting action_mask: {mask_err}")
+                self._status_bar.showMessage(f"Error: {mask_err}", 3000)
+                return
+
+        # Execute the action
+        try:
+            print(f"DEBUG: Executing env.step({action_index})")
+            env.step(action_index)
+            print("DEBUG: env.step completed successfully")
+
+            # Check for game end - in PettingZoo AEC, check if ALL agents are terminated
+            # or if there are no more agents to act
+            next_player = env.agent_selection
+            print(f"DEBUG: After step, agent_selection={next_player}")
+
+            # Check if game is truly over (all agents terminated or no agents left)
+            all_terminated = all(env.terminations.values())
+            all_truncated = all(env.truncations.values())
+            no_agents_left = len(env.agents) == 0
+            game_over = all_terminated or all_truncated or no_agents_left
+            print(f"DEBUG: all_terminated={all_terminated}, all_truncated={all_truncated}, no_agents={no_agents_left}, game_over={game_over}")
+
+            # For backward compat with the rest of the code
+            terminated = game_over
+            truncated = False
+
+            # Render updated board
+            print("DEBUG: Rendering frame...")
+            self._render_pettingzoo_frame()
+            print("DEBUG: Frame rendered")
+
+            if terminated or truncated:
+                print("DEBUG: Game over path")
+                # Game over
+                rewards = env.rewards
+                winner = "Draw"
+                for p, r in rewards.items():
+                    if r > 0:
+                        winner = p
+                        break
+                self._status_bar.showMessage(f"Game over! Winner: {winner}", 5000)
+                self.log_constant(
+                    LOG_UI_MAINWINDOW_INFO,
+                    message=f"PettingZoo game ended",
+                    extra={"winner": winner, "rewards": rewards},
+                )
+                # Disable both player step buttons when game is over
+                self._control_panel.set_current_player("")  # Empty disables both
+            else:
+                print("DEBUG: Game continues path")
+                print(f"DEBUG _execute_pettingzoo_action: player_id={player_id}, action={action_str}, next_player={next_player}")
+                # Update turn indicator for next player
+                self._control_panel.set_turn_indicator(next_player, visible=True)
+                # Toggle player step buttons for next turn
+                print(f"DEBUG: Calling set_current_player({next_player})")
+                self._control_panel.set_current_player(next_player)
+                self._status_bar.showMessage(
+                    f"{player_id} played {action_str}. Next: {next_player}",
+                    2000
+                )
+
+            self.log_constant(
+                LOG_OPERATOR_STEP_ALL_COMPLETED,
+                message=f"PettingZoo step completed",
+                extra={
+                    "player": player_id,
+                    "action": action_str,
+                    "next_player": env.agent_selection,
+                },
+            )
+            print("DEBUG: _execute_pettingzoo_action completed successfully!")
+
+        except Exception as e:
+            print(f"DEBUG _execute_pettingzoo_action EXCEPTION: {e}")
+            import traceback
+            traceback.print_exc()
+            self.log_constant(
+                LOG_UI_MAINWINDOW_ERROR,
+                message=f"Failed to execute action: {e}",
+                extra={"player": player_id, "action": action_str, "index": action_index},
+            )
+            self._status_bar.showMessage(f"Move failed: {e}", 5000)
+            # Re-enable the current player's button after error
+            self._control_panel.set_current_player(player_id)
+
+    def _poll_operator_responses(self, handles: list, max_wait_ms: int = 30000) -> None:
+        """Poll for responses from operator subprocesses and update render view.
+
+        Args:
+            handles: List of (operator_id, handle) tuples to poll.
+            max_wait_ms: Maximum time to wait for responses in milliseconds.
+        """
+        from PyQt6.QtCore import QTimer
+
+        pending = list(handles)
+        start_time = datetime.now()
+
+        def poll_once():
+            nonlocal pending
+            if not pending:
+                return
+
+            # Check if we've exceeded max wait time
+            elapsed = (datetime.now() - start_time).total_seconds() * 1000
+            if elapsed > max_wait_ms:
+                self.log_constant(
+                    LOG_UI_MAINWINDOW_WARNING,
+                    message=f"Timeout waiting for operator responses",
+                    extra={"pending_count": len(pending)},
+                )
+                return
+
+            still_pending = []
+            for operator_id, handle in pending:
+                # Try to read response (non-blocking)
+                response = handle.try_read_response(timeout=0.1)
+                if response is not None:
+                    response_type = response.get("type", "unknown")
+                    self._handle_operator_response(operator_id, response)
+                    # If we got a non-step response (e.g., "ready" from reset), keep polling
+                    if response_type != "step" and handle.is_running:
+                        still_pending.append((operator_id, handle))
+                else:
+                    # Check if process is still running
+                    if handle.is_running:
+                        still_pending.append((operator_id, handle))
+                    else:
+                        self.log_constant(
+                            LOG_UI_MAINWINDOW_WARNING,
+                            message=f"Operator process terminated while waiting for response",
+                            extra={"operator_id": operator_id},
+                        )
+                        self._multi_operator_service.set_operator_state(operator_id, "stopped")
+                        self._render_tabs.set_operator_status(operator_id, "stopped")
+
+            pending = still_pending
+            if pending:
+                # Schedule another poll
+                QTimer.singleShot(200, poll_once)
+
+        poll_once()
+
+    def _handle_operator_response(self, operator_id: str, response: dict) -> None:
+        """Handle a response from an operator subprocess.
+
+        Args:
+            operator_id: The operator that sent the response.
+            response: The parsed JSON response dict.
+        """
+        response_type = response.get("type", "unknown")
+
+        if response_type == "step":
+            # Build render payload from step response
+            payload = {
+                "step_index": response.get("step_index", 0),
+                "episode_index": response.get("episode_index", 0),
+                "reward": response.get("reward", 0.0),
+                "total_reward": response.get("total_reward", 0.0),
+                "terminated": response.get("terminated", False),
+                "truncated": response.get("truncated", False),
+                "action": response.get("action", ""),
+                "observation": response.get("observation", ""),
+                # Include render payload if available (format: {"mode": "rgb", "rgb": [...], "width": N, "height": N})
+                "render_payload": response.get("render_payload"),
+            }
+            self._render_tabs.display_operator_payload(operator_id, payload)
+            self.log_constant(
+                LOG_UI_MAINWINDOW_TRACE,
+                message=f"Received step response from operator",
+                extra={
+                    "operator_id": operator_id,
+                    "step_index": payload["step_index"],
+                    "reward": payload["reward"],
+                },
+            )
+
+        elif response_type == "ready":
+            self.log_constant(
+                LOG_UI_MAINWINDOW_INFO,
+                message=f"Operator ready",
+                extra={"operator_id": operator_id, "seed": response.get("seed")},
+            )
+
+        elif response_type == "error":
+            self.log_constant(
+                LOG_UI_MAINWINDOW_ERROR,
+                message=f"Operator error: {response.get('message', 'Unknown error')}",
+                extra={"operator_id": operator_id},
+            )
+            self._render_tabs.set_operator_status(operator_id, "error")
+
+        elif response_type == "stopped":
+            self._multi_operator_service.set_operator_state(operator_id, "stopped")
+            self._render_tabs.set_operator_status(operator_id, "stopped")
+
+        else:
+            self.log_constant(
+                LOG_UI_MAINWINDOW_WARNING,
+                message=f"Unknown response type from operator",
+                extra={"operator_id": operator_id, "type": response_type},
+            )
 
     def _on_stop_operators(self) -> None:
         """Stop all running operators.
@@ -1105,6 +2016,13 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             extra={"operator_ids": list(all_stopped)},
         )
 
+        # Disable PettingZoo mode if it was active
+        if self._shared_pettingzoo_env is not None:
+            self._control_panel.set_pettingzoo_mode(False)
+            self._control_panel.set_turn_indicator("", visible=False)
+            self._shared_pettingzoo_env = None
+            self._pettingzoo_player_handles.clear()
+
     def _on_initialize_operator(self, operator_id: str, config: OperatorConfig, seed: int) -> None:
         """Initialize environment for operator preview with shared seed.
 
@@ -1121,13 +2039,16 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         task = config.task
 
         self._status_bar.showMessage(f"Initializing {task} with seed={seed}...", 2000)
+        self.log_constant(
+            LOG_OPERATOR_ENV_PREVIEW_STARTED,
+            message=f"Loading environment preview for {env_name}/{task}",
+            extra={"operator_id": operator_id, "env_name": env_name, "task": task, "seed": seed},
+        )
 
         try:
-            # Create and reset environment to get initial observation
-            import numpy as np
-
             env = None
             rgb_frame = None
+            board_game_payload: Dict[str, Any] | None = None
 
             if env_name in ("babyai", "minigrid"):
                 # Use MiniGrid/BabyAI via gymnasium
@@ -1214,6 +2135,95 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     )
                     return
 
+            elif env_name == "pettingzoo":
+                # PettingZoo classic games (chess, go, connect_four, etc.)
+                # These use their own factory functions, not gymnasium.make()
+                try:
+                    from pettingzoo.classic import (
+                        chess_v6,
+                        connect_four_v3,
+                        go_v5,
+                        tictactoe_v3,
+                    )
+
+                    # Map task names to environment factories
+                    pz_env_factories = {
+                        "chess_v6": chess_v6.env,
+                        "connect_four_v3": connect_four_v3.env,
+                        "go_v5": go_v5.env,
+                        "tictactoe_v3": tictactoe_v3.env,
+                    }
+
+                    if task not in pz_env_factories:
+                        self._status_bar.showMessage(
+                            f"Unknown PettingZoo game: {task}",
+                            5000
+                        )
+                        return
+
+                    # Create environment with rgb_array rendering
+                    env = pz_env_factories[task](render_mode="rgb_array")
+                    env.reset(seed=seed)
+                    # PettingZoo AEC envs render() returns the board
+                    rgb_frame = env.render()
+
+                    # Build game-specific payload for BoardGameRendererStrategy
+                    board_game_payload: Dict[str, Any] | None = None
+                    if task == "chess_v6" and hasattr(env, "board"):
+                        # Extract chess-specific data for BoardGameRendererStrategy
+                        import chess
+                        board: chess.Board = env.board
+                        legal_moves = [move.uci() for move in board.legal_moves]
+                        current_player = "white" if board.turn == chess.WHITE else "black"
+                        board_game_payload = {
+                            "chess": {
+                                "fen": board.fen(),
+                                "legal_moves": legal_moves,
+                                "current_player": current_player,
+                                "is_check": board.is_check(),
+                            },
+                            "game_id": "chess",
+                        }
+                    elif task == "connect_four_v3" and hasattr(env, "board"):
+                        board_game_payload = {
+                            "connect_four": {
+                                "board": env.board.tolist() if hasattr(env.board, "tolist") else list(env.board),
+                                "current_player": getattr(env, "agent_selection", "player_0"),
+                            },
+                            "game_id": "connect_four",
+                        }
+                    elif task == "tictactoe_v3" and hasattr(env, "board"):
+                        board_game_payload = {
+                            "board": env.board.tolist() if hasattr(env.board, "tolist") else list(env.board),
+                            "current_player": getattr(env, "agent_selection", "player_1"),
+                            "game_id": "tictactoe",
+                        }
+
+                    env.close()
+
+                except ImportError as e:
+                    self._status_bar.showMessage(
+                        f"PettingZoo classic games not installed: {e}",
+                        5000
+                    )
+                    self.log_constant(
+                        LOG_OPERATOR_ENV_PREVIEW_IMPORT_ERROR,
+                        message=f"PettingZoo classic games not installed: {e}",
+                        extra={"operator_id": operator_id, "env_name": env_name, "task": task, "error": str(e)},
+                    )
+                    return
+                except Exception as e:
+                    self._status_bar.showMessage(
+                        f"Cannot preview PettingZoo {task}: {e}",
+                        5000
+                    )
+                    self.log_constant(
+                        LOG_OPERATOR_ENV_PREVIEW_ERROR,
+                        message=f"Cannot preview PettingZoo {task}: {e}",
+                        extra={"operator_id": operator_id, "env_name": env_name, "task": task, "error": str(e)},
+                    )
+                    return
+
             else:
                 # Generic gymnasium environment
                 try:
@@ -1233,34 +2243,84 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 # Build payload for the render container
                 # Extract dimensions safely for type checker
                 if isinstance(rgb_frame, np.ndarray) and rgb_frame.ndim >= 2:
+                    # Check if we need to scale image to target resolution
+                    image_scale = config.settings.get("image_scale", 0)
+                    if image_scale and image_scale > 0:
+                        # Scale image to target resolution (square)
+                        from PIL import Image
+                        pil_image = Image.fromarray(rgb_frame)
+                        pil_image = pil_image.resize(
+                            (image_scale, image_scale),
+                            Image.Resampling.LANCZOS
+                        )
+                        rgb_frame = np.array(pil_image)
+
                     shape = cast(tuple[int, ...], rgb_frame.shape)
                     frame_height, frame_width = shape[0], shape[1]
                     frame_data = rgb_frame.tolist()
                 else:
                     frame_height, frame_width = 0, 0
                     frame_data = rgb_frame
-                payload = {
-                    "render_payload": {
-                        "mode": "rgb",
-                        "rgb": frame_data,
-                        "width": frame_width,
-                        "height": frame_height,
-                    },
-                    "episode_index": 0,
-                    "step_index": 0,
-                    "reward": 0.0,
-                }
+                # Build payload - use board game payload for board games, RGB for others
+                if board_game_payload is not None:
+                    # Use structured board game payload for BoardGameRendererStrategy
+                    payload = {
+                        "render_payload": board_game_payload,
+                        "episode_index": 0,
+                        "step_index": 0,
+                        "reward": 0.0,
+                    }
+                else:
+                    # Use RGB payload for generic environments
+                    payload = {
+                        "render_payload": {
+                            "mode": "rgb",
+                            "rgb": frame_data,
+                            "width": frame_width,
+                            "height": frame_height,
+                        },
+                        "episode_index": 0,
+                        "step_index": 0,
+                        "reward": 0.0,
+                    }
 
                 # Update the operator's config (updates header: name, type badge, env/task)
                 self._render_tabs.update_operator_view(config)
+
+                # Set the container display size based on selected container size
+                container_size = config.settings.get("container_size", 0)
+                if container_size and container_size > 0:
+                    self._render_tabs.set_operator_display_size(
+                        operator_id, container_size, container_size
+                    )
+
                 # Display in the operator's container
                 self._render_tabs.display_operator_payload(operator_id, payload)
                 # Update status to "loaded" to indicate environment is ready
                 self._render_tabs.set_operator_status(operator_id, "loaded")
                 self._render_tabs.switch_to_multi_operator_tab()
+
+                # Update the environment size in the operator config widget
+                if frame_width > 0 and frame_height > 0:
+                    self._control_panel.set_operator_environment_size(
+                        operator_id, frame_width, frame_height,
+                        container_size if container_size and container_size > 0 else None
+                    )
+
                 self._status_bar.showMessage(
                     f"Previewing {task} - ready to start",
                     3000
+                )
+                self.log_constant(
+                    LOG_OPERATOR_ENV_PREVIEW_SUCCESS,
+                    message=f"Environment preview loaded for {env_name}/{task}",
+                    extra={
+                        "operator_id": operator_id,
+                        "env_name": env_name,
+                        "task": task,
+                        "width": frame_width,
+                        "height": frame_height,
+                    },
                 )
             else:
                 self._status_bar.showMessage(
@@ -1269,7 +2329,11 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 )
 
         except Exception as e:
-            _LOGGER.exception(f"Failed to initialize operator {operator_id}")
+            self.log_constant(
+                LOG_OPERATOR_ENV_PREVIEW_ERROR,
+                message=f"Failed to initialize operator {operator_id}: {e}",
+                extra={"operator_id": operator_id, "env_name": env_name, "task": task, "error": str(e)},
+            )
             self._status_bar.showMessage(
                 f"Failed to initialize: {e}",
                 5000
@@ -2082,7 +3146,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         try:
             # Get the presenter registry and resolve the worker presenter
             registry = get_worker_presenter_registry()
-            worker_id = "spade_bdi_worker"  # TODO: Extract from config/payload if supporting multiple workers
+            worker_id = "cleanrl_worker"  # TODO: Extract from config/payload if supporting multiple workers
             presenter = registry.get(worker_id)
             
             if presenter is None:
@@ -2281,7 +3345,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                         extra={"run_id": run_id, "tab_name": replay_tab_name},
                     )
             else:
-                # TODO: Replay tab creation removed (AgentReplayTab was part of spade_bdi_worker_tabs)
+                # TODO: Replay tab creation needs to be reimplemented for current workers
                 # Workers should implement their own replay tab via their presenter's create_tabs method
                 self.log_constant(
                     LOG_UI_MAINWINDOW_TRACE,

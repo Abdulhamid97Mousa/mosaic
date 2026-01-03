@@ -21,7 +21,19 @@ from PyQt6.QtCore import QTimer, pyqtSignal
 from qtpy import QtCore, QtWidgets
 
 from gym_gui.config.paths import VAR_MODELS_HF_CACHE, VAR_VLLM_DIR
-from gym_gui.config.settings import get_settings
+from gym_gui.logging_config.helpers import log_constant
+from gym_gui.logging_config.log_constants import (
+    LOG_VLLM_SERVER_COUNT_CHANGED,
+    LOG_VLLM_SERVER_STARTING,
+    LOG_VLLM_SERVER_RUNNING,
+    LOG_VLLM_SERVER_STOPPING,
+    LOG_VLLM_SERVER_START_FAILED,
+    LOG_VLLM_SERVER_PROCESS_EXITED,
+    LOG_VLLM_SERVER_NOT_RESPONDING,
+    LOG_VLLM_ORPHAN_PROCESS_KILLED,
+    LOG_VLLM_GPU_MEMORY_FREED,
+    LOG_VLLM_GPU_MEMORY_NOT_FREED,
+)
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -43,100 +55,369 @@ class VLLMServerState:
     error_message: Optional[str] = None
 
 
-class VLLMServerRow(QtWidgets.QWidget):
-    """Single row representing one vLLM server."""
+@dataclass
+class ServerRowWidgets:
+    """Widgets for a single server row in the grid."""
 
-    start_requested = pyqtSignal(int)  # server_id
-    stop_requested = pyqtSignal(int)  # server_id
+    server_id: int
+    server_label: QtWidgets.QLabel
+    port_label: QtWidgets.QLabel
+    model_combo: QtWidgets.QComboBox
+    status_label: QtWidgets.QLabel
+    start_btn: QtWidgets.QPushButton
+    stop_btn: QtWidgets.QPushButton
+
+
+class VLLMServerWidget(QtWidgets.QGroupBox):
+    """Widget for managing vLLM servers for operators.
+
+    Shows per-operator vLLM servers with status indicators and controls.
+    Each server runs on a different port (8000, 8001, etc.) and uses
+    GPU memory utilization limits to allow multiple servers on one GPU.
+    """
+
+    # Emitted when a server's status changes (server_id, status, base_url)
+    server_status_changed = pyqtSignal(int, str, str)
+
+    # Grid column indices
+    COL_SERVER = 0
+    COL_PORT = 1
+    COL_MODEL = 2
+    COL_STATUS = 3
+    COL_START = 4
+    COL_STOP = 5
+
+    # Row offset for server rows (after header row)
+    HEADER_ROW = 0
+    SERVER_ROW_OFFSET = 1
 
     def __init__(
         self,
-        server_id: int,
+        max_servers: int = 2,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
-        super().__init__(parent)
-        self._server_id = server_id
-        self._state = VLLMServerState(
-            server_id=server_id,
-            port=VLLM_BASE_PORT + server_id - 1,
-        )
+        super().__init__("vLLM Servers (Local Inference)", parent)
+        self._max_servers = max(1, min(8, max_servers))  # Clamp 1-8
+        self._current_server_count = self._max_servers
+        self._server_rows: Dict[int, ServerRowWidgets] = {}
+        self._server_states: Dict[int, VLLMServerState] = {}
+        self._processes: Dict[int, subprocess.Popen] = {}
+
+        # Track GPU memory usage per server (measured after loading)
+        self._server_gpu_usage: Dict[int, float] = {}  # server_id -> GB used
+
+        # Timer for checking server health
+        self._health_timer = QTimer(self)
+        self._health_timer.timeout.connect(self._check_server_health)
+
+        # Info label reference for dynamic updates
+        self._info_label: Optional[QtWidgets.QLabel] = None
+
         self._build_ui()
 
+    def _get_total_gpu_memory(self) -> float:
+        """Get total GPU memory in GB."""
+        try:
+            import pynvml
+            pynvml.nvmlInit()
+            handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+            info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            total_gb = info.total / (1024**3)
+            pynvml.nvmlShutdown()
+            return total_gb
+        except Exception:
+            return 16.0  # Default assumption
+
+    def _get_gpu_free_memory(self) -> float:
+        """Get free GPU memory in GB."""
+        try:
+            import pynvml
+            pynvml.nvmlInit()
+            handle = pynvml.nvmlDeviceGetHandleByIndex(0)
+            info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            free_gb = info.free / (1024**3)
+            pynvml.nvmlShutdown()
+            return free_gb
+        except Exception:
+            return 0.0
+
+    def _get_gpu_info_text(self) -> str:
+        """Get the GPU memory info text for the header."""
+        per_server_pct = (0.8 / max(1, self._current_server_count)) * 100
+        total_used = sum(self._server_gpu_usage.values())
+        free_gb = self._get_gpu_free_memory()
+        if total_used > 0:
+            return f"GPU: {total_used:.1f}GB used, {free_gb:.1f}GB free ({per_server_pct:.0f}%/server)"
+        return f"GPU: {free_gb:.1f}GB free ({per_server_pct:.0f}% allocated per server)"
+
+    def _update_info_label(self) -> None:
+        """Update the info label with current GPU usage."""
+        if self._info_label:
+            self._info_label.setText(self._get_gpu_info_text())
+
     def _build_ui(self) -> None:
-        layout = QtWidgets.QHBoxLayout(self)
-        layout.setContentsMargins(4, 4, 4, 4)
-        layout.setSpacing(8)
+        main_layout = QtWidgets.QVBoxLayout(self)
+        main_layout.setContentsMargins(8, 12, 8, 8)
+        main_layout.setSpacing(8)
+
+        # Header row with info and server count spinbox
+        header_layout = QtWidgets.QHBoxLayout()
+        header_layout.setSpacing(8)
+
+        self._info_label = QtWidgets.QLabel(self._get_gpu_info_text(), self)
+        self._info_label.setStyleSheet("color: #666; font-size: 11px;")
+        header_layout.addWidget(self._info_label)
+
+        header_layout.addStretch()
+
+        # Server count spinbox
+        servers_label = QtWidgets.QLabel("Servers:", self)
+        servers_label.setStyleSheet("color: #666;")
+        header_layout.addWidget(servers_label)
+
+        self._server_count_spinbox = QtWidgets.QSpinBox(self)
+        self._server_count_spinbox.setRange(1, 8)
+        self._server_count_spinbox.setValue(self._current_server_count)
+        self._server_count_spinbox.setToolTip("Number of vLLM server instances (1-8)")
+        self._server_count_spinbox.setFixedWidth(50)
+        self._server_count_spinbox.valueChanged.connect(self._on_server_count_changed)
+        header_layout.addWidget(self._server_count_spinbox)
+
+        main_layout.addLayout(header_layout)
+
+        # Grid for server rows
+        self._grid_widget = QtWidgets.QWidget(self)
+        self._grid_layout = QtWidgets.QGridLayout(self._grid_widget)
+        self._grid_layout.setContentsMargins(0, 0, 0, 0)
+        self._grid_layout.setSpacing(6)
+        self._grid_layout.setColumnStretch(self.COL_MODEL, 1)  # Model column expands
+
+        # Add header row
+        self._add_header_row()
+
+        # Add server rows
+        for i in range(1, self._current_server_count + 1):
+            self._add_server_row(i)
+
+        main_layout.addWidget(self._grid_widget)
+
+        # Control buttons row
+        btn_layout = QtWidgets.QHBoxLayout()
+        btn_layout.setSpacing(8)
+
+        btn_layout.addStretch()
+
+        self._start_all_btn = QtWidgets.QPushButton("Start All", self)
+        self._start_all_btn.setToolTip("Start all configured servers")
+        self._start_all_btn.clicked.connect(self._on_start_all)
+        btn_layout.addWidget(self._start_all_btn)
+
+        self._stop_all_btn = QtWidgets.QPushButton("Stop All", self)
+        self._stop_all_btn.setToolTip("Stop all running servers")
+        self._stop_all_btn.clicked.connect(self._on_stop_all)
+        btn_layout.addWidget(self._stop_all_btn)
+
+        self._refresh_btn = QtWidgets.QPushButton("↻ Refresh", self)
+        self._refresh_btn.setToolTip("Refresh model list from disk")
+        self._refresh_btn.clicked.connect(self._refresh_models)
+        btn_layout.addWidget(self._refresh_btn)
+
+        main_layout.addLayout(btn_layout)
+
+    def _add_header_row(self) -> None:
+        """Add the header row to the grid."""
+        header_style = "font-weight: bold; color: #444; font-size: 11px;"
+
+        server_header = QtWidgets.QLabel("Server", self)
+        server_header.setStyleSheet(header_style)
+        self._grid_layout.addWidget(server_header, self.HEADER_ROW, self.COL_SERVER)
+
+        port_header = QtWidgets.QLabel("Port", self)
+        port_header.setStyleSheet(header_style)
+        self._grid_layout.addWidget(port_header, self.HEADER_ROW, self.COL_PORT)
+
+        model_header = QtWidgets.QLabel("Model", self)
+        model_header.setStyleSheet(header_style)
+        self._grid_layout.addWidget(model_header, self.HEADER_ROW, self.COL_MODEL)
+
+        status_header = QtWidgets.QLabel("Status", self)
+        status_header.setStyleSheet(header_style)
+        self._grid_layout.addWidget(status_header, self.HEADER_ROW, self.COL_STATUS)
+
+        actions_header = QtWidgets.QLabel("Actions", self)
+        actions_header.setStyleSheet(header_style)
+        self._grid_layout.addWidget(actions_header, self.HEADER_ROW, self.COL_START, 1, 2)
+
+    def _add_server_row(self, server_id: int) -> None:
+        """Add a server row to the grid."""
+        row = self.SERVER_ROW_OFFSET + server_id - 1
+        port = VLLM_BASE_PORT + server_id - 1
 
         # Server label
-        self._server_label = QtWidgets.QLabel(f"Server {self._server_id}", self)
-        self._server_label.setFixedWidth(60)
-        self._server_label.setStyleSheet("font-weight: bold;")
-        layout.addWidget(self._server_label)
+        server_label = QtWidgets.QLabel(f"{server_id}", self)
+        server_label.setStyleSheet("font-weight: bold;")
+        server_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        self._grid_layout.addWidget(server_label, row, self.COL_SERVER)
 
         # Port label
-        self._port_label = QtWidgets.QLabel(f":{self._state.port}", self)
-        self._port_label.setFixedWidth(45)
-        self._port_label.setStyleSheet("color: #666;")
-        layout.addWidget(self._port_label)
+        port_label = QtWidgets.QLabel(f":{port}", self)
+        port_label.setStyleSheet("color: #666;")
+        self._grid_layout.addWidget(port_label, row, self.COL_PORT)
 
         # Model dropdown
-        self._model_combo = QtWidgets.QComboBox(self)
-        self._model_combo.setMinimumWidth(180)
-        self._model_combo.setToolTip("Select model to load")
-        self._populate_model_combo()
-        layout.addWidget(self._model_combo)
+        model_combo = QtWidgets.QComboBox(self)
+        model_combo.setMinimumWidth(150)
+        model_combo.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Fixed
+        )
+        model_combo.setToolTip("Select model to load")
+        self._populate_model_combo(model_combo)
+        self._grid_layout.addWidget(model_combo, row, self.COL_MODEL)
 
-        # Status indicator
-        self._status_indicator = QtWidgets.QLabel("○", self)
-        self._status_indicator.setFixedWidth(16)
-        self._status_indicator.setStyleSheet("color: #888; font-size: 14px;")
-        self._status_indicator.setToolTip("Server status")
-        layout.addWidget(self._status_indicator)
-
-        # Status text
-        self._status_label = QtWidgets.QLabel("Stopped", self)
-        self._status_label.setFixedWidth(60)
-        self._status_label.setStyleSheet("color: #666;")
-        layout.addWidget(self._status_label)
-
-        # Memory usage
-        self._memory_label = QtWidgets.QLabel("-", self)
-        self._memory_label.setFixedWidth(50)
-        self._memory_label.setStyleSheet("color: #888;")
-        self._memory_label.setToolTip("GPU memory usage")
-        layout.addWidget(self._memory_label)
-
-        layout.addStretch()
+        # Status label (combined indicator + text)
+        status_label = QtWidgets.QLabel("○ Stopped", self)
+        status_label.setStyleSheet("color: #666;")
+        status_label.setMinimumWidth(80)
+        self._grid_layout.addWidget(status_label, row, self.COL_STATUS)
 
         # Start button
-        self._start_btn = QtWidgets.QPushButton("Start", self)
-        self._start_btn.setFixedWidth(50)
-        self._start_btn.setToolTip("Start vLLM server with selected model")
-        self._start_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; border-radius: 3px; padding: 3px 8px; }"
+        start_btn = QtWidgets.QPushButton("Start", self)
+        start_btn.setFixedWidth(55)
+        start_btn.setToolTip("Start vLLM server with selected model")
+        start_btn.setStyleSheet(
+            "QPushButton { background-color: #4CAF50; color: white; border-radius: 3px; padding: 4px 8px; }"
             "QPushButton:hover { background-color: #388E3C; }"
             "QPushButton:disabled { background-color: #A5D6A7; color: #E8F5E9; }"
         )
-        self._start_btn.clicked.connect(lambda: self.start_requested.emit(self._server_id))
-        layout.addWidget(self._start_btn)
+        start_btn.clicked.connect(lambda checked, sid=server_id: self._on_start_requested(sid))
+        self._grid_layout.addWidget(start_btn, row, self.COL_START)
 
         # Stop button
-        self._stop_btn = QtWidgets.QPushButton("Stop", self)
-        self._stop_btn.setFixedWidth(50)
-        self._stop_btn.setToolTip("Stop vLLM server")
-        self._stop_btn.setStyleSheet(
-            "QPushButton { background-color: #F44336; color: white; border-radius: 3px; padding: 3px 8px; }"
+        stop_btn = QtWidgets.QPushButton("Stop", self)
+        stop_btn.setFixedWidth(55)
+        stop_btn.setToolTip("Stop vLLM server")
+        stop_btn.setStyleSheet(
+            "QPushButton { background-color: #F44336; color: white; border-radius: 3px; padding: 4px 8px; }"
             "QPushButton:hover { background-color: #D32F2F; }"
             "QPushButton:disabled { background-color: #EF9A9A; color: #FFEBEE; }"
         )
-        self._stop_btn.setEnabled(False)
-        self._stop_btn.clicked.connect(lambda: self.stop_requested.emit(self._server_id))
-        layout.addWidget(self._stop_btn)
+        stop_btn.setEnabled(False)
+        stop_btn.clicked.connect(lambda checked, sid=server_id: self._on_stop_requested(sid))
+        self._grid_layout.addWidget(stop_btn, row, self.COL_STOP)
 
-    def _populate_model_combo(self) -> None:
-        """Populate the model dropdown with locally available models."""
-        self._model_combo.clear()
-        self._model_combo.addItem("(Select model)", None)
+        # Store widgets
+        self._server_rows[server_id] = ServerRowWidgets(
+            server_id=server_id,
+            server_label=server_label,
+            port_label=port_label,
+            model_combo=model_combo,
+            status_label=status_label,
+            start_btn=start_btn,
+            stop_btn=stop_btn,
+        )
+
+        # Initialize state
+        self._server_states[server_id] = VLLMServerState(
+            server_id=server_id,
+            port=port,
+        )
+
+    def _remove_server_row(self, server_id: int) -> None:
+        """Remove a server row from the grid."""
+        if server_id not in self._server_rows:
+            return
+
+        # Stop server if running
+        if server_id in self._processes:
+            self._stop_server(server_id)
+
+        # Remove widgets from grid and delete them
+        row_widgets = self._server_rows[server_id]
+        for widget in [
+            row_widgets.server_label,
+            row_widgets.port_label,
+            row_widgets.model_combo,
+            row_widgets.status_label,
+            row_widgets.start_btn,
+            row_widgets.stop_btn,
+        ]:
+            self._grid_layout.removeWidget(widget)
+            widget.deleteLater()
+
+        # Clean up state
+        del self._server_rows[server_id]
+        del self._server_states[server_id]
+
+    def _on_server_count_changed(self, new_count: int) -> None:
+        """Handle server count spinbox change."""
+        if new_count == self._current_server_count:
+            return
+
+        # Check if any servers to be removed are running
+        if new_count < self._current_server_count:
+            running_to_remove = [
+                sid for sid in range(new_count + 1, self._current_server_count + 1)
+                if sid in self._processes
+            ]
+            if running_to_remove:
+                reply = QtWidgets.QMessageBox.question(
+                    self,
+                    "Stop Running Servers?",
+                    f"Server(s) {', '.join(map(str, running_to_remove))} are running. "
+                    "Stop them to reduce server count?",
+                    QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+                )
+                if reply != QtWidgets.QMessageBox.StandardButton.Yes:
+                    # Revert spinbox
+                    self._server_count_spinbox.blockSignals(True)
+                    self._server_count_spinbox.setValue(self._current_server_count)
+                    self._server_count_spinbox.blockSignals(False)
+                    return
+
+        self.set_server_count(new_count)
+
+    def set_server_count(self, count: int) -> None:
+        """Dynamically adjust the number of server rows.
+
+        Args:
+            count: New number of servers (1-8)
+        """
+        count = max(1, min(8, count))
+
+        if count == self._current_server_count:
+            return
+
+        if count > self._current_server_count:
+            # Add new rows
+            for i in range(self._current_server_count + 1, count + 1):
+                self._add_server_row(i)
+        else:
+            # Remove rows (from highest to lowest)
+            for i in range(self._current_server_count, count, -1):
+                self._remove_server_row(i)
+
+        self._current_server_count = count
+
+        # Update spinbox if called programmatically
+        self._server_count_spinbox.blockSignals(True)
+        self._server_count_spinbox.setValue(count)
+        self._server_count_spinbox.blockSignals(False)
+
+        # Update info label to show new per-server allocation
+        self._update_info_label()
+
+        per_server_pct = (0.8 / max(1, count)) * 100
+        log_constant(
+            _LOGGER, LOG_VLLM_SERVER_COUNT_CHANGED,
+            message=f"Server count changed to {count}, {per_server_pct:.0f}% GPU per server",
+            extra={"server_count": count, "per_server_gpu_pct": per_server_pct},
+        )
+
+    def _populate_model_combo(self, combo: QtWidgets.QComboBox) -> None:
+        """Populate a model dropdown with locally available models."""
+        combo.clear()
+        combo.addItem("(Select model)", None)
 
         hf_cache = VAR_MODELS_HF_CACHE
         if not hf_cache.exists():
@@ -172,146 +453,46 @@ class VLLMServerRow(QtWidgets.QWidget):
             model_path = str(model_dir)
             display_name = model_id.split("/")[-1] if "/" in model_id else model_id
 
-            self._model_combo.addItem(display_name, {"model_id": model_id, "model_path": model_path})
+            combo.addItem(display_name, {"model_id": model_id, "model_path": model_path})
 
-    def update_state(self, state: VLLMServerState) -> None:
-        """Update the UI to reflect the server state."""
-        self._state = state
+    def _update_row_state(self, server_id: int, state: VLLMServerState) -> None:
+        """Update the UI for a server row to reflect its state."""
+        if server_id not in self._server_rows:
+            return
 
-        # Update status indicator and text
+        row = self._server_rows[server_id]
+        self._server_states[server_id] = state
+
+        # Update status label and buttons based on state
         if state.status == "running":
-            self._status_indicator.setText("●")
-            self._status_indicator.setStyleSheet("color: #4CAF50; font-size: 14px;")
-            self._status_label.setText("Running")
-            self._status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
-            self._start_btn.setEnabled(False)
-            self._stop_btn.setEnabled(True)
-            self._model_combo.setEnabled(False)
+            status_text = "● Running"
+            if state.memory_gb > 0:
+                status_text += f" ({state.memory_gb:.1f}GB)"
+            row.status_label.setText(status_text)
+            row.status_label.setStyleSheet("color: #4CAF50; font-weight: bold;")
+            row.start_btn.setEnabled(False)
+            row.stop_btn.setEnabled(True)
+            row.model_combo.setEnabled(False)
         elif state.status == "starting":
-            self._status_indicator.setText("◐")
-            self._status_indicator.setStyleSheet("color: #FF9800; font-size: 14px;")
-            self._status_label.setText("Starting...")
-            self._status_label.setStyleSheet("color: #FF9800;")
-            self._start_btn.setEnabled(False)
-            self._stop_btn.setEnabled(False)
-            self._model_combo.setEnabled(False)
+            row.status_label.setText("◐ Starting...")
+            row.status_label.setStyleSheet("color: #FF9800;")
+            row.start_btn.setEnabled(False)
+            row.stop_btn.setEnabled(False)
+            row.model_combo.setEnabled(False)
         elif state.status == "error":
-            self._status_indicator.setText("✕")
-            self._status_indicator.setStyleSheet("color: #F44336; font-size: 14px;")
-            self._status_label.setText("Error")
-            self._status_label.setStyleSheet("color: #F44336;")
-            self._status_label.setToolTip(state.error_message or "Unknown error")
-            self._start_btn.setEnabled(True)
-            self._stop_btn.setEnabled(False)
-            self._model_combo.setEnabled(True)
+            row.status_label.setText("✕ Error")
+            row.status_label.setStyleSheet("color: #F44336;")
+            row.status_label.setToolTip(state.error_message or "Unknown error")
+            row.start_btn.setEnabled(True)
+            row.stop_btn.setEnabled(False)
+            row.model_combo.setEnabled(True)
         else:  # stopped
-            self._status_indicator.setText("○")
-            self._status_indicator.setStyleSheet("color: #888; font-size: 14px;")
-            self._status_label.setText("Stopped")
-            self._status_label.setStyleSheet("color: #666;")
-            self._start_btn.setEnabled(True)
-            self._stop_btn.setEnabled(False)
-            self._model_combo.setEnabled(True)
-
-        # Update memory display
-        if state.memory_gb > 0:
-            self._memory_label.setText(f"{state.memory_gb:.1f}GB")
-        else:
-            self._memory_label.setText("-")
-
-    def get_selected_model(self) -> Optional[Dict[str, str]]:
-        """Get the currently selected model info."""
-        data = self._model_combo.currentData()
-        return data if data else None
-
-    @property
-    def server_id(self) -> int:
-        return self._server_id
-
-    @property
-    def state(self) -> VLLMServerState:
-        return self._state
-
-
-class VLLMServerWidget(QtWidgets.QGroupBox):
-    """Widget for managing vLLM servers for operators.
-
-    Shows per-operator vLLM servers with status indicators and controls.
-    Each server runs on a different port (8000, 8001, etc.) and uses
-    GPU memory utilization limits to allow multiple servers on one GPU.
-    """
-
-    # Emitted when a server's status changes (server_id, status, base_url)
-    server_status_changed = pyqtSignal(int, str, str)
-
-    def __init__(
-        self,
-        max_servers: Optional[int] = None,
-        parent: Optional[QtWidgets.QWidget] = None,
-    ) -> None:
-        super().__init__("vLLM Servers (Local Inference)", parent)
-        settings = get_settings()
-        self._max_servers = max_servers if max_servers is not None else settings.vllm_max_servers
-        self._gpu_memory_utilization = settings.vllm_gpu_memory_utilization
-        self._servers: Dict[int, VLLMServerRow] = {}
-        self._server_states: Dict[int, VLLMServerState] = {}
-        self._processes: Dict[int, subprocess.Popen] = {}
-
-        # Timer for checking server health
-        self._health_timer = QTimer(self)
-        self._health_timer.timeout.connect(self._check_server_health)
-
-        self._build_ui()
-
-    def _build_ui(self) -> None:
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(8, 12, 8, 8)
-        layout.setSpacing(4)
-
-        # Info text
-        info_label = QtWidgets.QLabel(
-            f"<small>Each server uses ~{self._gpu_memory_utilization*100:.0f}% GPU memory. "
-            f"Server 1 → Operator 1, Server 2 → Operator 2</small>",
-            self
-        )
-        info_label.setStyleSheet("color: #666;")
-        info_label.setWordWrap(True)
-        layout.addWidget(info_label)
-
-        # Server rows
-        for i in range(1, self._max_servers + 1):
-            row = VLLMServerRow(i, self)
-            row.start_requested.connect(self._on_start_requested)
-            row.stop_requested.connect(self._on_stop_requested)
-            self._servers[i] = row
-            self._server_states[i] = VLLMServerState(
-                server_id=i,
-                port=VLLM_BASE_PORT + i - 1,
-            )
-            layout.addWidget(row)
-
-        # Control buttons row
-        btn_layout = QtWidgets.QHBoxLayout()
-        btn_layout.setSpacing(8)
-
-        btn_layout.addStretch()
-
-        self._start_all_btn = QtWidgets.QPushButton("Start All", self)
-        self._start_all_btn.setToolTip("Start all configured servers")
-        self._start_all_btn.clicked.connect(self._on_start_all)
-        btn_layout.addWidget(self._start_all_btn)
-
-        self._stop_all_btn = QtWidgets.QPushButton("Stop All", self)
-        self._stop_all_btn.setToolTip("Stop all running servers")
-        self._stop_all_btn.clicked.connect(self._on_stop_all)
-        btn_layout.addWidget(self._stop_all_btn)
-
-        self._refresh_btn = QtWidgets.QPushButton("↻ Refresh", self)
-        self._refresh_btn.setToolTip("Refresh model list from disk")
-        self._refresh_btn.clicked.connect(self._refresh_models)
-        btn_layout.addWidget(self._refresh_btn)
-
-        layout.addLayout(btn_layout)
+            row.status_label.setText("○ Stopped")
+            row.status_label.setStyleSheet("color: #666;")
+            row.status_label.setToolTip("")
+            row.start_btn.setEnabled(True)
+            row.stop_btn.setEnabled(False)
+            row.model_combo.setEnabled(True)
 
     def _on_start_requested(self, server_id: int) -> None:
         """Handle start request for a specific server."""
@@ -323,8 +504,8 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
 
     def _on_start_all(self) -> None:
         """Start all servers that have models selected."""
-        for server_id, row in self._servers.items():
-            model_info = row.get_selected_model()
+        for server_id, row_widgets in self._server_rows.items():
+            model_info = row_widgets.model_combo.currentData()
             if model_info and self._server_states[server_id].status == "stopped":
                 self._start_server(server_id)
 
@@ -335,17 +516,17 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
 
     def _refresh_models(self) -> None:
         """Refresh model list in all server rows."""
-        for row in self._servers.values():
-            if row.state.status == "stopped":
-                row._populate_model_combo()
+        for server_id, row_widgets in self._server_rows.items():
+            if self._server_states[server_id].status == "stopped":
+                self._populate_model_combo(row_widgets.model_combo)
 
     def _start_server(self, server_id: int) -> None:
         """Start a vLLM server for the given server ID."""
-        row = self._servers.get(server_id)
-        if not row:
+        row_widgets = self._server_rows.get(server_id)
+        if not row_widgets:
             return
 
-        model_info = row.get_selected_model()
+        model_info = row_widgets.model_combo.currentData()
         if not model_info:
             QtWidgets.QMessageBox.warning(
                 self,
@@ -358,12 +539,22 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
         state.status = "starting"
         state.model_id = model_info["model_id"]
         state.model_path = model_info["model_path"]
-        row.update_state(state)
+        self._update_row_state(server_id, state)
 
         # Build vLLM command
         port = VLLM_BASE_PORT + server_id - 1
         model_path = model_info["model_path"]
         model_id = model_info["model_id"]
+
+        # Record GPU memory before starting to calculate delta later
+        gpu_before = self._get_gpu_free_memory()
+        self._server_gpu_usage[server_id] = 0.0  # Will be updated after loading
+
+        # Calculate per-server GPU allocation
+        # vLLM pre-allocates for KV cache, so we MUST divide GPU among servers
+        # Use 0.8 total (leaving 20% for system), divided by server count
+        # e.g., 2 servers = 0.4 each, 3 servers = 0.27 each
+        per_server_gpu = 0.8 / max(1, self._current_server_count)
 
         # Use served-model-name for proper API compatibility
         cmd = [
@@ -371,11 +562,24 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
             "--host", "127.0.0.1",
             "--port", str(port),
             "--served-model-name", model_id,
-            "--gpu-memory-utilization", str(self._gpu_memory_utilization),
+            "--gpu-memory-utilization", str(per_server_gpu),
             "--enforce-eager",  # More stable, slightly slower
         ]
 
-        _LOGGER.info(f"Starting vLLM server {server_id}: {' '.join(cmd)}")
+        # Store GPU baseline for measuring actual usage
+        state.memory_gb = gpu_before  # Temporarily store baseline
+
+        log_constant(
+            _LOGGER, LOG_VLLM_SERVER_STARTING,
+            message=f"Starting vLLM server {server_id} on port {port} (GPU alloc: {per_server_gpu*100:.0f}%)",
+            extra={
+                "server_id": server_id,
+                "port": port,
+                "model_id": model_id,
+                "gpu_alloc_pct": per_server_gpu * 100,
+                "command": " ".join(cmd),
+            },
+        )
 
         try:
             # Ensure log directory exists
@@ -401,10 +605,14 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
             QTimer.singleShot(5000, lambda: self._check_server_startup(server_id))
 
         except Exception as e:
-            _LOGGER.error(f"Failed to start vLLM server {server_id}: {e}")
+            log_constant(
+                _LOGGER, LOG_VLLM_SERVER_START_FAILED,
+                message=f"Failed to start vLLM server {server_id}: {e}",
+                extra={"server_id": server_id, "error": str(e)},
+            )
             state.status = "error"
             state.error_message = str(e)
-            row.update_state(state)
+            self._update_row_state(server_id, state)
 
     def _stop_server(self, server_id: int) -> None:
         """Stop a vLLM server with full decommissioning.
@@ -418,7 +626,11 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
             self._kill_orphan_vllm_processes(server_id)
             return
 
-        _LOGGER.info(f"Decommissioning vLLM server {server_id} (PID: {process.pid})")
+        log_constant(
+            _LOGGER, LOG_VLLM_SERVER_STOPPING,
+            message=f"Decommissioning vLLM server {server_id} (PID: {process.pid})",
+            extra={"server_id": server_id, "pid": process.pid},
+        )
 
         try:
             # First, kill all child processes using psutil (more reliable)
@@ -456,12 +668,17 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
 
         # Clean up internal state
         self._processes.pop(server_id, None)
-        state = self._server_states[server_id]
-        state.status = "stopped"
-        state.process = None
-        state.memory_gb = 0.0
-        state.error_message = None
-        self._servers[server_id].update_state(state)
+        self._server_gpu_usage.pop(server_id, None)
+        state = self._server_states.get(server_id)
+        if state:
+            state.status = "stopped"
+            state.process = None
+            state.memory_gb = 0.0
+            state.error_message = None
+            self._update_row_state(server_id, state)
+
+        # Update GPU info label
+        self._update_info_label()
 
         # Emit status change
         self.server_status_changed.emit(server_id, "stopped", "")
@@ -536,7 +753,11 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
                 )
 
                 if is_vllm:
-                    _LOGGER.info(f"Killing orphan vLLM process: {proc.pid} ({name})")
+                    log_constant(
+                        _LOGGER, LOG_VLLM_ORPHAN_PROCESS_KILLED,
+                        message=f"Killing orphan vLLM process: {proc.pid} ({name})",
+                        extra={"pid": proc.pid, "process_name": name, "server_id": server_id},
+                    )
                     proc.terminate()
                     try:
                         proc.wait(timeout=2)
@@ -548,7 +769,11 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
                 continue
 
         if killed_count > 0:
-            _LOGGER.info(f"Killed {killed_count} orphan vLLM process(es) for server {server_id}")
+            log_constant(
+                _LOGGER, LOG_VLLM_ORPHAN_PROCESS_KILLED,
+                message=f"Killed {killed_count} orphan vLLM process(es) for server {server_id}",
+                extra={"killed_count": killed_count, "server_id": server_id},
+            )
             # Give GPU memory time to be freed
             time.sleep(1)
 
@@ -557,35 +782,47 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
 
         Returns True if GPU memory appears to be freed, False otherwise.
         """
+        # Get the amount of memory this server was using
+        expected_freed = self._server_gpu_usage.get(server_id, 0.0)
+        if expected_freed <= 0:
+            return True  # No tracked usage, assume freed
+
         try:
             import pynvml
             pynvml.nvmlInit()
             handle = pynvml.nvmlDeviceGetHandleByIndex(0)
 
+            # Get initial free memory
+            info = pynvml.nvmlDeviceGetMemoryInfo(handle)
+            initial_free = info.free / (1024**3)
+
             for attempt in range(max_retries):
                 info = pynvml.nvmlDeviceGetMemoryInfo(handle)
                 free_gb = info.free / (1024**3)
                 total_gb = info.total / (1024**3)
-                used_gb = info.used / (1024**3)
 
                 _LOGGER.debug(
                     f"GPU memory check (attempt {attempt + 1}): "
                     f"{free_gb:.1f}GB free / {total_gb:.1f}GB total"
                 )
 
-                # Consider memory freed if we have reasonable free space
-                expected_free = total_gb * (1 - self._gpu_memory_utilization * 0.5)
-                if free_gb >= expected_free:
-                    _LOGGER.info(f"GPU memory verified freed for server {server_id}")
+                # Consider memory freed if we gained back most of what was used
+                if free_gb >= initial_free + (expected_freed * 0.8):
+                    log_constant(
+                        _LOGGER, LOG_VLLM_GPU_MEMORY_FREED,
+                        message=f"GPU memory freed for server {server_id}: {free_gb:.1f}GB now free",
+                        extra={"server_id": server_id, "free_gb": free_gb, "total_gb": total_gb},
+                    )
                     pynvml.nvmlShutdown()
                     return True
 
                 # Wait and retry
                 time.sleep(1)
 
-            _LOGGER.warning(
-                f"GPU memory may not be fully freed for server {server_id}: "
-                f"{free_gb:.1f}GB free"
+            log_constant(
+                _LOGGER, LOG_VLLM_GPU_MEMORY_NOT_FREED,
+                message=f"GPU memory may not be fully freed for server {server_id}: {free_gb:.1f}GB free",
+                extra={"server_id": server_id, "free_gb": free_gb},
             )
             pynvml.nvmlShutdown()
             return False
@@ -612,7 +849,7 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
             # Process exited
             state.status = "error"
             state.error_message = "Server process exited unexpectedly"
-            self._servers[server_id].update_state(state)
+            self._update_row_state(server_id, state)
             self._processes.pop(server_id, None)
             return
 
@@ -624,14 +861,25 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
         try:
             response = urllib.request.urlopen(url, timeout=2)
             if response.status == 200:
+                # Measure actual GPU memory used by this server
+                gpu_before = state.memory_gb  # Baseline stored at start
+                gpu_after = self._get_gpu_free_memory()
+                actual_usage = max(0.0, gpu_before - gpu_after)
+
                 state.status = "running"
-                state.memory_gb = self._gpu_memory_utilization * 16  # Estimated
-                self._servers[server_id].update_state(state)
+                state.memory_gb = actual_usage
+                self._server_gpu_usage[server_id] = actual_usage
+                self._update_row_state(server_id, state)
+                self._update_info_label()
 
                 # Emit status change with base URL
                 base_url = f"http://127.0.0.1:{port}/v1"
                 self.server_status_changed.emit(server_id, "running", base_url)
-                _LOGGER.info(f"vLLM server {server_id} is running on port {port}")
+                log_constant(
+                    _LOGGER, LOG_VLLM_SERVER_RUNNING,
+                    message=f"vLLM server {server_id} running on port {port}, using {actual_usage:.1f}GB GPU",
+                    extra={"server_id": server_id, "port": port, "gpu_usage_gb": actual_usage},
+                )
         except Exception as e:
             # Server not ready yet, will be checked by health timer
             _LOGGER.debug(f"Server {server_id} startup check failed: {e}")
@@ -662,13 +910,25 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
             if server_responding:
                 # Server is healthy
                 if state.status == "starting":
+                    # Measure actual GPU memory used
+                    gpu_before = state.memory_gb  # Baseline stored at start
+                    gpu_after = self._get_gpu_free_memory()
+                    actual_usage = max(0.0, gpu_before - gpu_after)
+
                     state.status = "running"
-                    state.memory_gb = self._gpu_memory_utilization * 16
+                    state.memory_gb = actual_usage
                     state.error_message = None
-                    self._servers[server_id].update_state(state)
+                    self._server_gpu_usage[server_id] = actual_usage
+                    self._update_row_state(server_id, state)
+                    self._update_info_label()
+
                     base_url = f"http://127.0.0.1:{port}/v1"
                     self.server_status_changed.emit(server_id, "running", base_url)
-                    _LOGGER.info(f"vLLM server {server_id} is now running on port {port}")
+                    log_constant(
+                        _LOGGER, LOG_VLLM_SERVER_RUNNING,
+                        message=f"vLLM server {server_id} running on port {port}, using {actual_usage:.1f}GB GPU",
+                        extra={"server_id": server_id, "port": port, "gpu_usage_gb": actual_usage},
+                    )
             else:
                 # Server not responding - check if process is dead
                 process = self._processes.get(server_id)
@@ -676,17 +936,25 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
                     # Process exited and health endpoint not responding
                     state.status = "error"
                     state.error_message = "Server process exited"
-                    self._servers[server_id].update_state(state)
+                    self._update_row_state(server_id, state)
                     self._processes.pop(server_id, None)
                     self.server_status_changed.emit(server_id, "error", "")
-                    _LOGGER.warning(f"vLLM server {server_id} process exited")
+                    log_constant(
+                        _LOGGER, LOG_VLLM_SERVER_PROCESS_EXITED,
+                        message=f"vLLM server {server_id} process exited",
+                        extra={"server_id": server_id},
+                    )
                 elif state.status == "running":
                     # Was running but now not responding
                     state.status = "error"
                     state.error_message = "Server not responding"
-                    self._servers[server_id].update_state(state)
+                    self._update_row_state(server_id, state)
                     self.server_status_changed.emit(server_id, "error", "")
-                    _LOGGER.warning(f"vLLM server {server_id} stopped responding")
+                    log_constant(
+                        _LOGGER, LOG_VLLM_SERVER_NOT_RESPONDING,
+                        message=f"vLLM server {server_id} stopped responding",
+                        extra={"server_id": server_id},
+                    )
 
     def get_server_base_url(self, server_id: int) -> Optional[str]:
         """Get the base URL for a running server."""
@@ -721,8 +989,7 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
 
 __all__ = [
     "VLLMServerWidget",
-    "VLLMServerRow",
+    "ServerRowWidgets",
     "VLLMServerState",
     "VLLM_BASE_PORT",
-    "GPU_MEMORY_UTILIZATION",
 ]

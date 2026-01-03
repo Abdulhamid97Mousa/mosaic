@@ -32,7 +32,7 @@ class TestRayWorkerConfig:
         from ray_worker.config import (
             RayWorkerConfig,
             EnvironmentConfig,
-            TrainingParadigm,
+            PolicyConfiguration,
         )
 
         config = RayWorkerConfig(
@@ -41,20 +41,20 @@ class TestRayWorkerConfig:
                 family="sisl",
                 env_id="waterworld_v4",
             ),
-            paradigm=TrainingParadigm.PARAMETER_SHARING,
+            policy_configuration=PolicyConfiguration.PARAMETER_SHARING,
         )
 
         assert config.run_id == "test_run_001"
         assert config.environment.family == "sisl"
         assert config.environment.env_id == "waterworld_v4"
-        assert config.paradigm == TrainingParadigm.PARAMETER_SHARING
+        assert config.policy_configuration == PolicyConfiguration.PARAMETER_SHARING
 
     def test_config_path_resolution(self):
         """Test path resolution properties."""
         from ray_worker.config import (
             RayWorkerConfig,
             EnvironmentConfig,
-            TrainingParadigm,
+            PolicyConfiguration,
         )
 
         config = RayWorkerConfig(
@@ -63,7 +63,7 @@ class TestRayWorkerConfig:
                 family="sisl",
                 env_id="waterworld_v4",
             ),
-            paradigm=TrainingParadigm.PARAMETER_SHARING,
+            policy_configuration=PolicyConfiguration.PARAMETER_SHARING,
         )
 
         # Test path properties
@@ -78,7 +78,7 @@ class TestRayWorkerConfig:
         from ray_worker.config import (
             RayWorkerConfig,
             EnvironmentConfig,
-            TrainingParadigm,
+            PolicyConfiguration,
         )
 
         config = RayWorkerConfig(
@@ -87,7 +87,7 @@ class TestRayWorkerConfig:
                 family="sisl",
                 env_id="waterworld_v4",
             ),
-            paradigm=TrainingParadigm.INDEPENDENT,
+            policy_configuration=PolicyConfiguration.INDEPENDENT,
         )
 
         data = config.to_dict()
@@ -183,7 +183,7 @@ class TestRayWorkerRuntime:
             TrainingConfig,
             ResourceConfig,
             CheckpointConfig,
-            TrainingParadigm,
+            PolicyConfiguration,
         )
 
         return RayWorkerConfig(
@@ -192,7 +192,7 @@ class TestRayWorkerRuntime:
                 family="sisl",
                 env_id="waterworld_v4",
             ),
-            paradigm=TrainingParadigm.PARAMETER_SHARING,
+            policy_configuration=PolicyConfiguration.PARAMETER_SHARING,
             training=TrainingConfig(
                 algorithm="PPO",
                 total_timesteps=2000,  # Very short for testing
@@ -249,67 +249,103 @@ class TestRayWorkerRuntime:
 
 
 class TestAnalyticsManifest:
-    """Tests for analytics manifest generation."""
+    """Tests for analytics manifest generation using standardized WorkerAnalyticsManifest."""
 
-    def test_manifest_creation(self):
-        """Test creating analytics manifest."""
-        from ray_worker.analytics import RayAnalyticsManifest
+    def test_write_analytics_manifest(self, tmp_path):
+        """Test writing analytics manifest with write_analytics_manifest()."""
+        from ray_worker.analytics import write_analytics_manifest
+        from ray_worker.config import (
+            RayWorkerConfig,
+            EnvironmentConfig,
+            PolicyConfiguration,
+            PettingZooAPIType,
+        )
 
-        manifest = RayAnalyticsManifest(
+        config = RayWorkerConfig(
             run_id="test_manifest_001",
-            tensorboard_relative="tensorboard",
-            paradigm="parameter_sharing",
-            algorithm="PPO",
-            env_id="waterworld_v4",
-            env_family="sisl",
+            environment=EnvironmentConfig(
+                family="sisl",
+                env_id="waterworld_v4",
+                api_type=PettingZooAPIType.PARALLEL,
+            ),
+            policy_configuration=PolicyConfiguration.PARAMETER_SHARING,
+            output_dir=str(tmp_path),
+        )
+
+        manifest_path = write_analytics_manifest(
+            config,
+            wandb_run_path="entity/project/run123",
+            notes="Test run",
             num_agents=2,
         )
 
-        assert manifest.run_id == "test_manifest_001"
-        assert manifest.paradigm == "parameter_sharing"
+        assert manifest_path.exists()
 
-    def test_manifest_to_dict(self):
-        """Test manifest serialization."""
-        from ray_worker.analytics import RayAnalyticsManifest
+    def test_manifest_structure(self, tmp_path):
+        """Test manifest has correct structure."""
+        from ray_worker.analytics import write_analytics_manifest
+        from ray_worker.config import (
+            RayWorkerConfig,
+            EnvironmentConfig,
+            PolicyConfiguration,
+            PettingZooAPIType,
+        )
+        from gym_gui.core.worker import WorkerAnalyticsManifest
 
-        manifest = RayAnalyticsManifest(
+        config = RayWorkerConfig(
             run_id="test_manifest_002",
-            tensorboard_relative="tensorboard",
-            paradigm="independent",
-            algorithm="PPO",
-            env_id="waterworld_v4",
-            env_family="sisl",
+            environment=EnvironmentConfig(
+                family="sisl",
+                env_id="waterworld_v4",
+                api_type=PettingZooAPIType.PARALLEL,
+            ),
+            policy_configuration=PolicyConfiguration.INDEPENDENT,
+            output_dir=str(tmp_path),
+            tensorboard=True,
         )
 
-        data = manifest.to_dict()
-        assert data["run_id"] == "test_manifest_002"
-        assert data["worker_type"] == "ray_worker"
-        assert data["artifacts"]["tensorboard"]["enabled"] is True
-        assert data["ray_metadata"]["paradigm"] == "independent"
+        manifest_path = write_analytics_manifest(config)
+
+        # Load and verify
+        loaded = WorkerAnalyticsManifest.load(manifest_path)
+        assert loaded.run_id == "test_manifest_002"
+        assert loaded.worker_type == "ray"
+        assert loaded.metadata["paradigm"] == "independent"
+        assert loaded.metadata["env_id"] == "waterworld_v4"
+        assert loaded.artifacts.tensorboard is not None
+        assert loaded.artifacts.tensorboard.enabled is True
 
     def test_manifest_save_load(self, tmp_path):
-        """Test manifest save and load."""
-        from ray_worker.analytics import RayAnalyticsManifest
+        """Test manifest save and load roundtrip."""
+        from ray_worker.analytics import write_analytics_manifest
+        from ray_worker.config import (
+            RayWorkerConfig,
+            EnvironmentConfig,
+            PolicyConfiguration,
+            PettingZooAPIType,
+        )
+        from gym_gui.core.worker import WorkerAnalyticsManifest
 
-        manifest = RayAnalyticsManifest(
+        config = RayWorkerConfig(
             run_id="test_manifest_003",
-            tensorboard_relative="tensorboard",
-            paradigm="self_play",
-            algorithm="PPO",
-            env_id="chess_v6",
-            env_family="classic",
+            environment=EnvironmentConfig(
+                family="classic",
+                env_id="chess_v6",
+                api_type=PettingZooAPIType.AEC,
+            ),
+            policy_configuration=PolicyConfiguration.SELF_PLAY,
+            output_dir=str(tmp_path),
         )
 
         # Save
-        manifest_path = tmp_path / "analytics.json"
-        manifest.save(manifest_path)
-
+        manifest_path = write_analytics_manifest(config, num_agents=2)
         assert manifest_path.exists()
 
         # Load
-        loaded = RayAnalyticsManifest.load(manifest_path)
+        loaded = WorkerAnalyticsManifest.load(manifest_path)
         assert loaded.run_id == "test_manifest_003"
-        assert loaded.paradigm == "self_play"
+        assert loaded.metadata["paradigm"] == "self_play"
+        assert loaded.metadata["num_agents"] == 2
 
 
 class TestPolicyActor:

@@ -17,6 +17,7 @@ from qtpy import QtCore, QtWidgets
 
 from gym_gui.services.operator import OperatorConfig
 from gym_gui.rendering import RendererRegistry, create_default_renderer_registry, RendererContext
+from gym_gui.rendering.strategies.board_game import BoardGameRendererStrategy
 from gym_gui.core.enums import RenderMode
 
 _LOGGER = logging.getLogger(__name__)
@@ -61,8 +62,10 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         # Support multiple renderer types (GRID for text environments, RGB for visual)
         self._grid_renderer: Optional[Any] = None
         self._rgb_renderer: Optional[Any] = None
+        self._board_game_renderer: Optional[BoardGameRendererStrategy] = None
         self._renderer_strategy: Optional[Any] = None  # Currently active renderer
         self._active_render_mode: Optional[RenderMode] = None
+        self._is_board_game: bool = False  # Track if current payload is a board game
 
         # Stats tracking
         self._current_step = 0
@@ -213,33 +216,119 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         if old_status != status:
             self.status_changed.emit(self._config.operator_id, status)
 
+    def set_display_size(self, width: int, height: int) -> None:
+        """Set the display size of the render area.
+
+        This controls the size of the render container widget,
+        which affects how large the environment is displayed.
+
+        Args:
+            width: Width in pixels
+            height: Height in pixels
+        """
+        # Update render container to fixed size
+        self._render_container.setMinimumSize(width, height)
+        self._render_container.setFixedSize(width, height)
+
+        # Also update the overall widget size (add padding for header/stats)
+        total_height = height + 80  # header + stats bar
+        total_width = width + 20
+        self.setMinimumSize(total_width, total_height)
+        self.setFixedSize(total_width, total_height)
+
+        # Force layout update
+        self.updateGeometry()
+        if self.parent():
+            self.parent().updateGeometry()
+
+        _LOGGER.debug(f"Set display size to {width}x{height} for {self._config.operator_id}")
+
     def display_payload(self, payload: Dict[str, Any]) -> None:
         """Display a render payload from telemetry.
 
         Args:
             payload: Telemetry payload containing render data.
         """
+        print(f"DEBUG OperatorRenderContainer.display_payload: received payload keys={list(payload.keys())}")
         try:
             # Update stats from payload
             self._update_stats_from_payload(payload)
 
             # Extract render data
             render_payload = self._extract_render_payload(payload)
+            print(f"DEBUG OperatorRenderContainer.display_payload: render_payload={render_payload}")
             if render_payload is None:
+                print("DEBUG OperatorRenderContainer.display_payload: render_payload is None, returning!")
                 return
 
-            # Detect payload type and initialize appropriate renderer
-            required_mode = self._detect_render_mode(render_payload)
-            if required_mode != self._active_render_mode:
-                self._init_renderer(required_mode)
+            # Check if this is a board game payload (chess, go, connect_four, etc.)
+            is_board_game = self._is_board_game_payload(render_payload)
+            print(f"DEBUG OperatorRenderContainer.display_payload: is_board_game={is_board_game}")
 
-            # Render using the active strategy
-            if self._renderer_strategy and self._renderer_strategy.supports(render_payload):
-                context = RendererContext()
-                self._renderer_strategy.render(render_payload, context=context)
+            if is_board_game:
+                # Use BoardGameRendererStrategy for board games
+                if not self._board_game_renderer:
+                    self._board_game_renderer = BoardGameRendererStrategy(self._render_container)
+                    self._render_layout.addWidget(self._board_game_renderer.widget)
+
+                # Switch to board game renderer if needed
+                if not self._is_board_game:
+                    self._is_board_game = True
+                    # Hide other renderers
+                    if self._grid_renderer:
+                        self._grid_renderer.widget.hide()
+                    if self._rgb_renderer:
+                        self._rgb_renderer.widget.hide()
+                    self._board_game_renderer.widget.show()
+                    self._renderer_strategy = self._board_game_renderer
+
+                # Render the board game
+                if self._board_game_renderer.supports(render_payload):
+                    context = RendererContext()
+                    self._board_game_renderer.render(render_payload, context=context)
+            else:
+                # Use standard RGB or GRID renderer
+                if self._is_board_game:
+                    self._is_board_game = False
+                    if self._board_game_renderer:
+                        self._board_game_renderer.widget.hide()
+
+                # Detect payload type and initialize appropriate renderer
+                required_mode = self._detect_render_mode(render_payload)
+                if required_mode != self._active_render_mode:
+                    self._init_renderer(required_mode)
+
+                # Render using the active strategy
+                if self._renderer_strategy and self._renderer_strategy.supports(render_payload):
+                    context = RendererContext()
+                    self._renderer_strategy.render(render_payload, context=context)
 
         except Exception as e:
             _LOGGER.error(f"Error displaying payload: {e}")
+
+    def _is_board_game_payload(self, payload: Dict[str, Any]) -> bool:
+        """Check if the payload is for a board game (chess, go, connect_four, etc.).
+
+        Args:
+            payload: The render payload to analyze.
+
+        Returns:
+            True if this is a board game payload that should use BoardGameRendererStrategy.
+        """
+        # Check for board game specific keys
+        if "chess" in payload or "fen" in payload:
+            return True
+        if "connect_four" in payload:
+            return True
+        if "go" in payload:
+            return True
+        if "sudoku" in payload:
+            return True
+        # Check game_id
+        game_id = payload.get("game_id")
+        if game_id in ("chess", "connect_four", "go", "tictactoe", "sudoku"):
+            return True
+        return False
 
     def _detect_render_mode(self, payload: Dict[str, Any]) -> RenderMode:
         """Detect which render mode is needed for this payload.

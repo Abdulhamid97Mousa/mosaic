@@ -99,7 +99,7 @@ class TestAnalyticsSetup:
 
         # Check ray metadata
         ray_meta = manifest["ray_metadata"]
-        assert ray_meta["paradigm"] == "independent"
+        assert ray_meta["policy_configuration"] == "independent"
         assert ray_meta["algorithm"] == "PPO"
         assert ray_meta["env_id"] == "waterworld_v4"
         assert ray_meta["num_agents"] == 5

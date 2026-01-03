@@ -30,7 +30,7 @@ def test_env_creator_wraps_parallel_env_with_fastlane():
             total_timesteps=100,
             algo_params={},
         ),
-        paradigm="parameter_sharing",
+        policy_configuration="parameter_sharing",
         fastlane_enabled=True,
         fastlane_throttle_ms=0,
     )

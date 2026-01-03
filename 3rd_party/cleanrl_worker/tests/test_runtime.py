@@ -78,9 +78,9 @@ def test_run_dry_run_returns_summary() -> None:
     )
 
     summary = runtime.run()
-    assert summary.status == "dry-run"
-    assert summary.config["env_id"] == "CartPole-v1"
-    assert summary.config["algo"] == "ppo"
+    assert summary["status"] == "dry-run"
+    assert summary["config"]["env_id"] == "CartPole-v1"
+    assert summary["config"]["algo"] == "ppo"
 
 
 def test_build_cleanrl_args_respects_cli_overrides() -> None:
@@ -187,7 +187,7 @@ def test_run_uses_launcher_and_writes_logs(monkeypatch, tmp_path: Path) -> None:
     assert launched["cwd"] == (run_dir / "runs" / config.run_id).resolve()
     assert launched["stdout_path"].exists()
     assert launched["stderr_path"].exists()
-    assert summary.status == "completed"
+    assert summary["status"] == "completed"
     pythonpath = launched["env"].get("PYTHONPATH", "")
     assert str(REPO_ROOT) in pythonpath.split(os.pathsep)
     tb_dir = (launched["cwd"] / "tensorboard").resolve()

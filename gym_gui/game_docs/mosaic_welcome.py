@@ -70,7 +70,12 @@ to create cohesive intelligent systems — like tiles in a mosaic forming a comp
         <a href="https://xuance.readthedocs.io/" style="color: #1565c0; font-size: 10px;">Docs</a> |
         <a href="https://github.com/agi-brain/xuance" style="color: #1565c0; font-size: 10px;">GitHub</a>
     </td>
-    <td style="background-color: #f5f5f5; width: 33%;"></td>
+    <td style="background-color: #fce4ec; border-left: 4px solid #e91e63; width: 33%;">
+        <b style="color: #c2185b;">Jumanji</b><br/>
+        <span style="color: #666; font-size: 11px;">JAX-based logic puzzles (2048, Sudoku, etc.)</span><br/>
+        <a href="https://github.com/instadeepai/jumanji" style="color: #1565c0; font-size: 10px;">GitHub</a> |
+        <a href="https://instadeepai.github.io/jumanji/" style="color: #1565c0; font-size: 10px;">Docs</a>
+    </td>
     <td style="background-color: #f5f5f5; width: 33%;"></td>
 </tr>
 </table>

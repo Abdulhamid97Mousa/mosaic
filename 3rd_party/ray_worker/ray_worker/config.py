@@ -1,9 +1,9 @@
 """Configuration dataclasses for Ray RLlib multi-agent worker.
 
 This module defines the configuration structure for multi-agent training
-with Ray RLlib, supporting various training paradigms:
-- Parameter Sharing: All agents share one policy (cooperative)
-- Independent Learning: Each agent has its own policy
+with Ray RLlib, supporting various policy configurations:
+- Parameter Sharing: All agents share one policy (homogeneous cooperative)
+- Independent Learning: Each agent has its own policy (heterogeneous)
 - Self-Play: Agent plays against copies of itself (competitive)
 
 Integrates with MOSAIC's trainer infrastructure:
@@ -66,13 +66,24 @@ except ImportError:
         return f"var/trainer/runs/{run_id}/tensorboard"
 
 
-class TrainingParadigm(str, Enum):
-    """Multi-agent training paradigm."""
+class PolicyConfiguration(str, Enum):
+    """Multi-agent policy configuration strategy.
+
+    Defines how agents map to policies in multi-agent training:
+    - PARAMETER_SHARING: All agents share one policy (homogeneous cooperative)
+    - INDEPENDENT: Each agent has its own policy (heterogeneous learning)
+    - SELF_PLAY: Agents train against copies of themselves (competitive)
+    - SHARED_VALUE_FUNCTION: CTDE - Centralized Training, Decentralized Execution
+    """
 
     PARAMETER_SHARING = "parameter_sharing"
     INDEPENDENT = "independent"
     SELF_PLAY = "self_play"
     SHARED_VALUE_FUNCTION = "shared_value_function"
+
+
+# Backwards compatibility alias (deprecated - use PolicyConfiguration)
+TrainingParadigm = PolicyConfiguration
 
 
 class PettingZooAPIType(str, Enum):
@@ -199,7 +210,7 @@ class RayWorkerConfig:
                 env_id="waterworld_v4",
                 api_type=PettingZooAPIType.PARALLEL,
             ),
-            paradigm=TrainingParadigm.PARAMETER_SHARING,
+            policy_configuration=PolicyConfiguration.PARAMETER_SHARING,
         )
     """
 
@@ -209,8 +220,8 @@ class RayWorkerConfig:
     # Environment configuration
     environment: EnvironmentConfig
 
-    # Training paradigm
-    paradigm: TrainingParadigm = TrainingParadigm.PARAMETER_SHARING
+    # Policy configuration strategy
+    policy_configuration: PolicyConfiguration = PolicyConfiguration.PARAMETER_SHARING
 
     # Training hyperparameters
     training: TrainingConfig = field(default_factory=TrainingConfig)
@@ -243,6 +254,29 @@ class RayWorkerConfig:
 
     # Extra configuration passed through
     extras: Dict[str, Any] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Validate required fields on initialization."""
+        if not self.run_id:
+            raise ValueError("ray_worker config missing required field 'run_id'")
+
+        if not isinstance(self.environment, EnvironmentConfig):
+            raise TypeError("environment must be EnvironmentConfig instance")
+
+        if not self.environment.family:
+            raise ValueError("environment.family is required")
+
+        if not self.environment.env_id:
+            raise ValueError("environment.env_id is required")
+
+        if not isinstance(self.policy_configuration, PolicyConfiguration):
+            raise TypeError(f"policy_configuration must be PolicyConfiguration enum, got {type(self.policy_configuration)}")
+
+        # Protocol compliance assertion
+        from gym_gui.core.worker import WorkerConfig as WorkerConfigProtocol
+        assert isinstance(self, WorkerConfigProtocol), (
+            "RayWorkerConfig must implement WorkerConfig protocol"
+        )
 
     # --- Path resolution methods (integrates with var/trainer infrastructure) ---
 
@@ -310,7 +344,8 @@ class RayWorkerConfig:
                 "render_mode": self.environment.render_mode,
                 "env_kwargs": self.environment.env_kwargs,
             },
-            "paradigm": self.paradigm.value,
+            "policy_configuration": self.policy_configuration.value,
+            "paradigm": self.policy_configuration.value,  # Backwards compatibility (deprecated)
             "training": {
                 "algorithm": self.training.algorithm,
                 "total_timesteps": self.training.total_timesteps,
@@ -395,13 +430,14 @@ class RayWorkerConfig:
             export_policy=checkpoint_data.get("export_policy", True),
         )
 
-        paradigm_str = data.get("paradigm", "parameter_sharing")
-        paradigm = TrainingParadigm(paradigm_str)
+        # Support both new (policy_configuration) and old (paradigm) keys for backwards compatibility
+        policy_config_str = data.get("policy_configuration") or data.get("paradigm", "parameter_sharing")
+        policy_configuration = PolicyConfiguration(policy_config_str)
 
         return cls(
             run_id=data.get("run_id", ""),
             environment=environment,
-            paradigm=paradigm,
+            policy_configuration=policy_configuration,
             training=training,
             resources=resources,
             checkpoint=checkpoint,
@@ -462,7 +498,8 @@ def load_worker_config(config_path: str) -> RayWorkerConfig:
 
 
 __all__ = [
-    "TrainingParadigm",
+    "PolicyConfiguration",
+    "TrainingParadigm",  # Backwards compatibility alias (deprecated)
     "PettingZooAPIType",
     "ResourceConfig",
     "TrainingConfig",

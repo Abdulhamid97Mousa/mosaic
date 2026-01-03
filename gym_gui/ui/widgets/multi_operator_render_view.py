@@ -163,6 +163,20 @@ class MultiOperatorRenderView(QtWidgets.QWidget):
         if container:
             container.set_status(status)
 
+    def set_operator_display_size(self, operator_id: str, width: int, height: int) -> None:
+        """Set the display size for an operator's render container.
+
+        Args:
+            operator_id: The operator ID.
+            width: Display width in pixels.
+            height: Display height in pixels.
+        """
+        container = self._containers.get(operator_id)
+        if container:
+            container.set_display_size(width, height)
+            # Trigger relayout to accommodate new size
+            self._relayout()
+
     def display_payload(self, operator_id: str, payload: Dict[str, Any]) -> None:
         """Display render payload for a specific operator.
 
@@ -170,9 +184,14 @@ class MultiOperatorRenderView(QtWidgets.QWidget):
             operator_id: The operator to display the payload for.
             payload: The telemetry payload containing render data.
         """
+        print(f"DEBUG MultiOperatorRenderView.display_payload: operator_id={operator_id}")
+        print(f"DEBUG MultiOperatorRenderView.display_payload: available containers={list(self._containers.keys())}")
         container = self._containers.get(operator_id)
         if container:
+            print(f"DEBUG MultiOperatorRenderView.display_payload: Found container, calling display_payload")
             container.display_payload(payload)
+        else:
+            print(f"DEBUG MultiOperatorRenderView.display_payload: NO CONTAINER for {operator_id}!")
 
     def display_payload_by_run_id(self, run_id: str, payload: Dict[str, Any]) -> None:
         """Display render payload using run_id lookup.

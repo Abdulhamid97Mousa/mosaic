@@ -18,8 +18,8 @@ from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import pyqtSignal
 
 from gym_gui.services.operator import OperatorConfig
-from gym_gui.ui.widgets.operator_config_widget import OperatorConfigWidget
-from gym_gui.ui.widgets.vllm_server_widget import VLLMServerWidget
+from gym_gui.ui.widgets.operator_config_widget import OperatorConfigWidget, VLLMServerInfo
+from gym_gui.ui.widgets.vllm_server_widget import VLLMServerWidget, VLLM_BASE_PORT
 from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
 
 
@@ -42,11 +42,14 @@ class OperatorsSubTab(QtWidgets.QWidget):
     reset_all_requested = pyqtSignal(int)  # Emit with current seed
     stop_operators_requested = pyqtSignal()
     initialize_operator_requested = pyqtSignal(str, object, int)  # operator_id, config, seed
+    step_player_requested = pyqtSignal(str, int)  # player_id, seed
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
         self._step_count = 0
         self._is_running = False
+        self._pettingzoo_mode = False
+        self._current_player: str = ""
         self._build_ui()
 
     def _build_ui(self) -> None:
@@ -88,6 +91,7 @@ class OperatorsSubTab(QtWidgets.QWidget):
         self._operator_config_widget = OperatorConfigWidget(max_operators=8, parent=config_group)
         self._operator_config_widget.operators_changed.connect(self._on_operators_config_changed)
         self._operator_config_widget.initialize_requested.connect(self._on_initialize_requested)
+        self._operator_config_widget.vllm_refresh_requested.connect(self.refresh_vllm_servers)
         config_layout.addWidget(self._operator_config_widget)
 
         layout.addWidget(config_group)
@@ -159,6 +163,33 @@ class OperatorsSubTab(QtWidgets.QWidget):
         self._step_all_button.clicked.connect(self._on_step_all_clicked)
         button_row.addWidget(self._step_all_button)
 
+        # PettingZoo player-specific step buttons (hidden by default)
+        self._step_player_0_btn = QtWidgets.QPushButton("Step White ⚪", exec_group)
+        self._step_player_0_btn.setToolTip("Step player_0 (White) - their turn to move")
+        self._step_player_0_btn.setStyleSheet(
+            "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #4CAF50; color: white; }"
+            "QPushButton:hover { background-color: #45a049; }"
+            "QPushButton:pressed { background-color: #388E3C; }"
+            "QPushButton:disabled { background-color: #A5D6A7; color: #E8F5E9; }"
+        )
+        self._step_player_0_btn.setEnabled(False)
+        self._step_player_0_btn.setVisible(False)  # Hidden by default
+        self._step_player_0_btn.clicked.connect(lambda: self._on_step_player_clicked("player_0"))
+        button_row.addWidget(self._step_player_0_btn)
+
+        self._step_player_1_btn = QtWidgets.QPushButton("Step Black ⚫", exec_group)
+        self._step_player_1_btn.setToolTip("Step player_1 (Black) - their turn to move")
+        self._step_player_1_btn.setStyleSheet(
+            "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #4CAF50; color: white; }"
+            "QPushButton:hover { background-color: #45a049; }"
+            "QPushButton:pressed { background-color: #388E3C; }"
+            "QPushButton:disabled { background-color: #A5D6A7; color: #E8F5E9; }"
+        )
+        self._step_player_1_btn.setEnabled(False)
+        self._step_player_1_btn.setVisible(False)  # Hidden by default
+        self._step_player_1_btn.clicked.connect(lambda: self._on_step_player_clicked("player_1"))
+        button_row.addWidget(self._step_player_1_btn)
+
         self._stop_operators_button = QtWidgets.QPushButton("Stop All", exec_group)
         self._stop_operators_button.setToolTip("Stop all running operators and release resources")
         self._stop_operators_button.setStyleSheet(
@@ -189,6 +220,15 @@ class OperatorsSubTab(QtWidgets.QWidget):
             "QLabel { color: #666; padding: 4px; font-style: italic; }"
         )
         status_row.addWidget(self._status_label)
+
+        # Turn indicator for PettingZoo multi-agent games
+        self._turn_indicator_label = QtWidgets.QLabel("", exec_group)
+        self._turn_indicator_label.setStyleSheet(
+            "QLabel { font-weight: bold; color: #F57C00; padding: 4px 8px; "
+            "background-color: #FFF3E0; border-radius: 4px; }"
+        )
+        self._turn_indicator_label.setVisible(False)  # Hidden by default
+        status_row.addWidget(self._turn_indicator_label)
 
         status_row.addStretch(1)
 
@@ -260,6 +300,87 @@ class OperatorsSubTab(QtWidgets.QWidget):
         """Set the status label text."""
         self._status_label.setText(status)
 
+    def set_turn_indicator(self, player_id: str, visible: bool = True) -> None:
+        """Set the turn indicator for PettingZoo multi-agent games.
+
+        Args:
+            player_id: Current player (e.g., "player_0", "player_1").
+            visible: Whether to show the indicator.
+        """
+        if visible and player_id:
+            # Map player_id to friendly name
+            player_names = {
+                "player_0": "White",
+                "player_1": "Black",
+            }
+            friendly_name = player_names.get(player_id, player_id)
+            self._turn_indicator_label.setText(f"Next: {friendly_name} ({player_id})")
+            self._turn_indicator_label.setVisible(True)
+        else:
+            self._turn_indicator_label.setVisible(False)
+
+    def set_pettingzoo_mode(self, enabled: bool) -> None:
+        """Enable or disable PettingZoo multi-agent mode.
+
+        When enabled:
+        - Hides "Step All" button
+        - Shows player-specific step buttons (Step White, Step Black)
+
+        Args:
+            enabled: True to enable PettingZoo mode, False for normal mode.
+        """
+        print(f"DEBUG OperatorsSubTab.set_pettingzoo_mode: enabled={enabled}")
+        self._pettingzoo_mode = enabled
+        self._step_all_button.setVisible(not enabled)
+        self._step_player_0_btn.setVisible(enabled)
+        self._step_player_1_btn.setVisible(enabled)
+        print(f"DEBUG: step_all visible={not enabled}, player btns visible={enabled}")
+
+        if not enabled:
+            # Reset to normal mode
+            self._step_player_0_btn.setEnabled(False)
+            self._step_player_1_btn.setEnabled(False)
+            self._current_player = ""
+
+    def set_current_player(self, player_id: str) -> None:
+        """Set which player's turn it is (enables their button, disables the other).
+
+        Args:
+            player_id: The player whose turn it is ("player_0" or "player_1").
+        """
+        print(f"DEBUG OperatorsSubTab.set_current_player: player_id={player_id}")
+        self._current_player = player_id
+
+        if player_id == "player_0":
+            self._step_player_0_btn.setEnabled(True)
+            self._step_player_1_btn.setEnabled(False)
+            print("DEBUG: Enabled player_0 button, disabled player_1 button")
+        elif player_id == "player_1":
+            self._step_player_0_btn.setEnabled(False)
+            self._step_player_1_btn.setEnabled(True)
+            print("DEBUG: Disabled player_0 button, enabled player_1 button")
+        else:
+            # Unknown player or game over
+            self._step_player_0_btn.setEnabled(False)
+            self._step_player_1_btn.setEnabled(False)
+            print("DEBUG: Disabled both buttons (game over or unknown player)")
+
+    def _on_step_player_clicked(self, player_id: str) -> None:
+        """Handle click on a player-specific step button.
+
+        Args:
+            player_id: Which player's button was clicked.
+        """
+        seed = self._seed_spin.value()
+        # Disable button immediately to prevent double-clicks
+        if player_id == "player_0":
+            self._step_player_0_btn.setEnabled(False)
+        else:
+            self._step_player_1_btn.setEnabled(False)
+        self._step_count += 1
+        self._step_count_label.setText(f"Steps: {self._step_count}")
+        self.step_player_requested.emit(player_id, seed)
+
     def get_current_seed(self) -> int:
         """Get the current seed value."""
         return self._seed_spin.value()
@@ -267,12 +388,67 @@ class OperatorsSubTab(QtWidgets.QWidget):
     def _on_vllm_server_status_changed(self, server_id: int, status: str, base_url: str) -> None:
         """Handle vLLM server status changes.
 
-        This allows the UI to update operator indicators when servers start/stop.
+        This allows the UI to update operator dropdowns when servers start/stop.
+        Collects all server states and passes them to the operator config widget.
         """
-        # Log the status change
         import logging
         _LOGGER = logging.getLogger(__name__)
         _LOGGER.info(f"vLLM Server {server_id} status: {status}, URL: {base_url}")
+
+        # Collect all server info from the vLLM server widget
+        servers: list[VLLMServerInfo] = []
+        for sid, state in self._vllm_server_widget._server_states.items():
+            if state.model_id:  # Only include servers with a model selected
+                server_info = VLLMServerInfo(
+                    server_id=sid,
+                    port=state.port,
+                    model_id=state.model_id,
+                    base_url=f"http://127.0.0.1:{state.port}/v1",
+                    status=state.status,
+                )
+                servers.append(server_info)
+
+        # Update operator config widget with available servers
+        self._operator_config_widget.set_vllm_servers(servers)
+
+    def refresh_vllm_servers(self) -> None:
+        """Manually refresh the vLLM server list for operator dropdowns.
+
+        Call this to sync operator config with current vLLM server state.
+        Useful when servers were started before operators were configured.
+        """
+        import logging
+        _LOGGER = logging.getLogger(__name__)
+
+        servers: list[VLLMServerInfo] = []
+        for sid, state in self._vllm_server_widget._server_states.items():
+            if state.model_id:  # Only include servers with a model selected
+                server_info = VLLMServerInfo(
+                    server_id=sid,
+                    port=state.port,
+                    model_id=state.model_id,
+                    base_url=f"http://127.0.0.1:{state.port}/v1",
+                    status=state.status,
+                )
+                servers.append(server_info)
+
+        _LOGGER.debug(f"Refreshing vLLM servers: {len(servers)} available")
+        self._operator_config_widget.set_vllm_servers(servers)
+
+    def set_operator_environment_size(
+        self, operator_id: str, width: int, height: int, container_size: int | None = None
+    ) -> None:
+        """Set the environment size for a specific operator.
+
+        Args:
+            operator_id: The operator's unique ID
+            width: Rendered environment width in pixels (image size)
+            height: Rendered environment height in pixels (image size)
+            container_size: Optional container display size in pixels
+        """
+        self._operator_config_widget.set_operator_environment_size(
+            operator_id, width, height, container_size
+        )
 
     @property
     def vllm_server_widget(self) -> VLLMServerWidget:
@@ -509,6 +685,7 @@ class SingleAgentTab(QtWidgets.QWidget):
     # Forwarded signals from Operators subtab
     operators_changed = pyqtSignal(list)  # List[OperatorConfig]
     step_all_requested = pyqtSignal(int)  # Emit with seed for lock-step execution
+    step_player_requested = pyqtSignal(str, int)  # player_id, seed (PettingZoo mode)
     reset_all_requested = pyqtSignal(int)  # Emit with seed for fair reset
     stop_operators_requested = pyqtSignal()
     initialize_operator_requested = pyqtSignal(str, object, int)  # operator_id, config, seed
@@ -549,6 +726,7 @@ class SingleAgentTab(QtWidgets.QWidget):
         # Operators subtab - scientific execution controls
         self._operators_tab.operators_changed.connect(self.operators_changed)
         self._operators_tab.step_all_requested.connect(self.step_all_requested)
+        self._operators_tab.step_player_requested.connect(self.step_player_requested)
         self._operators_tab.reset_all_requested.connect(self.reset_all_requested)
         self._operators_tab.stop_operators_requested.connect(self.stop_operators_requested)
         self._operators_tab.initialize_operator_requested.connect(self.initialize_operator_requested)
@@ -579,6 +757,36 @@ class SingleAgentTab(QtWidgets.QWidget):
     def operator_config_widget(self) -> OperatorConfigWidget:
         """Get the operator configuration widget."""
         return self._operators_tab.operator_config_widget
+
+    def set_operator_environment_size(
+        self, operator_id: str, width: int, height: int, container_size: int | None = None
+    ) -> None:
+        """Set the environment size for a specific operator.
+
+        Args:
+            operator_id: The operator's unique ID
+            width: Rendered environment width in pixels (image size)
+            height: Rendered environment height in pixels (image size)
+            container_size: Optional container display size in pixels
+        """
+        self._operators_tab.set_operator_environment_size(
+            operator_id, width, height, container_size
+        )
+
+    def set_turn_indicator(self, player_id: str, visible: bool = True) -> None:
+        """Set the turn indicator to show whose turn it is."""
+        self._operators_tab.set_turn_indicator(player_id, visible)
+
+    def set_pettingzoo_mode(self, enabled: bool) -> None:
+        """Enable or disable PettingZoo multi-agent mode.
+
+        When enabled, shows player-specific step buttons instead of Step All.
+        """
+        self._operators_tab.set_pettingzoo_mode(enabled)
+
+    def set_current_player(self, player_id: str) -> None:
+        """Set which player's turn it is (enables their button, disables the other)."""
+        self._operators_tab.set_current_player(player_id)
 
     @property
     def worker_combo(self) -> QtWidgets.QComboBox:

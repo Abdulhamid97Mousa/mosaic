@@ -311,6 +311,35 @@ except Exception:  # pragma: no cover - textworld optional
     TEXTWORLD_CHALLENGES = []  # type: ignore
     _TEXTWORLD_AVAILABLE = False
 
+try:  # Optional dependency - Jumanji (JAX-based logic puzzle environments)
+    from .jumanji import (  # pragma: no cover - jumanji optional
+        JumanjiAdapter,
+        JumanjiGame2048Adapter,
+        JumanjiMinesweeperAdapter,
+        JumanjiRubiksCubeAdapter,
+        JumanjiSlidingPuzzleAdapter,
+        JumanjiSudokuAdapter,
+        JumanjiGraphColoringAdapter,
+        JUMANJI_ADAPTERS,
+        JUMANJI_ENV_NAMES,
+        GAME2048_ACTIONS,
+        RUBIKS_CUBE_ACTIONS,
+    )
+    _JUMANJI_AVAILABLE = True
+except Exception:  # pragma: no cover - jumanji optional
+    JumanjiAdapter = None  # type: ignore
+    JumanjiGame2048Adapter = None  # type: ignore
+    JumanjiMinesweeperAdapter = None  # type: ignore
+    JumanjiRubiksCubeAdapter = None  # type: ignore
+    JumanjiSlidingPuzzleAdapter = None  # type: ignore
+    JumanjiSudokuAdapter = None  # type: ignore
+    JumanjiGraphColoringAdapter = None  # type: ignore
+    JUMANJI_ADAPTERS = {}
+    JUMANJI_ENV_NAMES = []  # type: ignore
+    GAME2048_ACTIONS = []  # type: ignore
+    RUBIKS_CUBE_ACTIONS = []  # type: ignore
+    _JUMANJI_AVAILABLE = False
+
 # Standalone adapters for Human vs Agent mode (simplified state-based interfaces)
 from .chess_adapter import ChessAdapter as ChessHvAAdapter, ChessState
 from .connect_four_adapter import ConnectFourAdapter as ConnectFourHvAAdapter, ConnectFourState
@@ -521,6 +550,21 @@ if _TEXTWORLD_AVAILABLE:
         "TextWorldTreasureHunterAdapter",
         "TextWorldCookingAdapter",
         "TEXTWORLD_CHALLENGES",
+    ]
+
+if _JUMANJI_AVAILABLE:
+    __all__ += [
+        "JumanjiAdapter",
+        "JumanjiGame2048Adapter",
+        "JumanjiMinesweeperAdapter",
+        "JumanjiRubiksCubeAdapter",
+        "JumanjiSlidingPuzzleAdapter",
+        "JumanjiSudokuAdapter",
+        "JumanjiGraphColoringAdapter",
+        "JUMANJI_ADAPTERS",
+        "JUMANJI_ENV_NAMES",
+        "GAME2048_ACTIONS",
+        "RUBIKS_CUBE_ACTIONS",
     ]
 
 # Human vs Agent mode adapters (always available)

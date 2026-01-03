@@ -19,6 +19,9 @@ dev = [
 [project.scripts]
 xuance-worker = "xuance_worker.cli:main"
 
+[project.entry-points."mosaic.workers"]
+xuance = "xuance_worker:get_worker_metadata"
+
 [tool.setuptools.packages.find]
 where = ["."]
 include = ["xuance_worker*"]

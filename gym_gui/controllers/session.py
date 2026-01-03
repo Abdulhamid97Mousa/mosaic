@@ -47,6 +47,7 @@ from gym_gui.controllers.interaction import (
     AleInteractionController,
     ViZDoomInteractionController,
     ProcgenInteractionController,
+    JumanjiArcadeInteractionController,
 )
 from gym_gui.logging_config.log_constants import (
     LOG_NORMALIZATION_STATS_DROPPED,
@@ -357,6 +358,13 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._record_step(step, action=None, input_source=self._pending_input_label)
         self._update_idle_timer()
 
+    # Jumanji arcade-style games that need continuous simulation (ghosts move, blocks fall)
+    _JUMANJI_ARCADE_GAMES = frozenset({
+        GameId.JUMANJI_PACMAN,         # Ghosts chase player
+        GameId.JUMANJI_SNAKE,          # Snake auto-moves
+        GameId.JUMANJI_TETRIS,         # Blocks fall automatically
+    })
+
     def _create_interaction_controller(
         self, family: EnvironmentFamily | None
     ) -> InteractionController:
@@ -373,6 +381,10 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         if family == EnvironmentFamily.PROCGEN:
             # Procgen docs suggest 15 Hz, but 30 FPS feels more responsive in a GUI
             return ProcgenInteractionController(self, target_hz=30)
+        # Check for Jumanji arcade-style games (PacMan, Snake, Tetris)
+        if family == EnvironmentFamily.JUMANJI and self._game_id in self._JUMANJI_ARCADE_GAMES:
+            # 10 FPS for arcade feel - ghosts/snake/blocks move automatically
+            return JumanjiArcadeInteractionController(self, target_hz=10)
         return TurnBasedInteractionController()
 
     def perform_human_action(self, action: int, *, key_label: str | None = None) -> None:
@@ -989,9 +1001,9 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             self._stop_idle_tick()
             return
         interaction = getattr(self, "_interaction", None)
-        # For ALE, ViZDoom, and Procgen, do not gate on awaiting_human; always advance with NOOP when idle tick fires
+        # For ALE, ViZDoom, Procgen, and Jumanji arcade games, do not gate on awaiting_human
         # These are continuous games where the world should keep moving regardless of player input
-        require_awaiting = not isinstance(interaction, (AleInteractionController, ViZDoomInteractionController, ProcgenInteractionController))
+        require_awaiting = not isinstance(interaction, (AleInteractionController, ViZDoomInteractionController, ProcgenInteractionController, JumanjiArcadeInteractionController))
         if require_awaiting and not self._awaiting_human:
             return
 

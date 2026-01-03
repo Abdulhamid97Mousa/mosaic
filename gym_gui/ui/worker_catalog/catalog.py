@@ -45,11 +45,13 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
     """Return the catalog of worker integrations recognised by the UI.
 
     Workers available:
+    - BARLOG: LLM-based agents using BALROG benchmark framework
     - CleanRL: Single/multi-agent RL with clean implementations (PPO, DQN, SAC, TD3, etc.)
     - XuanCe: Comprehensive deep RL library with 50+ algorithms for single/multi-agent
     - Ray RLlib: Multi-agent distributed RL with various paradigms
-    - PettingZoo: Multi-agent environments with AEC and Parallel APIs
-    - BARLOG: LLM-based agents using BALROG benchmark framework
+
+    Note: PettingZoo is an environment library (not algorithms) and is supported
+    BY the workers above, not as a separate worker.
     """
     return (
         WorkerDefinition(
@@ -114,20 +116,37 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
             supports_multi_agent=True,
         ),
         WorkerDefinition(
-            worker_id="pettingzoo_worker",
-            display_name="PettingZoo Worker",
+            worker_id="chess_worker",
+            display_name="Chess LLM Worker",
             description=(
-                "Multi-agent reinforcement learning using PettingZoo environments. "
-                "Supports both AEC (turn-based) and Parallel (simultaneous) APIs. "
-                "Includes classic board games (Chess, Go), cooperative environments (MPE, SISL), "
-                "and competitive scenarios. Human control available for turn-based games."
+                "LLM-based chess player using llm_chess prompting style. "
+                "Multi-turn conversation: LLM can request board state, legal moves, or make moves. "
+                "Supports OpenAI, Anthropic, and local vLLM backends. "
+                "Works with PettingZoo chess_v6 environment. Regex validation with retry on invalid moves."
             ),
-            supports_training=True,
-            supports_policy_load=True,
-            requires_live_telemetry=True,
-            provides_fast_analytics=True,
-            supports_multi_agent=True,
+            supports_training=False,  # LLM inference only
+            supports_policy_load=True,  # Can load LLM configuration
+            requires_live_telemetry=True,  # Emits action/move telemetry
+            provides_fast_analytics=False,
+            supports_multi_agent=True,  # PettingZoo AEC turn-based
         ),
+        WorkerDefinition(
+            worker_id="human_worker",
+            display_name="Human Player",
+            description=(
+                "Human-in-the-loop action selection via GUI clicks. "
+                "When it's the human's turn, click on the board to select moves. "
+                "Works with PettingZoo chess, Go, Connect Four, Tic-Tac-Toe. "
+                "Enables human vs LLM and human vs RL policy comparisons."
+            ),
+            supports_training=False,  # Human doesn't train
+            supports_policy_load=False,  # No policy to load
+            requires_live_telemetry=True,  # Emits action telemetry
+            provides_fast_analytics=False,
+            supports_multi_agent=True,  # Multi-agent turn-based games
+        ),
+        # NOTE: PettingZoo is an environment library, not an algorithm provider.
+        # PettingZoo environments are supported BY other workers (CleanRL, XuanCe, Ray RLlib, Chess, Human).
     )
 
 

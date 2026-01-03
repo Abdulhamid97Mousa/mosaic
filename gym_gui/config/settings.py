@@ -64,7 +64,7 @@ class Settings:
 
     # vLLM Server settings
     vllm_max_servers: int = 4  # Maximum number of vLLM server instances
-    vllm_gpu_memory_utilization: float = 0.4  # GPU memory fraction per server (0.4 = 40%)
+    vllm_gpu_memory_utilization: float = 0.9  # GPU memory fraction per server (0.9 = 90%)
 
     @property
     def video_dir(self) -> Path | None:

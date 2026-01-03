@@ -304,10 +304,10 @@ class _RgbView(QtWidgets.QWidget):
         self.update()
 
     def paintEvent(self, event: QtGui.QPaintEvent) -> None:  # type: ignore[override]
-        """Paint the pixmap scaled to fill widget while preserving aspect ratio.
+        """Paint the pixmap at its actual size, centered in the widget.
 
-        This is the Qt6 recommended approach for custom image rendering widgets
-        that need to expand to fill available space while maintaining aspect ratio.
+        The image is displayed at its actual pixel size (after any PIL scaling),
+        centered within the container. No additional scaling is applied.
         """
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform)
@@ -322,19 +322,15 @@ class _RgbView(QtWidgets.QWidget):
             painter.end()
             return
 
-        # Scale pixmap to fit widget while keeping aspect ratio
+        # Get actual pixmap size (no scaling - display at true size)
         pixmap_size = self._current_pixmap.size()
-        scaled_size = pixmap_size.scaled(
-            widget_rect.size(),
-            QtCore.Qt.AspectRatioMode.KeepAspectRatio
-        )
 
-        # Center the scaled pixmap in the widget
-        x = (widget_rect.width() - scaled_size.width()) // 2
-        y = (widget_rect.height() - scaled_size.height()) // 2
+        # Center the pixmap in the widget (at actual size)
+        x = (widget_rect.width() - pixmap_size.width()) // 2
+        y = (widget_rect.height() - pixmap_size.height()) // 2
 
-        # Draw the scaled pixmap
-        target_rect = QtCore.QRect(x, y, scaled_size.width(), scaled_size.height())
+        # Draw the pixmap at its actual size, centered
+        target_rect = QtCore.QRect(x, y, pixmap_size.width(), pixmap_size.height())
         painter.drawPixmap(target_rect, self._current_pixmap)
         painter.end()
 

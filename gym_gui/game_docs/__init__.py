@@ -353,6 +353,65 @@ GAME_INFO.update({
     GameId.BABYAI_BOSSLEVEL_NOUNLOCK: BABYAI_BOSSLEVEL_NOUNLOCK_HTML,
 })
 
+# Jumanji mappings (JAX-based environments)
+try:
+    from gym_gui.game_docs.Jumanji import (
+        # Phase 1: Logic
+        GAME2048_HTML,
+        MINESWEEPER_HTML,
+        RUBIKS_CUBE_HTML,
+        SLIDING_PUZZLE_HTML,
+        SUDOKU_HTML,
+        GRAPH_COLORING_HTML,
+        # Phase 2: Packing
+        BINPACK_HTML,
+        FLATPACK_HTML,
+        JOBSHOP_HTML,
+        KNAPSACK_HTML,
+        TETRIS_HTML,
+        # Phase 3: Routing
+        CLEANER_HTML,
+        CONNECTOR_HTML,
+        CVRP_HTML,
+        MAZE_HTML,
+        MMST_HTML,
+        MULTI_CVRP_HTML,
+        PACMAN_HTML,
+        ROBOT_WAREHOUSE_HTML,
+        SNAKE_HTML,
+        SOKOBAN_HTML,
+        TSP_HTML,
+    )
+    GAME_INFO.update({
+        # Phase 1: Logic
+        GameId.JUMANJI_GAME2048: GAME2048_HTML,
+        GameId.JUMANJI_MINESWEEPER: MINESWEEPER_HTML,
+        GameId.JUMANJI_RUBIKS_CUBE: RUBIKS_CUBE_HTML,
+        GameId.JUMANJI_SLIDING_PUZZLE: SLIDING_PUZZLE_HTML,
+        GameId.JUMANJI_SUDOKU: SUDOKU_HTML,
+        GameId.JUMANJI_GRAPH_COLORING: GRAPH_COLORING_HTML,
+        # Phase 2: Packing
+        GameId.JUMANJI_BINPACK: BINPACK_HTML,
+        GameId.JUMANJI_FLATPACK: FLATPACK_HTML,
+        GameId.JUMANJI_JOBSHOP: JOBSHOP_HTML,
+        GameId.JUMANJI_KNAPSACK: KNAPSACK_HTML,
+        GameId.JUMANJI_TETRIS: TETRIS_HTML,
+        # Phase 3: Routing
+        GameId.JUMANJI_CLEANER: CLEANER_HTML,
+        GameId.JUMANJI_CONNECTOR: CONNECTOR_HTML,
+        GameId.JUMANJI_CVRP: CVRP_HTML,
+        GameId.JUMANJI_MAZE: MAZE_HTML,
+        GameId.JUMANJI_MMST: MMST_HTML,
+        GameId.JUMANJI_MULTI_CVRP: MULTI_CVRP_HTML,
+        GameId.JUMANJI_PACMAN: PACMAN_HTML,
+        GameId.JUMANJI_ROBOT_WAREHOUSE: ROBOT_WAREHOUSE_HTML,
+        GameId.JUMANJI_SNAKE: SNAKE_HTML,
+        GameId.JUMANJI_SOKOBAN: SOKOBAN_HTML,
+        GameId.JUMANJI_TSP: TSP_HTML,
+    })
+except ImportError:
+    pass  # Jumanji docs optional
+
 
 def get_game_info(game_id: GameId) -> str:
     """Return HTML documentation for the specified environment."""

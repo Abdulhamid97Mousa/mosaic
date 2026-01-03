@@ -19,6 +19,9 @@ dev = [
 [project.scripts]
 cleanrl-worker = "cleanrl_worker.cli:main"
 
+[project.entry-points."mosaic.workers"]
+cleanrl = "cleanrl_worker:get_worker_metadata"
+
 [tool.setuptools]
 # Expose both the original cleanrl packages AND our harness
 packages = [

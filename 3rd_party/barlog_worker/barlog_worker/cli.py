@@ -127,6 +127,14 @@ Examples:
         default=None,
         help="Random seed for reproducibility",
     )
+    env_group.add_argument(
+        "--render-mode",
+        type=str,
+        choices=["rgb_array", "human"],
+        default=None,
+        dest="render_mode",
+        help="Rendering mode for environment (default: None). Use 'rgb_array' for GUI display.",
+    )
 
     # LLM client settings
     llm_group = parser.add_argument_group("LLM Client")
@@ -251,6 +259,7 @@ def build_config_from_args(args: argparse.Namespace) -> BarlogWorkerConfig:
         seed=args.seed,
         timeout=args.timeout,
         max_image_history=args.max_image_history,
+        render_mode=args.render_mode,
     )
 
 

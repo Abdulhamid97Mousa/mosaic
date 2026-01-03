@@ -225,6 +225,27 @@ from gym_gui.constants.constants_trainer import (
 )
 
 # ================================================================
+# Worker Constants
+# ================================================================
+
+from gym_gui.constants.constants_worker import (
+    WORKER_DEFAULTS,
+    WORKER_DISCOVERY_TIMEOUT_S,
+    WORKER_ENTRY_POINT_GROUP,
+    WORKER_HEARTBEAT_INTERVAL_S,
+    WORKER_LOG_LEVEL,
+    WORKER_METADATA_CACHE_TTL_S,
+    WORKER_SHUTDOWN_TIMEOUT_S,
+    WORKER_STARTUP_TIMEOUT_S,
+    WORKER_TELEMETRY_BUFFER_SIZE,
+    WorkerDefaults,
+    WorkerDiscoveryDefaults,
+    WorkerResourceDefaults,
+    WorkerSubprocessDefaults,
+    WorkerTelemetryDefaults,
+)
+
+# ================================================================
 # TensorBoard Constants
 # ================================================================
 
