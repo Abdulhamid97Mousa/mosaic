@@ -14,7 +14,7 @@
 # ─────────────────────────────────────────────────────────────────────────────
 #   pip install -r requirements.txt
 #
-#   Installs: Core GUI + CleanRL + PettingZoo + Jason BDI + SPADE BDI + Chat UI
+#   Installs: Core GUI + CleanRL + PettingZoo + Jason BDI + Chat UI
 #   Size: ~2-3 GB
 #   Use for: Standard RL development with multi-agent support and LLM chat
 #
@@ -50,7 +50,6 @@
 #   - ray-rllib      : Ray/RLlib distributed training
 #   - xuance         : XuanCe MARL algorithms
 #   - jason          : Jason BDI agents
-#   - spade-bdi      : SPADE BDI agents
 #   - full           : All of the above
 #
 # ==============================================================================

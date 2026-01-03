@@ -61,7 +61,7 @@ class BarlogWorkerConfig:
     temperature: float = 0.7
     api_key: Optional[str] = None
     base_url: Optional[str] = None
-    telemetry_dir: str = "./telemetry"
+    telemetry_dir: Optional[str] = None  # Resolved in __post_init__ to VAR_TELEMETRY_DIR
     emit_jsonl: bool = True
     seed: Optional[int] = None
     render_mode: Optional[str] = None
@@ -98,6 +98,14 @@ class BarlogWorkerConfig:
             raise ValueError("max_steps must be >= 1")
         if not 0.0 <= self.temperature <= 2.0:
             raise ValueError("temperature must be between 0.0 and 2.0")
+
+        # Resolve telemetry_dir to VAR_TELEMETRY_DIR if not specified
+        if self.telemetry_dir is None:
+            try:
+                from gym_gui.config.paths import VAR_TELEMETRY_DIR
+                object.__setattr__(self, "telemetry_dir", str(VAR_TELEMETRY_DIR))
+            except ImportError:
+                object.__setattr__(self, "telemetry_dir", "./telemetry")
 
         # Protocol compliance assertion (only if gym_gui available)
         try:
