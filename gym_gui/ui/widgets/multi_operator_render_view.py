@@ -16,7 +16,8 @@ from qtpy import QtCore, QtWidgets
 from gym_gui.services.operator import OperatorConfig
 from gym_gui.ui.widgets.operator_render_container import OperatorRenderContainer
 
-_LOGGER = logging.getLogger(__name__)
+# Use operators namespace for dedicated operators.log routing
+_LOGGER = logging.getLogger("gym_gui.operators.multi_render_view")
 
 
 class MultiOperatorRenderView(QtWidgets.QWidget):
@@ -184,14 +185,21 @@ class MultiOperatorRenderView(QtWidgets.QWidget):
             operator_id: The operator to display the payload for.
             payload: The telemetry payload containing render data.
         """
-        print(f"DEBUG MultiOperatorRenderView.display_payload: operator_id={operator_id}")
-        print(f"DEBUG MultiOperatorRenderView.display_payload: available containers={list(self._containers.keys())}")
         container = self._containers.get(operator_id)
+        run_id = container.config.run_id if container else None
+        extra = {"run_id": run_id or "unknown", "agent_id": operator_id}
+
+        _LOGGER.debug(
+            "display_payload: operator_id=%s, available containers=%s",
+            operator_id,
+            list(self._containers.keys()),
+            extra=extra,
+        )
         if container:
-            print(f"DEBUG MultiOperatorRenderView.display_payload: Found container, calling display_payload")
+            _LOGGER.debug("display_payload: Found container, forwarding", extra=extra)
             container.display_payload(payload)
         else:
-            print(f"DEBUG MultiOperatorRenderView.display_payload: NO CONTAINER for {operator_id}!")
+            _LOGGER.debug("display_payload: NO CONTAINER for %s", operator_id, extra=extra)
 
     def display_payload_by_run_id(self, run_id: str, payload: Dict[str, Any]) -> None:
         """Display render payload using run_id lookup.

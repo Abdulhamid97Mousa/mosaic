@@ -20,7 +20,8 @@ from gym_gui.rendering import RendererRegistry, create_default_renderer_registry
 from gym_gui.rendering.strategies.board_game import BoardGameRendererStrategy
 from gym_gui.core.enums import RenderMode
 
-_LOGGER = logging.getLogger(__name__)
+# Use operators namespace for dedicated operators.log routing
+_LOGGER = logging.getLogger("gym_gui.operators.render_container")
 
 
 class OperatorRenderContainer(QtWidgets.QFrame):
@@ -46,6 +47,7 @@ class OperatorRenderContainer(QtWidgets.QFrame):
     # Type badge colors
     TYPE_COLORS = {
         "llm": "#2196F3",  # Blue
+        "vlm": "#00BCD4",  # Cyan
         "rl": "#9C27B0",   # Purple
     }
 
@@ -76,6 +78,13 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         self._build_ui()
         self._update_header()
 
+    def _log_extra(self) -> dict:
+        """Return extra dict for correlated logging with run_id and operator_id."""
+        return {
+            "run_id": self._config.run_id or "unknown",
+            "agent_id": self._config.operator_id,
+        }
+
     def _build_ui(self) -> None:
         self.setFrameStyle(QtWidgets.QFrame.Shape.Box | QtWidgets.QFrame.Shadow.Raised)
         self.setLineWidth(1)
@@ -104,7 +113,7 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         self._name_label.setStyleSheet("font-weight: bold; font-size: 11px;")
         header_layout.addWidget(self._name_label)
 
-        # Type badge (LLM / RL)
+        # Type badge (LLM / VLM / RL)
         self._type_badge = QtWidgets.QLabel(self._config.operator_type.upper(), self._header)
         type_color = self.TYPE_COLORS.get(self._config.operator_type, "#666")
         self._type_badge.setStyleSheet(
@@ -113,8 +122,20 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         )
         header_layout.addWidget(self._type_badge)
 
+        # Worker name (e.g., "BALROG LLM Worker")
+        worker_name = self._get_worker_display_name()
+        self._worker_label = QtWidgets.QLabel(worker_name, self._header)
+        self._worker_label.setStyleSheet("color: #333; font-size: 10px;")
+        header_layout.addWidget(self._worker_label)
+
+        # Model/Policy info (e.g., "GPT-4o Mini" for LLM, policy name for RL)
+        model_info = self._get_model_display_name()
+        self._model_label = QtWidgets.QLabel(model_info, self._header)
+        self._model_label.setStyleSheet("color: #666; font-size: 10px; font-style: italic;")
+        header_layout.addWidget(self._model_label)
+
         # Environment/Task info
-        env_task = f"{self._config.env_name} / {self._config.task}"
+        env_task = f"{self._config.env_name}/{self._config.task}"
         self._env_label = QtWidgets.QLabel(env_task, self._header)
         self._env_label.setStyleSheet("color: #666; font-size: 10px;")
         self._env_label.setToolTip(f"Environment: {self._config.env_name}\nTask: {self._config.task}")
@@ -182,7 +203,10 @@ class OperatorRenderContainer(QtWidgets.QFrame):
             f"background-color: {type_color}; color: white; "
             f"padding: 2px 6px; border-radius: 3px; font-size: 9px; font-weight: bold;"
         )
-        env_task = f"{self._config.env_name} / {self._config.task}"
+        # Update worker and model labels
+        self._worker_label.setText(self._get_worker_display_name())
+        self._model_label.setText(self._get_model_display_name())
+        env_task = f"{self._config.env_name}/{self._config.task}"
         self._env_label.setText(env_task)
 
     def _update_status_indicator(self) -> None:
@@ -193,6 +217,54 @@ class OperatorRenderContainer(QtWidgets.QFrame):
             f"background-color: {status_color}; color: white; "
             f"padding: 2px 6px; border-radius: 3px; font-size: 9px; font-weight: bold;"
         )
+
+    def _get_worker_display_name(self) -> str:
+        """Get a user-friendly worker name from the config.
+
+        Returns:
+            Worker display name (e.g., "BALROG Worker", "CleanRL Worker").
+        """
+        worker_id = self._config.worker_id
+        # Convert worker_id to display name
+        # e.g., "balrog_worker" -> "BALROG", "cleanrl_worker" -> "CleanRL"
+        if worker_id:
+            name = worker_id.replace("_worker", "").replace("_", " ")
+            return name.upper() if len(name) <= 6 else name.title()
+        return ""
+
+    def _get_model_display_name(self) -> str:
+        """Get a user-friendly model/policy name from the config.
+
+        Returns:
+            For LLM/VLM: Model name (e.g., "GPT-4o Mini", "Llama 3.3 70B")
+            For RL: Policy filename or "No policy"
+        """
+        settings = self._config.settings
+        op_type = self._config.operator_type
+
+        if op_type in ("llm", "vlm"):
+            # Get model_id from settings
+            model_id = settings.get("model_id", "")
+            if model_id:
+                # Extract display name from model_id
+                # e.g., "openai/gpt-4o-mini" -> "gpt-4o-mini"
+                # e.g., "meta-llama/llama-3.3-70b-instruct:free" -> "llama-3.3-70b"
+                if "/" in model_id:
+                    model_id = model_id.split("/")[-1]
+                # Remove common suffixes
+                for suffix in (":free", "-instruct", "-chat"):
+                    model_id = model_id.replace(suffix, "")
+                return model_id
+            return ""
+        elif op_type == "rl":
+            # Get policy path
+            policy_path = settings.get("policy_path", "")
+            if policy_path:
+                # Extract filename from path
+                import os
+                return os.path.basename(policy_path)
+            return ""
+        return ""
 
     def set_config(self, config: OperatorConfig) -> None:
         """Update the operator configuration."""
@@ -249,21 +321,43 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         Args:
             payload: Telemetry payload containing render data.
         """
-        print(f"DEBUG OperatorRenderContainer.display_payload: received payload keys={list(payload.keys())}")
+        _LOGGER.debug(
+            "display_payload: received payload keys=%s",
+            list(payload.keys()),
+            extra=self._log_extra(),
+        )
         try:
             # Update stats from payload
             self._update_stats_from_payload(payload)
 
             # Extract render data
             render_payload = self._extract_render_payload(payload)
-            print(f"DEBUG OperatorRenderContainer.display_payload: render_payload={render_payload}")
             if render_payload is None:
-                print("DEBUG OperatorRenderContainer.display_payload: render_payload is None, returning!")
+                _LOGGER.debug(
+                    "display_payload: render_payload is None, returning",
+                    extra=self._log_extra(),
+                )
                 return
+
+            # Debug: check render_payload structure
+            rp_keys = list(render_payload.keys()) if isinstance(render_payload, dict) else "not_dict"
+            rp_width = render_payload.get("width") if isinstance(render_payload, dict) else None
+            rp_height = render_payload.get("height") if isinstance(render_payload, dict) else None
+            rgb = render_payload.get("rgb") if isinstance(render_payload, dict) else None
+            rgb_info = f"len={len(rgb)}" if rgb else "None"
+            _LOGGER.debug(
+                "render_payload: keys=%s, width=%s, height=%s, rgb=%s",
+                rp_keys, rp_width, rp_height, rgb_info,
+                extra=self._log_extra(),
+            )
 
             # Check if this is a board game payload (chess, go, connect_four, etc.)
             is_board_game = self._is_board_game_payload(render_payload)
-            print(f"DEBUG OperatorRenderContainer.display_payload: is_board_game={is_board_game}")
+            _LOGGER.debug(
+                "display_payload: is_board_game=%s",
+                is_board_game,
+                extra=self._log_extra(),
+            )
 
             if is_board_game:
                 # Use BoardGameRendererStrategy for board games
@@ -455,12 +549,27 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         # Extract episode/step info
         episode_index = payload.get("episode_index", payload.get("episodeIndex", 0))
         step_index = payload.get("step_index", payload.get("stepIndex", 0))
-        reward = payload.get("reward", 0.0)
+
+        # Use episode_reward if available (cumulative from worker), else accumulate step reward
+        episode_reward = payload.get("episode_reward")
+        step_reward = payload.get("reward", 0.0)
 
         try:
-            self._current_episode = int(episode_index) + 1
-            self._current_step = int(step_index) + 1
-            self._episode_reward += float(reward)
+            new_episode = int(episode_index) + 1
+            new_step = int(step_index) + 1
+
+            # Reset episode reward when episode changes
+            if new_episode != self._current_episode:
+                self._episode_reward = 0.0
+
+            self._current_episode = new_episode
+            self._current_step = new_step
+
+            # Prefer episode_reward from worker (already cumulative)
+            if episode_reward is not None:
+                self._episode_reward = float(episode_reward)
+            else:
+                self._episode_reward += float(step_reward)
         except (TypeError, ValueError):
             pass
 

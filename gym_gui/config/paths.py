@@ -22,8 +22,13 @@ VAR_TRAINER_DB = VAR_TRAINER_DIR / "trainer.sqlite"
 VAR_DATA_DIR = VAR_ROOT / "data"
 VAR_MODELS_DIR = VAR_ROOT / "models"  # LLM models for vLLM serving
 VAR_MODELS_HF_CACHE = VAR_MODELS_DIR / "huggingface"  # HuggingFace cache
-VAR_OPERATORS_DIR = VAR_ROOT / "operators"  # Operator subprocess logs and state
+VAR_MODELS_KATAGO_DIR = VAR_MODELS_DIR / "katago"  # KataGo neural network models
+VAR_MODELS_GO_AI_DIR = VAR_MODELS_DIR / "go_ai"  # Go AI engines config/models
+VAR_OPERATORS_DIR = VAR_ROOT / "operators"  # Operator subprocess data
+VAR_OPERATORS_LOGS_DIR = VAR_OPERATORS_DIR / "logs"  # Operator subprocess logs
+VAR_OPERATORS_TELEMETRY_DIR = VAR_OPERATORS_DIR / "telemetry"  # Operator telemetry (steps, episodes)
 VAR_VLLM_DIR = VAR_ROOT / "vllm"  # vLLM server logs and state
+VAR_BIN_DIR = VAR_ROOT / "bin"  # Project-local binaries (KataGo, etc.)
 
 
 def ensure_var_directories() -> None:
@@ -42,8 +47,13 @@ def ensure_var_directories() -> None:
         VAR_DATA_DIR,
         VAR_MODELS_DIR,
         VAR_MODELS_HF_CACHE,
+        VAR_MODELS_KATAGO_DIR,
+        VAR_MODELS_GO_AI_DIR,
         VAR_OPERATORS_DIR,
+        VAR_OPERATORS_LOGS_DIR,
+        VAR_OPERATORS_TELEMETRY_DIR,
         VAR_VLLM_DIR,
+        VAR_BIN_DIR,
     ):
         path.mkdir(parents=True, exist_ok=True)
 
@@ -62,7 +72,12 @@ __all__ = [
     "VAR_DATA_DIR",
     "VAR_MODELS_DIR",
     "VAR_MODELS_HF_CACHE",
+    "VAR_MODELS_KATAGO_DIR",
+    "VAR_MODELS_GO_AI_DIR",
     "VAR_OPERATORS_DIR",
+    "VAR_OPERATORS_LOGS_DIR",
+    "VAR_OPERATORS_TELEMETRY_DIR",
     "VAR_VLLM_DIR",
+    "VAR_BIN_DIR",
     "ensure_var_directories",
 ]

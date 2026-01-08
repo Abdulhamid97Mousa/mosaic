@@ -19,8 +19,8 @@ from gym_gui.config.paths import VAR_MODELS_HF_CACHE
 from gym_gui.services.operator import OperatorConfig, WorkerAssignment
 from gym_gui.ui.worker_catalog.catalog import get_worker_catalog, WorkerDefinition
 from gym_gui.constants.constants_operator import (
-    BARLOG_SUPPORTED_ENVS,
-    BARLOG_DEFAULT_TASK,
+    BALROG_SUPPORTED_ENVS,
+    BALROG_DEFAULT_TASK,
 )
 
 
@@ -215,49 +215,205 @@ LLM_CLIENTS: Dict[str, Tuple[str, bool, Optional[str]]] = {
     "google": ("Google (Direct)", True, None),
 }
 
-# Default models for each LLM client
-# OpenRouter provides access to all major models via a unified API
-LLM_CLIENT_MODELS: Dict[str, List[Tuple[str, str]]] = {
+# =============================================================================
+# VLM Models (Vision Language Models) - Support image input
+# Verified via OpenRouter API: models with 'image' in input_modalities
+# =============================================================================
+VLM_CLIENT_MODELS: Dict[str, List[Tuple[str, str]]] = {
     "openrouter": [
-        # OpenAI models via OpenRouter
-        ("openai/gpt-4o-mini", "GPT-4o Mini"),
+        # OpenAI VLMs (verified: image modality)
+        # GPT-5 Series (Latest - Vision capable)
+        ("openai/gpt-5.2", "GPT-5.2"),
+        ("openai/gpt-5.1", "GPT-5.1"),
+        ("openai/gpt-5", "GPT-5"),
+        ("openai/gpt-5-mini", "GPT-5 Mini"),
+        ("openai/gpt-5-image", "GPT-5 Image"),
+        # GPT-4.1 Series (Vision capable)
+        ("openai/gpt-4.1", "GPT-4.1"),
+        ("openai/gpt-4.1-mini", "GPT-4.1 Mini"),
+        ("openai/gpt-4.1-nano", "GPT-4.1 Nano"),
+        # GPT-4o Series (Vision capable)
         ("openai/gpt-4o", "GPT-4o"),
+        ("openai/gpt-4o-mini", "GPT-4o Mini"),
         ("openai/gpt-4-turbo", "GPT-4 Turbo"),
-        # Anthropic models via OpenRouter
+        # Anthropic VLMs (verified: image modality)
         ("anthropic/claude-3.5-sonnet", "Claude 3.5 Sonnet"),
         ("anthropic/claude-3.5-haiku", "Claude 3.5 Haiku"),
         ("anthropic/claude-3-opus", "Claude 3 Opus"),
-        # Google models via OpenRouter
-        ("google/gemini-2.0-flash-exp:free", "Gemini 2.0 Flash (Free)"),
-        ("google/gemini-pro-1.5", "Gemini 1.5 Pro"),
-        ("google/gemini-flash-1.5", "Gemini 1.5 Flash"),
-        # Meta Llama models via OpenRouter
-        ("meta-llama/llama-3.1-8b-instruct:free", "Llama 3.1 8B (Free)"),
-        ("meta-llama/llama-3.1-70b-instruct", "Llama 3.1 70B"),
-        ("meta-llama/llama-3.1-405b-instruct", "Llama 3.1 405B"),
-        # Mistral models via OpenRouter
-        ("mistralai/mistral-7b-instruct:free", "Mistral 7B (Free)"),
-        ("mistralai/mixtral-8x7b-instruct", "Mixtral 8x7B"),
-        # DeepSeek models via OpenRouter
-        ("deepseek/deepseek-chat", "DeepSeek Chat"),
-        ("deepseek/deepseek-r1", "DeepSeek R1"),
+        ("anthropic/claude-3-haiku", "Claude 3 Haiku"),
+        # Google Gemini VLMs (verified: image modality)
+        # Gemini 3 (Latest - Vision capable)
+        ("google/gemini-3-flash-preview", "Gemini 3 Flash Preview"),
+        ("google/gemini-3-pro-preview", "Gemini 3 Pro Preview"),
+        ("google/gemini-3-pro-image-preview", "Gemini 3 Pro Image Preview"),
+        # Gemini 2.5 (Vision capable)
+        ("google/gemini-2.5-pro-preview-05-06", "Gemini 2.5 Pro Preview"),
+        ("google/gemini-2.5-pro-preview-03-25", "Gemini 2.5 Pro (March)"),
+        ("google/gemini-2.5-flash-preview", "Gemini 2.5 Flash Preview"),
+        ("google/gemini-2.5-flash-preview-05-20", "Gemini 2.5 Flash (May)"),
+        ("google/gemini-2.5-flash-lite-preview-06-17", "Gemini 2.5 Flash Lite"),
+        ("google/gemini-2.5-flash-preview-image-05-20", "Gemini 2.5 Flash Image"),
+        # Gemini 2.0 (Vision capable)
+        ("google/gemini-2.0-flash-001", "Gemini 2.0 Flash"),
+        ("google/gemini-2.0-flash-lite-001", "Gemini 2.0 Flash Lite"),
+        ("google/gemini-2.0-flash-exp:free", "Gemini 2.0 Flash Exp (Free)"),
+        # Meta Llama VLMs (verified: image modality)
+        # Llama 4 (Latest)
+        ("meta-llama/llama-4-maverick", "Llama 4 Maverick"),
+        ("meta-llama/llama-4-scout", "Llama 4 Scout"),
+        # Llama 3.2 Vision
+        ("meta-llama/llama-3.2-90b-vision-instruct", "Llama 3.2 90B Vision"),
+        ("meta-llama/llama-3.2-11b-vision-instruct", "Llama 3.2 11B Vision"),
+        # Qwen VLMs (verified: image modality)
+        # Qwen 3 VL (Latest)
+        ("qwen/qwen3-vl-235b-a22b-instruct", "Qwen 3 VL 235B"),
+        ("qwen/qwen3-vl-32b-instruct", "Qwen 3 VL 32B"),
+        ("qwen/qwen3-vl-8b-instruct", "Qwen 3 VL 8B"),
+        # Qwen 2.5 VL
+        ("qwen/qwen2.5-vl-72b-instruct", "Qwen 2.5 VL 72B"),
+        ("qwen/qwen2.5-vl-32b-instruct", "Qwen 2.5 VL 32B"),
+        ("qwen/qwen-2.5-vl-7b-instruct:free", "Qwen 2.5 VL 7B (Free)"),
+        ("qwen/qwen-2.5-vl-7b-instruct", "Qwen 2.5 VL 7B"),
+        # Qwen VL Legacy
+        ("qwen/qwen-vl-max", "Qwen VL Max"),
+        ("qwen/qwen-vl-plus", "Qwen VL Plus"),
+        # Google Gemma VLMs (verified: image modality - Gemma 3 has vision)
+        ("google/gemma-3-27b-it", "Gemma 3 27B"),
+        ("google/gemma-3-27b-it:free", "Gemma 3 27B (Free)"),
+        ("google/gemma-3-12b-it", "Gemma 3 12B"),
+        ("google/gemma-3-12b-it:free", "Gemma 3 12B (Free)"),
+        ("google/gemma-3-4b-it", "Gemma 3 4B"),
+        ("google/gemma-3-4b-it:free", "Gemma 3 4B (Free)"),
+        # Mistral VLMs (verified: image modality)
+        # Pixtral (Vision-first models)
+        ("mistralai/pixtral-large-2411", "Pixtral Large 2411"),
+        ("mistralai/pixtral-12b", "Pixtral 12B"),
+        # Mistral Small 3.x (Vision capable)
+        ("mistralai/mistral-small-3.2-24b-instruct-2506", "Mistral Small 3.2 24B"),
+        ("mistralai/mistral-small-3.1-24b-instruct-2503", "Mistral Small 3.1 24B"),
+        ("mistralai/mistral-small-3.1-24b-instruct:free", "Mistral Small 3.1 24B (Free)"),
+        # Ministral 3 (Vision capable)
+        ("mistralai/ministral-14b-2512", "Ministral 3 14B"),
+        ("mistralai/ministral-8b-2512", "Ministral 3 8B"),
+        ("mistralai/ministral-3b-2512", "Ministral 3 3B"),
     ],
-    # vLLM models are dynamically scanned - see get_vllm_models()
-    "vllm": [],
+    "vllm": [],  # vLLM servers are dynamically scanned
     "openai": [
-        ("gpt-4o-mini", "GPT-4o Mini"),
         ("gpt-4o", "GPT-4o"),
+        ("gpt-4o-mini", "GPT-4o Mini"),
         ("gpt-4-turbo", "GPT-4 Turbo"),
-        ("gpt-3.5-turbo", "GPT-3.5 Turbo"),
     ],
     "anthropic": [
         ("claude-3-5-sonnet-20241022", "Claude 3.5 Sonnet"),
         ("claude-3-5-haiku-20241022", "Claude 3.5 Haiku"),
         ("claude-3-opus-20240229", "Claude 3 Opus"),
+        ("claude-3-haiku-20240307", "Claude 3 Haiku"),
     ],
     "google": [
         ("gemini-2.0-flash-exp", "Gemini 2.0 Flash"),
         ("gemini-1.5-pro", "Gemini 1.5 Pro"),
+    ],
+}
+
+# =============================================================================
+# LLM Models (Text-Only Language Models) - NO image support
+# Verified via OpenRouter API: models with only 'text' in input_modalities
+# =============================================================================
+LLM_CLIENT_MODELS: Dict[str, List[Tuple[str, str]]] = {
+    "openrouter": [
+        # Meta Llama text-only models (verified: text-only modality)
+        # Llama 3.3
+        ("meta-llama/llama-3.3-70b-instruct:free", "Llama 3.3 70B (Free)"),
+        ("meta-llama/llama-3.3-70b-instruct", "Llama 3.3 70B"),
+        # Llama 3.2
+        ("meta-llama/llama-3.2-3b-instruct:free", "Llama 3.2 3B (Free)"),
+        ("meta-llama/llama-3.2-3b-instruct", "Llama 3.2 3B"),
+        ("meta-llama/llama-3.2-1b-instruct", "Llama 3.2 1B"),
+        # Llama 3.1
+        ("meta-llama/llama-3.1-405b-instruct:free", "Llama 3.1 405B (Free)"),
+        ("meta-llama/llama-3.1-405b-instruct", "Llama 3.1 405B"),
+        ("meta-llama/llama-3.1-70b-instruct", "Llama 3.1 70B"),
+        ("meta-llama/llama-3.1-8b-instruct", "Llama 3.1 8B"),
+        # Llama 3.0
+        ("meta-llama/llama-3-70b-instruct", "Llama 3 70B"),
+        ("meta-llama/llama-3-8b-instruct", "Llama 3 8B"),
+        # Mistral text-only models (verified: text-only modality)
+        # Mistral Large Series
+        ("mistralai/mistral-large-2512", "Mistral Large 3 2512"),
+        ("mistralai/mistral-large-2411", "Mistral Large 2411"),
+        ("mistralai/mistral-large-2407", "Mistral Large 2407"),
+        # Mistral Medium Series
+        ("mistralai/mistral-medium-3.1", "Mistral Medium 3.1"),
+        ("mistralai/mistral-medium-3", "Mistral Medium 3"),
+        # Codestral (Code-focused)
+        ("mistralai/codestral-2508", "Codestral 2508"),
+        ("mistralai/codestral-mamba", "Codestral Mamba"),
+        # Devstral (Agentic coding)
+        ("mistralai/devstral-2512", "Devstral 2 2512"),
+        ("mistralai/devstral-2512:free", "Devstral 2 2512 (Free)"),
+        # Mixtral (MoE)
+        ("mistralai/mixtral-8x22b-instruct", "Mixtral 8x22B"),
+        ("mistralai/mixtral-8x7b-instruct", "Mixtral 8x7B"),
+        # Mistral Small/7B
+        ("mistralai/mistral-7b-instruct:free", "Mistral 7B (Free)"),
+        ("mistralai/mistral-7b-instruct", "Mistral 7B"),
+        # DeepSeek text-only models (verified: text-only modality)
+        # DeepSeek V3.x Series
+        ("deepseek/deepseek-v3.2", "DeepSeek V3.2"),
+        ("deepseek/deepseek-v3.2-speciale", "DeepSeek V3.2 Speciale"),
+        ("deepseek/deepseek-chat-v3.1", "DeepSeek V3.1"),
+        ("deepseek/deepseek-v3.1-terminus", "DeepSeek V3.1 Terminus"),
+        ("deepseek/deepseek-chat", "DeepSeek V3"),
+        ("deepseek/deepseek-chat-v3-0324", "DeepSeek V3 0324"),
+        # DeepSeek R1 (Reasoning)
+        ("deepseek/deepseek-r1-0528", "DeepSeek R1 0528"),
+        ("deepseek/deepseek-r1-0528:free", "DeepSeek R1 0528 (Free)"),
+        ("deepseek/deepseek-r1", "DeepSeek R1"),
+        # DeepSeek R1 Distill (Smaller/Faster)
+        ("deepseek/deepseek-r1-distill-llama-70b", "R1 Distill Llama 70B"),
+        ("deepseek/deepseek-r1-distill-qwen-32b", "R1 Distill Qwen 32B"),
+        ("deepseek/deepseek-r1-distill-qwen-14b", "R1 Distill Qwen 14B"),
+        ("deepseek/deepseek-r1-distill-llama-8b", "R1 Distill Llama 8B"),
+        ("deepseek/deepseek-r1-distill-qwen-7b", "R1 Distill Qwen 7B"),
+        # DeepSeek Prover (Math)
+        ("deepseek/deepseek-prover-v2", "DeepSeek Prover V2"),
+        # Qwen text-only models (verified: text-only modality)
+        # Qwen 3
+        ("qwen/qwen3-235b-a22b", "Qwen 3 235B"),
+        ("qwen/qwen3-32b", "Qwen 3 32B"),
+        ("qwen/qwen3-14b", "Qwen 3 14B"),
+        ("qwen/qwen3-8b", "Qwen 3 8B"),
+        ("qwen/qwen3-4b:free", "Qwen 3 4B (Free)"),
+        # Qwen 3 Coder
+        ("qwen/qwen3-coder:free", "Qwen 3 Coder (Free)"),
+        ("qwen/qwen3-coder", "Qwen 3 Coder"),
+        ("qwen/qwen3-coder-plus", "Qwen 3 Coder Plus"),
+        # Qwen 2.5
+        ("qwen/qwen-2.5-72b-instruct", "Qwen 2.5 72B"),
+        ("qwen/qwen-2.5-7b-instruct", "Qwen 2.5 7B"),
+        ("qwen/qwen-2.5-coder-32b-instruct", "Qwen 2.5 Coder 32B"),
+        # QwQ (Reasoning)
+        ("qwen/qwq-32b", "QwQ 32B"),
+        # Qwen API Models
+        ("qwen/qwen-max", "Qwen Max"),
+        ("qwen/qwen-plus", "Qwen Plus"),
+        ("qwen/qwen-turbo", "Qwen Turbo"),
+        # Google Gemma text-only models (verified: text-only modality)
+        # Gemma 3n (Text-only, smaller efficient models)
+        ("google/gemma-3n-e4b-it:free", "Gemma 3n 4B (Free)"),
+        ("google/gemma-3n-e4b-it", "Gemma 3n 4B"),
+        ("google/gemma-3n-e2b-it:free", "Gemma 3n 2B (Free)"),
+        # Gemma 2 (Text-only)
+        ("google/gemma-2-27b-it", "Gemma 2 27B"),
+        ("google/gemma-2-9b-it", "Gemma 2 9B"),
+        ("google/gemma-2-9b-it:free", "Gemma 2 9B (Free)"),
+    ],
+    "vllm": [],  # vLLM servers are dynamically scanned
+    "openai": [
+        ("gpt-3.5-turbo", "GPT-3.5 Turbo"),
+    ],
+    "anthropic": [],  # All Claude 3+ models support vision
+    "google": [
         ("gemini-1.5-flash", "Gemini 1.5 Flash"),
     ],
 }
@@ -271,6 +427,11 @@ def _get_llm_workers() -> List[WorkerDefinition]:
 def _get_rl_workers() -> List[WorkerDefinition]:
     """Get RL workers from catalog (supports_training=True)."""
     return [w for w in get_worker_catalog() if w.supports_training]
+
+
+def _get_rl_evaluation_workers() -> List[WorkerDefinition]:
+    """Get RL workers that support policy loading for evaluation."""
+    return [w for w in get_worker_catalog() if w.supports_training and w.supports_policy_load]
 
 
 def _get_registered_envs(prefix: str) -> List[str]:
@@ -357,7 +518,7 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         main_layout.setContentsMargins(4, 2, 4, 2)
         main_layout.setSpacing(2)
 
-        # Row 1: Player label, Worker, Provider
+        # Row 1: Player label, Type selector, Worker dropdown, Provider (LLM only)
         row1 = QtWidgets.QHBoxLayout()
         row1.setSpacing(6)
 
@@ -368,16 +529,23 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         player_label.setStyleSheet("font-weight: bold;")
         row1.addWidget(player_label)
 
+        # Type selector (LLM / RL)
+        row1.addWidget(QtWidgets.QLabel("Type:", self))
+        self._type_combo = QtWidgets.QComboBox(self)
+        self._type_combo.setFixedWidth(60)
+        self._type_combo.addItems(["LLM", "RL"])
+        row1.addWidget(self._type_combo)
+
         # Worker dropdown
         row1.addWidget(QtWidgets.QLabel("Worker:", self))
         self._worker_combo = QtWidgets.QComboBox(self)
         self._worker_combo.setMinimumWidth(140)
-        for worker in _get_llm_workers():
-            self._worker_combo.addItem(worker.display_name, worker.worker_id)
+        # Populated dynamically by _update_worker_dropdown()
         row1.addWidget(self._worker_combo)
 
-        # Provider dropdown
-        row1.addWidget(QtWidgets.QLabel("Provider:", self))
+        # Provider dropdown (LLM only)
+        self._provider_label = QtWidgets.QLabel("Provider:", self)
+        row1.addWidget(self._provider_label)
         self._client_combo = QtWidgets.QComboBox(self)
         self._client_combo.setMinimumWidth(100)
         for client_name, (display_name, _, _) in LLM_CLIENTS.items():
@@ -387,43 +555,78 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         row1.addStretch()
         main_layout.addLayout(row1)
 
-        # Row 2: Model/Server, API Key (indented to align with row1 controls)
-        row2 = QtWidgets.QHBoxLayout()
-        row2.setSpacing(6)
+        # Row 2: LLM settings container (Model/Server, API Key)
+        self._llm_row = QtWidgets.QWidget(self)
+        llm_layout = QtWidgets.QHBoxLayout(self._llm_row)
+        llm_layout.setContentsMargins(0, 0, 0, 0)
+        llm_layout.setSpacing(6)
 
         # Spacer to align with row1 (same width as player label)
-        spacer = QtWidgets.QWidget(self)
+        spacer = QtWidgets.QWidget(self._llm_row)
         spacer.setFixedWidth(120)
-        row2.addWidget(spacer)
+        llm_layout.addWidget(spacer)
 
         # Model dropdown
-        self._model_label = QtWidgets.QLabel("Model:", self)
-        row2.addWidget(self._model_label)
-        self._model_combo = QtWidgets.QComboBox(self)
+        self._model_label = QtWidgets.QLabel("Model:", self._llm_row)
+        llm_layout.addWidget(self._model_label)
+        self._model_combo = QtWidgets.QComboBox(self._llm_row)
         self._model_combo.setMinimumWidth(160)
-        row2.addWidget(self._model_combo)
+        self._model_combo.setMaxVisibleItems(20)  # Limit dropdown height with scrollbar
+        llm_layout.addWidget(self._model_combo)
 
         # API Key field
-        self._api_key_label = QtWidgets.QLabel("API Key:", self)
-        row2.addWidget(self._api_key_label)
-        self._api_key_edit = QtWidgets.QLineEdit(self)
+        self._api_key_label = QtWidgets.QLabel("API Key:", self._llm_row)
+        llm_layout.addWidget(self._api_key_label)
+        self._api_key_edit = QtWidgets.QLineEdit(self._llm_row)
         self._api_key_edit.setPlaceholderText("API key")
         self._api_key_edit.setEchoMode(QtWidgets.QLineEdit.EchoMode.Password)
         self._api_key_edit.setMinimumWidth(120)
-        row2.addWidget(self._api_key_edit)
+        llm_layout.addWidget(self._api_key_edit)
 
-        row2.addStretch()
-        main_layout.addLayout(row2)
+        llm_layout.addStretch()
+        main_layout.addWidget(self._llm_row)
 
-        # Initialize model dropdown
+        # Row 3: RL settings container (Policy path)
+        self._rl_row = QtWidgets.QWidget(self)
+        rl_layout = QtWidgets.QHBoxLayout(self._rl_row)
+        rl_layout.setContentsMargins(0, 0, 0, 0)
+        rl_layout.setSpacing(6)
+
+        # Spacer to align with row1 (same width as player label)
+        rl_spacer = QtWidgets.QWidget(self._rl_row)
+        rl_spacer.setFixedWidth(120)
+        rl_layout.addWidget(rl_spacer)
+
+        # Policy path field
+        rl_layout.addWidget(QtWidgets.QLabel("Policy:", self._rl_row))
+        self._policy_path_edit = QtWidgets.QLineEdit(self._rl_row)
+        self._policy_path_edit.setPlaceholderText("Path to trained policy/checkpoint")
+        self._policy_path_edit.setMinimumWidth(200)
+        rl_layout.addWidget(self._policy_path_edit)
+
+        # Browse button
+        self._browse_btn = QtWidgets.QPushButton("Browse...", self._rl_row)
+        self._browse_btn.setFixedWidth(70)
+        self._browse_btn.clicked.connect(self._on_browse_policy)
+        rl_layout.addWidget(self._browse_btn)
+
+        rl_layout.addStretch()
+        main_layout.addWidget(self._rl_row)
+        self._rl_row.hide()  # Hidden by default (LLM is default type)
+
+        # Initialize dropdowns and visibility
+        self._update_worker_dropdown()
         self._update_model_dropdown()
         self._update_api_key_visibility()
+        self._update_type_visibility()
 
     def _connect_signals(self) -> None:
+        self._type_combo.currentIndexChanged.connect(self._on_type_changed)
         self._worker_combo.currentIndexChanged.connect(self._on_changed)
         self._client_combo.currentIndexChanged.connect(self._on_client_changed)
         self._model_combo.currentIndexChanged.connect(self._on_changed)
         self._api_key_edit.textChanged.connect(self._on_changed)
+        self._policy_path_edit.textChanged.connect(self._on_changed)
 
     def _on_changed(self) -> None:
         if not self._updating:
@@ -435,6 +638,59 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         self._update_model_dropdown()
         self._update_api_key_visibility()
         self.assignment_changed.emit()
+
+    def _on_type_changed(self) -> None:
+        """Handle worker type change (LLM <-> RL)."""
+        if self._updating:
+            return
+        self._update_worker_dropdown()
+        self._update_type_visibility()
+        self.assignment_changed.emit()
+
+    def _update_worker_dropdown(self) -> None:
+        """Update worker dropdown based on selected type (LLM or RL)."""
+        self._updating = True
+        current_worker = self._worker_combo.currentData()
+        self._worker_combo.clear()
+
+        worker_type = self._type_combo.currentText().lower()
+        if worker_type == "llm":
+            workers = _get_llm_workers()
+        else:
+            # RL: only workers that support policy loading for evaluation
+            workers = _get_rl_evaluation_workers()
+
+        for worker in workers:
+            self._worker_combo.addItem(worker.display_name, worker.worker_id)
+
+        # Restore selection if possible
+        if current_worker:
+            idx = self._worker_combo.findData(current_worker)
+            if idx >= 0:
+                self._worker_combo.setCurrentIndex(idx)
+
+        self._updating = False
+
+    def _update_type_visibility(self) -> None:
+        """Show/hide LLM or RL settings based on selected type."""
+        is_llm = self._type_combo.currentText().lower() == "llm"
+        # LLM row visibility
+        self._llm_row.setVisible(is_llm)
+        self._provider_label.setVisible(is_llm)
+        self._client_combo.setVisible(is_llm)
+        # RL row visibility
+        self._rl_row.setVisible(not is_llm)
+
+    def _on_browse_policy(self) -> None:
+        """Open file dialog to browse for policy file."""
+        file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
+            self,
+            "Select Policy File",
+            "",
+            "Policy Files (*.pt *.pth *.zip *.pkl *.ckpt);;All Files (*)"
+        )
+        if file_path:
+            self._policy_path_edit.setText(file_path)
 
     def _update_model_dropdown(self) -> None:
         """Update model dropdown based on selected provider."""
@@ -493,34 +749,52 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         Returns:
             WorkerAssignment with worker_id, worker_type, and settings.
         """
-        worker_id = self._worker_combo.currentData() or "barlog_worker"
-        client_name = self._client_combo.currentData() or "openrouter"
-        api_key = self._api_key_edit.text().strip()
+        worker_type = self._type_combo.currentText().lower()
+        worker_id = self._worker_combo.currentData() or ""
 
-        settings: Dict[str, Any] = {"client_name": client_name}
+        settings: Dict[str, Any] = {}
 
-        if api_key:
-            settings["api_key"] = api_key
-
-        # Handle vLLM vs other providers
-        if client_name == "vllm":
-            server_info = self._model_combo.currentData()
-            if isinstance(server_info, VLLMServerInfo):
-                settings["model_id"] = server_info.model_id
-                settings["base_url"] = server_info.base_url
-            else:
-                settings["model_id"] = ""
-                settings["base_url"] = "http://localhost:8000/v1"
+        if worker_type == "rl":
+            # RL worker settings: policy path
+            policy_path = self._policy_path_edit.text().strip()
+            if policy_path:
+                settings["policy_path"] = policy_path
+            # Default worker if none selected
+            if not worker_id:
+                worker_id = "ray_worker"
         else:
-            settings["model_id"] = self._model_combo.currentData() or ""
-            if client_name in LLM_CLIENTS:
-                _, _, default_base_url = LLM_CLIENTS[client_name]
-                if default_base_url:
-                    settings["base_url"] = default_base_url
+            # LLM worker settings: client, model, API key
+            client_name = self._client_combo.currentData() or "openrouter"
+            api_key = self._api_key_edit.text().strip()
+
+            settings["client_name"] = client_name
+
+            if api_key:
+                settings["api_key"] = api_key
+
+            # Handle vLLM vs other providers
+            if client_name == "vllm":
+                server_info = self._model_combo.currentData()
+                if isinstance(server_info, VLLMServerInfo):
+                    settings["model_id"] = server_info.model_id
+                    settings["base_url"] = server_info.base_url
+                else:
+                    settings["model_id"] = ""
+                    settings["base_url"] = "http://localhost:8000/v1"
+            else:
+                settings["model_id"] = self._model_combo.currentData() or ""
+                if client_name in LLM_CLIENTS:
+                    _, _, default_base_url = LLM_CLIENTS[client_name]
+                    if default_base_url:
+                        settings["base_url"] = default_base_url
+
+            # Default worker if none selected
+            if not worker_id:
+                worker_id = "balrog_worker"
 
         return WorkerAssignment(
             worker_id=worker_id,
-            worker_type="llm",
+            worker_type=worker_type,
             settings=settings,
         )
 
@@ -683,29 +957,66 @@ class OperatorConfigRow(QtWidgets.QWidget):
         main_layout.addLayout(row1)
 
         # ============================================================
-        # Row 2: Environment Family & Environment dropdowns, Load button
+        # Row 2: Two-column layout for environment and display settings
         # ============================================================
         row2 = QtWidgets.QHBoxLayout()
-        row2.setSpacing(8)
+        row2.setSpacing(16)
 
-        row2.addWidget(QtWidgets.QLabel("Env Family:", self))
+        # --- Left Column: Environment Selection + Load Button ---
+        left_col = QtWidgets.QVBoxLayout()
+        left_col.setSpacing(6)
+
+        left_form = QtWidgets.QFormLayout()
+        left_form.setSpacing(6)
+        left_form.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
+
         self._env_combo = QtWidgets.QComboBox(self)
-        self._env_combo.setMinimumWidth(100)
-        row2.addWidget(self._env_combo)
+        self._env_combo.setMinimumWidth(200)
+        left_form.addRow("Env Family:", self._env_combo)
 
-        row2.addWidget(QtWidgets.QLabel("Environment:", self))
         self._task_combo = QtWidgets.QComboBox(self)
         self._task_combo.setMinimumWidth(200)
-        row2.addWidget(self._task_combo)
+        self._task_combo.setMaxVisibleItems(20)  # Limit dropdown height with scrollbar
+        task_view = self._task_combo.view()
+        if task_view is not None:
+            task_view.setVerticalScrollBarPolicy(
+                QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn
+            )
+        left_form.addRow("Environment:", self._task_combo)
+
+        left_col.addLayout(left_form)
+
+        # Load button and size label under environment selection
+        btn_row = QtWidgets.QHBoxLayout()
+        btn_row.setSpacing(8)
+
+        self._init_btn = QtWidgets.QPushButton("Load Environment", self)
+        self._init_btn.setToolTip("Load and initialize this environment for the operator")
+        btn_row.addWidget(self._init_btn)
+
+        self._size_label = QtWidgets.QLabel("", self)
+        self._size_label.setStyleSheet("color: #666; font-size: 10px;")
+        self._size_label.setToolTip("Actual displayed dimensions after scaling (width × height)")
+        self._size_label.hide()
+        btn_row.addWidget(self._size_label)
+
+        btn_row.addStretch()
+        left_col.addLayout(btn_row)
+
+        row2.addLayout(left_col)
+
+        # --- Right Column: Display Settings ---
+        right_col = QtWidgets.QFormLayout()
+        right_col.setSpacing(6)
+        right_col.setLabelAlignment(QtCore.Qt.AlignmentFlag.AlignRight)
 
         # Container size dropdown (operator card boundary)
-        row2.addWidget(QtWidgets.QLabel("Container:", self))
         self._container_size_combo = QtWidgets.QComboBox(self)
         self._container_size_combo.setToolTip(
             "Operator container size.\n"
             "Controls the size of the operator card boundary."
         )
-        self._container_size_combo.addItem("Auto", 0)  # Auto-size based on image
+        self._container_size_combo.addItem("Auto", 0)
         self._container_size_combo.addItem("400px", 400)
         self._container_size_combo.addItem("512px", 512)
         self._container_size_combo.addItem("600px", 600)
@@ -717,17 +1028,16 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._container_size_combo.addItem("1600px", 1600)
         self._container_size_combo.addItem("1920px", 1920)
         self._container_size_combo.setCurrentIndex(5)  # Default to 800px
-        self._container_size_combo.setFixedWidth(80)
-        row2.addWidget(self._container_size_combo)
+        self._container_size_combo.setFixedWidth(100)
+        right_col.addRow("Container:", self._container_size_combo)
 
         # Image scale dropdown (RGB image scaling)
-        row2.addWidget(QtWidgets.QLabel("Image:", self))
         self._image_scale_combo = QtWidgets.QComboBox(self)
         self._image_scale_combo.setToolTip(
             "Image scaling resolution.\n"
             "The RGB frame will be scaled to this size before display."
         )
-        self._image_scale_combo.addItem("Native", 0)  # No scaling
+        self._image_scale_combo.addItem("Native", 0)
         self._image_scale_combo.addItem("256px", 256)
         self._image_scale_combo.addItem("384px", 384)
         self._image_scale_combo.addItem("512px", 512)
@@ -736,25 +1046,10 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._image_scale_combo.addItem("1280px", 1280)
         self._image_scale_combo.addItem("1440px", 1440)
         self._image_scale_combo.setCurrentIndex(0)  # Default to Native
-        self._image_scale_combo.setFixedWidth(80)
-        row2.addWidget(self._image_scale_combo)
+        self._image_scale_combo.setFixedWidth(100)
+        right_col.addRow("Image:", self._image_scale_combo)
 
-        # Load Environment button - mandatory to initialize the environment
-        self._init_btn = QtWidgets.QPushButton("Load Environment", self)
-        self._init_btn.setToolTip("Load and initialize this environment for the operator")
-        self._init_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; font-weight: bold; "
-            "border-radius: 3px; padding: 4px 12px; }"
-            "QPushButton:hover { background-color: #388E3C; }"
-        )
-        row2.addWidget(self._init_btn)
-
-        # Environment size label (shown after loading)
-        self._size_label = QtWidgets.QLabel("", self)
-        self._size_label.setStyleSheet("color: #666; font-size: 10px;")
-        self._size_label.setToolTip("Actual displayed dimensions after scaling (width × height)")
-        self._size_label.hide()  # Hidden until environment is loaded
-        row2.addWidget(self._size_label)
+        row2.addLayout(right_col)
 
         row2.addStretch()
 
@@ -783,6 +1078,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
         llm_layout.addWidget(self._model_label)
         self._model_combo = QtWidgets.QComboBox(self._llm_container)
         self._model_combo.setMinimumWidth(200)  # Wider for server names
+        self._model_combo.setMaxVisibleItems(20)  # Limit dropdown height with scrollbar
         llm_layout.addWidget(self._model_combo)
 
         llm_layout.addStretch()
@@ -862,12 +1158,13 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._policy_path_edit.textChanged.connect(self._on_config_changed)
 
     def _on_type_changed(self) -> None:
-        """Handle operator type change (LLM <-> RL)."""
+        """Handle operator type change (LLM <-> VLM <-> RL)."""
         if self._updating:
             return
         self._update_worker_dropdown()
         self._update_env_dropdown()
         self._update_task_dropdown()
+        self._update_model_dropdown()  # Update models based on VLM vs LLM
         self._update_type_specific_visibility()
         self._on_config_changed()
 
@@ -1007,16 +1304,19 @@ class OperatorConfigRow(QtWidgets.QWidget):
                     self._api_key_edit.setPlaceholderText(f"Enter key or set {env_var}")
 
     def _update_model_dropdown(self) -> None:
-        """Update model/server dropdown based on selected LLM client.
+        """Update model/server dropdown based on selected LLM client and operator type.
 
         For vLLM: Shows running servers from vLLM Server widget
-        For others: Shows predefined model list
+        For VLM type: Shows VLM_CLIENT_MODELS (vision-capable models)
+        For LLM type: Shows LLM_CLIENT_MODELS (text-only models)
         """
         self._updating = True
         current_data = self._model_combo.currentData()
         self._model_combo.clear()
 
         client_name = self._client_combo.currentData()
+        operator_type = self._type_combo.currentText().lower()
+
         if client_name:
             if client_name == "vllm":
                 # Show running vLLM servers instead of models
@@ -1030,10 +1330,16 @@ class OperatorConfigRow(QtWidgets.QWidget):
                     # No running servers - show placeholder
                     self._model_combo.addItem("(No running servers)", None)
             else:
-                # Other providers: show models as usual
+                # Other providers: show models based on operator type (VLM vs LLM)
                 self._model_label.setText("Model:")
-                if client_name in LLM_CLIENT_MODELS:
-                    models = LLM_CLIENT_MODELS[client_name]
+                # Use VLM models for VLM type, LLM models for LLM type
+                if operator_type == "vlm":
+                    model_dict = VLM_CLIENT_MODELS
+                else:
+                    model_dict = LLM_CLIENT_MODELS
+
+                if client_name in model_dict:
+                    models = model_dict[client_name]
                 else:
                     models = []
                 for model_id, display_name in models:
@@ -1078,7 +1384,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._worker_combo.clear()
 
         operator_type = self._type_combo.currentText().lower()
-        # LLM and VLM both use LLM workers (same BARLOG worker, different image settings)
+        # LLM and VLM both use LLM workers (same BALROG worker, different image settings)
         if operator_type in ("llm", "vlm"):
             workers = _get_llm_workers()
         else:
@@ -1155,7 +1461,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
             # Use static list from ENV_FAMILIES
             envs = list(ENV_FAMILIES[env_family])
         else:
-            envs = [BARLOG_DEFAULT_TASK]
+            envs = [BALROG_DEFAULT_TASK]
 
         self._task_combo.addItems(envs if envs else ["default"])
 
@@ -1255,7 +1561,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
             idx = 1
         display_name = self._name_edit.text() or f"Operator {idx}"
         env_name = self._env_combo.currentText() or "babyai"
-        task = self._task_combo.currentText() or BARLOG_DEFAULT_TASK
+        task = self._task_combo.currentText() or BALROG_DEFAULT_TASK
 
         # Multi-agent mode: pettingzoo with player assignments
         if self._is_pettingzoo_selected() and self._player_panel is not None:
@@ -1463,7 +1769,7 @@ class OperatorConfigWidget(QtWidgets.QWidget):
             config = OperatorConfig.single_agent(
                 operator_id=operator_id,
                 display_name=f"Operator {len(self._rows) + 1}",
-                worker_id="barlog_worker",
+                worker_id="balrog_worker",
                 worker_type="llm",
                 env_name="babyai",
                 task="BabyAI-GoToRedBall-v0",
@@ -1604,5 +1910,6 @@ __all__ = [
     "MAX_OPERATORS",
     "LLM_CLIENTS",
     "LLM_CLIENT_MODELS",
+    "VLM_CLIENT_MODELS",
     "PETTINGZOO_GAMES",
 ]

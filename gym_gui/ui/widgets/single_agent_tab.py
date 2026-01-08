@@ -11,10 +11,14 @@ Human vs Agent, Cooperation, and Competition modes.
 
 from __future__ import annotations
 
+import logging
 import random
 from typing import Optional, List
 
 from PyQt6 import QtCore, QtWidgets
+
+# Use operators namespace for dedicated operators.log routing
+_LOGGER = logging.getLogger("gym_gui.operators.single_agent_tab")
 from PyQt6.QtCore import pyqtSignal
 
 from gym_gui.services.operator import OperatorConfig
@@ -329,12 +333,15 @@ class OperatorsSubTab(QtWidgets.QWidget):
         Args:
             enabled: True to enable PettingZoo mode, False for normal mode.
         """
-        print(f"DEBUG OperatorsSubTab.set_pettingzoo_mode: enabled={enabled}")
+        _LOGGER.debug("set_pettingzoo_mode: enabled=%s", enabled)
         self._pettingzoo_mode = enabled
         self._step_all_button.setVisible(not enabled)
         self._step_player_0_btn.setVisible(enabled)
         self._step_player_1_btn.setVisible(enabled)
-        print(f"DEBUG: step_all visible={not enabled}, player btns visible={enabled}")
+        _LOGGER.debug(
+            "set_pettingzoo_mode: step_all visible=%s, player btns visible=%s",
+            not enabled, enabled,
+        )
 
         if not enabled:
             # Reset to normal mode
@@ -348,22 +355,26 @@ class OperatorsSubTab(QtWidgets.QWidget):
         Args:
             player_id: The player whose turn it is ("player_0" or "player_1").
         """
-        print(f"DEBUG OperatorsSubTab.set_current_player: player_id={player_id}")
+        _LOGGER.debug(
+            "set_current_player: player_id=%s",
+            player_id,
+            extra={"agent_id": player_id},
+        )
         self._current_player = player_id
 
         if player_id == "player_0":
             self._step_player_0_btn.setEnabled(True)
             self._step_player_1_btn.setEnabled(False)
-            print("DEBUG: Enabled player_0 button, disabled player_1 button")
+            _LOGGER.debug("Enabled player_0 button, disabled player_1 button")
         elif player_id == "player_1":
             self._step_player_0_btn.setEnabled(False)
             self._step_player_1_btn.setEnabled(True)
-            print("DEBUG: Disabled player_0 button, enabled player_1 button")
+            _LOGGER.debug("Disabled player_0 button, enabled player_1 button")
         else:
             # Unknown player or game over
             self._step_player_0_btn.setEnabled(False)
             self._step_player_1_btn.setEnabled(False)
-            print("DEBUG: Disabled both buttons (game over or unknown player)")
+            _LOGGER.debug("Disabled both buttons (game over or unknown player)")
 
     def _on_step_player_clicked(self, player_id: str) -> None:
         """Handle click on a player-specific step button.
@@ -494,7 +505,7 @@ class WorkersSubTab(QtWidgets.QWidget):
             "<p><b>Workers</b> are subprocess backends that handle training and inference. "
             "Each worker provides a specific implementation:</p>"
             "<ul>"
-            "<li><b>BARLOG LLM Worker</b> - LLM agents using BALROG (OpenAI, Claude, Gemini)</li>"
+            "<li><b>BALROG LLM Worker</b> - LLM agents using BALROG (OpenAI, Claude, Gemini)</li>"
             "<li><b>CleanRL Worker</b> - Single-file RL implementations (PPO, DQN, SAC)</li>"
             "<li><b>XuanCe Worker</b> - Comprehensive deep RL library with 50+ algorithms</li>"
             "<li><b>Ray RLlib Worker</b> - Scalable distributed RL training</li>"

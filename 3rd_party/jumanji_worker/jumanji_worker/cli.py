@@ -203,6 +203,19 @@ def parse_args(args: Optional[list[str]] = None) -> argparse.Namespace:
         help="Worker identifier (for multi-worker training)",
     )
 
+    # Interactive mode for Multi-Operator view (step-by-step policy evaluation)
+    parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Run in interactive mode for GUI step-by-step policy evaluation",
+    )
+    parser.add_argument(
+        "--policy-path",
+        type=str,
+        default=None,
+        help="Path to trained policy checkpoint (required for interactive mode)",
+    )
+
     return parser.parse_args(args)
 
 
@@ -285,6 +298,25 @@ def main(args: Optional[list[str]] = None) -> int:
     # Dry-run mode: print config and exit
     if parsed.dry_run:
         print(json.dumps(config.to_dict(), indent=2))
+        return 0
+
+    # Interactive mode: run step-by-step policy evaluation
+    if parsed.interactive:
+        from .runtime import InteractiveRuntime, InteractiveConfig
+
+        if not parsed.policy_path:
+            logger.error("--policy-path is required for interactive mode")
+            return 1
+
+        interactive_config = InteractiveConfig(
+            run_id=config.run_id,
+            env_id=config.env_id,
+            agent=config.agent,
+            policy_path=parsed.policy_path,
+            device=config.device,
+        )
+        runtime = InteractiveRuntime(interactive_config)
+        runtime.run()
         return 0
 
     # Import runtime (lazy to avoid JAX import until needed)

@@ -135,7 +135,7 @@ class ChessEnvLoader:
 
         # Get AI opponent configuration and set up provider via handler
         ai_config = human_vs_agent_tab.get_ai_config()
-        ai_name = self._human_vs_agent_handler.setup_ai_provider(
+        ai_name, is_fallback = self._human_vs_agent_handler.setup_ai_provider(
             ai_config, self._chess_controller
         )
 
@@ -147,10 +147,17 @@ class ChessEnvLoader:
         human_vs_agent_tab.set_policy_loaded(ai_name)
         human_vs_agent_tab._reset_btn.setEnabled(True)
 
-        self._status_bar.showMessage(
-            f"Chess loaded (seed={seed}). You play as {human_color} vs {ai_name}. Click board to move.",
-            5000
-        )
+        if is_fallback:
+            self._status_bar.showMessage(
+                f"Chess loaded (seed={seed}). You play as {human_color}. "
+                f"WARNING: Using Random AI (Stockfish unavailable).",
+                8000
+            )
+        else:
+            self._status_bar.showMessage(
+                f"Chess loaded (seed={seed}). You play as {human_color} vs {ai_name}. Click board to move.",
+                5000
+            )
 
         return ai_name
 
@@ -187,18 +194,26 @@ class ChessEnvLoader:
             return None
 
         human_vs_agent_tab = self._control_panel.multi_agent_tab.human_vs_agent
-        ai_name = self._human_vs_agent_handler.on_ai_config_changed(
+        result = self._human_vs_agent_handler.on_ai_config_changed(
             opponent_type,
             difficulty,
             self._chess_controller,
             human_vs_agent_tab.get_ai_config,
         )
 
-        if ai_name:
+        if result is not None:
+            ai_name, is_fallback = result
             human_vs_agent_tab.set_policy_loaded(ai_name)
-            self._status_bar.showMessage(f"AI opponent changed to {ai_name}", 3000)
+            if is_fallback:
+                self._status_bar.showMessage(
+                    f"WARNING: Using {ai_name} - Stockfish not available",
+                    5000
+                )
+            else:
+                self._status_bar.showMessage(f"AI opponent changed to {ai_name}", 3000)
+            return ai_name
 
-        return ai_name
+        return None
 
     def on_start_requested(self, human_agent: str, seed: int) -> None:
         """Handle start game request.

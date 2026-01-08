@@ -122,12 +122,17 @@ def _get_available_cpus() -> int:
     return 4  # Safe default
 
 
+# Environments with high CPU cost per step (complex logic, legal move generation)
+_CPU_INTENSIVE_ENVS = {"chess_v6", "go_v5", "connect_four_v3", "hanabi_v5"}
+
+
 def _calculate_optimal_workers(env_id: str, available_cpus: int) -> int:
     """Calculate optimal number of rollout workers.
 
     Heuristics:
     - Leave 2 CPUs for learner/driver process
     - Scale with number of agents (more agents = more parallel samples help)
+    - CPU-intensive envs (chess, go) get more workers to parallelize sampling
     - Cap at reasonable maximum
 
     Args:
@@ -138,6 +143,7 @@ def _calculate_optimal_workers(env_id: str, available_cpus: int) -> int:
         Recommended number of rollout workers
     """
     num_agents = _get_default_agent_count(env_id)
+    is_cpu_intensive = env_id in _CPU_INTENSIVE_ENVS
 
     # Reserve CPUs for learner (1-2 depending on total)
     reserved_cpus = 2 if available_cpus > 4 else 1
@@ -145,9 +151,12 @@ def _calculate_optimal_workers(env_id: str, available_cpus: int) -> int:
     # Available for workers
     worker_cpus = max(1, available_cpus - reserved_cpus)
 
-    # For multi-agent envs, having more workers helps parallelize sampling
-    # Rule: workers ≈ max(2, min(worker_cpus, num_agents))
-    if num_agents >= 8:
+    # CPU-intensive environments benefit from more parallel workers
+    # Even with 2 agents, chess/go need many workers to parallelize sampling
+    if is_cpu_intensive:
+        # Use half available CPUs for CPU-bound envs like chess
+        optimal = min(worker_cpus, max(8, worker_cpus // 2))
+    elif num_agents >= 8:
         # Large multi-agent (pursuit): use more workers
         optimal = min(worker_cpus, max(4, num_agents // 2))
     elif num_agents >= 4:

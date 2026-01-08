@@ -95,6 +95,9 @@ from gym_gui.game_docs.Jumanji import (
     SUDOKU_HTML,
     GRAPH_COLORING_HTML,
 )
+from gym_gui.game_docs.OpenSpiel import (
+    CHECKERS_HTML,
+)
 
 
 GAME_INFO: Dict[GameId, str] = {
@@ -288,6 +291,9 @@ GAME_INFO[GameId.JUMANJI_RUBIKS_CUBE] = RUBIKS_CUBE_HTML
 GAME_INFO[GameId.JUMANJI_SLIDING_PUZZLE] = SLIDING_PUZZLE_HTML
 GAME_INFO[GameId.JUMANJI_SUDOKU] = SUDOKU_HTML
 GAME_INFO[GameId.JUMANJI_GRAPH_COLORING] = GRAPH_COLORING_HTML
+
+# OpenSpiel mappings (board games via Shimmy wrapper)
+GAME_INFO[GameId.OPEN_SPIEL_CHECKERS] = CHECKERS_HTML
 
 
 __all__ = ["GAME_INFO"]

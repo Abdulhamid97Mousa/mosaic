@@ -97,7 +97,9 @@ from gym_gui.ui.handlers import (
     ConnectFourHandler,
     GoHandler,
     SudokuHandler,
+    CheckersHandler,
     HumanVsAgentHandler,
+    CheckersEnvLoader,
     ChessEnvLoader,
     ConnectFourEnvLoader,
     GoEnvLoader,
@@ -110,7 +112,6 @@ from gym_gui.ui.handlers import (
     FastLaneTabHandler,
     TrainingMonitorHandler,
 )
-from gym_gui.ui.widgets.advanced_config import LaunchConfig, RunMode
 
 from gym_gui.constants.optional_deps import (
     get_mjpc_launcher,
@@ -130,6 +131,8 @@ def _training_submit_deadline_seconds() -> float:
 
 
 _LOGGER = logging.getLogger(__name__)
+# Dedicated operator logger for PettingZoo/multi-agent game operations → operators.log
+_OP_LOGGER = logging.getLogger("gym_gui.operators.main_window")
 
 
 class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
@@ -641,6 +644,11 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             render_tabs=self._render_tabs,
             status_bar=self._status_bar,
         )
+        self._checkers_handler = CheckersHandler(
+            session=self._session,
+            render_tabs=self._render_tabs,
+            status_bar=self._status_bar,
+        )
 
         # Environment loaders (for Human vs Agent mode and environment-specific setup)
         self._chess_env_loader = ChessEnvLoader(
@@ -663,6 +671,11 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             control_panel=self._control_panel,
             status_bar=self._status_bar,
         )
+        self._checkers_env_loader = CheckersEnvLoader(
+            render_tabs=self._render_tabs,
+            control_panel=self._control_panel,
+            status_bar=self._status_bar,
+        )
         self._vizdoom_env_loader = VizdoomEnvLoader(
             render_tabs=self._render_tabs,
         )
@@ -674,6 +687,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             connect_four_loader=self._connect_four_env_loader,
             go_loader=self._go_env_loader,
             tictactoe_loader=self._tictactoe_env_loader,
+            checkers_loader=self._checkers_env_loader,
             set_game_info=self._set_game_info,
             get_game_info=get_game_info,
             parent=self,
@@ -795,10 +809,6 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._policy_evaluation_handler.handle_evaluate_request
         )
 
-        # Advanced Configuration Tab handlers
-        self._control_panel.advanced_launch_requested.connect(self._on_advanced_launch)
-        self._control_panel.advanced_env_load_requested.connect(self._on_advanced_env_load)
-
         # Board game handlers (Human Control Mode)
         # These signals come from BoardGameRendererStrategy in the Grid tab
         self._render_tabs.chess_move_made.connect(self._chess_handler.on_chess_move)
@@ -809,6 +819,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._render_tabs.sudoku_cell_selected.connect(self._sudoku_handler.on_cell_selected)
         self._render_tabs.sudoku_digit_entered.connect(self._sudoku_handler.on_digit_entered)
         self._render_tabs.sudoku_cell_cleared.connect(self._sudoku_handler.on_cell_cleared)
+        # Checkers handler (OpenSpiel via Shimmy - two-click selection)
+        self._render_tabs.checkers_cell_clicked.connect(self._checkers_handler.on_checkers_cell_clicked)
 
         self._session.seed_applied.connect(self._on_seed_applied)
 
@@ -1046,7 +1058,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             move = chess.Move.from_uci(uci_move)
 
             if move not in board.legal_moves:
-                print(f"DEBUG _convert_uci_to_action_index: {uci_move} not in legal_moves")
+                _OP_LOGGER.debug("_convert_uci_to_action_index: %s not in legal_moves", uci_move)
                 return None
 
             # Determine current player (0 = white, 1 = black)
@@ -1069,8 +1081,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             panel = chess_utils.get_move_plane(move_for_encoding)
             action = (coord[0] * 8 + coord[1]) * 73 + panel
 
-            print(f"DEBUG _convert_uci_to_action_index: {uci_move} -> action={action}")
-            print(f"DEBUG   current_player={current_player}, coord={coord}, panel={panel}")
+            _OP_LOGGER.debug(
+                "_convert_uci_to_action_index: %s -> action=%s, current_player=%s, coord=%s, panel=%s",
+                uci_move, action, current_player, coord, panel,
+            )
 
             # Verify this action is legal
             obs = env.observe(current_agent)
@@ -1078,16 +1092,14 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 if obs["action_mask"][action] == 1:
                     return action
                 else:
-                    print(f"DEBUG _convert_uci_to_action_index: action {action} not in action_mask!")
+                    _OP_LOGGER.debug("_convert_uci_to_action_index: action %s not in action_mask", action)
                     return None
             else:
                 # No action mask, return the computed action
                 return action
 
         except Exception as e:
-            import traceback
-            print(f"DEBUG _convert_uci_to_action_index EXCEPTION: {e}")
-            traceback.print_exc()
+            _OP_LOGGER.debug("_convert_uci_to_action_index EXCEPTION: %s", e, exc_info=True)
             self.log_constant(
                 LOG_UI_MAINWINDOW_WARNING,
                 message=f"Failed to convert UCI move '{uci_move}': {e}",
@@ -1115,13 +1127,19 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         # Check if this is PettingZoo multi-agent mode
         is_multiagent, first_config = self._is_pettingzoo_multiagent()
-        print(f"DEBUG: _on_reset_all_operators - is_multiagent={is_multiagent}, first_config={first_config}")
+        _OP_LOGGER.debug(
+            "_on_reset_all_operators: is_multiagent=%s, first_config=%s",
+            is_multiagent, first_config,
+        )
         if first_config:
-            print(f"DEBUG: env_name={first_config.env_name}, workers={list(first_config.workers.keys())}")
+            _OP_LOGGER.debug(
+                "_on_reset_all_operators: env_name=%s, workers=%s",
+                first_config.env_name, list(first_config.workers.keys()),
+            )
 
         if is_multiagent and first_config is not None:
             # PettingZoo multi-agent: GUI owns the shared environment
-            print("DEBUG: Taking PettingZoo path")
+            _OP_LOGGER.debug("_on_reset_all_operators: Taking PettingZoo path")
             self._on_reset_pettingzoo_multiagent(seed, first_config)
             return
 
@@ -1257,23 +1275,26 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         # Get all operators and their player assignments
         active_operators = self._multi_operator_service.get_active_operators()
-        print(f"DEBUG: active_operators count={len(active_operators)}")
+        _OP_LOGGER.debug("active_operators count=%d", len(active_operators))
         pending_ids = self._multi_operator_service.start_all()
-        print(f"DEBUG: pending_ids={pending_ids}")
+        _OP_LOGGER.debug("pending_ids=%s", pending_ids)
 
         for operator_id in pending_ids:
-            print(f"DEBUG: Processing operator_id={operator_id}")
+            _OP_LOGGER.debug("Processing operator_id=%s", operator_id)
             op_config = self._multi_operator_service.get_operator(operator_id)
             if op_config is None:
-                print(f"DEBUG: op_config is None for {operator_id}")
+                _OP_LOGGER.debug("op_config is None for %s", operator_id)
                 continue
 
-            print(f"DEBUG: op_config.workers={list(op_config.workers.keys())}")
+            _OP_LOGGER.debug("op_config.workers=%s", list(op_config.workers.keys()))
             # Determine which player this operator controls
             # If multiple workers in one operator, each controls a player
             # If single worker per operator, operator controls one player
             for player_id, worker_assignment in op_config.workers.items():
-                print(f"DEBUG: Launching worker for player_id={player_id}, worker_id={worker_assignment.worker_id}")
+                _OP_LOGGER.debug(
+                    "Launching worker for player_id=%s, worker_id=%s",
+                    player_id, worker_assignment.worker_id,
+                )
                 try:
                     # Create single-agent config for this player's worker
                     # (multiagent OperatorConfig has operator_type="multiagent" which
@@ -1302,7 +1323,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
                     # Store mapping for step coordination
                     self._pettingzoo_player_handles[player_id] = handle
-                    print(f"DEBUG: Stored handle for {player_id}, total handles={len(self._pettingzoo_player_handles)}")
+                    _OP_LOGGER.debug(
+                        "Stored handle for %s, total handles=%d",
+                        player_id, len(self._pettingzoo_player_handles),
+                    )
 
                     # Assign run_id
                     self._multi_operator_service.assign_run_id(operator_id, handle.run_id)
@@ -1353,10 +1377,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._control_panel.set_turn_indicator(current_player, visible=True)
 
         # Enable PettingZoo mode: show player step buttons instead of Step All
-        print(f"DEBUG: Enabling PettingZoo mode, current_player={current_player}")
+        _OP_LOGGER.debug("Enabling PettingZoo mode, current_player=%s", current_player)
         self._control_panel.set_pettingzoo_mode(True)
         self._control_panel.set_current_player(current_player)
-        print("DEBUG: PettingZoo mode enabled")
+        _OP_LOGGER.debug("PettingZoo mode enabled")
 
         # Switch to Multi-Operator tab
         self._render_tabs.switch_to_multi_operator_tab()
@@ -1379,7 +1403,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
     def _render_pettingzoo_frame(self) -> None:
         """Render the current state of the shared PettingZoo environment."""
         if self._shared_pettingzoo_env is None:
-            print("DEBUG _render_pettingzoo_frame: No environment!")
+            _OP_LOGGER.debug("_render_pettingzoo_frame: No environment")
             return
 
         try:
@@ -1396,7 +1420,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             if task == "chess_v6" and hasattr(env, "board"):
                 import chess
                 board: chess.Board = env.board
-                print(f"DEBUG _render_pettingzoo_frame: Chess board FEN={board.fen()}")
+                _OP_LOGGER.debug("_render_pettingzoo_frame: Chess board FEN=%s", board.fen())
 
                 legal_moves = [move.uci() for move in board.legal_moves]
                 current_player = "white" if board.turn == chess.WHITE else "black"
@@ -1416,10 +1440,12 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                         "game_id": "chess",
                     },
                 }
-                print(f"DEBUG _render_pettingzoo_frame: Sending payload to operator_id={first_id}")
-                print(f"DEBUG _render_pettingzoo_frame: payload keys={list(payload.keys())}")
+                _OP_LOGGER.debug(
+                    "_render_pettingzoo_frame: Sending payload to operator_id=%s, keys=%s",
+                    first_id, list(payload.keys()),
+                )
                 self._render_tabs.display_operator_payload(first_id, payload)
-                print(f"DEBUG _render_pettingzoo_frame: Payload sent!")
+                _OP_LOGGER.debug("_render_pettingzoo_frame: Payload sent")
             else:
                 # Fallback to RGB rendering for other games
                 rgb_frame = env.render()
@@ -1436,9 +1462,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     }
                     self._render_tabs.display_operator_payload(first_id, payload)
         except Exception as e:
-            print(f"DEBUG _render_pettingzoo_frame EXCEPTION: {e}")
-            import traceback
-            traceback.print_exc()
+            _OP_LOGGER.debug("_render_pettingzoo_frame EXCEPTION: %s", e, exc_info=True)
             self.log_constant(
                 LOG_UI_MAINWINDOW_WARNING,
                 message=f"Failed to render PettingZoo frame: {e}",
@@ -1531,16 +1555,16 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             player_id: Which player to step (e.g., "player_0", "player_1").
             seed: Random seed (currently unused for PettingZoo steps).
         """
-        print(f"DEBUG _on_step_player: player_id={player_id}, seed={seed}")
+        _OP_LOGGER.debug("_on_step_player: player_id=%s, seed=%s", player_id, seed)
         env = self._shared_pettingzoo_env
         if env is None:
-            print("DEBUG _on_step_player: No environment!")
+            _OP_LOGGER.debug("_on_step_player: No environment")
             self._status_bar.showMessage("No PettingZoo environment active", 3000)
             return
 
         # Validate it's actually this player's turn
         current_player = env.agent_selection
-        print(f"DEBUG _on_step_player: current_player from env={current_player}")
+        _OP_LOGGER.debug("_on_step_player: current_player from env=%s", current_player)
         if current_player != player_id:
             self.log_constant(
                 LOG_UI_MAINWINDOW_WARNING,
@@ -1569,28 +1593,31 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         5. Execute action on shared environment
         6. Render updated board
         """
-        print("DEBUG _on_step_pettingzoo_multiagent: Starting")
+        _OP_LOGGER.debug("_on_step_pettingzoo_multiagent: Starting")
         env = self._shared_pettingzoo_env
         if env is None:
-            print("DEBUG _on_step_pettingzoo_multiagent: No environment!")
+            _OP_LOGGER.debug("_on_step_pettingzoo_multiagent: No environment")
             return
 
         # Check if game is over
         if env.terminations.get(env.agent_selection, False) or \
            env.truncations.get(env.agent_selection, False):
-            print("DEBUG _on_step_pettingzoo_multiagent: Game over!")
+            _OP_LOGGER.debug("_on_step_pettingzoo_multiagent: Game over")
             self._status_bar.showMessage("Game over! Use Reset to start new game.", 3000)
             return
 
         # Get current player
         current_player = env.agent_selection  # e.g., "player_0" or "player_1"
-        print(f"DEBUG _on_step_pettingzoo_multiagent: current_player={current_player}")
+        _OP_LOGGER.debug("_on_step_pettingzoo_multiagent: current_player=%s", current_player)
 
         # Get handle for this player's worker
-        print(f"DEBUG _on_step_pettingzoo_multiagent: Available handles={list(self._pettingzoo_player_handles.keys())}")
+        _OP_LOGGER.debug(
+            "_on_step_pettingzoo_multiagent: Available handles=%s",
+            list(self._pettingzoo_player_handles.keys()),
+        )
         handle = self._pettingzoo_player_handles.get(current_player)
         if handle is None:
-            print(f"DEBUG _on_step_pettingzoo_multiagent: NO HANDLE for {current_player}!")
+            _OP_LOGGER.debug("_on_step_pettingzoo_multiagent: NO HANDLE for %s", current_player)
             self.log_constant(
                 LOG_UI_MAINWINDOW_ERROR,
                 message=f"No worker handle for player: {current_player}",
@@ -1599,9 +1626,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._status_bar.showMessage(f"No worker for {current_player}", 3000)
             return
 
-        print(f"DEBUG _on_step_pettingzoo_multiagent: Got handle, is_running={handle.is_running}")
+        _OP_LOGGER.debug("_on_step_pettingzoo_multiagent: Got handle, is_running=%s", handle.is_running)
         if not handle.is_running:
-            print(f"DEBUG _on_step_pettingzoo_multiagent: Handle not running!")
+            _OP_LOGGER.debug("_on_step_pettingzoo_multiagent: Handle not running")
             self.log_constant(
                 LOG_UI_MAINWINDOW_WARNING,
                 message=f"Worker not running for player: {current_player}",
@@ -1614,7 +1641,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         # Get legal moves (for chess, convert to UCI strings)
         legal_moves = self._get_chess_legal_moves(env)
-        print(f"DEBUG _on_step_pettingzoo_multiagent: legal_moves count={len(legal_moves)}")
+        _OP_LOGGER.debug("_on_step_pettingzoo_multiagent: legal_moves count=%d", len(legal_moves))
 
         # Build observation string for LLM
         obs_str = f"Current player: {current_player}\n"
@@ -1622,9 +1649,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         # Send select_action command to worker
         info = {"legal_moves": legal_moves}
-        print(f"DEBUG _on_step_pettingzoo_multiagent: Sending select_action to worker...")
+        _OP_LOGGER.debug("_on_step_pettingzoo_multiagent: Sending select_action to worker...")
         if handle.send_select_action(obs_str, current_player, info):
-            print(f"DEBUG _on_step_pettingzoo_multiagent: select_action sent successfully")
+            _OP_LOGGER.debug("_on_step_pettingzoo_multiagent: select_action sent successfully")
             self.log_constant(
                 LOG_UI_MAINWINDOW_TRACE,
                 message=f"Sent select_action to {current_player}",
@@ -1635,7 +1662,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             from PyQt6.QtCore import QTimer
             QTimer.singleShot(100, lambda: self._poll_pettingzoo_action(handle, current_player))
         else:
-            print(f"DEBUG _on_step_pettingzoo_multiagent: Failed to send select_action!")
+            _OP_LOGGER.debug("_on_step_pettingzoo_multiagent: Failed to send select_action")
             self.log_constant(
                 LOG_UI_MAINWINDOW_ERROR,
                 message=f"Failed to send select_action to {current_player}",
@@ -1659,7 +1686,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         from PyQt6.QtCore import QTimer
 
         if attempts >= max_attempts:
-            print(f"DEBUG _poll_pettingzoo_action: TIMEOUT for {player_id} after {max_attempts} attempts")
+            _OP_LOGGER.debug("_poll_pettingzoo_action: TIMEOUT for %s after %d attempts", player_id, max_attempts)
             self.log_constant(
                 LOG_UI_MAINWINDOW_ERROR,
                 message=f"Timeout waiting for action from {player_id}",
@@ -1685,7 +1712,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             # Got the action!
             action_str = response.get("action_str", "")
             action_index = response.get("action")
-            print(f"DEBUG _poll_pettingzoo_action: Got action_selected from {player_id}: {action_str} (index={action_index})")
+            _OP_LOGGER.debug(
+                "_poll_pettingzoo_action: Got action_selected from %s: %s (index=%s)",
+                player_id, action_str, action_index,
+            )
 
             self.log_constant(
                 LOG_UI_MAINWINDOW_INFO,
@@ -1704,7 +1734,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         elif response_type == "error":
             error_msg = response.get("message", "Unknown error")
-            print(f"DEBUG _poll_pettingzoo_action: Got error from {player_id}: {error_msg}")
+            _OP_LOGGER.debug("_poll_pettingzoo_action: Got error from %s: %s", player_id, error_msg)
             self.log_constant(
                 LOG_UI_MAINWINDOW_ERROR,
                 message=f"Worker error for {player_id}: {error_msg}",
@@ -1736,21 +1766,24 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             action_str: The action as a string (e.g., UCI move "e2e4").
             action_index: Optional pre-computed action index.
         """
-        print(f"DEBUG _execute_pettingzoo_action: player_id={player_id}, action_str={action_str}, action_index={action_index}")
+        _OP_LOGGER.debug(
+            "_execute_pettingzoo_action: player_id=%s, action_str=%s, action_index=%s",
+            player_id, action_str, action_index,
+        )
         env = self._shared_pettingzoo_env
         if env is None:
-            print("DEBUG _execute_pettingzoo_action: No environment!")
+            _OP_LOGGER.debug("_execute_pettingzoo_action: No environment")
             return
 
         # Convert action string to index if needed
         if action_index is None or not isinstance(action_index, int):
-            print(f"DEBUG: action_index is not int ({type(action_index)}), converting UCI to index")
+            _OP_LOGGER.debug("action_index is not int (%s), converting UCI to index", type(action_index))
             action_index = self._convert_uci_to_action_index(env, action_str)
-            print(f"DEBUG: Converted action_index = {action_index}")
+            _OP_LOGGER.debug("Converted action_index = %s", action_index)
 
         if action_index is None:
             # Invalid move - try to pick a random legal move using action mask
-            print(f"DEBUG: Invalid move '{action_str}', picking random legal move from action_mask")
+            _OP_LOGGER.debug("Invalid move '%s', picking random legal move from action_mask", action_str)
             self.log_constant(
                 LOG_UI_MAINWINDOW_WARNING,
                 message=f"Invalid move '{action_str}' from {player_id}, selecting random",
@@ -1767,53 +1800,56 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
                 if action_mask is not None:
                     legal_action_indices = np.where(action_mask == 1)[0]
-                    print(f"DEBUG: legal_action_indices count = {len(legal_action_indices)}")
+                    _OP_LOGGER.debug("legal_action_indices count = %d", len(legal_action_indices))
                     if len(legal_action_indices) > 0:
                         import random
                         action_index = int(random.choice(legal_action_indices))
-                        print(f"DEBUG: Random legal action_index = {action_index}")
+                        _OP_LOGGER.debug("Random legal action_index = %s", action_index)
                     else:
-                        print("DEBUG: No legal actions in action_mask!")
+                        _OP_LOGGER.debug("No legal actions in action_mask")
                         self._status_bar.showMessage(f"No legal moves available", 3000)
                         return
                 else:
-                    print("DEBUG: No action_mask available!")
+                    _OP_LOGGER.debug("No action_mask available")
                     self._status_bar.showMessage(f"Cannot determine legal moves", 3000)
                     return
             except Exception as mask_err:
-                print(f"DEBUG: Error getting action_mask: {mask_err}")
+                _OP_LOGGER.debug("Error getting action_mask: %s", mask_err)
                 self._status_bar.showMessage(f"Error: {mask_err}", 3000)
                 return
 
         # Execute the action
         try:
-            print(f"DEBUG: Executing env.step({action_index})")
+            _OP_LOGGER.debug("Executing env.step(%s)", action_index)
             env.step(action_index)
-            print("DEBUG: env.step completed successfully")
+            _OP_LOGGER.debug("env.step completed successfully")
 
             # Check for game end - in PettingZoo AEC, check if ALL agents are terminated
             # or if there are no more agents to act
             next_player = env.agent_selection
-            print(f"DEBUG: After step, agent_selection={next_player}")
+            _OP_LOGGER.debug("After step, agent_selection=%s", next_player)
 
             # Check if game is truly over (all agents terminated or no agents left)
             all_terminated = all(env.terminations.values())
             all_truncated = all(env.truncations.values())
             no_agents_left = len(env.agents) == 0
             game_over = all_terminated or all_truncated or no_agents_left
-            print(f"DEBUG: all_terminated={all_terminated}, all_truncated={all_truncated}, no_agents={no_agents_left}, game_over={game_over}")
+            _OP_LOGGER.debug(
+                "all_terminated=%s, all_truncated=%s, no_agents=%s, game_over=%s",
+                all_terminated, all_truncated, no_agents_left, game_over,
+            )
 
             # For backward compat with the rest of the code
             terminated = game_over
             truncated = False
 
             # Render updated board
-            print("DEBUG: Rendering frame...")
+            _OP_LOGGER.debug("Rendering frame...")
             self._render_pettingzoo_frame()
-            print("DEBUG: Frame rendered")
+            _OP_LOGGER.debug("Frame rendered")
 
             if terminated or truncated:
-                print("DEBUG: Game over path")
+                _OP_LOGGER.debug("Game over path")
                 # Game over
                 rewards = env.rewards
                 winner = "Draw"
@@ -1830,12 +1866,15 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 # Disable both player step buttons when game is over
                 self._control_panel.set_current_player("")  # Empty disables both
             else:
-                print("DEBUG: Game continues path")
-                print(f"DEBUG _execute_pettingzoo_action: player_id={player_id}, action={action_str}, next_player={next_player}")
+                _OP_LOGGER.debug("Game continues path")
+                _OP_LOGGER.debug(
+                    "_execute_pettingzoo_action: player_id=%s, action=%s, next_player=%s",
+                    player_id, action_str, next_player,
+                )
                 # Update turn indicator for next player
                 self._control_panel.set_turn_indicator(next_player, visible=True)
                 # Toggle player step buttons for next turn
-                print(f"DEBUG: Calling set_current_player({next_player})")
+                _OP_LOGGER.debug("Calling set_current_player(%s)", next_player)
                 self._control_panel.set_current_player(next_player)
                 self._status_bar.showMessage(
                     f"{player_id} played {action_str}. Next: {next_player}",
@@ -1851,12 +1890,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     "next_player": env.agent_selection,
                 },
             )
-            print("DEBUG: _execute_pettingzoo_action completed successfully!")
+            _OP_LOGGER.debug("_execute_pettingzoo_action completed successfully")
 
         except Exception as e:
-            print(f"DEBUG _execute_pettingzoo_action EXCEPTION: {e}")
-            import traceback
-            traceback.print_exc()
+            _OP_LOGGER.debug("_execute_pettingzoo_action EXCEPTION: %s", e, exc_info=True)
             self.log_constant(
                 LOG_UI_MAINWINDOW_ERROR,
                 message=f"Failed to execute action: {e}",
@@ -1958,6 +1995,15 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             )
 
         elif response_type == "ready":
+            # Build payload to reset stats and display initial render
+            payload = {
+                "step_index": response.get("step_index", 0),
+                "episode_index": response.get("episode_index", 0),
+                "reward": 0.0,
+                "episode_reward": response.get("episode_reward", 0.0),
+                "render_payload": response.get("render_payload"),
+            }
+            self._render_tabs.display_operator_payload(operator_id, payload)
             self.log_constant(
                 LOG_UI_MAINWINDOW_INFO,
                 message=f"Operator ready",
@@ -2366,199 +2412,6 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
     # Policy evaluation methods delegated to PolicyEvaluationHandler:
     # - handle_evaluate_request
     # - _launch_evaluation (uses EvaluationWorker QThread)
-
-    # ------------------------------------------------------------------
-    # Advanced Configuration Tab Handlers
-    # ------------------------------------------------------------------
-
-    def _on_advanced_env_load(self, env_id: str, seed: int) -> None:
-        """Handle environment load request from Advanced Configuration tab.
-
-        This is triggered when the user clicks 'Load Environment' in Step 1.
-        Currently logs the request; full environment loading will be implemented
-        as part of Phase 2.2 (SessionController integration).
-
-        Args:
-            env_id: Environment identifier (e.g., "CartPole-v1", "chess_v6")
-            seed: Random seed for environment initialization
-        """
-        _LOGGER.info(
-            "Advanced tab: Environment load requested | env_id=%s seed=%d",
-            env_id,
-            seed,
-        )
-        self._status_bar.showMessage(
-            f"Environment preview: {env_id} (seed={seed})", 3000
-        )
-
-    def _on_advanced_launch(self, config: LaunchConfig) -> None:
-        """Handle launch request from Advanced Configuration tab.
-
-        Dispatches to the appropriate handler based on run mode:
-        - INTERACTIVE: Start rendered session via SessionController
-        - HEADLESS: Submit to trainer daemon for background training
-        - EVALUATION: Load policy and run evaluation with rendering
-
-        Args:
-            config: Complete launch configuration from the Advanced tab
-        """
-        _LOGGER.info(
-            "Advanced tab: Launch requested | env=%s mode=%s paradigm=%s agents=%d",
-            config.env_id,
-            config.run_mode.name,
-            config.paradigm.value,
-            len(config.agent_bindings),
-        )
-
-        if config.run_mode == RunMode.INTERACTIVE:
-            self._launch_interactive_session(config)
-        elif config.run_mode == RunMode.HEADLESS:
-            self._launch_headless_training(config)
-        elif config.run_mode == RunMode.EVALUATION:
-            self._launch_evaluation_session(config)
-        else:
-            _LOGGER.warning("Unknown run mode: %s", config.run_mode)
-            self._status_bar.showMessage(
-                f"Unknown run mode: {config.run_mode.name}", 5000
-            )
-
-    def _launch_interactive_session(self, config: LaunchConfig) -> None:
-        """Launch an interactive session with rendering.
-
-        Uses the existing SessionController infrastructure.
-
-        Args:
-            config: Launch configuration
-        """
-        _LOGGER.info(
-            "Launching interactive session: env=%s seed=%d",
-            config.env_id,
-            config.seed,
-        )
-
-        # TODO (Phase 2.2): Full integration with SessionController
-        # For now, provide a status message indicating the configuration is ready
-        # The PolicyMappingService is already configured by AdvancedConfigTab._configure_policy_mapping()
-
-        human_agents = [
-            aid for aid, b in config.agent_bindings.items()
-            if b.actor_id == "human_keyboard"
-        ]
-        ai_agents = [
-            aid for aid, b in config.agent_bindings.items()
-            if b.actor_id != "human_keyboard"
-        ]
-
-        self._status_bar.showMessage(
-            f"Interactive: {config.env_id} | {len(human_agents)} human, {len(ai_agents)} AI agents",
-            5000,
-        )
-
-        # Log the full configuration for debugging
-        _LOGGER.debug(
-            "Interactive session config: paradigm=%s bindings=%s",
-            config.paradigm.value,
-            {aid: (b.actor_id, b.worker_id) for aid, b in config.agent_bindings.items()},
-        )
-
-    def _launch_headless_training(self, config: LaunchConfig) -> None:
-        """Launch headless training via the trainer daemon.
-
-        Builds a training configuration from the LaunchConfig and submits
-        it to the TrainerClientRunner.
-
-        Args:
-            config: Launch configuration
-        """
-        _LOGGER.info(
-            "Launching headless training: env=%s seed=%d",
-            config.env_id,
-            config.seed,
-        )
-
-        # Build training config from LaunchConfig
-        training_config = self._build_training_config_from_launch(config)
-        if training_config is None:
-            return
-
-        self._status_bar.showMessage(
-            f"Submitting training: {config.env_id}", 5000
-        )
-        self._submit_training_config(training_config)
-
-    def _launch_evaluation_session(self, config: LaunchConfig) -> None:
-        """Launch evaluation session with a trained policy.
-
-        Loads the trained policy and runs in evaluation mode with rendering.
-
-        Args:
-            config: Launch configuration
-        """
-        _LOGGER.info(
-            "Launching evaluation session: env=%s seed=%d",
-            config.env_id,
-            config.seed,
-        )
-
-        # TODO (Phase 2.2): Full integration with policy loading
-        # For now, provide status and log the configuration
-
-        self._status_bar.showMessage(
-            f"Evaluation: {config.env_id} (policy loading not yet implemented)",
-            5000,
-        )
-
-    def _build_training_config_from_launch(
-        self, config: LaunchConfig
-    ) -> Optional[dict[str, object]]:
-        """Build a training configuration dict from LaunchConfig.
-
-        Converts the unified LaunchConfig into the format expected by
-        the trainer daemon.
-
-        Args:
-            config: Launch configuration from Advanced tab
-
-        Returns:
-            Training config dict, or None if configuration fails
-        """
-        # Determine primary worker
-        primary_worker = config.primary_worker_id
-        if not primary_worker:
-            QtWidgets.QMessageBox.warning(
-                self,
-                "No Worker Selected",
-                "Headless training requires at least one agent with a worker "
-                "(e.g., CleanRL, RLlib). Please configure a non-local worker.",
-            )
-            return None
-
-        # Get worker-specific config
-        worker_config = config.worker_configs.get(primary_worker, {})
-
-        # Build training config
-        training_config: dict[str, object] = {
-            "env_id": config.env_id,
-            "seed": config.seed,
-            "worker_id": primary_worker,
-            "paradigm": config.paradigm.value,
-            "agent_bindings": {
-                aid: {
-                    "actor_id": b.actor_id,
-                    "worker_id": b.worker_id,
-                    "mode": b.mode,
-                }
-                for aid, b in config.agent_bindings.items()
-            },
-            **worker_config,
-        }
-
-        _LOGGER.debug(
-            "Built training config: %s",
-            {k: v for k, v in training_config.items() if k != "agent_bindings"},
-        )
-
-        return training_config
 
     def _on_start_game(self) -> None:
         """Handle Start Game button."""

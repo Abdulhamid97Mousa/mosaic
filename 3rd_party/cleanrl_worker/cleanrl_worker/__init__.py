@@ -31,7 +31,7 @@ def get_worker_metadata() -> tuple[WorkerMetadata, WorkerCapabilities]:
     capabilities = WorkerCapabilities(
         worker_type="cleanrl",
         supported_paradigms=("sequential",),
-        env_families=("gymnasium", "atari", "procgen", "mujoco", "dm_control"),
+        env_families=("gymnasium", "atari", "procgen", "mujoco", "dm_control", "minigrid", "babyai"),
         action_spaces=("discrete", "continuous"),
         observation_spaces=("vector", "image"),
         max_agents=1,

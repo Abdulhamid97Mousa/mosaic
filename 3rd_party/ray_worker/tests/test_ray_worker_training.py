@@ -125,8 +125,9 @@ class TestEnvironmentFactory:
     def test_create_waterworld(self):
         """Test creating Waterworld environment."""
         from ray_worker.runtime import EnvironmentFactory
+        from ray_worker.config import PettingZooAPIType
 
-        env = EnvironmentFactory.create_sisl_env("waterworld_v4")
+        env = EnvironmentFactory.create_sisl_env("waterworld_v4", PettingZooAPIType.PARALLEL)
         assert env is not None
         assert hasattr(env, "reset")
         assert hasattr(env, "step")
@@ -135,8 +136,9 @@ class TestEnvironmentFactory:
     def test_create_multiwalker(self):
         """Test creating Multiwalker environment."""
         from ray_worker.runtime import EnvironmentFactory
+        from ray_worker.config import PettingZooAPIType
 
-        env = EnvironmentFactory.create_sisl_env("multiwalker_v9")
+        env = EnvironmentFactory.create_sisl_env("multiwalker_v9", PettingZooAPIType.PARALLEL)
         assert env is not None
         assert hasattr(env, "reset")
         env.close()
@@ -144,8 +146,9 @@ class TestEnvironmentFactory:
     def test_create_pursuit(self):
         """Test creating Pursuit environment."""
         from ray_worker.runtime import EnvironmentFactory
+        from ray_worker.config import PettingZooAPIType
 
-        env = EnvironmentFactory.create_sisl_env("pursuit_v4")
+        env = EnvironmentFactory.create_sisl_env("pursuit_v4", PettingZooAPIType.PARALLEL)
         assert env is not None
         assert hasattr(env, "reset")
         env.close()
@@ -166,9 +169,10 @@ class TestEnvironmentFactory:
     def test_invalid_env_raises(self):
         """Test that invalid env ID raises error."""
         from ray_worker.runtime import EnvironmentFactory
+        from ray_worker.config import PettingZooAPIType
 
         with pytest.raises(ValueError, match="Unknown SISL environment"):
-            EnvironmentFactory.create_sisl_env("invalid_env_v99")
+            EnvironmentFactory.create_sisl_env("invalid_env_v99", PettingZooAPIType.PARALLEL)
 
 
 class TestRayWorkerRuntime:
@@ -196,7 +200,7 @@ class TestRayWorkerRuntime:
             training=TrainingConfig(
                 algorithm="PPO",
                 total_timesteps=2000,  # Very short for testing
-                train_batch_size=500,
+                algo_params={"train_batch_size": 500},
             ),
             resources=ResourceConfig(
                 num_workers=0,  # Local only for testing
@@ -310,7 +314,7 @@ class TestAnalyticsManifest:
         loaded = WorkerAnalyticsManifest.load(manifest_path)
         assert loaded.run_id == "test_manifest_002"
         assert loaded.worker_type == "ray"
-        assert loaded.metadata["paradigm"] == "independent"
+        assert loaded.metadata["policy_configuration"] == "independent"
         assert loaded.metadata["env_id"] == "waterworld_v4"
         assert loaded.artifacts.tensorboard is not None
         assert loaded.artifacts.tensorboard.enabled is True
@@ -344,7 +348,7 @@ class TestAnalyticsManifest:
         # Load
         loaded = WorkerAnalyticsManifest.load(manifest_path)
         assert loaded.run_id == "test_manifest_003"
-        assert loaded.metadata["paradigm"] == "self_play"
+        assert loaded.metadata["policy_configuration"] == "self_play"
         assert loaded.metadata["num_agents"] == 2
 
 

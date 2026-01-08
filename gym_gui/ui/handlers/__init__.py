@@ -50,6 +50,7 @@ from gym_gui.ui.handlers.game_moves import (
     GoHandler,
     ConnectFourHandler,
     SudokuHandler,
+    CheckersHandler,
 )
 
 # Feature handlers (cross-cutting concerns)
@@ -73,6 +74,7 @@ from gym_gui.ui.handlers.env_loaders import (
     GoEnvLoader,
     TicTacToeEnvLoader,
     VizdoomEnvLoader,
+    CheckersEnvLoader,
 )
 
 __all__ = [
@@ -81,6 +83,7 @@ __all__ = [
     "GoHandler",
     "ConnectFourHandler",
     "SudokuHandler",
+    "CheckersHandler",
     # Feature handlers
     "GameConfigHandler",
     "MPCHandler",
@@ -98,4 +101,5 @@ __all__ = [
     "GoEnvLoader",
     "TicTacToeEnvLoader",
     "VizdoomEnvLoader",
+    "CheckersEnvLoader",
 ]

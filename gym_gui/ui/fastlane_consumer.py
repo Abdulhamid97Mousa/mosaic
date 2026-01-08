@@ -20,6 +20,7 @@ from gym_gui.logging_config.log_constants import (
 class FastLaneFrameEvent:
     image: QtGui.QImage
     hud_text: str
+    metadata: Optional[bytes] = None  # JSON metadata bytes (for board games, etc.)
 
 
 _LOGGER = logging.getLogger(__name__)
@@ -104,7 +105,7 @@ class FastLaneConsumer(QtCore.QObject):
         image = qimage.copy() if not qimage.isNull() else QtGui.QImage(frame.width, frame.height, fmt)
         metrics = frame.metrics
         hud = f"reward: {metrics.last_reward:.2f}\nreturn: {metrics.rolling_return:.2f}\nstep/sec: {metrics.step_rate_hz:.1f}"
-        return FastLaneFrameEvent(image=image, hud_text=hud)
+        return FastLaneFrameEvent(image=image, hud_text=hud, metadata=frame.metadata)
 
     def stop(self) -> None:
         self._timer.stop()

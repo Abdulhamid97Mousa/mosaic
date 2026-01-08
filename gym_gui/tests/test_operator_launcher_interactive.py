@@ -176,7 +176,7 @@ class TestOperatorLauncherInteractive(unittest.TestCase):
         """Create a test operator config."""
         return OperatorConfig.single_agent(
             operator_id="test_operator",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
             display_name="Test Operator",
             env_name="babyai",
@@ -189,8 +189,8 @@ class TestOperatorLauncherInteractive(unittest.TestCase):
         )
 
     @patch("gym_gui.services.operator_launcher.validated_popen")
-    @patch("gym_gui.services.operator_launcher.VAR_OPERATORS_DIR", Path("/tmp/operators"))
-    @patch("gym_gui.services.operator_launcher.VAR_TELEMETRY_DIR", Path("/tmp/telemetry"))
+    @patch("gym_gui.services.operator_launcher.VAR_OPERATORS_LOGS_DIR", Path("/tmp/operators/logs"))
+    @patch("gym_gui.services.operator_launcher.VAR_OPERATORS_TELEMETRY_DIR", Path("/tmp/operators/telemetry"))
     @patch("gym_gui.services.operator_launcher.ensure_var_directories")
     def test_launch_interactive_uses_pipes(
         self,
@@ -204,7 +204,7 @@ class TestOperatorLauncherInteractive(unittest.TestCase):
         mock_popen.return_value = mock_process
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("gym_gui.services.operator_launcher.VAR_OPERATORS_DIR", Path(tmpdir)):
+            with patch("gym_gui.services.operator_launcher.VAR_OPERATORS_LOGS_DIR", Path(tmpdir)):
                 launcher = OperatorLauncher()
                 config = self._make_config()
 
@@ -219,8 +219,8 @@ class TestOperatorLauncherInteractive(unittest.TestCase):
         self.assertTrue(handle.interactive)
 
     @patch("gym_gui.services.operator_launcher.validated_popen")
-    @patch("gym_gui.services.operator_launcher.VAR_OPERATORS_DIR", Path("/tmp/operators"))
-    @patch("gym_gui.services.operator_launcher.VAR_TELEMETRY_DIR", Path("/tmp/telemetry"))
+    @patch("gym_gui.services.operator_launcher.VAR_OPERATORS_LOGS_DIR", Path("/tmp/operators/logs"))
+    @patch("gym_gui.services.operator_launcher.VAR_OPERATORS_TELEMETRY_DIR", Path("/tmp/operators/telemetry"))
     @patch("gym_gui.services.operator_launcher.ensure_var_directories")
     def test_launch_non_interactive_uses_log_file(
         self,
@@ -234,7 +234,7 @@ class TestOperatorLauncherInteractive(unittest.TestCase):
         mock_popen.return_value = mock_process
 
         with tempfile.TemporaryDirectory() as tmpdir:
-            with patch("gym_gui.services.operator_launcher.VAR_OPERATORS_DIR", Path(tmpdir)):
+            with patch("gym_gui.services.operator_launcher.VAR_OPERATORS_LOGS_DIR", Path(tmpdir)):
                 launcher = OperatorLauncher()
                 config = self._make_config()
 

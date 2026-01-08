@@ -73,6 +73,8 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
     sudoku_digit_entered: "QtCore.SignalInstance" = QtCore.Signal(int, int, int)  # type: ignore[assignment]
     # Signal emitted when a Sudoku cell is cleared (row, col)
     sudoku_cell_cleared: "QtCore.SignalInstance" = QtCore.Signal(int, int)  # type: ignore[assignment]
+    # Signal emitted when a Checkers cell is clicked (row, col)
+    checkers_cell_clicked: "QtCore.SignalInstance" = QtCore.Signal(int, int)  # type: ignore[assignment]
 
     _current_game: GameId | None
 
@@ -656,6 +658,9 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
             )
             self._board_game_strategy.sudoku_cell_cleared.connect(
                 self.sudoku_cell_cleared
+            )
+            self._board_game_strategy.checkers_cell_clicked.connect(
+                self.checkers_cell_clicked
             )
 
             # Add board game widget to the grid stack (index 2)

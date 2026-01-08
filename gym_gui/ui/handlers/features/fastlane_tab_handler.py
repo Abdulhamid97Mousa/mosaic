@@ -7,11 +7,12 @@ Handles both Ray multi-worker tabs and single CleanRL tabs.
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, Optional, Set, Tuple, TYPE_CHECKING
+from typing import Any, Callable, Dict, Optional, Set, Tuple, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     from gym_gui.ui.widgets.render_tabs import RenderTabs
     from gym_gui.logging_config.helpers import LogConstantMixin
+    from gym_gui.core.enums import GameId
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -110,6 +111,26 @@ class FastLaneTabHandler:
                 run_id, canonical_agent_id, run_mode, env_id, worker_id
             )
 
+    # Board game environments that should use BoardGameFastLaneTab
+    _BOARD_GAME_ENVS: Set[str] = {
+        "chess_v6", "go_v5", "connect_four_v3", "tictactoe_v3",
+        "chess", "go", "connect_four", "tictactoe",
+    }
+
+    def _is_board_game_env(self, env_id: str) -> bool:
+        """Check if env_id is a board game that needs interactive rendering."""
+        if not env_id:
+            return False
+        env_lower = env_id.lower()
+        # Check exact match
+        if env_lower in self._BOARD_GAME_ENVS:
+            return True
+        # Check prefix match (e.g., "chess_v6" matches "chess")
+        for board_game in self._BOARD_GAME_ENVS:
+            if env_lower.startswith(board_game):
+                return True
+        return False
+
     def open_ray_fastlane_tabs(
         self,
         run_id: str,
@@ -123,14 +144,15 @@ class FastLaneTabHandler:
         RLlib architecture:
         - num_workers=0: W0 samples (1 cell)
         - num_workers=2: W1, W2 sample (2 cells, W0 is coordinator)
-        """
-        from gym_gui.ui.widgets.ray_multi_worker_fastlane_tab import RayMultiWorkerFastLaneTab
 
+        For board games (chess, go, etc.), uses BoardGameFastLaneTab for
+        interactive rendering with FEN/metadata.
+        """
         # Use run_id as key - one grid tab per run
         key = (run_id, "ray_grid")
         if key in self._fastlane_tabs_open:
             self._log(
-                message="Ray multi-worker FastLane tab already open",
+                message="Ray FastLane tab already open",
                 extra={"run_id": run_id},
             )
             return
@@ -139,6 +161,18 @@ class FastLaneTabHandler:
         mode_prefix = "Ray-Eval" if run_mode == "policy_eval" else "Ray-Live"
         # Active workers: W0 if num_workers=0, else W1..WN (num_workers count)
         active_workers = 1 if num_workers == 0 else num_workers
+        # First active worker index
+        first_worker_idx = 0 if num_workers == 0 else 1
+
+        # For board games, use BoardGameFastLaneTab for interactive rendering
+        if self._is_board_game_env(env_id):
+            self._open_board_game_fastlane_tab(
+                run_id, agent_id, run_mode, env_id, key, first_worker_idx, mode_prefix
+            )
+            return
+
+        # Standard multi-worker tab for non-board-game environments
+        from gym_gui.ui.widgets.ray_multi_worker_fastlane_tab import RayMultiWorkerFastLaneTab
 
         try:
             tab = RayMultiWorkerFastLaneTab(
@@ -164,6 +198,67 @@ class FastLaneTabHandler:
             message="Opened Ray multi-worker FastLane grid tab",
             extra={"run_id": run_id, "active_workers": active_workers, "title": title},
         )
+
+    def _open_board_game_fastlane_tab(
+        self,
+        run_id: str,
+        agent_id: str,
+        run_mode: str,
+        env_id: str,
+        key: Tuple[str, str],
+        worker_idx: int,
+        mode_prefix: str,
+    ) -> None:
+        """Open a board game FastLane tab with interactive rendering."""
+        from gym_gui.ui.widgets.board_game_fastlane_tab import BoardGameFastLaneTab
+        from gym_gui.core.enums import GameId
+
+        # Map env_id to GameId
+        game_id = self._env_id_to_game_id(env_id)
+
+        # Agent ID for FastLane: {run_id}_W{worker_idx}
+        fastlane_agent_id = f"{run_id}_W{worker_idx}"
+
+        try:
+            tab = BoardGameFastLaneTab(
+                run_id,
+                fastlane_agent_id,
+                game_id=game_id,
+                mode_label=f"{mode_prefix} Board",
+                run_mode=run_mode,
+                parent=self._render_tabs,
+            )
+        except Exception as exc:
+            self._log(
+                message="Failed to create BoardGame FastLane tab",
+                extra={"run_id": run_id, "env_id": env_id},
+                exc_info=exc,
+            )
+            return
+
+        # Tab title: Ray-Live-Chess-{run_id[:8]}
+        title = f"{mode_prefix}-{env_id}-{run_id[:8]}"
+        self._render_tabs.add_dynamic_tab(run_id, title, tab)
+        self._fastlane_tabs_open.add(key)
+        self._log(
+            message="Opened BoardGame FastLane tab",
+            extra={"run_id": run_id, "env_id": env_id, "game_id": str(game_id), "title": title},
+        )
+
+    def _env_id_to_game_id(self, env_id: str) -> Optional["GameId"]:
+        """Map environment ID to GameId enum."""
+        from gym_gui.core.enums import GameId
+
+        env_lower = (env_id or "").lower()
+        if "chess" in env_lower:
+            return GameId.CHESS
+        if "go" in env_lower:
+            return GameId.GO
+        if "connect_four" in env_lower:
+            return GameId.CONNECT_FOUR
+        if "tictactoe" in env_lower:
+            return GameId.TIC_TAC_TOE
+        return None
 
     def open_single_fastlane_tab(
         self,

@@ -304,10 +304,10 @@ class _RgbView(QtWidgets.QWidget):
         self.update()
 
     def paintEvent(self, event: QtGui.QPaintEvent) -> None:  # type: ignore[override]
-        """Paint the pixmap at its actual size, centered in the widget.
+        """Paint the pixmap scaled to fit the widget, preserving aspect ratio.
 
-        The image is displayed at its actual pixel size (after any PIL scaling),
-        centered within the container. No additional scaling is applied.
+        The image is scaled to fit within the container while maintaining
+        its aspect ratio, then centered.
         """
         painter = QtGui.QPainter(self)
         painter.setRenderHint(QtGui.QPainter.RenderHint.SmoothPixmapTransform)
@@ -322,16 +322,35 @@ class _RgbView(QtWidgets.QWidget):
             painter.end()
             return
 
-        # Get actual pixmap size (no scaling - display at true size)
+        # Get actual pixmap size
         pixmap_size = self._current_pixmap.size()
+        pixmap_width = pixmap_size.width()
+        pixmap_height = pixmap_size.height()
 
-        # Center the pixmap in the widget (at actual size)
-        x = (widget_rect.width() - pixmap_size.width()) // 2
-        y = (widget_rect.height() - pixmap_size.height()) // 2
+        # Calculate scale to fit within widget while preserving aspect ratio
+        widget_width = widget_rect.width()
+        widget_height = widget_rect.height()
 
-        # Draw the pixmap at its actual size, centered
-        target_rect = QtCore.QRect(x, y, pixmap_size.width(), pixmap_size.height())
-        painter.drawPixmap(target_rect, self._current_pixmap)
+        if pixmap_width > 0 and pixmap_height > 0:
+            scale_x = widget_width / pixmap_width
+            scale_y = widget_height / pixmap_height
+            scale = min(scale_x, scale_y)  # Use smaller scale to fit entirely
+
+            # Calculate scaled dimensions
+            scaled_width = int(pixmap_width * scale)
+            scaled_height = int(pixmap_height * scale)
+
+            # Center the scaled pixmap in the widget
+            x = (widget_width - scaled_width) // 2
+            y = (widget_height - scaled_height) // 2
+
+            # Draw the pixmap scaled to fit
+            target_rect = QtCore.QRect(x, y, scaled_width, scaled_height)
+            painter.drawPixmap(target_rect, self._current_pixmap)
+        else:
+            # Fallback: draw at original size if dimensions are invalid
+            painter.drawPixmap(0, 0, self._current_pixmap)
+
         painter.end()
 
 

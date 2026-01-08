@@ -54,7 +54,7 @@ class TestWorkerAssignment:
             - settings dict contains expected keys
         """
         assignment = WorkerAssignment(
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
             settings={
                 "client_name": "openrouter",
@@ -63,8 +63,8 @@ class TestWorkerAssignment:
             },
         )
 
-        assert assignment.worker_id == "barlog_worker", \
-            "worker_id should be 'barlog_worker'"
+        assert assignment.worker_id == "balrog_worker", \
+            "worker_id should be 'balrog_worker'"
         assert assignment.worker_type == "llm", \
             "worker_type should be 'llm'"
         assert assignment.settings["client_name"] == "openrouter", \
@@ -82,7 +82,7 @@ class TestWorkerAssignment:
             - max_image_history setting is preserved
         """
         assignment = WorkerAssignment(
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="vlm",
             settings={
                 "client_name": "openai",
@@ -169,7 +169,7 @@ class TestWorkerAssignment:
         explicitly passing settings parameter.
         """
         assignment = WorkerAssignment(
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
         )
 
@@ -202,7 +202,7 @@ class TestOperatorConfigSingleAgent:
         config = OperatorConfig.single_agent(
             operator_id="op_1",
             display_name="Test Operator",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
             env_name="babyai",
             task="BabyAI-GoToObj-v0",
@@ -230,7 +230,7 @@ class TestOperatorConfigSingleAgent:
         config = OperatorConfig.single_agent(
             operator_id="op_1",
             display_name="GPT-4 Agent",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
             settings={
                 "client_name": "openrouter",
@@ -239,7 +239,7 @@ class TestOperatorConfigSingleAgent:
         )
 
         worker = config.workers["agent"]
-        assert worker.worker_id == "barlog_worker", \
+        assert worker.worker_id == "balrog_worker", \
             "Worker should have correct worker_id"
         assert worker.worker_type == "llm", \
             "Worker should have correct worker_type"
@@ -255,7 +255,7 @@ class TestOperatorConfigSingleAgent:
         config = OperatorConfig.single_agent(
             operator_id="op_1",
             display_name="Default Env",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
         )
 
@@ -315,8 +315,8 @@ class TestOperatorConfigMultiAgent:
             env_name="pettingzoo",
             task="chess_v6",
             player_workers={
-                "player_0": WorkerAssignment("barlog_worker", "llm", {"model_id": "gpt-4o"}),
-                "player_1": WorkerAssignment("barlog_worker", "llm", {"model_id": "llama-3"}),
+                "player_0": WorkerAssignment("balrog_worker", "llm", {"model_id": "gpt-4o"}),
+                "player_1": WorkerAssignment("balrog_worker", "llm", {"model_id": "llama-3"}),
             },
         )
 
@@ -344,8 +344,8 @@ class TestOperatorConfigMultiAgent:
             env_name="pettingzoo",
             task="go_v5",
             player_workers={
-                "black_0": WorkerAssignment("barlog_worker", "llm", {}),
-                "white_0": WorkerAssignment("barlog_worker", "rl", {}),
+                "black_0": WorkerAssignment("balrog_worker", "llm", {}),
+                "white_0": WorkerAssignment("balrog_worker", "rl", {}),
             },
         )
 
@@ -372,8 +372,8 @@ class TestOperatorConfigMultiAgent:
             env_name="pettingzoo",
             task="chess_v6",
             player_workers={
-                "player_0": WorkerAssignment("barlog_worker", "llm", gpt4_settings),
-                "player_1": WorkerAssignment("barlog_worker", "llm", llama_settings),
+                "player_0": WorkerAssignment("balrog_worker", "llm", gpt4_settings),
+                "player_1": WorkerAssignment("balrog_worker", "llm", llama_settings),
             },
         )
 
@@ -407,7 +407,7 @@ class TestOperatorConfigMultiAgent:
             task="connect_four_v3",
             player_workers={
                 "player_0": WorkerAssignment("human_input", "human", {}),
-                "player_1": WorkerAssignment("barlog_worker", "llm", {"model_id": "gpt-4o"}),
+                "player_1": WorkerAssignment("balrog_worker", "llm", {"model_id": "gpt-4o"}),
             },
         )
 
@@ -440,7 +440,7 @@ class TestOperatorConfigBackwardsCompatibility:
         config = OperatorConfig.single_agent(
             operator_id="op_1",
             display_name="Test",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
         )
 
@@ -458,8 +458,8 @@ class TestOperatorConfigBackwardsCompatibility:
             env_name="pettingzoo",
             task="chess_v6",
             player_workers={
-                "player_0": WorkerAssignment("barlog_worker", "llm", {}),
-                "player_1": WorkerAssignment("barlog_worker", "llm", {}),
+                "player_0": WorkerAssignment("balrog_worker", "llm", {}),
+                "player_1": WorkerAssignment("balrog_worker", "llm", {}),
             },
         )
 
@@ -475,12 +475,12 @@ class TestOperatorConfigBackwardsCompatibility:
         config = OperatorConfig.single_agent(
             operator_id="op_1",
             display_name="Test",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
         )
 
-        assert config.worker_id == "barlog_worker", \
-            "worker_id property should return 'barlog_worker'"
+        assert config.worker_id == "balrog_worker", \
+            "worker_id property should return 'balrog_worker'"
 
     def test_settings_property(self) -> None:
         """Test settings property returns first worker's settings.
@@ -491,7 +491,7 @@ class TestOperatorConfigBackwardsCompatibility:
         config = OperatorConfig.single_agent(
             operator_id="op_1",
             display_name="Test",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
             settings={"model_id": "gpt-4o", "temperature": 0.7},
         )
@@ -525,7 +525,7 @@ class TestOperatorConfigWithRunId:
         original = OperatorConfig.single_agent(
             operator_id="op_1",
             display_name="Test",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
             settings={"model_id": "gpt-4o"},
         )
@@ -556,7 +556,7 @@ class TestOperatorConfigWithRunId:
         original = OperatorConfig.single_agent(
             operator_id="op_1",
             display_name="Test",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
             settings={"model_id": "gpt-4o"},
         )
@@ -581,8 +581,8 @@ class TestOperatorConfigWithRunId:
             env_name="pettingzoo",
             task="chess_v6",
             player_workers={
-                "player_0": WorkerAssignment("barlog_worker", "llm", {"model_id": "gpt-4o"}),
-                "player_1": WorkerAssignment("barlog_worker", "llm", {"model_id": "llama-3"}),
+                "player_0": WorkerAssignment("balrog_worker", "llm", {"model_id": "gpt-4o"}),
+                "player_1": WorkerAssignment("balrog_worker", "llm", {"model_id": "llama-3"}),
             },
         )
 
@@ -621,8 +621,8 @@ class TestOperatorConfigDefaultConstructor:
 
         assert "agent" in config.workers, \
             "Should have 'agent' key in workers"
-        assert config.workers["agent"].worker_id == "barlog_worker", \
-            "Default worker_id should be 'barlog_worker'"
+        assert config.workers["agent"].worker_id == "balrog_worker", \
+            "Default worker_id should be 'balrog_worker'"
         assert config.workers["agent"].worker_type == "llm", \
             "Default worker_type should be 'llm'"
 
@@ -663,7 +663,7 @@ class TestOperatorConfigIntegration:
         """
         # Simulate widget creating config
         operator_type = "llm"
-        worker_id = "barlog_worker"
+        worker_id = "balrog_worker"
         settings = {
             "client_name": "openrouter",
             "model_id": "openai/gpt-4o-mini",
@@ -682,7 +682,7 @@ class TestOperatorConfigIntegration:
         # Verify backwards-compatible access
         assert config.operator_type == "llm", \
             "Widget should be able to read operator_type"
-        assert config.worker_id == "barlog_worker", \
+        assert config.worker_id == "balrog_worker", \
             "Widget should be able to read worker_id"
         assert config.settings["model_id"] == "openai/gpt-4o-mini", \
             "Widget should be able to read settings"
@@ -696,7 +696,7 @@ class TestOperatorConfigIntegration:
             OperatorConfig.single_agent(
                 operator_id=f"operator_{i}",
                 display_name=f"Operator {i+1}",
-                worker_id="barlog_worker",
+                worker_id="balrog_worker",
                 worker_type="llm",
                 env_name="babyai",
                 task="BabyAI-GoToObj-v0",
@@ -726,7 +726,7 @@ class TestOperatorConfigIntegration:
             task="chess_v6",
             player_workers={
                 "player_0": WorkerAssignment(
-                    worker_id="barlog_worker",
+                    worker_id="balrog_worker",
                     worker_type="llm",
                     settings={
                         "client_name": "openai",
@@ -734,7 +734,7 @@ class TestOperatorConfigIntegration:
                     },
                 ),
                 "player_1": WorkerAssignment(
-                    worker_id="barlog_worker",
+                    worker_id="balrog_worker",
                     worker_type="llm",
                     settings={
                         "client_name": "anthropic",
@@ -776,7 +776,7 @@ class TestOperatorConfigEdgeCases:
         config = OperatorConfig.single_agent(
             operator_id="op_1",
             display_name="Minimal",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
             settings=None,  # None should be converted to {}
         )
@@ -790,7 +790,7 @@ class TestOperatorConfigEdgeCases:
             operator_id="op_1",
             display_name="Single",
             workers={
-                "agent": WorkerAssignment("barlog_worker", "llm", {}),
+                "agent": WorkerAssignment("balrog_worker", "llm", {}),
             },
         )
 
@@ -805,9 +805,9 @@ class TestOperatorConfigEdgeCases:
             env_name="pettingzoo",
             task="some_3_player_game",
             player_workers={
-                "player_0": WorkerAssignment("barlog_worker", "llm", {}),
-                "player_1": WorkerAssignment("barlog_worker", "llm", {}),
-                "player_2": WorkerAssignment("barlog_worker", "rl", {}),
+                "player_0": WorkerAssignment("balrog_worker", "llm", {}),
+                "player_1": WorkerAssignment("balrog_worker", "llm", {}),
+                "player_2": WorkerAssignment("balrog_worker", "rl", {}),
             },
         )
 
@@ -930,7 +930,7 @@ class TestMultiAgentConfigFromUIPattern:
         """Test creating chess config with different LLMs for each player."""
         # Simulate what the UI widget would do:
         player_0_assignment = WorkerAssignment(
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
             settings={
                 "client_name": "openrouter",
@@ -939,7 +939,7 @@ class TestMultiAgentConfigFromUIPattern:
             },
         )
         player_1_assignment = WorkerAssignment(
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
             settings={
                 "client_name": "vllm",
@@ -977,7 +977,7 @@ class TestMultiAgentConfigFromUIPattern:
         """Test creating connect-four config with same model for both players."""
         # Same worker assignment for both players
         assignment = WorkerAssignment(
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
             settings={
                 "client_name": "openrouter",

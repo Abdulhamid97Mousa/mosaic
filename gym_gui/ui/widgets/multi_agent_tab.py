@@ -60,6 +60,7 @@ class HumanVsAgentTab(QtWidgets.QWidget):
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
         self._selected_env: Optional[PettingZooEnvId] = None
+        self._selected_env_value: Optional[str] = None  # For non-PettingZoo envs like OpenSpiel Checkers
         self._default_seed = 42
         self._allow_seed_reuse = False
         self._environment_loaded = False
@@ -193,6 +194,13 @@ class HumanVsAgentTab(QtWidgets.QWidget):
         status_group = QtWidgets.QGroupBox("Game Status", self)
         status_layout = QtWidgets.QFormLayout(status_group)
 
+        # Active AI indicator - shows what AI is ACTUALLY being used
+        self._active_ai_label = QtWidgets.QLabel("—", status_group)
+        self._active_ai_label.setStyleSheet(
+            "font-weight: bold; padding: 2px 6px; border-radius: 3px;"
+        )
+        status_layout.addRow("Active AI:", self._active_ai_label)
+
         self._turn_label = QtWidgets.QLabel("—", status_group)
         status_layout.addRow("Current Turn:", self._turn_label)
 
@@ -228,14 +236,17 @@ class HumanVsAgentTab(QtWidgets.QWidget):
         """Handle family selection change."""
         self._env_combo.clear()
 
-        # Get human-controllable envs
+        # Get human-controllable envs from PettingZoo
         human_envs = get_human_vs_agent_envs()
 
         for env_id in human_envs:
             display_name = get_display_name(env_id)
             self._env_combo.addItem(display_name, env_id.value)
 
-        if human_envs:
+        # Add OpenSpiel Checkers (not a PettingZoo env, but supported via Shimmy)
+        self._env_combo.addItem("Checkers (OpenSpiel)", "checkers")
+
+        if self._env_combo.count() > 0:
             self._env_combo.setCurrentIndex(0)
             self._on_env_changed(0)
 
@@ -246,9 +257,26 @@ class HumanVsAgentTab(QtWidgets.QWidget):
             self._env_info.setText("")
             return
 
+        # Handle OpenSpiel Checkers specially (not a PettingZoo env)
+        if env_value == "checkers":
+            self._selected_env = None  # Not a PettingZooEnvId
+            self._selected_env_value = "checkers"
+            self._env_info.setText(
+                f"<b>Checkers (OpenSpiel)</b><br/>"
+                f"Classic checkers/draughts board game via OpenSpiel<br/>"
+                f"<i>API: AEC (Turn-based)</i>"
+            )
+            # Reset loaded state when environment changes
+            self._environment_loaded = False
+            self._policy_loaded = False
+            self._start_btn.setEnabled(False)
+            self._update_config_summary()
+            return
+
         try:
             env_id = PettingZooEnvId(env_value)
             self._selected_env = env_id
+            self._selected_env_value = env_value
             description = get_description(env_id)
             api_type = get_api_type(env_id)
             self._env_info.setText(
@@ -278,9 +306,10 @@ class HumanVsAgentTab(QtWidgets.QWidget):
 
     def _on_load_environment(self) -> None:
         """Handle load environment button click."""
-        if self._selected_env:
+        env_value = self._selected_env_value
+        if env_value:
             seed = self._seed_spin.value()
-            self.load_environment_requested.emit(self._selected_env.value, seed)
+            self.load_environment_requested.emit(env_value, seed)
             self._environment_loaded = True
             # For non-custom AI, policy is implicitly "loaded"
             if self._ai_config.opponent_type != "custom":
@@ -288,16 +317,17 @@ class HumanVsAgentTab(QtWidgets.QWidget):
             self._update_button_states()
             _LOGGER.info(
                 "Environment load requested: %s (seed=%d)",
-                self._selected_env.value,
+                env_value,
                 seed,
             )
 
     def _on_start_game(self) -> None:
         """Handle start game button click."""
-        if self._selected_env:
+        env_value = self._selected_env_value
+        if env_value:
             human_agent = self._human_player_combo.currentData()
             seed = self._seed_spin.value()
-            self.start_game_requested.emit(self._selected_env.value, human_agent, seed)
+            self.start_game_requested.emit(env_value, human_agent, seed)
             self._reset_btn.setEnabled(True)
             # Auto-increment seed if not allowing reuse
             if not self._allow_seed_reuse:
@@ -345,19 +375,82 @@ class HumanVsAgentTab(QtWidgets.QWidget):
         else:
             self._result_label.setText("In Progress")
 
+    def set_active_ai(self, ai_name: str, is_fallback: bool = False) -> None:
+        """Update the active AI indicator to show what AI is actually being used.
+
+        Args:
+            ai_name: Display name of the AI (e.g., "Stockfish (Medium)", "Random AI")
+            is_fallback: True if this is a fallback from the requested AI
+        """
+        self._active_ai_label.setText(ai_name)
+
+        if is_fallback:
+            # Yellow/orange warning style - fallback from requested AI
+            self._active_ai_label.setStyleSheet(
+                "font-weight: bold; padding: 2px 6px; border-radius: 3px; "
+                "background-color: #fff3cd; color: #856404; border: 1px solid #ffc107;"
+            )
+            self._active_ai_label.setToolTip(
+                "Fallback: The requested AI (Stockfish) was not available. "
+                "Install with: sudo apt install stockfish"
+            )
+        elif "stockfish" in ai_name.lower():
+            # Green success style - Stockfish is running
+            self._active_ai_label.setStyleSheet(
+                "font-weight: bold; padding: 2px 6px; border-radius: 3px; "
+                "background-color: #d4edda; color: #155724; border: 1px solid #28a745;"
+            )
+            self._active_ai_label.setToolTip("Stockfish engine is active")
+        elif "katago" in ai_name.lower():
+            # Green success style - KataGo is running
+            self._active_ai_label.setStyleSheet(
+                "font-weight: bold; padding: 2px 6px; border-radius: 3px; "
+                "background-color: #d4edda; color: #155724; border: 1px solid #28a745;"
+            )
+            self._active_ai_label.setToolTip("KataGo engine is active (superhuman strength)")
+        elif "gnu go" in ai_name.lower() or "gnugo" in ai_name.lower():
+            # Blue info style - GNU Go is running (weaker than KataGo but still good)
+            self._active_ai_label.setStyleSheet(
+                "font-weight: bold; padding: 2px 6px; border-radius: 3px; "
+                "background-color: #cce5ff; color: #004085; border: 1px solid #007bff;"
+            )
+            self._active_ai_label.setToolTip("GNU Go engine is active (amateur dan level)")
+        else:
+            # Neutral style - Random AI (as selected)
+            self._active_ai_label.setStyleSheet(
+                "font-weight: bold; padding: 2px 6px; border-radius: 3px; "
+                "background-color: #e2e3e5; color: #383d41; border: 1px solid #6c757d;"
+            )
+            self._active_ai_label.setToolTip("Random move selection")
+
     def current_seed(self) -> int:
         """Get current seed value."""
         return self._seed_spin.value()
 
     def current_env_id(self) -> Optional[str]:
         """Get current environment ID."""
-        return self._selected_env.value if self._selected_env else None
+        return self._selected_env_value
 
     def _on_configure_clicked(self) -> None:
         """Handle configure button click - open the configuration dialog."""
-        dialog = HumanVsAgentConfigForm(self, self._ai_config)
+        # Determine game type from selected environment
+        game_type = self._get_game_type()
+        dialog = HumanVsAgentConfigForm(self, self._ai_config, game_type=game_type)
         dialog.config_accepted.connect(self._on_config_accepted)
         dialog.exec()
+
+    def _get_game_type(self) -> str:
+        """Get game type ('chess', 'go', or 'checkers') from selected environment."""
+        env_id = self._selected_env_value
+        if env_id is None:
+            return "chess"  # Default
+
+        if env_id in ("go_v5", "go"):
+            return "go"
+        elif env_id == "checkers":
+            return "checkers"
+        else:
+            return "chess"  # Chess, Connect Four, Tic-Tac-Toe all use similar config
 
     def _on_config_accepted(self, config: HumanVsAgentConfig) -> None:
         """Handle configuration dialog accepted."""
@@ -385,26 +478,51 @@ class HumanVsAgentTab(QtWidgets.QWidget):
 
         Shows appropriate AI opponent info based on the selected game:
         - Chess: Stockfish engine available with difficulty options
-        - Connect Four/Go: Random AI only (no dedicated engine)
+        - Go: KataGo/GNU Go available with difficulty options
+        - Connect Four/Tic-Tac-Toe: Random AI only (no dedicated engine)
         """
         config = self._ai_config
 
-        # Check if selected game supports Stockfish (only Chess)
+        # Check which game is selected
         is_chess = (
             self._selected_env is not None
             and self._selected_env.value == "chess_v6"
         )
+        is_go = (
+            self._selected_env is not None
+            and self._selected_env.value == "go_v5"
+        )
 
-        # For non-Chess games, always show Random AI
-        if not is_chess and self._selected_env is not None:
-            game_name = get_display_name(self._selected_env) if self._selected_env else "this game"
+        # For games without dedicated AI engines
+        if not is_chess and not is_go and self._selected_env is not None:
             summary = (
                 "<b>AI Opponent:</b> Random AI<br>"
-                f"Makes random legal moves. (Stockfish is only available for Chess.)"
+                "Makes random legal moves. (No dedicated AI engine for this game.)"
             )
             self._config_summary.setText(summary)
             return
 
+        # Go-specific AI summary
+        if is_go:
+            if config.opponent_type == "katago":
+                summary = (
+                    f"<b>AI Opponent:</b> KataGo ({config.difficulty.capitalize()})<br>"
+                    "Superhuman-strength Go AI (requires katago + model)."
+                )
+            elif config.opponent_type == "gnugo":
+                summary = (
+                    f"<b>AI Opponent:</b> GNU Go ({config.difficulty.capitalize()})<br>"
+                    "Classical Go AI (amateur dan level). Install: sudo apt install gnugo"
+                )
+            else:
+                summary = (
+                    "<b>AI Opponent:</b> Random AI<br>"
+                    "Makes random legal moves. Install gnugo or katago for stronger AI."
+                )
+            self._config_summary.setText(summary)
+            return
+
+        # Chess-specific AI summary
         if config.opponent_type == "random":
             summary = (
                 "<b>AI Opponent:</b> Random<br>"

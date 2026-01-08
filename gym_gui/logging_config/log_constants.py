@@ -2419,6 +2419,82 @@ LOG_UTIL_JSON_NUMPY_SCALAR_COERCE_FAILED = _constant(
 
 
 # ---------------------------------------------------------------------------
+# Go AI Service constants (LOG850–LOG859)
+# ---------------------------------------------------------------------------
+LOG_GO_AI_KATAGO_START = _constant(
+    "LOG850",
+    "INFO",
+    "KataGo engine started",
+    component="Service",
+    subcomponent="GoAI",
+    tags=_tags("katago", "start"),
+)
+
+LOG_GO_AI_KATAGO_STOP = _constant(
+    "LOG851",
+    "INFO",
+    "KataGo engine stopped",
+    component="Service",
+    subcomponent="GoAI",
+    tags=_tags("katago", "stop"),
+)
+
+LOG_GO_AI_KATAGO_UNAVAILABLE = _constant(
+    "LOG852",
+    "WARNING",
+    "KataGo not available, falling back to random AI",
+    component="Service",
+    subcomponent="GoAI",
+    tags=_tags("katago", "fallback"),
+)
+
+LOG_GO_AI_GNUGO_START = _constant(
+    "LOG853",
+    "INFO",
+    "GNU Go engine started",
+    component="Service",
+    subcomponent="GoAI",
+    tags=_tags("gnugo", "start"),
+)
+
+LOG_GO_AI_GNUGO_STOP = _constant(
+    "LOG854",
+    "INFO",
+    "GNU Go engine stopped",
+    component="Service",
+    subcomponent="GoAI",
+    tags=_tags("gnugo", "stop"),
+)
+
+LOG_GO_AI_GNUGO_UNAVAILABLE = _constant(
+    "LOG855",
+    "WARNING",
+    "GNU Go not available",
+    component="Service",
+    subcomponent="GoAI",
+    tags=_tags("gnugo", "fallback"),
+)
+
+LOG_GO_AI_GTP_ERROR = _constant(
+    "LOG856",
+    "ERROR",
+    "GTP communication error",
+    component="Service",
+    subcomponent="GoAI",
+    tags=_tags("gtp", "error"),
+)
+
+LOG_GO_AI_MOVE_GENERATED = _constant(
+    "LOG857",
+    "DEBUG",
+    "Go AI move generated",
+    component="Service",
+    subcomponent="GoAI",
+    tags=_tags("move", "generated"),
+)
+
+
+# ---------------------------------------------------------------------------
 # Worker constants (LOG901–LOG915)
 # ---------------------------------------------------------------------------
 LOG_WORKER_RUNTIME_EVENT = _constant(
@@ -3266,141 +3342,141 @@ LOG_WORKER_RAY_ANALYTICS_MANIFEST_CREATED = _constant(
 
 
 # ---------------------------------------------------------------------------
-# BARLOG Worker constants (LOG1001–LOG1015)
+# BALROG Worker constants (LOG1001–LOG1015)
 # ---------------------------------------------------------------------------
-LOG_WORKER_BARLOG_RUNTIME_STARTED = _constant(
+LOG_WORKER_BALROG_RUNTIME_STARTED = _constant(
     "LOG1001",
     "INFO",
-    "BARLOG worker runtime started",
+    "BALROG worker runtime started",
     component="Worker",
     subcomponent="BarlogRuntime",
-    tags=_tags("barlog", "worker", "runtime", "lifecycle"),
+    tags=_tags("balrog", "worker", "runtime", "lifecycle"),
 )
 
-LOG_WORKER_BARLOG_RUNTIME_STOPPED = _constant(
+LOG_WORKER_BALROG_RUNTIME_STOPPED = _constant(
     "LOG1002",
     "INFO",
-    "BARLOG worker runtime stopped",
+    "BALROG worker runtime stopped",
     component="Worker",
     subcomponent="BarlogRuntime",
-    tags=_tags("barlog", "worker", "runtime", "lifecycle"),
+    tags=_tags("balrog", "worker", "runtime", "lifecycle"),
 )
 
-LOG_WORKER_BARLOG_RUNTIME_ERROR = _constant(
+LOG_WORKER_BALROG_RUNTIME_ERROR = _constant(
     "LOG1003",
     "ERROR",
-    "BARLOG worker runtime error",
+    "BALROG worker runtime error",
     component="Worker",
     subcomponent="BarlogRuntime",
-    tags=_tags("barlog", "worker", "runtime", "error"),
+    tags=_tags("balrog", "worker", "runtime", "error"),
 )
 
-LOG_WORKER_BARLOG_EPISODE_STARTED = _constant(
+LOG_WORKER_BALROG_EPISODE_STARTED = _constant(
     "LOG1004",
     "INFO",
-    "BARLOG episode started",
+    "BALROG episode started",
     component="Worker",
     subcomponent="BarlogRuntime",
-    tags=_tags("barlog", "worker", "episode", "start"),
+    tags=_tags("balrog", "worker", "episode", "start"),
 )
 
-LOG_WORKER_BARLOG_EPISODE_COMPLETED = _constant(
+LOG_WORKER_BALROG_EPISODE_COMPLETED = _constant(
     "LOG1005",
     "INFO",
-    "BARLOG episode completed",
+    "BALROG episode completed",
     component="Worker",
     subcomponent="BarlogRuntime",
-    tags=_tags("barlog", "worker", "episode", "complete"),
+    tags=_tags("balrog", "worker", "episode", "complete"),
 )
 
-LOG_WORKER_BARLOG_LLM_REQUEST = _constant(
+LOG_WORKER_BALROG_LLM_REQUEST = _constant(
     "LOG1006",
     "DEBUG",
-    "BARLOG LLM request sent",
+    "BALROG LLM request sent",
     component="Worker",
     subcomponent="BarlogRuntime",
-    tags=_tags("barlog", "worker", "llm", "request"),
+    tags=_tags("balrog", "worker", "llm", "request"),
 )
 
-LOG_WORKER_BARLOG_LLM_RESPONSE = _constant(
+LOG_WORKER_BALROG_LLM_RESPONSE = _constant(
     "LOG1007",
     "DEBUG",
-    "BARLOG LLM response received",
+    "BALROG LLM response received",
     component="Worker",
     subcomponent="BarlogRuntime",
-    tags=_tags("barlog", "worker", "llm", "response"),
+    tags=_tags("balrog", "worker", "llm", "response"),
 )
 
-LOG_WORKER_BARLOG_LLM_ERROR = _constant(
+LOG_WORKER_BALROG_LLM_ERROR = _constant(
     "LOG1008",
     "ERROR",
-    "BARLOG LLM request failed",
+    "BALROG LLM request failed",
     component="Worker",
     subcomponent="BarlogRuntime",
-    tags=_tags("barlog", "worker", "llm", "error"),
+    tags=_tags("balrog", "worker", "llm", "error"),
 )
 
-LOG_WORKER_BARLOG_ACTION_SELECTED = _constant(
+LOG_WORKER_BALROG_ACTION_SELECTED = _constant(
     "LOG1009",
     "DEBUG",
-    "BARLOG agent selected action",
+    "BALROG agent selected action",
     component="Worker",
     subcomponent="BarlogRuntime",
-    tags=_tags("barlog", "worker", "action"),
+    tags=_tags("balrog", "worker", "action"),
 )
 
-LOG_WORKER_BARLOG_STEP_TELEMETRY = _constant(
+LOG_WORKER_BALROG_STEP_TELEMETRY = _constant(
     "LOG1010",
     "DEBUG",
-    "BARLOG step telemetry emitted",
+    "BALROG step telemetry emitted",
     component="Worker",
     subcomponent="BarlogRuntime",
-    tags=_tags("barlog", "worker", "telemetry", "step"),
+    tags=_tags("balrog", "worker", "telemetry", "step"),
 )
 
-LOG_WORKER_BARLOG_EPISODE_TELEMETRY = _constant(
+LOG_WORKER_BALROG_EPISODE_TELEMETRY = _constant(
     "LOG1011",
     "INFO",
-    "BARLOG episode telemetry emitted",
+    "BALROG episode telemetry emitted",
     component="Worker",
     subcomponent="BarlogRuntime",
-    tags=_tags("barlog", "worker", "telemetry", "episode"),
+    tags=_tags("balrog", "worker", "telemetry", "episode"),
 )
 
-LOG_WORKER_BARLOG_CONFIG_LOADED = _constant(
+LOG_WORKER_BALROG_CONFIG_LOADED = _constant(
     "LOG1012",
     "INFO",
-    "BARLOG configuration loaded",
+    "BALROG configuration loaded",
     component="Worker",
     subcomponent="BarlogRuntime",
-    tags=_tags("barlog", "worker", "config", "loaded"),
+    tags=_tags("balrog", "worker", "config", "loaded"),
 )
 
-LOG_WORKER_BARLOG_ENV_CREATED = _constant(
+LOG_WORKER_BALROG_ENV_CREATED = _constant(
     "LOG1013",
     "INFO",
-    "BARLOG environment created",
+    "BALROG environment created",
     component="Worker",
     subcomponent="BarlogRuntime",
-    tags=_tags("barlog", "worker", "environment", "created"),
+    tags=_tags("balrog", "worker", "environment", "created"),
 )
 
-LOG_WORKER_BARLOG_AGENT_CREATED = _constant(
+LOG_WORKER_BALROG_AGENT_CREATED = _constant(
     "LOG1014",
     "INFO",
-    "BARLOG agent created",
+    "BALROG agent created",
     component="Worker",
     subcomponent="BarlogRuntime",
-    tags=_tags("barlog", "worker", "agent", "created"),
+    tags=_tags("balrog", "worker", "agent", "created"),
 )
 
-LOG_WORKER_BARLOG_DEBUG = _constant(
+LOG_WORKER_BALROG_DEBUG = _constant(
     "LOG1015",
     "DEBUG",
-    "BARLOG worker debug event",
+    "BALROG worker debug event",
     component="Worker",
     subcomponent="BarlogRuntime",
-    tags=_tags("barlog", "worker", "debug"),
+    tags=_tags("balrog", "worker", "debug"),
 )
 
 
@@ -3531,6 +3607,83 @@ LOG_WORKER_XUANCE_DEBUG = _constant(
     component="Worker",
     subcomponent="XuanCeRuntime",
     tags=_tags("xuance", "worker", "debug"),
+)
+
+
+# =========================================================================
+# Checkers Board Game (Human Control Mode)
+# =========================================================================
+
+LOG_CHECKERS_BOARD_CLICK = _constant(
+    "LOG1030",
+    "INFO",
+    "Checkers board cell clicked",
+    component="Rendering",
+    subcomponent="CheckersBoardRenderer",
+    tags=_tags("checkers", "board", "click", "ui"),
+)
+
+LOG_CHECKERS_BOARD_CLICK_IGNORED = _constant(
+    "LOG1031",
+    "DEBUG",
+    "Checkers board click ignored (disabled or game over)",
+    component="Rendering",
+    subcomponent="CheckersBoardRenderer",
+    tags=_tags("checkers", "board", "click", "ignored"),
+)
+
+LOG_CHECKERS_CELL_SIGNAL_EMITTED = _constant(
+    "LOG1032",
+    "DEBUG",
+    "Checkers cell_clicked signal emitted",
+    component="Rendering",
+    subcomponent="CheckersBoardRenderer",
+    tags=_tags("checkers", "signal", "emitted"),
+)
+
+LOG_CHECKERS_HANDLER_CLICK_RECEIVED = _constant(
+    "LOG1033",
+    "INFO",
+    "Checkers handler received cell click",
+    component="UI",
+    subcomponent="CheckersHandler",
+    tags=_tags("checkers", "handler", "click"),
+)
+
+LOG_CHECKERS_HANDLER_GAME_MISMATCH = _constant(
+    "LOG1034",
+    "DEBUG",
+    "Checkers click ignored - game_id mismatch",
+    component="UI",
+    subcomponent="CheckersHandler",
+    tags=_tags("checkers", "handler", "mismatch"),
+)
+
+LOG_CHECKERS_PIECE_SELECTED = _constant(
+    "LOG1035",
+    "INFO",
+    "Checkers piece selected",
+    component="UI",
+    subcomponent="CheckersHandler",
+    tags=_tags("checkers", "handler", "selection"),
+)
+
+LOG_CHECKERS_MOVE_EXECUTED = _constant(
+    "LOG1036",
+    "INFO",
+    "Checkers move executed",
+    component="UI",
+    subcomponent="CheckersHandler",
+    tags=_tags("checkers", "handler", "move"),
+)
+
+LOG_CHECKERS_MOVE_FAILED = _constant(
+    "LOG1037",
+    "ERROR",
+    "Checkers move execution failed",
+    component="UI",
+    subcomponent="CheckersHandler",
+    tags=_tags("checkers", "handler", "error"),
 )
 
 
@@ -3916,22 +4069,22 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_XUANCE_WORKER_CONFIG_LOADED,
     LOG_XUANCE_WORKER_BENCHMARK_STARTED,
     LOG_XUANCE_WORKER_DEBUG,
-    # BARLOG Worker
-    LOG_WORKER_BARLOG_RUNTIME_STARTED,
-    LOG_WORKER_BARLOG_RUNTIME_STOPPED,
-    LOG_WORKER_BARLOG_RUNTIME_ERROR,
-    LOG_WORKER_BARLOG_EPISODE_STARTED,
-    LOG_WORKER_BARLOG_EPISODE_COMPLETED,
-    LOG_WORKER_BARLOG_LLM_REQUEST,
-    LOG_WORKER_BARLOG_LLM_RESPONSE,
-    LOG_WORKER_BARLOG_LLM_ERROR,
-    LOG_WORKER_BARLOG_ACTION_SELECTED,
-    LOG_WORKER_BARLOG_STEP_TELEMETRY,
-    LOG_WORKER_BARLOG_EPISODE_TELEMETRY,
-    LOG_WORKER_BARLOG_CONFIG_LOADED,
-    LOG_WORKER_BARLOG_ENV_CREATED,
-    LOG_WORKER_BARLOG_AGENT_CREATED,
-    LOG_WORKER_BARLOG_DEBUG,
+    # BALROG Worker
+    LOG_WORKER_BALROG_RUNTIME_STARTED,
+    LOG_WORKER_BALROG_RUNTIME_STOPPED,
+    LOG_WORKER_BALROG_RUNTIME_ERROR,
+    LOG_WORKER_BALROG_EPISODE_STARTED,
+    LOG_WORKER_BALROG_EPISODE_COMPLETED,
+    LOG_WORKER_BALROG_LLM_REQUEST,
+    LOG_WORKER_BALROG_LLM_RESPONSE,
+    LOG_WORKER_BALROG_LLM_ERROR,
+    LOG_WORKER_BALROG_ACTION_SELECTED,
+    LOG_WORKER_BALROG_STEP_TELEMETRY,
+    LOG_WORKER_BALROG_EPISODE_TELEMETRY,
+    LOG_WORKER_BALROG_CONFIG_LOADED,
+    LOG_WORKER_BALROG_ENV_CREATED,
+    LOG_WORKER_BALROG_AGENT_CREATED,
+    LOG_WORKER_BALROG_DEBUG,
     # XuanCe Worker
     LOG_WORKER_XUANCE_RUNTIME_STARTED,
     LOG_WORKER_XUANCE_RUNTIME_STOPPED,
@@ -4265,22 +4418,22 @@ __all__ = (
     "LOG_XUANCE_WORKER_CONFIG_LOADED",
     "LOG_XUANCE_WORKER_BENCHMARK_STARTED",
     "LOG_XUANCE_WORKER_DEBUG",
-    # BARLOG Worker
-    "LOG_WORKER_BARLOG_RUNTIME_STARTED",
-    "LOG_WORKER_BARLOG_RUNTIME_STOPPED",
-    "LOG_WORKER_BARLOG_RUNTIME_ERROR",
-    "LOG_WORKER_BARLOG_EPISODE_STARTED",
-    "LOG_WORKER_BARLOG_EPISODE_COMPLETED",
-    "LOG_WORKER_BARLOG_LLM_REQUEST",
-    "LOG_WORKER_BARLOG_LLM_RESPONSE",
-    "LOG_WORKER_BARLOG_LLM_ERROR",
-    "LOG_WORKER_BARLOG_ACTION_SELECTED",
-    "LOG_WORKER_BARLOG_STEP_TELEMETRY",
-    "LOG_WORKER_BARLOG_EPISODE_TELEMETRY",
-    "LOG_WORKER_BARLOG_CONFIG_LOADED",
-    "LOG_WORKER_BARLOG_ENV_CREATED",
-    "LOG_WORKER_BARLOG_AGENT_CREATED",
-    "LOG_WORKER_BARLOG_DEBUG",
+    # BALROG Worker
+    "LOG_WORKER_BALROG_RUNTIME_STARTED",
+    "LOG_WORKER_BALROG_RUNTIME_STOPPED",
+    "LOG_WORKER_BALROG_RUNTIME_ERROR",
+    "LOG_WORKER_BALROG_EPISODE_STARTED",
+    "LOG_WORKER_BALROG_EPISODE_COMPLETED",
+    "LOG_WORKER_BALROG_LLM_REQUEST",
+    "LOG_WORKER_BALROG_LLM_RESPONSE",
+    "LOG_WORKER_BALROG_LLM_ERROR",
+    "LOG_WORKER_BALROG_ACTION_SELECTED",
+    "LOG_WORKER_BALROG_STEP_TELEMETRY",
+    "LOG_WORKER_BALROG_EPISODE_TELEMETRY",
+    "LOG_WORKER_BALROG_CONFIG_LOADED",
+    "LOG_WORKER_BALROG_ENV_CREATED",
+    "LOG_WORKER_BALROG_AGENT_CREATED",
+    "LOG_WORKER_BALROG_DEBUG",
     # XuanCe Worker
     "LOG_WORKER_XUANCE_RUNTIME_STARTED",
     "LOG_WORKER_XUANCE_RUNTIME_STOPPED",

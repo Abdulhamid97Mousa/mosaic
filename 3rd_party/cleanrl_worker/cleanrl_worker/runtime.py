@@ -1212,3 +1212,340 @@ def _sanitize_launch_command(cmd: Sequence[Any]) -> list[str]:
             )
         sanitized.append(component)
     return sanitized
+
+
+# ===========================================================================
+# Interactive Runtime for GUI step-by-step control
+# ===========================================================================
+
+
+class InteractiveRuntime:
+    """Interactive runtime for step-by-step RL policy evaluation.
+
+    Enables GUI-controlled stepping for scientific comparison with LLM operators.
+    Follows the same IPC protocol as balrog_worker.InteractiveRuntime.
+
+    Protocol:
+        Input (stdin):
+            {"cmd": "reset", "seed": 42}  - Reset environment with seed
+            {"cmd": "step"}               - Execute one step using loaded policy
+            {"cmd": "stop"}               - Terminate gracefully
+
+        Output (stdout):
+            {"type": "ready", "run_id": "...", "env_id": "...", "seed": 42}
+            {"type": "step", "step_index": 0, "action": 2, "reward": 0.5, ...}
+            {"type": "episode_done", "total_reward": 0.95, "episode_length": 15}
+            {"type": "error", "message": "..."}
+            {"type": "stopped"}
+    """
+
+    def __init__(self, config: CleanRLWorkerConfig):
+        """Initialize interactive runtime.
+
+        Args:
+            config: Worker configuration with policy_path in extras.
+        """
+        self._config = config
+        self._policy_path = config.extras.get("policy_path")
+        self._env_id = config.env_id
+        self._algo = config.algo
+
+        # State (initialized on reset)
+        self._env = None
+        self._envs = None  # Vector env wrapper for CleanRL compatibility
+        self._selector = None
+        self._obs = None
+        self._step_idx = 0
+        self._episode_reward = 0.0
+        self._episode_count = 0
+        self._device = "cpu"
+
+        LOGGER.info(
+            "InteractiveRuntime initialized | env=%s algo=%s policy=%s",
+            self._env_id,
+            self._algo,
+            self._policy_path,
+        )
+
+    def _load_policy(self) -> None:
+        """Load trained policy from checkpoint."""
+        import torch
+        import gymnasium as gym
+        import numpy as np
+
+        if not self._policy_path:
+            raise ValueError("policy_path is required for interactive mode")
+
+        policy_file = Path(self._policy_path).expanduser()
+        if not policy_file.exists():
+            raise FileNotFoundError(f"Policy checkpoint not found: {policy_file}")
+
+        LOGGER.info("Loading policy from %s", policy_file)
+
+        # Auto-import environment packages to register their environments
+        if self._env_id.startswith("MiniGrid") or self._env_id.startswith("BabyAI"):
+            try:
+                import minigrid  # noqa: F401 - registers MiniGrid/BabyAI envs
+                LOGGER.debug("Imported minigrid to register environments")
+            except ImportError:
+                LOGGER.warning("minigrid package not installed")
+
+        # Create environment
+        self._env = gym.make(self._env_id)
+
+        # Apply MiniGrid observation wrappers if needed (flatten Dict to Box)
+        if self._env_id.startswith("MiniGrid") or self._env_id.startswith("BabyAI"):
+            try:
+                from minigrid.wrappers import ImgObsWrapper
+                self._env = ImgObsWrapper(self._env)
+                self._env = gym.wrappers.FlattenObservation(self._env)
+                LOGGER.debug("Applied MiniGrid observation wrappers")
+            except ImportError:
+                pass
+
+        self._env = gym.wrappers.RecordEpisodeStatistics(self._env)
+
+        # Wrap in vector env for compatibility with CleanRL models
+        env_id = self._env_id
+        is_minigrid = env_id.startswith("MiniGrid") or env_id.startswith("BabyAI")
+
+        def make_env():
+            env = gym.make(env_id, render_mode="rgb_array")  # Enable RGB rendering
+            # Apply MiniGrid wrappers if needed
+            if is_minigrid:
+                try:
+                    from minigrid.wrappers import ImgObsWrapper
+                    env = ImgObsWrapper(env)
+                    env = gym.wrappers.FlattenObservation(env)
+                except ImportError:
+                    pass
+            env = gym.wrappers.RecordEpisodeStatistics(env)
+            return env
+
+        self._envs = gym.vector.SyncVectorEnv([make_env])
+
+        # Get eval entry for agent class, and adapter for action selection
+        from .unified_eval.registry import get_adapter
+        eval_entry = get_eval_entry(self._algo)
+        if eval_entry is None:
+            raise ValueError(f"No evaluation entry for algorithm: {self._algo}")
+
+        adapter = get_adapter(self._algo)
+        if adapter is None:
+            raise ValueError(f"No unified adapter for algorithm: {self._algo}")
+
+        # Load the model using adapter
+        adapter.load(
+            str(policy_file),
+            self._envs,
+            self._device,
+            agent_cls=eval_entry.agent_cls,
+        )
+        self._selector = adapter
+
+        LOGGER.info("Policy loaded successfully")
+
+    def _handle_reset(self, seed: Optional[int] = None) -> None:
+        """Handle reset command - initialize environment with seed."""
+        try:
+            # Load policy on first reset
+            if self._selector is None:
+                self._load_policy()
+
+            # Reset environment
+            self._obs, info = self._envs.reset(seed=seed)
+            self._step_idx = 0
+            self._episode_reward = 0.0
+
+            # Get initial render frame
+            render_payload = None
+            try:
+                frame = self._envs.call("render")
+                if frame is not None and len(frame) > 0:
+                    rgb_frame = frame[0]
+                    if rgb_frame is not None and hasattr(rgb_frame, 'shape'):
+                        render_payload = {
+                            "mode": "rgb_array",
+                            "rgb": rgb_frame.tolist() if hasattr(rgb_frame, 'tolist') else rgb_frame,
+                            "width": int(rgb_frame.shape[1]),
+                            "height": int(rgb_frame.shape[0]),
+                        }
+            except Exception:
+                pass
+
+            ready_response = {
+                "type": "ready",
+                "run_id": self._config.run_id,
+                "env_id": self._env_id,
+                "algo": self._algo,
+                "seed": seed,
+                "observation_shape": list(self._obs.shape) if hasattr(self._obs, 'shape') else None,
+                # Include stats for GUI reset
+                "step_index": 0,
+                "episode_index": self._episode_count,
+                "episode_reward": 0.0,
+            }
+            if render_payload is not None:
+                ready_response["render_payload"] = render_payload
+
+            self._emit(ready_response)
+
+            LOGGER.debug("Environment reset with seed=%s", seed)
+
+        except Exception as e:
+            LOGGER.exception("Reset failed")
+            self._emit({"type": "error", "message": str(e)})
+
+    def _handle_step(self) -> None:
+        """Execute one step using the loaded policy."""
+        if self._selector is None or self._obs is None:
+            self._emit({"type": "error", "message": "Environment not initialized. Send reset first."})
+            return
+
+        try:
+            import numpy as np
+
+            # Get action from policy
+            action = self._selector.select_action(self._obs)
+
+            # Unwrap from vector env format if needed
+            if hasattr(action, '__len__') and len(action) == 1:
+                action_scalar = int(action[0])
+            else:
+                action_scalar = int(action)
+
+            # Step environment
+            obs_new, reward, terminated, truncated, info = self._envs.step(action)
+
+            # Handle reward (may be array from vector env)
+            if hasattr(reward, '__len__'):
+                reward_scalar = float(reward[0])
+            else:
+                reward_scalar = float(reward)
+
+            # Handle terminated/truncated
+            if hasattr(terminated, '__len__'):
+                term = bool(terminated[0])
+                trunc = bool(truncated[0])
+            else:
+                term = bool(terminated)
+                trunc = bool(truncated)
+
+            done = term or trunc
+
+            self._episode_reward += reward_scalar
+            self._step_idx += 1
+
+            # Get RGB frame for rendering if available
+            render_payload = None
+            try:
+                frame = self._envs.call("render")
+                if frame is not None and len(frame) > 0:
+                    rgb_frame = frame[0]
+                    if rgb_frame is not None and hasattr(rgb_frame, 'shape'):
+                        # Build render_payload in the format expected by GUI
+                        render_payload = {
+                            "mode": "rgb_array",
+                            "rgb": rgb_frame.tolist() if hasattr(rgb_frame, 'tolist') else rgb_frame,
+                            "width": int(rgb_frame.shape[1]),
+                            "height": int(rgb_frame.shape[0]),
+                        }
+            except Exception:
+                pass  # Rendering not available
+
+            # Emit step telemetry
+            step_data = {
+                "type": "step",
+                "step_index": self._step_idx,
+                "episode_index": self._episode_count,  # Current episode number
+                "action": action_scalar,
+                "reward": reward_scalar,
+                "terminated": term,
+                "truncated": trunc,
+                "episode_reward": self._episode_reward,
+            }
+
+            # Include render_payload if available (for GUI rendering)
+            if render_payload is not None:
+                step_data["render_payload"] = render_payload
+
+            self._emit(step_data)
+
+            # Check for episode end
+            if done:
+                self._episode_count += 1
+                self._emit({
+                    "type": "episode_done",
+                    "total_reward": self._episode_reward,
+                    "episode_length": self._step_idx,
+                    "episode_number": self._episode_count,
+                })
+                LOGGER.info(
+                    "Episode %d completed | reward=%.3f steps=%d",
+                    self._episode_count,
+                    self._episode_reward,
+                    self._step_idx,
+                )
+                # Reset counters for next episode (SyncVectorEnv auto-resets the env)
+                self._step_idx = 0
+                self._episode_reward = 0.0
+
+            self._obs = obs_new
+
+        except Exception as e:
+            LOGGER.exception("Step failed")
+            self._emit({"type": "error", "message": str(e)})
+
+    def _emit(self, data: dict) -> None:
+        """Emit JSON line to stdout."""
+        print(json.dumps(data), flush=True)
+
+    def run(self) -> None:
+        """Main loop - read commands from stdin, execute, respond."""
+        # Emit init message
+        self._emit({
+            "type": "init",
+            "run_id": self._config.run_id,
+            "env_id": self._env_id,
+            "algo": self._algo,
+            "policy_path": self._policy_path,
+            "version": "1.0",
+        })
+
+        LOGGER.info("Interactive runtime started, waiting for commands...")
+
+        for line in sys.stdin:
+            line = line.strip()
+            if not line:
+                continue
+
+            try:
+                cmd = json.loads(line)
+            except json.JSONDecodeError as e:
+                self._emit({"type": "error", "message": f"Invalid JSON: {e}"})
+                continue
+
+            cmd_type = cmd.get("cmd")
+            LOGGER.debug("Received command: %s", cmd_type)
+
+            if cmd_type == "reset":
+                self._handle_reset(cmd.get("seed"))
+            elif cmd_type == "step":
+                self._handle_step()
+            elif cmd_type == "stop":
+                self._emit({"type": "stopped"})
+                LOGGER.info("Stop command received, shutting down")
+                break
+            elif cmd_type == "ping":
+                self._emit({"type": "pong"})
+            else:
+                self._emit({"type": "error", "message": f"Unknown command: {cmd_type}"})
+
+        # Cleanup
+        if self._envs is not None:
+            try:
+                self._envs.close()
+            except Exception:
+                pass
+
+        LOGGER.info("Interactive runtime stopped")

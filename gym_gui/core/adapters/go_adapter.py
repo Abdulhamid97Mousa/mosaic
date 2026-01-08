@@ -260,6 +260,10 @@ class GoAdapter:
             self._last_move = (row, col)
             self._last_was_pass = False
             self._consecutive_passes = 0
+            _LOG.debug(
+                f"[MAKE_MOVE] Before sync: player={self._current_player}, "
+                f"action={action}, placed value={player_value} at ({row},{col})"
+            )
 
         self._move_count += 1
 
@@ -268,6 +272,13 @@ class GoAdapter:
 
         # Sync board state from observation (captures are handled by env)
         self._sync_board_from_observation()
+
+        # Debug: Log board state after sync
+        if not is_pass:
+            _LOG.debug(
+                f"[MAKE_MOVE] After sync: board[{row}][{col}]={self._board[row][col]}, "
+                f"new_agent={self._aec_env.agent_selection}"
+            )
 
         # Count captures
         self._count_captures(prev_board)
@@ -299,7 +310,13 @@ class GoAdapter:
         return self.make_move(self.pass_action)
 
     def _sync_board_from_observation(self) -> None:
-        """Sync internal board state from observation planes."""
+        """Sync internal board state from observation planes.
+
+        Instead of completely overwriting the board from observation,
+        we only detect and apply captures. This is more reliable because:
+        1. We already set the stone before step() is called
+        2. We only need to remove captured stones
+        """
         if self._aec_env is None:
             return
 
@@ -309,21 +326,35 @@ class GoAdapter:
         # Plane 0: current player's stones
         # Plane 1: opponent's stones
         # Plane 2: player indicator (1 if black's turn, 0 if white's turn)
-        is_black_turn = observation[0, 0, 2] == 1
+        plane2_value = float(observation[0, 0, 2])
+        is_black_turn = plane2_value > 0.5
+
+        _LOG.debug(
+            f"[SYNC] plane2_value={plane2_value}, is_black_turn={is_black_turn}, "
+            f"agent_selection={self._aec_env.agent_selection}"
+        )
+
+        # Detect captured stones: positions where we have a stone on our board
+        # but no stone exists in the observation
+        captures_removed = 0
 
         for row in range(self._board_size):
             for col in range(self._board_size):
-                current_stones = observation[row, col, 0]
-                opponent_stones = observation[row, col, 1]
+                our_stone = self._board[row][col]
 
-                if current_stones == 1:
-                    # Current player has stone here
-                    self._board[row][col] = 1 if is_black_turn else 2
-                elif opponent_stones == 1:
-                    # Opponent has stone here
-                    self._board[row][col] = 2 if is_black_turn else 1
-                else:
+                # Check if there's ANY stone in the observation
+                has_current_stone = float(observation[row, col, 0]) > 0.5
+                has_opponent_stone = float(observation[row, col, 1]) > 0.5
+                has_any_stone = has_current_stone or has_opponent_stone
+
+                # If we have a stone but observation shows empty, it was captured
+                if our_stone != 0 and not has_any_stone:
+                    _LOG.debug(f"[SYNC] Stone captured at ({row},{col}), was value={our_stone}")
                     self._board[row][col] = 0
+                    captures_removed += 1
+
+        if captures_removed > 0:
+            _LOG.debug(f"[SYNC] Removed {captures_removed} captured stones")
 
     def _count_captures(self, prev_board: List[List[int]]) -> None:
         """Count stones captured in the last move.

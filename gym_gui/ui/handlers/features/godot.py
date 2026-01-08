@@ -98,7 +98,7 @@ class GodotHandler:
             self._create_external_tab(process, instance_id, tab_name)
 
         # Update sidebar instance count
-        godot_tab = self._control_panel.get_godot_ue_tab()
+        godot_tab = self._control_panel.get_godot_ge_tab()
         godot_tab.update_instance_count(len(self._godot_tabs))
 
         self._status_bar.showMessage(
@@ -134,7 +134,7 @@ class GodotHandler:
         self._create_editor_tab(process, instance_id, tab_name)
 
         # Update sidebar instance count
-        godot_tab = self._control_panel.get_godot_ue_tab()
+        godot_tab = self._control_panel.get_godot_ge_tab()
         godot_tab.update_instance_count(len(self._godot_tabs))
 
         self._status_bar.showMessage(
@@ -281,7 +281,7 @@ class GodotHandler:
                 del self._render_tabs._agent_tabs[run_id]
 
         # Update sidebar instance count
-        godot_tab = self._control_panel.get_godot_ue_tab()
+        godot_tab = self._control_panel.get_godot_ge_tab()
         godot_tab.update_instance_count(len(self._godot_tabs))
 
         self._status_bar.showMessage(f"Stopped {tab_name}", 3000)
@@ -303,7 +303,7 @@ class GodotHandler:
         self._godot_tabs.clear()
 
         # Update sidebar instance count
-        godot_tab = self._control_panel.get_godot_ue_tab()
+        godot_tab = self._control_panel.get_godot_ge_tab()
         godot_tab.update_instance_count(0)
 
         self._status_bar.showMessage(f"Stopped {count} Godot instance(s)", 3000)

@@ -36,14 +36,14 @@ class TestOperatorConfig(unittest.TestCase):
         config = OperatorConfig.single_agent(
             operator_id="op_0",
             display_name="GPT-4 LLM",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
             env_name="babyai",
             task="BabyAI-GoToRedBall-v0",
         )
         self.assertEqual(config.operator_id, "op_0")
         self.assertEqual(config.operator_type, "llm")  # Via property
-        self.assertEqual(config.worker_id, "barlog_worker")  # Via property
+        self.assertEqual(config.worker_id, "balrog_worker")  # Via property
         self.assertEqual(config.display_name, "GPT-4 LLM")
         self.assertEqual(config.env_name, "babyai")
         self.assertEqual(config.task, "BabyAI-GoToRedBall-v0")
@@ -91,7 +91,7 @@ class TestOperatorConfig(unittest.TestCase):
         config = OperatorConfig.single_agent(
             operator_id="op_0",
             display_name="GPT-4 LLM",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
         )
         new_config = config.with_run_id("run_abc123")
@@ -112,7 +112,7 @@ class TestOperatorConfig(unittest.TestCase):
         config = OperatorConfig.single_agent(
             operator_id="op_0",
             display_name="Test LLM",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
         )
         self.assertEqual(config.env_name, "babyai")
@@ -126,7 +126,7 @@ class TestOperatorConfig(unittest.TestCase):
         config = OperatorConfig.single_agent(
             operator_id="op_0",
             display_name="Test LLM",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
         )
         self.assertEqual(config.settings, {})
@@ -159,7 +159,7 @@ class TestMultiOperatorServiceBasic(unittest.TestCase):
         config = OperatorConfig.single_agent(
             operator_id="op_0",
             display_name="GPT-4 LLM",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
         )
         self.service.add_operator(config)
@@ -179,7 +179,7 @@ class TestMultiOperatorServiceBasic(unittest.TestCase):
         config1 = OperatorConfig.single_agent(
             operator_id="llm_1",
             display_name="LLM Agent 1",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
         )
         config2 = OperatorConfig.single_agent(
@@ -204,7 +204,7 @@ class TestMultiOperatorServiceBasic(unittest.TestCase):
         config = OperatorConfig.single_agent(
             operator_id="op_0",
             display_name="Test",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
         )
         self.service.add_operator(config)
@@ -232,7 +232,7 @@ class TestMultiOperatorServiceBasic(unittest.TestCase):
         config1 = OperatorConfig.single_agent(
             operator_id="op_0",
             display_name="Original Name",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
         )
         self.service.add_operator(config1)
@@ -240,7 +240,7 @@ class TestMultiOperatorServiceBasic(unittest.TestCase):
         config2 = OperatorConfig.single_agent(
             operator_id="op_0",
             display_name="Updated Name",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
         )
         self.service.update_operator(config2)
@@ -256,7 +256,7 @@ class TestMultiOperatorServiceBasic(unittest.TestCase):
         config1 = OperatorConfig.single_agent(
             operator_id="op_0",
             display_name="LLM 1",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
         )
         config2 = OperatorConfig.single_agent(
@@ -325,7 +325,7 @@ class TestMultiOperatorServiceStateManagement(unittest.TestCase):
         self.config = OperatorConfig.single_agent(
             operator_id="op_0",
             display_name="Test",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
         )
         self.service.add_operator(self.config)
@@ -371,7 +371,7 @@ class TestMultiOperatorServiceStateManagement(unittest.TestCase):
         config3 = OperatorConfig.single_agent(
             operator_id="op_2",
             display_name="LLM 2",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
         )
 
@@ -403,7 +403,7 @@ class TestMultiOperatorServiceRunIdManagement(unittest.TestCase):
         self.config = OperatorConfig.single_agent(
             operator_id="op_0",
             display_name="Test",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
         )
         self.service.add_operator(self.config)
@@ -456,7 +456,7 @@ class TestMultiOperatorServiceLifecycle(unittest.TestCase):
             config = OperatorConfig.single_agent(
                 operator_id=f"op_{i}",
                 display_name=f"Agent {i}",
-                worker_id="barlog_worker" if i % 2 == 0 else "cleanrl_worker",
+                worker_id="balrog_worker" if i % 2 == 0 else "cleanrl_worker",
                 worker_type="llm" if i % 2 == 0 else "rl",
             )
             self.service.add_operator(config)
@@ -538,7 +538,7 @@ class TestMultiOperatorServiceRemovalCleansState(unittest.TestCase):
         config = OperatorConfig.single_agent(
             operator_id="op_0",
             display_name="Test",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             worker_type="llm",
         )
         self.service.add_operator(config)

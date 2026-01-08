@@ -50,10 +50,16 @@ class FastLaneConfig:
     channels: int = 3
     pixel_format: str = "RGB"
     capacity: int = _DEFAULT_CAPACITY
+    metadata_size: int = 0  # Max size for JSON metadata (0 = disabled)
 
     @property
     def payload_bytes(self) -> int:
         return max(1, self.width * self.height * self.channels)
+
+    @property
+    def slot_payload_bytes(self) -> int:
+        """Total slot payload: frame + metadata."""
+        return self.payload_bytes + self.metadata_size
 
 
 @dataclass(frozen=True)
@@ -70,6 +76,7 @@ class FastLaneFrame:
     height: int
     channels: int
     metrics: FastLaneMetrics
+    metadata: Optional[bytes] = None  # JSON metadata bytes (if available)
 
 
 def create_fastlane_name(run_id: str) -> str:
@@ -149,7 +156,9 @@ class FastLaneWriter(FastLaneBase):
         super().__init__(shm)
         self._config = config
         self._slot_offset = _HEADER_SIZE
-        self._slot_payload_bytes = config.payload_bytes
+        self._frame_payload_bytes = config.payload_bytes
+        self._metadata_size = config.metadata_size
+        self._slot_payload_bytes = config.slot_payload_bytes
 
     @classmethod
     def create(
@@ -160,8 +169,9 @@ class FastLaneWriter(FastLaneBase):
         capacity: int | None = None,
     ) -> "FastLaneWriter":
         cap = max(1, capacity or config.capacity)
-        payload_size = config.payload_bytes
-        slot_size = _SLOT_META_SIZE + payload_size
+        # Total slot payload includes frame + metadata
+        slot_payload_size = config.slot_payload_bytes
+        slot_size = _SLOT_META_SIZE + slot_payload_size
         total_size = _HEADER_SIZE + cap * slot_size
         name = create_fastlane_name(run_id)
         shm = shared_memory.SharedMemory(name=name, create=True, size=total_size)
@@ -171,6 +181,7 @@ class FastLaneWriter(FastLaneBase):
             channels=config.channels,
             pixel_format=config.pixel_format,
             capacity=cap,
+            metadata_size=config.metadata_size,
         ))
         fmt_hash = _hash_format(config.pixel_format)
         writer._write_header(
@@ -180,7 +191,7 @@ class FastLaneWriter(FastLaneBase):
                 0,
                 cap,
                 slot_size,
-                payload_size,
+                slot_payload_size,  # payload_size now includes metadata space
                 config.width,
                 config.height,
                 config.channels,
@@ -199,10 +210,33 @@ class FastLaneWriter(FastLaneBase):
         frame: bytes | memoryview | "np.ndarray",
         *,
         metrics: FastLaneMetrics | None = None,
+        metadata: bytes | str | None = None,
     ) -> int:
-        payload = _coerce_bytes(frame)
-        if len(payload) > self._slot_payload_bytes:
+        """Publish a frame with optional metrics and metadata.
+
+        Args:
+            frame: RGB/RGBA frame bytes or numpy array.
+            metrics: Optional metrics to update in header.
+            metadata: Optional JSON metadata (str or bytes). Will be truncated
+                     if larger than metadata_size configured at creation.
+
+        Returns:
+            New head sequence number.
+        """
+        frame_bytes = _coerce_bytes(frame)
+        if len(frame_bytes) > self._frame_payload_bytes:
             raise ValueError("Frame payload exceeds slot capacity")
+
+        # Handle metadata
+        metadata_bytes = b""
+        if metadata is not None:
+            if isinstance(metadata, str):
+                metadata_bytes = metadata.encode("utf-8")
+            else:
+                metadata_bytes = bytes(metadata)
+            # Truncate if too large
+            if len(metadata_bytes) > self._metadata_size:
+                metadata_bytes = metadata_bytes[:self._metadata_size]
 
         if metrics is not None:
             self._set_metrics(metrics)
@@ -214,12 +248,25 @@ class FastLaneWriter(FastLaneBase):
         payload_addr = slot_offset + _SLOT_META_SIZE
 
         seq = head * 2
-        _SLOT_META_STRUCT.pack_into(self._mv, seq_addr, seq + 1, len(payload), 0)
+        # Use reserved field (index 2) for metadata_len
+        _SLOT_META_STRUCT.pack_into(self._mv, seq_addr, seq + 1, len(frame_bytes), len(metadata_bytes))
+
+        # Write frame data
         payload_view = self._mv[payload_addr:payload_addr + self._slot_payload_bytes]
-        payload_view[:len(payload)] = payload
-        if len(payload) < self._slot_payload_bytes:
-            payload_view[len(payload):] = b"\x00" * (self._slot_payload_bytes - len(payload))
-        _SLOT_META_STRUCT.pack_into(self._mv, seq_addr, seq + 2, len(payload), 0)
+        payload_view[:len(frame_bytes)] = frame_bytes
+
+        # Write metadata after frame
+        if metadata_bytes:
+            metadata_start = len(frame_bytes)
+            metadata_end = metadata_start + len(metadata_bytes)
+            payload_view[metadata_start:metadata_end] = metadata_bytes
+
+        # Zero-fill remaining space
+        used = len(frame_bytes) + len(metadata_bytes)
+        if used < self._slot_payload_bytes:
+            payload_view[used:] = b"\x00" * (self._slot_payload_bytes - used)
+
+        _SLOT_META_STRUCT.pack_into(self._mv, seq_addr, seq + 2, len(frame_bytes), len(metadata_bytes))
         self._set_head(head)
         return head
 
@@ -255,21 +302,28 @@ class FastLaneReader(FastLaneBase):
             slot_offset = self._slot_offset + slot_index * slot_size
             seq_addr = slot_offset
             payload_addr = slot_offset + _SLOT_META_SIZE
-            seq1, payload_len, _reserved = _SLOT_META_STRUCT.unpack_from(self._mv, seq_addr)
+            seq1, frame_len, metadata_len = _SLOT_META_STRUCT.unpack_from(self._mv, seq_addr)
             if seq1 % 2 == 1:
                 continue  # writer mid-flight
-            payload_bytes = bytes(self._mv[payload_addr:payload_addr + payload_len])
+            # Read frame data
+            frame_bytes = bytes(self._mv[payload_addr:payload_addr + frame_len])
+            # Read metadata if present (metadata_len > 0)
+            metadata_bytes: Optional[bytes] = None
+            if metadata_len > 0:
+                metadata_start = payload_addr + frame_len
+                metadata_bytes = bytes(self._mv[metadata_start:metadata_start + metadata_len])
             seq2, _, _ = _SLOT_META_STRUCT.unpack_from(self._mv, seq_addr)
             if seq1 != seq2:
                 continue
             self._last_seq = seq2
             metrics = self.metrics()
             return FastLaneFrame(
-                data=payload_bytes,
+                data=frame_bytes,
                 width=self.width,
                 height=self.height,
                 channels=self.channels,
                 metrics=metrics,
+                metadata=metadata_bytes,
             )
         return None
 

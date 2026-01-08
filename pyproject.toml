@@ -149,6 +149,30 @@ jumanji = [
     "flax>=0.7.0",
 ]
 
+# PyBullet Drones quadcopter environments (University of Toronto)
+# Paper: Panerati et al. (2021). "Learning to Fly - a Gym Environment with PyBullet Physics
+#        for Reinforcement Learning of Multi-agent Quadcopter Control"
+# Repository: https://github.com/utiasDSL/gym-pybullet-drones
+# Includes: HoverAviary, MultiHoverAviary, CtrlAviary, VelocityAviary
+# Features: Realistic physics, aerodynamic effects (drag, ground effect, downwash), multi-agent
+pybullet-drones = [
+    "gymnasium>=1.1.0",
+    "pybullet>=3.2.5",
+    "numpy>=2.0.0",
+    "scipy>=1.10.0",
+    "matplotlib>=3.7.0",
+]
+
+# OpenSpiel board games (Google DeepMind) via Shimmy PettingZoo wrapper
+# Repository: https://github.com/google-deepmind/open_spiel
+# Shimmy: https://shimmy.farama.org/environments/open_spiel/
+# Currently supported in MOSAIC: Checkers
+# NOTE: OpenSpiel provides 70+ games; we expose only Checkers for now
+openspiel = [
+    "open-spiel>=1.4.0",
+    "shimmy[openspiel]>=1.3.0",
+]
+
 # =============================================================================
 # Workers (training backends)
 # =============================================================================
@@ -208,13 +232,29 @@ xuance = [
     "mpi4py>=3.1.0",
 ]
 
-# BARLOG worker for LLM-based agents on BALROG benchmarks
+# BALROG worker for LLM-based agents on BALROG benchmarks
 # Supports BabyAI, MiniHack, Crafter environments with OpenAI/Claude/Gemini
-barlog = [
+balrog = [
     "omegaconf>=2.3.0",
     "openai>=1.0.0",
     "anthropic>=0.18.0",
     "google-generativeai>=0.3.0",
+]
+
+# MCTX worker for GPU-accelerated MCTS training (AlphaZero/MuZero)
+# Uses Pgx for GPU game environments and mctx for MCTS algorithms
+# Paper: "Monte-Carlo Tree Search as Regularized Policy Optimization" (DeepMind)
+# Repository: https://github.com/google-deepmind/mctx
+# Supports: Chess, Go, Shogi, Connect Four, Othello, Backgammon, etc.
+mctx = [
+    "jax>=0.4.20",
+    "jaxlib>=0.4.20",
+    "flax>=0.7.0",
+    "optax>=0.1.7",
+    "chex>=0.1.82",
+    "pgx>=2.0.0",
+    "mctx>=0.0.5",
+    "tensorboard>=2.11.0",
 ]
 
 # =============================================================================
@@ -238,7 +278,7 @@ all-gymnasium = [
 
 # All environment families (single + multi-agent)
 all-envs = [
-    "mosaic[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom,nethack,crafter,procgen,textworld,jumanji]",
+    "mosaic[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom,nethack,crafter,procgen,textworld,jumanji,pybullet-drones,openspiel]",
 ]
 
 # Full development setup
@@ -247,8 +287,38 @@ full = [
 ]
 
 [tool.setuptools.packages.find]
-where = ["."]
-include = ["gym_gui*"]
+where = [
+    ".",
+    "3rd_party/jumanji_worker",
+    "3rd_party/balrog_worker",
+    "3rd_party/cleanrl_worker",
+    "3rd_party/ray_worker",
+    "3rd_party/xuance_worker",
+    "3rd_party/chess_worker",
+    "3rd_party/human_worker",
+    "3rd_party/mctx_worker",
+]
+include = [
+    "gym_gui*",
+    "jumanji_worker*",
+    "balrog_worker*",
+    "cleanrl_worker*",
+    "ray_worker*",
+    "xuance_worker*",
+    "chess_worker*",
+    "human_worker*",
+    "mctx_worker*",
+]
+
+[project.entry-points."mosaic.workers"]
+jumanji = "jumanji_worker:get_worker_metadata"
+balrog = "balrog_worker:get_worker_metadata"
+cleanrl = "cleanrl_worker:get_worker_metadata"
+ray = "ray_worker:get_worker_metadata"
+xuance = "xuance_worker:get_worker_metadata"
+chess = "chess_worker:get_worker_metadata"
+human = "human_worker:get_worker_metadata"
+mctx = "mctx_worker:get_worker_metadata"
 
 [project.urls]
 Homepage = "https://github.com/Abdulhamid97Mousa/MOSAIC"

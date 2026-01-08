@@ -41,11 +41,11 @@ from gym_gui.constants import (
     OPERATOR_CATEGORY_HUMAN,
     OPERATOR_CATEGORY_LLM,
     OPERATOR_CATEGORY_RL,
-    WORKER_ID_BARLOG,
+    WORKER_ID_BALROG,
     OPERATOR_DISPLAY_NAME_HUMAN,
-    OPERATOR_DISPLAY_NAME_BARLOG_LLM,
+    OPERATOR_DISPLAY_NAME_BALROG_LLM,
     OPERATOR_DESCRIPTION_HUMAN,
-    OPERATOR_DESCRIPTION_BARLOG_LLM,
+    OPERATOR_DESCRIPTION_BALROG_LLM,
 )
 from gym_gui.controllers.live_telemetry_controllers import LiveTelemetryController
 
@@ -131,12 +131,12 @@ def bootstrap_default_services() -> ServiceLocator:
     )
     operators.register_operator(
         WorkerOperator(
-            id="barlog_llm",
-            name="BARLOG LLM",
-            worker_id=WORKER_ID_BARLOG,
+            id="balrog_llm",
+            name="BALROG LLM",
+            worker_id=WORKER_ID_BALROG,
         ),
-        display_name=OPERATOR_DISPLAY_NAME_BARLOG_LLM,
-        description=OPERATOR_DESCRIPTION_BARLOG_LLM,
+        display_name=OPERATOR_DISPLAY_NAME_BALROG_LLM,
+        description=OPERATOR_DESCRIPTION_BALROG_LLM,
         category=OPERATOR_CATEGORY_LLM,
         requires_api_key=True,
     )

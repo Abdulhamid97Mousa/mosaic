@@ -33,8 +33,10 @@ class EnvironmentFamily(StrEnum):
     PROCGEN = "procgen"  # Procgen procedural benchmark (16 environments)
     JUMANJI = "jumanji"  # Jumanji JAX-based logic puzzle environments
     TEXTWORLD = "textworld"  # TextWorld text-based game environment (Microsoft Research)
+    PYBULLET_DRONES = "pybullet_drones"  # PyBullet Drones quadcopter environments (University of Toronto)
     PETTINGZOO = "pettingzoo"
     PETTINGZOO_CLASSIC = "pettingzoo_classic"  # PettingZoo Classic: turn-based games (Chess, Go, Connect Four, etc.)
+    OPEN_SPIEL = "open_spiel"  # OpenSpiel board games (Google DeepMind) via Shimmy
     OTHER = "other"  # Fallback for unknown environments (not displayed in UI)
 
 
@@ -383,6 +385,21 @@ class GameId(StrEnum):
     JUMANJI_SNAKE = "jumanji/Snake-v1"
     JUMANJI_SOKOBAN = "jumanji/Sokoban-v0"
     JUMANJI_TSP = "jumanji/TSP-v1"
+    # ─────────────────────────────────────────────────────────────────────────
+    # PyBullet Drones - Quadcopter Control Environments (University of Toronto)
+    # Paper: Panerati et al. (2021) "Learning to Fly"
+    # Repository: https://github.com/utiasDSL/gym-pybullet-drones
+    # ─────────────────────────────────────────────────────────────────────────
+    PYBULLET_HOVER_AVIARY = "hover-aviary-v0"
+    PYBULLET_MULTIHOVER_AVIARY = "multihover-aviary-v0"
+    PYBULLET_CTRL_AVIARY = "ctrl-aviary-v0"
+    PYBULLET_VELOCITY_AVIARY = "velocity-aviary-v0"
+    # ─────────────────────────────────────────────────────────────────────────
+    # OpenSpiel - Board Games via Shimmy PettingZoo Wrapper
+    # Repository: https://github.com/google-deepmind/open_spiel
+    # Shimmy: https://shimmy.farama.org/environments/open_spiel/
+    # ─────────────────────────────────────────────────────────────────────────
+    OPEN_SPIEL_CHECKERS = "open_spiel/checkers"
 
 
 def get_game_display_name(game_id: GameId) -> str:
@@ -428,6 +445,10 @@ def get_game_display_name(game_id: GameId) -> str:
         return "PettingZoo-Go"
     if game_id == GameId.TIC_TAC_TOE:
         return "PettingZoo-TicTacToe"
+    # OpenSpiel board games (via Shimmy)
+    if value.startswith("open_spiel/"):
+        game_name = value.split("/")[1].replace("_", " ").title()
+        return f"OpenSpiel-{game_name}"
 
     # Determine Gym family based on enum
     if game_id in (GameId.FROZEN_LAKE, GameId.FROZEN_LAKE_V2, GameId.CLIFF_WALKING, 
@@ -903,6 +924,13 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.JUMANJI_SNAKE: EnvironmentFamily.JUMANJI,
     GameId.JUMANJI_SOKOBAN: EnvironmentFamily.JUMANJI,
     GameId.JUMANJI_TSP: EnvironmentFamily.JUMANJI,
+    # PyBullet Drones
+    GameId.PYBULLET_HOVER_AVIARY: EnvironmentFamily.PYBULLET_DRONES,
+    GameId.PYBULLET_MULTIHOVER_AVIARY: EnvironmentFamily.PYBULLET_DRONES,
+    GameId.PYBULLET_CTRL_AVIARY: EnvironmentFamily.PYBULLET_DRONES,
+    GameId.PYBULLET_VELOCITY_AVIARY: EnvironmentFamily.PYBULLET_DRONES,
+    # OpenSpiel
+    GameId.OPEN_SPIEL_CHECKERS: EnvironmentFamily.OPEN_SPIEL,
 }
 
 
@@ -1106,6 +1134,13 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.JUMANJI_SNAKE: RenderMode.RGB_ARRAY,
     GameId.JUMANJI_SOKOBAN: RenderMode.RGB_ARRAY,
     GameId.JUMANJI_TSP: RenderMode.RGB_ARRAY,
+    # PyBullet Drones (3D physics simulation with PyBullet rendering)
+    GameId.PYBULLET_HOVER_AVIARY: RenderMode.RGB_ARRAY,
+    GameId.PYBULLET_MULTIHOVER_AVIARY: RenderMode.RGB_ARRAY,
+    GameId.PYBULLET_CTRL_AVIARY: RenderMode.RGB_ARRAY,
+    GameId.PYBULLET_VELOCITY_AVIARY: RenderMode.RGB_ARRAY,
+    # OpenSpiel (board games rendered via Shimmy)
+    GameId.OPEN_SPIEL_CHECKERS: RenderMode.RGB_ARRAY,
 }
 
 
@@ -1755,6 +1790,14 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
     GameId.BABYAI_MINIBOSSLEVEL: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     GameId.BABYAI_BOSSLEVEL: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     GameId.BABYAI_BOSSLEVEL_NOUNLOCK: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    # PyBullet Drones - Continuous control quadcopter environments
+    # Note: These require continuous actions (RPM/velocity), primarily agent-controlled
+    GameId.PYBULLET_HOVER_AVIARY: (ControlMode.AGENT_ONLY,),
+    GameId.PYBULLET_MULTIHOVER_AVIARY: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.PYBULLET_CTRL_AVIARY: (ControlMode.AGENT_ONLY,),
+    GameId.PYBULLET_VELOCITY_AVIARY: (ControlMode.AGENT_ONLY,),
+    # OpenSpiel - Turn-based board games via Shimmy
+    GameId.OPEN_SPIEL_CHECKERS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
 }
 
 
@@ -1782,6 +1825,8 @@ DEFAULT_PARADIGM_BY_FAMILY: dict[EnvironmentFamily, SteppingParadigm] = {
     EnvironmentFamily.TEXTWORLD: SteppingParadigm.SINGLE_AGENT,  # Text-based adventure games
     EnvironmentFamily.PETTINGZOO: SteppingParadigm.SEQUENTIAL,  # AEC by default
     EnvironmentFamily.PETTINGZOO_CLASSIC: SteppingParadigm.SEQUENTIAL,  # Chess, Go, etc.
+    EnvironmentFamily.PYBULLET_DRONES: SteppingParadigm.SINGLE_AGENT,  # Single/multi-agent quadcopter control
+    EnvironmentFamily.OPEN_SPIEL: SteppingParadigm.SEQUENTIAL,  # Turn-based board games (Checkers, etc.)
     EnvironmentFamily.OTHER: SteppingParadigm.SINGLE_AGENT,  # Fallback
 }
 

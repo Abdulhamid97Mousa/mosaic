@@ -837,6 +837,43 @@ class PistonballAdapter(PettingZooAdapter):
         super().__init__(context, config=config)
 
 
+class KnightsArchersZombiesAdapter(PettingZooAdapter):
+    """Adapter for Knights Archers Zombies (Butterfly) environment.
+
+    A cooperative 4-agent game where knights and archers defend against zombies.
+    Default agents: ['archer_0', 'archer_1', 'knight_0', 'knight_1']
+    """
+
+    id = PettingZooEnvId.KNIGHTS_ARCHERS_ZOMBIES.value
+    supported_control_modes = PETTINGZOO_CONTROL_MODES.get(
+        PettingZooEnvId.KNIGHTS_ARCHERS_ZOMBIES,
+        (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    )
+
+    def __init__(self, context: AdapterContext | None = None, *, config: PettingZooConfig | None = None) -> None:
+        if config is None:
+            config = PettingZooConfig(env_id=PettingZooEnvId.KNIGHTS_ARCHERS_ZOMBIES)
+        super().__init__(context, config=config)
+
+
+class CooperativePongAdapter(PettingZooAdapter):
+    """Adapter for Cooperative Pong (Butterfly) environment.
+
+    Two paddles work together to keep a ball in play.
+    """
+
+    id = PettingZooEnvId.COOPERATIVE_PONG.value
+    supported_control_modes = PETTINGZOO_CONTROL_MODES.get(
+        PettingZooEnvId.COOPERATIVE_PONG,
+        (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    )
+
+    def __init__(self, context: AdapterContext | None = None, *, config: PettingZooConfig | None = None) -> None:
+        if config is None:
+            config = PettingZooConfig(env_id=PettingZooEnvId.COOPERATIVE_PONG)
+        super().__init__(context, config=config)
+
+
 class MultiwalkerAdapter(PettingZooAdapter):
     """Adapter for Multiwalker (SISL) environment."""
 
@@ -859,13 +896,19 @@ class MultiwalkerAdapter(PettingZooAdapter):
 # Note: This maps to GameId-compatible keys for integration with existing factory
 # PettingZoo environments use their own enum but need string keys for compatibility
 PETTINGZOO_ADAPTERS: Dict[str, Type[PettingZooAdapter]] = {
+    # Classic (AEC - turn-based)
     PettingZooEnvId.CHESS.value: ChessAdapter,
     PettingZooEnvId.CONNECT_FOUR.value: ConnectFourAdapter,
     PettingZooEnvId.TIC_TAC_TOE.value: TicTacToeAdapter,
     PettingZooEnvId.GO.value: GoAdapter,
+    # MPE (Parallel)
     PettingZooEnvId.SIMPLE_SPREAD.value: SimpleSpreadAdapter,
     PettingZooEnvId.SIMPLE_TAG.value: SimpleTagAdapter,
+    # Butterfly (Parallel - cooperative visual)
     PettingZooEnvId.PISTONBALL.value: PistonballAdapter,
+    PettingZooEnvId.KNIGHTS_ARCHERS_ZOMBIES.value: KnightsArchersZombiesAdapter,
+    PettingZooEnvId.COOPERATIVE_PONG.value: CooperativePongAdapter,
+    # SISL (Parallel - continuous control)
     PettingZooEnvId.MULTIWALKER.value: MultiwalkerAdapter,
 }
 
@@ -898,14 +941,21 @@ def create_pettingzoo_adapter(
 __all__ = [
     "PettingZooConfig",
     "PettingZooAdapter",
+    # Classic
     "ChessAdapter",
     "ConnectFourAdapter",
     "TicTacToeAdapter",
     "GoAdapter",
+    # MPE
     "SimpleSpreadAdapter",
     "SimpleTagAdapter",
+    # Butterfly
     "PistonballAdapter",
+    "KnightsArchersZombiesAdapter",
+    "CooperativePongAdapter",
+    # SISL
     "MultiwalkerAdapter",
+    # Registry & Factory
     "PETTINGZOO_ADAPTERS",
     "create_pettingzoo_adapter",
 ]

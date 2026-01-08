@@ -133,6 +133,8 @@ class RayWorkerPresenter:
 
         For Ray RLlib, this creates:
         1. FastLane tab for live visualization (composite agent view)
+           - Uses BoardGameFastLaneTab for chess/board games
+           - Uses regular FastLaneTab for other environments
         2. Metrics tab for training progress
 
         Args:
@@ -148,25 +150,80 @@ class RayWorkerPresenter:
 
         # Extract environment info from payload
         env_name = first_payload.get("env_name", "Multi-Agent")
+        env_id = first_payload.get("env_id", "")
+
+        # Check if this is a board game environment
+        is_board_game = self._is_board_game_env(env_id)
 
         try:
-            from gym_gui.ui.widgets.fastlane_tab import FastLaneTab
+            if is_board_game:
+                # Use BoardGameFastLaneTab for interactive chess/board visualization
+                from gym_gui.ui.widgets.board_game_fastlane_tab import BoardGameFastLaneTab
+                from gym_gui.core.enums import GameId
 
-            # Create FastLane tab with Ray-specific naming
-            # Tab name format: Ray-Live-{Env}-{run_id}
-            tab_name = f"Ray-Live-{env_name}-{run_id[:8]}"
-            fastlane_tab = FastLaneTab(
-                run_id=run_id,
-                tab_name=tab_name,
-                parent=parent,
-            )
-            tabs.append(fastlane_tab)
-            _LOGGER.info(f"Created FastLane tab: {tab_name}")
+                # Map env_id to GameId
+                game_id = self._env_to_game_id(env_id)
+
+                tab_name = f"Ray-Live-{env_name}-{run_id[:8]}"
+                fastlane_tab = BoardGameFastLaneTab(
+                    run_id=run_id,
+                    agent_id=agent_id,
+                    game_id=game_id,
+                    mode_label=tab_name,
+                    parent=parent,
+                )
+                tabs.append(fastlane_tab)
+                _LOGGER.info(f"Created BoardGameFastLane tab for {env_id}: {tab_name}")
+
+            else:
+                # Use regular FastLane tab for RGB frame display
+                from gym_gui.ui.widgets.fastlane_tab import FastLaneTab
+
+                tab_name = f"Ray-Live-{env_name}-{run_id[:8]}"
+                fastlane_tab = FastLaneTab(
+                    run_id=run_id,
+                    agent_id=agent_id,
+                    mode_label=tab_name,
+                    parent=parent,
+                )
+                tabs.append(fastlane_tab)
+                _LOGGER.info(f"Created FastLane tab: {tab_name}")
 
         except ImportError as e:
             _LOGGER.warning(f"FastLane tab not available: {e}")
 
         return tabs
+
+    def _is_board_game_env(self, env_id: str) -> bool:
+        """Check if environment is a board game that supports interactive rendering.
+
+        Args:
+            env_id: Environment identifier.
+
+        Returns:
+            True if environment is a board game.
+        """
+        board_games = {"chess_v6", "go_v5", "connect_four_v3", "tictactoe_v3"}
+        return env_id in board_games
+
+    def _env_to_game_id(self, env_id: str) -> Any:
+        """Map environment ID to GameId enum.
+
+        Args:
+            env_id: Environment identifier.
+
+        Returns:
+            GameId enum value or None.
+        """
+        from gym_gui.core.enums import GameId
+
+        mapping = {
+            "chess_v6": GameId.CHESS,
+            "go_v5": GameId.GO,
+            "connect_four_v3": GameId.CONNECT_FOUR,
+            "tictactoe_v3": GameId.TIC_TAC_TOE,
+        }
+        return mapping.get(env_id)
 
     def load_policy(self, checkpoint_path: str, policy_id: str = "shared") -> Any:
         """Load a trained policy from a Ray RLlib checkpoint.

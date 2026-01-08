@@ -105,6 +105,7 @@ def get_worker_metadata() -> tuple:
             "smac",                # StarCraft Multi-Agent Challenge
             "football",            # Google Research Football
             "minigrid",            # MiniGrid environments
+            "babyai",              # BabyAI language-grounded environments
         ),
         action_spaces=("discrete", "continuous", "multi_discrete"),
         observation_spaces=("vector", "image", "dict"),

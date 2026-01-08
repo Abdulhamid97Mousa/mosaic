@@ -2,7 +2,7 @@
 
 This loader handles:
 - Go game initialization with interactive board
-- AI opponent setup
+- AI opponent setup (KataGo, GNU Go, or Random)
 - Game lifecycle management
 - Signal connections between components
 """
@@ -10,7 +10,7 @@ This loader handles:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING, Optional, Union
 
 from qtpy import QtCore, QtWidgets
 
@@ -23,6 +23,14 @@ from gym_gui.controllers.go_controller import GoGameController
 from gym_gui.core.adapters.go_adapter import GoState
 from gym_gui.core.enums import GameId
 from gym_gui.rendering.strategies.board_game import BoardGameRendererStrategy
+from gym_gui.services.go_ai import (
+    KataGoService,
+    KataGoConfig,
+    KATAGO_DIFFICULTY_PRESETS,
+    GnuGoService,
+    GnuGoConfig,
+    GNUGO_DIFFICULTY_PRESETS,
+)
 
 _LOG = logging.getLogger(__name__)
 
@@ -65,6 +73,11 @@ class GoEnvLoader:
         self._renderer_strategy: Optional[BoardGameRendererStrategy] = None
         self._tab_index: int = -1
         self._signal_connected: bool = False
+
+        # AI service (KataGo or GNU Go)
+        self._ai_service: Optional[Union[KataGoService, GnuGoService]] = None
+        self._current_ai_name: str = "Random AI"
+        self._is_fallback: bool = False
 
     @property
     def controller(self) -> Optional[GoGameController]:
@@ -138,8 +151,11 @@ class GoEnvLoader:
         human_agent = human_vs_agent_tab._human_player_combo.currentData()
         human_player = "black_0" if human_agent == "player_0" else "white_0"
 
-        # AI is Random for Go (no strong engine like Stockfish available by default)
-        ai_name = "Random AI"
+        # Get AI opponent configuration and set up provider
+        ai_config = human_vs_agent_tab.get_ai_config()
+        ai_name, is_fallback = self._setup_ai_provider(ai_config)
+        self._current_ai_name = ai_name
+        self._is_fallback = is_fallback
 
         # Start the game
         self._controller.start_game(human_player=human_player, seed=seed)
@@ -147,19 +163,35 @@ class GoEnvLoader:
         # Update control panel state
         human_vs_agent_tab.set_environment_loaded("go_v5", seed)
         human_vs_agent_tab.set_policy_loaded(ai_name)
+        human_vs_agent_tab.set_active_ai(ai_name, is_fallback)
         human_vs_agent_tab._reset_btn.setEnabled(True)
 
         human_color = "Black" if human_player == "black_0" else "White"
-        self._status_bar.showMessage(
-            f"Go loaded ({self._board_size}x{self._board_size}, komi={self._komi}, seed={seed}). "
-            f"You play as {human_color} vs {ai_name}. Click intersection to place stone.",
-            5000
-        )
+        if is_fallback:
+            self._status_bar.showMessage(
+                f"Go loaded ({self._board_size}x{self._board_size}, seed={seed}). "
+                f"You play as {human_color}. WARNING: Using Random AI (engine unavailable).",
+                8000
+            )
+        else:
+            self._status_bar.showMessage(
+                f"Go loaded ({self._board_size}x{self._board_size}, komi={self._komi}, seed={seed}). "
+                f"You play as {human_color} vs {ai_name}. Click intersection to place stone.",
+                5000
+            )
 
         return ai_name
 
     def cleanup(self) -> None:
         """Clean up Go game resources."""
+        # Clean up AI service
+        if self._ai_service is not None:
+            try:
+                self._ai_service.stop()
+            except Exception as e:
+                _LOG.warning(f"Error stopping Go AI service: {e}")
+            self._ai_service = None
+
         # Disconnect signals
         if self._signal_connected and self._renderer_strategy is not None:
             try:
@@ -184,6 +216,160 @@ class GoEnvLoader:
             self._tab_index = -1
 
         self._renderer_strategy = None
+
+    def _setup_ai_provider(self, ai_config) -> tuple[str, bool]:
+        """Set up the AI action provider for Go.
+
+        Attempts to use KataGo first, falls back to GNU Go, then Random AI.
+
+        Args:
+            ai_config: HumanVsAgentConfig with opponent settings.
+
+        Returns:
+            Tuple of (display_name, is_fallback) where is_fallback indicates
+            if we fell back from the requested AI.
+        """
+        # Clean up existing AI service
+        if self._ai_service is not None:
+            self._ai_service.stop()
+            self._ai_service = None
+
+        opponent_type = getattr(ai_config, "opponent_type", "random")
+        difficulty = getattr(ai_config, "difficulty", "medium")
+
+        if opponent_type == "katago":
+            return self._setup_katago(difficulty)
+        elif opponent_type == "gnugo":
+            return self._setup_gnugo(difficulty)
+        else:
+            # Random AI (no action provider)
+            if self._controller is not None:
+                self._controller.set_ai_action_provider(None)
+            return "Random AI", False
+
+    def _setup_katago(self, difficulty: str) -> tuple[str, bool]:
+        """Set up KataGo as the AI provider.
+
+        Args:
+            difficulty: Difficulty level.
+
+        Returns:
+            Tuple of (display_name, is_fallback).
+        """
+        config = KATAGO_DIFFICULTY_PRESETS.get(difficulty, KATAGO_DIFFICULTY_PRESETS["medium"])
+        service = KataGoService(config)
+
+        if service.is_available():
+            if service.start():
+                self._ai_service = service
+                if self._controller is not None:
+                    self._controller.set_ai_action_provider(service.get_best_move)
+                _LOG.info(f"KataGo AI configured: difficulty={difficulty}")
+                return f"KataGo ({difficulty.capitalize()})", False
+            else:
+                _LOG.warning("Failed to start KataGo, trying GNU Go")
+        else:
+            _LOG.warning("KataGo not available, trying GNU Go")
+
+        # Fall back to GNU Go
+        return self._setup_gnugo_fallback(difficulty)
+
+    def _setup_gnugo(self, difficulty: str) -> tuple[str, bool]:
+        """Set up GNU Go as the AI provider.
+
+        Args:
+            difficulty: Difficulty level.
+
+        Returns:
+            Tuple of (display_name, is_fallback).
+        """
+        config = GNUGO_DIFFICULTY_PRESETS.get(difficulty, GNUGO_DIFFICULTY_PRESETS["medium"])
+        service = GnuGoService(config)
+
+        if service.is_available():
+            if service.start():
+                self._ai_service = service
+                if self._controller is not None:
+                    self._controller.set_ai_action_provider(service.get_best_move)
+                _LOG.info(f"GNU Go AI configured: difficulty={difficulty}")
+                return f"GNU Go ({difficulty.capitalize()})", False
+            else:
+                _LOG.warning("Failed to start GNU Go, falling back to Random")
+        else:
+            _LOG.warning("GNU Go not available, falling back to Random")
+
+        # Fall through to random
+        if self._controller is not None:
+            self._controller.set_ai_action_provider(None)
+        return "Random AI (GNU Go unavailable)", True
+
+    def _setup_gnugo_fallback(self, difficulty: str) -> tuple[str, bool]:
+        """Set up GNU Go as fallback when KataGo is unavailable.
+
+        Args:
+            difficulty: Difficulty level.
+
+        Returns:
+            Tuple of (display_name, is_fallback).
+        """
+        config = GNUGO_DIFFICULTY_PRESETS.get(difficulty, GNUGO_DIFFICULTY_PRESETS["medium"])
+        service = GnuGoService(config)
+
+        if service.is_available():
+            if service.start():
+                self._ai_service = service
+                if self._controller is not None:
+                    self._controller.set_ai_action_provider(service.get_best_move)
+                _LOG.info(f"GNU Go AI configured as fallback: difficulty={difficulty}")
+                self._status_bar.showMessage(
+                    f"KataGo unavailable, using GNU Go ({difficulty}). "
+                    "Install KataGo for stronger AI.",
+                    5000
+                )
+                return f"GNU Go ({difficulty.capitalize()}) [fallback]", True
+
+        # Fall through to random
+        if self._controller is not None:
+            self._controller.set_ai_action_provider(None)
+        self._status_bar.showMessage(
+            "No Go AI engine available. Install gnugo or katago for AI opponents.",
+            8000
+        )
+        return "Random AI (no engine)", True
+
+    def on_ai_config_changed(self, opponent_type: str, difficulty: str) -> Optional[str]:
+        """Handle AI opponent configuration change.
+
+        Args:
+            opponent_type: Type of AI opponent ("random", "katago", "gnugo").
+            difficulty: Difficulty level.
+
+        Returns:
+            AI display name if updated, None if no game active.
+        """
+        if self._controller is None:
+            return None
+
+        # Get full config from tab
+        human_vs_agent_tab = self._control_panel.multi_agent_tab.human_vs_agent
+        ai_config = human_vs_agent_tab.get_ai_config()
+
+        ai_name, is_fallback = self._setup_ai_provider(ai_config)
+        self._current_ai_name = ai_name
+        self._is_fallback = is_fallback
+
+        human_vs_agent_tab.set_policy_loaded(ai_name)
+        human_vs_agent_tab.set_active_ai(ai_name, is_fallback)
+
+        if is_fallback:
+            self._status_bar.showMessage(
+                f"WARNING: Using {ai_name} - requested AI not available",
+                5000
+            )
+        else:
+            self._status_bar.showMessage(f"AI opponent changed to {ai_name}", 3000)
+
+        return ai_name
 
     def on_start_requested(self, human_agent: str, seed: int) -> None:
         """Handle start game request.

@@ -239,6 +239,10 @@ class TrainerDaemon:
             self._gpu_allocator,
             broadcaster=broadcast_callback,
         )
+
+        # Recover stale runs left in intermediate states from previous daemon crash
+        self._recover_stale_runs()
+
         await self._dispatcher.start()
 
         # Initialize and start database sink for durable persistence
@@ -308,6 +312,36 @@ class TrainerDaemon:
             finally:
                 self._telemetry_store = None
         _LOGGER.info("Trainer daemon shutdown complete")
+
+    def _recover_stale_runs(self) -> None:
+        """Reset stale runs left in intermediate states from a previous daemon crash.
+
+        Runs in HANDSHAKE or READY status without active workers are orphaned and
+        need to be reset to INIT so the dispatcher can re-dispatch them.
+        """
+        stale_statuses = [RunStatus.HANDSHAKE, RunStatus.READY]
+        stale_runs = self._registry.load_runs(stale_statuses)
+        if not stale_runs:
+            return
+
+        for run in stale_runs:
+            _LOGGER.warning(
+                "Recovering stale run from previous daemon session",
+                extra={
+                    "run_id": run.run_id,
+                    "previous_status": run.status.value,
+                    "new_status": RunStatus.INIT.value,
+                },
+            )
+            self._registry.update_status(run.run_id, RunStatus.INIT)
+            # Release any GPU slots that may have been reserved
+            self._gpu_allocator.release_many([run.run_id])
+            self._registry.update_gpu_slots(run.run_id, [])
+
+        _LOGGER.info(
+            "Stale run recovery complete",
+            extra={"recovered_count": len(stale_runs)},
+        )
 
     async def _maintenance_loop(self) -> None:
         try:

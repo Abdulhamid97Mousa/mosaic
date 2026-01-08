@@ -66,8 +66,7 @@ from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
 from gym_gui.ui.widgets.mujoco_mpc_tab import MuJoCoMPCTab
 from gym_gui.ui.widgets.multi_agent_tab import MultiAgentTab
 from gym_gui.ui.widgets.single_agent_tab import SingleAgentTab
-from gym_gui.ui.widgets.advanced_config import AdvancedConfigTab
-from gym_gui.ui.widgets.godot_ue_tab import GodotUETab
+from gym_gui.ui.widgets.godot_ge_tab import GodotGETab
 from gym_gui.telemetry.semconv import (
     TelemetryModes,
     TELEMETRY_MODE_DESCRIPTORS,
@@ -136,7 +135,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
     # MuJoCo MPC signals - emitted when user launches from sidebar
     mpc_launch_requested = pyqtSignal(str)  # Launch with display mode ("external" or "embedded")
     mpc_stop_all_requested = pyqtSignal()  # Stop all MJPC instances
-    # Godot UE signals - emitted when user launches from sidebar
+    # Godot GE signals - emitted when user launches from sidebar
     godot_launch_requested = pyqtSignal(str)  # Launch with display mode ("external" or "embedded")
     godot_editor_requested = pyqtSignal()  # Launch Godot editor
     godot_stop_all_requested = pyqtSignal()  # Stop all Godot instances
@@ -145,9 +144,6 @@ class ControlPanelWidget(QtWidgets.QWidget):
     multi_agent_start_requested = pyqtSignal(str, str, int)  # env_id, human_agent, seed
     multi_agent_reset_requested = pyqtSignal(int)  # seed
     policy_evaluate_requested = pyqtSignal(dict)  # Full evaluation config with policies
-    # Advanced Mode signals - emitted from the Advanced Config tab
-    advanced_launch_requested = pyqtSignal(object)  # LaunchConfig
-    advanced_env_load_requested = pyqtSignal(str, int)  # env_id, seed
 
     def __init__(
         self,
@@ -605,9 +601,9 @@ class ControlPanelWidget(QtWidgets.QWidget):
         """Return the MuJoCo MPC tab for status updates."""
         return self._mujoco_mpc_tab
 
-    def get_godot_ue_tab(self) -> GodotUETab:
-        """Return the Godot UE tab for status updates."""
-        return self._godot_ue_tab
+    def get_godot_ge_tab(self) -> GodotGETab:
+        """Return the Godot GE tab for status updates."""
+        return self._godot_ge_tab
 
     def set_auto_running(self, running: bool) -> None:
         self._auto_running = running
@@ -741,20 +737,13 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._mujoco_mpc_tab.launch_mpc_requested.connect(self.mpc_launch_requested)
         self._mujoco_mpc_tab.stop_all_requested.connect(self.mpc_stop_all_requested)
 
-        # Godot UE Tab - launcher for Godot game engine (UE-style 3D environments)
-        self._godot_ue_tab = GodotUETab(self)
-        self._tab_widget.addTab(self._godot_ue_tab, "Godot UE")
+        # Godot GE Tab - launcher for Godot game engine (3D environments)
+        self._godot_ge_tab = GodotGETab(self)
+        self._tab_widget.addTab(self._godot_ge_tab, "Godot GE")
         # Connect signals directly
-        self._godot_ue_tab.launch_godot_requested.connect(self.godot_launch_requested)
-        self._godot_ue_tab.launch_editor_requested.connect(self.godot_editor_requested)
-        self._godot_ue_tab.stop_all_requested.connect(self.godot_stop_all_requested)
-
-        # Advanced Configuration Tab - full Unified Flow for power users
-        self._advanced_tab = AdvancedConfigTab(self)
-        self._tab_widget.addTab(self._advanced_tab, "Advanced")
-        # Connect signals
-        self._advanced_tab.launch_requested.connect(self.advanced_launch_requested)
-        self._advanced_tab.environment_load_requested.connect(self.advanced_env_load_requested)
+        self._godot_ge_tab.launch_godot_requested.connect(self.godot_launch_requested)
+        self._godot_ge_tab.launch_editor_requested.connect(self.godot_editor_requested)
+        self._godot_ge_tab.stop_all_requested.connect(self.godot_stop_all_requested)
 
         self._on_tab_changed(self._tab_widget.currentIndex())
 
@@ -818,7 +807,11 @@ class ControlPanelWidget(QtWidgets.QWidget):
     def _populate_family_combo(self, preferred: Optional[EnvironmentFamily]) -> None:
         if self._family_combo is None:
             return
-        families = sorted(self._family_to_games.keys(), key=lambda fam: fam.value)
+        # Filter out OTHER - it's a fallback category not meant for UI display
+        families = sorted(
+            (f for f in self._family_to_games.keys() if f != EnvironmentFamily.OTHER),
+            key=lambda fam: fam.value
+        )
         if not families:
             self._family_combo.blockSignals(True)
             self._family_combo.clear()

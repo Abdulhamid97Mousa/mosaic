@@ -134,6 +134,19 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
         help="Logging level",
     )
 
+    # Interactive mode for Multi-Operator view (step-by-step policy evaluation)
+    parser.add_argument(
+        "--interactive",
+        action="store_true",
+        help="Run in interactive mode for GUI step-by-step policy evaluation",
+    )
+    parser.add_argument(
+        "--policy-path",
+        type=str,
+        default=None,
+        help="Path to trained policy checkpoint (required for interactive mode)",
+    )
+
     # MOSAIC integration arguments (passed by trainer dispatcher)
     parser.add_argument(
         "--grpc",
@@ -237,6 +250,25 @@ def main(args: list[str] | None = None) -> int:
     # Dry-run mode: print config and exit
     if parsed.dry_run:
         print(json.dumps(config.to_dict(), indent=2))
+        return 0
+
+    # Interactive mode: run step-by-step policy evaluation
+    if parsed.interactive:
+        from .runtime import InteractiveRuntime, InteractiveConfig
+
+        if not parsed.policy_path:
+            logger.error("--policy-path is required for interactive mode")
+            return 1
+
+        interactive_config = InteractiveConfig(
+            run_id=config.run_id,
+            env_id=config.env_id,
+            method=config.method,
+            policy_path=parsed.policy_path,
+            device=config.device,
+        )
+        runtime = InteractiveRuntime(interactive_config)
+        runtime.run()
         return 0
 
     # Create runtime and execute

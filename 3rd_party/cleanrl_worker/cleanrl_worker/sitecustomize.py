@@ -94,6 +94,16 @@ try:  # pragma: no cover - gym optional
         RecordVideo.path = property(_get_path, _set_path)  # type: ignore[attr-defined]
 
     def _wrapped_make(env_id, *args, **kwargs):
+        # Auto-import environment packages to register their environments
+        _is_minigrid_env = False
+        if isinstance(env_id, str):
+            if env_id.startswith("MiniGrid") or env_id.startswith("BabyAI"):
+                _is_minigrid_env = True
+                try:
+                    import minigrid  # noqa: F401 - registers MiniGrid/BabyAI envs
+                except ImportError:
+                    pass
+
         render_kwargs = dict(kwargs)
         env = None
         if is_fastlane_enabled() and "render_mode" not in render_kwargs:
@@ -103,6 +113,16 @@ try:  # pragma: no cover - gym optional
                 env = _ORIG_MAKE(env_id, *args, **render_kwargs)
         else:
             env = _ORIG_MAKE(env_id, *args, **render_kwargs)
+
+        # Wrap MiniGrid/BabyAI environments to flatten Dict observation to Box
+        if _is_minigrid_env and env is not None:
+            try:
+                from minigrid.wrappers import ImgObsWrapper
+                # ImgObsWrapper extracts just the image (7,7,3), then flatten to (147,)
+                env = ImgObsWrapper(env)
+                env = gym.wrappers.FlattenObservation(env)
+            except Exception:
+                pass
 
         if os.getenv("MOSAIC_CAPTURE_VIDEO") == "1" and not isinstance(env, RecordVideo):
             render_mode = getattr(env, "render_mode", None)

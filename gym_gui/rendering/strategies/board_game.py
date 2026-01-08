@@ -14,6 +14,12 @@ from qtpy import QtCore, QtGui, QtWidgets
 
 from gym_gui.core.enums import GameId, RenderMode
 from gym_gui.rendering.interfaces import RendererContext, RendererStrategy
+from gym_gui.logging_config.helpers import log_constant
+from gym_gui.logging_config.log_constants import (
+    LOG_CHECKERS_BOARD_CLICK,
+    LOG_CHECKERS_BOARD_CLICK_IGNORED,
+    LOG_CHECKERS_CELL_SIGNAL_EMITTED,
+)
 
 _LOG = logging.getLogger(__name__)
 
@@ -39,7 +45,7 @@ class BoardGameRendererStrategy(RendererStrategy):
     # Supported game IDs
     SUPPORTED_GAMES = frozenset({
         GameId.CHESS, GameId.CONNECT_FOUR, GameId.GO, GameId.TIC_TAC_TOE,
-        GameId.JUMANJI_SUDOKU,
+        GameId.JUMANJI_SUDOKU, GameId.OPEN_SPIEL_CHECKERS,
     })
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
@@ -91,6 +97,35 @@ class BoardGameRendererStrategy(RendererStrategy):
         """Signal: Sudoku cell cleared (row: int, col: int)."""
         return self._widget.sudoku_cell_cleared
 
+    @property
+    def checkers_cell_clicked(self) -> QtCore.SignalInstance:
+        """Signal: Checkers cell clicked (row: int, col: int)."""
+        return self._widget.checkers_cell_clicked
+
+    def set_checkers_selection(
+        self,
+        selected_cell: Optional[tuple[int, int]],
+        legal_destinations: Optional[List[tuple[int, int]]] = None,
+    ) -> None:
+        """Set the checkers selection highlight.
+
+        Args:
+            selected_cell: The (row, col) of selected piece, or None to clear.
+            legal_destinations: List of (row, col) tuples for valid destinations.
+        """
+        self._widget.set_checkers_selection(selected_cell, legal_destinations)
+
+    def set_checkers_moveable_cells(
+        self,
+        cells: Optional[List[tuple[int, int]]] = None,
+    ) -> None:
+        """Highlight pieces that can move (for mandatory jump hints).
+
+        Args:
+            cells: List of (row, col) tuples for pieces that can move, or None to clear.
+        """
+        self._widget.set_checkers_moveable_cells(cells)
+
     def render(
         self, payload: Mapping[str, object], *, context: RendererContext | None = None
     ) -> None:
@@ -113,6 +148,12 @@ class BoardGameRendererStrategy(RendererStrategy):
         if "go" in payload:
             return True
         if "sudoku" in payload:
+            return True
+        if "checkers" in payload:
+            return True
+        # Check game_type field (from adapter payloads)
+        game_type = payload.get("game_type")
+        if game_type in ("chess", "connect_four", "go", "sudoku", "checkers"):
             return True
         # Check game_id
         game_id = payload.get("game_id")
@@ -163,6 +204,8 @@ class BoardGameRendererStrategy(RendererStrategy):
             return GameId.GO
         if "sudoku" in payload:
             return GameId.JUMANJI_SUDOKU
+        if "checkers" in payload:
+            return GameId.OPEN_SPIEL_CHECKERS
 
         # Detect from game_type value (adapter payloads use this)
         game_type = payload.get("game_type")
@@ -174,6 +217,8 @@ class BoardGameRendererStrategy(RendererStrategy):
             return GameId.GO
         if game_type == "sudoku":
             return GameId.JUMANJI_SUDOKU
+        if game_type == "checkers":
+            return GameId.OPEN_SPIEL_CHECKERS
 
         return None
 
@@ -188,6 +233,8 @@ class BoardGameRendererStrategy(RendererStrategy):
             return GameId.GO
         if "sudoku" in payload:
             return GameId.JUMANJI_SUDOKU
+        if "checkers" in payload:
+            return GameId.OPEN_SPIEL_CHECKERS
 
         # Detect from game_type value (adapter payloads use this)
         game_type = payload.get("game_type")
@@ -199,6 +246,8 @@ class BoardGameRendererStrategy(RendererStrategy):
             return GameId.GO
         if game_type == "sudoku":
             return GameId.JUMANJI_SUDOKU
+        if game_type == "checkers":
+            return GameId.OPEN_SPIEL_CHECKERS
 
         return None
 
@@ -224,6 +273,7 @@ class _BoardGameWidget(QtWidgets.QStackedWidget):
     sudoku_cell_selected = QtCore.Signal(int, int)  # row, col
     sudoku_digit_entered = QtCore.Signal(int, int, int)  # row, col, digit
     sudoku_cell_cleared = QtCore.Signal(int, int)  # row, col
+    checkers_cell_clicked = QtCore.Signal(int, int)  # row, col
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
@@ -234,6 +284,7 @@ class _BoardGameWidget(QtWidgets.QStackedWidget):
         self._go_renderer: _GoBoardRenderer | None = None
         self._tictactoe_renderer: _TicTacToeBoardRenderer | None = None
         self._sudoku_renderer: _SudokuBoardRenderer | None = None
+        self._checkers_renderer: _CheckersBoardRenderer | None = None
 
         # Placeholder for empty state
         self._placeholder = QtWidgets.QLabel("No board game loaded", self)
@@ -266,6 +317,10 @@ class _BoardGameWidget(QtWidgets.QStackedWidget):
             # Extract sudoku data from wrapped or flat payload
             sudoku_data = payload.get("sudoku", payload)
             renderer.update_from_payload(sudoku_data)
+            self.setCurrentWidget(renderer)
+        elif game_id == GameId.OPEN_SPIEL_CHECKERS:
+            renderer = self._get_checkers_renderer()
+            renderer.update_from_payload(payload)
             self.setCurrentWidget(renderer)
         else:
             self.setCurrentWidget(self._placeholder)
@@ -321,6 +376,40 @@ class _BoardGameWidget(QtWidgets.QStackedWidget):
             self._sudoku_renderer.cell_cleared.connect(self.sudoku_cell_cleared)
             self.addWidget(self._sudoku_renderer)
         return self._sudoku_renderer
+
+    def _get_checkers_renderer(self) -> "_CheckersBoardRenderer":
+        """Lazy-load Checkers renderer."""
+        if self._checkers_renderer is None:
+            self._checkers_renderer = _CheckersBoardRenderer(self)
+            self._checkers_renderer.cell_clicked.connect(self.checkers_cell_clicked)
+            self.addWidget(self._checkers_renderer)
+        return self._checkers_renderer
+
+    def set_checkers_selection(
+        self,
+        selected_cell: Optional[tuple[int, int]],
+        legal_destinations: Optional[List[tuple[int, int]]] = None,
+    ) -> None:
+        """Set the checkers selection highlight.
+
+        Args:
+            selected_cell: The (row, col) of selected piece, or None to clear.
+            legal_destinations: List of (row, col) tuples for valid destinations.
+        """
+        renderer = self._get_checkers_renderer()
+        renderer.set_selection(selected_cell, legal_destinations)
+
+    def set_checkers_moveable_cells(
+        self,
+        cells: Optional[List[tuple[int, int]]] = None,
+    ) -> None:
+        """Highlight pieces that can move (for mandatory jump hints).
+
+        Args:
+            cells: List of (row, col) tuples for pieces that can move, or None to clear.
+        """
+        renderer = self._get_checkers_renderer()
+        renderer.set_moveable_cells(cells)
 
 
 # =============================================================================
@@ -1861,6 +1950,401 @@ class _SudokuBoardRenderer(QtWidgets.QWidget):
             dy = y + d_row * mini_size
             rect = QtCore.QRect(dx, dy, mini_size, mini_size)
             painter.drawText(rect, QtCore.Qt.AlignmentFlag.AlignCenter, str(digit))
+
+
+# =============================================================================
+# Checkers Board Renderer (OpenSpiel via Shimmy)
+# =============================================================================
+
+# Checkers colors
+_CHECKERS_LIGHT_SQUARE = QtGui.QColor(240, 217, 181)  # Cream
+_CHECKERS_DARK_SQUARE = QtGui.QColor(181, 136, 99)    # Brown
+_CHECKERS_BLACK_PIECE = QtGui.QColor(50, 50, 50)      # Dark gray/black
+_CHECKERS_WHITE_PIECE = QtGui.QColor(255, 255, 255)   # White
+_CHECKERS_KING_CROWN = QtGui.QColor(255, 215, 0)      # Gold for king marker
+_CHECKERS_SELECTED = QtGui.QColor(255, 255, 0, 150)   # Yellow highlight
+_CHECKERS_LEGAL_MOVE = QtGui.QColor(0, 255, 0, 100)   # Green for legal moves
+_CHECKERS_LAST_MOVE = QtGui.QColor(255, 255, 0, 80)   # Light yellow for last move
+_CHECKERS_HOVER = QtGui.QColor(100, 100, 255, 50)     # Light blue hover
+
+
+class _CheckersBoardRenderer(QtWidgets.QWidget):
+    """Checkers board renderer with interactive piece selection.
+
+    Renders an 8x8 checkers board. Board values:
+    - 0: Empty
+    - 1: Black piece (player_0)
+    - 2: Black king
+    - 3: White piece (player_1)
+    - 4: White king
+
+    Note: Only dark squares are playable in checkers.
+    """
+
+    cell_clicked = QtCore.Signal(int, int)  # row, col
+
+    SIZE = 8  # 8x8 board
+
+    def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
+        super().__init__(parent)
+
+        # Board state (0=empty, 1=black, 2=black king, 3=white, 4=white king)
+        self._board: List[List[int]] = [[0] * self.SIZE for _ in range(self.SIZE)]
+        self._current_player: str = "player_0"
+        self._legal_moves: List[int] = []
+        self._last_move: Optional[int] = None
+        self._is_game_over: bool = False
+        self._winner: Optional[str] = None
+        self._move_count: int = 0
+
+        # Interaction state
+        self._selected_cell: Optional[tuple[int, int]] = None
+        self._legal_destinations: Set[tuple[int, int]] = set()  # Valid destination cells
+        self._moveable_cells: Set[tuple[int, int]] = set()  # Cells with pieces that can move
+        self._hover_cell: Optional[tuple[int, int]] = None
+        self._enabled: bool = True
+
+        # Visual settings
+        self._cell_size: int = 60
+        self._margin: int = 25
+
+        # Widget setup
+        self.setMouseTracking(True)
+        self.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Expanding,
+        )
+        self._update_minimum_size()
+
+    def _update_minimum_size(self) -> None:
+        size = self.SIZE * self._cell_size + 2 * self._margin
+        self.setMinimumSize(size, size)
+
+    def update_from_payload(self, payload: Dict[str, Any]) -> None:
+        """Update Checkers board from adapter payload."""
+        # Get board (8x8 array)
+        board = payload.get("board")
+        if isinstance(board, list):
+            self._board = [row[:] for row in board]
+
+        # Get current player
+        self._current_player = payload.get("current_player", "player_0")
+
+        # Get legal moves (action indices)
+        legal = payload.get("legal_moves", [])
+        if isinstance(legal, list):
+            self._legal_moves = list(legal)
+
+        # Get last move
+        self._last_move = payload.get("last_move")
+
+        # Get game over state
+        self._is_game_over = bool(payload.get("is_game_over", False))
+        self._winner = payload.get("winner")
+        self._move_count = payload.get("move_count", 0)
+
+        # Clear selection on update (new board state)
+        self._selected_cell = None
+        self._legal_destinations = set()
+        self._moveable_cells = set()
+
+        self.update()
+
+    def set_selection(
+        self,
+        selected_cell: Optional[tuple[int, int]],
+        legal_destinations: Optional[List[tuple[int, int]]] = None,
+    ) -> None:
+        """Set the currently selected piece and its legal destinations.
+
+        Args:
+            selected_cell: The (row, col) of selected piece, or None to clear.
+            legal_destinations: List of (row, col) tuples for valid destinations.
+        """
+        self._selected_cell = selected_cell
+        if legal_destinations:
+            self._legal_destinations = set(legal_destinations)
+        else:
+            self._legal_destinations = set()
+        # Clear moveable hints when a piece is selected
+        self._moveable_cells = set()
+        self.update()
+
+    def set_moveable_cells(
+        self,
+        cells: Optional[List[tuple[int, int]]] = None,
+    ) -> None:
+        """Highlight cells that have pieces which can move (for mandatory jump hints).
+
+        Args:
+            cells: List of (row, col) tuples for pieces that can move, or None to clear.
+        """
+        if cells:
+            self._moveable_cells = set(cells)
+        else:
+            self._moveable_cells = set()
+        self.update()
+
+    def _pixel_to_cell(self, pos: QtCore.QPointF) -> Optional[tuple[int, int]]:
+        """Convert pixel position to cell coordinates."""
+        x = int(pos.x()) - self._margin
+        y = int(pos.y()) - self._margin
+
+        if x < 0 or y < 0:
+            return None
+
+        col = x // self._cell_size
+        row = y // self._cell_size
+
+        if row >= self.SIZE or col >= self.SIZE:
+            return None
+
+        return (row, col)
+
+    def _cell_to_pixel(self, row: int, col: int) -> tuple[int, int]:
+        """Convert cell coordinates to top-left pixel position."""
+        x = self._margin + col * self._cell_size
+        y = self._margin + row * self._cell_size
+        return (x, y)
+
+    def _is_dark_square(self, row: int, col: int) -> bool:
+        """Check if a square is dark (playable in checkers)."""
+        return (row + col) % 2 == 1
+
+    # -------------------------------------------------------------------------
+    # Event Handlers
+    # -------------------------------------------------------------------------
+
+    def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:
+        log_constant(
+            _LOG,
+            LOG_CHECKERS_BOARD_CLICK,
+            extra={"enabled": self._enabled, "game_over": self._is_game_over},
+        )
+        if not self._enabled or self._is_game_over:
+            log_constant(
+                _LOG,
+                LOG_CHECKERS_BOARD_CLICK_IGNORED,
+                extra={"enabled": self._enabled, "game_over": self._is_game_over},
+            )
+            return super().mousePressEvent(event)
+        if event.button() != QtCore.Qt.MouseButton.LeftButton:
+            return super().mousePressEvent(event)
+
+        cell = self._pixel_to_cell(event.position())
+        if cell is not None:
+            row, col = cell
+            is_dark = self._is_dark_square(row, col)
+            # Only allow clicks on dark squares
+            if is_dark:
+                log_constant(
+                    _LOG,
+                    LOG_CHECKERS_CELL_SIGNAL_EMITTED,
+                    extra={"row": row, "col": col},
+                )
+                self.cell_clicked.emit(row, col)
+
+        super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: QtGui.QMouseEvent) -> None:
+        cell = self._pixel_to_cell(event.position())
+        if cell != self._hover_cell:
+            self._hover_cell = cell
+            self.update()
+        super().mouseMoveEvent(event)
+
+    def leaveEvent(self, event: QtCore.QEvent) -> None:
+        self._hover_cell = None
+        self.update()
+        super().leaveEvent(event)
+
+    def resizeEvent(self, event: QtGui.QResizeEvent) -> None:
+        """Handle resize to keep board square and centered."""
+        super().resizeEvent(event)
+        available = min(self.width(), self.height())
+        self._cell_size = (available - 2 * self._margin) // self.SIZE
+        self._margin = (available - self._cell_size * self.SIZE) // 2
+
+    # -------------------------------------------------------------------------
+    # Painting
+    # -------------------------------------------------------------------------
+
+    def paintEvent(self, event: QtGui.QPaintEvent) -> None:
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+
+        # Draw board squares
+        self._draw_squares(painter)
+
+        # Draw highlights
+        self._draw_highlights(painter)
+
+        # Draw pieces
+        self._draw_pieces(painter)
+
+        # Draw coordinates
+        self._draw_coordinates(painter)
+
+        # Draw game status
+        if self._is_game_over:
+            self._draw_game_over(painter)
+
+        painter.end()
+
+    def _draw_squares(self, painter: QtGui.QPainter) -> None:
+        """Draw the checkerboard pattern."""
+        for row in range(self.SIZE):
+            for col in range(self.SIZE):
+                x, y = self._cell_to_pixel(row, col)
+
+                if self._is_dark_square(row, col):
+                    color = _CHECKERS_DARK_SQUARE
+                else:
+                    color = _CHECKERS_LIGHT_SQUARE
+
+                painter.fillRect(x, y, self._cell_size, self._cell_size, color)
+
+    def _draw_highlights(self, painter: QtGui.QPainter) -> None:
+        """Draw cell highlights (selection, legal moves, moveable hints, hover)."""
+        # Moveable pieces hint (pulsing border to show which pieces can move)
+        # This is shown when user clicks a piece with no legal moves
+        for cell in self._moveable_cells:
+            row, col = cell
+            x, y = self._cell_to_pixel(row, col)
+            # Draw pulsing blue border around moveable pieces
+            painter.setPen(QtGui.QPen(QtGui.QColor(0, 150, 255, 200), 4))
+            painter.setBrush(QtCore.Qt.BrushStyle.NoBrush)
+            painter.drawRect(x + 2, y + 2, self._cell_size - 4, self._cell_size - 4)
+
+        # Selected piece highlight
+        if self._selected_cell is not None:
+            row, col = self._selected_cell
+            x, y = self._cell_to_pixel(row, col)
+            painter.fillRect(x, y, self._cell_size, self._cell_size, _CHECKERS_SELECTED)
+
+        # Legal move destinations (draw circles like Chess)
+        for dest in self._legal_destinations:
+            row, col = dest
+            x, y = self._cell_to_pixel(row, col)
+            center_x = x + self._cell_size // 2
+            center_y = y + self._cell_size // 2
+
+            # Check if there's a piece at destination (capture)
+            if self._board[row][col] != 0:
+                # Draw ring for capture
+                painter.setPen(QtGui.QPen(_CHECKERS_LEGAL_MOVE, 4))
+                painter.setBrush(QtCore.Qt.BrushStyle.NoBrush)
+                radius = self._cell_size // 2 - 4
+            else:
+                # Draw dot for empty square
+                painter.setPen(QtCore.Qt.PenStyle.NoPen)
+                painter.setBrush(_CHECKERS_LEGAL_MOVE)
+                radius = self._cell_size // 6
+
+            painter.drawEllipse(QtCore.QPoint(center_x, center_y), radius, radius)
+
+        # Hover highlight (only on dark squares, not on selected)
+        if self._hover_cell is not None and not self._is_game_over:
+            row, col = self._hover_cell
+            if self._is_dark_square(row, col) and self._hover_cell != self._selected_cell:
+                x, y = self._cell_to_pixel(row, col)
+                painter.fillRect(x, y, self._cell_size, self._cell_size, _CHECKERS_HOVER)
+
+    def _draw_pieces(self, painter: QtGui.QPainter) -> None:
+        """Draw checkers pieces on the board."""
+        for row in range(self.SIZE):
+            for col in range(self.SIZE):
+                piece = self._board[row][col]
+                if piece == 0:
+                    continue
+
+                x, y = self._cell_to_pixel(row, col)
+                center_x = x + self._cell_size // 2
+                center_y = y + self._cell_size // 2
+                radius = self._cell_size // 2 - 5
+
+                # Determine piece color
+                if piece in (1, 2):  # Black pieces
+                    piece_color = _CHECKERS_BLACK_PIECE
+                    border_color = QtGui.QColor(100, 100, 100)
+                else:  # White pieces (3, 4)
+                    piece_color = _CHECKERS_WHITE_PIECE
+                    border_color = QtGui.QColor(150, 150, 150)
+
+                # Draw piece with border
+                painter.setPen(QtGui.QPen(border_color, 2))
+                painter.setBrush(piece_color)
+                painter.drawEllipse(QtCore.QPoint(center_x, center_y), radius, radius)
+
+                # Draw king crown for kings (2, 4)
+                if piece in (2, 4):
+                    crown_radius = radius // 3
+                    painter.setPen(QtCore.Qt.PenStyle.NoPen)
+                    painter.setBrush(_CHECKERS_KING_CROWN)
+                    painter.drawEllipse(QtCore.QPoint(center_x, center_y), crown_radius, crown_radius)
+
+                    # Draw "K" on king
+                    font = QtGui.QFont("Arial", int(self._cell_size * 0.2), QtGui.QFont.Weight.Bold)
+                    painter.setFont(font)
+                    if piece == 2:  # Black king
+                        painter.setPen(QtGui.QColor(255, 255, 255))
+                    else:  # White king
+                        painter.setPen(QtGui.QColor(0, 0, 0))
+
+    def _draw_coordinates(self, painter: QtGui.QPainter) -> None:
+        """Draw board coordinates (1-8 and a-h)."""
+        font = QtGui.QFont("Arial", max(10, int(self._cell_size * 0.18)))
+        painter.setFont(font)
+        painter.setPen(QtGui.QColor(40, 40, 40))
+        font_metrics = QtGui.QFontMetrics(font)
+
+        for i in range(self.SIZE):
+            # Column labels (a-h)
+            file_char = chr(ord("a") + i)
+            char_width = font_metrics.horizontalAdvance(file_char)
+            x = self._margin + i * self._cell_size + (self._cell_size - char_width) // 2
+
+            painter.drawText(x, self._margin - 8, file_char)
+            board_bottom = self._margin + self.SIZE * self._cell_size
+            painter.drawText(x, board_bottom + font_metrics.ascent() + 5, file_char)
+
+            # Row labels (8-1, top to bottom)
+            rank_char = str(self.SIZE - i)
+            char_width = font_metrics.horizontalAdvance(rank_char)
+            y = self._margin + i * self._cell_size + (self._cell_size + font_metrics.ascent()) // 2
+
+            painter.drawText(self._margin - char_width - 8, y, rank_char)
+            board_right = self._margin + self.SIZE * self._cell_size
+            painter.drawText(board_right + 8, y, rank_char)
+
+    def _draw_game_over(self, painter: QtGui.QPainter) -> None:
+        """Draw game over overlay."""
+        # Semi-transparent overlay
+        overlay = QtGui.QColor(0, 0, 0, 100)
+        board_size = self.SIZE * self._cell_size
+        painter.fillRect(
+            self._margin, self._margin, board_size, board_size, overlay
+        )
+
+        # Winner text
+        font = QtGui.QFont("Arial", int(self._cell_size * 0.4), QtGui.QFont.Weight.Bold)
+        painter.setFont(font)
+        painter.setPen(QtGui.QColor(255, 255, 255))
+
+        if self._winner == "player_0":
+            text = "Black Wins!"
+        elif self._winner == "player_1":
+            text = "White Wins!"
+        elif self._winner == "draw":
+            text = "Draw!"
+        else:
+            text = "Game Over"
+
+        rect = QtCore.QRect(
+            self._margin, self._margin, board_size, board_size
+        )
+        painter.drawText(rect, QtCore.Qt.AlignmentFlag.AlignCenter, text)
 
 
 # =============================================================================

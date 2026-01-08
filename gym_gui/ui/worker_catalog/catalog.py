@@ -45,7 +45,7 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
     """Return the catalog of worker integrations recognised by the UI.
 
     Workers available:
-    - BARLOG: LLM-based agents using BALROG benchmark framework
+    - BALROG: LLM-based agents using BALROG benchmark framework
     - CleanRL: Single/multi-agent RL with clean implementations (PPO, DQN, SAC, TD3, etc.)
     - XuanCe: Comprehensive deep RL library with 50+ algorithms for single/multi-agent
     - Ray RLlib: Multi-agent distributed RL with various paradigms
@@ -55,8 +55,8 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
     """
     return (
         WorkerDefinition(
-            worker_id="barlog_worker",
-            display_name="BARLOG LLM Worker",
+            worker_id="balrog_worker",
+            display_name="BALROG LLM Worker",
             description=(
                 "LLM-based agents using the BALROG benchmark framework. "
                 "Supports OpenAI, Anthropic Claude, Google Gemini, and local vLLM backends. "
@@ -145,8 +145,23 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
             provides_fast_analytics=False,
             supports_multi_agent=True,  # Multi-agent turn-based games
         ),
+        WorkerDefinition(
+            worker_id="mctx_worker",
+            display_name="MCTX GPU Worker",
+            description=(
+                "GPU-accelerated MCTS training using mctx + Pgx. "
+                "Implements AlphaZero, MuZero, and Gumbel MuZero algorithms. "
+                "Runs thousands of parallel games on GPU via JAX for massive speedup. "
+                "Supports Chess, Go (9x9/19x19), Shogi, Connect Four, Othello, Backgammon, Hex."
+            ),
+            supports_training=True,  # Self-play training
+            supports_policy_load=True,  # Can load trained policies
+            requires_live_telemetry=False,  # GPU batch training
+            provides_fast_analytics=True,  # TensorBoard logging
+            supports_multi_agent=True,  # Two-player games
+        ),
         # NOTE: PettingZoo is an environment library, not an algorithm provider.
-        # PettingZoo environments are supported BY other workers (CleanRL, XuanCe, Ray RLlib, Chess, Human).
+        # PettingZoo environments are supported BY other workers (CleanRL, XuanCe, Ray RLlib, Chess, Human, MCTX).
     )
 
 

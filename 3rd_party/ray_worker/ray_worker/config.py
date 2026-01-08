@@ -311,8 +311,8 @@ class RayWorkerConfig:
             return None
         if self.tensorboard_dir:
             return Path(self.tensorboard_dir)
-        # Use the standard path: var/trainer/runs/{run_id}/tensorboard
-        return build_tensorboard_log_dir(self.run_id)
+        # Use run_dir/tensorboard to respect output_dir setting
+        return self.run_dir / "tensorboard"
 
     @property
     def tensorboard_relative_path(self) -> Optional[str]:

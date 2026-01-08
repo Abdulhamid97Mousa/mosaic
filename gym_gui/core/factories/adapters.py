@@ -31,6 +31,7 @@ if TYPE_CHECKING:
     from gym_gui.config.game_configs import ProcgenConfig as _ProcgenConfigType
     from gym_gui.config.game_configs import TextWorldConfig as _TextWorldConfigType
     from gym_gui.config.game_configs import JumanjiConfig as _JumanjiConfigType
+    from gym_gui.core.adapters.pybullet_drones import PyBulletDronesConfig as _PyBulletDronesConfigType
 
 try:  # Optional dependency
     from gym_gui.core.adapters.vizdoom import (  # pragma: no cover - optional
@@ -116,6 +117,26 @@ except Exception:  # pragma: no cover - jumanji optional
     JumanjiAdapter = None  # type: ignore[misc, assignment]
     JumanjiConfig = None  # type: ignore[misc, assignment]
 
+try:  # Optional dependency - PyBullet Drones (quadcopter control environments)
+    from gym_gui.core.adapters.pybullet_drones import (  # pragma: no cover - optional
+        PYBULLET_DRONES_ADAPTERS,
+        PyBulletDronesAdapter,
+        PyBulletDronesConfig,
+    )
+except Exception:  # pragma: no cover - pybullet-drones optional
+    PYBULLET_DRONES_ADAPTERS: dict[Any, Any] = {}
+    PyBulletDronesAdapter = None  # type: ignore[misc, assignment]
+    PyBulletDronesConfig = None  # type: ignore[misc, assignment]
+
+try:  # Optional dependency - OpenSpiel (board games via Shimmy)
+    from gym_gui.core.adapters.open_spiel import (  # pragma: no cover - optional
+        OPENSPIEL_ADAPTERS,
+        CheckersEnvironmentAdapter,
+    )
+except Exception:  # pragma: no cover - openspiel optional
+    OPENSPIEL_ADAPTERS: dict[Any, Any] = {}
+    CheckersEnvironmentAdapter = None  # type: ignore[misc, assignment]
+
 from gym_gui.core.enums import GameId
 
 AdapterT = TypeVar("AdapterT", bound=EnvironmentAdapter)
@@ -147,6 +168,8 @@ def _registry() -> Mapping[GameId, type[EnvironmentAdapter]]:
         **PROCGEN_ADAPTERS,
         **TEXTWORLD_ADAPTERS,
         **JUMANJI_ADAPTERS,
+        **PYBULLET_DRONES_ADAPTERS,
+        **OPENSPIEL_ADAPTERS,
     }
 
 
@@ -186,6 +209,7 @@ def create_adapter(
         | "_ProcgenConfigType"
         | "_TextWorldConfigType"
         | "_JumanjiConfigType"
+        | "_PyBulletDronesConfigType"
         | None
     ) = None,
 ) -> EnvironmentAdapter:
@@ -296,6 +320,13 @@ def create_adapter(
             and issubclass(adapter_cls, JumanjiAdapter)
             and JumanjiConfig is not None
             and isinstance(game_config, JumanjiConfig)
+        ):
+            adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
+        elif (
+            PyBulletDronesAdapter is not None
+            and issubclass(adapter_cls, PyBulletDronesAdapter)
+            and PyBulletDronesConfig is not None
+            and isinstance(game_config, PyBulletDronesConfig)
         ):
             adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
         else:

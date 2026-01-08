@@ -80,7 +80,7 @@ class HumanVsAgentHandler:
         self,
         config: "HumanVsAgentConfig",
         chess_controller: "ChessGameController",
-    ) -> str:
+    ) -> tuple[str, bool]:
         """Set up the AI action provider for chess from configuration.
 
         Args:
@@ -88,7 +88,8 @@ class HumanVsAgentHandler:
             chess_controller: The chess game controller to configure.
 
         Returns:
-            Display name for the AI opponent.
+            Tuple of (display_name, is_fallback) where is_fallback indicates
+            if we fell back to Random AI because Stockfish wasn't available.
         """
         # Store current settings
         self._current_ai_opponent = config.opponent_type
@@ -98,17 +99,23 @@ class HumanVsAgentHandler:
         self.cleanup()
 
         if config.opponent_type == "stockfish":
-            return self._setup_stockfish(config, chess_controller)
+            ai_name, is_fallback = self._setup_stockfish(config, chess_controller)
+            # Update the UI to show which AI is actually active
+            if self._human_vs_agent_tab is not None:
+                self._human_vs_agent_tab.set_active_ai(ai_name, is_fallback)
+            return ai_name, is_fallback
 
         # Default: random AI (no action provider = uses default random)
         chess_controller.set_ai_action_provider(None)
-        return "Random AI"
+        if self._human_vs_agent_tab is not None:
+            self._human_vs_agent_tab.set_active_ai("Random AI", is_fallback=False)
+        return "Random AI", False
 
     def _setup_stockfish(
         self,
         config: "HumanVsAgentConfig",
         chess_controller: "ChessGameController",
-    ) -> str:
+    ) -> tuple[str, bool]:
         """Set up Stockfish as the AI provider.
 
         Args:
@@ -116,7 +123,8 @@ class HumanVsAgentHandler:
             chess_controller: The chess game controller.
 
         Returns:
-            Display name for Stockfish or fallback.
+            Tuple of (display_name, is_fallback) where is_fallback is True
+            if we fell back to Random AI because Stockfish wasn't available.
         """
         # Create Stockfish config from dialog settings
         stockfish_config = StockfishConfig(
@@ -139,7 +147,7 @@ class HumanVsAgentHandler:
                     f"depth={config.stockfish.depth}, "
                     f"time={config.stockfish.time_limit_ms}ms"
                 )
-                return f"Stockfish ({config.difficulty.capitalize()})"
+                return f"Stockfish ({config.difficulty.capitalize()})", False
             else:
                 _LOG.warning("Failed to start Stockfish, falling back to random AI")
                 self._status_bar.showMessage(
@@ -157,7 +165,7 @@ class HumanVsAgentHandler:
         # Fall through to random if Stockfish failed
         self._stockfish_service = None
         chess_controller.set_ai_action_provider(None)
-        return "Random AI"
+        return "Random AI (Stockfish unavailable)", True
 
     def on_ai_config_changed(
         self,
@@ -165,7 +173,7 @@ class HumanVsAgentHandler:
         difficulty: str,
         chess_controller: Optional["ChessGameController"],
         get_ai_config: Callable[[], "HumanVsAgentConfig"],
-    ) -> Optional[str]:
+    ) -> Optional[tuple[str, bool]]:
         """Handle AI opponent selection change.
 
         If a game is currently running, update the AI provider.
@@ -177,7 +185,7 @@ class HumanVsAgentHandler:
             get_ai_config: Callable to get the full config from the tab.
 
         Returns:
-            AI display name if updated, None if no game active.
+            Tuple of (ai_name, is_fallback) if updated, None if no game active.
         """
         self._current_ai_opponent = opponent_type
         self._current_ai_difficulty = difficulty
@@ -185,9 +193,9 @@ class HumanVsAgentHandler:
         # If a chess game is active, update the AI provider
         if chess_controller is not None and chess_controller.is_game_active():
             ai_config = get_ai_config()
-            ai_name = self.setup_ai_provider(ai_config, chess_controller)
-            _LOG.info(f"AI opponent updated: {ai_name}")
-            return ai_name
+            ai_name, is_fallback = self.setup_ai_provider(ai_config, chess_controller)
+            _LOG.info(f"AI opponent updated: {ai_name} (fallback={is_fallback})")
+            return ai_name, is_fallback
 
         return None
 

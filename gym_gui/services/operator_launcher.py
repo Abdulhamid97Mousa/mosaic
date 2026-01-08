@@ -15,8 +15,8 @@ Architecture Overview:
     RL Operators  -> RL_worker subprocess -> Policy inference
 
     Each subprocess:
-    - Writes logs to VAR_OPERATORS_DIR
-    - Emits telemetry to VAR_TELEMETRY_DIR (JSONL + stdout)
+    - Writes logs to VAR_OPERATORS_LOGS_DIR
+    - Emits telemetry to VAR_OPERATORS_TELEMETRY_DIR (JSONL + stdout)
     - Can be started/stopped independently
 """
 
@@ -32,7 +32,7 @@ from pathlib import Path
 import json
 from typing import IO, Any, Dict, List, Optional
 
-from gym_gui.config.paths import VAR_OPERATORS_DIR, VAR_TELEMETRY_DIR, ensure_var_directories
+from gym_gui.config.paths import VAR_OPERATORS_LOGS_DIR, VAR_OPERATORS_TELEMETRY_DIR, ensure_var_directories
 from gym_gui.core.subprocess_validation import validated_popen
 from gym_gui.services.operator import OperatorConfig
 from gym_gui.logging_config.helpers import log_constant
@@ -510,7 +510,7 @@ class OperatorLauncher:
         config = OperatorConfig(
             operator_id="op_0",
             operator_type="llm",
-            worker_id="barlog_worker",
+            worker_id="balrog_worker",
             display_name="GPT-4 Agent",
             env_name="babyai",
             task="BabyAI-GoToRedBall-v0",
@@ -564,11 +564,11 @@ class OperatorLauncher:
         run_id = run_id or f"{config.operator_id}_{uuid.uuid4().hex[:8]}"
 
         ensure_var_directories()
-        VAR_OPERATORS_DIR.mkdir(parents=True, exist_ok=True)
+        VAR_OPERATORS_LOGS_DIR.mkdir(parents=True, exist_ok=True)
 
         # Create log file for this operator
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        log_path = VAR_OPERATORS_DIR / f"{config.operator_id}_{timestamp}.log"
+        log_path = VAR_OPERATORS_LOGS_DIR / f"{config.operator_id}_{timestamp}.log"
         log_file = log_path.open("a", encoding="utf-8")
 
         # Build command based on operator type
@@ -596,7 +596,7 @@ class OperatorLauncher:
                 env.pop(proxy_var, None)
 
         # Pass telemetry directory
-        env["TELEMETRY_DIR"] = str(VAR_TELEMETRY_DIR)
+        env["TELEMETRY_DIR"] = str(VAR_OPERATORS_TELEMETRY_DIR)
         env["OPERATOR_RUN_ID"] = run_id
         env["OPERATOR_ID"] = config.operator_id
 
@@ -794,7 +794,7 @@ class OperatorLauncher:
         temperature = settings.get("temperature", 0.7)
 
         # Use chess_worker for chess games (llm_chess prompting style)
-        # Use barlog_worker for other environments (BALROG benchmarks)
+        # Use balrog_worker for other environments (BALROG benchmarks)
         is_chess = config.task and "chess" in config.task.lower()
 
         if is_chess:
@@ -806,7 +806,7 @@ class OperatorLauncher:
                 "--client-name", client_name,
                 "--model-id", model_id,
                 "--temperature", str(temperature),
-                "--telemetry-dir", str(VAR_TELEMETRY_DIR),
+                "--telemetry-dir", str(VAR_OPERATORS_TELEMETRY_DIR),
             ]
 
             # Add optional base URL (for vLLM)
@@ -824,10 +824,10 @@ class OperatorLauncher:
             cmd.extend(["--max-dialog-turns", str(max_dialog_turns)])
 
         else:
-            # BARLOG worker for other environments
+            # BALROG worker for other environments
             cmd = [
                 self._python_executable,
-                "-m", "barlog_worker.cli",
+                "-m", "balrog_worker.cli",
                 "--run-id", run_id,
                 "--env", config.env_name,
                 "--task", config.task,
@@ -837,7 +837,7 @@ class OperatorLauncher:
                 "--num-episodes", str(num_episodes),
                 "--max-steps", str(max_steps),
                 "--temperature", str(temperature),
-                "--telemetry-dir", str(VAR_TELEMETRY_DIR),
+                "--telemetry-dir", str(VAR_OPERATORS_TELEMETRY_DIR),
                 "-v",  # Verbose logging
             ]
 
@@ -871,6 +871,10 @@ class OperatorLauncher:
     ) -> list[str]:
         """Build command line for RL operator.
 
+        Uses cleanrl_worker for policy evaluation. In interactive mode,
+        the worker reads commands from stdin and emits telemetry to stdout,
+        following the same IPC protocol as balrog_worker.
+
         Args:
             config: Operator configuration with RL settings.
             run_id: Run ID for telemetry.
@@ -878,30 +882,59 @@ class OperatorLauncher:
 
         Returns:
             Command arguments list.
+
+        Raises:
+            OperatorLaunchError: If required settings are missing.
         """
         settings = config.settings or {}
 
         # Get RL-specific settings
         policy_path = settings.get("policy_path")
         algorithm = settings.get("algorithm", "ppo")
-        num_episodes = settings.get("num_episodes", 5)
 
-        # TODO: Integrate with actual RL worker (cleanrl_worker, xuance_worker, etc.)
-        # For now, RL uses a placeholder that logs its intent
+        # Validate required settings
+        if not policy_path:
+            raise OperatorLaunchError(
+                operator_id=config.operator_id,
+                message="RL operator requires 'policy_path' in settings",
+            )
+
+        # Determine environment ID (task field contains the full env ID)
+        env_id = config.task
+        if not env_id:
+            raise OperatorLaunchError(
+                operator_id=config.operator_id,
+                message="RL operator requires 'task' (environment ID)",
+            )
+
+        # Build cleanrl-worker command
         cmd = [
             self._python_executable,
-            "-c",
-            f"import time; print('RL operator {config.operator_id} started. "
-            f"Policy: {policy_path}, Algorithm: {algorithm}, "
-            f"Env: {config.env_name}, Task: {config.task}'); "
-            f"time.sleep(2); print('RL operator placeholder complete')"
+            "-m", "cleanrl_worker.cli",
+            "--interactive",  # Always use interactive mode for operators
+            "--run-id", run_id,
+            "--algo", algorithm,
+            "--env-id", env_id,
+            "--policy-path", str(policy_path),
         ]
 
-        LOGGER.warning(
-            "RL operator launching not yet fully implemented. "
-            "Operator %s will run a placeholder.",
-            config.operator_id
+        # Add seed if provided
+        seed = settings.get("seed")
+        if seed is not None:
+            cmd.extend(["--seed", str(seed)])
+
+        # Add verbose flag for debugging
+        if settings.get("verbose"):
+            cmd.append("--verbose")
+
+        LOGGER.info(
+            "Built RL command for operator %s | algo=%s env=%s policy=%s",
+            config.operator_id,
+            algorithm,
+            env_id,
+            policy_path,
         )
+
         return cmd
 
     def _build_human_command(
@@ -936,7 +969,7 @@ class OperatorLauncher:
             "--run-id", run_id,
             "--player-name", player_name,
             "--timeout", str(timeout_seconds),
-            "--telemetry-dir", str(VAR_TELEMETRY_DIR),
+            "--telemetry-dir", str(VAR_OPERATORS_TELEMETRY_DIR),
         ]
 
         if show_legal_moves:

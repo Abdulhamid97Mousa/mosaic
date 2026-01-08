@@ -7,11 +7,13 @@ from dataclasses import dataclass
 from logging.config import dictConfig
 from typing import Any, Dict, Iterable, Tuple
 
-from gym_gui.config.paths import VAR_LOGS_DIR, ensure_var_directories
+from gym_gui.config.paths import VAR_LOGS_DIR, VAR_OPERATORS_LOGS_DIR, ensure_var_directories
 
 ensure_var_directories()
 LOG_DIR = VAR_LOGS_DIR
 LOG_DIR.mkdir(parents=True, exist_ok=True)
+OPERATORS_LOG_DIR = VAR_OPERATORS_LOGS_DIR
+OPERATORS_LOG_DIR.mkdir(parents=True, exist_ok=True)
 
 # Format includes correlation IDs and component metadata for tracing
 _DEFAULT_FORMAT = (
@@ -38,6 +40,7 @@ class _ComponentRegistry:
 
     def _register_default_prefixes(self) -> None:
         defaults = {
+            "gym_gui.operators": "Operator",  # Dedicated operator UI logging
             "gym_gui.ui": "UI",
             "gym_gui.controllers": "Controller",
             "gym_gui.core.adapters": "Adapter",
@@ -255,6 +258,19 @@ def configure_logging(
         }
         root_handlers.append("file")
 
+        # Dedicated operators.log for operator UI activity with correlation IDs
+        operators_log_file = OPERATORS_LOG_DIR / "operators.log"
+        handlers["operators_file"] = {
+            "class": "logging.handlers.RotatingFileHandler",
+            "level": "DEBUG",  # Capture all operator debug logs
+            "formatter": "structured",
+            "filters": ["correlation", "component"],
+            "filename": str(operators_log_file),
+            "maxBytes": 10 * 1024 * 1024,
+            "backupCount": 5,
+            "encoding": "utf-8",
+        }
+
     config = {
         "version": 1,
         "disable_existing_loggers": False,
@@ -293,6 +309,12 @@ def configure_logging(
             "PIL": {"level": "WARNING", "propagate": True},
             "urllib3": {"level": "WARNING", "propagate": True},
             "numba": {"level": "WARNING", "propagate": True},
+            # Operator UI logs → operators.log with correlation IDs
+            "gym_gui.operators": {
+                "level": "DEBUG",
+                "handlers": ["operators_file"] if log_to_file else [],
+                "propagate": True,  # Also propagate to root for console output
+            },
         },
         "root": {
             "level": _level_name(root_level),
@@ -320,4 +342,5 @@ __all__ = [
     "list_known_components",
     "GrpcBlockingIOFilter",
     "LOG_DIR",
+    "OPERATORS_LOG_DIR",
 ]

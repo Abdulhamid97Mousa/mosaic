@@ -38,11 +38,90 @@ from ray.rllib.algorithms.impala import IMPALAConfig
 from ray.rllib.algorithms.appo import APPOConfig
 from ray.rllib.algorithms.dqn import DQNConfig
 from ray.rllib.algorithms.sac import SACConfig
-from ray.rllib.core.rl_module.default_model_config import DefaultModelConfig
-from ray.rllib.core.rl_module.multi_rl_module import MultiRLModuleSpec
-from ray.rllib.core.rl_module.rl_module import RLModuleSpec
 from ray.rllib.env.wrappers.pettingzoo_env import PettingZooEnv, ParallelPettingZooEnv
+from ray.rllib.utils.from_config import from_config
+from ray.rllib.utils.replay_buffers.multi_agent_replay_buffer import MultiAgentReplayBuffer, ReplayBuffer
 from ray.tune.registry import register_env
+
+
+# =============================================================================
+# Ray RLlib Bug Workaround: ABCMeta type check in replay buffer creation
+# =============================================================================
+# Bug: Ray RLlib 2.52.1 has a bug in _create_local_replay_buffer_if_necessary()
+# where it checks `if "EpisodeReplayBuffer" in config["replay_buffer_config"]["type"]`
+# but the `type` field is sometimes converted to a class (ABCMeta) instead of
+# remaining as a string, causing TypeError: argument of type 'ABCMeta' is not iterable.
+#
+# This affects DQN and SAC algorithms when using the old API stack.
+# Fix: Monkey-patch the method to handle both string and class types.
+# =============================================================================
+
+def _patched_create_local_replay_buffer_if_necessary(
+    self, config
+) -> Optional[MultiAgentReplayBuffer]:
+    """Patched version that handles both string and class types for replay buffer.
+
+    This fixes Ray RLlib bug where the replay buffer type string is converted to
+    an ABCMeta class before the string check, causing a TypeError.
+    """
+    if not config.get("replay_buffer_config") or config["replay_buffer_config"].get(
+        "no_local_replay_buffer"
+    ):
+        return None
+
+    buffer_type = config["replay_buffer_config"].get("type", "")
+
+    # Handle both string and class types - this is the fix
+    if isinstance(buffer_type, str):
+        type_name = buffer_type
+    elif isinstance(buffer_type, type):
+        type_name = buffer_type.__name__
+    else:
+        type_name = str(buffer_type)
+
+    # Check for EpisodeReplayBuffer using the type name string
+    if "EpisodeReplayBuffer" in type_name:
+        config["replay_buffer_config"][
+            "metrics_num_episodes_for_smoothing"
+        ] = self.config.metrics_num_episodes_for_smoothing
+
+    return from_config(ReplayBuffer, config["replay_buffer_config"])
+
+
+def _apply_ray_replay_buffer_patch() -> None:
+    """Apply monkey-patch to fix Ray RLlib replay buffer bug.
+
+    Only patches if the bug exists (checks for the problematic code pattern).
+    This is idempotent - safe to call multiple times.
+    """
+    import inspect
+    import logging as _logging
+
+    # Check if already patched
+    if getattr(Algorithm, "_replay_buffer_patched", False):
+        return
+
+    try:
+        # Get the source of the original method
+        source = inspect.getsource(Algorithm._create_local_replay_buffer_if_necessary)
+
+        # Check if the buggy pattern exists
+        if '"EpisodeReplayBuffer" in config["replay_buffer_config"]["type"]' in source:
+            Algorithm._create_local_replay_buffer_if_necessary = (
+                _patched_create_local_replay_buffer_if_necessary
+            )
+            Algorithm._replay_buffer_patched = True
+            _logging.getLogger(__name__).debug(
+                "Applied Ray RLlib replay buffer bug workaround (ABCMeta fix)"
+            )
+    except Exception as e:
+        _logging.getLogger(__name__).debug(
+            f"Could not check/apply replay buffer patch: {e}"
+        )
+
+
+# Apply the patch at module import time (for DQN/SAC to work)
+_apply_ray_replay_buffer_patch()
 
 from gym_gui.core.worker import TelemetryEmitter
 from gym_gui.logging_config.helpers import log_constant
@@ -87,7 +166,7 @@ def _wrap_env_for_ray(env: Any, api_type: PettingZooAPIType, worker_index: int =
 
     Args:
         env: Raw PettingZoo environment (AEC or Parallel)
-        api_type: API type of the environment
+        api_type: API type of the environment (may be overridden by actual env type)
         worker_index: Ray worker index for unique FastLane stream per worker
 
     Returns:
@@ -95,7 +174,14 @@ def _wrap_env_for_ray(env: Any, api_type: PettingZooAPIType, worker_index: int =
         - PettingZooEnv for AEC environments
         - ParallelPettingZooEnv for Parallel environments
     """
-    if api_type == PettingZooAPIType.PARALLEL:
+    # Detect actual environment type - some envs (like Classic games) are always AEC
+    # regardless of what the config says. AEC envs have agent_selection attribute.
+    is_aec_env = hasattr(env, "agent_selection") or hasattr(env, "agent_iter")
+
+    # Use detected type: if env is AEC, always use PettingZooEnv wrapper
+    use_parallel = (api_type == PettingZooAPIType.PARALLEL) and not is_aec_env
+
+    if use_parallel:
         # Wrap with FastLane for live visualization (Parallel version)
         # Each worker gets its own stream: {run_id}-worker-{worker_index}
         env = maybe_wrap_parallel_env(env, worker_index=worker_index)
@@ -343,6 +429,102 @@ ALGORITHM_INFO = {
 }
 
 
+# =============================================================================
+# Environment-Specific Model Configurations
+# =============================================================================
+# Ray RLlib only has default CNN configs for: 42x42, 84x84, 64x64, 10x10
+# We need custom configs for other observation shapes.
+
+ENV_MODEL_CONFIGS = {
+    # Classic board games (8x8 board with many channels)
+    "chess_v6": {
+        "conv_filters": [
+            [64, [3, 3], 1],   # 8x8 -> 6x6
+            [64, [3, 3], 1],   # 6x6 -> 4x4
+            [64, [2, 2], 2],   # 4x4 -> 2x2
+        ],
+        "conv_activation": "relu",
+        "fcnet_hiddens": [256, 256],
+        "fcnet_activation": "relu",
+    },
+    "go_v5": {
+        # Go board: 19x19 or configurable with many channels
+        "conv_filters": [
+            [64, [3, 3], 2],   # 19x19 -> 9x9
+            [128, [3, 3], 2],  # 9x9 -> 4x4
+            [128, [2, 2], 2],  # 4x4 -> 2x2
+        ],
+        "conv_activation": "relu",
+        "fcnet_hiddens": [256, 256],
+        "fcnet_activation": "relu",
+    },
+    "connect_four_v3": {
+        # Connect Four: 6x7 board
+        "conv_filters": [
+            [32, [3, 3], 1],   # 6x7 -> 4x5
+            [64, [3, 3], 1],   # 4x5 -> 2x3
+        ],
+        "conv_activation": "relu",
+        "fcnet_hiddens": [128, 128],
+        "fcnet_activation": "relu",
+    },
+    "tictactoe_v3": {
+        # Tic-tac-toe: 3x3 board
+        "conv_filters": [
+            [16, [2, 2], 1],   # 3x3 -> 2x2
+        ],
+        "conv_activation": "relu",
+        "fcnet_hiddens": [64, 64],
+        "fcnet_activation": "relu",
+    },
+    # SISL environments (small observation spaces)
+    "pursuit_v4": {
+        # Pursuit: 7x7x3
+        "conv_filters": [
+            [16, [3, 3], 2],  # 7x7 -> 3x3
+            [32, [3, 3], 2],  # 3x3 -> 1x1
+        ],
+        "conv_activation": "relu",
+        "fcnet_hiddens": [64, 64],
+        "fcnet_activation": "relu",
+    },
+    "waterworld_v4": {
+        # Waterworld: Continuous observation space - uses MLP, not CNN
+        "fcnet_hiddens": [256, 256],
+        "fcnet_activation": "tanh",
+    },
+    "multiwalker_v9": {
+        # Multiwalker: Continuous observation space - uses MLP, not CNN
+        "fcnet_hiddens": [256, 256],
+        "fcnet_activation": "tanh",
+    },
+}
+
+
+def _get_model_config_for_env(env_id: str) -> Dict[str, Any]:
+    """Get appropriate model configuration for an environment.
+
+    Args:
+        env_id: Environment ID (e.g., 'chess_v6', 'pursuit_v4')
+
+    Returns:
+        Model config dict suitable for RLlib's config.training(model=...)
+    """
+    if env_id in ENV_MODEL_CONFIGS:
+        return ENV_MODEL_CONFIGS[env_id]
+
+    # Default for small image observations (7x7 like pursuit)
+    return {
+        "conv_filters": [
+            [16, [3, 3], 2],  # Generic for small images
+            [32, [3, 3], 2],
+        ],
+        "conv_activation": "relu",
+        "fcnet_hiddens": [64, 64],
+        "fcnet_activation": "relu",
+    }
+
+
 def get_algorithm_config_class(algorithm: str) -> type:
     """Get the algorithm config class for a given algorithm name.
 
@@ -467,6 +649,9 @@ class RayWorkerRuntime:
     def _build_multi_agent_config(self, base_config: PPOConfig) -> PPOConfig:
         """Configure multi-agent settings based on policy configuration.
 
+        Uses the OLD RLlib API (api_stack with enable_rl_module_and_learner=False).
+        The new API's .rl_module() method is not compatible with the old stack.
+
         Args:
             base_config: Base algorithm config
 
@@ -481,11 +666,6 @@ class RayWorkerRuntime:
             return base_config.multi_agent(
                 policies={"shared"},
                 policy_mapping_fn=lambda agent_id, *args, **kwargs: "shared",
-            ).rl_module(
-                rl_module_spec=MultiRLModuleSpec(
-                    rl_module_specs={"shared": RLModuleSpec()},
-                ),
-                model_config=DefaultModelConfig(vf_share_layers=True),
             )
 
         elif policy_config == PolicyConfiguration.INDEPENDENT:
@@ -494,11 +674,6 @@ class RayWorkerRuntime:
             return base_config.multi_agent(
                 policies=policies,
                 policy_mapping_fn=lambda agent_id, *args, **kwargs: agent_id,
-            ).rl_module(
-                rl_module_spec=MultiRLModuleSpec(
-                    rl_module_specs={p: RLModuleSpec() for p in policies},
-                ),
-                model_config=DefaultModelConfig(vf_share_layers=True),
             )
 
         elif policy_config == PolicyConfiguration.SELF_PLAY:
@@ -508,11 +683,6 @@ class RayWorkerRuntime:
             return base_config.multi_agent(
                 policies={"main"},
                 policy_mapping_fn=lambda agent_id, *args, **kwargs: "main",
-            ).rl_module(
-                rl_module_spec=MultiRLModuleSpec(
-                    rl_module_specs={"main": RLModuleSpec()},
-                ),
-                model_config=DefaultModelConfig(vf_share_layers=True),
             )
 
         elif policy_config == PolicyConfiguration.SHARED_VALUE_FUNCTION:
@@ -522,11 +692,6 @@ class RayWorkerRuntime:
             return base_config.multi_agent(
                 policies=policies,
                 policy_mapping_fn=lambda agent_id, *args, **kwargs: agent_id,
-            ).rl_module(
-                rl_module_spec=MultiRLModuleSpec(
-                    rl_module_specs={p: RLModuleSpec() for p in policies},
-                ),
-                model_config=DefaultModelConfig(vf_share_layers=True),
             )
 
         else:
@@ -590,15 +755,16 @@ class RayWorkerRuntime:
         _LOGGER.info(f"Using algorithm: {algorithm} ({ConfigClass.__name__})")
 
         # Build base config with common settings
+        # Use OLD API stack for all algorithms (better compatibility with various obs shapes)
         base_config = (
             ConfigClass()
             .environment(self._env_name)
-            # Use old API stack for compatibility with various observation spaces
-            # The new API stack doesn't support arbitrary obs shapes like 7x7x3
             .api_stack(
                 enable_rl_module_and_learner=False,
                 enable_env_runner_and_connector_v2=False,
             )
+            # Disable validation to allow custom replay buffer configs
+            .experimental(_validate_config=False)
             .env_runners(
                 num_env_runners=rc.num_workers,
                 num_cpus_per_env_runner=rc.num_cpus_per_worker,
@@ -609,19 +775,11 @@ class RayWorkerRuntime:
             .resources(
                 num_gpus=rc.num_gpus,
             )
-            # Custom model config for small observation spaces (e.g., 7x7x3 in Pursuit)
-            # Ray RLlib only has defaults for 42x42, 84x84, 64x64, 10x10
-            # For 7x7: [3,3] stride 2 -> 3x3, then [3,3] stride 2 -> 1x1
+            # Environment-specific model config (CNN/MLP architecture)
+            # Ray RLlib only has defaults for 42x42, 84x84, 64x64, 10x10 images
+            # We define custom configs for chess (8x8x111), pursuit (7x7x3), etc.
             .training(
-                model={
-                    "conv_filters": [
-                        [16, [3, 3], 2],  # 7x7 -> 3x3
-                        [32, [3, 3], 2],  # 3x3 -> 1x1
-                    ],
-                    "conv_activation": "relu",
-                    "fcnet_hiddens": [64, 64],
-                    "fcnet_activation": "relu",
-                }
+                model=_get_model_config_for_env(env_id)
             )
         )
 
@@ -687,6 +845,30 @@ class RayWorkerRuntime:
 
         _LOGGER.info(f"Applying {len(training_params)} training params for {algorithm}")
         _LOGGER.debug(f"Training params: {training_params}")
+
+        # DQN and SAC require explicit replay buffer config with old API stack
+        # Note: The _apply_ray_replay_buffer_patch() fixes a Ray RLlib bug that caused
+        # TypeError when checking replay buffer type (ABCMeta vs string issue)
+        #
+        # Memory considerations for DQN/SAC:
+        # - Chess obs: 8x8x111 = 7104 floats ≈ 28KB per transition
+        # - 10000 capacity ≈ 280MB (manageable), 50000 ≈ 1.4GB (can cause OOM)
+        #
+        # Note: We use MultiAgentReplayBuffer (non-prioritized) instead of
+        # MultiAgentPrioritizedReplayBuffer because the prioritized version has
+        # an assertion error in update_priorities_in_replay_buffer with multi-agent
+        # environments (len(batch_indices) != len(td_error)).
+        if algorithm in ("DQN", "SAC"):
+            # Use smaller buffer to prevent OOM on large observation spaces
+            buffer_capacity = training_params.pop("replay_buffer_capacity", 10000)
+            training_params["replay_buffer_config"] = {
+                "type": "MultiAgentReplayBuffer",  # Non-prioritized for multi-agent
+                "capacity": buffer_capacity,
+            }
+            _LOGGER.info(
+                f"Configured MultiAgentReplayBuffer for {algorithm} "
+                f"(capacity={buffer_capacity})"
+            )
 
         # Apply training parameters
         return config.training(**training_params)
@@ -1014,10 +1196,17 @@ class RayWorkerRuntime:
         self._setup_analytics()
 
         # Build runtime_env with all required environment variables
+        # Get run_dir early so we can redirect ALL Ray outputs there
+        run_dir = self.config.run_dir
+        run_dir.mkdir(parents=True, exist_ok=True)
+
         runtime_env_vars = {
             # Disable pygame windows (use dummy video/audio driver)
             "SDL_VIDEODRIVER": "dummy",
             "SDL_AUDIODRIVER": "dummy",
+            # CRITICAL: Redirect Ray's internal cache from ~/ray_results to our run directory
+            # This ensures ALL Ray artifacts (checkpoints, logs, trial metadata) stay in var/trainer/runs/
+            "RAY_AIR_LOCAL_CACHE_DIR": str(run_dir),
         }
 
         # Add FastLane env vars if enabled (so Ray workers can use FastLane)
@@ -1041,11 +1230,19 @@ class RayWorkerRuntime:
             )
 
         try:
-            # Build algorithm
+            # Build algorithm (use build_algo() for RLlib 2.x+)
             algo_config = self._build_algorithm_config()
-            self._algorithm = algo_config.build()
 
-            _LOGGER.info("Algorithm built successfully")
+            # Create custom logger_creator to redirect Ray's logs to our run directory
+            # This ensures Ray RLlib writes TensorBoard events to var/trainer/runs/{run_id}/
+            # Note: run_dir was already created above when setting RAY_AIR_LOCAL_CACHE_DIR
+            def custom_logger_creator(config):
+                from ray.tune.logger import UnifiedLogger
+                return UnifiedLogger(config, str(run_dir), loggers=None)
+
+            self._algorithm = algo_config.build_algo(logger_creator=custom_logger_creator)
+
+            _LOGGER.info(f"Algorithm built successfully, logging to: {run_dir}")
 
             # Calculate iterations using train_batch_size from algo_params
             train_batch_size = self.config.training.algo_params.get("train_batch_size", 4000)

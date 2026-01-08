@@ -239,7 +239,7 @@ class WorkerDiscovery:
             discovery.discover_all()
 
             worker_ids = discovery.list_worker_ids()
-            # Returns: ["barlog", "cleanrl", "ray"]
+            # Returns: ["balrog", "cleanrl", "ray"]
         """
         if not self._loaded:
             self.discover_all()

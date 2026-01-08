@@ -14,6 +14,7 @@ from PyQt6.QtWidgets import QStatusBar, QWidget
 if TYPE_CHECKING:
     from gym_gui.core.enums import GameId
     from gym_gui.ui.handlers.env_loaders import (
+        CheckersEnvLoader,
         ChessEnvLoader,
         ConnectFourEnvLoader,
         GoEnvLoader,
@@ -27,7 +28,7 @@ class MultiAgentGameHandler:
     """Handler for multi-agent game routing.
 
     Routes load/start/reset requests to appropriate environment loaders
-    for Chess, Connect Four, Go, and Tic-Tac-Toe games.
+    for Chess, Connect Four, Go, Tic-Tac-Toe, and Checkers games.
     """
 
     def __init__(
@@ -37,6 +38,7 @@ class MultiAgentGameHandler:
         connect_four_loader: "ConnectFourEnvLoader",
         go_loader: "GoEnvLoader",
         tictactoe_loader: "TicTacToeEnvLoader",
+        checkers_loader: "CheckersEnvLoader",
         set_game_info: Callable[[str], None],
         get_game_info: Callable[["GameId"], Optional[str]],
         parent: Optional[QWidget] = None,
@@ -49,6 +51,7 @@ class MultiAgentGameHandler:
             connect_four_loader: Connect Four environment loader.
             go_loader: Go environment loader.
             tictactoe_loader: Tic-Tac-Toe environment loader.
+            checkers_loader: Checkers environment loader.
             set_game_info: Callback to set game info panel HTML.
             get_game_info: Callback to get game info HTML by GameId.
             parent: Optional parent widget.
@@ -58,6 +61,7 @@ class MultiAgentGameHandler:
         self._connect_four_loader = connect_four_loader
         self._go_loader = go_loader
         self._tictactoe_loader = tictactoe_loader
+        self._checkers_loader = checkers_loader
         self._set_game_info = set_game_info
         self._get_game_info = get_game_info
         self._parent = parent
@@ -68,7 +72,7 @@ class MultiAgentGameHandler:
         Routes to appropriate loader based on environment ID.
 
         Args:
-            env_id: Environment ID (e.g., "chess_v6", "connect_four_v3").
+            env_id: Environment ID (e.g., "chess_v6", "connect_four_v3", "checkers").
             seed: Random seed for game initialization.
         """
         _LOGGER.info(
@@ -85,6 +89,8 @@ class MultiAgentGameHandler:
             self._load_go_game(seed)
         elif env_id == "tictactoe_v3":
             self._load_tictactoe_game(seed)
+        elif env_id == "checkers":
+            self._load_checkers_game(seed)
         else:
             # Other PettingZoo environments not yet implemented
             self._status_bar.showMessage(
@@ -128,6 +134,15 @@ class MultiAgentGameHandler:
         if desc:
             self._set_game_info(desc)
 
+    def _load_checkers_game(self, seed: int) -> None:
+        """Load and initialize the Checkers game with interactive board."""
+        from gym_gui.core.enums import GameId
+
+        self._checkers_loader.load(seed, parent=self._parent)
+        desc = self._get_game_info(GameId.OPEN_SPIEL_CHECKERS)
+        if desc:
+            self._set_game_info(desc)
+
     def on_start_requested(self, env_id: str, human_agent: str, seed: int) -> None:
         """Handle start game request from Multi-Agent tab.
 
@@ -163,6 +178,8 @@ class MultiAgentGameHandler:
             self._go_loader.on_reset_requested(seed)
         elif self._tictactoe_loader.is_loaded:
             self._tictactoe_loader.on_reset_requested(seed)
+        elif self._checkers_loader.is_loaded:
+            self._checkers_loader.reset(seed)
         else:
             self._status_bar.showMessage("No active game to reset", 3000)
 
@@ -170,8 +187,13 @@ class MultiAgentGameHandler:
         """Handle AI opponent selection change.
 
         Args:
-            opponent_type: Type of AI opponent ("random", "stockfish", "custom").
-            difficulty: Difficulty level for engines like Stockfish.
+            opponent_type: Type of AI opponent.
+                - Chess: "random", "stockfish", "custom"
+                - Go: "random", "katago", "gnugo"
+            difficulty: Difficulty level for engines.
         """
-        # Currently only chess supports AI config changes
-        self._chess_loader.on_ai_config_changed(opponent_type, difficulty)
+        # Route to the appropriate loader based on which game is active
+        if self._chess_loader.is_loaded:
+            self._chess_loader.on_ai_config_changed(opponent_type, difficulty)
+        elif self._go_loader.is_loaded:
+            self._go_loader.on_ai_config_changed(opponent_type, difficulty)

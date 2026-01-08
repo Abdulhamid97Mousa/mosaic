@@ -220,7 +220,7 @@ class WorkerAssignment:
     For multi-agent environments (e.g., chess), there's one per player.
 
     Attributes:
-        worker_id: References WorkerDefinition (e.g., "barlog_worker", "cleanrl_worker").
+        worker_id: References WorkerDefinition (e.g., "balrog_worker", "cleanrl_worker").
         worker_type: Type of worker - "llm", "vlm", "rl", or "human".
         settings: Worker-specific settings (client_name, model_id, api_key, etc.).
     """
@@ -280,7 +280,7 @@ class OperatorConfig:
             # Default single-agent worker
             self.workers = {
                 "agent": WorkerAssignment(
-                    worker_id="barlog_worker",
+                    worker_id="balrog_worker",
                     worker_type="llm",
                     settings={},
                 )
@@ -311,7 +311,7 @@ class OperatorConfig:
         """
         if self.workers:
             return next(iter(self.workers.values())).worker_id
-        return "barlog_worker"
+        return "balrog_worker"
 
     @property
     def settings(self) -> Dict[str, Any]:
@@ -368,7 +368,7 @@ class OperatorConfig:
         Args:
             operator_id: Unique operator ID.
             display_name: Display name for UI.
-            worker_id: Worker to use (e.g., "barlog_worker").
+            worker_id: Worker to use (e.g., "balrog_worker").
             worker_type: Type of worker ("llm", "vlm", "rl", "human").
             env_name: Environment family.
             task: Specific task/level.

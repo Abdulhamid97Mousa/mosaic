@@ -276,10 +276,14 @@ class MultiAgentFastLaneWrapper:
     2. Tracks per-agent metrics (reward, steps)
     3. Composites all agent views into a tiled grid
     4. Publishes composite frame to FastLane shared memory
+    5. For board games (chess), includes structured game state metadata
 
     For AEC (turn-based) environments, frames are collected as each agent acts
     and the composite is published after all agents have taken their turn.
     """
+
+    # Metadata size for JSON board game state (FEN + legal_moves)
+    METADATA_SIZE = 4096  # 4KB should be plenty for chess state
 
     def __init__(self, env: Any, config: Optional[FastLaneRayConfig] = None):
         """Initialize the wrapper.
@@ -316,7 +320,83 @@ class MultiAgentFastLaneWrapper:
         # Debug
         self._debug_counter = 0
 
+        # Board game detection (chess, go, etc.)
+        self._is_chess = self._detect_chess_env()
+        self._chess_board: Any = None
+        if self._is_chess:
+            self._log_debug("Chess environment detected - will send board state metadata")
+
         self._log_debug(f"MultiAgentFastLane initialized: stream={self._config.stream_id}, worker={self._config.worker_index}")
+
+    def _detect_chess_env(self) -> bool:
+        """Check if the wrapped environment is a chess environment."""
+        try:
+            unwrapped = self._env.unwrapped if hasattr(self._env, 'unwrapped') else self._env
+            if hasattr(unwrapped, 'board'):
+                # Check if it's a chess.Board
+                board = unwrapped.board
+                if hasattr(board, 'fen') and hasattr(board, 'legal_moves'):
+                    return True
+        except Exception:
+            pass
+        return False
+
+    def _get_chess_board(self) -> Any:
+        """Get the underlying chess.Board object."""
+        if self._chess_board is not None:
+            return self._chess_board
+        try:
+            unwrapped = self._env.unwrapped if hasattr(self._env, 'unwrapped') else self._env
+            if hasattr(unwrapped, 'board'):
+                self._chess_board = unwrapped.board
+                return self._chess_board
+        except Exception:
+            pass
+        return None
+
+    def _get_board_game_metadata(self) -> Optional[str]:
+        """Get board game state as JSON string for metadata.
+
+        Returns JSON with:
+        - game_type: "chess"
+        - fen: FEN string
+        - legal_moves: list of UCI move strings
+        - current_player: "white" or "black"
+        - is_check: bool
+        - is_game_over: bool
+        """
+        if not self._is_chess:
+            return None
+
+        try:
+            import json
+            board = self._get_chess_board()
+            if board is None:
+                return None
+
+            # Get current player
+            is_white_turn = board.turn  # True = white, False = black
+            current_player = "white" if is_white_turn else "black"
+            current_agent = "player_0" if is_white_turn else "player_1"
+
+            # Get legal moves in UCI notation
+            legal_moves = [str(move) for move in board.legal_moves]
+
+            metadata = {
+                "game_type": "chess",
+                "fen": board.fen(),
+                "legal_moves": legal_moves,
+                "current_player": current_player,
+                "current_agent": current_agent,
+                "is_check": board.is_check(),
+                "is_checkmate": board.is_checkmate(),
+                "is_stalemate": board.is_stalemate(),
+                "is_game_over": board.is_game_over(),
+            }
+            return json.dumps(metadata)
+        except Exception as e:
+            self._log_debug(f"Failed to get chess metadata: {e}", limit=5)
+            return None
 
     # ------------------------------------------------------------------
     # Environment API passthrough
@@ -488,13 +568,15 @@ class MultiAgentFastLaneWrapper:
         height, width, channels = frame.shape
         frame_bytes = frame.astype(np.uint8).tobytes()
 
-        # Create writer if needed
+        # Create writer if needed (with metadata support for board games)
         if self._writer is None:
+            metadata_size = self.METADATA_SIZE if self._is_chess else 0
             config = FastLaneConfig(
                 width=width,
                 height=height,
                 channels=channels,
                 pixel_format="RGB" if channels == 3 else "RGBA",
+                metadata_size=metadata_size,
             )
             self._writer = self._create_writer(config)
             if self._writer is None:
@@ -519,8 +601,11 @@ class MultiAgentFastLaneWrapper:
             step_rate_hz=step_rate,
         )
 
+        # Get board game metadata if applicable
+        metadata = self._get_board_game_metadata()
+
         try:
-            self._writer.publish(frame_bytes, metrics=metrics)
+            self._writer.publish(frame_bytes, metrics=metrics, metadata=metadata)
             self._log_debug("Frame published", limit=20)
         except Exception as e:
             self._log_debug(f"Publish failed: {e}", limit=5)
