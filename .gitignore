@@ -239,5 +239,5 @@ _vizdoom.ini
 # Development Progress (internal documentation - not for public release)
 # =============================================================================
 
-
-
+# Paper drafts and research documents (private)
+docs/my_paper/
