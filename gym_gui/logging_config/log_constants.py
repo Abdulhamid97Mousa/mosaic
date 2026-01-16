@@ -1416,6 +1416,37 @@ LOG_OPERATOR_ENV_PREVIEW_ERROR = _constant(
 )
 
 # ---------------------------------------------------------------------------
+# Parallel Multi-Agent Operator constants (LOG707–LOG709)
+# For simultaneous environments: MultiGrid, MeltingPot, Overcooked
+# ---------------------------------------------------------------------------
+LOG_OPERATOR_PARALLEL_RESET_STARTED = _constant(
+    "LOG707",
+    "INFO",
+    "Parallel multi-agent operator reset started",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("operator", "parallel", "multiagent", "reset", "start"),
+)
+
+LOG_OPERATOR_PARALLEL_STEP_STARTED = _constant(
+    "LOG708",
+    "DEBUG",
+    "Parallel multi-agent step started, collecting actions",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("operator", "parallel", "multiagent", "step", "start"),
+)
+
+LOG_OPERATOR_PARALLEL_STEP_COMPLETED = _constant(
+    "LOG709",
+    "DEBUG",
+    "Parallel multi-agent step completed",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("operator", "parallel", "multiagent", "step", "complete"),
+)
+
+# ---------------------------------------------------------------------------
 # vLLM Server Widget constants (LOG710–LOG719)
 # ---------------------------------------------------------------------------
 LOG_VLLM_SERVER_COUNT_CHANGED = _constant(
@@ -2280,6 +2311,185 @@ LOG_UI_CHAT_CLEANUP_WARNING = _constant(
     component="UI",
     subcomponent="ChatPanel",
     tags=_tags("ui", "chat", "cleanup", "warning"),
+)
+
+
+# ---------------------------------------------------------------------------
+# Board Config Dialog constants (LOG790–LOG799)
+# ---------------------------------------------------------------------------
+LOG_UI_BOARD_CONFIG_DIALOG_OPENED = _constant(
+    "LOG790",
+    "INFO",
+    "Board configuration dialog opened",
+    component="UI",
+    subcomponent="BoardConfigDialog",
+    tags=_tags("ui", "board_config", "dialog", "opened"),
+)
+
+LOG_UI_BOARD_CONFIG_STATE_APPLIED = _constant(
+    "LOG791",
+    "INFO",
+    "Custom board state applied",
+    component="UI",
+    subcomponent="BoardConfigDialog",
+    tags=_tags("ui", "board_config", "state", "applied"),
+)
+
+LOG_UI_BOARD_CONFIG_VALIDATION_ERROR = _constant(
+    "LOG792",
+    "WARNING",
+    "Board state validation failed",
+    component="UI",
+    subcomponent="BoardConfigDialog",
+    tags=_tags("ui", "board_config", "validation", "error"),
+)
+
+LOG_UI_BOARD_CONFIG_PRESET_LOADED = _constant(
+    "LOG793",
+    "DEBUG",
+    "Board preset position loaded",
+    component="UI",
+    subcomponent="BoardConfigDialog",
+    tags=_tags("ui", "board_config", "preset", "loaded"),
+)
+
+LOG_UI_BOARD_CONFIG_PIECE_MOVED = _constant(
+    "LOG794",
+    "DEBUG",
+    "Board piece moved",
+    component="UI",
+    subcomponent="BoardConfigDialog",
+    tags=_tags("ui", "board_config", "piece", "moved"),
+)
+
+LOG_UI_BOARD_CONFIG_PIECE_REMOVED = _constant(
+    "LOG795",
+    "DEBUG",
+    "Board piece removed",
+    component="UI",
+    subcomponent="BoardConfigDialog",
+    tags=_tags("ui", "board_config", "piece", "removed"),
+)
+
+LOG_UI_BOARD_CONFIG_NOTATION_EDITED = _constant(
+    "LOG796",
+    "DEBUG",
+    "Board notation manually edited",
+    component="UI",
+    subcomponent="BoardConfigDialog",
+    tags=_tags("ui", "board_config", "notation", "edited"),
+)
+
+LOG_UI_BOARD_CONFIG_FACTORY_CREATE = _constant(
+    "LOG797",
+    "DEBUG",
+    "Board config dialog created via factory",
+    component="UI",
+    subcomponent="BoardConfigDialogFactory",
+    tags=_tags("ui", "board_config", "factory", "create"),
+)
+
+LOG_UI_BOARD_CONFIG_UNSUPPORTED_GAME = _constant(
+    "LOG798",
+    "WARNING",
+    "Board configuration not supported for game",
+    component="UI",
+    subcomponent="BoardConfigDialogFactory",
+    tags=_tags("ui", "board_config", "unsupported"),
+)
+
+LOG_UI_BOARD_CONFIG_ENV_INIT_CUSTOM = _constant(
+    "LOG799",
+    "INFO",
+    "Environment initialized with custom board state",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("ui", "board_config", "env", "init"),
+)
+
+
+# ---------------------------------------------------------------------------
+# Operators Grid Config Dialog constants (LOG800-LOG819)
+# ---------------------------------------------------------------------------
+LOG_OP_GRID_CONFIG_DIALOG_OPENED = _constant(
+    "LOG800",
+    "INFO",
+    "Grid configuration dialog opened",
+    component="Operators",
+    subcomponent="GridConfigDialog",
+    tags=_tags("operators", "grid_config", "dialog", "open"),
+)
+
+LOG_OP_GRID_CONFIG_STATE_APPLIED = _constant(
+    "LOG801",
+    "INFO",
+    "Grid configuration state applied",
+    component="Operators",
+    subcomponent="GridConfigDialog",
+    tags=_tags("operators", "grid_config", "state", "apply"),
+)
+
+LOG_OP_GRID_CONFIG_VALIDATION_ERROR = _constant(
+    "LOG802",
+    "WARNING",
+    "Grid configuration validation error",
+    component="Operators",
+    subcomponent="GridConfigDialog",
+    tags=_tags("operators", "grid_config", "validation", "error"),
+)
+
+LOG_OP_GRID_CONFIG_PRESET_LOADED = _constant(
+    "LOG803",
+    "DEBUG",
+    "Grid configuration preset loaded",
+    component="Operators",
+    subcomponent="GridConfigDialog",
+    tags=_tags("operators", "grid_config", "preset", "load"),
+)
+
+LOG_OP_GRID_CONFIG_OBJECT_PLACED = _constant(
+    "LOG804",
+    "DEBUG",
+    "Object placed on grid",
+    component="Operators",
+    subcomponent="GridConfigDialog",
+    tags=_tags("operators", "grid_config", "object", "place"),
+)
+
+LOG_OP_GRID_CONFIG_OBJECT_REMOVED = _constant(
+    "LOG805",
+    "DEBUG",
+    "Object removed from grid",
+    component="Operators",
+    subcomponent="GridConfigDialog",
+    tags=_tags("operators", "grid_config", "object", "remove"),
+)
+
+LOG_OP_GRID_CONFIG_FACTORY_CREATE = _constant(
+    "LOG806",
+    "DEBUG",
+    "Grid config dialog created by factory",
+    component="Operators",
+    subcomponent="GridConfigDialogFactory",
+    tags=_tags("operators", "grid_config", "factory", "create"),
+)
+
+LOG_OP_GRID_CONFIG_UNSUPPORTED_ENV = _constant(
+    "LOG807",
+    "WARNING",
+    "Unsupported environment for grid configuration",
+    component="Operators",
+    subcomponent="GridConfigDialogFactory",
+    tags=_tags("operators", "grid_config", "factory", "unsupported"),
+)
+
+LOG_OP_GRID_CONFIG_ENV_INIT_CUSTOM = _constant(
+    "LOG808",
+    "INFO",
+    "Environment initialized with custom grid state",
+    component="Operators",
+    subcomponent="OperatorsTab",
+    tags=_tags("operators", "grid_config", "env", "init"),
 )
 
 
@@ -3687,6 +3897,203 @@ LOG_CHECKERS_MOVE_FAILED = _constant(
 )
 
 
+# ---------------------------------------------------------------------------
+# MOSAIC MultiGrid Extension constants (LOG1038–LOG1043)
+# ---------------------------------------------------------------------------
+LOG_WORKER_MOSAIC_PROMPT_GENERATED = _constant(
+    "LOG1038",
+    "DEBUG",
+    "MOSAIC MultiGrid instruction prompt generated",
+    component="Worker",
+    subcomponent="MosaicExtension",
+    tags=_tags("mosaic", "multigrid", "prompt", "generated"),
+)
+
+LOG_WORKER_MOSAIC_OBSERVATION_EGOCENTRIC = _constant(
+    "LOG1039",
+    "DEBUG",
+    "MOSAIC egocentric observation generated",
+    component="Worker",
+    subcomponent="MosaicExtension",
+    tags=_tags("mosaic", "multigrid", "observation", "egocentric"),
+)
+
+LOG_WORKER_MOSAIC_OBSERVATION_TEAMMATES = _constant(
+    "LOG1040",
+    "DEBUG",
+    "MOSAIC teammates observation generated",
+    component="Worker",
+    subcomponent="MosaicExtension",
+    tags=_tags("mosaic", "multigrid", "observation", "teammates"),
+)
+
+LOG_WORKER_MOSAIC_ACTION_PARSED = _constant(
+    "LOG1041",
+    "DEBUG",
+    "MOSAIC action parsed from LLM output",
+    component="Worker",
+    subcomponent="MosaicExtension",
+    tags=_tags("mosaic", "multigrid", "action", "parsed"),
+)
+
+LOG_WORKER_MOSAIC_ACTION_PARSE_FAILED = _constant(
+    "LOG1042",
+    "WARNING",
+    "MOSAIC action parse failed, defaulting to 'still'",
+    component="Worker",
+    subcomponent="MosaicExtension",
+    tags=_tags("mosaic", "multigrid", "action", "parse_failed"),
+)
+
+LOG_WORKER_MOSAIC_RUNTIME_INTEGRATION = _constant(
+    "LOG1043",
+    "INFO",
+    "MOSAIC runtime integration initialized",
+    component="Worker",
+    subcomponent="BalrogRuntime",
+    tags=_tags("mosaic", "multigrid", "runtime", "integration"),
+)
+
+
+# ---------------------------------------------------------------------------
+# LLM Worker constants (LOG1044–LOG1058)
+# ---------------------------------------------------------------------------
+LOG_WORKER_LLM_RUNTIME_STARTED = _constant(
+    "LOG1044",
+    "INFO",
+    "LLM worker runtime started",
+    component="Worker",
+    subcomponent="LLMRuntime",
+    tags=_tags("llm", "worker", "runtime", "lifecycle"),
+)
+
+LOG_WORKER_LLM_RUNTIME_STOPPED = _constant(
+    "LOG1045",
+    "INFO",
+    "LLM worker runtime stopped",
+    component="Worker",
+    subcomponent="LLMRuntime",
+    tags=_tags("llm", "worker", "runtime", "lifecycle"),
+)
+
+LOG_WORKER_LLM_RUNTIME_ERROR = _constant(
+    "LOG1046",
+    "ERROR",
+    "LLM worker runtime error",
+    component="Worker",
+    subcomponent="LLMRuntime",
+    tags=_tags("llm", "worker", "runtime", "error"),
+)
+
+LOG_WORKER_LLM_EPISODE_STARTED = _constant(
+    "LOG1047",
+    "INFO",
+    "LLM episode started",
+    component="Worker",
+    subcomponent="LLMRuntime",
+    tags=_tags("llm", "worker", "episode", "start"),
+)
+
+LOG_WORKER_LLM_EPISODE_COMPLETED = _constant(
+    "LOG1048",
+    "INFO",
+    "LLM episode completed",
+    component="Worker",
+    subcomponent="LLMRuntime",
+    tags=_tags("llm", "worker", "episode", "complete"),
+)
+
+LOG_WORKER_LLM_REQUEST = _constant(
+    "LOG1049",
+    "DEBUG",
+    "LLM request sent",
+    component="Worker",
+    subcomponent="LLMRuntime",
+    tags=_tags("llm", "worker", "llm", "request"),
+)
+
+LOG_WORKER_LLM_RESPONSE = _constant(
+    "LOG1050",
+    "DEBUG",
+    "LLM response received",
+    component="Worker",
+    subcomponent="LLMRuntime",
+    tags=_tags("llm", "worker", "llm", "response"),
+)
+
+LOG_WORKER_LLM_ERROR = _constant(
+    "LOG1051",
+    "ERROR",
+    "LLM request failed",
+    component="Worker",
+    subcomponent="LLMRuntime",
+    tags=_tags("llm", "worker", "llm", "error"),
+)
+
+LOG_WORKER_LLM_ACTION_SELECTED = _constant(
+    "LOG1052",
+    "DEBUG",
+    "LLM agent selected action",
+    component="Worker",
+    subcomponent="LLMRuntime",
+    tags=_tags("llm", "worker", "action"),
+)
+
+LOG_WORKER_LLM_STEP_TELEMETRY = _constant(
+    "LOG1053",
+    "DEBUG",
+    "LLM step telemetry emitted",
+    component="Worker",
+    subcomponent="LLMRuntime",
+    tags=_tags("llm", "worker", "telemetry", "step"),
+)
+
+LOG_WORKER_LLM_EPISODE_TELEMETRY = _constant(
+    "LOG1054",
+    "INFO",
+    "LLM episode telemetry emitted",
+    component="Worker",
+    subcomponent="LLMRuntime",
+    tags=_tags("llm", "worker", "telemetry", "episode"),
+)
+
+LOG_WORKER_LLM_CONFIG_LOADED = _constant(
+    "LOG1055",
+    "INFO",
+    "LLM configuration loaded",
+    component="Worker",
+    subcomponent="LLMRuntime",
+    tags=_tags("llm", "worker", "config", "loaded"),
+)
+
+LOG_WORKER_LLM_ENV_CREATED = _constant(
+    "LOG1056",
+    "INFO",
+    "LLM environment created",
+    component="Worker",
+    subcomponent="LLMRuntime",
+    tags=_tags("llm", "worker", "environment", "created"),
+)
+
+LOG_WORKER_LLM_AGENT_CREATED = _constant(
+    "LOG1057",
+    "INFO",
+    "LLM agent created",
+    component="Worker",
+    subcomponent="LLMRuntime",
+    tags=_tags("llm", "worker", "agent", "created"),
+)
+
+LOG_WORKER_LLM_DEBUG = _constant(
+    "LOG1058",
+    "DEBUG",
+    "LLM worker debug event",
+    component="Worker",
+    subcomponent="LLMRuntime",
+    tags=_tags("llm", "worker", "debug"),
+)
+
+
 # =========================================================================
 # Helper Functions for Runtime Discovery & Validation
 # =========================================================================
@@ -3922,6 +4329,9 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_OPERATOR_ENV_PREVIEW_SUCCESS,
     LOG_OPERATOR_ENV_PREVIEW_IMPORT_ERROR,
     LOG_OPERATOR_ENV_PREVIEW_ERROR,
+    LOG_OPERATOR_PARALLEL_RESET_STARTED,
+    LOG_OPERATOR_PARALLEL_STEP_STARTED,
+    LOG_OPERATOR_PARALLEL_STEP_COMPLETED,
     LOG_VLLM_SERVER_COUNT_CHANGED,
     LOG_VLLM_SERVER_STARTING,
     LOG_VLLM_SERVER_RUNNING,
@@ -4100,6 +4510,22 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_WORKER_XUANCE_CHECKPOINT_SAVED,
     LOG_WORKER_XUANCE_METRICS_LOGGED,
     LOG_WORKER_XUANCE_DEBUG,
+    # LLM Worker
+    LOG_WORKER_LLM_RUNTIME_STARTED,
+    LOG_WORKER_LLM_RUNTIME_STOPPED,
+    LOG_WORKER_LLM_RUNTIME_ERROR,
+    LOG_WORKER_LLM_EPISODE_STARTED,
+    LOG_WORKER_LLM_EPISODE_COMPLETED,
+    LOG_WORKER_LLM_REQUEST,
+    LOG_WORKER_LLM_RESPONSE,
+    LOG_WORKER_LLM_ERROR,
+    LOG_WORKER_LLM_ACTION_SELECTED,
+    LOG_WORKER_LLM_STEP_TELEMETRY,
+    LOG_WORKER_LLM_EPISODE_TELEMETRY,
+    LOG_WORKER_LLM_CONFIG_LOADED,
+    LOG_WORKER_LLM_ENV_CREATED,
+    LOG_WORKER_LLM_AGENT_CREATED,
+    LOG_WORKER_LLM_DEBUG,
 )
 
 
@@ -4244,6 +4670,9 @@ __all__ = (
     "LOG_OPERATOR_ENV_PREVIEW_SUCCESS",
     "LOG_OPERATOR_ENV_PREVIEW_IMPORT_ERROR",
     "LOG_OPERATOR_ENV_PREVIEW_ERROR",
+    "LOG_OPERATOR_PARALLEL_RESET_STARTED",
+    "LOG_OPERATOR_PARALLEL_STEP_STARTED",
+    "LOG_OPERATOR_PARALLEL_STEP_COMPLETED",
     "LOG_VLLM_SERVER_COUNT_CHANGED",
     "LOG_VLLM_SERVER_STARTING",
     "LOG_VLLM_SERVER_RUNNING",
@@ -4334,6 +4763,26 @@ __all__ = (
     "LOG_UI_CHAT_PROXY_ENABLED",
     "LOG_UI_CHAT_PROXY_DISABLED",
     "LOG_UI_CHAT_CLEANUP_WARNING",
+    # Board Config Dialog
+    "LOG_UI_BOARD_CONFIG_DIALOG_OPENED",
+    "LOG_UI_BOARD_CONFIG_STATE_APPLIED",
+    "LOG_UI_BOARD_CONFIG_VALIDATION_ERROR",
+    "LOG_UI_BOARD_CONFIG_PRESET_LOADED",
+    "LOG_UI_BOARD_CONFIG_PIECE_MOVED",
+    "LOG_UI_BOARD_CONFIG_PIECE_REMOVED",
+    "LOG_UI_BOARD_CONFIG_NOTATION_EDITED",
+    "LOG_UI_BOARD_CONFIG_FACTORY_CREATE",
+    "LOG_UI_BOARD_CONFIG_UNSUPPORTED_GAME",
+    "LOG_UI_BOARD_CONFIG_ENV_INIT_CUSTOM",
+    "LOG_OP_GRID_CONFIG_DIALOG_OPENED",
+    "LOG_OP_GRID_CONFIG_STATE_APPLIED",
+    "LOG_OP_GRID_CONFIG_VALIDATION_ERROR",
+    "LOG_OP_GRID_CONFIG_PRESET_LOADED",
+    "LOG_OP_GRID_CONFIG_OBJECT_PLACED",
+    "LOG_OP_GRID_CONFIG_OBJECT_REMOVED",
+    "LOG_OP_GRID_CONFIG_FACTORY_CREATE",
+    "LOG_OP_GRID_CONFIG_UNSUPPORTED_ENV",
+    "LOG_OP_GRID_CONFIG_ENV_INIT_CUSTOM",
     "LOG_UI_PRESENTER_SIGNAL_CONNECTION_WARNING",
     "LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING",
     "LOG_UI_TENSORBOARD_KILL_WARNING",
@@ -4449,6 +4898,22 @@ __all__ = (
     "LOG_WORKER_XUANCE_CHECKPOINT_SAVED",
     "LOG_WORKER_XUANCE_METRICS_LOGGED",
     "LOG_WORKER_XUANCE_DEBUG",
+    # LLM Worker
+    "LOG_WORKER_LLM_RUNTIME_STARTED",
+    "LOG_WORKER_LLM_RUNTIME_STOPPED",
+    "LOG_WORKER_LLM_RUNTIME_ERROR",
+    "LOG_WORKER_LLM_EPISODE_STARTED",
+    "LOG_WORKER_LLM_EPISODE_COMPLETED",
+    "LOG_WORKER_LLM_REQUEST",
+    "LOG_WORKER_LLM_RESPONSE",
+    "LOG_WORKER_LLM_ERROR",
+    "LOG_WORKER_LLM_ACTION_SELECTED",
+    "LOG_WORKER_LLM_STEP_TELEMETRY",
+    "LOG_WORKER_LLM_EPISODE_TELEMETRY",
+    "LOG_WORKER_LLM_CONFIG_LOADED",
+    "LOG_WORKER_LLM_ENV_CREATED",
+    "LOG_WORKER_LLM_AGENT_CREATED",
+    "LOG_WORKER_LLM_DEBUG",
     # Worker Availability Messages
     "GODOT_NOT_INSTALLED_TITLE",
     "GODOT_NOT_INSTALLED_MSG",

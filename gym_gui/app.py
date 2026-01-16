@@ -6,6 +6,15 @@ from __future__ import annotations
 import os
 os.environ.setdefault("QT_API", "PyQt6")
 
+# Suppress noisy deprecation warnings from 3rd party dependencies
+import warnings
+warnings.filterwarnings("ignore", message=".*Gym has been unmaintained.*")
+warnings.filterwarnings("ignore", message=".*pkg_resources is deprecated.*")
+warnings.filterwarnings("ignore", message=".*Matplotlib is not installed.*")
+# Suppress gym-multigrid deprecation warnings (old gym API)
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="gym.utils.seeding")
+warnings.filterwarnings("ignore", category=DeprecationWarning, module="gym.core")
+
 import asyncio
 import errno
 import json

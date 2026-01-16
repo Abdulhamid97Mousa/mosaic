@@ -166,6 +166,24 @@ class OperatorProcessHandle:
             )
         return result
 
+    def send_step_with_action(self, action: int) -> bool:
+        """Send step command with action index for human operators.
+
+        Args:
+            action: The action index to execute.
+
+        Returns:
+            True if command was sent, False otherwise.
+        """
+        result = self.send_command({"cmd": "step", "action": action})
+        if result:
+            log_constant(
+                LOGGER, LOG_OPERATOR_STEP_COMMAND_SENT,
+                message=f"Step command sent with action={action}",
+                extra={"operator_id": self.operator_id, "action": action},
+            )
+        return result
+
     def send_init_agent(
         self,
         game_name: str,
@@ -773,6 +791,11 @@ class OperatorLauncher:
     ) -> list[str]:
         """Build command line for LLM operator.
 
+        Dispatches to the appropriate worker based on config.worker_id:
+        - chess_worker: For chess games (PettingZoo chess_v6)
+        - mosaic_llm_worker: MOSAIC multi-agent LLM with Theory of Mind
+        - balrog_worker: BALROG benchmark environments (default)
+
         Args:
             config: Operator configuration with LLM settings.
             run_id: Run ID for telemetry.
@@ -793,8 +816,8 @@ class OperatorLauncher:
         max_steps = settings.get("max_steps", 100)
         temperature = settings.get("temperature", 0.7)
 
-        # Use chess_worker for chess games (llm_chess prompting style)
-        # Use balrog_worker for other environments (BALROG benchmarks)
+        # Dispatch based on worker_id
+        worker_id = config.worker_id or "balrog_worker"
         is_chess = config.task and "chess" in config.task.lower()
 
         if is_chess:
@@ -823,8 +846,39 @@ class OperatorLauncher:
             cmd.extend(["--max-retries", str(max_retries)])
             cmd.extend(["--max-dialog-turns", str(max_dialog_turns)])
 
+        elif worker_id == "mosaic_llm_worker":
+            # MOSAIC LLM Worker - uses llm_worker.cli with BALROG-compatible arguments
+            cmd = [
+                self._python_executable,
+                "-m", "llm_worker.cli",
+                "--run-id", run_id,
+                "--env", config.env_name,  # CLI uses --env not --env-name
+                "--task", config.task,
+                "--client", client_name,
+                "--model", model_id,
+                "--agent-type", agent_type,
+                "--num-episodes", str(num_episodes),
+                "--max-steps", str(max_steps),
+                "--temperature", str(temperature),
+                "--telemetry-dir", str(VAR_OPERATORS_TELEMETRY_DIR),
+                "--render-mode", "rgb_array",  # Required for GUI display
+                "-v",  # Verbose logging
+            ]
+
+            # Add interactive mode flag for step-by-step GUI control
+            if interactive:
+                cmd.append("--interactive")
+
+            # Add optional base URL (for vLLM)
+            if base_url:
+                cmd.extend(["--base-url", base_url])  # CLI uses --base-url not --api-base-url
+
+            # Add API key if provided
+            if api_key:
+                cmd.extend(["--api-key", api_key])
+
         else:
-            # BALROG worker for other environments
+            # BALROG worker for other environments (default)
             cmd = [
                 self._python_executable,
                 "-m", "balrog_worker.cli",
@@ -944,9 +998,12 @@ class OperatorLauncher:
     ) -> list[str]:
         """Build command line for Human operator.
 
-        Human operators wait for input from the GUI via stdin.
-        They emit 'waiting_for_human' when it's their turn, then
-        wait for 'human_input' commands with the selected move.
+        In interactive mode (default for single-agent envs), the human_worker
+        owns the gymnasium environment. The GUI sends action commands, and
+        the worker returns rendered frames.
+
+        In board-game mode (for PettingZoo games like chess), the GUI owns
+        the environment and the worker just provides move selection.
 
         Args:
             config: Operator configuration with human settings.
@@ -963,14 +1020,32 @@ class OperatorLauncher:
         confirm_moves = settings.get("confirm_moves", False)
         timeout_seconds = settings.get("timeout_seconds", 0.0)
 
+        # Determine mode: interactive for gymnasium, board-game for PettingZoo
+        is_pettingzoo = config.env_name == "pettingzoo"
+        mode = "board-game" if is_pettingzoo else "interactive"
+
         cmd = [
             self._python_executable,
             "-m", "human_worker.cli",
+            "--mode", mode,
             "--run-id", run_id,
             "--player-name", player_name,
             "--timeout", str(timeout_seconds),
             "--telemetry-dir", str(VAR_OPERATORS_TELEMETRY_DIR),
         ]
+
+        # Add environment configuration for interactive mode
+        if mode == "interactive":
+            cmd.extend(["--env-name", config.env_name or ""])
+            cmd.extend(["--task", config.task or ""])
+            seed = settings.get("seed", 42)
+            cmd.extend(["--seed", str(seed)])
+
+            # Add game resolution for Crafter (controls native render size)
+            game_resolution = settings.get("game_resolution")
+            if game_resolution and isinstance(game_resolution, (list, tuple)) and len(game_resolution) == 2:
+                res_str = f"{game_resolution[0]}x{game_resolution[1]}"
+                cmd.extend(["--game-resolution", res_str])
 
         if show_legal_moves:
             cmd.append("--show-legal-moves")
@@ -981,9 +1056,12 @@ class OperatorLauncher:
             cmd.append("--confirm-moves")
 
         LOGGER.info(
-            "Building human operator command for %s (player: %s)",
+            "Building human operator command for %s (mode=%s, player=%s, env=%s/%s)",
             config.operator_id,
+            mode,
             player_name,
+            config.env_name,
+            config.task,
         )
 
         return cmd

@@ -66,6 +66,7 @@ from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
 from gym_gui.ui.widgets.mujoco_mpc_tab import MuJoCoMPCTab
 from gym_gui.ui.widgets.multi_agent_tab import MultiAgentTab
 from gym_gui.ui.widgets.single_agent_tab import SingleAgentTab
+from gym_gui.ui.widgets.operators_tab import OperatorsTab
 from gym_gui.ui.widgets.godot_ge_tab import GodotGETab
 from gym_gui.telemetry.semconv import (
     TelemetryModes,
@@ -129,6 +130,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
     reset_all_requested = pyqtSignal(int)  # Reset all operators with seed (fair comparison)
     stop_operators_requested = pyqtSignal()  # Stop all running operators
     initialize_operator_requested = pyqtSignal(str, object, int)  # operator_id, config, seed - preview env
+    human_action_requested = pyqtSignal(str, int)  # operator_id, action - human operator action from action buttons
     train_agent_requested = pyqtSignal(str)  # Start fresh headless training
     trained_agent_requested = pyqtSignal(str)  # Load trained policy for evaluation
     resume_training_requested = pyqtSignal(str)  # Resume training from checkpoint
@@ -700,19 +702,26 @@ class ControlPanelWidget(QtWidgets.QWidget):
         human_index = self._tab_widget.addTab(self._human_tab, "Human Control")
         self._tab_to_mode[human_index] = ControlMode.HUMAN_ONLY
 
-        # Single-Agent Mode Tab with subtabs (Operators, Workers)
+        # Operators Tab - main tab for configuring action-selecting entities
+        self._operators_tab = OperatorsTab(self)
+        operators_index = self._tab_widget.addTab(self._operators_tab, "Operators")
+        self._tab_to_mode[operators_index] = ControlMode.AGENT_ONLY
+        # Initialize legacy operator widgets (hidden, for backward compatibility)
+        self._init_legacy_operator_widgets()
+        # Connect operators signals - scientific execution for fair comparison
+        self._operators_tab.operators_changed.connect(self._on_operators_config_changed)
+        self._operators_tab.step_all_requested.connect(self._on_step_all_clicked)
+        self._operators_tab.step_player_requested.connect(self._on_step_player_clicked)
+        self._operators_tab.reset_all_requested.connect(self._on_reset_all_clicked)
+        self._operators_tab.stop_operators_requested.connect(self._on_stop_operators_clicked)
+        self._operators_tab.initialize_operator_requested.connect(self._on_initialize_operator_requested)
+        self._operators_tab.human_action_requested.connect(self._on_human_action_requested)
+
+        # Single-Agent Mode Tab with Workers subtab (training)
         self._single_agent_tab = SingleAgentTab(self)
         single_index = self._tab_widget.addTab(self._single_agent_tab, "Single-Agent Mode")
         self._tab_to_mode[single_index] = ControlMode.AGENT_ONLY
-        # Initialize legacy operator widgets (hidden, for backward compatibility)
-        self._init_legacy_operator_widgets()
-        # Connect single-agent signals - scientific execution for fair comparison
-        self._single_agent_tab.operators_changed.connect(self._on_operators_config_changed)
-        self._single_agent_tab.step_all_requested.connect(self._on_step_all_clicked)
-        self._single_agent_tab.step_player_requested.connect(self._on_step_player_clicked)
-        self._single_agent_tab.reset_all_requested.connect(self._on_reset_all_clicked)
-        self._single_agent_tab.stop_operators_requested.connect(self._on_stop_operators_clicked)
-        self._single_agent_tab.initialize_operator_requested.connect(self._on_initialize_operator_requested)
+        # Connect single-agent (workers) signals
         self._single_agent_tab.worker_changed.connect(self._on_single_agent_worker_changed)
         self._single_agent_tab.train_requested.connect(self._emit_train_agent_requested)
         self._single_agent_tab.evaluate_requested.connect(self._emit_trained_agent_requested)
@@ -941,6 +950,15 @@ class ControlPanelWidget(QtWidgets.QWidget):
         """
         self.step_all_requested.emit(seed)
 
+    def _on_human_action_requested(self, operator_id: str, action: int) -> None:
+        """Handle human action request from action buttons.
+
+        Args:
+            operator_id: The human operator's ID.
+            action: The action index selected.
+        """
+        self.human_action_requested.emit(operator_id, action)
+
     def _on_step_player_clicked(self, player_id: str, seed: int) -> None:
         """Handle player-specific step button click (PettingZoo mode).
 
@@ -1001,8 +1019,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
 
     @property
     def _operator_config_widget(self) -> OperatorConfigWidget:
-        """Get operator config widget from SingleAgentTab."""
-        return self._single_agent_tab.operator_config_widget
+        """Get operator config widget from OperatorsTab."""
+        return self._operators_tab.operator_config_widget
 
     def set_operator_environment_size(
         self, operator_id: str, width: int, height: int, container_size: int | None = None
@@ -1015,7 +1033,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
             height: Rendered environment height in pixels (image size)
             container_size: Optional container display size in pixels
         """
-        self._single_agent_tab.set_operator_environment_size(
+        self._operators_tab.set_operator_environment_size(
             operator_id, width, height, container_size
         )
 
@@ -1028,7 +1046,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
             player_id: Current player (e.g., "player_0", "player_1").
             visible: Whether to show the indicator.
         """
-        self._single_agent_tab.set_turn_indicator(player_id, visible)
+        self._operators_tab.set_turn_indicator(player_id, visible)
 
     def set_pettingzoo_mode(self, enabled: bool) -> None:
         """Enable or disable PettingZoo multi-agent mode.
@@ -1038,7 +1056,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         Args:
             enabled: True to enable PettingZoo mode.
         """
-        self._single_agent_tab.set_pettingzoo_mode(enabled)
+        self._operators_tab.set_pettingzoo_mode(enabled)
 
     def set_current_player(self, player_id: str) -> None:
         """Set which player's turn it is (enables their step button).
@@ -1046,7 +1064,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         Args:
             player_id: The player whose turn it is ("player_0" or "player_1").
         """
-        self._single_agent_tab.set_current_player(player_id)
+        self._operators_tab.set_current_player(player_id)
 
     def _create_control_group(self, parent: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
         group = QtWidgets.QGroupBox("Game Control Flow", parent)
@@ -1805,6 +1823,11 @@ class ControlPanelWidget(QtWidgets.QWidget):
     # ------------------------------------------------------------------
     # Property accessors
     # ------------------------------------------------------------------
+    @property
+    def operators_tab(self) -> OperatorsTab:
+        """Get the Operators tab widget."""
+        return self._operators_tab
+
     @property
     def single_agent_tab(self) -> SingleAgentTab:
         """Get the Single-Agent tab widget."""

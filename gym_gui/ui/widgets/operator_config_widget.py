@@ -172,38 +172,136 @@ ENV_FAMILIES: Dict[str, Tuple[str, ...]] = {
     "babyai": (),  # Loaded dynamically from gymnasium
     "minigrid": (),  # Loaded dynamically from gymnasium
     "minihack": (),  # Loaded dynamically from gymnasium
-    "crafter": ("crafter-reward-v1", "crafter-nonreward-v1"),
+    "crafter": ("CrafterReward-v1", "CrafterNoReward-v1"),
     "nle": (),  # Loaded dynamically from gymnasium
-    "textworld": ("tw-simple", "tw-cooking"),
+    "textworld": ("treasure_hunter", "the_cooking_game", "coin_collector"),
     "toytext": (
         "FrozenLake-v1",
         "Taxi-v3",
         "CliffWalking-v0",
         "Blackjack-v1",
     ),
-    "classic_control": (
-        "CartPole-v1",
-        "MountainCar-v0",
-        "MountainCarContinuous-v0",
-        "Pendulum-v1",
-        "Acrobot-v1",
+    # PettingZoo Classic board games (Chess, Go, Connect Four, TicTacToe)
+    "pettingzoo_classic": ("chess_v6", "connect_four_v3", "go_v5", "tictactoe_v3"),
+    # OpenSpiel board games (Google DeepMind) + custom draughts variants
+    # - open_spiel/* : Original OpenSpiel implementations via Shimmy
+    # - draughts/*   : Custom implementations with proper rule variants
+    "open_spiel": (
+        "open_spiel/checkers",           # Original OpenSpiel (American rules only)
+        "draughts/american_checkers",    # Custom: 8x8, no backward captures
+        "draughts/russian_checkers",     # Custom: 8x8, men capture backward, flying kings
+        "draughts/international_draughts",  # Custom: 10x10, backward captures, flying kings
     ),
-    "box2d": (
-        "LunarLander-v3",
-        "LunarLanderContinuous-v3",
-        "BipedalWalker-v3",
-        "BipedalWalkerHardcore-v3",
-        "CarRacing-v3",
+    # gym-multigrid multi-agent environments (simultaneous stepping)
+    "multigrid": ("MultiGrid-Soccer-v0", "MultiGrid-Collect-v0"),
+    # Melting Pot multi-agent social scenarios (DeepMind)
+    "meltingpot": (),  # Loaded dynamically from available substrates
+    # Overcooked-AI cooperative cooking (UC Berkeley CHAI)
+    "overcooked": (
+        "overcooked/cramped_room",
+        "overcooked/asymmetric_advantages",
+        "overcooked/coordination_ring",
+        "overcooked/forced_coordination",
+        "overcooked/counter_circuit",
     ),
-    # PettingZoo multi-agent games - populated from PETTINGZOO_GAMES
-    "pettingzoo": tuple(PETTINGZOO_GAMES.keys()),
 }
+
+
+def _auto_detect_agent_count(env_family: str, env_id: str) -> int:
+    """Auto-detect the number of agents in a multi-agent environment.
+
+    Args:
+        env_family: Environment family (e.g., "pettingzoo", "multigrid")
+        env_id: Environment ID (e.g., "chess_v6", "MultiGrid-Soccer-v0")
+
+    Returns:
+        Number of agents, or 0 if detection fails or single-agent
+    """
+    try:
+        if env_family in ("pettingzoo", "pettingzoo_classic"):
+            # PettingZoo / PettingZoo Classic: use predefined game info
+            if env_id in PETTINGZOO_GAMES:
+                return len(PETTINGZOO_GAMES[env_id]["players"])
+            # PettingZoo Classic board games: always 2 players
+            if env_family == "pettingzoo_classic":
+                return 2
+            return 0
+
+        elif env_family == "multigrid":
+            # MultiGrid: instantiate environment and query agent count
+            from gym_gui.core.factories.adapters import create_adapter
+            from gym_gui.core.enums import GameId
+
+            # Map UI env_id to GameId enum
+            try:
+                game_id = GameId(env_id)
+            except ValueError:
+                # Fallback: unknown MultiGrid variant
+                return 0
+
+            adapter = create_adapter(game_id)
+            adapter.load()
+            num_agents = adapter.num_agents
+            adapter.close()
+            return num_agents
+
+        elif env_family == "meltingpot":
+            # Melting Pot: variable agent count (2-16)
+            # Instantiate adapter to query
+            from gym_gui.core.factories.adapters import create_adapter
+            from gym_gui.core.enums import GameId
+
+            try:
+                game_id = GameId(env_id)
+                adapter = create_adapter(game_id)
+                adapter.load()
+                num_agents = adapter.num_agents
+                adapter.close()
+                return num_agents
+            except (ValueError, Exception):
+                return 0
+
+        elif env_family == "overcooked":
+            # Overcooked-AI: always 2 agents
+            return 2
+
+        elif env_family == "open_spiel":
+            # OpenSpiel board games: always 2 players
+            return 2
+
+        # Unknown multi-agent family
+        return 0
+
+    except Exception as e:
+        # Log error but don't crash
+        import logging
+        logging.getLogger(__name__).warning(
+            f"Failed to auto-detect agent count for {env_family}/{env_id}: {e}"
+        )
+        return 0
+
+
+def _get_execution_mode(env_family: str) -> str:
+    """Get the default execution mode for an environment family.
+
+    Args:
+        env_family: Environment family (e.g., "pettingzoo", "multigrid")
+
+    Returns:
+        "aec" for turn-based, "parallel" for simultaneous
+    """
+    if env_family in ("pettingzoo", "pettingzoo_classic", "open_spiel"):
+        return "aec"  # Turn-based
+    elif env_family in ("multigrid", "meltingpot", "overcooked"):
+        return "parallel"  # Simultaneous
+    return "aec"  # Default
+
 
 # RL has access to ALL environment families
 RL_ENV_FAMILIES = tuple(ENV_FAMILIES.keys())
 
-# LLM has access to all families EXCEPT classic_control and box2d
-LLM_ENV_FAMILIES = tuple(f for f in ENV_FAMILIES.keys() if f not in ("classic_control", "box2d"))
+# LLM has access to all environment families (same as RL)
+LLM_ENV_FAMILIES = tuple(ENV_FAMILIES.keys())
 
 # LLM Client configurations
 # Maps client_name -> (display_name, requires_api_key, default_base_url)
@@ -529,11 +627,11 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         player_label.setStyleSheet("font-weight: bold;")
         row1.addWidget(player_label)
 
-        # Type selector (LLM / RL)
+        # Type selector (LLM / RL / Human)
         row1.addWidget(QtWidgets.QLabel("Type:", self))
         self._type_combo = QtWidgets.QComboBox(self)
-        self._type_combo.setFixedWidth(60)
-        self._type_combo.addItems(["LLM", "RL"])
+        self._type_combo.setFixedWidth(70)
+        self._type_combo.addItems(["LLM", "RL", "Human"])
         row1.addWidget(self._type_combo)
 
         # Worker dropdown
@@ -572,6 +670,12 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         self._model_combo = QtWidgets.QComboBox(self._llm_row)
         self._model_combo.setMinimumWidth(160)
         self._model_combo.setMaxVisibleItems(20)  # Limit dropdown height with scrollbar
+        self._model_combo.setStyleSheet("QComboBox { combobox-popup: 0; }")
+        model_view = self._model_combo.view()
+        if model_view is not None:
+            model_view.setVerticalScrollBarPolicy(
+                QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
+            )
         llm_layout.addWidget(self._model_combo)
 
         # API Key field
@@ -648,7 +752,7 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         self.assignment_changed.emit()
 
     def _update_worker_dropdown(self) -> None:
-        """Update worker dropdown based on selected type (LLM or RL)."""
+        """Update worker dropdown based on selected type (LLM, RL, or Human)."""
         self._updating = True
         current_worker = self._worker_combo.currentData()
         self._worker_combo.clear()
@@ -656,12 +760,16 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         worker_type = self._type_combo.currentText().lower()
         if worker_type == "llm":
             workers = _get_llm_workers()
-        else:
+            for worker in workers:
+                self._worker_combo.addItem(worker.display_name, worker.worker_id)
+        elif worker_type == "rl":
             # RL: only workers that support policy loading for evaluation
             workers = _get_rl_evaluation_workers()
-
-        for worker in workers:
-            self._worker_combo.addItem(worker.display_name, worker.worker_id)
+            for worker in workers:
+                self._worker_combo.addItem(worker.display_name, worker.worker_id)
+        else:
+            # Human: single worker option
+            self._worker_combo.addItem("MOSAIC Human Worker", "human_worker")
 
         # Restore selection if possible
         if current_worker:
@@ -672,14 +780,20 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         self._updating = False
 
     def _update_type_visibility(self) -> None:
-        """Show/hide LLM or RL settings based on selected type."""
-        is_llm = self._type_combo.currentText().lower() == "llm"
+        """Show/hide LLM, RL, or Human settings based on selected type."""
+        worker_type = self._type_combo.currentText().lower()
+        is_llm = worker_type == "llm"
+        is_rl = worker_type == "rl"
+        is_human = worker_type == "human"
+
         # LLM row visibility
         self._llm_row.setVisible(is_llm)
         self._provider_label.setVisible(is_llm)
         self._client_combo.setVisible(is_llm)
         # RL row visibility
-        self._rl_row.setVisible(not is_llm)
+        self._rl_row.setVisible(is_rl)
+        # Worker dropdown: hide for Human (only one option)
+        self._worker_combo.setVisible(not is_human)
 
     def _on_browse_policy(self) -> None:
         """Open file dialog to browse for policy file."""
@@ -754,7 +868,12 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
 
         settings: Dict[str, Any] = {}
 
-        if worker_type == "rl":
+        if worker_type == "human":
+            # Human worker: minimal settings, no model/policy needed
+            worker_id = "human_worker"
+            settings["player_name"] = self._player_label
+            settings["player_id"] = self._player_id
+        elif worker_type == "rl":
             # RL worker settings: policy path
             policy_path = self._policy_path_edit.text().strip()
             if policy_path:
@@ -804,27 +923,50 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
 
 
 class PlayerAssignmentPanel(QtWidgets.QWidget):
-    """Panel showing all player assignments for a multi-agent environment.
+    """Panel showing all agent/player assignments for a multi-agent environment.
 
-    Contains a PlayerAssignmentRow for each player in the game.
+    Contains a PlayerAssignmentRow for each agent/player in the game.
+    Supports both PettingZoo (turn-based) and MultiGrid (simultaneous) environments.
     """
 
     assignments_changed = pyqtSignal()  # Emitted when any player assignment changes
 
     def __init__(
         self,
-        game_name: str,
+        env_family: str,
+        env_id: str,
+        num_agents: int,
+        agent_ids: Optional[List[str]] = None,
+        agent_labels: Optional[Dict[str, str]] = None,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         """Initialize the player assignment panel.
 
         Args:
-            game_name: Name of the PettingZoo game (e.g., "chess_v6").
+            env_family: Environment family ("pettingzoo", "multigrid", etc.)
+            env_id: Environment ID (e.g., "chess_v6", "MultiGrid-Soccer-v0")
+            num_agents: Number of agents in the environment
+            agent_ids: Optional list of agent IDs (e.g., ["player_0", "player_1"])
+                      If None, auto-generates ["agent_0", "agent_1", ...]
+            agent_labels: Optional dict mapping agent_id to display label
+                         If None, uses agent_id as label
             parent: Parent widget.
         """
         super().__init__(parent)
-        self._game_name = game_name
+        self._env_family = env_family
+        self._env_id = env_id
+        self._num_agents = num_agents
         self._rows: Dict[str, PlayerAssignmentRow] = {}
+
+        # Generate agent IDs if not provided
+        if agent_ids is None:
+            agent_ids = [f"agent_{i}" for i in range(num_agents)]
+        self._agent_ids = agent_ids
+
+        # Use provided labels or default to agent_id
+        if agent_labels is None:
+            agent_labels = {aid: aid for aid in agent_ids}
+        self._agent_labels = agent_labels
 
         self._build_ui()
 
@@ -834,22 +976,17 @@ class PlayerAssignmentPanel(QtWidgets.QWidget):
         layout.setSpacing(2)
 
         # Header
-        header = QtWidgets.QLabel("Player Assignments:", self)
+        header = QtWidgets.QLabel(f"Agent Assignments ({self._num_agents} agents):", self)
         header.setStyleSheet("font-weight: bold; color: #555;")
         layout.addWidget(header)
 
-        # Get player info from PETTINGZOO_GAMES
-        game_info = PETTINGZOO_GAMES.get(self._game_name, {})
-        players = game_info.get("players", ["player_0", "player_1"])
-        labels = game_info.get("player_labels", {})
-
-        # Create row for each player
-        for player_id in players:
-            player_label = labels.get(player_id, player_id)
-            row = PlayerAssignmentRow(player_id, player_label, self)
+        # Create row for each agent/player
+        for agent_id in self._agent_ids:
+            agent_label = self._agent_labels.get(agent_id, agent_id)
+            row = PlayerAssignmentRow(agent_id, agent_label, self)
             row.assignment_changed.connect(self.assignments_changed)
             layout.addWidget(row)
-            self._rows[player_id] = row
+            self._rows[agent_id] = row
 
     def set_vllm_servers(self, servers: List[VLLMServerInfo]) -> None:
         """Update all rows with available vLLM servers."""
@@ -869,7 +1006,13 @@ class PlayerAssignmentPanel(QtWidgets.QWidget):
 
     @property
     def game_name(self) -> str:
-        return self._game_name
+        """Return environment ID for backwards compatibility."""
+        return self._env_id
+
+    @property
+    def env_family(self) -> str:
+        """Return environment family."""
+        return self._env_family
 
 
 class OperatorConfigRow(QtWidgets.QWidget):
@@ -884,6 +1027,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
     config_changed = pyqtSignal(str, object)  # operator_id, new_config
     remove_requested = pyqtSignal(str)  # operator_id
     initialize_requested = pyqtSignal(str)  # operator_id - request to preview env
+    configure_requested = pyqtSignal(str)  # operator_id - request to configure board game
     vllm_refresh_requested = pyqtSignal()  # request parent to refresh vLLM servers
 
     def __init__(
@@ -897,6 +1041,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._updating = False  # Prevent signal loops
         self._vllm_servers: List[VLLMServerInfo] = []  # Available vLLM servers
         self._player_panel: Optional[PlayerAssignmentPanel] = None  # Multi-agent panel
+        self._initial_state: Optional[str] = None  # Custom board/grid state (FEN, JSON, etc.)
 
         self._build_ui()
         self._connect_signals()
@@ -931,10 +1076,10 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._name_edit.setFixedWidth(120)
         row1.addWidget(self._name_edit)
 
-        # Type selector (LLM / VLM / RL)
+        # Type selector (LLM / VLM / RL / Human)
         self._type_combo = QtWidgets.QComboBox(self)
-        self._type_combo.addItems(["LLM", "VLM", "RL"])
-        self._type_combo.setFixedWidth(70)
+        self._type_combo.addItems(["LLM", "VLM", "RL", "Human"])
+        self._type_combo.setFixedWidth(80)
         row1.addWidget(self._type_combo)
 
         # Worker dropdown
@@ -977,10 +1122,11 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._task_combo = QtWidgets.QComboBox(self)
         self._task_combo.setMinimumWidth(200)
         self._task_combo.setMaxVisibleItems(20)  # Limit dropdown height with scrollbar
+        self._task_combo.setStyleSheet("QComboBox { combobox-popup: 0; }")  # Force native popup limiting
         task_view = self._task_combo.view()
         if task_view is not None:
             task_view.setVerticalScrollBarPolicy(
-                QtCore.Qt.ScrollBarPolicy.ScrollBarAlwaysOn
+                QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
             )
         left_form.addRow("Environment:", self._task_combo)
 
@@ -990,9 +1136,25 @@ class OperatorConfigRow(QtWidgets.QWidget):
         btn_row = QtWidgets.QHBoxLayout()
         btn_row.setSpacing(8)
 
+        # Preview label
+        preview_label = QtWidgets.QLabel("Preview:", self)
+        preview_label.setStyleSheet("font-weight: bold; color: #333;")
+        btn_row.addWidget(preview_label)
+
         self._init_btn = QtWidgets.QPushButton("Load Environment", self)
         self._init_btn.setToolTip("Load and initialize this environment for the operator")
         btn_row.addWidget(self._init_btn)
+
+        # Map label and Configure button - for board games and custom environments
+        self._map_label = QtWidgets.QLabel("Map:", self)
+        self._map_label.setStyleSheet("font-weight: bold; color: #333;")
+        self._map_label.hide()  # Hidden by default
+        btn_row.addWidget(self._map_label)
+
+        self._configure_btn = QtWidgets.QPushButton("Configure Environment", self)
+        self._configure_btn.setToolTip("Configure custom starting position or environment layout")
+        self._configure_btn.hide()  # Hidden by default, shown only for supported games
+        btn_row.addWidget(self._configure_btn)
 
         self._size_label = QtWidgets.QLabel("", self)
         self._size_label.setStyleSheet("color: #666; font-size: 10px;")
@@ -1017,6 +1179,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
             "Controls the size of the operator card boundary."
         )
         self._container_size_combo.addItem("Auto", 0)
+        self._container_size_combo.addItem("300px", 300)
         self._container_size_combo.addItem("400px", 400)
         self._container_size_combo.addItem("512px", 512)
         self._container_size_combo.addItem("600px", 600)
@@ -1027,7 +1190,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._container_size_combo.addItem("1440px", 1440)
         self._container_size_combo.addItem("1600px", 1600)
         self._container_size_combo.addItem("1920px", 1920)
-        self._container_size_combo.setCurrentIndex(5)  # Default to 800px
+        self._container_size_combo.setCurrentIndex(6)  # Default to 800px
         self._container_size_combo.setFixedWidth(100)
         right_col.addRow("Container:", self._container_size_combo)
 
@@ -1048,6 +1211,46 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._image_scale_combo.setCurrentIndex(0)  # Default to Native
         self._image_scale_combo.setFixedWidth(100)
         right_col.addRow("Image:", self._image_scale_combo)
+
+        # Game resolution dropdown (for Crafter - controls native render size)
+        self._game_resolution_label = QtWidgets.QLabel("Resolution:", self)
+        self._game_resolution_label.setStyleSheet("font-weight: bold; color: #333;")
+        self._game_resolution_label.hide()  # Hidden by default, shown only for Crafter
+
+        self._game_resolution_combo = QtWidgets.QComboBox(self)
+        self._game_resolution_combo.setToolTip(
+            "Game render resolution (for Crafter).\n"
+            "Higher resolution = sharper image but larger data transfer.\n"
+            "64x64 is native, 512x512 matches Human Control mode."
+        )
+        self._game_resolution_combo.addItem("64x64 (Native)", (64, 64))
+        self._game_resolution_combo.addItem("128x128", (128, 128))
+        self._game_resolution_combo.addItem("256x256", (256, 256))
+        self._game_resolution_combo.addItem("512x512 (Recommended)", (512, 512))
+        self._game_resolution_combo.setCurrentIndex(3)  # Default to 512x512
+        self._game_resolution_combo.setFixedWidth(150)
+        self._game_resolution_combo.hide()  # Hidden by default
+        right_col.addRow(self._game_resolution_label, self._game_resolution_combo)
+
+        # Square size dropdown (for board games - Chess, Go, Connect Four, Checkers)
+        self._square_size_label = QtWidgets.QLabel("Square:", self)
+        self._square_size_label.setStyleSheet("font-weight: bold; color: #333;")
+        self._square_size_label.hide()  # Hidden by default, shown only for board games
+
+        self._square_size_combo = QtWidgets.QComboBox(self)
+        self._square_size_combo.setToolTip(
+            "Board square size (for Chess, Go, Connect Four, Checkers).\n"
+            "Controls the size of each square/cell on the board."
+        )
+        self._square_size_combo.addItem("Small (30px)", 30)
+        self._square_size_combo.addItem("Medium (50px)", 50)
+        self._square_size_combo.addItem("Default (70px)", 70)
+        self._square_size_combo.addItem("Large (90px)", 90)
+        self._square_size_combo.addItem("XL (110px)", 110)
+        self._square_size_combo.setCurrentIndex(2)  # Default to 70px
+        self._square_size_combo.setFixedWidth(150)
+        self._square_size_combo.hide()  # Hidden by default
+        right_col.addRow(self._square_size_label, self._square_size_combo)
 
         row2.addLayout(right_col)
 
@@ -1079,6 +1282,12 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._model_combo = QtWidgets.QComboBox(self._llm_container)
         self._model_combo.setMinimumWidth(200)  # Wider for server names
         self._model_combo.setMaxVisibleItems(20)  # Limit dropdown height with scrollbar
+        self._model_combo.setStyleSheet("QComboBox { combobox-popup: 0; }")
+        model_view = self._model_combo.view()
+        if model_view is not None:
+            model_view.setVerticalScrollBarPolicy(
+                QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded
+            )
         llm_layout.addWidget(self._model_combo)
 
         llm_layout.addStretch()
@@ -1122,12 +1331,109 @@ class OperatorConfigRow(QtWidgets.QWidget):
 
         main_layout.addWidget(self._rl_container)
 
+        # === Execution Mode Selector (for multi-agent environments) ===
+        self._execution_mode_container = QtWidgets.QWidget(self)
+        exec_mode_layout = QtWidgets.QHBoxLayout(self._execution_mode_container)
+        exec_mode_layout.setContentsMargins(0, 4, 0, 4)
+        exec_mode_layout.setSpacing(8)
+
+        exec_mode_label = QtWidgets.QLabel("Execution Mode:", self._execution_mode_container)
+        exec_mode_label.setStyleSheet("font-weight: bold; color: #555;")
+        exec_mode_layout.addWidget(exec_mode_label)
+
+        self._execution_mode_combo = QtWidgets.QComboBox(self._execution_mode_container)
+        self._execution_mode_combo.addItem("AEC (Turn-Based)", "aec")
+        self._execution_mode_combo.addItem("Parallel (Simultaneous)", "parallel")
+        self._execution_mode_combo.setToolTip(
+            "Execution paradigm for multi-agent environments:\n"
+            "- AEC (Agent Environment Cycle): Agents take turns one at a time\n"
+            "- Parallel: All agents act simultaneously each step"
+        )
+        self._execution_mode_combo.setMinimumWidth(200)
+        self._execution_mode_combo.currentIndexChanged.connect(self._on_config_changed)
+        exec_mode_layout.addWidget(self._execution_mode_combo)
+
+        exec_mode_layout.addStretch()
+        self._execution_mode_container.hide()  # Hidden until multi-agent env selected
+        main_layout.addWidget(self._execution_mode_container)
+
+        # === MultiGrid Settings (for MultiGrid multi-agent environments) ===
+        self._multigrid_settings_container = QtWidgets.QWidget(self)
+        multigrid_layout = QtWidgets.QVBoxLayout(self._multigrid_settings_container)
+        multigrid_layout.setContentsMargins(0, 4, 0, 4)
+        multigrid_layout.setSpacing(8)
+
+        # Observation Mode Selector
+        obs_mode_row = QtWidgets.QHBoxLayout()
+        obs_mode_label = QtWidgets.QLabel("Observation Mode:", self._multigrid_settings_container)
+        obs_mode_label.setStyleSheet("font-weight: bold; color: #555;")
+        obs_mode_row.addWidget(obs_mode_label)
+
+        self._observation_mode_combo = QtWidgets.QComboBox(self._multigrid_settings_container)
+        self._observation_mode_combo.addItem("Egocentric Only", "egocentric")
+        self._observation_mode_combo.addItem("Visible Teammates (Recommended)", "visible_teammates")
+        self._observation_mode_combo.setCurrentIndex(1)  # Default: visible_teammates
+        self._observation_mode_combo.setToolTip(
+            "Observation mode for LLM agents:\n"
+            "- Egocentric Only: Agent sees only its own view (decentralized, realistic)\n"
+            "- Visible Teammates: Include visible teammates in observation (better for games)"
+        )
+        self._observation_mode_combo.setMinimumWidth(250)
+        self._observation_mode_combo.currentIndexChanged.connect(self._on_config_changed)
+        obs_mode_row.addWidget(self._observation_mode_combo)
+        obs_mode_row.addStretch()
+        multigrid_layout.addLayout(obs_mode_row)
+
+        # Coordination Level Selector
+        coord_level_row = QtWidgets.QHBoxLayout()
+        coord_level_label = QtWidgets.QLabel("Coordination Strategy:", self._multigrid_settings_container)
+        coord_level_label.setStyleSheet("font-weight: bold; color: #555;")
+        coord_level_row.addWidget(coord_level_label)
+
+        self._coordination_level_combo = QtWidgets.QComboBox(self._multigrid_settings_container)
+        self._coordination_level_combo.addItem("Level 1: Emergent (Minimal)", 1)
+        self._coordination_level_combo.addItem("Level 2: Basic Hints", 2)
+        self._coordination_level_combo.addItem("Level 3: Role-Based", 3)
+        self._coordination_level_combo.setCurrentIndex(0)  # Default: Level 1
+        self._coordination_level_combo.setToolTip(
+            "Coordination strategy for LLM agents:\n"
+            "- Level 1 (Emergent): Let LLMs figure out coordination naturally\n"
+            "- Level 2 (Basic Hints): Add cooperation tips in system prompt\n"
+            "- Level 3 (Role-Based): Assign explicit roles (forward/defender)"
+        )
+        self._coordination_level_combo.setMinimumWidth(250)
+        self._coordination_level_combo.currentIndexChanged.connect(self._on_coordination_level_changed)
+        coord_level_row.addWidget(self._coordination_level_combo)
+        coord_level_row.addStretch()
+        multigrid_layout.addLayout(coord_level_row)
+
+        # Role Assignment Panel (shown only for Level 3)
+        self._role_assignment_container = QtWidgets.QWidget(self._multigrid_settings_container)
+        role_layout = QtWidgets.QVBoxLayout(self._role_assignment_container)
+        role_layout.setContentsMargins(20, 4, 0, 4)
+        role_layout.setSpacing(4)
+
+        role_info_label = QtWidgets.QLabel("Assign roles to agents:", self._role_assignment_container)
+        role_info_label.setStyleSheet("color: #666; font-style: italic;")
+        role_layout.addWidget(role_info_label)
+
+        # Role selectors will be created dynamically based on number of agents
+        self._role_selectors: Dict[str, QtWidgets.QComboBox] = {}
+        self._role_selectors_layout = QtWidgets.QVBoxLayout()
+        role_layout.addLayout(self._role_selectors_layout)
+
+        self._role_assignment_container.hide()  # Hidden by default
+        multigrid_layout.addWidget(self._role_assignment_container)
+
+        self._multigrid_settings_container.hide()  # Hidden until MultiGrid selected
+        main_layout.addWidget(self._multigrid_settings_container)
+
         # === Multi-agent player assignment container ===
-        # Created dynamically when pettingzoo environment is selected
+        # Created dynamically when multi-agent environment is selected
         self._player_panel_container = QtWidgets.QWidget(self)
         self._player_panel_layout = QtWidgets.QVBoxLayout(self._player_panel_container)
         self._player_panel_layout.setContentsMargins(0, 0, 0, 0)
-        self._player_panel_container.hide()  # Hidden until pettingzoo selected
+        self._player_panel_container.hide()  # Hidden until multi-agent env selected
         main_layout.addWidget(self._player_panel_container)
 
         # Store main_layout reference for dynamic updates
@@ -1148,6 +1454,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._task_combo.currentIndexChanged.connect(self._on_task_changed)
         self._remove_btn.clicked.connect(lambda: self.remove_requested.emit(self._operator_id))
         self._init_btn.clicked.connect(lambda: self.initialize_requested.emit(self._operator_id))
+        self._configure_btn.clicked.connect(lambda: self.configure_requested.emit(self._operator_id))
 
         # LLM-specific signals
         self._client_combo.currentIndexChanged.connect(self._on_client_changed)
@@ -1181,14 +1488,59 @@ class OperatorConfigRow(QtWidgets.QWidget):
         """Handle task/game change within an environment family."""
         if self._updating:
             return
-        # For pettingzoo, different games have different players
-        if self._is_pettingzoo_selected():
+        # For multi-agent envs, different games have different agent counts/players
+        if self._is_multiagent_env_selected():
             self._update_multiagent_panel()
+        # Update Configure button visibility based on game support
+        self._update_configure_button_visibility()
         self._on_config_changed()
+
+    def _update_configure_button_visibility(self) -> None:
+        """Show/hide Configure button based on whether game supports configuration."""
+        from gym_gui.ui.widgets.operators_board_config_form import BoardConfigDialogFactory
+        from gym_gui.ui.widgets.operators_grid_config_form import GridConfigDialogFactory
+
+        env_family = self._env_combo.currentText()
+        task = self._task_combo.currentText()
+
+        # Show Configure button for:
+        # 1. Turn-based board games (Chess, Go, Checkers) - via BoardConfigDialogFactory
+        # 2. Grid environments (MiniGrid, BabyAI, MultiGrid, MeltingPot) - via GridConfigDialogFactory
+        is_board_game = BoardConfigDialogFactory.supports(task)
+        is_grid_env = GridConfigDialogFactory.supports(task)
+
+        is_configurable = is_board_game or is_grid_env
+        self._configure_btn.setVisible(is_configurable)
+        self._map_label.setVisible(is_configurable)
+
+        # Show square size dropdown only for board games (Chess, Go, Connect Four, Checkers)
+        # Note: MiniGrid/BabyAI/MultiGrid use RGB rendering - tile size is fixed by environment
+        is_board_game_env = env_family in ("pettingzoo_classic", "open_spiel") or is_board_game
+        self._square_size_combo.setVisible(is_board_game_env)
+        self._square_size_label.setVisible(is_board_game_env)
+
+        # Show game resolution dropdown only for Crafter (controls native render size)
+        is_crafter = env_family == "crafter"
+        self._game_resolution_combo.setVisible(is_crafter)
+        self._game_resolution_label.setVisible(is_crafter)
 
     def _is_pettingzoo_selected(self) -> bool:
         """Check if pettingzoo environment family is selected."""
         return self._env_combo.currentText() == "pettingzoo"
+
+    def _is_multiagent_env_selected(self) -> bool:
+        """Check if a multi-agent environment family is selected.
+
+        Multi-agent environments include:
+        - pettingzoo: Turn-based games (Chess, Go, Connect Four)
+        - pettingzoo_classic: Classic board games (Chess, Go, Connect Four, TicTacToe)
+        - open_spiel: OpenSpiel board games (Checkers, etc.)
+        - multigrid: Simultaneous grid world (Soccer, Collect)
+        - meltingpot: DeepMind social scenarios
+        - overcooked: Cooperative cooking
+        """
+        env_family = self._env_combo.currentText()
+        return env_family in ("pettingzoo", "pettingzoo_classic", "open_spiel", "multigrid", "meltingpot", "overcooked")
 
     def _update_multiagent_panel(self) -> None:
         """Update the multi-agent player assignment panel based on selected game."""
@@ -1198,19 +1550,100 @@ class OperatorConfigRow(QtWidgets.QWidget):
             self._player_panel.deleteLater()
             self._player_panel = None
 
-        # Only show for pettingzoo environments
-        if not self._is_pettingzoo_selected():
+        # Get current environment selection
+        env_family = self._env_combo.currentText()
+        env_id = self._task_combo.currentText()
+
+        # Only show for multi-agent environments
+        if not self._is_multiagent_env_selected():
             self._player_panel_container.hide()
+            self._execution_mode_container.hide()
             return
 
-        # Get the selected game
-        game_name = self._task_combo.currentText()
-        if not game_name or game_name not in PETTINGZOO_GAMES:
+        if not env_id:
             self._player_panel_container.hide()
+            self._execution_mode_container.hide()
             return
 
-        # Create new player panel for this game
-        self._player_panel = PlayerAssignmentPanel(game_name, self._player_panel_container)
+        # Auto-detect number of agents
+        num_agents = _auto_detect_agent_count(env_family, env_id)
+        if num_agents == 0:
+            self._player_panel_container.hide()
+            self._execution_mode_container.hide()
+            return
+
+        # Set default execution mode based on environment family
+        default_mode = _get_execution_mode(env_family)
+
+        # Disable/enable AEC option based on environment capabilities
+        # Some environments (overcooked, multigrid, meltingpot) only support parallel/simultaneous
+        simultaneous_only_envs = ("overcooked", "multigrid", "meltingpot")
+
+        if env_family in simultaneous_only_envs:
+            # Disable AEC option for simultaneous-only environments
+            # Use QStandardItemModel for proper type checking
+            from PyQt6.QtGui import QStandardItemModel
+            model = self._execution_mode_combo.model()
+            if isinstance(model, QStandardItemModel):
+                item = model.item(0)  # AEC is at index 0
+                if item is not None:
+                    item.setEnabled(False)
+                    item.setToolTip("This environment only supports Parallel (Simultaneous) execution")
+            # Force selection to Parallel
+            self._execution_mode_combo.setCurrentIndex(1)  # Parallel
+        else:
+            # Enable AEC option for environments that support it
+            from PyQt6.QtGui import QStandardItemModel
+            model = self._execution_mode_combo.model()
+            if isinstance(model, QStandardItemModel):
+                item = model.item(0)  # AEC is at index 0
+                if item is not None:
+                    item.setEnabled(True)
+                    item.setToolTip("")
+            # Set based on default mode
+            if default_mode == "aec":
+                self._execution_mode_combo.setCurrentIndex(0)  # AEC
+            else:
+                self._execution_mode_combo.setCurrentIndex(1)  # Parallel
+
+        # Show execution mode selector
+        self._execution_mode_container.show()
+
+        # Show MultiGrid settings if MultiGrid is selected
+        if env_family == "multigrid":
+            self._multigrid_settings_container.show()
+            # Update role selectors if Level 3 is selected
+            if self._coordination_level_combo.currentData() == 3:
+                self._update_role_selectors()
+                self._role_assignment_container.show()
+            else:
+                self._role_assignment_container.hide()
+        else:
+            self._multigrid_settings_container.hide()
+
+        # Get agent IDs and labels based on environment type
+        agent_ids: Optional[List[str]] = None
+        agent_labels: Optional[Dict[str, str]] = None
+
+        if env_family in ("pettingzoo", "pettingzoo_classic") and env_id in PETTINGZOO_GAMES:
+            # PettingZoo / PettingZoo Classic: use predefined player info
+            game_info = PETTINGZOO_GAMES[env_id]
+            agent_ids = game_info.get("players", None)
+            agent_labels = game_info.get("player_labels", None)
+        elif env_family in ("multigrid", "meltingpot", "overcooked"):
+            # Simultaneous multi-agent: auto-generate agent_0, agent_1, etc.
+            agent_ids = [f"agent_{i}" for i in range(num_agents)]
+            agent_labels = {aid: f"Agent {i}" for i, aid in enumerate(agent_ids)}
+
+        # Create new player panel
+        self._player_panel = PlayerAssignmentPanel(
+            env_family=env_family,
+            env_id=env_id,
+            num_agents=num_agents,
+            agent_ids=agent_ids,
+            agent_labels=agent_labels,
+            parent=self._player_panel_container,
+        )
         self._player_panel.assignments_changed.connect(self._on_config_changed)
         self._player_panel.set_vllm_servers(self._vllm_servers)
         self._player_panel_layout.addWidget(self._player_panel)
@@ -1234,6 +1667,70 @@ class OperatorConfigRow(QtWidgets.QWidget):
         config = self.get_config()
         self.config_changed.emit(self._operator_id, config)
 
+    def _on_coordination_level_changed(self) -> None:
+        """Handle coordination level change - show/hide role assignment panel."""
+        if self._updating:
+            return
+
+        # Show role assignment panel only for Level 3 (Role-Based)
+        level = self._coordination_level_combo.currentData()
+        if level == 3:
+            self._update_role_selectors()
+            self._role_assignment_container.show()
+        else:
+            self._role_assignment_container.hide()
+
+        # Emit config changed
+        self._on_config_changed()
+
+    def _update_role_selectors(self) -> None:
+        """Create or update role assignment selectors based on current environment."""
+        # Clear existing role selectors
+        for combo in self._role_selectors.values():
+            combo.deleteLater()
+        self._role_selectors.clear()
+
+        # Clear layout
+        while self._role_selectors_layout.count():
+            item = self._role_selectors_layout.takeAt(0)
+            if item and item.widget():
+                item.widget().deleteLater()
+
+        # Get current environment
+        env_family = self._env_combo.currentText()
+        env_id = self._task_combo.currentText()
+
+        # Only create role selectors for MultiGrid Soccer
+        if env_family != "multigrid" or "Soccer" not in env_id:
+            return
+
+        # Get number of agents
+        num_agents = _auto_detect_agent_count(env_family, env_id)
+        if num_agents == 0:
+            return
+
+        # Create role selector for each agent (Soccer: 4 agents, 2 per team)
+        for i in range(num_agents):
+            agent_row = QtWidgets.QHBoxLayout()
+            agent_label = QtWidgets.QLabel(f"Agent {i}:")
+            agent_label.setMinimumWidth(80)
+            agent_row.addWidget(agent_label)
+
+            role_combo = QtWidgets.QComboBox()
+            role_combo.addItem("Forward", "forward")
+            role_combo.addItem("Defender", "defender")
+            # Default: Agent 0, 2 = Forward; Agent 1, 3 = Defender
+            if i % 2 == 0:
+                role_combo.setCurrentIndex(0)  # Forward
+            else:
+                role_combo.setCurrentIndex(1)  # Defender
+            role_combo.currentIndexChanged.connect(self._on_config_changed)
+            agent_row.addWidget(role_combo)
+            agent_row.addStretch()
+
+            self._role_selectors_layout.addLayout(agent_row)
+            self._role_selectors[f"agent_{i}"] = role_combo
+
     def _toggle_api_key_visibility(self) -> None:
         """Toggle API key visibility."""
         if self._show_key_btn.isChecked():
@@ -1255,31 +1752,42 @@ class OperatorConfigRow(QtWidgets.QWidget):
             self._policy_path_edit.setText(file_path)
 
     def _update_type_specific_visibility(self) -> None:
-        """Show/hide LLM/VLM or RL specific widgets based on operator type and env.
+        """Show/hide LLM/VLM, RL, or Human specific widgets based on operator type and env.
 
-        For single-agent environments: Show single worker row (LLM or RL).
-        For multi-agent (pettingzoo): Hide single worker row, show player panel.
+        For single-agent environments: Show single worker row (LLM, RL, or Human).
+        For multi-agent environments: Hide single worker row, show player panel.
+            - pettingzoo: Turn-based games (Chess, Go)
+            - multigrid, meltingpot, overcooked: Simultaneous multi-agent
+        For Human type: Hide both LLM and RL containers (no configuration needed).
         """
         operator_type = self._type_combo.currentText().lower()
         is_llm_or_vlm = operator_type in ("llm", "vlm")
-        is_pettingzoo = self._is_pettingzoo_selected()
+        is_human = operator_type == "human"
+        is_multiagent = self._is_multiagent_env_selected()
 
-        # For pettingzoo: hide single-worker UI, workers are per-player
-        if is_pettingzoo:
+        # For multi-agent environments: hide single-worker UI, workers are per-agent
+        if is_multiagent:
             self._llm_container.hide()
             self._rl_container.hide()
             self._worker_combo.hide()
-            # Type dropdown should also be hidden - all players use LLM workers
+            # Type dropdown should also be hidden - each agent has its own type in player panel
             self._type_combo.hide()
         else:
             # Single-agent mode: show appropriate container
-            self._worker_combo.show()
             self._type_combo.show()
-            self._llm_container.setVisible(is_llm_or_vlm)
-            self._rl_container.setVisible(not is_llm_or_vlm)
 
-            if is_llm_or_vlm:
-                self._update_api_key_visibility()
+            if is_human:
+                # Human operators: hide all config (no LLM/RL settings needed)
+                self._llm_container.hide()
+                self._rl_container.hide()
+                self._worker_combo.hide()  # No worker selection for human
+            else:
+                self._worker_combo.show()
+                self._llm_container.setVisible(is_llm_or_vlm)
+                self._rl_container.setVisible(not is_llm_or_vlm)
+
+                if is_llm_or_vlm:
+                    self._update_api_key_visibility()
 
     def _update_api_key_visibility(self) -> None:
         """Show/hide API key field based on selected client."""
@@ -1377,6 +1885,18 @@ class OperatorConfigRow(QtWidgets.QWidget):
         if self._player_panel is not None:
             self._player_panel.set_vllm_servers(servers)
 
+    def set_initial_state(self, initial_state: Optional[str]) -> None:
+        """Set the custom initial state for this operator.
+
+        Stores the board/grid configuration (FEN for chess, JSON for MiniGrid, etc.)
+        that will be applied when the environment is loaded.
+
+        Args:
+            initial_state: State notation string (FEN, JSON, etc.) or None to clear.
+        """
+        self._initial_state = initial_state
+        _LOGGER.debug(f"Set initial state for {self._operator_id}: {initial_state[:50] if initial_state else 'None'}...")
+
     def _update_worker_dropdown(self) -> None:
         """Update worker dropdown based on selected type."""
         self._updating = True
@@ -1411,6 +1931,9 @@ class OperatorConfigRow(QtWidgets.QWidget):
         # LLM and VLM use same env families (text-based reasoning environments)
         if operator_type in ("llm", "vlm"):
             envs = LLM_ENV_FAMILIES
+        elif operator_type == "human":
+            # Human can play any environment (same as RL)
+            envs = RL_ENV_FAMILIES
         else:
             # RL: all environment families
             envs = RL_ENV_FAMILIES
@@ -1457,6 +1980,16 @@ class OperatorConfigRow(QtWidgets.QWidget):
             envs = _get_registered_envs("NetHack")
             if not envs:
                 envs = ["NetHackScore-v0", "NetHackStaircase-v0", "NetHackEat-v0"]
+        elif env_family == "meltingpot":
+            # Dynamically load available Melting Pot substrates
+            try:
+                from gym_gui.core.factories.adapters import available_games
+                envs = [g for g in available_games() if g.startswith("meltingpot/")]
+                if not envs:
+                    # Fallback to common substrates
+                    envs = ["meltingpot/clean_up", "meltingpot/prisoners_dilemma_in_the_matrix__arena"]
+            except Exception:
+                envs = ["meltingpot/clean_up", "meltingpot/prisoners_dilemma_in_the_matrix__arena"]
         elif env_family in ENV_FAMILIES:
             # Use static list from ENV_FAMILIES
             envs = list(ENV_FAMILIES[env_family])
@@ -1476,6 +2009,9 @@ class OperatorConfigRow(QtWidgets.QWidget):
 
         self._updating = False
 
+        # Update Configure button visibility for board games
+        self._update_configure_button_visibility()
+
     def _load_config(self, config: OperatorConfig) -> None:
         """Load configuration into UI elements."""
         self._updating = True
@@ -1492,8 +2028,8 @@ class OperatorConfigRow(QtWidgets.QWidget):
             else:
                 operator_type = "llm"
 
-        # Set type: LLM=0, VLM=1, RL=2
-        type_map = {"llm": 0, "vlm": 1, "rl": 2}
+        # Set type: LLM=0, VLM=1, RL=2, Human=3
+        type_map = {"llm": 0, "vlm": 1, "rl": 2, "human": 3}
         type_idx = type_map.get(operator_type, 0)
         self._type_combo.setCurrentIndex(type_idx)
 
@@ -1547,6 +2083,9 @@ class OperatorConfigRow(QtWidgets.QWidget):
 
         self._updating = False
 
+        # Update Configure button visibility for board games
+        self._update_configure_button_visibility()
+
     def get_config(self) -> OperatorConfig:
         """Get current configuration from UI elements.
 
@@ -1563,9 +2102,14 @@ class OperatorConfigRow(QtWidgets.QWidget):
         env_name = self._env_combo.currentText() or "babyai"
         task = self._task_combo.currentText() or BALROG_DEFAULT_TASK
 
-        # Multi-agent mode: pettingzoo with player assignments
-        if self._is_pettingzoo_selected() and self._player_panel is not None:
+        # Multi-agent mode: multi-agent environment with player assignments
+        if self._is_multiagent_env_selected() and self._player_panel is not None:
             player_workers = self._player_panel.get_worker_assignments()
+            # Get execution mode from dropdown
+            execution_mode = self._execution_mode_combo.currentData() or "aec"
+            # Get MultiGrid settings
+            observation_mode = self._observation_mode_combo.currentData() or "visible_teammates"
+            coordination_level = self._coordination_level_combo.currentData() or 1
             # Add container_size and image_scale to first worker's settings
             # (accessed via config.settings property)
             if player_workers:
@@ -1576,15 +2120,36 @@ class OperatorConfigRow(QtWidgets.QWidget):
                 image_scale = self._image_scale_combo.currentData()
                 if image_scale and image_scale > 0:
                     player_workers[first_player].settings["image_scale"] = image_scale
+                square_size = self._square_size_combo.currentData()
+                if square_size and square_size > 0:
+                    player_workers[first_player].settings["square_size"] = square_size
+                game_resolution = self._game_resolution_combo.currentData()
+                if game_resolution:
+                    player_workers[first_player].settings["game_resolution"] = game_resolution
+
+                # Add role assignments for Level 3 (Role-Based)
+                if env_name == "multigrid" and coordination_level == 3:
+                    for player_id, worker in player_workers.items():
+                        if player_id in self._role_selectors:
+                            role = self._role_selectors[player_id].currentData()
+                            worker.settings["role"] = role
+
+                # Include custom initial state (board/grid config) if set
+                if self._initial_state:
+                    player_workers[first_player].settings["initial_state"] = self._initial_state
+
             return OperatorConfig.multi_agent(
                 operator_id=self._operator_id,
                 display_name=display_name,
                 env_name=env_name,
                 task=task,
                 player_workers=player_workers,
+                execution_mode=execution_mode,
+                observation_mode=observation_mode,
+                coordination_level=coordination_level,
             )
 
-        # Single-agent mode: standard LLM/VLM/RL configuration
+        # Single-agent mode: standard LLM/VLM/RL/Human configuration
         operator_type = self._type_combo.currentText().lower()
         worker_id = self._worker_combo.currentData() or ""
 
@@ -1626,19 +2191,37 @@ class OperatorConfigRow(QtWidgets.QWidget):
                     if default_base_url:
                         settings["base_url"] = default_base_url
 
-        else:
+        elif operator_type == "rl":
             # RL-specific settings
             policy_path = self._policy_path_edit.text().strip()
             if policy_path:
                 settings["policy_path"] = policy_path
 
-        # Common settings - container size and image scale
+        elif operator_type == "human":
+            # Human operators: no subprocess worker, environment lives in GUI
+            # No special settings needed - action selection happens via UI
+            worker_id = "human_worker"  # Special marker for human operators
+
+        # Common settings - container size, image scale, and square size
         container_size = self._container_size_combo.currentData()
         if container_size and container_size > 0:
             settings["container_size"] = container_size
         image_scale = self._image_scale_combo.currentData()
         if image_scale and image_scale > 0:
             settings["image_scale"] = image_scale
+        square_size = self._square_size_combo.currentData()
+        if square_size and square_size > 0:
+            settings["square_size"] = square_size
+        game_resolution = self._game_resolution_combo.currentData()
+        if game_resolution:
+            settings["game_resolution"] = game_resolution
+
+        # Include custom initial state (board/grid config) if set
+        if self._initial_state:
+            settings["initial_state"] = self._initial_state
+            _LOGGER.debug(f"get_config: Including initial_state for {self._operator_id}")
+        else:
+            _LOGGER.debug(f"get_config: No initial_state for {self._operator_id}")
 
         return OperatorConfig.single_agent(
             operator_id=self._operator_id,
@@ -1688,6 +2271,7 @@ class OperatorConfigWidget(QtWidgets.QWidget):
 
     operators_changed = pyqtSignal(list)  # List[OperatorConfig]
     initialize_requested = pyqtSignal(str, object)  # operator_id, config
+    configure_requested = pyqtSignal(str, object)  # operator_id, config - for board game config
     vllm_refresh_requested = pyqtSignal()  # request to refresh vLLM server list
 
     def __init__(
@@ -1784,6 +2368,7 @@ class OperatorConfigWidget(QtWidgets.QWidget):
         row.config_changed.connect(self._on_row_config_changed)
         row.remove_requested.connect(self.remove_operator)
         row.initialize_requested.connect(self._on_initialize_requested)
+        row.configure_requested.connect(self._on_configure_requested)
         row.vllm_refresh_requested.connect(self.vllm_refresh_requested)  # Propagate to parent
 
         # Pass cached vLLM server list to new row
@@ -1846,6 +2431,14 @@ class OperatorConfigWidget(QtWidgets.QWidget):
         _LOGGER.info(f"Initialize requested for operator {operator_id}: {config.env_name}/{config.task}")
         self.initialize_requested.emit(operator_id, config)
 
+    def _on_configure_requested(self, operator_id: str) -> None:
+        """Handle configure request from a row (board game configuration)."""
+        if operator_id not in self._rows:
+            return
+        config = self._rows[operator_id].get_config()
+        _LOGGER.info(f"Configure requested for operator {operator_id}: {config.env_name}/{config.task}")
+        self.configure_requested.emit(operator_id, config)
+
     def _emit_operators_changed(self) -> None:
         """Emit the operators_changed signal with current configs."""
         configs = self.get_operators()
@@ -1881,6 +2474,28 @@ class OperatorConfigWidget(QtWidgets.QWidget):
         _LOGGER.debug(f"Updating operator rows with {len(servers)} vLLM servers")
         for row in self._rows.values():
             row.set_vllm_servers(servers)
+
+    def set_operator_initial_state(self, operator_id: str, initial_state: str) -> None:
+        """Set the initial state (board position) for a specific operator.
+
+        Called after the board configuration dialog is accepted to store
+        the custom starting position in the operator's config.
+
+        Args:
+            operator_id: The operator's unique ID
+            initial_state: Board state notation (FEN for chess, SGF for Go, etc.)
+        """
+        if operator_id not in self._rows:
+            _LOGGER.warning(f"Cannot set initial state: operator {operator_id} not found")
+            return
+
+        row = self._rows[operator_id]
+        # Store initial_state in the row widget itself so it persists across get_config() calls
+        row.set_initial_state(initial_state)
+        _LOGGER.info(f"Set initial state for {operator_id}: {initial_state[:50]}...")
+
+        # Emit config changed to propagate the update
+        self._emit_operators_changed()
 
     def set_operator_environment_size(
         self, operator_id: str, width: int, height: int, container_size: Optional[int] = None

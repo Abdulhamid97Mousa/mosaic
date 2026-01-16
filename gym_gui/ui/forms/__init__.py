@@ -13,6 +13,7 @@ from gym_gui.ui.widgets.ray_train_form import RayRLlibTrainForm  # noqa: F401
 from gym_gui.ui.widgets import ray_policy_form  # noqa: F401  # registration side-effect
 from gym_gui.ui.widgets.ray_evaluation_form import RayEvaluationForm  # noqa: F401
 from gym_gui.ui.widgets.xuance_train_form import XuanCeTrainForm  # noqa: F401
+from gym_gui.ui.widgets.mctx_train_form import MCTXTrainForm  # noqa: F401
 
 __all__ = [
     "WorkerFormFactory",
@@ -23,4 +24,5 @@ __all__ = [
     "RayRLlibTrainForm",
     "RayEvaluationForm",
     "XuanCeTrainForm",
+    "MCTXTrainForm",
 ]

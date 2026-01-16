@@ -652,13 +652,26 @@ class MCTXWorkerRuntime:
                         global_step,
                     )
 
-                # Progress report
+                # Progress report and heartbeat
                 if iteration % 10 == 0:
                     elapsed = time.time() - start_time
                     steps_per_sec = global_step / elapsed if elapsed > 0 else 0
+
+                    # Get latest metrics for heartbeat
+                    heartbeat_metrics = {
+                        "iteration": iteration,
+                        "global_step": global_step,
+                        "buffer_size": self._buffer.size,
+                        "steps_per_second": steps_per_sec,
+                        "progress_pct": (global_step / total_steps) * 100 if total_steps > 0 else 0,
+                    }
+
+                    # Emit heartbeat for monitoring
+                    self._emitter.heartbeat(heartbeat_metrics)
+
                     print(
                         f"[PROGRESS] iteration={iteration} | "
-                        f"steps={global_step}/{total_steps} | "
+                        f"steps={global_step}/{total_steps} ({heartbeat_metrics['progress_pct']:.1f}%) | "
                         f"buffer={self._buffer.size} | "
                         f"steps/sec={steps_per_sec:.0f}"
                     )
@@ -671,13 +684,24 @@ class MCTXWorkerRuntime:
                 ):
                     self._save_checkpoint(train_state_obj, iteration)
 
+            # Save final policy
+            final_policy_path = self._save_policy(train_state_obj, iteration, final=True)
+
             _LOGGER.info("Training completed")
             print(f"[COMPLETE] run_id={self.config.run_id} status=success")
             sys.stdout.flush()
 
-            self._emitter.run_completed({"final_step": global_step})
+            self._emitter.run_completed({
+                "final_step": global_step,
+                "iterations": iteration,
+                "policy_path": str(final_policy_path),
+            })
 
-            return {"final_step": global_step, "iterations": iteration}
+            return {
+                "final_step": global_step,
+                "iterations": iteration,
+                "policy_path": str(final_policy_path),
+            }
 
         except Exception as e:
             _LOGGER.error(f"Training failed: {e}", exc_info=True)
@@ -714,6 +738,63 @@ class MCTXWorkerRuntime:
         _LOGGER.info(f"Checkpoint saved: {ckpt_path}")
         print(f"[CHECKPOINT] path={ckpt_path}")
         sys.stdout.flush()
+
+    def _save_policy(self, state: TrainState, iteration: int, final: bool = False) -> Path:
+        """Save a clean policy file for inference/evaluation.
+
+        This saves only the network parameters needed for inference,
+        separate from training state (optimizer, batch stats, etc.).
+
+        Args:
+            state: Current training state
+            iteration: Current iteration number
+            final: Whether this is the final policy
+
+        Returns:
+            Path to the saved policy file
+        """
+        run_dir = Path(
+            self.config.checkpoint_path or f"var/trainer/runs/{self.config.run_id}"
+        )
+        policy_dir = run_dir / "policies"
+        policy_dir.mkdir(parents=True, exist_ok=True)
+
+        # Save policy with metadata
+        policy_name = "policy_final.pkl" if final else f"policy_iter_{iteration}.pkl"
+        policy_path = policy_dir / policy_name
+
+        import pickle
+        policy_data = {
+            "params": state.params,
+            "batch_stats": state.batch_stats,
+            # Metadata for loading
+            "env_id": self.config.env_id,
+            "algorithm": self.config.algorithm.value if hasattr(self.config.algorithm, "value") else str(self.config.algorithm),
+            "num_actions": self._num_actions,
+            "obs_shape": self._obs_shape,
+            "network_config": {
+                "num_res_blocks": self.config.network.num_res_blocks,
+                "channels": self.config.network.channels,
+                "hidden_dims": list(self.config.network.hidden_dims),
+                "use_resnet": self.config.network.use_resnet,
+            },
+            "mcts_config": {
+                "num_simulations": self.config.mcts.num_simulations,
+                "dirichlet_alpha": self.config.mcts.dirichlet_alpha,
+                "temperature": self.config.mcts.temperature,
+            },
+            "iteration": iteration,
+            "run_id": self.config.run_id,
+        }
+
+        with open(policy_path, "wb") as f:
+            pickle.dump(policy_data, f)
+
+        _LOGGER.info(f"Policy saved: {policy_path}")
+        print(f"[POLICY] path={policy_path} final={final}")
+        sys.stdout.flush()
+
+        return policy_path
 
     def _cleanup(self) -> None:
         """Clean up resources."""

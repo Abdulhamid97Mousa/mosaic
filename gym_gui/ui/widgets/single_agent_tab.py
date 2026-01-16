@@ -1,475 +1,24 @@
-"""Single-Agent Mode tab with subtabs for Operators and Workers.
+"""Single-Agent Mode tab with Workers subtab for training backends.
 
-This module provides the SingleAgentTab widget that organizes single-agent
-mode into two logical subtabs:
-- Operators: Configure action-selecting entities (Human, LLM, RL policies)
-- Workers: Select worker backends and control training/evaluation
+This module provides:
+- WorkersSubTab: Select worker backends and control training/evaluation
+- SingleAgentTab: Container for Workers subtab (training mode)
 
-This follows the same pattern as MultiAgentTab which has subtabs for
-Human vs Agent, Cooperation, and Competition modes.
+Note: Operators have been moved to their own main tab (see operators_tab.py).
+Single-Agent Mode now focuses on training via Workers.
 """
 
 from __future__ import annotations
 
 import logging
-import random
 from typing import Optional, List
 
 from PyQt6 import QtCore, QtWidgets
-
-# Use operators namespace for dedicated operators.log routing
-_LOGGER = logging.getLogger("gym_gui.operators.single_agent_tab")
 from PyQt6.QtCore import pyqtSignal
 
-from gym_gui.services.operator import OperatorConfig
-from gym_gui.ui.widgets.operator_config_widget import OperatorConfigWidget, VLLMServerInfo
-from gym_gui.ui.widgets.vllm_server_widget import VLLMServerWidget, VLLM_BASE_PORT
 from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
 
-
-class OperatorsSubTab(QtWidgets.QWidget):
-    """Subtab for configuring Operators.
-
-    Operators are the action-selecting entities in MOSAIC - they represent
-    who or what controls the agent in an environment.
-
-    Scientific Execution Model (inspired by BALROG):
-    - Shared seed ensures all operators start with identical initial conditions
-    - Step All advances all operators by exactly one step (lock-step execution)
-    - Reset All resets all operators to the same seed for fair comparison
-    - No arbitrary timing delays - steps are explicitly controlled
-    """
-
-    # Signals
-    operators_changed = pyqtSignal(list)  # List[OperatorConfig]
-    step_all_requested = pyqtSignal(int)  # Emit with current seed
-    reset_all_requested = pyqtSignal(int)  # Emit with current seed
-    stop_operators_requested = pyqtSignal()
-    initialize_operator_requested = pyqtSignal(str, object, int)  # operator_id, config, seed
-    step_player_requested = pyqtSignal(str, int)  # player_id, seed
-
-    def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
-        super().__init__(parent)
-        self._step_count = 0
-        self._is_running = False
-        self._pettingzoo_mode = False
-        self._current_player: str = ""
-        self._build_ui()
-
-    def _build_ui(self) -> None:
-        """Build the UI layout."""
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(8, 8, 8, 8)
-        layout.setSpacing(12)
-
-        # Explanation section
-        explanation_group = QtWidgets.QGroupBox("What are Operators?", self)
-        explanation_layout = QtWidgets.QVBoxLayout(explanation_group)
-
-        explanation_text = QtWidgets.QLabel(
-            "<p><b>Operators</b> are action-selecting entities that control agents in environments. "
-            "MOSAIC introduces a unified <i>Operator</i> abstraction that bridges:</p>"
-            "<ul>"
-            "<li><b>LLM Agents</b> - GPT-4, Claude, Gemini making decisions</li>"
-            "<li><b>RL Policies</b> - Trained neural network policies</li>"
-            "</ul>"
-            "<p>Add multiple operators below to run them in parallel and compare their performance side-by-side.</p>",
-            self
-        )
-        explanation_text.setWordWrap(True)
-        explanation_text.setTextFormat(QtCore.Qt.TextFormat.RichText)
-        explanation_text.setStyleSheet("QLabel { color: #555; padding: 4px; }")
-        explanation_layout.addWidget(explanation_text)
-        layout.addWidget(explanation_group)
-
-        # vLLM Servers section (for local LLM/VLM inference)
-        self._vllm_server_widget = VLLMServerWidget(max_servers=2, parent=self)
-        self._vllm_server_widget.server_status_changed.connect(self._on_vllm_server_status_changed)
-        layout.addWidget(self._vllm_server_widget)
-
-        # Configure Operators section
-        config_group = QtWidgets.QGroupBox("Configure Operators", self)
-        config_layout = QtWidgets.QVBoxLayout(config_group)
-
-        # Multi-operator configuration widget
-        self._operator_config_widget = OperatorConfigWidget(max_operators=8, parent=config_group)
-        self._operator_config_widget.operators_changed.connect(self._on_operators_config_changed)
-        self._operator_config_widget.initialize_requested.connect(self._on_initialize_requested)
-        self._operator_config_widget.vllm_refresh_requested.connect(self.refresh_vllm_servers)
-        config_layout.addWidget(self._operator_config_widget)
-
-        layout.addWidget(config_group)
-
-        # Scientific Execution Controls (inspired by BALROG methodology)
-        exec_group = QtWidgets.QGroupBox("Execution Controls (Scientific Comparison)", self)
-        exec_layout = QtWidgets.QVBoxLayout(exec_group)
-
-        # Seed row - for reproducibility like BALROG
-        seed_row = QtWidgets.QHBoxLayout()
-        seed_row.setSpacing(8)
-
-        seed_label = QtWidgets.QLabel("Shared Seed:", exec_group)
-        seed_label.setToolTip(
-            "All operators use this seed for identical initial conditions.\n"
-            "This ensures fair, reproducible side-by-side comparison."
-        )
-        seed_row.addWidget(seed_label)
-
-        self._seed_spin = QtWidgets.QSpinBox(exec_group)
-        self._seed_spin.setRange(0, 2147483647)  # Max int32
-        self._seed_spin.setValue(42)  # Default seed like BALROG
-        self._seed_spin.setToolTip(
-            "Seed for random number generators.\n"
-            "Same seed = same initial environment state for all operators."
-        )
-        seed_row.addWidget(self._seed_spin, 1)
-
-        self._random_seed_button = QtWidgets.QPushButton("Random", exec_group)
-        self._random_seed_button.setToolTip("Generate a new random seed")
-        self._random_seed_button.setStyleSheet("QPushButton { padding: 4px 8px; }")
-        self._random_seed_button.clicked.connect(self._on_random_seed_clicked)
-        seed_row.addWidget(self._random_seed_button)
-
-        exec_layout.addLayout(seed_row)
-
-        # Control buttons row
-        button_row = QtWidgets.QHBoxLayout()
-        button_row.setSpacing(8)
-
-        self._reset_all_button = QtWidgets.QPushButton("Reset All", exec_group)
-        self._reset_all_button.setToolTip(
-            "Reset all operators to initial state with the shared seed.\n"
-            "All environments will have identical starting conditions."
-        )
-        self._reset_all_button.setStyleSheet(
-            "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #FF9800; color: white; }"
-            "QPushButton:hover { background-color: #F57C00; }"
-            "QPushButton:pressed { background-color: #EF6C00; }"
-            "QPushButton:disabled { background-color: #FFCC80; color: #FFF3E0; }"
-        )
-        self._reset_all_button.setEnabled(False)
-        self._reset_all_button.clicked.connect(self._on_reset_all_clicked)
-        button_row.addWidget(self._reset_all_button)
-
-        self._step_all_button = QtWidgets.QPushButton("Step All", exec_group)
-        self._step_all_button.setToolTip(
-            "Advance ALL operators by exactly one step (lock-step execution).\n"
-            "Each operator's agent selects one action simultaneously.\n"
-            "This ensures scientifically fair side-by-side comparison."
-        )
-        self._step_all_button.setStyleSheet(
-            "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #4CAF50; color: white; }"
-            "QPushButton:hover { background-color: #45a049; }"
-            "QPushButton:pressed { background-color: #388E3C; }"
-            "QPushButton:disabled { background-color: #A5D6A7; color: #E8F5E9; }"
-        )
-        self._step_all_button.setEnabled(False)
-        self._step_all_button.clicked.connect(self._on_step_all_clicked)
-        button_row.addWidget(self._step_all_button)
-
-        # PettingZoo player-specific step buttons (hidden by default)
-        self._step_player_0_btn = QtWidgets.QPushButton("Step White ⚪", exec_group)
-        self._step_player_0_btn.setToolTip("Step player_0 (White) - their turn to move")
-        self._step_player_0_btn.setStyleSheet(
-            "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #4CAF50; color: white; }"
-            "QPushButton:hover { background-color: #45a049; }"
-            "QPushButton:pressed { background-color: #388E3C; }"
-            "QPushButton:disabled { background-color: #A5D6A7; color: #E8F5E9; }"
-        )
-        self._step_player_0_btn.setEnabled(False)
-        self._step_player_0_btn.setVisible(False)  # Hidden by default
-        self._step_player_0_btn.clicked.connect(lambda: self._on_step_player_clicked("player_0"))
-        button_row.addWidget(self._step_player_0_btn)
-
-        self._step_player_1_btn = QtWidgets.QPushButton("Step Black ⚫", exec_group)
-        self._step_player_1_btn.setToolTip("Step player_1 (Black) - their turn to move")
-        self._step_player_1_btn.setStyleSheet(
-            "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #4CAF50; color: white; }"
-            "QPushButton:hover { background-color: #45a049; }"
-            "QPushButton:pressed { background-color: #388E3C; }"
-            "QPushButton:disabled { background-color: #A5D6A7; color: #E8F5E9; }"
-        )
-        self._step_player_1_btn.setEnabled(False)
-        self._step_player_1_btn.setVisible(False)  # Hidden by default
-        self._step_player_1_btn.clicked.connect(lambda: self._on_step_player_clicked("player_1"))
-        button_row.addWidget(self._step_player_1_btn)
-
-        self._stop_operators_button = QtWidgets.QPushButton("Stop All", exec_group)
-        self._stop_operators_button.setToolTip("Stop all running operators and release resources")
-        self._stop_operators_button.setStyleSheet(
-            "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #F44336; color: white; }"
-            "QPushButton:hover { background-color: #E53935; }"
-            "QPushButton:pressed { background-color: #D32F2F; }"
-            "QPushButton:disabled { background-color: #EF9A9A; color: #FFEBEE; }"
-        )
-        self._stop_operators_button.setEnabled(False)
-        self._stop_operators_button.clicked.connect(self._on_stop_operators_clicked)
-        button_row.addWidget(self._stop_operators_button)
-
-        exec_layout.addLayout(button_row)
-
-        # Step counter and status row
-        status_row = QtWidgets.QHBoxLayout()
-        status_row.setSpacing(12)
-
-        self._step_count_label = QtWidgets.QLabel("Steps: 0", exec_group)
-        self._step_count_label.setStyleSheet(
-            "QLabel { font-weight: bold; color: #1976D2; padding: 4px 8px; "
-            "background-color: #E3F2FD; border-radius: 4px; }"
-        )
-        status_row.addWidget(self._step_count_label)
-
-        self._status_label = QtWidgets.QLabel("Ready", exec_group)
-        self._status_label.setStyleSheet(
-            "QLabel { color: #666; padding: 4px; font-style: italic; }"
-        )
-        status_row.addWidget(self._status_label)
-
-        # Turn indicator for PettingZoo multi-agent games
-        self._turn_indicator_label = QtWidgets.QLabel("", exec_group)
-        self._turn_indicator_label.setStyleSheet(
-            "QLabel { font-weight: bold; color: #F57C00; padding: 4px 8px; "
-            "background-color: #FFF3E0; border-radius: 4px; }"
-        )
-        self._turn_indicator_label.setVisible(False)  # Hidden by default
-        status_row.addWidget(self._turn_indicator_label)
-
-        status_row.addStretch(1)
-
-        exec_layout.addLayout(status_row)
-
-        layout.addWidget(exec_group)
-
-        layout.addStretch(1)
-
-    def _on_operators_config_changed(self, configs: list) -> None:
-        """Handle operator configuration changes."""
-        self.operators_changed.emit(configs)
-        has_operators = len(configs) > 0
-        self._reset_all_button.setEnabled(has_operators)
-        # Step All only enabled after Reset All is done
-        if not has_operators:
-            self._step_all_button.setEnabled(False)
-            self._stop_operators_button.setEnabled(False)
-
-    def _on_random_seed_clicked(self) -> None:
-        """Generate a random seed."""
-        new_seed = random.randint(0, 2147483647)
-        self._seed_spin.setValue(new_seed)
-
-    def _on_reset_all_clicked(self) -> None:
-        """Handle Reset All button click."""
-        seed = self._seed_spin.value()
-        self._step_count = 0
-        self._step_count_label.setText("Steps: 0")
-        self._status_label.setText(f"Resetting with seed {seed}...")
-        self._is_running = True
-        self.reset_all_requested.emit(seed)
-        # Enable step button after reset
-        self._step_all_button.setEnabled(True)
-        self._stop_operators_button.setEnabled(True)
-        self._status_label.setText(f"Running (seed={seed})")
-
-    def _on_step_all_clicked(self) -> None:
-        """Handle Step All button click."""
-        if not self._is_running:
-            return
-        seed = self._seed_spin.value()
-        self._step_count += 1
-        self._step_count_label.setText(f"Steps: {self._step_count}")
-        self.step_all_requested.emit(seed)
-
-    def _on_stop_operators_clicked(self) -> None:
-        """Handle Stop All button click."""
-        self.stop_operators_requested.emit()
-        self._is_running = False
-        self._step_all_button.setEnabled(False)
-        self._stop_operators_button.setEnabled(False)
-        self._status_label.setText("Stopped")
-
-    def _on_initialize_requested(self, operator_id: str, config) -> None:
-        """Handle initialize request from an operator row.
-
-        Passes the shared seed for controlled scientific comparison.
-        """
-        seed = self.get_current_seed()
-        self.initialize_operator_requested.emit(operator_id, config, seed)
-
-    def set_step_count(self, count: int) -> None:
-        """Set the step count (called externally when steps complete)."""
-        self._step_count = count
-        self._step_count_label.setText(f"Steps: {count}")
-
-    def set_status(self, status: str) -> None:
-        """Set the status label text."""
-        self._status_label.setText(status)
-
-    def set_turn_indicator(self, player_id: str, visible: bool = True) -> None:
-        """Set the turn indicator for PettingZoo multi-agent games.
-
-        Args:
-            player_id: Current player (e.g., "player_0", "player_1").
-            visible: Whether to show the indicator.
-        """
-        if visible and player_id:
-            # Map player_id to friendly name
-            player_names = {
-                "player_0": "White",
-                "player_1": "Black",
-            }
-            friendly_name = player_names.get(player_id, player_id)
-            self._turn_indicator_label.setText(f"Next: {friendly_name} ({player_id})")
-            self._turn_indicator_label.setVisible(True)
-        else:
-            self._turn_indicator_label.setVisible(False)
-
-    def set_pettingzoo_mode(self, enabled: bool) -> None:
-        """Enable or disable PettingZoo multi-agent mode.
-
-        When enabled:
-        - Hides "Step All" button
-        - Shows player-specific step buttons (Step White, Step Black)
-
-        Args:
-            enabled: True to enable PettingZoo mode, False for normal mode.
-        """
-        _LOGGER.debug("set_pettingzoo_mode: enabled=%s", enabled)
-        self._pettingzoo_mode = enabled
-        self._step_all_button.setVisible(not enabled)
-        self._step_player_0_btn.setVisible(enabled)
-        self._step_player_1_btn.setVisible(enabled)
-        _LOGGER.debug(
-            "set_pettingzoo_mode: step_all visible=%s, player btns visible=%s",
-            not enabled, enabled,
-        )
-
-        if not enabled:
-            # Reset to normal mode
-            self._step_player_0_btn.setEnabled(False)
-            self._step_player_1_btn.setEnabled(False)
-            self._current_player = ""
-
-    def set_current_player(self, player_id: str) -> None:
-        """Set which player's turn it is (enables their button, disables the other).
-
-        Args:
-            player_id: The player whose turn it is ("player_0" or "player_1").
-        """
-        _LOGGER.debug(
-            "set_current_player: player_id=%s",
-            player_id,
-            extra={"agent_id": player_id},
-        )
-        self._current_player = player_id
-
-        if player_id == "player_0":
-            self._step_player_0_btn.setEnabled(True)
-            self._step_player_1_btn.setEnabled(False)
-            _LOGGER.debug("Enabled player_0 button, disabled player_1 button")
-        elif player_id == "player_1":
-            self._step_player_0_btn.setEnabled(False)
-            self._step_player_1_btn.setEnabled(True)
-            _LOGGER.debug("Disabled player_0 button, enabled player_1 button")
-        else:
-            # Unknown player or game over
-            self._step_player_0_btn.setEnabled(False)
-            self._step_player_1_btn.setEnabled(False)
-            _LOGGER.debug("Disabled both buttons (game over or unknown player)")
-
-    def _on_step_player_clicked(self, player_id: str) -> None:
-        """Handle click on a player-specific step button.
-
-        Args:
-            player_id: Which player's button was clicked.
-        """
-        seed = self._seed_spin.value()
-        # Disable button immediately to prevent double-clicks
-        if player_id == "player_0":
-            self._step_player_0_btn.setEnabled(False)
-        else:
-            self._step_player_1_btn.setEnabled(False)
-        self._step_count += 1
-        self._step_count_label.setText(f"Steps: {self._step_count}")
-        self.step_player_requested.emit(player_id, seed)
-
-    def get_current_seed(self) -> int:
-        """Get the current seed value."""
-        return self._seed_spin.value()
-
-    def _on_vllm_server_status_changed(self, server_id: int, status: str, base_url: str) -> None:
-        """Handle vLLM server status changes.
-
-        This allows the UI to update operator dropdowns when servers start/stop.
-        Collects all server states and passes them to the operator config widget.
-        """
-        import logging
-        _LOGGER = logging.getLogger(__name__)
-        _LOGGER.info(f"vLLM Server {server_id} status: {status}, URL: {base_url}")
-
-        # Collect all server info from the vLLM server widget
-        servers: list[VLLMServerInfo] = []
-        for sid, state in self._vllm_server_widget._server_states.items():
-            if state.model_id:  # Only include servers with a model selected
-                server_info = VLLMServerInfo(
-                    server_id=sid,
-                    port=state.port,
-                    model_id=state.model_id,
-                    base_url=f"http://127.0.0.1:{state.port}/v1",
-                    status=state.status,
-                )
-                servers.append(server_info)
-
-        # Update operator config widget with available servers
-        self._operator_config_widget.set_vllm_servers(servers)
-
-    def refresh_vllm_servers(self) -> None:
-        """Manually refresh the vLLM server list for operator dropdowns.
-
-        Call this to sync operator config with current vLLM server state.
-        Useful when servers were started before operators were configured.
-        """
-        import logging
-        _LOGGER = logging.getLogger(__name__)
-
-        servers: list[VLLMServerInfo] = []
-        for sid, state in self._vllm_server_widget._server_states.items():
-            if state.model_id:  # Only include servers with a model selected
-                server_info = VLLMServerInfo(
-                    server_id=sid,
-                    port=state.port,
-                    model_id=state.model_id,
-                    base_url=f"http://127.0.0.1:{state.port}/v1",
-                    status=state.status,
-                )
-                servers.append(server_info)
-
-        _LOGGER.debug(f"Refreshing vLLM servers: {len(servers)} available")
-        self._operator_config_widget.set_vllm_servers(servers)
-
-    def set_operator_environment_size(
-        self, operator_id: str, width: int, height: int, container_size: int | None = None
-    ) -> None:
-        """Set the environment size for a specific operator.
-
-        Args:
-            operator_id: The operator's unique ID
-            width: Rendered environment width in pixels (image size)
-            height: Rendered environment height in pixels (image size)
-            container_size: Optional container display size in pixels
-        """
-        self._operator_config_widget.set_operator_environment_size(
-            operator_id, width, height, container_size
-        )
-
-    @property
-    def vllm_server_widget(self) -> VLLMServerWidget:
-        """Get the vLLM server management widget."""
-        return self._vllm_server_widget
-
-    @property
-    def operator_config_widget(self) -> OperatorConfigWidget:
-        """Get the operator configuration widget."""
-        return self._operator_config_widget
+_LOGGER = logging.getLogger("gym_gui.ui.single_agent_tab")
 
 
 class WorkersSubTab(QtWidgets.QWidget):
@@ -679,29 +228,15 @@ class WorkersSubTab(QtWidgets.QWidget):
 
 
 class SingleAgentTab(QtWidgets.QWidget):
-    """Main Single-Agent Mode tab with subtabs for Operators and Workers.
+    """Single-Agent Mode tab with Workers subtab for training backends.
 
     Contains:
-    - Operators: Configure action-selecting entities
-    - Workers: Select backends and control training
+    - Workers: Select worker backends and control training/evaluation
 
-    This follows the same pattern as MultiAgentTab which has subtabs for
-    Human vs Agent, Cooperation, and Competition modes.
-
-    Scientific Execution Model (forwarded from OperatorsSubTab):
-    - step_all_requested: Advance all operators by one step (lock-step)
-    - reset_all_requested: Reset all operators with shared seed
+    Note: Operators have been moved to their own main tab in the control panel.
     """
 
-    # Forwarded signals from Operators subtab
-    operators_changed = pyqtSignal(list)  # List[OperatorConfig]
-    step_all_requested = pyqtSignal(int)  # Emit with seed for lock-step execution
-    step_player_requested = pyqtSignal(str, int)  # player_id, seed (PettingZoo mode)
-    reset_all_requested = pyqtSignal(int)  # Emit with seed for fair reset
-    stop_operators_requested = pyqtSignal()
-    initialize_operator_requested = pyqtSignal(str, object, int)  # operator_id, config, seed
-
-    # Forwarded signals from Workers subtab
+    # Signals from Workers subtab
     worker_changed = pyqtSignal(str)  # worker_id
     train_requested = pyqtSignal()
     evaluate_requested = pyqtSignal()
@@ -718,30 +253,20 @@ class SingleAgentTab(QtWidgets.QWidget):
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setSpacing(0)
 
-        # Subtab widget
+        # Subtab widget (keeping subtab structure for future extensibility)
         self._subtabs = QtWidgets.QTabWidget(self)
         self._subtabs.setTabPosition(QtWidgets.QTabWidget.TabPosition.North)
 
-        # Create subtabs
-        self._operators_tab = OperatorsSubTab(self)
+        # Create Workers subtab
         self._workers_tab = WorkersSubTab(self)
 
-        # Add subtabs
-        self._subtabs.addTab(self._operators_tab, "Operators")
+        # Add subtab
         self._subtabs.addTab(self._workers_tab, "Workers")
 
         layout.addWidget(self._subtabs)
 
     def _connect_signals(self) -> None:
         """Connect signals from subtabs."""
-        # Operators subtab - scientific execution controls
-        self._operators_tab.operators_changed.connect(self.operators_changed)
-        self._operators_tab.step_all_requested.connect(self.step_all_requested)
-        self._operators_tab.step_player_requested.connect(self.step_player_requested)
-        self._operators_tab.reset_all_requested.connect(self.reset_all_requested)
-        self._operators_tab.stop_operators_requested.connect(self.stop_operators_requested)
-        self._operators_tab.initialize_operator_requested.connect(self.initialize_operator_requested)
-
         # Workers subtab
         self._workers_tab.worker_changed.connect(self.worker_changed)
         self._workers_tab.train_requested.connect(self.train_requested)
@@ -749,55 +274,9 @@ class SingleAgentTab(QtWidgets.QWidget):
         self._workers_tab.resume_requested.connect(self.resume_requested)
 
     @property
-    def operators_subtab(self) -> OperatorsSubTab:
-        """Get the Operators subtab."""
-        return self._operators_tab
-
-    @property
     def workers_subtab(self) -> WorkersSubTab:
         """Get the Workers subtab."""
         return self._workers_tab
-
-    @property
-    def vllm_server_widget(self) -> VLLMServerWidget:
-        """Get the vLLM server management widget."""
-        return self._operators_tab.vllm_server_widget
-
-    # Backward compatibility properties for control_panel.py
-    @property
-    def operator_config_widget(self) -> OperatorConfigWidget:
-        """Get the operator configuration widget."""
-        return self._operators_tab.operator_config_widget
-
-    def set_operator_environment_size(
-        self, operator_id: str, width: int, height: int, container_size: int | None = None
-    ) -> None:
-        """Set the environment size for a specific operator.
-
-        Args:
-            operator_id: The operator's unique ID
-            width: Rendered environment width in pixels (image size)
-            height: Rendered environment height in pixels (image size)
-            container_size: Optional container display size in pixels
-        """
-        self._operators_tab.set_operator_environment_size(
-            operator_id, width, height, container_size
-        )
-
-    def set_turn_indicator(self, player_id: str, visible: bool = True) -> None:
-        """Set the turn indicator to show whose turn it is."""
-        self._operators_tab.set_turn_indicator(player_id, visible)
-
-    def set_pettingzoo_mode(self, enabled: bool) -> None:
-        """Enable or disable PettingZoo multi-agent mode.
-
-        When enabled, shows player-specific step buttons instead of Step All.
-        """
-        self._operators_tab.set_pettingzoo_mode(enabled)
-
-    def set_current_player(self, player_id: str) -> None:
-        """Set which player's turn it is (enables their button, disables the other)."""
-        self._operators_tab.set_current_player(player_id)
 
     @property
     def worker_combo(self) -> QtWidgets.QComboBox:
@@ -827,6 +306,5 @@ class SingleAgentTab(QtWidgets.QWidget):
 
 __all__ = [
     "SingleAgentTab",
-    "OperatorsSubTab",
     "WorkersSubTab",
 ]

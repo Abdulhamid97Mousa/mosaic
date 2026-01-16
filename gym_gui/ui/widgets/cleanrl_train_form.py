@@ -172,6 +172,11 @@ _SUPPORTED_FAMILIES: set[EnvironmentFamily] = {
     EnvironmentFamily.NETHACK,
     EnvironmentFamily.CRAFTER,
     EnvironmentFamily.PROCGEN,
+    # Multi-agent environments
+    EnvironmentFamily.PETTINGZOO_CLASSIC,
+    EnvironmentFamily.MULTIGRID,
+    EnvironmentFamily.MELTINGPOT,
+    EnvironmentFamily.OVERCOOKED,
 }
 
 _ADDITIONAL_SUPPORTED_GAMES: set[GameId] = {

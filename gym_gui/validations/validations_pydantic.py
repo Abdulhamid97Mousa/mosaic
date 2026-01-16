@@ -5,22 +5,19 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 
 class TelemetryEventBase(BaseModel):
     """Base model for all telemetry events."""
+
+    model_config = ConfigDict(extra="allow")  # Allow additional fields for extensibility
 
     type: str = Field(..., description="Event type identifier")
     ts: datetime = Field(
         default_factory=lambda: datetime.now(timezone.utc),
         description="Event timestamp",
     )
-
-    class Config:
-        """Pydantic config allowing forward-compatible fields."""
-
-        extra = "allow"  # Allow additional fields for extensibility
 
 
 class RunStartedEvent(TelemetryEventBase):
@@ -173,12 +170,11 @@ class TrainerControlUpdate(BaseModel):
     bounded ranges. Unknown keys are allowed to enable gradual adoption.
     """
 
+    model_config = ConfigDict(extra="allow")
+
     run_id: str = Field(..., description="Target run identifier")
     reason: str = Field(..., description="Human-readable reason for the change")
     params: Dict[str, Any] = Field(default_factory=dict, description="Parameter overrides")
-
-    class Config:
-        extra = "allow"
 
     @field_validator("run_id")
     @classmethod

@@ -41,6 +41,8 @@ try:
         LOG_WORKER_BALROG_ENV_CREATED,
         LOG_WORKER_BALROG_AGENT_CREATED,
         LOG_WORKER_BALROG_DEBUG,
+        LOG_WORKER_MOSAIC_RUNTIME_INTEGRATION,
+        LOG_WORKER_MOSAIC_ACTION_PARSED,
     )
     _HAS_GYM_GUI = True
 except ImportError:
@@ -420,19 +422,19 @@ class BarlogWorkerRuntime:
                 episode_id=episode_id,
                 step_index=step_idx,
                 observation=self._obs_to_str(obs),
-                action=action_str,
+                action=action,  # Use validated action, not raw LLM output
                 reward=float(reward),
                 terminated=terminated,
                 truncated=truncated,
                 info=self._sanitize_info(info),
-                llm_response=action_str,
+                llm_response=action_str,  # Keep raw LLM response for debugging
                 llm_input_tokens=input_tokens,
                 llm_output_tokens=output_tokens,
             )
             self.telemetry.emit_step(step_telemetry)
 
             total_reward += reward
-            prev_action = action_str
+            prev_action = action  # Use validated action so agent knows what was executed
             obs = obs_new
 
             if terminated or truncated:
@@ -504,6 +506,28 @@ class BarlogWorkerRuntime:
         """Convert observation to string for telemetry."""
         if isinstance(obs, str):
             return obs
+
+        # MOSAIC MultiGrid extension
+        if self.config.env_name == "multigrid" and hasattr(obs, "shape"):
+            from balrog_worker.environments import generate_multigrid_description
+            import numpy as np
+
+            if isinstance(obs, np.ndarray):
+                agent_id = getattr(self.config, "agent_id", 0)
+                observation_mode = getattr(self.config, "observation_mode", "egocentric")
+
+                # Note: In real environment, agent state would come from env
+                # For now, use defaults for direction and carrying
+                description = generate_multigrid_description(
+                    obs,
+                    agent_id=agent_id,
+                    env=self._env if hasattr(self, "_env") else None,
+                    observation_mode=observation_mode,
+                    agent_direction=0,  # TODO: Get from env state
+                    carrying=None,  # TODO: Get from env state
+                )
+                return description
+
         if isinstance(obs, dict):
             # BALROG environments often have 'text' or 'message' keys
             if "text" in obs:
@@ -629,9 +653,39 @@ class InteractiveRuntime:
             instructions = None
             if self.config.env_name in ["babyai", "minigrid"]:
                 instructions = self._obs.get("mission") if isinstance(self._obs, dict) else None
-            self._agent.prompt_builder.update_instruction_prompt(
-                self._env.get_instruction_prompt(instructions=instructions)
-            )
+            elif self.config.env_name == "multigrid":
+                # MOSAIC MultiGrid extension
+                from balrog_worker.environments import get_multigrid_instruction_prompt
+
+                agent_id = getattr(self.config, "agent_id", 0)
+                coordination_level = getattr(self.config, "coordination_level", 1)
+                role = getattr(self.config, "role", "forward")
+
+                instructions = get_multigrid_instruction_prompt(
+                    agent_id=agent_id,
+                    env_id=self.config.task,
+                    coordination_level=coordination_level,
+                    role=role,
+                )
+                self._agent.prompt_builder.update_instruction_prompt(instructions)
+
+                if _HAS_GYM_GUI and log_constant:
+                    log_constant(
+                        logger,
+                        LOG_WORKER_MOSAIC_RUNTIME_INTEGRATION,
+                        extra={
+                            "agent_id": agent_id,
+                            "coordination_level": coordination_level,
+                            "role": role,
+                            "env_id": self.config.task,
+                        },
+                    )
+                else:
+                    logger.info(f"MOSAIC: Set MultiGrid prompt | agent={agent_id} level={coordination_level} role={role}")
+            else:
+                self._agent.prompt_builder.update_instruction_prompt(
+                    self._env.get_instruction_prompt(instructions=instructions)
+                )
 
             # Reset episode state
             self._episode_idx = 0
@@ -680,7 +734,25 @@ class InteractiveRuntime:
                 action_str = ""
 
             # Validate and execute action
-            action = self._env.check_action_validity(action_str)
+            if self.config.env_name == "multigrid":
+                # MOSAIC MultiGrid extension - parse action from LLM text
+                from mosaic_extension.multigrid import parse_action
+                action = parse_action(action_str)
+
+                if _HAS_GYM_GUI and log_constant:
+                    log_constant(
+                        logger,
+                        LOG_WORKER_MOSAIC_ACTION_PARSED,
+                        extra={
+                            "action_index": action,
+                            "llm_output": action_str[:50],
+                        },
+                    )
+                else:
+                    logger.debug(f"MOSAIC: Parsed action {action} from LLM: {action_str[:50]}")
+            else:
+                action = self._env.check_action_validity(action_str)
+
             obs_new, reward, terminated, truncated, info = self._env.step(action)
 
             # Emit step telemetry

@@ -13,9 +13,10 @@ from typing import Any, Dict, Literal, Optional
 
 # Valid environment names supported by BALROG
 # Note: "minigrid" uses the same wrapper as "babyai" (BabyAI is built on MiniGrid)
+# Note: "multigrid" is multi-agent extension of MiniGrid with simultaneous stepping
 # Note: "pettingzoo" is used for multi-agent games (chess, go, connect-four, etc.)
 #       In pettingzoo mode, the worker acts as action-selector (doesn't own env)
-ENV_NAMES = ("babyai", "minigrid", "minihack", "crafter", "nle", "textworld", "pettingzoo")
+ENV_NAMES = ("babyai", "minigrid", "multigrid", "minihack", "crafter", "nle", "textworld", "pettingzoo")
 
 # Valid LLM client names
 # OpenRouter provides unified access to all major model providers
@@ -51,7 +52,7 @@ class BarlogWorkerConfig:
     """
 
     run_id: str
-    env_name: Literal["babyai", "minigrid", "minihack", "crafter", "nle", "textworld"] = "babyai"
+    env_name: Literal["babyai", "minigrid", "multigrid", "minihack", "crafter", "nle", "textworld"] = "babyai"
     task: str = "BabyAI-GoToRedBall-v0"
     client_name: Literal["openrouter", "openai", "anthropic", "google", "vllm"] = "openrouter"
     model_id: str = "openai/gpt-4o-mini"  # OpenRouter format: provider/model
@@ -74,6 +75,11 @@ class BarlogWorkerConfig:
     # Set to 0 for text-only models (e.g., Qwen2.5-1.5B-Instruct)
     # Set to >= 1 for multimodal models (e.g., GPT-4V, Claude 3)
     max_image_history: int = 0
+    # MultiGrid-specific settings (for multi-agent environments)
+    agent_id: int = 0  # Agent index for multi-agent environments
+    observation_mode: str = "visible_teammates"  # "egocentric" or "visible_teammates"
+    coordination_level: int = 1  # 1=Emergent, 2=Basic Hints, 3=Role-Based
+    role: Optional[str] = None  # Agent role for Level 3 (e.g., "forward", "defender")
 
     def __post_init__(self) -> None:
         """Validate configuration after initialization."""
@@ -138,6 +144,9 @@ class BarlogWorkerConfig:
             "retry_delay": self.retry_delay,
             "timeout": self.timeout,
             "alternate_roles": self.alternate_roles,
+            "observation_mode": self.observation_mode,
+            "coordination_level": self.coordination_level,
+            "role": self.role,
         }
 
     def to_json(self, indent: int = 2) -> str:

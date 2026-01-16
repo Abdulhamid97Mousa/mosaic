@@ -1,0 +1,66 @@
+"""Documentation for Overcooked Forced Coordination layout."""
+from __future__ import annotations
+
+
+def get_forced_coordination_html(env_id: str) -> str:
+    """Generate Forced Coordination HTML documentation."""
+    return (
+        f"<h2>{env_id}</h2>"
+        "<p>An extreme coordination scenario where <strong>neither agent can complete a soup delivery alone</strong>. Spatial barriers force mandatory task division and item handoffs between agents.</p>"
+        "<h4>Layout Characteristics</h4>"
+        "<ul>"
+        "<li><strong>Difficulty:</strong> ⭐⭐⭐⭐⭐ (Expert)</li>"
+        "<li><strong>Challenge:</strong> Mandatory joint strategy - no solo completion</li>"
+        "<li><strong>SP-XP Gap:</strong> ⚠ SIGNIFICANT (requires explicit protocol)</li>"
+        "<li><strong>Best for:</strong> Testing true cooperation vs parallel execution</li>"
+        "</ul>"
+        "<h4>The Forced Dependency</h4>"
+        "<p>The layout divides the workspace such that:</p>"
+        "<ul>"
+        "<li><strong>Agent A:</strong> ✓ Accesses onions, ✓ Can place in pot, ✗ CANNOT access dishes or serving area</li>"
+        "<li><strong>Agent B:</strong> ✗ CANNOT access onions, ✓ Can retrieve soup from pot, ✓ Accesses dishes and serving</li>"
+        "</ul>"
+        "<p>⚠ <strong>Result:</strong> Neither agent can deliver soup independently - cooperation is STRICTLY NECESSARY!</p>"
+        "<h4>Required Workflow</h4>"
+        "<ol>"
+        "<li>Agent A: Gather 3 onions → Place in pot</li>"
+        "<li>(Both wait 20 timesteps for cooking)</li>"
+        "<li>Agent B: Get dish → Plate cooked soup from pot</li>"
+        "<li>Agent B: Deliver soup to serving area</li>"
+        "<li>Repeat with synchronized timing</li>"
+        "</ol>"
+        "<h4>Coordination Requirements</h4>"
+        "<ul>"
+        "<li>Strict task division (each agent has exclusive responsibilities)</li>"
+        "<li>Handoff synchronization (timing is critical)</li>"
+        "<li>Counter management for item transfers</li>"
+        "<li>Deadlock avoidance (don't block critical handoff points)</li>"
+        "<li>Protocol adherence (both must follow agreed workflow)</li>"
+        "</ul>"
+        "<h4>Common Failure Modes</h4>"
+        "<ul>"
+        "<li>⚠⚠⚠ <strong>Deadlock:</strong> Agent A fills pot but Agent B not ready → workflow blocked completely</li>"
+        "<li>Timing mismatch: Asynchronous cycles reduce throughput</li>"
+        "<li>Counter confusion: Wrong items picked up from shared counters</li>"
+        "<li>No protocol: Agents act independently → zero soups delivered</li>"
+        "</ul>"
+        "<h4>Performance Benchmarks (400 timesteps)</h4>"
+        "<ul>"
+        "<li>Independent agents (no coordination): ~0-10 points</li>"
+        "<li>Weak coordination: ~40-80 points (2-4 soups)</li>"
+        "<li>Good protocol (self-play): ~160-200 points (8-10 soups)</li>"
+        "<li>Expert: ~200-240 points (10-12 soups)</li>"
+        "<li>Human-human (first attempt): ~80-120 points (even humans struggle!)</li>"
+        "</ul>"
+        "<h4>Research Context</h4>"
+        "<p>Forced Coordination removes collision challenges and forces high-level joint strategy development. From Carroll et al.: \"Separates algorithms that learn true cooperation from those that merely learn parallel task execution.\"</p>"
+        "<p><strong>Key Insight:</strong> No partial credit - either coordinate explicitly or fail completely. This makes it an ultimate test of cooperative AI.</p>"
+        "<p><strong>Real-World Analogy:</strong> Assembly line where Worker A only accesses raw materials and Worker B only accesses packaging - product MUST pass through both.</p>"
+        "<p>See: <a href=\"https://github.com/HumanCompatibleAI/overcooked_ai\">Overcooked-AI Repository</a> | <a href=\"https://arxiv.org/abs/1910.05789\">Research Paper</a></p>"
+    )
+
+
+# For backward compatibility
+OVERCOOKED_FORCED_COORDINATION_HTML = get_forced_coordination_html("overcooked/forced_coordination")
+
+__all__ = ["OVERCOOKED_FORCED_COORDINATION_HTML", "get_forced_coordination_html"]

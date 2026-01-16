@@ -15,6 +15,7 @@ class RendererContext:
     """Contextual metadata made available to renderer strategies."""
 
     game_id: GameId | None = None
+    square_size: int | None = None  # For board games (Chess, Go, etc.)
 
 
 class RendererStrategy(Protocol):

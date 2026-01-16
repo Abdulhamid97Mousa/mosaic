@@ -135,7 +135,7 @@ class BoardGameRendererStrategy(RendererStrategy):
             self.reset()
             return
 
-        self._widget.render_game(game_id, dict(payload))
+        self._widget.render_game(game_id, dict(payload), context=context)
         self._current_game = game_id
 
     def supports(self, payload: Mapping[str, object]) -> bool:
@@ -294,10 +294,15 @@ class _BoardGameWidget(QtWidgets.QStackedWidget):
 
         self._current_game: GameId | None = None
 
-    def render_game(self, game_id: GameId, payload: Dict[str, Any]) -> None:
+    def render_game(self, game_id: GameId, payload: Dict[str, Any], context: RendererContext | None = None) -> None:
         """Render the specified board game."""
+        # Extract square_size from context if provided
+        square_size = context.square_size if context else None
+
         if game_id == GameId.CHESS:
             renderer = self._get_chess_renderer()
+            if square_size:
+                renderer.set_square_size(square_size)
             renderer.update_from_payload(payload)
             self.setCurrentWidget(renderer)
         elif game_id == GameId.CONNECT_FOUR:
@@ -480,6 +485,16 @@ class _ChessBoardRenderer(QtWidgets.QWidget):
     def _update_minimum_size(self) -> None:
         size = 8 * self._square_size + 2 * self._margin
         self.setMinimumSize(size, size)
+
+    def set_square_size(self, size: int) -> None:
+        """Set the square size for the chess board.
+
+        Args:
+            size: Size of each square in pixels.
+        """
+        self._square_size = size
+        self._update_minimum_size()
+        self.update()  # Trigger repaint
 
     def update_from_payload(self, payload: Dict[str, Any]) -> None:
         """Update chess board from payload."""

@@ -661,6 +661,153 @@ class JumanjiConfig:
         }
 
 
+@dataclass
+class MultiGridConfig:
+    """Configuration payload for gym-multigrid multi-agent environments.
+
+    gym-multigrid is a multi-agent extension of MiniGrid for training cooperative
+    and competitive multi-agent RL policies. All agents act simultaneously.
+
+    Repository: https://github.com/ArnaudFickinger/gym-multigrid
+    Location: 3rd_party/gym-multigrid/
+    """
+
+    env_id: str = "soccer"
+    """Environment variant: 'soccer' (2v2, 4 agents) or 'collect' (3 agents)."""
+
+    seed: int | None = None
+    """Random seed for reproducibility."""
+
+    highlight: bool = True
+    """Whether to highlight agent view cones in render."""
+
+    env_kwargs: Dict[str, Any] | None = None
+    """Additional environment-specific kwargs."""
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert config to dictionary."""
+        return {
+            "env_id": self.env_id,
+            "seed": self.seed,
+            "highlight": self.highlight,
+            "env_kwargs": self.env_kwargs or {},
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "MultiGridConfig":
+        """Create config from dictionary."""
+        return cls(
+            env_id=data.get("env_id", "soccer"),
+            seed=data.get("seed"),
+            highlight=data.get("highlight", True),
+            env_kwargs=data.get("env_kwargs"),
+        )
+
+
+@dataclass(frozen=True)
+class MeltingPotConfig:
+    """Configuration payload for Melting Pot multi-agent environments.
+
+    Melting Pot is a suite of test scenarios for multi-agent reinforcement learning
+    developed by Google DeepMind. It assesses generalization to novel social situations
+    involving both familiar and unfamiliar individuals, using the Shimmy PettingZoo wrapper.
+
+    Repository: https://github.com/google-deepmind/meltingpot
+    Shimmy: https://shimmy.farama.org/environments/meltingpot/
+
+    NOTE: Linux/macOS only (Windows NOT supported)
+    """
+
+    substrate_name: str = "collaborative_cooking__circuit"
+    """Substrate identifier (e.g., 'collaborative_cooking__circuit', 'commons_harvest__open').
+    Available substrates: collaborative_cooking, clean_up, commons_harvest, territory,
+    king_of_the_hill, prisoners_dilemma_in_the_matrix, stag_hunt_in_the_matrix,
+    allelopathic_harvest."""
+
+    seed: int | None = None
+    """Random seed for reproducibility."""
+
+    env_kwargs: Dict[str, Any] | None = None
+    """Additional environment-specific kwargs passed to Shimmy wrapper."""
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert config to dictionary."""
+        return {
+            "substrate_name": self.substrate_name,
+            "seed": self.seed,
+            "env_kwargs": self.env_kwargs or {},
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "MeltingPotConfig":
+        """Create config from dictionary."""
+        return cls(
+            substrate_name=data.get("substrate_name", "collaborative_cooking__circuit"),
+            seed=data.get("seed"),
+            env_kwargs=data.get("env_kwargs"),
+        )
+
+
+@dataclass(frozen=True)
+class OvercookedConfig:
+    """Configuration payload for Overcooked-AI cooperative cooking environments.
+
+    Overcooked-AI is a benchmark environment for fully cooperative human-AI task performance,
+    based on the cooperative cooking game. Two agents must coordinate to prepare and deliver
+    soups by collecting ingredients, placing them in pots, waiting for cooking, and serving.
+
+    Repository: https://github.com/HumanCompatibleAI/overcooked_ai
+    Paper: https://arxiv.org/abs/1910.05789 (NeurIPS 2019)
+
+    Research focus: Human-AI coordination, zero-shot coordination, behavior cloning
+    """
+
+    layout_name: str = "cramped_room"
+    """Layout identifier (e.g., 'cramped_room', 'asymmetric_advantages', 'coordination_ring').
+    Available research layouts: cramped_room, asymmetric_advantages, coordination_ring,
+    forced_coordination, counter_circuit (plus 45+ others)."""
+
+    horizon: int = 400
+    """Maximum episode length in timesteps."""
+
+    mdp_params: Dict[str, Any] | None = None
+    """MDP parameters passed to OvercookedGridworld.from_layout_name().
+    Common params: {'old_dynamics': True/False, 'start_positions': [(x,y), (x,y)]}."""
+
+    env_params: Dict[str, Any] | None = None
+    """Environment parameters passed to OvercookedEnv.from_mdp().
+    Common params: {'reward_shaping_params': dict, 'mlam_params': dict}."""
+
+    featurization: str = "lossless_encoding"
+    """State featurization method: 'lossless_encoding' (default) or 'featurize'."""
+
+    seed: int | None = None
+    """Random seed for reproducibility (used in MDP generation)."""
+
+    def to_dict(self) -> Dict[str, Any]:
+        """Convert config to dictionary."""
+        return {
+            "layout_name": self.layout_name,
+            "horizon": self.horizon,
+            "mdp_params": self.mdp_params or {},
+            "env_params": self.env_params or {},
+            "featurization": self.featurization,
+            "seed": self.seed,
+        }
+
+    @classmethod
+    def from_dict(cls, data: Dict[str, Any]) -> "OvercookedConfig":
+        """Create config from dictionary."""
+        return cls(
+            layout_name=data.get("layout_name", "cramped_room"),
+            horizon=data.get("horizon", 400),
+            mdp_params=data.get("mdp_params"),
+            env_params=data.get("env_params"),
+            featurization=data.get("featurization", "lossless_encoding"),
+            seed=data.get("seed"),
+        )
+
+
 # Type alias for all game configuration types
 GameConfig: TypeAlias = (
     FrozenLakeConfig
@@ -675,6 +822,9 @@ GameConfig: TypeAlias = (
     | ALEConfig
     | TextWorldConfig
     | JumanjiConfig
+    | MultiGridConfig
+    | MeltingPotConfig
+    | OvercookedConfig
 )
 
 
@@ -685,6 +835,27 @@ DEFAULT_JUMANJI_RUBIKS_CUBE_CONFIG = JumanjiConfig(env_id="jumanji/RubiksCube-v0
 DEFAULT_JUMANJI_SLIDING_PUZZLE_CONFIG = JumanjiConfig(env_id="jumanji/SlidingTilePuzzle-v0")
 DEFAULT_JUMANJI_SUDOKU_CONFIG = JumanjiConfig(env_id="jumanji/Sudoku-v0")
 DEFAULT_JUMANJI_GRAPH_COLORING_CONFIG = JumanjiConfig(env_id="jumanji/GraphColoring-v1")
+
+# Default MultiGrid configurations for each multi-agent environment
+DEFAULT_MULTIGRID_SOCCER_CONFIG = MultiGridConfig(env_id="soccer", highlight=True)
+DEFAULT_MULTIGRID_COLLECT_CONFIG = MultiGridConfig(env_id="collect", highlight=True)
+
+# Default Melting Pot configurations for each substrate
+DEFAULT_MELTINGPOT_COLLABORATIVE_COOKING_CONFIG = MeltingPotConfig(substrate_name="collaborative_cooking__circuit")
+DEFAULT_MELTINGPOT_CLEAN_UP_CONFIG = MeltingPotConfig(substrate_name="clean_up__repeated")
+DEFAULT_MELTINGPOT_COMMONS_HARVEST_CONFIG = MeltingPotConfig(substrate_name="commons_harvest__open")
+DEFAULT_MELTINGPOT_TERRITORY_CONFIG = MeltingPotConfig(substrate_name="territory__rooms")
+DEFAULT_MELTINGPOT_KING_OF_THE_HILL_CONFIG = MeltingPotConfig(substrate_name="king_of_the_hill__repeated")
+DEFAULT_MELTINGPOT_PRISONERS_DILEMMA_CONFIG = MeltingPotConfig(substrate_name="prisoners_dilemma_in_the_matrix__repeated")
+DEFAULT_MELTINGPOT_STAG_HUNT_CONFIG = MeltingPotConfig(substrate_name="stag_hunt_in_the_matrix__repeated")
+DEFAULT_MELTINGPOT_ALLELOPATHIC_HARVEST_CONFIG = MeltingPotConfig(substrate_name="allelopathic_harvest__open")
+
+# Default Overcooked configurations for core research layouts
+DEFAULT_OVERCOOKED_CRAMPED_ROOM_CONFIG = OvercookedConfig(layout_name="cramped_room", horizon=400)
+DEFAULT_OVERCOOKED_ASYMMETRIC_ADVANTAGES_CONFIG = OvercookedConfig(layout_name="asymmetric_advantages", horizon=400)
+DEFAULT_OVERCOOKED_COORDINATION_RING_CONFIG = OvercookedConfig(layout_name="coordination_ring", horizon=400)
+DEFAULT_OVERCOOKED_FORCED_COORDINATION_CONFIG = OvercookedConfig(layout_name="forced_coordination", horizon=400)
+DEFAULT_OVERCOOKED_COUNTER_CIRCUIT_CONFIG = OvercookedConfig(layout_name="counter_circuit", horizon=400)
 
 
 __all__ = [
@@ -701,6 +872,9 @@ __all__ = [
     "ALEConfig",
     "TextWorldConfig",
     "JumanjiConfig",
+    "MultiGridConfig",
+    "MeltingPotConfig",
+    "OvercookedConfig",
     "GameConfig",
     "DEFAULT_FROZEN_LAKE_CONFIG",
     "DEFAULT_FROZEN_LAKE_V2_CONFIG",
@@ -729,4 +903,19 @@ __all__ = [
     "DEFAULT_JUMANJI_SLIDING_PUZZLE_CONFIG",
     "DEFAULT_JUMANJI_SUDOKU_CONFIG",
     "DEFAULT_JUMANJI_GRAPH_COLORING_CONFIG",
+    "DEFAULT_MULTIGRID_SOCCER_CONFIG",
+    "DEFAULT_MULTIGRID_COLLECT_CONFIG",
+    "DEFAULT_MELTINGPOT_COLLABORATIVE_COOKING_CONFIG",
+    "DEFAULT_MELTINGPOT_CLEAN_UP_CONFIG",
+    "DEFAULT_MELTINGPOT_COMMONS_HARVEST_CONFIG",
+    "DEFAULT_MELTINGPOT_TERRITORY_CONFIG",
+    "DEFAULT_MELTINGPOT_KING_OF_THE_HILL_CONFIG",
+    "DEFAULT_MELTINGPOT_PRISONERS_DILEMMA_CONFIG",
+    "DEFAULT_MELTINGPOT_STAG_HUNT_CONFIG",
+    "DEFAULT_MELTINGPOT_ALLELOPATHIC_HARVEST_CONFIG",
+    "DEFAULT_OVERCOOKED_CRAMPED_ROOM_CONFIG",
+    "DEFAULT_OVERCOOKED_ASYMMETRIC_ADVANTAGES_CONFIG",
+    "DEFAULT_OVERCOOKED_COORDINATION_RING_CONFIG",
+    "DEFAULT_OVERCOOKED_FORCED_COORDINATION_CONFIG",
+    "DEFAULT_OVERCOOKED_COUNTER_CIRCUIT_CONFIG",
 ]

@@ -15,6 +15,7 @@ from gym_gui.config.game_configs import (
     ALEConfig,
     TaxiConfig,
     BlackjackConfig,
+    MultiGridConfig,
 )
 from gym_gui.core.adapters.base import AdapterContext, EnvironmentAdapter
 from gym_gui.core.adapters.toy_text import TOY_TEXT_ADAPTERS
@@ -32,6 +33,7 @@ if TYPE_CHECKING:
     from gym_gui.config.game_configs import TextWorldConfig as _TextWorldConfigType
     from gym_gui.config.game_configs import JumanjiConfig as _JumanjiConfigType
     from gym_gui.core.adapters.pybullet_drones import PyBulletDronesConfig as _PyBulletDronesConfigType
+    from gym_gui.config.game_configs import MeltingPotConfig as _MeltingPotConfigType
 
 try:  # Optional dependency
     from gym_gui.core.adapters.vizdoom import (  # pragma: no cover - optional
@@ -137,6 +139,61 @@ except Exception:  # pragma: no cover - openspiel optional
     OPENSPIEL_ADAPTERS: dict[Any, Any] = {}
     CheckersEnvironmentAdapter = None  # type: ignore[misc, assignment]
 
+try:  # Draughts/Checkers variants with proper rule implementations
+    from gym_gui.core.adapters.draughts import (  # pragma: no cover - draughts
+        DRAUGHTS_ADAPTERS,
+        AmericanCheckersAdapter,
+        RussianCheckersAdapter,
+        InternationalDraughtsAdapter,
+    )
+except Exception:  # pragma: no cover - draughts adapters
+    DRAUGHTS_ADAPTERS: dict[Any, Any] = {}
+    AmericanCheckersAdapter = None  # type: ignore[misc, assignment]
+    RussianCheckersAdapter = None  # type: ignore[misc, assignment]
+    InternationalDraughtsAdapter = None  # type: ignore[misc, assignment]
+
+try:  # Optional dependency - BabaIsAI (rule manipulation puzzle benchmark)
+    from gym_gui.core.adapters.babaisai import (  # pragma: no cover - optional
+        BABAISAI_ADAPTERS,
+        BabaIsAIAdapter,
+        BabaIsAIConfig,
+    )
+except Exception:  # pragma: no cover - babaisai optional
+    BABAISAI_ADAPTERS: dict[Any, Any] = {}
+    BabaIsAIAdapter = None  # type: ignore[misc, assignment]
+    BabaIsAIConfig = None  # type: ignore[misc, assignment]
+
+try:  # Optional dependency - gym-multigrid (multi-agent grid environments)
+    from gym_gui.core.adapters.multigrid import (  # pragma: no cover - optional
+        MULTIGRID_ADAPTERS,
+        MultiGridAdapter,
+    )
+except Exception:  # pragma: no cover - multigrid optional
+    MULTIGRID_ADAPTERS: dict[Any, Any] = {}
+    MultiGridAdapter = None  # type: ignore[misc, assignment]
+
+try:  # Optional dependency - Melting Pot (multi-agent social scenarios via Shimmy)
+    from gym_gui.core.adapters.meltingpot import (  # pragma: no cover - optional
+        MELTINGPOT_ADAPTERS,
+        MeltingPotAdapter,
+    )
+    from gym_gui.config.game_configs import MeltingPotConfig
+except Exception:  # pragma: no cover - meltingpot optional
+    MELTINGPOT_ADAPTERS: dict[Any, Any] = {}
+    MeltingPotAdapter = None  # type: ignore[misc, assignment]
+    MeltingPotConfig = None  # type: ignore[misc, assignment]
+
+try:  # pragma: no cover - optional dep: overcooked
+    from gym_gui.core.adapters.overcooked import (  # pragma: no cover - optional
+        OVERCOOKED_ADAPTERS,
+        OvercookedAdapter,
+    )
+    from gym_gui.config.game_configs import OvercookedConfig
+except Exception:  # pragma: no cover - overcooked optional
+    OVERCOOKED_ADAPTERS: dict[Any, Any] = {}
+    OvercookedAdapter = None  # type: ignore[misc, assignment]
+    OvercookedConfig = None  # type: ignore[misc, assignment]
+
 from gym_gui.core.enums import GameId
 
 AdapterT = TypeVar("AdapterT", bound=EnvironmentAdapter)
@@ -170,6 +227,11 @@ def _registry() -> Mapping[GameId, type[EnvironmentAdapter]]:
         **JUMANJI_ADAPTERS,
         **PYBULLET_DRONES_ADAPTERS,
         **OPENSPIEL_ADAPTERS,
+        **DRAUGHTS_ADAPTERS,
+        **BABAISAI_ADAPTERS,
+        **MULTIGRID_ADAPTERS,
+        **MELTINGPOT_ADAPTERS,
+        **OVERCOOKED_ADAPTERS,
     }
 
 
@@ -202,6 +264,7 @@ def create_adapter(
         | BipedalWalkerConfig
         | MiniGridConfig
         | ALEConfig
+        | MultiGridConfig
         | "_ViZDoomConfigType"
         | "_MiniHackConfigType"
         | "_NetHackConfigType"
@@ -210,6 +273,7 @@ def create_adapter(
         | "_TextWorldConfigType"
         | "_JumanjiConfigType"
         | "_PyBulletDronesConfigType"
+        | "_MeltingPotConfigType"
         | None
     ) = None,
 ) -> EnvironmentAdapter:
@@ -327,6 +391,26 @@ def create_adapter(
             and issubclass(adapter_cls, PyBulletDronesAdapter)
             and PyBulletDronesConfig is not None
             and isinstance(game_config, PyBulletDronesConfig)
+        ):
+            adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
+        elif (
+            MultiGridAdapter is not None
+            and issubclass(adapter_cls, MultiGridAdapter)
+            and isinstance(game_config, MultiGridConfig)
+        ):
+            adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
+        elif (
+            MeltingPotAdapter is not None
+            and issubclass(adapter_cls, MeltingPotAdapter)
+            and MeltingPotConfig is not None
+            and isinstance(game_config, MeltingPotConfig)
+        ):
+            adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
+        elif (
+            OvercookedAdapter is not None
+            and issubclass(adapter_cls, OvercookedAdapter)
+            and OvercookedConfig is not None
+            and isinstance(game_config, OvercookedConfig)
         ):
             adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
         else:

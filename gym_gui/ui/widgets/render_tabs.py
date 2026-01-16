@@ -76,6 +76,11 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
     # Signal emitted when a Checkers cell is clicked (row, col)
     checkers_cell_clicked: "QtCore.SignalInstance" = QtCore.Signal(int, int)  # type: ignore[assignment]
 
+    # Human operator interaction signals (from Multi-Operator view)
+    human_action_submitted: "QtCore.SignalInstance" = QtCore.Signal(str, int)  # type: ignore[assignment]  # operator_id, action_index
+    board_game_move_made: "QtCore.SignalInstance" = QtCore.Signal(str, str, str)  # type: ignore[assignment]  # operator_id, from_sq, to_sq
+    chess_move_button_clicked: "QtCore.SignalInstance" = QtCore.Signal(str, str)  # type: ignore[assignment]  # operator_id, uci_move
+
     _current_game: GameId | None
 
     def __init__(
@@ -141,8 +146,12 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
         self._multi_operator_tab_index = self.addTab(self._multi_operator_view, "Multi-Operator")
         self.setTabToolTip(
             self._multi_operator_tab_index,
-            "Side-by-side comparison of multiple operators (LLM, RL)"
+            "Side-by-side comparison of multiple operators (LLM, RL, Human)"
         )
+        # Connect human interaction signals from multi-operator view
+        self._multi_operator_view.human_action_submitted.connect(self.human_action_submitted.emit)
+        self._multi_operator_view.board_game_move_made.connect(self.board_game_move_made.emit)
+        self._multi_operator_view.chess_move_button_clicked.connect(self.chess_move_button_clicked.emit)
 
         # Management tab for training runs (optional, requires run_manager)
         self._management_tab: Optional["ManagementTab"] = None
@@ -546,6 +555,51 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
     def multi_operator_view(self) -> MultiOperatorRenderView:
         """Get the multi-operator render view widget."""
         return self._multi_operator_view
+
+    # --- Human Operator Methods ---
+
+    def set_interactive(self, operator_id: str, enabled: bool) -> None:
+        """Enable or disable interactive mode for an operator.
+
+        Args:
+            operator_id: The operator's ID.
+            enabled: True to enable user interaction (for human operators).
+        """
+        self._multi_operator_view.set_interactive(operator_id, enabled)
+
+    def set_game_id(self, operator_id: str, game_id: "GameId") -> None:
+        """Set the game ID for an operator to configure keyboard mappings.
+
+        Args:
+            operator_id: The operator's ID.
+            game_id: The GameId for the current environment.
+        """
+        self._multi_operator_view.set_game_id(operator_id, game_id)
+
+    def set_human_turn(self, operator_id: str, is_their_turn: bool) -> None:
+        """Set the 'Your Turn' indicator for a human operator.
+
+        Args:
+            operator_id: The human operator's ID.
+            is_their_turn: True to show indicator, False to hide.
+        """
+        self._multi_operator_view.set_human_turn(operator_id, is_their_turn)
+
+    def set_available_actions(
+        self, operator_id: str, actions: List[int], labels: Optional[List[str]] = None
+    ) -> None:
+        """Set available actions for a human operator.
+
+        Args:
+            operator_id: The human operator's ID.
+            actions: List of valid action indices.
+            labels: Optional human-readable labels.
+        """
+        self._multi_operator_view.set_available_actions(operator_id, actions, labels)
+
+    def get_human_operator_ids(self) -> List[str]:
+        """Get list of human operator IDs from multi-operator view."""
+        return self._multi_operator_view.get_human_operator_ids()
 
     def _on_runs_deleted(self, run_ids: list[str]) -> None:
         """Handle deletion of runs by closing associated dynamic tabs.

@@ -55,6 +55,22 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
     """
     return (
         WorkerDefinition(
+            worker_id="mosaic_llm_worker",
+            display_name="MOSAIC LLM Worker",
+            description=(
+                "Native MOSAIC multi-agent LLM worker with Theory of Mind. "
+                "Multi-agent coordination: Independent, Shared Memory, Full Communication. "
+                "Supports OpenRouter, OpenAI, Anthropic, Google, and local vLLM backends. "
+                "Works with BabyAI, MiniGrid, MiniHack, Crafter, TextWorld, BabaIsAI, MultiGrid, MeltingPot. "
+                "Agent strategies: Naive, Chain-of-Thought, Robust, Few-Shot, Custom."
+            ),
+            supports_training=False,  # LLM inference only, no RL training
+            supports_policy_load=True,  # Can load LLM configuration
+            requires_live_telemetry=True,  # Emits step/episode telemetry
+            provides_fast_analytics=False,  # No pre-computed analytics
+            supports_multi_agent=True,  # Multi-agent coordination
+        ),
+        WorkerDefinition(
             worker_id="balrog_worker",
             display_name="BALROG LLM Worker",
             description=(
@@ -132,11 +148,11 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
         ),
         WorkerDefinition(
             worker_id="human_worker",
-            display_name="Human Player",
+            display_name="MOSAIC Human Worker",
             description=(
-                "Human-in-the-loop action selection via GUI clicks. "
-                "When it's the human's turn, click on the board to select moves. "
-                "Works with PettingZoo chess, Go, Connect Four, Tic-Tac-Toe. "
+                "Native MOSAIC human-in-the-loop action selection. "
+                "Keyboard shortcuts and click-to-select for all supported environments. "
+                "Works with MiniGrid, BabyAI, Crafter, MiniHack, NetHack, PettingZoo games. "
                 "Enables human vs LLM and human vs RL policy comparisons."
             ),
             supports_training=False,  # Human doesn't train

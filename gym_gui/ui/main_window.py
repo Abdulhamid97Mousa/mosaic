@@ -49,6 +49,10 @@ from gym_gui.logging_config.log_constants import (
     LOG_OPERATOR_ENV_PREVIEW_SUCCESS,
     LOG_OPERATOR_ENV_PREVIEW_IMPORT_ERROR,
     LOG_OPERATOR_ENV_PREVIEW_ERROR,
+    LOG_OPERATOR_PARALLEL_RESET_STARTED,
+    LOG_OPERATOR_PARALLEL_STEP_STARTED,
+    LOG_OPERATOR_PARALLEL_STEP_COMPLETED,
+    LOG_UI_BOARD_CONFIG_ENV_INIT_CUSTOM,
 )
 from gym_gui.constants import DEFAULT_RENDER_DELAY_MS
 from gym_gui.logging_config.logger import list_known_components
@@ -58,10 +62,16 @@ from gym_gui.ui.presenters.main_window_presenter import MainWindowPresenter, Mai
 from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWidget
 from gym_gui.ui.indicators.busy_indicator import modal_busy_indicator
 from gym_gui.ui.widgets.render_tabs import RenderTabs
+from gym_gui.ui.widgets.multi_agent_action_panel import MultiAgentActionPanel
 from gym_gui.game_docs import get_game_info
 from gym_gui.game_docs.mosaic_welcome import MOSAIC_WELCOME_HTML
 from gym_gui.services.actor import ActorService
-from gym_gui.services.operator import OperatorConfig, OperatorDescriptor, MultiOperatorService
+from gym_gui.services.operator import (
+    OperatorConfig,
+    OperatorDescriptor,
+    MultiOperatorService,
+    MultiAgentStepState,
+)
 from gym_gui.services.operator_launcher import OperatorLauncher, OperatorLaunchError
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
@@ -213,6 +223,15 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._pettingzoo_multiagent_mode: bool = False
         self._pettingzoo_player_handles: Dict[str, Any] = {}  # player_id -> handle
         self._pettingzoo_current_seed: int = 42
+
+        # Parallel multi-agent mode (MultiGrid, MeltingPot, Overcooked)
+        # Similar to PettingZoo but uses Parallel API (simultaneous stepping)
+        self._parallel_multiagent_mode: bool = False
+        self._parallel_multiagent_env: Any = None
+        self._parallel_multiagent_config: Optional[OperatorConfig] = None
+        self._parallel_multiagent_step_state: Optional[MultiAgentStepState] = None
+        self._parallel_action_panel: Optional[MultiAgentActionPanel] = None
+        self._parallel_player_handles: Dict[str, Any] = {}  # agent_id -> handle
 
         # Track dynamic agent tabs by (run_id, agent_id)
         self._agent_tab_index: set[tuple[str, str]] = set()
@@ -771,6 +790,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._control_panel.reset_all_requested.connect(self._on_reset_all_operators)
         self._control_panel.stop_operators_requested.connect(self._on_stop_operators)
         self._control_panel.initialize_operator_requested.connect(self._on_initialize_operator)
+        self._control_panel.human_action_requested.connect(self._on_human_action_submitted)
         # Game configuration handlers (delegated)
         self._control_panel.slippery_toggled.connect(self._game_config_handler.on_slippery_toggled)
         self._control_panel.frozen_v2_config_changed.connect(self._game_config_handler.on_frozen_v2_config_changed)
@@ -821,6 +841,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._render_tabs.sudoku_cell_cleared.connect(self._sudoku_handler.on_cell_cleared)
         # Checkers handler (OpenSpiel via Shimmy - two-click selection)
         self._render_tabs.checkers_cell_clicked.connect(self._checkers_handler.on_checkers_cell_clicked)
+
+        # Human operator interaction signals (from Multi-Operator view)
+        self._render_tabs.human_action_submitted.connect(self._on_human_action_submitted)
+        self._render_tabs.board_game_move_made.connect(self._on_human_board_game_move)
 
         self._session.seed_applied.connect(self._on_seed_applied)
 
@@ -952,8 +976,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     extra={"operator_type": config.operator_type, "worker_id": config.worker_id},
                 )
             else:
-                # Existing operator - update config if needed
+                # Existing operator - update config (including workers) in both service and view
                 self._multi_operator_service.add_operator(config)  # Will update if exists
+                self._render_tabs.update_operator_view(config)  # Update container's config
 
         count = len(configs)
         self._status_bar.showMessage(
@@ -978,9 +1003,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         if first_config is None:
             return False, None
 
-        # PettingZoo multi-agent: env_name == "pettingzoo" and multiple workers per operator
+        # PettingZoo multi-agent: env_name in ("pettingzoo", "pettingzoo_classic") and multiple workers per operator
         # or multiple operators assigned to different players
-        if first_config.env_name == "pettingzoo":
+        if first_config.env_name in ("pettingzoo", "pettingzoo_classic"):
             # Check if we have multiple workers (player assignments)
             if len(first_config.workers) > 1:
                 return True, first_config
@@ -990,12 +1015,125 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         return False, None
 
-    def _create_pettingzoo_env(self, task: str, seed: int) -> Any:
+    def _is_parallel_multiagent(self) -> tuple[bool, Optional["OperatorConfig"]]:
+        """Check if we're in parallel multi-agent mode (MultiGrid, MeltingPot, Overcooked).
+
+        Parallel multi-agent environments use the Parallel API where all agents
+        act simultaneously in each step.
+
+        Returns:
+            Tuple of (is_parallel_multiagent, first_config) where first_config
+            contains the environment and worker configuration.
+        """
+        active_operators = self._multi_operator_service.get_active_operators()
+        if not active_operators:
+            return False, None
+
+        # Get first operator config
+        first_id = next(iter(active_operators.keys()))
+        first_config = self._multi_operator_service.get_operator(first_id)
+        if first_config is None:
+            return False, None
+
+        # Check if this is a parallel multi-agent environment
+        if first_config.env_name in ("multigrid", "meltingpot", "overcooked"):
+            # Must have multiple workers (agents)
+            if len(first_config.workers) > 1:
+                return True, first_config
+
+        return False, None
+
+    def _apply_minigrid_custom_state(self, env: Any, state_json: str) -> bool:
+        """Apply custom grid state to a MiniGrid environment.
+
+        Args:
+            env: The MiniGrid gymnasium environment
+            state_json: JSON string containing the custom grid state
+
+        Returns:
+            True if state was applied successfully
+        """
+        import json
+
+        try:
+            state_dict = json.loads(state_json)
+        except json.JSONDecodeError as e:
+            _OP_LOGGER.warning(f"Invalid MiniGrid state JSON: {e}")
+            return False
+
+        try:
+            # Import MiniGrid object types
+            from minigrid.core.world_object import (
+                Wall, Goal, Key, Door, Ball, Box, Lava, Floor
+            )
+
+            # Map our object types to MiniGrid classes
+            # Colors available: red, green, blue, purple, yellow, grey
+            obj_type_map = {
+                "wall": lambda color: Wall(),
+                "goal": lambda color: Goal(),
+                "lava": lambda color: Lava(),
+                "key": lambda color: Key(color=color if color != "none" else "yellow"),
+                "door": lambda color: Door(color=color if color != "none" else "yellow"),
+                "ball": lambda color: Ball(color=color if color != "none" else "blue"),
+                "box": lambda color: Box(color=color if color != "none" else "red"),
+            }
+
+            unwrapped = env.unwrapped
+            grid = unwrapped.grid
+            rows = state_dict.get("rows", unwrapped.height)
+            cols = state_dict.get("cols", unwrapped.width)
+
+            # Clear the interior of the grid (keep walls on border if present)
+            for x in range(1, cols - 1):
+                for y in range(1, rows - 1):
+                    grid.set(x, y, None)
+
+            # Place objects from state
+            for cell_data in state_dict.get("cells", []):
+                row = cell_data.get("row", 0)
+                col = cell_data.get("col", 0)
+
+                # Convert our (row, col) to MiniGrid's (x, y) where x=col, y=row
+                x, y = col, row
+
+                for obj_data in cell_data.get("objects", []):
+                    obj_type = obj_data.get("type", "empty")
+                    color = obj_data.get("color", "none")
+
+                    if obj_type in obj_type_map:
+                        obj = obj_type_map[obj_type](color)
+                        grid.set(x, y, obj)
+
+            # Set agent position and direction
+            agent_pos = state_dict.get("agent_pos")
+            if agent_pos:
+                # Convert (row, col) to (x, y)
+                agent_row, agent_col = agent_pos
+                unwrapped.agent_pos = (agent_col, agent_row)
+
+            agent_dir = state_dict.get("agent_dir", 0)
+            unwrapped.agent_dir = agent_dir
+
+            _OP_LOGGER.info(
+                f"Applied custom MiniGrid state: {rows}x{cols} grid, "
+                f"agent at ({agent_pos}), dir={agent_dir}"
+            )
+            return True
+
+        except Exception as e:
+            _OP_LOGGER.error(f"Failed to apply MiniGrid custom state: {e}")
+            return False
+
+    def _create_pettingzoo_env(
+        self, task: str, seed: int, initial_state: Optional[str] = None
+    ) -> Any:
         """Create a PettingZoo environment for multi-agent games.
 
         Args:
             task: The specific game (e.g., "chess_v6", "connect_four_v3").
             seed: Random seed for initialization.
+            initial_state: Optional custom initial state (FEN for chess).
 
         Returns:
             The PettingZoo AEC environment.
@@ -1019,6 +1157,17 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         env = env_factories[task](render_mode="rgb_array")
         env.reset(seed=seed)
+
+        # Apply custom initial state if provided (for board games like chess)
+        if initial_state and task == "chess_v6" and hasattr(env, "board"):
+            try:
+                env.board.set_fen(initial_state)
+                _OP_LOGGER.info(
+                    f"Applied custom FEN position: {initial_state[:50]}..."
+                )
+            except Exception as e:
+                _OP_LOGGER.warning(f"Failed to apply custom FEN: {e}")
+
         return env
 
     def _get_chess_legal_moves(self, env: Any) -> list[str]:
@@ -1143,18 +1292,138 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._on_reset_pettingzoo_multiagent(seed, first_config)
             return
 
+        # Check if this is parallel multi-agent mode (MultiGrid, MeltingPot, Overcooked)
+        is_parallel, parallel_config = self._is_parallel_multiagent()
+        _OP_LOGGER.debug(
+            "_on_reset_all_operators: is_parallel=%s, parallel_config=%s",
+            is_parallel, parallel_config,
+        )
+        if is_parallel and parallel_config is not None:
+            # Parallel multi-agent: GUI owns the shared environment
+            _OP_LOGGER.debug("_on_reset_all_operators: Taking Parallel multi-agent path")
+            self._on_reset_parallel_multiagent(seed, parallel_config)
+            return
+
         # Standard single-agent flow: each worker owns its own environment
         # Get operators that are pending (not yet started)
         pending_ids = self._multi_operator_service.start_all()
 
         # Launch subprocess workers for each operator that needs to be started
+        # All operators (human, LLM, RL) use subprocess workers for consistency
         started_ids = []
         failed_ids = []
+
         for operator_id in pending_ids:
             config = self._multi_operator_service.get_operator(operator_id)
             if config is None:
                 continue
 
+            # Human operators: launch subprocess (same pattern as LLM/RL workers)
+            # The human_worker subprocess owns the gymnasium environment
+            if config.worker_id == "human_worker":
+                try:
+                    # Launch human_worker subprocess in interactive mode
+                    handle = self._operator_launcher.launch_operator(
+                        config,
+                        interactive=True,
+                    )
+
+                    # Read the "init" message that the worker emits on startup
+                    init_response = handle.read_response(timeout=5.0)
+                    if init_response is None:
+                        raise RuntimeError("Timeout waiting for human_worker init")
+                    if init_response.get("type") != "init":
+                        self.log_constant(
+                            LOG_UI_MAINWINDOW_WARNING,
+                            message=f"Unexpected first response from human_worker: {init_response.get('type')}",
+                        )
+
+                    # Send reset command with seed and env configuration
+                    # Include initial_state if configured (for custom board/grid positions)
+                    reset_cmd: Dict[str, Any] = {
+                        "cmd": "reset",
+                        "seed": seed,
+                        "env_name": config.env_name,
+                        "task": config.task,
+                    }
+                    # Pass settings including initial_state for custom configurations
+                    if config.settings:
+                        reset_cmd["settings"] = config.settings
+                    handle.send_command(reset_cmd)
+
+                    # Wait for "ready" response with action labels and initial render
+                    response = handle.read_response(timeout=10.0)
+                    if response is None:
+                        raise RuntimeError("Timeout waiting for human_worker ready response")
+
+                    if response.get("type") == "error":
+                        raise RuntimeError(response.get("message", "Unknown error from human_worker"))
+
+                    if response.get("type") != "ready":
+                        raise RuntimeError(f"Unexpected response type: {response.get('type')}")
+
+                    # Extract action labels and render payload from ready response
+                    action_labels = response.get("action_labels", [])
+                    action_space_n = response.get("action_space", len(action_labels))
+                    render_payload = response.get("render_payload")
+
+                    # Update render container with initial state
+                    if render_payload:
+                        wrapped_payload = {
+                            "render_payload": render_payload,
+                            "episode_index": 0,
+                            "step_index": 0,
+                            "reward": 0.0,
+                            "episode_reward": 0.0,
+                        }
+                        self._render_tabs.display_operator_payload(operator_id, wrapped_payload)
+
+                    # Enable interactive mode for human operators
+                    self._render_tabs.set_interactive(operator_id, True)
+
+                    # Set game-specific keyboard mappings
+                    try:
+                        game_id = GameId(config.env_name)
+                        self._render_tabs.set_game_id(operator_id, game_id)
+                    except ValueError:
+                        pass
+
+                    # Set available actions from the worker's response
+                    actions = list(range(action_space_n))
+                    self._render_tabs.set_available_actions(operator_id, actions, action_labels)
+
+                    # Set "Your Turn" indicator
+                    self._render_tabs.set_human_turn(operator_id, True)
+
+                    # Assign run_id and set state
+                    self._multi_operator_service.assign_run_id(operator_id, handle.run_id)
+                    self._multi_operator_service.set_operator_state(operator_id, "running")
+                    started_ids.append(operator_id)
+
+                    self.log_constant(
+                        LOG_UI_MAINWINDOW_INFO,
+                        message=f"Launched human_worker subprocess for operator",
+                        extra={
+                            "operator_id": operator_id,
+                            "seed": seed,
+                            "env_name": config.env_name,
+                            "task": config.task,
+                            "action_count": action_space_n,
+                            "run_id": handle.run_id,
+                            "pid": handle.pid,
+                        },
+                    )
+                except Exception as e:
+                    self._multi_operator_service.set_operator_state(operator_id, "error")
+                    failed_ids.append(operator_id)
+                    self.log_constant(
+                        LOG_UI_MAINWINDOW_ERROR,
+                        message=f"Failed to launch human_worker: {e}",
+                        extra={"operator_id": operator_id, "seed": seed},
+                    )
+                continue
+
+            # Non-human operators: launch subprocess
             try:
                 # Launch the subprocess in interactive mode for step-by-step control
                 handle = self._operator_launcher.launch_operator(
@@ -1209,6 +1478,11 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # Switch to Multi-Operator tab
         self._render_tabs.switch_to_multi_operator_tab()
 
+        # Show "Your Turn" indicator for human operators
+        human_operator_ids = self._render_tabs.get_human_operator_ids()
+        for human_op_id in human_operator_ids:
+            self._render_tabs.set_human_turn(human_op_id, True)
+
         count = len(started_ids)
         if failed_ids:
             self._status_bar.showMessage(
@@ -1240,6 +1514,16 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         """
         task = config.task  # e.g., "chess_v6"
 
+        # Extract custom initial state from worker settings (e.g., custom FEN for chess)
+        initial_state = None
+        if config.workers:
+            first_worker_id = next(iter(config.workers.keys()))
+            initial_state = config.workers[first_worker_id].settings.get("initial_state")
+            if initial_state:
+                _OP_LOGGER.debug(
+                    f"Found custom initial_state in worker '{first_worker_id}': {initial_state[:50]}..."
+                )
+
         # Close existing shared environment if any
         if self._shared_pettingzoo_env is not None:
             try:
@@ -1249,7 +1533,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         # Create the shared environment in the GUI
         try:
-            self._shared_pettingzoo_env = self._create_pettingzoo_env(task, seed)
+            self._shared_pettingzoo_env = self._create_pettingzoo_env(task, seed, initial_state)
             self._pettingzoo_multiagent_mode = True
             self._pettingzoo_current_seed = seed
             self._pettingzoo_player_handles.clear()
@@ -1369,7 +1653,16 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     op_id, container_size, container_size
                 )
 
-        # Render initial board state
+        # Enable interactive mode for human operators BEFORE rendering
+        # (so that legal moves panel is shown during render)
+        for op_id, op_config in active_operators.items():
+            for player_id, worker_assignment in op_config.workers.items():
+                if worker_assignment.worker_type == "human" or worker_assignment.worker_id == "human_worker":
+                    self._render_tabs.set_interactive(op_id, True)
+                    _OP_LOGGER.debug("Enabled interactive mode for operator %s", op_id)
+                    break  # One human worker is enough to enable interactive mode
+
+        # Render initial board state (after enabling interactive mode)
         self._render_pettingzoo_frame()
 
         # Show turn indicator for first player
@@ -1492,11 +1785,29 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._on_step_pettingzoo_multiagent()
             return
 
+        # Check if we're in parallel multi-agent mode (MultiGrid, MeltingPot, Overcooked)
+        if self._parallel_multiagent_mode and self._parallel_multiagent_env is not None:
+            self._on_step_parallel_multiagent()
+            return
+
         # Standard single-agent flow: each worker owns its own environment
         # Send step command to each running operator subprocess
+        # NOTE: Human operators are EXCLUDED - they only respond to action button clicks
         stepped_count = 0
+        skipped_human_count = 0
         stepped_handles = []  # Track handles that received step command
         for operator_id in active_operators:
+            # Skip Human operators - they are controlled by action buttons, not Step All
+            config = self._multi_operator_service.get_operator(operator_id)
+            if config and config.worker_id == "human_worker":
+                skipped_human_count += 1
+                self.log_constant(
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message=f"Skipping human operator in Step All (use action buttons)",
+                    extra={"operator_id": operator_id},
+                )
+                continue
+
             handle = self._operator_launcher.get_handle(operator_id)
             if handle is None:
                 self.log_constant(
@@ -1515,7 +1826,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 self._multi_operator_service.set_operator_state(operator_id, "stopped")
                 continue
 
-            # Send step command
+            # Send step command (only for non-human operators)
             if handle.send_step():
                 stepped_count += 1
                 stepped_handles.append((operator_id, handle))
@@ -1539,12 +1850,247 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self.log_constant(
             LOG_OPERATOR_STEP_ALL_COMPLETED,
             message=f"Step all operators completed",
-            extra={"stepped_count": stepped_count, "total_active": len(active_operators)},
+            extra={
+                "stepped_count": stepped_count,
+                "skipped_human": skipped_human_count,
+                "total_active": len(active_operators),
+            },
         )
-        self._status_bar.showMessage(
-            f"Stepped {stepped_count} operator{'s' if stepped_count != 1 else ''}",
-            2000
+        # Build status message
+        status_parts = []
+        if stepped_count > 0:
+            status_parts.append(f"Stepped {stepped_count} AI operator{'s' if stepped_count != 1 else ''}")
+        if skipped_human_count > 0:
+            status_parts.append(f"{skipped_human_count} Human (use action buttons)")
+        if status_parts:
+            self._status_bar.showMessage(" | ".join(status_parts), 3000)
+        else:
+            self._status_bar.showMessage("No operators to step", 2000)
+
+    # --- Human Operator Action Handlers ---
+
+    def _on_human_action_submitted(self, operator_id: str, action: int) -> None:
+        """Handle action submitted by a human operator via button click or keyboard.
+
+        This sends a step command with the action to the human_worker subprocess,
+        which owns the gymnasium environment. The response includes the updated
+        render payload which is displayed in the render container.
+
+        Args:
+            operator_id: The human operator's ID.
+            action: The action index selected by the human.
+        """
+        _OP_LOGGER.info(
+            "Human action submitted: operator=%s, action=%d",
+            operator_id, action,
         )
+
+        # Get the human operator's configuration
+        config = self._multi_operator_service.get_operator(operator_id)
+        if config is None:
+            _OP_LOGGER.warning(f"Human action for unknown operator: {operator_id}")
+            return
+
+        if config.worker_id != "human_worker":
+            _OP_LOGGER.warning(f"Action submitted for non-human operator: {operator_id}")
+            return
+
+        # Get the subprocess handle for this operator
+        handle = self._operator_launcher.get_handle(operator_id)
+        if handle is None or not handle.is_running:
+            _OP_LOGGER.warning(f"No running subprocess for human operator: {operator_id}")
+            self._status_bar.showMessage(f"Human operator not running", 3000)
+            return
+
+        # Send step command with action to the subprocess
+        if not handle.send_step_with_action(action):
+            _OP_LOGGER.error(f"Failed to send step command to human operator: {operator_id}")
+            self._status_bar.showMessage(f"Failed to send action", 3000)
+            return
+
+        # Wait for step response (blocking with short timeout)
+        response = handle.read_response(timeout=5.0)
+        if response is None:
+            _OP_LOGGER.warning(f"Timeout waiting for step response from human operator: {operator_id}")
+            self._status_bar.showMessage(f"Timeout waiting for response", 3000)
+            return
+
+        response_type = response.get("type", "unknown")
+
+        if response_type == "error":
+            error_msg = response.get("message", "Unknown error")
+            _OP_LOGGER.error(f"Error from human operator: {error_msg}")
+            self._status_bar.showMessage(f"Error: {error_msg}", 5000)
+            return
+
+        if response_type == "step":
+            # Extract step info from response
+            step_index = response.get("step_index", 0)
+            reward = response.get("reward", 0.0)
+            total_reward = response.get("total_reward", 0.0)
+            terminated = response.get("terminated", False)
+            truncated = response.get("truncated", False)
+            render_payload = response.get("render_payload")
+
+            _OP_LOGGER.debug(
+                "Human action step result: step=%d, reward=%.2f, terminated=%s",
+                step_index, reward, terminated,
+            )
+
+            # Update the render container with new state
+            wrapped_payload = {
+                "render_payload": render_payload if render_payload else {},
+                "episode_index": response.get("episode_index", 0),
+                "step_index": step_index,
+                "reward": reward,
+                "episode_reward": total_reward,
+                "terminated": terminated,
+                "truncated": truncated,
+            }
+            self._render_tabs.display_operator_payload(operator_id, wrapped_payload)
+
+            # Log if render_payload is empty
+            if not render_payload:
+                _OP_LOGGER.warning(
+                    "Empty render_payload for human operator %s",
+                    operator_id,
+                )
+
+            done_info = "DONE!" if terminated or truncated else ""
+            self._status_bar.showMessage(
+                f"Human action: {action} (step={step_index}, reward={reward:.2f}) {done_info}",
+                2000
+            )
+
+            # If episode ended, log it
+            if terminated or truncated:
+                _OP_LOGGER.info(
+                    f"Human operator {operator_id} episode ended: total_reward={total_reward:.2f}"
+                )
+        else:
+            _OP_LOGGER.warning(f"Unexpected response type from human operator: {response_type}")
+
+        # Notify the Operators tab that the human has completed their step
+        # This enables the "Step All" button for AI operators
+        self._control_panel.operators_tab.on_human_action_received(operator_id)
+
+        # Hide the "Your Turn" indicator
+        self._render_tabs.set_human_turn(operator_id, False)
+
+    def _on_human_board_game_move(self, operator_id: str, from_sq: str, to_sq: str) -> None:
+        """Handle board game move submitted by a human operator.
+
+        This is called when a human clicks on a board game (Chess, Go, etc.)
+        to make a move in the Multi-Operator view.
+
+        For PettingZoo multi-agent mode:
+        - Converts the UCI move (e.g., "e2e4") to action index
+        - Submits the action to the shared PettingZoo environment
+        - Updates the game state and renders the next frame
+
+        Args:
+            operator_id: The human operator's ID.
+            from_sq: Source square (e.g., "e2" for chess).
+            to_sq: Target square (e.g., "e4" for chess, or "e4q" with promotion piece).
+        """
+        uci_move = f"{from_sq}{to_sq}"
+
+        # Handle pawn promotion: when a pawn reaches the back rank, must promote
+        # Check if this is a chess pawn promotion move
+        # Skip if promotion piece already specified (to_sq length > 2, e.g., "b1q")
+        promotion_already_specified = len(to_sq) > 2 and to_sq[2] in "qrnb"
+        if not promotion_already_specified and self._shared_pettingzoo_env is not None and hasattr(self._shared_pettingzoo_env, "board"):
+            try:
+                import chess
+                board = self._shared_pettingzoo_env.board
+                from_square = chess.parse_square(from_sq)
+                piece = board.piece_at(from_square)
+
+                # Check if piece is a pawn moving to back rank
+                if piece is not None and piece.piece_type == chess.PAWN:
+                    to_rank = to_sq[1]  # '1' through '8'
+                    # White pawn to rank 8, or Black pawn to rank 1
+                    if (piece.color == chess.WHITE and to_rank == '8') or \
+                       (piece.color == chess.BLACK and to_rank == '1'):
+                        # Auto-promote to Queen (most common choice)
+                        uci_move = f"{from_sq}{to_sq}q"
+                        _OP_LOGGER.info(f"Pawn promotion detected, using: {uci_move}")
+            except Exception as e:
+                _OP_LOGGER.debug(f"Promotion check failed: {e}")
+
+        _OP_LOGGER.info(
+            "Human board game move: operator=%s, %s -> %s (UCI: %s)",
+            operator_id, from_sq, to_sq, uci_move,
+        )
+
+        # Check if we're in PettingZoo multi-agent mode
+        if self._shared_pettingzoo_env is not None:
+            self._submit_pettingzoo_human_move(operator_id, uci_move)
+            return
+
+        # Get the human operator's configuration (single-agent mode)
+        config = self._multi_operator_service.get_operator(operator_id)
+        if config is None:
+            _OP_LOGGER.warning(f"Board game move for unknown operator: {operator_id}")
+            return
+
+        if config.worker_id != "human_worker":
+            _OP_LOGGER.warning(f"Board game move for non-human operator: {operator_id}")
+            return
+
+        # Single-agent mode: Send move to human_worker subprocess
+        self._status_bar.showMessage(f"Human move: {from_sq} -> {to_sq}", 2000)
+
+        # Notify the Operators tab that the human has completed their step
+        self._control_panel.operators_tab.on_human_action_received(operator_id)
+
+        # Hide the "Your Turn" indicator
+        self._render_tabs.set_human_turn(operator_id, False)
+
+    def _submit_pettingzoo_human_move(self, operator_id: str, uci_move: str) -> None:
+        """Submit a Human move to the shared PettingZoo environment.
+
+        Converts UCI move to action index and executes it.
+
+        Args:
+            operator_id: The operator ID.
+            uci_move: Move in UCI notation (e.g., "e2e4").
+        """
+        env = self._shared_pettingzoo_env
+        if env is None:
+            _OP_LOGGER.warning("No shared PettingZoo env for human move")
+            return
+
+        try:
+            # Use the existing conversion function
+            action_index = self._convert_uci_to_action_index(env, uci_move)
+
+            if action_index is None:
+                _OP_LOGGER.warning(f"Move {uci_move} not found in legal moves")
+                self._status_bar.showMessage(f"Illegal move: {uci_move}", 3000)
+                return
+
+            _OP_LOGGER.info(
+                f"Submitting human chess move: {uci_move} -> action {action_index}"
+            )
+
+            # Execute the action in the environment
+            env.step(action_index)
+
+            # Render the updated state
+            self._render_pettingzoo_frame()
+
+            # Update turn indicator
+            next_player = env.agent_selection
+            self._control_panel.operators_tab.set_current_player(next_player)
+
+            self._status_bar.showMessage(
+                f"Human move: {uci_move}, next: {next_player}", 2000
+            )
+
+        except Exception as e:
+            _OP_LOGGER.error(f"Error submitting human chess move: {e}", exc_info=True)
+            self._status_bar.showMessage(f"Error: {e}", 3000)
 
     def _on_step_player(self, player_id: str, seed: int) -> None:
         """Handle step request for a specific player (PettingZoo mode).
@@ -1903,6 +2449,358 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             # Re-enable the current player's button after error
             self._control_panel.set_current_player(player_id)
 
+    # -------------------------------------------------------------------------
+    # Parallel Multi-Agent Mode (MultiGrid, MeltingPot, Overcooked)
+    # -------------------------------------------------------------------------
+
+    def _on_reset_parallel_multiagent(self, seed: int, config: "OperatorConfig") -> None:
+        """Reset for parallel multi-agent mode (MultiGrid, MeltingPot, Overcooked).
+
+        In this mode:
+        1. GUI creates ONE shared environment (Parallel API)
+        2. AI workers are launched in action_selector mode
+        3. Human agents are controlled via action panel
+        4. All agents step simultaneously
+
+        Args:
+            seed: Random seed for environment.
+            config: The operator config with task and worker assignments.
+        """
+        task = config.task
+        env_name = config.env_name
+
+        _OP_LOGGER.info(
+            "Resetting parallel multi-agent: env=%s, task=%s, seed=%d",
+            env_name, task, seed,
+        )
+
+        # Close existing shared environment if any
+        if self._parallel_multiagent_env is not None:
+            try:
+                self._parallel_multiagent_env.close()
+            except Exception:
+                pass
+
+        # Create the shared environment
+        try:
+            self._parallel_multiagent_env = self._create_parallel_multiagent_env(
+                env_name, task, seed
+            )
+            self._parallel_multiagent_mode = True
+            self._parallel_multiagent_config = config
+            self._parallel_player_handles.clear()
+
+            self.log_constant(
+                LOG_OPERATOR_PARALLEL_RESET_STARTED,
+                message=f"Created shared parallel environment: {env_name}/{task}",
+                extra={"env_name": env_name, "task": task, "seed": seed},
+            )
+        except Exception as e:
+            self.log_constant(
+                LOG_OPERATOR_ENV_PREVIEW_ERROR,
+                message=f"Failed to create parallel environment: {e}",
+                extra={"env_name": env_name, "task": task, "seed": seed},
+            )
+            self._status_bar.showMessage(f"Failed to create {task}: {e}", 5000)
+            return
+
+        # Launch AI workers in action_selector mode
+        ai_agents = config.get_ai_agents()
+        human_agents = config.get_human_agents()
+
+        _OP_LOGGER.debug(
+            "AI agents: %s, Human agents: %s",
+            ai_agents, human_agents,
+        )
+
+        # TODO: Launch AI workers for ai_agents
+        # For now, we just support all-human mode for testing
+
+        # Reset the environment
+        try:
+            obs, info = self._parallel_multiagent_env.reset(seed=seed)
+            _OP_LOGGER.debug("Environment reset, obs keys: %s", list(obs.keys()) if isinstance(obs, dict) else type(obs))
+        except Exception as e:
+            self.log_constant(
+                LOG_OPERATOR_ENV_PREVIEW_ERROR,
+                message=f"Failed to reset environment: {e}",
+                extra={"env_name": env_name, "task": task, "seed": seed},
+            )
+            self._status_bar.showMessage(f"Reset failed: {e}", 5000)
+            return
+
+        # Render initial frame
+        self._render_parallel_multiagent_frame()
+
+        # Update operator state
+        operator_id = config.operator_id
+        self._multi_operator_service.set_operator_state(operator_id, "running")
+        self._render_tabs.set_operator_status(operator_id, "running")
+
+        # Show status
+        self._status_bar.showMessage(
+            f"Parallel multi-agent {task} ready: {len(human_agents)} human, {len(ai_agents)} AI agents (seed={seed})",
+            3000
+        )
+
+    def _create_parallel_multiagent_env(self, env_name: str, task: str, seed: int) -> Any:
+        """Create a parallel multi-agent environment.
+
+        Args:
+            env_name: Environment family (multigrid, meltingpot, overcooked).
+            task: Specific environment (e.g., MultiGrid-Soccer-v0).
+            seed: Random seed.
+
+        Returns:
+            The created gymnasium/PettingZoo Parallel environment.
+        """
+        if env_name == "multigrid":
+            # Import and create MultiGrid environment
+            try:
+                from gym_multigrid.envs import CollectGame, Soccer
+            except ImportError:
+                import gymnasium as gym
+                # Fallback: try to create via gym.make
+                env = gym.make(task, render_mode="rgb_array")
+                return env
+
+            # Create based on task
+            if "Soccer" in task:
+                env = Soccer(render_mode="rgb_array")
+            elif "Collect" in task:
+                env = CollectGame(render_mode="rgb_array")
+            else:
+                import gymnasium as gym
+                env = gym.make(task, render_mode="rgb_array")
+            return env
+
+        elif env_name == "meltingpot":
+            # MeltingPot support (placeholder)
+            raise NotImplementedError("MeltingPot environment not yet supported")
+
+        elif env_name == "overcooked":
+            # Overcooked support (placeholder)
+            raise NotImplementedError("Overcooked environment not yet supported")
+
+        else:
+            raise ValueError(f"Unknown parallel multi-agent environment: {env_name}")
+
+    def _render_parallel_multiagent_frame(self) -> None:
+        """Render the current state of the parallel multi-agent environment."""
+        if self._parallel_multiagent_env is None:
+            return
+
+        try:
+            env = self._parallel_multiagent_env
+            config = self._parallel_multiagent_config
+            if config is None:
+                return
+
+            # Get RGB frame from environment
+            frame = env.render()
+            if frame is None:
+                _OP_LOGGER.warning("Environment render returned None")
+                return
+
+            # Create render payload
+            if isinstance(frame, np.ndarray):
+                h, w = int(frame.shape[0]), int(frame.shape[1])
+                render_payload = {
+                    "mode": "rgb",
+                    "rgb": frame.tolist(),
+                    "width": w,
+                    "height": h,
+                }
+            else:
+                _OP_LOGGER.warning(f"Unexpected frame type: {type(frame)}")
+                return
+
+            # Display in render container
+            wrapped_payload = {
+                "render_payload": render_payload,
+                "episode_index": 0,
+                "step_index": 0,
+                "reward": 0.0,
+                "episode_reward": 0.0,
+                "terminated": False,
+                "truncated": False,
+            }
+            self._render_tabs.display_operator_payload(config.operator_id, wrapped_payload)
+
+        except Exception as e:
+            _OP_LOGGER.warning(f"Failed to render parallel frame: {e}")
+
+    def _on_step_parallel_multiagent(self) -> None:
+        """Step the parallel multi-agent environment.
+
+        Flow for simultaneous stepping:
+        1. Collect actions from AI agents (via workers)
+        2. Show action panel for human agents
+        3. Wait for all human selections
+        4. Call env.step() with all actions
+        5. Render updated frame
+        """
+        env = self._parallel_multiagent_env
+        config = self._parallel_multiagent_config
+        if env is None or config is None:
+            _OP_LOGGER.warning("No parallel multi-agent environment")
+            return
+
+        # Get agent lists
+        human_agents = config.get_human_agents()
+        ai_agents = config.get_ai_agents()
+
+        _OP_LOGGER.debug(
+            "Stepping parallel multi-agent: human=%s, ai=%s",
+            human_agents, ai_agents,
+        )
+
+        # Create step state to track pending actions
+        step_state = MultiAgentStepState.from_config(config, step_id=0)
+        self._parallel_multiagent_step_state = step_state
+
+        self.log_constant(
+            LOG_OPERATOR_PARALLEL_STEP_STARTED,
+            message=f"Collecting actions from {len(ai_agents)} AI and {len(human_agents)} human agents",
+            extra={"human_agents": human_agents, "ai_agents": ai_agents},
+        )
+
+        # Collect AI actions first (blocking for now)
+        # TODO: Implement async action collection from AI workers
+        for agent_id in ai_agents:
+            # For now, use random action as placeholder
+            action_space = env.action_spaces.get(agent_id) if hasattr(env, "action_spaces") else env.action_space
+            if hasattr(action_space, "sample"):
+                action = action_space.sample()
+            else:
+                action = 0
+            step_state.add_action(agent_id, action)
+            _OP_LOGGER.debug(f"AI agent {agent_id} action: {action}")
+
+        step_state.ai_actions_ready = True
+
+        # If no human agents, step immediately
+        if not human_agents:
+            self._execute_parallel_multiagent_step(step_state.get_all_actions())
+            return
+
+        # Show action panel for human agents
+        # Get action labels from environment
+        if hasattr(env, "action_space") and hasattr(env.action_space, "n"):
+            num_actions = env.action_space.n
+            # Default action labels for MultiGrid
+            action_labels = ["Still", "Left", "Right", "Forward", "Pickup", "Drop", "Toggle", "Done"][:num_actions]
+        else:
+            action_labels = ["Action 0", "Action 1", "Action 2", "Action 3", "Action 4", "Action 5", "Action 6", "Action 7"]
+
+        # Create and show action panel
+        if self._parallel_action_panel is not None:
+            self._parallel_action_panel.deleteLater()
+
+        self._parallel_action_panel = MultiAgentActionPanel(
+            human_agents=human_agents,
+            action_labels=action_labels,
+            agent_labels={f"agent_{i}": f"Agent {i}" for i in range(len(human_agents))},
+        )
+        self._parallel_action_panel.all_actions_submitted.connect(
+            self._on_parallel_human_actions_submitted
+        )
+
+        # TODO: Display action panel in the UI (e.g., as a dialog or embedded widget)
+        # For now, just log that we're waiting
+        _OP_LOGGER.info(
+            f"Waiting for human actions from {len(human_agents)} agents"
+        )
+        self._status_bar.showMessage(
+            f"Select actions for {len(human_agents)} human agent(s)",
+            10000
+        )
+
+    def _on_parallel_human_actions_submitted(self, actions: Dict[str, int]) -> None:
+        """Handle submission of all human actions.
+
+        Args:
+            actions: Dict mapping agent_id to action index.
+        """
+        _OP_LOGGER.info(f"Human actions submitted: {actions}")
+
+        step_state = self._parallel_multiagent_step_state
+        if step_state is None:
+            _OP_LOGGER.warning("No step state for human action submission")
+            return
+
+        # Add human actions to step state
+        for agent_id, action in actions.items():
+            step_state.add_action(agent_id, action)
+
+        # Check if all actions are collected
+        if step_state.is_complete():
+            self._execute_parallel_multiagent_step(step_state.get_all_actions())
+        else:
+            _OP_LOGGER.warning(
+                f"Not all actions collected: {len(step_state.pending_actions)} / "
+                f"{len(step_state.human_agents) + len(step_state.ai_agents)}"
+            )
+
+    def _execute_parallel_multiagent_step(self, actions: Dict[str, int]) -> None:
+        """Execute a step on the parallel multi-agent environment.
+
+        Args:
+            actions: Dict mapping agent_id to action index.
+        """
+        env = self._parallel_multiagent_env
+        config = self._parallel_multiagent_config
+        if env is None or config is None:
+            return
+
+        _OP_LOGGER.info(f"Executing parallel step with actions: {actions}")
+
+        try:
+            # Convert to list if env expects list-based actions
+            if hasattr(env, "agents"):
+                action_list = [actions.get(agent, 0) for agent in env.agents]
+                obs, rewards, terminateds, truncateds, infos = env.step(action_list)
+            else:
+                obs, rewards, terminateds, truncateds, infos = env.step(actions)
+
+            # Render updated frame
+            self._render_parallel_multiagent_frame()
+
+            # Check for episode end
+            all_done = all(terminateds.values()) if isinstance(terminateds, dict) else all(terminateds)
+            all_truncated = all(truncateds.values()) if isinstance(truncateds, dict) else all(truncateds)
+
+            if all_done or all_truncated:
+                total_reward = sum(rewards.values()) if isinstance(rewards, dict) else sum(rewards)
+                self._status_bar.showMessage(
+                    f"Episode done! Total reward: {total_reward:.2f}",
+                    5000
+                )
+                _OP_LOGGER.info(f"Episode ended with total reward: {total_reward}")
+            else:
+                step_reward = sum(rewards.values()) if isinstance(rewards, dict) else sum(rewards)
+                self._status_bar.showMessage(
+                    f"Step completed. Reward: {step_reward:.2f}",
+                    2000
+                )
+
+            # Clear step state
+            self._parallel_multiagent_step_state = None
+
+            self.log_constant(
+                LOG_OPERATOR_PARALLEL_STEP_COMPLETED,
+                message="Parallel multi-agent step completed",
+                extra={
+                    "actions": actions,
+                    "terminated": all_done,
+                    "truncated": all_truncated,
+                },
+            )
+
+        except Exception as e:
+            _OP_LOGGER.error(f"Failed to step environment: {e}", exc_info=True)
+            self._status_bar.showMessage(f"Step failed: {e}", 5000)
+
     def _poll_operator_responses(self, handles: list, max_wait_ms: int = 30000) -> None:
         """Poll for responses from operator subprocesses and update render view.
 
@@ -1996,12 +2894,15 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         elif response_type == "ready":
             # Build payload to reset stats and display initial render
+            # Include observation for conversation tracker (system prompt/initial context)
             payload = {
                 "step_index": response.get("step_index", 0),
                 "episode_index": response.get("episode_index", 0),
                 "reward": 0.0,
                 "episode_reward": response.get("episode_reward", 0.0),
                 "render_payload": response.get("render_payload"),
+                "observation": response.get("observation", ""),  # For conversation tracking
+                "system_prompt": response.get("system_prompt", ""),  # Env-family instruction
             }
             self._render_tabs.display_operator_payload(operator_id, payload)
             self.log_constant(
@@ -2113,6 +3014,30 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
                 env = gym.make(task, render_mode="rgb_array")
                 env.reset(seed=seed)
+
+                # Apply custom initial state if configured
+                initial_state = None
+                if config.workers:
+                    first_worker_id = next(iter(config.workers.keys()))
+                    initial_state = config.workers[first_worker_id].settings.get("initial_state")
+                    _OP_LOGGER.debug(
+                        f"MiniGrid preview: worker={first_worker_id}, "
+                        f"settings_keys={list(config.workers[first_worker_id].settings.keys())}, "
+                        f"initial_state={'SET' if initial_state else 'NOT SET'}"
+                    )
+
+                if initial_state:
+                    if self._apply_minigrid_custom_state(env, initial_state):
+                        self._status_bar.showMessage(
+                            f"Custom MiniGrid configuration applied!",
+                            3000
+                        )
+                    else:
+                        self._status_bar.showMessage(
+                            f"Failed to apply custom MiniGrid configuration",
+                            5000
+                        )
+
                 rgb_frame = env.render()
                 env.close()
 
@@ -2181,7 +3106,68 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     )
                     return
 
-            elif env_name == "pettingzoo":
+            elif env_name == "textworld":
+                # TextWorld is text-based - render text observation as image
+                try:
+                    import textworld
+                    import textworld.gym
+                    import glob
+                    from PIL import Image, ImageDraw, ImageFont
+
+                    # Find game files for this task
+                    games_path = Path(__file__).parent.parent.parent.parent / "var" / "data" / "tw_games" / task
+                    game_files = list(games_path.glob("*.ulx")) + list(games_path.glob("*.z8"))
+
+                    if not game_files:
+                        self._status_bar.showMessage(
+                            f"No TextWorld games found for '{task}' in var/data/tw_games/",
+                            5000
+                        )
+                        return
+
+                    # Register and create environment from first game file
+                    game_file = str(game_files[seed % len(game_files)])
+                    request_infos = textworld.EnvInfos(
+                        objective=True, description=True, score=True, max_score=True, won=True
+                    )
+                    env_id = textworld.gym.register_game(game_file, request_infos, max_episode_steps=100)
+                    env = textworld.gym.make(env_id)
+                    obs, info = env.reset()
+                    env.close()
+
+                    # Render text observation as image
+                    text = obs if isinstance(obs, str) else str(obs)
+                    # Wrap long lines
+                    lines = []
+                    for line in text.split('\n'):
+                        while len(line) > 80:
+                            lines.append(line[:80])
+                            line = line[80:]
+                        lines.append(line)
+                    text = '\n'.join(lines[:40])  # Limit to 40 lines
+
+                    # Create image from text
+                    img_width, img_height = 640, 480
+                    img = Image.new('RGB', (img_width, img_height), color=(20, 20, 30))
+                    draw = ImageDraw.Draw(img)
+                    try:
+                        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSansMono.ttf", 11)
+                    except OSError:
+                        font = ImageFont.load_default()
+                    draw.text((10, 10), text, fill=(200, 200, 200), font=font)
+                    rgb_frame = np.array(img)
+
+                except ImportError:
+                    self._status_bar.showMessage(
+                        "TextWorld not installed - cannot preview",
+                        5000
+                    )
+                    return
+                except Exception as e:
+                    self._status_bar.showMessage(f"Cannot preview TextWorld: {e}", 5000)
+                    return
+
+            elif env_name in ("pettingzoo", "pettingzoo_classic"):
                 # PettingZoo classic games (chess, go, connect_four, etc.)
                 # These use their own factory functions, not gymnasium.make()
                 try:
@@ -2210,6 +3196,78 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     # Create environment with rgb_array rendering
                     env = pz_env_factories[task](render_mode="rgb_array")
                     env.reset(seed=seed)
+
+                    # Apply custom initial state if configured (for board games)
+                    # State is stored in worker settings, not config settings
+                    initial_state = None
+                    if config.workers:
+                        first_worker_id = next(iter(config.workers.keys()))
+                        initial_state = config.workers[first_worker_id].settings.get("initial_state")
+                        self.log_constant(
+                            LOG_OPERATOR_ENV_PREVIEW_STARTED,
+                            message=f"Checking for custom initial state in worker '{first_worker_id}'",
+                            extra={
+                                "operator_id": operator_id,
+                                "worker_id": first_worker_id,
+                                "worker_settings": str(config.workers[first_worker_id].settings),
+                                "initial_state_found": initial_state is not None,
+                                "initial_state": initial_state[:50] if initial_state else None,
+                            },
+                        )
+
+                    if initial_state and task == "chess_v6" and hasattr(env, "board"):
+                        # Use python-chess to set custom FEN position
+                        try:
+                            self.log_constant(
+                                LOG_OPERATOR_ENV_PREVIEW_STARTED,
+                                message=f"Applying custom chess position",
+                                extra={
+                                    "operator_id": operator_id,
+                                    "custom_fen": initial_state,
+                                },
+                            )
+                            env.board.set_fen(initial_state)
+                            self.log_constant(
+                                LOG_UI_BOARD_CONFIG_ENV_INIT_CUSTOM,
+                                message=f"Custom chess position applied successfully",
+                                extra={
+                                    "operator_id": operator_id,
+                                    "game_id": task,
+                                    "custom_fen": initial_state,
+                                    "applied_fen": env.board.fen(),
+                                },
+                            )
+                            self._status_bar.showMessage(
+                                f"Custom chess position applied!",
+                                3000
+                            )
+                        except Exception as e:
+                            self.log_constant(
+                                LOG_OPERATOR_ENV_PREVIEW_ERROR,
+                                message=f"Failed to apply custom chess position: {e}",
+                                extra={
+                                    "operator_id": operator_id,
+                                    "custom_fen": initial_state,
+                                    "error": str(e),
+                                },
+                            )
+                            self._status_bar.showMessage(
+                                f"Failed to apply custom position: {e}",
+                                5000
+                            )
+                    else:
+                        self.log_constant(
+                            LOG_OPERATOR_ENV_PREVIEW_STARTED,
+                            message=f"Using standard starting position (no custom state configured)",
+                            extra={
+                                "operator_id": operator_id,
+                                "task": task,
+                                "has_initial_state": initial_state is not None,
+                                "is_chess": task == "chess_v6",
+                                "has_board_attr": hasattr(env, "board") if 'env' in locals() else False,
+                            },
+                        )
+
                     # PettingZoo AEC envs render() returns the board
                     rgb_frame = env.render()
 
@@ -2267,6 +3325,140 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                         LOG_OPERATOR_ENV_PREVIEW_ERROR,
                         message=f"Cannot preview PettingZoo {task}: {e}",
                         extra={"operator_id": operator_id, "env_name": env_name, "task": task, "error": str(e)},
+                    )
+                    return
+
+            elif env_name == "multigrid":
+                # gym-multigrid uses old gym API (not gymnasium)
+                try:
+                    import gym
+                    from gym_multigrid.envs import SoccerGame4HEnv10x15N2, CollectGame4HEnv10x10N2
+
+                    # Create environment based on task
+                    if task == "MultiGrid-Soccer-v0":
+                        env = SoccerGame4HEnv10x15N2()
+                        # Set render_mode to avoid deprecation warning (MultiGrid doesn't support in constructor)
+                        env.render_mode = 'rgb_array'
+                    elif task == "MultiGrid-Collect-v0":
+                        env = CollectGame4HEnv10x10N2()
+                        # Set render_mode to avoid deprecation warning (MultiGrid doesn't support in constructor)
+                        env.render_mode = 'rgb_array'
+                    else:
+                        # Try gym.make as fallback (render_mode already set)
+                        env = gym.make(task, render_mode="rgb_array")
+
+                    env.reset()
+                    # Use newer render API (render_mode set above, so don't pass mode argument)
+                    # Note: highlight parameter is MultiGrid-specific and still needed
+                    rgb_frame = env.render(highlight=True)
+                    env.close()
+                except ImportError:
+                    self._status_bar.showMessage(
+                        "gym-multigrid not installed - cannot preview",
+                        5000
+                    )
+                    return
+                except Exception as e:
+                    self._status_bar.showMessage(
+                        f"Cannot preview multigrid {task}: {e}",
+                        5000
+                    )
+                    return
+
+            elif env_name == "meltingpot":
+                # MeltingPot multi-agent scenarios via Shimmy wrapper
+                try:
+                    from shimmy import MeltingPotCompatibilityV0
+
+                    # Extract substrate name from task (format: meltingpot/substrate_name)
+                    substrate_name = task.split("/", 1)[-1] if "/" in task else task
+
+                    # Create environment via Shimmy wrapper (handles roles automatically)
+                    env = MeltingPotCompatibilityV0(substrate_name=substrate_name)
+
+                    # Reset
+                    observations, _ = env.reset()
+
+                    # Get RGB from first agent
+                    # Prefer WORLD.RGB (40×72 full world view) over individual RGB (40×40)
+                    first_agent = env.agents[0]
+                    if first_agent in observations:
+                        if "WORLD.RGB" in observations[first_agent]:
+                            rgb_frame = observations[first_agent]["WORLD.RGB"]
+                        elif "RGB" in observations[first_agent]:
+                            rgb_frame = observations[first_agent]["RGB"]
+                        else:
+                            rgb_frame = None
+                    else:
+                        rgb_frame = None
+
+                    env.close()
+
+                    if rgb_frame is None:
+                        self._status_bar.showMessage(
+                            f"No RGB observation available for {substrate_name}",
+                            5000
+                        )
+                        return
+
+                except ImportError:
+                    self._status_bar.showMessage(
+                        "MeltingPot not installed - cannot preview",
+                        5000
+                    )
+                    return
+                except Exception as e:
+                    self._status_bar.showMessage(
+                        f"Cannot preview MeltingPot {task}: {e}",
+                        5000
+                    )
+                    return
+
+            elif env_name == "overcooked":
+                # Overcooked-AI cooperative cooking (custom API)
+                try:
+                    import pygame
+                    from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Recipe
+                    from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+                    from overcooked_ai_py.visualization.state_visualizer import StateVisualizer
+
+                    # Extract layout name from task (format: overcooked/layout_name)
+                    layout_name = task.split("/", 1)[-1] if "/" in task else task
+
+                    # Configure Recipe class
+                    Recipe.configure({})
+
+                    # Create MDP from layout
+                    mdp = OvercookedGridworld.from_layout_name(layout_name)
+
+                    # Create environment
+                    env = OvercookedEnv.from_mdp(mdp, horizon=400)
+
+                    # Reset
+                    env.reset()
+
+                    # Render state to RGB using StateVisualizer with higher resolution
+                    # tile_size controls native render resolution:
+                    # 75 (default) = 375×300, 100 = 500×400, 150 = 750×600
+                    tile_size = 100  # High quality native rendering
+                    visualizer = StateVisualizer(tile_size=tile_size)
+                    surface = visualizer.render_state(env.state, grid=mdp.terrain_mtx)
+
+                    # Convert pygame Surface to numpy array
+                    rgb_array = pygame.surfarray.array3d(surface)
+                    # surfarray returns (width, height, 3), transpose to (height, width, 3)
+                    rgb_frame = np.transpose(rgb_array, (1, 0, 2))
+
+                except ImportError:
+                    self._status_bar.showMessage(
+                        "Overcooked-AI not installed - cannot preview",
+                        5000
+                    )
+                    return
+                except Exception as e:
+                    self._status_bar.showMessage(
+                        f"Cannot preview Overcooked {task}: {e}",
+                        5000
                     )
                     return
 
@@ -2345,6 +3537,99 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 # Update status to "loaded" to indicate environment is ready
                 self._render_tabs.set_operator_status(operator_id, "loaded")
                 self._render_tabs.switch_to_multi_operator_tab()
+
+                # For human operators (single-agent only): launch subprocess to own the environment
+                # Multiagent human operators are handled via Reset -> _on_reset_pettingzoo_multiagent
+                if config.worker_id == "human_worker" and config.operator_type != "multiagent":
+                    # Stop any existing subprocess for this operator
+                    self._operator_launcher.stop_operator(operator_id)
+
+                    # Launch human_worker subprocess
+                    handle = self._operator_launcher.launch_operator(
+                        config,
+                        interactive=True,
+                    )
+
+                    # Read the "init" message that the worker emits on startup
+                    init_response = handle.read_response(timeout=5.0)
+                    if init_response is None:
+                        raise RuntimeError("Timeout waiting for human_worker init")
+
+                    # Send reset command with seed and env configuration
+                    handle.send_command({
+                        "cmd": "reset",
+                        "seed": seed,
+                        "env_name": env_name,
+                        "task": task,
+                    })
+
+                    # Wait for "ready" response with action labels and render
+                    response = handle.read_response(timeout=10.0)
+                    if response is None:
+                        raise RuntimeError("Timeout waiting for human_worker ready response")
+
+                    if response.get("type") == "error":
+                        raise RuntimeError(response.get("message", "Unknown error"))
+
+                    if response.get("type") != "ready":
+                        raise RuntimeError(f"Unexpected response: {response.get('type')}")
+
+                    # Extract action labels and render from response
+                    action_labels = response.get("action_labels", [])
+                    action_space_n = response.get("action_space", len(action_labels))
+                    render_payload_human = response.get("render_payload")
+
+                    # Display render from human_worker (overrides preview render)
+                    if render_payload_human:
+                        wrapped_payload = {
+                            "render_payload": render_payload_human,
+                            "episode_index": 0,
+                            "step_index": 0,
+                            "reward": 0.0,
+                            "episode_reward": 0.0,
+                        }
+                        self._render_tabs.display_operator_payload(operator_id, wrapped_payload)
+
+                    # Enable interactive mode for human operators
+                    self._render_tabs.set_interactive(operator_id, True)
+
+                    # Set game-specific keyboard mappings
+                    try:
+                        game_id = GameId(env_name)
+                        self._render_tabs.set_game_id(operator_id, game_id)
+                    except ValueError:
+                        pass
+
+                    # Set available actions from subprocess response
+                    actions = list(range(action_space_n))
+                    self._render_tabs.set_available_actions(operator_id, actions, action_labels)
+
+                    # Show "Your Turn" indicator
+                    self._render_tabs.set_human_turn(operator_id, True)
+
+                    # Assign run_id and update operator state
+                    self._multi_operator_service.assign_run_id(operator_id, handle.run_id)
+                    self._multi_operator_service.set_operator_state(operator_id, "running")
+
+                    self.log_constant(
+                        LOG_UI_MAINWINDOW_INFO,
+                        message=f"Human operator subprocess launched",
+                        extra={
+                            "operator_id": operator_id,
+                            "seed": seed,
+                            "env_name": env_name,
+                            "task": task,
+                            "action_count": action_space_n,
+                            "run_id": handle.run_id,
+                            "pid": handle.pid,
+                        },
+                    )
+
+                # Enable interactive mode for multiagent human operators
+                # (single-agent human handled above in the subprocess block)
+                if config.operator_type == "multiagent" and config.worker_id == "human_worker":
+                    self._render_tabs.set_interactive(operator_id, True)
+                    _OP_LOGGER.debug(f"Enabled interactive mode for multiagent human preview: {operator_id}")
 
                 # Update the environment size in the operator config widget
                 if frame_width > 0 and frame_height > 0:

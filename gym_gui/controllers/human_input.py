@@ -895,6 +895,25 @@ _CRAFTER_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
 }
 
 # ===========================================================================
+# BabaIsAI Mappings (rule manipulation puzzle benchmark - ICML 2024)
+# 5 discrete actions: 0:UP, 1:DOWN, 2:LEFT, 3:RIGHT, 4:IDLE
+# ===========================================================================
+def _babaisai_mappings() -> Tuple[ShortcutMapping, ...]:
+    """Standard 5-action mapping for BabaIsAI environments."""
+    return (
+        _mapping(("Key_Up", "Key_W"), 0),         # UP
+        _mapping(("Key_Down", "Key_S"), 1),       # DOWN
+        _mapping(("Key_Left", "Key_A"), 2),       # LEFT
+        _mapping(("Key_Right", "Key_D"), 3),      # RIGHT
+        _mapping(("Key_Space",), 4),               # IDLE (wait/skip)
+    )
+
+
+_BABAISAI_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
+    GameId.BABAISAI_DEFAULT: _babaisai_mappings(),
+}
+
+# ===========================================================================
 # Procgen Mappings (procedurally generated benchmark - 16 environments)
 # 15 discrete actions (button combinations):
 # 0:down_left, 1:left, 2:up_left, 3:down, 4:noop, 5:up,
@@ -1305,6 +1324,8 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
                 mappings = _NETHACK_MAPPINGS.get(game_id)
             if mappings is None:
                 mappings = _CRAFTER_MAPPINGS.get(game_id)
+            if mappings is None:
+                mappings = _BABAISAI_MAPPINGS.get(game_id)
             if mappings is None:
                 mappings = _PROCGEN_MAPPINGS.get(game_id)
             if mappings is None:

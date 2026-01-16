@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mosaic-dragon-worker"
+version = "1.0.0"
+description = "Komodo Dragon chess engine worker for MOSAIC operators with Elo calibration"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "MOSAIC Team", email = "mosaic@example.com"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Games/Entertainment :: Board Games",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+keywords = ["dragon", "komodo", "chess", "mosaic", "reinforcement-learning", "multi-agent", "elo"]
+
+dependencies = [
+    "chess>=1.9.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+]
+
+[project.scripts]
+dragon-worker = "dragon_worker.cli:main"
+
+# CRITICAL: Register worker for MOSAIC discovery
+[project.entry-points."mosaic.workers"]
+dragon = "dragon_worker:get_worker_metadata"
+
+[project.urls]
+Homepage = "https://github.com/Abdulhamid97Mousa/MOSAIC"
+Documentation = "https://komodochess.com/"
+Repository = "https://github.com/Abdulhamid97Mousa/MOSAIC"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["dragon_worker*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"

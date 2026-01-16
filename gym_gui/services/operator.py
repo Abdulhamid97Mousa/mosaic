@@ -237,6 +237,79 @@ class WorkerAssignment:
 
 
 @dataclass
+class MultiAgentStepState:
+    """Tracks pending actions for a parallel multi-agent step.
+
+    Used when stepping simultaneous environments (MultiGrid, MeltingPot, Overcooked)
+    where all agents must provide actions before the environment steps.
+
+    Attributes:
+        step_id: Unique identifier for this step (typically step count).
+        human_agents: List of agent IDs controlled by humans.
+        ai_agents: List of agent IDs controlled by AI (LLM/RL).
+        pending_actions: Dict mapping agent_id to action (collected so far).
+        ai_actions_ready: True when all AI agents have provided actions.
+    """
+
+    step_id: int
+    human_agents: list[str] = field(default_factory=list)
+    ai_agents: list[str] = field(default_factory=list)
+    pending_actions: Dict[str, int] = field(default_factory=dict)
+    ai_actions_ready: bool = False
+
+    def is_complete(self) -> bool:
+        """Check if all actions have been collected.
+
+        Returns:
+            True if all human and AI agents have provided actions.
+        """
+        expected = len(self.human_agents) + len(self.ai_agents)
+        return len(self.pending_actions) >= expected
+
+    def pending_human_agents(self) -> list[str]:
+        """Get human agents that haven't provided an action yet.
+
+        Returns:
+            List of agent IDs still waiting for human input.
+        """
+        return [a for a in self.human_agents if a not in self.pending_actions]
+
+    def add_action(self, agent_id: str, action: int) -> None:
+        """Record an action for an agent.
+
+        Args:
+            agent_id: The agent providing the action.
+            action: The action index.
+        """
+        self.pending_actions[agent_id] = action
+
+    def get_all_actions(self) -> Dict[str, int]:
+        """Get all collected actions.
+
+        Returns:
+            Dict mapping agent_id to action for all agents.
+        """
+        return dict(self.pending_actions)
+
+    @classmethod
+    def from_config(cls, config: "OperatorConfig", step_id: int) -> "MultiAgentStepState":
+        """Create a step state from an operator config.
+
+        Args:
+            config: The operator configuration.
+            step_id: The step identifier.
+
+        Returns:
+            MultiAgentStepState initialized with agent lists from config.
+        """
+        return cls(
+            step_id=step_id,
+            human_agents=config.get_human_agents(),
+            ai_agents=config.get_ai_agents(),
+        )
+
+
+@dataclass
 class OperatorConfig:
     """Configuration for a single operator instance in multi-operator mode.
 
@@ -272,6 +345,11 @@ class OperatorConfig:
     task: str = "BabyAI-GoToRedBall-v0"
     workers: Dict[str, WorkerAssignment] = field(default_factory=dict)
     run_id: str | None = None  # Assigned when operator starts
+    execution_mode: str = "aec"  # "aec" (turn-based) or "parallel" (simultaneous) for multi-agent
+
+    # MultiGrid-specific settings (for LLM workers in multi-agent environments)
+    observation_mode: str = "visible_teammates"  # "egocentric" or "visible_teammates"
+    coordination_level: int = 1  # 1=Emergent, 2=Basic Hints, 3=Role-Based
 
     def __post_init__(self) -> None:
         """Validate configuration and ensure workers dict is populated."""
@@ -348,6 +426,44 @@ class OperatorConfig:
         """
         return self.workers.get(player_id)
 
+    def get_human_agents(self) -> list[str]:
+        """Get list of agent IDs that are controlled by humans.
+
+        Returns:
+            List of agent IDs where worker_type == "human".
+        """
+        return [
+            agent_id for agent_id, assignment in self.workers.items()
+            if assignment.worker_type == "human"
+        ]
+
+    def get_ai_agents(self) -> list[str]:
+        """Get list of agent IDs that are controlled by AI (LLM/RL).
+
+        Returns:
+            List of agent IDs where worker_type != "human".
+        """
+        return [
+            agent_id for agent_id, assignment in self.workers.items()
+            if assignment.worker_type != "human"
+        ]
+
+    def is_parallel_multiagent(self) -> bool:
+        """Check if this is a parallel/simultaneous multi-agent environment.
+
+        Returns:
+            True if execution_mode is "parallel" and there are multiple agents.
+        """
+        return self.execution_mode == "parallel" and self.is_multiagent
+
+    def has_human_agents(self) -> bool:
+        """Check if this operator has any human-controlled agents.
+
+        Returns:
+            True if at least one agent is human-controlled.
+        """
+        return len(self.get_human_agents()) > 0
+
     # -------------------------------------------------------------------------
     # Factory Methods
     # -------------------------------------------------------------------------
@@ -399,6 +515,9 @@ class OperatorConfig:
         env_name: str,
         task: str,
         player_workers: Dict[str, WorkerAssignment],
+        execution_mode: str = "aec",
+        observation_mode: str = "visible_teammates",
+        coordination_level: int = 1,
     ) -> "OperatorConfig":
         """Create a multi-agent operator config.
 
@@ -408,6 +527,9 @@ class OperatorConfig:
             env_name: Environment family (e.g., "pettingzoo").
             task: Specific task (e.g., "chess_v6").
             player_workers: Dict mapping player_id to WorkerAssignment.
+            execution_mode: Execution paradigm - "aec" (turn-based) or "parallel" (simultaneous).
+            observation_mode: Observation mode for MultiGrid - "egocentric" or "visible_teammates".
+            coordination_level: Coordination strategy level (1=Emergent, 2=Basic Hints, 3=Role-Based).
 
         Returns:
             OperatorConfig with multiple workers for multi-agent env.
@@ -418,6 +540,9 @@ class OperatorConfig:
             env_name=env_name,
             task=task,
             workers=player_workers,
+            execution_mode=execution_mode,
+            observation_mode=observation_mode,
+            coordination_level=coordination_level,
         )
 
     def with_run_id(self, run_id: str) -> "OperatorConfig":
@@ -910,6 +1035,7 @@ __all__ = [
     "OperatorDescriptor",
     "OperatorConfig",
     "WorkerAssignment",
+    "MultiAgentStepState",
     "MultiOperatorService",
     "HumanOperator",
     "WorkerOperator",

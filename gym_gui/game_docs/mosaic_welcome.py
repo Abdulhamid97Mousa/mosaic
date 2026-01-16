@@ -120,6 +120,66 @@ to create cohesive intelligent systems — like tiles in a mosaic forming a comp
         <a href="https://github.com/Farama-Foundation/Arcade-Learning-Environment" style="color: #1565c0; font-size: 10px;">GitHub</a>
     </td>
 </tr>
+<tr>
+    <td style="background-color: #f3e5f5; border-left: 4px solid #9c27b0; width: 33%;">
+        <b style="color: #9c27b0;">BabaIsAI</b><br/>
+        <span style="color: #666; font-size: 11px;">Rule manipulation puzzles for LLM reasoning</span><br/>
+        <a href="https://github.com/nacloos/baba-is-ai" style="color: #1565c0; font-size: 10px;">GitHub</a> |
+        <a href="https://arxiv.org/abs/2407.13729" style="color: #1565c0; font-size: 10px;">Paper</a>
+    </td>
+    <td style="background-color: #e8eaf6; border-left: 4px solid #3f51b5; width: 33%;">
+        <b style="color: #3f51b5;">OpenSpiel</b><br/>
+        <span style="color: #666; font-size: 11px;">Collection of games for research (DeepMind)</span><br/>
+        <a href="https://github.com/google-deepmind/open_spiel" style="color: #1565c0; font-size: 10px;">GitHub</a> |
+        <a href="https://openspiel.readthedocs.io/en/latest/" style="color: #1565c0; font-size: 10px;">Docs</a>
+    </td>
+    <td style="background-color: #e0f7fa; border-left: 4px solid #0097a7; width: 33%;">
+        <b style="color: #0097a7;">Procgen</b><br/>
+        <span style="color: #666; font-size: 11px;">16 procedurally generated games for generalization</span><br/>
+        <a href="https://github.com/openai/procgen" style="color: #1565c0; font-size: 10px;">GitHub</a> |
+        <a href="https://arxiv.org/abs/1912.01588" style="color: #1565c0; font-size: 10px;">Paper</a>
+    </td>
+</tr>
+<tr>
+    <td style="background-color: #e1f5fe; border-left: 4px solid #0288d1; width: 33%;">
+        <b style="color: #0288d1;">BabyAI</b><br/>
+        <span style="color: #666; font-size: 11px;">Language-grounded instruction following</span><br/>
+        <a href="https://github.com/mila-iqia/babyai" style="color: #1565c0; font-size: 10px;">GitHub</a> |
+        <a href="https://arxiv.org/abs/1810.08272" style="color: #1565c0; font-size: 10px;">Paper</a>
+    </td>
+    <td style="background-color: #fbe9e7; border-left: 4px solid #d84315; width: 33%;">
+        <b style="color: #d84315;">TextWorld</b><br/>
+        <span style="color: #666; font-size: 11px;">Text-based games framework (Microsoft)</span><br/>
+        <a href="https://github.com/microsoft/TextWorld" style="color: #1565c0; font-size: 10px;">GitHub</a> |
+        <a href="https://arxiv.org/abs/1806.11532" style="color: #1565c0; font-size: 10px;">Paper</a>
+    </td>
+    <td style="background-color: #e8f5e9; border-left: 4px solid #43a047; width: 33%;">
+        <b style="color: #43a047;">MultiGrid</b><br/>
+        <span style="color: #666; font-size: 11px;">Multi-agent MiniGrid extensions (Soccer, Collect)</span><br/>
+        <a href="https://github.com/ArnaudFickinger/gym-multigrid" style="color: #1565c0; font-size: 10px;">GitHub</a>
+    </td>
+</tr>
+<tr>
+    <td style="background-color: #fff3e0; border-left: 4px solid #ef6c00; width: 33%;">
+        <b style="color: #ef6c00;">Melting Pot</b><br/>
+        <span style="color: #666; font-size: 11px;">Multi-agent social scenarios (50+ substrates, up to 16 agents, DeepMind)</span><br/>
+        <a href="https://github.com/google-deepmind/meltingpot" style="color: #1565c0; font-size: 10px;">GitHub</a> |
+        <a href="https://shimmy.farama.org/environments/meltingpot/" style="color: #1565c0; font-size: 10px;">Docs</a>
+    </td>
+    <td style="background-color: #fff8e1; border-left: 4px solid #f57c00; width: 33%;">
+        <b style="color: #f57c00;">Overcooked-AI</b><br/>
+        <span style="color: #666; font-size: 11px;">2-agent cooperative cooking for human-AI coordination (UC Berkeley CHAI)</span><br/>
+        <a href="https://github.com/HumanCompatibleAI/overcooked_ai" style="color: #1565c0; font-size: 10px;">GitHub</a> |
+        <a href="https://arxiv.org/abs/1910.05789" style="color: #1565c0; font-size: 10px;">Paper</a> |
+        <a href="https://bair.berkeley.edu/blog/2019/10/21/coordination/" style="color: #1565c0; font-size: 10px;">Blog</a>
+    </td>
+    <td style="background-color: #e0f2f1; border-left: 4px solid #00695c; width: 33%;">
+        <b style="color: #00695c;">PyBullet Drones</b><br/>
+        <span style="color: #666; font-size: 11px;">Multi-agent quadcopter control with realistic physics (University of Toronto)</span><br/>
+        <a href="https://github.com/utiasDSL/gym-pybullet-drones" style="color: #1565c0; font-size: 10px;">GitHub</a> |
+        <a href="https://arxiv.org/abs/2103.02142" style="color: #1565c0; font-size: 10px;">Paper</a>
+    </td>
+</tr>
 </table>
 
 <h3 style="color: #333; margin-top: 15px; margin-bottom: 10px;">Core Features</h3>
@@ -133,7 +193,7 @@ to create cohesive intelligent systems — like tiles in a mosaic forming a comp
 <tr>
     <td style="background-color: #f5f5f5; border-left: 4px solid #2e7d32;">
         <b style="color: #333;">Agent Integration</b><br/>
-        <span style="color: #666; font-size: 12px;">Human, RL (CleanRL, Ray RLlib), BDI (SPADE, Jason), and LLM agents</span>
+        <span style="color: #666; font-size: 12px;">Human, RL (CleanRL, Ray RLlib, XuanCe), and LLM agents</span>
     </td>
 </tr>
 <tr>

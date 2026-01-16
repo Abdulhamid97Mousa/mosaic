@@ -33,10 +33,14 @@ class EnvironmentFamily(StrEnum):
     PROCGEN = "procgen"  # Procgen procedural benchmark (16 environments)
     JUMANJI = "jumanji"  # Jumanji JAX-based logic puzzle environments
     TEXTWORLD = "textworld"  # TextWorld text-based game environment (Microsoft Research)
+    BABAISAI = "babaisai"  # BabaIsAI rule manipulation puzzle benchmark (ICML 2024)
     PYBULLET_DRONES = "pybullet_drones"  # PyBullet Drones quadcopter environments (University of Toronto)
     PETTINGZOO = "pettingzoo"
     PETTINGZOO_CLASSIC = "pettingzoo_classic"  # PettingZoo Classic: turn-based games (Chess, Go, Connect Four, etc.)
-    OPEN_SPIEL = "open_spiel"  # OpenSpiel board games (Google DeepMind) via Shimmy
+    OPEN_SPIEL = "open_spiel"  # OpenSpiel + custom draughts variants (American, Russian, International)
+    MULTIGRID = "multigrid"  # gym-multigrid multi-agent grid environments (Soccer, Collect)
+    MELTINGPOT = "meltingpot"  # Melting Pot multi-agent social scenarios (Google DeepMind) via Shimmy
+    OVERCOOKED = "overcooked"  # Overcooked-AI cooperative cooking (2 agents, human-AI coordination)
     OTHER = "other"  # Fallback for unknown environments (not displayed in UI)
 
 
@@ -342,6 +346,11 @@ class GameId(StrEnum):
     TEXTWORLD_CUSTOM = "TextWorld-Custom-v0"
 
     # ─────────────────────────────────────────────────────────────────────────
+    # BabaIsAI (Rule Manipulation Puzzle Benchmark - ICML 2024)
+    # ─────────────────────────────────────────────────────────────────────────
+    BABAISAI_DEFAULT = "BabaIsAI-Default-v0"
+
+    # ─────────────────────────────────────────────────────────────────────────
     # Procgen (Procedurally Generated Benchmark - 16 environments)
     # ─────────────────────────────────────────────────────────────────────────
     PROCGEN_BIGFISH = "procgen:procgen-bigfish-v0"
@@ -401,6 +410,56 @@ class GameId(StrEnum):
     # ─────────────────────────────────────────────────────────────────────────
     OPEN_SPIEL_CHECKERS = "open_spiel/checkers"
 
+    # ─────────────────────────────────────────────────────────────────────────
+    # Draughts/Checkers Variants (Custom implementations with proper rules)
+    # ─────────────────────────────────────────────────────────────────────────
+    # American Checkers (8x8) - No backward captures, no flying kings
+    AMERICAN_CHECKERS = "draughts/american_checkers"
+    # Russian Checkers (8x8) - Men can capture backward, flying kings
+    RUSSIAN_CHECKERS = "draughts/russian_checkers"
+    # International Draughts (10x10) - Men can capture backward, flying kings, 20 pieces
+    INTERNATIONAL_DRAUGHTS = "draughts/international_draughts"
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # gym-multigrid (Multi-Agent Grid Environments)
+    # Repository: https://github.com/ArnaudFickinger/gym-multigrid
+    # Location: 3rd_party/gym-multigrid/
+    # ─────────────────────────────────────────────────────────────────────────
+    MULTIGRID_SOCCER = "MultiGrid-Soccer-v0"  # 4 agents, 2v2 soccer
+    MULTIGRID_COLLECT = "MultiGrid-Collect-v0"  # 3 agents, collect balls
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Melting Pot (Multi-Agent Social Scenarios - Google DeepMind)
+    # Repository: https://github.com/google-deepmind/meltingpot
+    # Shimmy: https://shimmy.farama.org/environments/meltingpot/
+    # NOTE: Linux/macOS only (Windows NOT supported)
+    # ─────────────────────────────────────────────────────────────────────────
+    # Cooperative Scenarios
+    MELTINGPOT_COLLABORATIVE_COOKING = "meltingpot/collaborative_cooking__circuit"  # Up to 9 agents, cooking cooperation
+    MELTINGPOT_CLEAN_UP = "meltingpot/clean_up__repeated"  # Up to 7 agents, public goods game
+    MELTINGPOT_COMMONS_HARVEST = "meltingpot/commons_harvest__open"  # Up to 16 agents, tragedy of the commons
+
+    # Competitive Scenarios
+    MELTINGPOT_TERRITORY = "meltingpot/territory__rooms"  # Up to 8 agents, territory control
+    MELTINGPOT_KING_OF_THE_HILL = "meltingpot/king_of_the_hill__repeated"  # Up to 16 agents, area control
+
+    # Mixed-Motive (Cooperation + Competition)
+    MELTINGPOT_PRISONERS_DILEMMA = "meltingpot/prisoners_dilemma_in_the_matrix__repeated"  # 2 agents, game theory classic
+    MELTINGPOT_STAG_HUNT = "meltingpot/stag_hunt_in_the_matrix__repeated"  # 2 agents, coordination dilemma
+    MELTINGPOT_ALLELOPATHIC_HARVEST = "meltingpot/allelopathic_harvest__open"  # Up to 16 agents, resource competition
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # Overcooked-AI (Cooperative Cooking - Human-AI Coordination)
+    # Repository: https://github.com/HumanCompatibleAI/overcooked_ai
+    # Paper: https://arxiv.org/abs/1910.05789 (NeurIPS 2019)
+    # Location: 3rd_party/overcooked_ai/
+    # ─────────────────────────────────────────────────────────────────────────
+    OVERCOOKED_CRAMPED_ROOM = "overcooked/cramped_room"  # 2 agents, tight kitchen coordination
+    OVERCOOKED_ASYMMETRIC_ADVANTAGES = "overcooked/asymmetric_advantages"  # 2 agents, asymmetric resource access
+    OVERCOOKED_COORDINATION_RING = "overcooked/coordination_ring"  # 2 agents, circular kitchen layout
+    OVERCOOKED_FORCED_COORDINATION = "overcooked/forced_coordination"  # 2 agents, explicit coordination required
+    OVERCOOKED_COUNTER_CIRCUIT = "overcooked/counter_circuit"  # 2 agents, circuit-style counter layout
+
 
 def get_game_display_name(game_id: GameId) -> str:
     """Get the display name for a GameId with family prefix.
@@ -449,6 +508,9 @@ def get_game_display_name(game_id: GameId) -> str:
     if value.startswith("open_spiel/"):
         game_name = value.split("/")[1].replace("_", " ").title()
         return f"OpenSpiel-{game_name}"
+    # MultiGrid environments (multi-agent grid worlds)
+    if value.startswith("MultiGrid-"):
+        return value
 
     # Determine Gym family based on enum
     if game_id in (GameId.FROZEN_LAKE, GameId.FROZEN_LAKE_V2, GameId.CLIFF_WALKING, 
@@ -882,6 +944,8 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.TEXTWORLD_TREASURE_HUNTER: EnvironmentFamily.TEXTWORLD,
     GameId.TEXTWORLD_COOKING: EnvironmentFamily.TEXTWORLD,
     GameId.TEXTWORLD_CUSTOM: EnvironmentFamily.TEXTWORLD,
+    # BabaIsAI environments (rule manipulation puzzles)
+    GameId.BABAISAI_DEFAULT: EnvironmentFamily.BABAISAI,
     # Procgen environments (16 procedurally generated games)
     GameId.PROCGEN_BIGFISH: EnvironmentFamily.PROCGEN,
     GameId.PROCGEN_BOSSFIGHT: EnvironmentFamily.PROCGEN,
@@ -929,8 +993,29 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.PYBULLET_MULTIHOVER_AVIARY: EnvironmentFamily.PYBULLET_DRONES,
     GameId.PYBULLET_CTRL_AVIARY: EnvironmentFamily.PYBULLET_DRONES,
     GameId.PYBULLET_VELOCITY_AVIARY: EnvironmentFamily.PYBULLET_DRONES,
-    # OpenSpiel
+    # OpenSpiel + custom draughts variants (all under open_spiel family)
     GameId.OPEN_SPIEL_CHECKERS: EnvironmentFamily.OPEN_SPIEL,
+    GameId.AMERICAN_CHECKERS: EnvironmentFamily.OPEN_SPIEL,  # Custom implementation
+    GameId.RUSSIAN_CHECKERS: EnvironmentFamily.OPEN_SPIEL,  # Custom implementation
+    GameId.INTERNATIONAL_DRAUGHTS: EnvironmentFamily.OPEN_SPIEL,  # Custom implementation
+    # gym-multigrid (multi-agent grid environments)
+    GameId.MULTIGRID_SOCCER: EnvironmentFamily.MULTIGRID,
+    GameId.MULTIGRID_COLLECT: EnvironmentFamily.MULTIGRID,
+    # Melting Pot (multi-agent social scenarios)
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_CLEAN_UP: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_COMMONS_HARVEST: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_TERRITORY: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_KING_OF_THE_HILL: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_PRISONERS_DILEMMA: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_STAG_HUNT: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_ALLELOPATHIC_HARVEST: EnvironmentFamily.MELTINGPOT,
+    # Overcooked-AI (cooperative cooking)
+    GameId.OVERCOOKED_CRAMPED_ROOM: EnvironmentFamily.OVERCOOKED,
+    GameId.OVERCOOKED_ASYMMETRIC_ADVANTAGES: EnvironmentFamily.OVERCOOKED,
+    GameId.OVERCOOKED_COORDINATION_RING: EnvironmentFamily.OVERCOOKED,
+    GameId.OVERCOOKED_FORCED_COORDINATION: EnvironmentFamily.OVERCOOKED,
+    GameId.OVERCOOKED_COUNTER_CIRCUIT: EnvironmentFamily.OVERCOOKED,
 }
 
 
@@ -1092,6 +1177,8 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.TEXTWORLD_TREASURE_HUNTER: RenderMode.ANSI,
     GameId.TEXTWORLD_COOKING: RenderMode.ANSI,
     GameId.TEXTWORLD_CUSTOM: RenderMode.ANSI,
+    # BabaIsAI - RGB observation
+    GameId.BABAISAI_DEFAULT: RenderMode.RGB_ARRAY,
     # Procgen - RGB observation (64x64x3)
     GameId.PROCGEN_BIGFISH: RenderMode.RGB_ARRAY,
     GameId.PROCGEN_BOSSFIGHT: RenderMode.RGB_ARRAY,
@@ -1141,6 +1228,28 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.PYBULLET_VELOCITY_AVIARY: RenderMode.RGB_ARRAY,
     # OpenSpiel (board games rendered via Shimmy)
     GameId.OPEN_SPIEL_CHECKERS: RenderMode.RGB_ARRAY,
+    # Draughts/Checkers variants
+    GameId.AMERICAN_CHECKERS: RenderMode.RGB_ARRAY,
+    GameId.RUSSIAN_CHECKERS: RenderMode.RGB_ARRAY,
+    GameId.INTERNATIONAL_DRAUGHTS: RenderMode.RGB_ARRAY,
+    # gym-multigrid (multi-agent grid environments)
+    GameId.MULTIGRID_SOCCER: RenderMode.RGB_ARRAY,
+    GameId.MULTIGRID_COLLECT: RenderMode.RGB_ARRAY,
+    # Melting Pot (multi-agent social scenarios via Shimmy)
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_CLEAN_UP: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_COMMONS_HARVEST: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_TERRITORY: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_KING_OF_THE_HILL: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_PRISONERS_DILEMMA: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_STAG_HUNT: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_ALLELOPATHIC_HARVEST: RenderMode.RGB_ARRAY,
+    # Overcooked-AI (cooperative cooking)
+    GameId.OVERCOOKED_CRAMPED_ROOM: RenderMode.RGB_ARRAY,
+    GameId.OVERCOOKED_ASYMMETRIC_ADVANTAGES: RenderMode.RGB_ARRAY,
+    GameId.OVERCOOKED_COORDINATION_RING: RenderMode.RGB_ARRAY,
+    GameId.OVERCOOKED_FORCED_COORDINATION: RenderMode.RGB_ARRAY,
+    GameId.OVERCOOKED_COUNTER_CIRCUIT: RenderMode.RGB_ARRAY,
 }
 
 
@@ -1704,6 +1813,8 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
     GameId.TEXTWORLD_TREASURE_HUNTER: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     GameId.TEXTWORLD_COOKING: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     GameId.TEXTWORLD_CUSTOM: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    # BabaIsAI - turn-based puzzle game (supports Human Control)
+    GameId.BABAISAI_DEFAULT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     # Procgen - procedurally generated games (supports Human Control)
     GameId.PROCGEN_BIGFISH: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     GameId.PROCGEN_BOSSFIGHT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
@@ -1798,6 +1909,28 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
     GameId.PYBULLET_VELOCITY_AVIARY: (ControlMode.AGENT_ONLY,),
     # OpenSpiel - Turn-based board games via Shimmy
     GameId.OPEN_SPIEL_CHECKERS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    # Draughts/Checkers variants - Turn-based board games with proper rule implementations
+    GameId.AMERICAN_CHECKERS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.RUSSIAN_CHECKERS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    GameId.INTERNATIONAL_DRAUGHTS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
+    # gym-multigrid - Multi-agent environments (simultaneous stepping)
+    GameId.MULTIGRID_SOCCER: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MULTIGRID_COLLECT: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    # Melting Pot - Multi-agent social scenarios (parallel stepping)
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_CLEAN_UP: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_COMMONS_HARVEST: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_TERRITORY: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_KING_OF_THE_HILL: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_PRISONERS_DILEMMA: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_STAG_HUNT: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_ALLELOPATHIC_HARVEST: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COMPETITIVE),
+    # Overcooked-AI - 2-agent cooperative cooking
+    GameId.OVERCOOKED_CRAMPED_ROOM: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.OVERCOOKED_ASYMMETRIC_ADVANTAGES: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.OVERCOOKED_COORDINATION_RING: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.OVERCOOKED_FORCED_COORDINATION: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.OVERCOOKED_COUNTER_CIRCUIT: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
 }
 
 
@@ -1823,10 +1956,14 @@ DEFAULT_PARADIGM_BY_FAMILY: dict[EnvironmentFamily, SteppingParadigm] = {
     EnvironmentFamily.PROCGEN: SteppingParadigm.SINGLE_AGENT,  # Procedurally generated games
     EnvironmentFamily.JUMANJI: SteppingParadigm.SINGLE_AGENT,  # JAX-based logic puzzles (turn-based)
     EnvironmentFamily.TEXTWORLD: SteppingParadigm.SINGLE_AGENT,  # Text-based adventure games
+    EnvironmentFamily.BABAISAI: SteppingParadigm.SINGLE_AGENT,  # Turn-based puzzle game
     EnvironmentFamily.PETTINGZOO: SteppingParadigm.SEQUENTIAL,  # AEC by default
     EnvironmentFamily.PETTINGZOO_CLASSIC: SteppingParadigm.SEQUENTIAL,  # Chess, Go, etc.
     EnvironmentFamily.PYBULLET_DRONES: SteppingParadigm.SINGLE_AGENT,  # Single/multi-agent quadcopter control
     EnvironmentFamily.OPEN_SPIEL: SteppingParadigm.SEQUENTIAL,  # Turn-based board games (Checkers, etc.)
+    EnvironmentFamily.MULTIGRID: SteppingParadigm.SIMULTANEOUS,  # Multi-agent grid envs (all agents act at once)
+    EnvironmentFamily.MELTINGPOT: SteppingParadigm.SIMULTANEOUS,  # Multi-agent social scenarios (parallel stepping)
+    EnvironmentFamily.OVERCOOKED: SteppingParadigm.SIMULTANEOUS,  # 2-agent cooperative cooking (parallel stepping)
     EnvironmentFamily.OTHER: SteppingParadigm.SINGLE_AGENT,  # Fallback
 }
 

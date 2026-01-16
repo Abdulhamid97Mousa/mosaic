@@ -138,6 +138,85 @@ class BabyAIDescriptionWrapper(gym.Wrapper):
 
 
 # =============================================================================
+# MultiGrid Text Description Generator (MOSAIC Extension)
+# =============================================================================
+
+def generate_multigrid_description(
+    obs: np.ndarray,
+    agent_id: int,
+    env: Any,
+    observation_mode: str = "visible_teammates",
+    agent_direction: int = 0,
+    carrying: Optional[str] = None,
+) -> str:
+    """Generate text description from MultiGrid observation using MOSAIC extension.
+
+    Args:
+        obs: Encoded grid observation (view_size, view_size, 6)
+        agent_id: Current agent index
+        env: MultiGrid environment instance
+        observation_mode: "egocentric" or "visible_teammates"
+        agent_direction: Agent's facing direction (0-3)
+        carrying: What agent is carrying
+
+    Returns:
+        Natural language description of observation
+    """
+    # Import MOSAIC extension
+    from mosaic_extension.multigrid import observations
+
+    if observation_mode == "egocentric":
+        return observations.describe_observation_egocentric(
+            obs, agent_direction, carrying
+        )
+    else:  # visible_teammates
+        # Extract teammate info
+        agent_team = agent_id // 2  # Soccer: 0,1=team0, 2,3=team1
+        visible_teammates = observations.extract_visible_teammates(
+            env, agent_id, agent_team
+        )
+        return observations.describe_observation_with_teammates(
+            obs, agent_id, visible_teammates, agent_direction, carrying
+        )
+
+
+def get_multigrid_instruction_prompt(
+    agent_id: int,
+    env_id: str,
+    coordination_level: int = 1,
+    role: Optional[str] = None,
+) -> str:
+    """Get MultiGrid instruction prompt using MOSAIC extension.
+
+    Args:
+        agent_id: Agent index
+        env_id: Environment identifier (e.g., "MultiGrid-Soccer-v0")
+        coordination_level: 1=Emergent, 2=Basic Hints, 3=Role-Based
+        role: Agent role for Level 3 (e.g., "forward", "defender")
+
+    Returns:
+        Instruction prompt for the specified coordination level
+    """
+    # Import MOSAIC extension
+    from mosaic_extension.multigrid import prompts
+
+    # Determine team (Soccer: agents 0,1=team0, 2,3=team1)
+    team = agent_id // 2 if "Soccer" in env_id else agent_id
+
+    if coordination_level == 1:
+        return prompts.get_instruction_prompt_level1(agent_id, team, env_id)
+    elif coordination_level == 2:
+        return prompts.get_instruction_prompt_level2(agent_id, team, env_id)
+    elif coordination_level == 3:
+        return prompts.get_instruction_prompt_level3(
+            agent_id, team, role or "forward", env_id
+        )
+    else:
+        logger.warning(f"Unknown coordination_level {coordination_level}, using Level 1")
+        return prompts.get_instruction_prompt_level1(agent_id, team, env_id)
+
+
+# =============================================================================
 # Environment Factory
 # =============================================================================
 

@@ -18,10 +18,123 @@ from qtpy import QtCore, QtWidgets
 from gym_gui.services.operator import OperatorConfig
 from gym_gui.rendering import RendererRegistry, create_default_renderer_registry, RendererContext
 from gym_gui.rendering.strategies.board_game import BoardGameRendererStrategy
-from gym_gui.core.enums import RenderMode
+from gym_gui.core.enums import GameId, RenderMode
+from gym_gui.controllers.human_input import (
+    _TOY_TEXT_MAPPINGS,
+    _MINIG_GRID_MAPPINGS,
+    _BOX_2D_MAPPINGS,
+    _VIZDOOM_MAPPINGS,
+    _MINIHACK_MAPPINGS,
+    _NETHACK_MAPPINGS,
+    _CRAFTER_MAPPINGS,
+    _BABAISAI_MAPPINGS,
+    _PROCGEN_MAPPINGS,
+    _JUMANJI_MAPPINGS,
+    _ALE_MAPPINGS,
+)
 
 # Use operators namespace for dedicated operators.log routing
 _LOGGER = logging.getLogger("gym_gui.operators.render_container")
+
+
+class FlowLayout(QtWidgets.QLayout):
+    """A layout that arranges widgets in a flow, wrapping to new lines as needed.
+
+    Based on Qt's FlowLayout example. Widgets are added left-to-right and wrap
+    to the next line when they exceed the available width.
+    """
+
+    def __init__(self, parent: Optional[QtWidgets.QWidget] = None, margin: int = 0, spacing: int = -1):
+        super().__init__(parent)
+        self._item_list: list[QtWidgets.QLayoutItem] = []
+        self._h_spacing = spacing if spacing >= 0 else 4
+        self._v_spacing = spacing if spacing >= 0 else 4
+        self.setContentsMargins(margin, margin, margin, margin)
+
+    def addItem(self, item: QtWidgets.QLayoutItem) -> None:
+        self._item_list.append(item)
+
+    def horizontalSpacing(self) -> int:
+        return self._h_spacing
+
+    def verticalSpacing(self) -> int:
+        return self._v_spacing
+
+    def count(self) -> int:
+        return len(self._item_list)
+
+    def itemAt(self, index: int) -> Optional[QtWidgets.QLayoutItem]:
+        if 0 <= index < len(self._item_list):
+            return self._item_list[index]
+        return None
+
+    def takeAt(self, index: int) -> Optional[QtWidgets.QLayoutItem]:
+        if 0 <= index < len(self._item_list):
+            return self._item_list.pop(index)
+        return None
+
+    def expandingDirections(self) -> QtCore.Qt.Orientation:
+        return QtCore.Qt.Orientation(0)
+
+    def hasHeightForWidth(self) -> bool:
+        return True
+
+    def heightForWidth(self, width: int) -> int:
+        return self._do_layout(QtCore.QRect(0, 0, width, 0), test_only=True)
+
+    def setGeometry(self, rect: QtCore.QRect) -> None:
+        super().setGeometry(rect)
+        self._do_layout(rect, test_only=False)
+
+    def sizeHint(self) -> QtCore.QSize:
+        return self.minimumSize()
+
+    def minimumSize(self) -> QtCore.QSize:
+        size = QtCore.QSize()
+        for item in self._item_list:
+            size = size.expandedTo(item.minimumSize())
+        margins = self.contentsMargins()
+        size += QtCore.QSize(margins.left() + margins.right(), margins.top() + margins.bottom())
+        return size
+
+    def _do_layout(self, rect: QtCore.QRect, test_only: bool) -> int:
+        """Arrange items in the layout, wrapping as needed.
+
+        Args:
+            rect: The available rectangle for layout.
+            test_only: If True, just calculate height without moving widgets.
+
+        Returns:
+            The total height needed.
+        """
+        margins = self.contentsMargins()
+        effective_rect = rect.adjusted(margins.left(), margins.top(), -margins.right(), -margins.bottom())
+        x = effective_rect.x()
+        y = effective_rect.y()
+        line_height = 0
+
+        for item in self._item_list:
+            widget = item.widget()
+            if widget is None:
+                continue
+
+            space_x = self._h_spacing
+            space_y = self._v_spacing
+
+            next_x = x + item.sizeHint().width() + space_x
+            if next_x - space_x > effective_rect.right() and line_height > 0:
+                x = effective_rect.x()
+                y = y + line_height + space_y
+                next_x = x + item.sizeHint().width() + space_x
+                line_height = 0
+
+            if not test_only:
+                item.setGeometry(QtCore.QRect(QtCore.QPoint(x, y), item.sizeHint()))
+
+            x = next_x
+            line_height = max(line_height, item.sizeHint().height())
+
+        return y + line_height - rect.y() + margins.bottom()
 
 
 class OperatorRenderContainer(QtWidgets.QFrame):
@@ -31,9 +144,17 @@ class OperatorRenderContainer(QtWidgets.QFrame):
     - Header with operator name, type badge, and status
     - Render area for visual output (grid/video)
     - Stats bar with step/episode/reward counters
+
+    For Human operators, this container is interactive:
+    - Board games: click on board to make moves
+    - Other envs: keyboard input to select actions
     """
 
     status_changed = pyqtSignal(str, str)  # operator_id, new_status
+    # Human interaction signals
+    human_action_submitted = pyqtSignal(str, int)  # operator_id, action_index
+    board_game_move_made = pyqtSignal(str, str, str)  # operator_id, from_square, to_square
+    chess_move_button_clicked = pyqtSignal(str, str)  # operator_id, uci_move (e.g., "e2e4")
 
     # Status colors
     STATUS_COLORS = {
@@ -49,6 +170,7 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         "llm": "#2196F3",  # Blue
         "vlm": "#00BCD4",  # Cyan
         "rl": "#9C27B0",   # Purple
+        "human": "#FF5722",  # Deep Orange - distinct for human operators
     }
 
     def __init__(
@@ -75,8 +197,30 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         self._total_reward = 0.0
         self._episode_reward = 0.0
 
+        # LLM conversation tracking
+        self._system_prompt: str = ""
+        self._conversation_history: list = []  # List of {"role": "user"|"assistant", "content": str}
+
+        # Human operator interaction tracking
+        # Check if this is a human operator:
+        # - Single-agent: operator_type == "human"
+        # - Multi-agent: any worker has worker_type == "human" or worker_id == "human_worker"
+        self._is_interactive: bool = self._has_human_worker(config)
+        _LOGGER.debug(
+            f"OperatorRenderContainer __init__: operator_id={config.operator_id}, "
+            f"_is_interactive={self._is_interactive}, workers={list(config.workers.keys())}",
+        )
+        self._available_actions: list[int] = []  # Available action indices for human selection
+        self._action_labels: list[str] = []  # Human-readable labels for actions
+        self._game_id: Optional[GameId] = None  # Current game for key mappings
+        self._key_mappings: dict[int, int] = {}  # Qt key -> action index
+
         self._build_ui()
         self._update_header()
+
+        # Enable keyboard focus for human operators
+        if self._is_interactive:
+            self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
 
     def _log_extra(self) -> dict:
         """Return extra dict for correlated logging with run_id and operator_id."""
@@ -84,6 +228,27 @@ class OperatorRenderContainer(QtWidgets.QFrame):
             "run_id": self._config.run_id or "unknown",
             "agent_id": self._config.operator_id,
         }
+
+    @staticmethod
+    def _has_human_worker(config: OperatorConfig) -> bool:
+        """Check if the operator has any human workers.
+
+        Args:
+            config: The operator configuration.
+
+        Returns:
+            True if any worker is a human worker (single-agent or multi-agent).
+        """
+        # Single-agent mode: check operator_type directly
+        if config.operator_type == "human":
+            return True
+
+        # Multi-agent mode: check if any worker is human
+        for worker in config.workers.values():
+            if worker.worker_type == "human" or worker.worker_id == "human_worker":
+                return True
+
+        return False
 
     def _build_ui(self) -> None:
         self.setFrameStyle(QtWidgets.QFrame.Shape.Box | QtWidgets.QFrame.Shadow.Raised)
@@ -192,7 +357,98 @@ class OperatorRenderContainer(QtWidgets.QFrame):
 
         stats_layout.addStretch()
 
+        # LLM info buttons (only visible for LLM/VLM operators)
+        self._prompt_btn = QtWidgets.QPushButton("Step Prompt", self._stats_bar)
+        self._prompt_btn.setFixedSize(75, 22)
+        self._prompt_btn.setToolTip("View the full prompt sent to LLM at current step")
+        self._prompt_btn.setStyleSheet(
+            "QPushButton { font-size: 9px; padding: 2px 4px; }"
+            "QPushButton:hover { background-color: #e3f2fd; }"
+        )
+        self._prompt_btn.clicked.connect(self._show_prompt_dialog)
+        stats_layout.addWidget(self._prompt_btn)
+
+        self._chat_btn = QtWidgets.QPushButton("Chat", self._stats_bar)
+        self._chat_btn.setFixedSize(45, 22)
+        self._chat_btn.setToolTip("View LLM conversation history")
+        self._chat_btn.setStyleSheet(
+            "QPushButton { font-size: 9px; padding: 2px 4px; }"
+            "QPushButton:hover { background-color: #e3f2fd; }"
+        )
+        self._chat_btn.clicked.connect(self._show_chat_dialog)
+        stats_layout.addWidget(self._chat_btn)
+
+        # Show/hide LLM buttons based on operator type (not for human operators)
+        is_llm = self._config.operator_type in ("llm", "vlm")
+        self._prompt_btn.setVisible(is_llm)
+        self._chat_btn.setVisible(is_llm)
+
+        # Add "Your Turn" indicator for human operators (hidden initially)
+        self._your_turn_label = QtWidgets.QLabel("Your Turn!", self._stats_bar)
+        self._your_turn_label.setStyleSheet(
+            "QLabel { font-weight: bold; color: white; padding: 2px 8px; "
+            "background-color: #FF5722; border-radius: 3px; font-size: 10px; }"
+        )
+        self._your_turn_label.setVisible(False)
+        stats_layout.addWidget(self._your_turn_label)
+
         layout.addWidget(self._stats_bar)
+
+        # Action panel for human operators (click-to-select actions)
+        # Uses FlowLayout so buttons wrap to multiple lines
+        self._action_panel = QtWidgets.QWidget(self)
+        action_panel_layout = QtWidgets.QVBoxLayout(self._action_panel)
+        action_panel_layout.setContentsMargins(4, 2, 4, 2)
+        action_panel_layout.setSpacing(2)
+
+        # Header row with "Actions:" label
+        header_row = QtWidgets.QWidget(self._action_panel)
+        header_layout = QtWidgets.QHBoxLayout(header_row)
+        header_layout.setContentsMargins(0, 0, 0, 0)
+        action_label = QtWidgets.QLabel("Actions:", header_row)
+        action_label.setStyleSheet("font-size: 10px; font-weight: bold;")
+        header_layout.addWidget(action_label)
+        header_layout.addStretch()
+        action_panel_layout.addWidget(header_row)
+
+        # Container for action buttons with FlowLayout (wraps to multiple lines)
+        self._action_buttons_container = QtWidgets.QWidget(self._action_panel)
+        self._action_buttons_layout = FlowLayout(self._action_buttons_container, margin=0, spacing=3)
+        action_panel_layout.addWidget(self._action_buttons_container)
+
+        self._action_panel.setVisible(False)  # Hidden by default
+        layout.addWidget(self._action_panel)
+
+        # Chess moves panel for Human chess players (clickable legal move buttons)
+        self._chess_moves_panel = QtWidgets.QWidget(self)
+        chess_panel_layout = QtWidgets.QVBoxLayout(self._chess_moves_panel)
+        chess_panel_layout.setContentsMargins(4, 2, 4, 2)
+        chess_panel_layout.setSpacing(2)
+
+        # Header row with "Legal Moves:" label and current player indicator
+        chess_header = QtWidgets.QWidget(self._chess_moves_panel)
+        chess_header_layout = QtWidgets.QHBoxLayout(chess_header)
+        chess_header_layout.setContentsMargins(0, 0, 0, 0)
+        chess_moves_label = QtWidgets.QLabel("Legal Moves:", chess_header)
+        chess_moves_label.setStyleSheet("font-size: 10px; font-weight: bold;")
+        chess_header_layout.addWidget(chess_moves_label)
+        self._chess_player_label = QtWidgets.QLabel("", chess_header)
+        self._chess_player_label.setStyleSheet("font-size: 10px; color: #666;")
+        chess_header_layout.addWidget(self._chess_player_label)
+        chess_header_layout.addStretch()
+        chess_panel_layout.addWidget(chess_header)
+
+        # Container for chess move buttons with FlowLayout
+        self._chess_buttons_container = QtWidgets.QWidget(self._chess_moves_panel)
+        self._chess_buttons_layout = FlowLayout(self._chess_buttons_container, margin=0, spacing=3)
+        chess_panel_layout.addWidget(self._chess_buttons_container)
+
+        self._chess_moves_panel.setVisible(False)  # Hidden by default
+        layout.addWidget(self._chess_moves_panel)
+
+        # Track current chess state
+        self._chess_legal_moves: list[str] = []
+        self._chess_current_player: str = ""
 
     def _update_header(self) -> None:
         """Update header with current config."""
@@ -208,6 +464,10 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         self._model_label.setText(self._get_model_display_name())
         env_task = f"{self._config.env_name}/{self._config.task}"
         self._env_label.setText(env_task)
+        # Update LLM button visibility
+        is_llm = self._config.operator_type in ("llm", "vlm")
+        self._prompt_btn.setVisible(is_llm)
+        self._chat_btn.setVisible(is_llm)
 
     def _update_status_indicator(self) -> None:
         """Update status indicator appearance."""
@@ -222,11 +482,24 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         """Get a user-friendly worker name from the config.
 
         Returns:
-            Worker display name (e.g., "BALROG Worker", "CleanRL Worker").
+            Worker display name based on operator type:
+            - LLM/VLM: "LLM Worker" (generic, model shown separately)
+            - Human: "HUMAN"
+            - RL: Specific worker name (e.g., "CleanRL", "Ray")
         """
+        op_type = self._config.operator_type
         worker_id = self._config.worker_id
-        # Convert worker_id to display name
-        # e.g., "balrog_worker" -> "BALROG", "cleanrl_worker" -> "CleanRL"
+
+        # For Human operators, show "HUMAN"
+        if op_type == "human" or worker_id == "human_worker":
+            return "HUMAN"
+
+        # For LLM/VLM operators, show generic "LLM Worker"
+        # (the specific model is shown in the model label)
+        if op_type in ("llm", "vlm"):
+            return "LLM Worker"
+
+        # For RL operators, show the specific worker name
         if worker_id:
             name = worker_id.replace("_worker", "").replace("_", " ")
             return name.upper() if len(name) <= 6 else name.title()
@@ -269,6 +542,24 @@ class OperatorRenderContainer(QtWidgets.QFrame):
     def set_config(self, config: OperatorConfig) -> None:
         """Update the operator configuration."""
         self._config = config
+        # Update interactive flag when config changes (e.g., Human workers added)
+        old_interactive = self._is_interactive
+        self._is_interactive = self._has_human_worker(config)
+        _LOGGER.debug(
+            f"set_config: operator_id={config.operator_id}, "
+            f"old_interactive={old_interactive}, new_interactive={self._is_interactive}, "
+            f"workers={list(config.workers.keys())}",
+            extra=self._log_extra()
+        )
+        if self._is_interactive and not old_interactive:
+            _LOGGER.debug(
+                f"set_config: Enabling interactive mode for {config.operator_id}",
+                extra=self._log_extra()
+            )
+            self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
+            # Reconnect board game signals if renderer exists
+            if self._board_game_renderer:
+                self.connect_board_game_signals()
         self._update_header()
 
     def set_status(self, status: str) -> None:
@@ -364,6 +655,12 @@ class OperatorRenderContainer(QtWidgets.QFrame):
                 if not self._board_game_renderer:
                     self._board_game_renderer = BoardGameRendererStrategy(self._render_container)
                     self._render_layout.addWidget(self._board_game_renderer.widget)
+                    # Connect board click signals for Human operators
+                    _LOGGER.debug(
+                        f"Created board game renderer, _is_interactive={self._is_interactive}",
+                        extra=self._log_extra()
+                    )
+                    self.connect_board_game_signals()
 
                 # Switch to board game renderer if needed
                 if not self._is_board_game:
@@ -379,7 +676,21 @@ class OperatorRenderContainer(QtWidgets.QFrame):
                 # Render the board game
                 if self._board_game_renderer.supports(render_payload):
                     context = RendererContext()
+                    # Extract square_size from config settings (if configured via operator widget)
+                    square_size = self._config.settings.get("square_size")
+                    if square_size:
+                        context.square_size = square_size
                     self._board_game_renderer.render(render_payload, context=context)
+
+                    # For Human operators playing chess, extract and show legal moves
+                    _LOGGER.debug(
+                        f"Chess payload check: _is_interactive={self._is_interactive}, "
+                        f"has_chess={'chess' in render_payload}, has_fen={'fen' in render_payload}",
+                        extra=self._log_extra()
+                    )
+                    if self._is_interactive and ("chess" in render_payload or "fen" in render_payload):
+                        _LOGGER.debug("Calling _update_chess_legal_moves", extra=self._log_extra())
+                        self._update_chess_legal_moves(render_payload)
             else:
                 # Use standard RGB or GRID renderer
                 if self._is_board_game:
@@ -558,9 +869,10 @@ class OperatorRenderContainer(QtWidgets.QFrame):
             new_episode = int(episode_index) + 1
             new_step = int(step_index) + 1
 
-            # Reset episode reward when episode changes
+            # Reset episode reward and conversation when episode changes
             if new_episode != self._current_episode:
                 self._episode_reward = 0.0
+                self._conversation_history.clear()
 
             self._current_episode = new_episode
             self._current_step = new_step
@@ -578,6 +890,40 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         self._step_label.setText(f"Step: {self._current_step}")
         self._reward_label.setText(f"Reward: {self._episode_reward:.2f}")
 
+        # Extract LLM conversation data (for LLM/VLM operators)
+        if self._config.operator_type in ("llm", "vlm"):
+            self._update_conversation_from_payload(payload)
+
+    def _update_conversation_from_payload(self, payload: Dict[str, Any]) -> None:
+        """Extract and store LLM conversation data from telemetry payload.
+
+        Args:
+            payload: Telemetry payload that may contain observation, action, system_prompt.
+        """
+        # Extract system prompt (env-family specific instruction, sent once on ready)
+        system_prompt = payload.get("system_prompt", "")
+        if system_prompt and not self._system_prompt:
+            self._system_prompt = system_prompt
+
+        # Extract observation (what was sent to LLM at this step)
+        observation = payload.get("observation", "")
+
+        # Extract action/LLM response
+        action = payload.get("action", payload.get("llm_response", ""))
+
+        # Add to conversation history
+        if observation:
+            self._conversation_history.append({
+                "role": "user",
+                "content": observation
+            })
+
+        if action:
+            self._conversation_history.append({
+                "role": "assistant",
+                "content": action
+            })
+
     def reset_stats(self) -> None:
         """Reset stats for a new episode."""
         self._current_step = 0
@@ -585,6 +931,609 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         self._episode_label.setText(f"Episode: {self._current_episode}")
         self._step_label.setText("Step: 0")
         self._reward_label.setText("Reward: 0.00")
+        # Clear conversation history for new episode
+        self._conversation_history.clear()
+
+    def _show_prompt_dialog(self) -> None:
+        """Show dialog with the full prompt sent to LLM at current step."""
+        dialog = QtWidgets.QDialog(self)
+        dialog.setWindowTitle(f"Step Prompt - {self._config.display_name}")
+        dialog.setMinimumSize(700, 500)
+
+        layout = QtWidgets.QVBoxLayout(dialog)
+
+        # Header with step info
+        header = QtWidgets.QLabel(
+            f"Step Prompt - Episode {self._current_episode}, Step {self._current_step}",
+            dialog
+        )
+        header.setStyleSheet("font-weight: bold; font-size: 12px; margin-bottom: 8px;")
+        layout.addWidget(header)
+
+        # Subheader
+        subheader = QtWidgets.QLabel(
+            "Full prompt sent to the LLM at current step:",
+            dialog
+        )
+        subheader.setStyleSheet("font-size: 10px; color: #666; margin-bottom: 4px;")
+        layout.addWidget(subheader)
+
+        # Prompt text area
+        text_edit = QtWidgets.QTextEdit(dialog)
+        text_edit.setReadOnly(True)
+        text_edit.setStyleSheet("font-family: monospace; font-size: 11px;")
+
+        # Build the full step prompt
+        prompt_lines = []
+        sep = "=" * 70
+
+        # System Instruction (env-family specific)
+        env_family = getattr(self._config, "env_family", "unknown")
+        prompt_lines.append(sep)
+        prompt_lines.append(f"SYSTEM INSTRUCTION (Env: {env_family})")
+        prompt_lines.append(sep)
+        if self._system_prompt:
+            prompt_lines.append(self._system_prompt)
+        else:
+            prompt_lines.append("(No system prompt captured yet. Run the operator to see it.)")
+        prompt_lines.append("")
+
+        # Current Step Observation (most recent)
+        prompt_lines.append(sep)
+        prompt_lines.append(f"CURRENT STEP OBSERVATION (Step {self._current_step})")
+        prompt_lines.append(sep)
+        if self._conversation_history:
+            # Find the most recent USER message (observation)
+            for msg in reversed(self._conversation_history):
+                if msg.get("role") == "user":
+                    prompt_lines.append(msg.get("content", "(empty)"))
+                    break
+            else:
+                prompt_lines.append("(No observation yet)")
+        else:
+            prompt_lines.append("(No observation yet. Run the operator.)")
+        prompt_lines.append("")
+
+        # Full Conversation History
+        if self._conversation_history:
+            prompt_lines.append(sep)
+            prompt_lines.append("FULL CONVERSATION HISTORY")
+            prompt_lines.append(sep)
+            for i, msg in enumerate(self._conversation_history):
+                role = msg.get("role", "unknown").upper()
+                content = msg.get("content", "")
+                if role == "USER":
+                    prompt_lines.append(f"\n[{i+1}] USER (Observation):")
+                    prompt_lines.append(content)
+                elif role == "ASSISTANT":
+                    prompt_lines.append(f"\n[{i+1}] ASSISTANT (Action):")
+                    prompt_lines.append(content)
+                else:
+                    prompt_lines.append(f"\n[{i+1}] {role}:")
+                    prompt_lines.append(content)
+                prompt_lines.append("-" * 40)
+
+        text_edit.setPlainText("\n".join(prompt_lines))
+        layout.addWidget(text_edit)
+
+        # Close button
+        close_btn = QtWidgets.QPushButton("Close", dialog)
+        close_btn.clicked.connect(dialog.accept)
+        layout.addWidget(close_btn)
+
+        dialog.exec()
+
+    def _show_chat_dialog(self) -> None:
+        """Show dialog with the full LLM conversation history."""
+        dialog = QtWidgets.QDialog(self)
+        dialog.setWindowTitle(f"LLM Conversation - {self._config.display_name}")
+        dialog.setMinimumSize(700, 500)
+
+        layout = QtWidgets.QVBoxLayout(dialog)
+
+        # Header with stats
+        header = QtWidgets.QLabel(
+            f"Conversation History - Episode {self._current_episode}, Step {self._current_step}",
+            dialog
+        )
+        header.setStyleSheet("font-weight: bold; font-size: 12px; margin-bottom: 8px;")
+        layout.addWidget(header)
+
+        # Conversation text area
+        text_edit = QtWidgets.QTextEdit(dialog)
+        text_edit.setReadOnly(True)
+        text_edit.setStyleSheet("font-family: monospace; font-size: 11px;")
+
+        if self._conversation_history:
+            # Format conversation
+            lines = []
+            for i, msg in enumerate(self._conversation_history):
+                role = msg.get("role", "unknown").upper()
+                content = msg.get("content", "")
+                # Color-code by role
+                if role == "USER":
+                    lines.append(f"[{i+1}] USER (Observation):\n{content}\n")
+                elif role == "ASSISTANT":
+                    lines.append(f"[{i+1}] ASSISTANT (Action):\n{content}\n")
+                else:
+                    lines.append(f"[{i+1}] {role}:\n{content}\n")
+                lines.append("-" * 60 + "\n")
+            text_edit.setPlainText("".join(lines))
+        else:
+            text_edit.setPlainText("(No conversation captured yet. Run the operator to see the chat.)")
+
+        layout.addWidget(text_edit)
+
+        # Button row
+        btn_layout = QtWidgets.QHBoxLayout()
+        btn_layout.addStretch()
+
+        # Copy button
+        copy_btn = QtWidgets.QPushButton("Copy to Clipboard", dialog)
+        copy_btn.clicked.connect(lambda: self._copy_conversation_to_clipboard(text_edit.toPlainText()))
+        btn_layout.addWidget(copy_btn)
+
+        # Close button
+        close_btn = QtWidgets.QPushButton("Close", dialog)
+        close_btn.clicked.connect(dialog.accept)
+        btn_layout.addWidget(close_btn)
+
+        layout.addLayout(btn_layout)
+
+        dialog.exec()
+
+    def _copy_conversation_to_clipboard(self, text: str) -> None:
+        """Copy text to clipboard."""
+        from qtpy.QtWidgets import QApplication
+        clipboard = QApplication.clipboard()
+        if clipboard:
+            clipboard.setText(text)
+
+    def update_llm_data(self, system_prompt: str = "", observation: str = "", action: str = "") -> None:
+        """Update LLM conversation data from external source.
+
+        This can be called when receiving telemetry with LLM data.
+
+        Args:
+            system_prompt: The system prompt / instruction (set once)
+            observation: Current observation sent to LLM
+            action: LLM's response / selected action
+        """
+        if system_prompt and not self._system_prompt:
+            self._system_prompt = system_prompt
+
+        if observation:
+            self._conversation_history.append({
+                "role": "user",
+                "content": observation
+            })
+
+        if action:
+            self._conversation_history.append({
+                "role": "assistant",
+                "content": action
+            })
+
+    # --- Human Operator Interaction Methods ---
+
+    def set_interactive(self, enabled: bool) -> None:
+        """Enable or disable interactive mode for human operators.
+
+        Args:
+            enabled: True to enable user interaction, False to disable.
+        """
+        self._is_interactive = enabled
+        if enabled:
+            self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
+            _LOGGER.debug(f"Interactive mode enabled for {self._config.operator_id}")
+            # Reconnect board game signals when enabling interactive mode
+            if self._board_game_renderer:
+                self.connect_board_game_signals()
+        else:
+            self.setFocusPolicy(QtCore.Qt.FocusPolicy.NoFocus)
+
+    def set_game_id(self, game_id: GameId) -> None:
+        """Set the current game and configure keyboard mappings.
+
+        Args:
+            game_id: The GameId for the current environment.
+        """
+        self._game_id = game_id
+        self._key_mappings = {}
+
+        # Look up mappings from human_input.py
+        mappings = None
+        for mapping_dict in [
+            _TOY_TEXT_MAPPINGS,
+            _MINIG_GRID_MAPPINGS,
+            _BOX_2D_MAPPINGS,
+            _VIZDOOM_MAPPINGS,
+            _MINIHACK_MAPPINGS,
+            _NETHACK_MAPPINGS,
+            _CRAFTER_MAPPINGS,
+            _BABAISAI_MAPPINGS,
+            _PROCGEN_MAPPINGS,
+            _JUMANJI_MAPPINGS,
+            _ALE_MAPPINGS,
+        ]:
+            if game_id in mapping_dict:
+                mappings = mapping_dict[game_id]
+                break
+
+        if mappings:
+            # Convert ShortcutMapping tuples to a flat key -> action dict
+            for mapping in mappings:
+                action = mapping.action
+                for sequence in mapping.key_sequences:
+                    # QKeySequence stores the key code - need to handle Qt5/Qt6 differences
+                    if sequence.count() > 0:
+                        # In Qt6, sequence[0] returns QKeyCombination, need .key()
+                        # In Qt5, it returns int directly
+                        qt_key = sequence[0]
+                        if hasattr(qt_key, 'key'):
+                            qt_key = int(qt_key.key())
+                        else:
+                            qt_key = int(qt_key)
+                        self._key_mappings[qt_key] = action
+
+            _LOGGER.info(
+                f"Configured {len(self._key_mappings)} key mappings for {game_id.value}",
+                extra=self._log_extra()
+            )
+        else:
+            _LOGGER.debug(
+                f"No specific key mappings found for {game_id.value}, using fallback",
+                extra=self._log_extra()
+            )
+
+    def set_available_actions(self, actions: list[int], labels: Optional[list[str]] = None) -> None:
+        """Set the available actions for human selection.
+
+        Args:
+            actions: List of valid action indices.
+            labels: Optional human-readable labels for each action.
+        """
+        self._available_actions = actions
+        self._action_labels = labels or [str(a) for a in actions]
+        _LOGGER.debug(
+            f"Available actions for {self._config.operator_id}: {actions}",
+            extra=self._log_extra()
+        )
+
+        # Update action buttons for human operators
+        if self._is_interactive:
+            self._populate_action_buttons(actions, self._action_labels)
+            self._action_panel.setVisible(len(actions) > 0)
+
+    def _populate_action_buttons(self, actions: list[int], labels: list[str]) -> None:
+        """Populate action panel with clickable buttons.
+
+        Uses FlowLayout so buttons automatically wrap to multiple lines
+        when they exceed the container width.
+
+        Args:
+            actions: List of action indices.
+            labels: Human-readable labels for each action.
+        """
+        # Clear existing buttons
+        while self._action_buttons_layout.count():
+            item = self._action_buttons_layout.takeAt(0)
+            if item and item.widget():
+                item.widget().deleteLater()
+
+        # Create buttons for ALL actions (FlowLayout handles wrapping)
+        for action_idx, label in zip(actions, labels):
+            btn = QtWidgets.QPushButton(label, self._action_buttons_container)
+            btn.setFixedHeight(22)
+            btn.setMinimumWidth(40)
+            btn.setToolTip(f"Action {action_idx}: {label}")
+            btn.setStyleSheet(
+                "QPushButton { font-size: 9px; padding: 2px 6px; "
+                "background-color: #e3f2fd; border: 1px solid #90caf9; border-radius: 3px; }"
+                "QPushButton:hover { background-color: #bbdefb; }"
+                "QPushButton:pressed { background-color: #90caf9; }"
+            )
+            # Connect click to emit action
+            btn.clicked.connect(lambda checked, a=action_idx: self._on_action_button_clicked(a))
+            self._action_buttons_layout.addWidget(btn)
+
+        # Update container geometry to trigger flow layout recalculation
+        self._action_buttons_container.updateGeometry()
+
+    def _on_action_button_clicked(self, action: int) -> None:
+        """Handle action button click.
+
+        Args:
+            action: The action index that was clicked.
+        """
+        _LOGGER.info(
+            f"Human action via button click: {action}",
+            extra=self._log_extra()
+        )
+        self.human_action_submitted.emit(self._config.operator_id, action)
+
+    def set_chess_legal_moves(
+        self,
+        moves: list[str],
+        current_player: str = "",
+        fen: str = ""
+    ) -> None:
+        """Set legal chess moves for human player selection.
+
+        Args:
+            moves: List of legal moves in UCI notation (e.g., ["e2e4", "d2d4", ...])
+            current_player: Current player ("white" or "black")
+            fen: Current FEN position (for SAN conversion)
+        """
+        self._chess_legal_moves = moves
+        self._chess_current_player = current_player
+
+        # Update player label
+        if current_player:
+            player_display = current_player.title()
+            color = "#333" if current_player == "white" else "#666"
+            self._chess_player_label.setText(f"({player_display} to move)")
+            self._chess_player_label.setStyleSheet(f"font-size: 10px; color: {color};")
+
+        # Populate chess move buttons
+        self._populate_chess_buttons(moves, fen)
+
+        # Show panel only for Human operators with legal moves
+        show_panel = self._is_interactive and len(moves) > 0
+        self._chess_moves_panel.setVisible(show_panel)
+
+        _LOGGER.debug(
+            f"Chess legal moves set: {len(moves)} moves for {current_player}",
+            extra=self._log_extra()
+        )
+
+    def _update_chess_legal_moves(self, render_payload: Dict[str, Any]) -> None:
+        """Extract FEN from payload and update legal chess moves for Human player.
+
+        Uses python-chess to compute legal moves from the FEN position.
+
+        Args:
+            render_payload: The render payload containing chess data.
+        """
+        _LOGGER.debug(
+            f"_update_chess_legal_moves called, payload keys: {list(render_payload.keys())}",
+            extra=self._log_extra()
+        )
+        try:
+            import chess
+        except ImportError:
+            _LOGGER.debug("python-chess not installed, skipping legal moves display")
+            return
+
+        # Extract FEN from payload
+        fen = None
+        if "fen" in render_payload:
+            fen = render_payload["fen"]
+        elif "chess" in render_payload:
+            chess_data = render_payload["chess"]
+            _LOGGER.debug(f"chess_data type: {type(chess_data)}", extra=self._log_extra())
+            if isinstance(chess_data, dict):
+                fen = chess_data.get("fen")
+                _LOGGER.debug(f"Extracted FEN from dict: {fen}", extra=self._log_extra())
+            elif isinstance(chess_data, str):
+                fen = chess_data
+
+        if not fen:
+            _LOGGER.debug("No FEN found in chess payload", extra=self._log_extra())
+            self._chess_moves_panel.setVisible(False)
+            return
+
+        try:
+            # Create board and get legal moves
+            board = chess.Board(fen)
+
+            # Get current player
+            current_player = "white" if board.turn == chess.WHITE else "black"
+
+            # Get all legal moves in UCI notation
+            legal_moves = [move.uci() for move in board.legal_moves]
+
+            _LOGGER.debug(
+                f"Chess position: {len(legal_moves)} legal moves for {current_player}",
+                extra=self._log_extra()
+            )
+
+            # Update the chess moves panel
+            self.set_chess_legal_moves(legal_moves, current_player, fen)
+
+        except Exception as e:
+            _LOGGER.warning(f"Error parsing chess FEN: {e}")
+            self._chess_moves_panel.setVisible(False)
+
+    def _populate_chess_buttons(self, moves: list[str], fen: str = "") -> None:
+        """Populate chess move buttons with legal moves.
+
+        Groups moves by source piece for better organization.
+
+        Args:
+            moves: List of UCI moves (e.g., ["e2e4", "g1f3"])
+            fen: Current FEN position (for piece identification)
+        """
+        # Clear existing buttons
+        while self._chess_buttons_layout.count():
+            item = self._chess_buttons_layout.takeAt(0)
+            if item and item.widget():
+                item.widget().deleteLater()
+
+        if not moves:
+            return
+
+        # Group moves by source square for organization
+        # e.g., {"e2": ["e2e3", "e2e4"], "g1": ["g1f3", "g1h3"]}
+        moves_by_source: dict[str, list[str]] = {}
+        for move in sorted(moves):
+            source = move[:2]
+            if source not in moves_by_source:
+                moves_by_source[source] = []
+            moves_by_source[source].append(move)
+
+        # Create buttons - group by source square
+        for source in sorted(moves_by_source.keys()):
+            source_moves = moves_by_source[source]
+
+            for uci_move in source_moves:
+                # Format: "e2→e4" or "e2e4" for compact display
+                from_sq = uci_move[:2]
+                to_sq = uci_move[2:4]
+                promotion = uci_move[4:] if len(uci_move) > 4 else ""
+
+                # Display format: compact UCI
+                if promotion:
+                    label = f"{from_sq}{to_sq}={promotion.upper()}"
+                else:
+                    label = f"{from_sq}{to_sq}"
+
+                btn = QtWidgets.QPushButton(label, self._chess_buttons_container)
+                btn.setFixedHeight(22)
+                btn.setMinimumWidth(45)
+                btn.setToolTip(f"Move: {from_sq} → {to_sq}" + (f" (promote to {promotion.upper()})" if promotion else ""))
+                btn.setStyleSheet(
+                    "QPushButton { font-size: 9px; padding: 2px 4px; "
+                    "background-color: #fff3e0; border: 1px solid #ffb74d; border-radius: 3px; "
+                    "font-family: monospace; }"
+                    "QPushButton:hover { background-color: #ffe0b2; }"
+                    "QPushButton:pressed { background-color: #ffb74d; }"
+                )
+                # Connect click to emit the UCI move
+                btn.clicked.connect(lambda checked, m=uci_move: self._on_chess_move_clicked(m))
+                self._chess_buttons_layout.addWidget(btn)
+
+        # Update geometry
+        self._chess_buttons_container.updateGeometry()
+
+    def _on_chess_move_clicked(self, uci_move: str) -> None:
+        """Handle chess move button click.
+
+        Args:
+            uci_move: The UCI move string (e.g., "e2e4")
+        """
+        _LOGGER.info(
+            f"Chess move via button click: {uci_move}",
+            extra=self._log_extra()
+        )
+        # Emit the signal with operator_id and the UCI move
+        self.chess_move_button_clicked.emit(self._config.operator_id, uci_move)
+
+        # Also emit as board_game_move for compatibility with existing handlers
+        # Note: UCI moves can be 4 chars (e.g., "e2e4") or 5 chars for promotion (e.g., "c2b1q")
+        from_sq = uci_move[:2]
+        to_sq = uci_move[2:]  # Keep promotion piece if present (e.g., "b1q" from "c2b1q")
+        self.board_game_move_made.emit(self._config.operator_id, from_sq, to_sq)
+
+    def keyPressEvent(self, event) -> None:
+        """Handle keyboard input for human operators.
+
+        Uses game-specific key mappings from human_input.py when available,
+        falling back to number keys (0-9) and arrow keys.
+        """
+        if not self._is_interactive:
+            super().keyPressEvent(event)
+            return
+
+        key = event.key()
+
+        # First, try game-specific mappings from human_input.py (supports WASD, arrows, etc.)
+        if key in self._key_mappings:
+            action_idx = self._key_mappings[key]
+            if action_idx in self._available_actions or not self._available_actions:
+                _LOGGER.info(
+                    f"Human action via game-specific key: {action_idx} (key={key})",
+                    extra=self._log_extra()
+                )
+                self.human_action_submitted.emit(self._config.operator_id, action_idx)
+                return
+
+        # Number keys 0-9 map to actions 0-9 (fallback for any environment)
+        if QtCore.Qt.Key.Key_0 <= key <= QtCore.Qt.Key.Key_9:
+            action_idx = key - QtCore.Qt.Key.Key_0
+            if action_idx in self._available_actions or not self._available_actions:
+                _LOGGER.info(
+                    f"Human action via number key: {action_idx}",
+                    extra=self._log_extra()
+                )
+                self.human_action_submitted.emit(self._config.operator_id, action_idx)
+                return
+
+        # Arrow keys as fallback (FrozenLake convention: Left=0, Down=1, Right=2, Up=3)
+        # Only used if no game-specific mappings found
+        if not self._key_mappings:
+            arrow_mapping = {
+                QtCore.Qt.Key.Key_Left: 0,
+                QtCore.Qt.Key.Key_Down: 1,
+                QtCore.Qt.Key.Key_Right: 2,
+                QtCore.Qt.Key.Key_Up: 3,
+            }
+            if key in arrow_mapping:
+                action_idx = arrow_mapping[key]
+                _LOGGER.info(
+                    f"Human action via arrow key: {action_idx}",
+                    extra=self._log_extra()
+                )
+                self.human_action_submitted.emit(self._config.operator_id, action_idx)
+                return
+
+        super().keyPressEvent(event)
+
+    def mousePressEvent(self, event) -> None:
+        """Handle mouse clicks - set focus for keyboard input."""
+        if self._is_interactive:
+            self.setFocus()
+        super().mousePressEvent(event)
+
+    def connect_board_game_signals(self) -> None:
+        """Connect board game renderer signals to container signals.
+
+        Call this after the board game renderer is initialized.
+        """
+        if self._board_game_renderer and self._is_interactive:
+            # BoardGameRendererStrategy emits chess_move_made(from_sq, to_sq) signal
+            if hasattr(self._board_game_renderer, 'chess_move_made'):
+                self._board_game_renderer.chess_move_made.connect(self._on_board_game_move)
+                _LOGGER.debug(
+                    f"Connected board game signals for {self._config.operator_id}",
+                    extra=self._log_extra()
+                )
+
+    def _on_board_game_move(self, from_square: str, to_square: str) -> None:
+        """Handle board game move from renderer.
+
+        Args:
+            from_square: Source square (e.g., "e2")
+            to_square: Target square (e.g., "e4")
+        """
+        _LOGGER.info(
+            f"Human board game move: {from_square} -> {to_square}",
+            extra=self._log_extra()
+        )
+        self.board_game_move_made.emit(self._config.operator_id, from_square, to_square)
+
+    def set_your_turn(self, is_your_turn: bool) -> None:
+        """Show or hide the 'Your Turn' indicator for human operators.
+
+        Args:
+            is_your_turn: True to show indicator, False to hide.
+        """
+        if self._is_interactive:
+            self._your_turn_label.setVisible(is_your_turn)
+            if is_your_turn:
+                # Visual feedback - highlight the container border
+                self.setStyleSheet(
+                    "QFrame { border: 2px solid #FF5722; border-radius: 4px; }"
+                )
+            else:
+                self.setStyleSheet(
+                    "QFrame { border: 1px solid #ccc; border-radius: 4px; }"
+                )
+
+    @property
+    def is_interactive(self) -> bool:
+        """Check if this container is interactive (human operator)."""
+        return self._is_interactive
 
     def cleanup(self) -> None:
         """Clean up resources."""

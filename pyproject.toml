@@ -17,8 +17,7 @@ keywords = [
     "multi-agent",
     "gymnasium",
     "pettingzoo",
-    "bdi",
-    "orchestration",
+    "meltingpot",
     "pyqt6",
 ]
 classifiers = [
@@ -137,6 +136,25 @@ textworld = [
     "textworld>=1.6.0",
 ]
 
+# BabaIsAI rule manipulation puzzle benchmark (ICML 2024 Workshop)
+# Paper: Cloos et al. (2024). "Baba Is AI: Break the Rules to Beat the Benchmark"
+# Repository: https://github.com/nacloos/baba-is-ai
+# Tests LLM reasoning and compositional generalization
+babaisai = [
+    "baba-is-ai @ git+https://github.com/nacloos/baba-is-ai",
+]
+
+# gym-multigrid multi-agent grid environments
+# Repository: https://github.com/ArnaudFickinger/gym-multigrid
+# Location: 3rd_party/gym-multigrid/
+# Includes: MultiGrid-Soccer (4 agents, 2v2), MultiGrid-Collect (3 agents)
+# Features: Simultaneous stepping, cooperative/competitive rewards, RLlib compatible
+# NOTE: Install from local path: pip install -e 3rd_party/gym-multigrid/
+multigrid = [
+    "gym>=0.21.0,<0.26.0",
+    "numpy>=1.18.0",
+]
+
 # Jumanji JAX-based RL environments (Google DeepMind)
 # Paper: Bonnet et al. (2024). "Jumanji: Industry-Driven Hardware-Accelerated RL Environments"
 # Repository: https://github.com/google-deepmind/jumanji
@@ -171,6 +189,39 @@ pybullet-drones = [
 openspiel = [
     "open-spiel>=1.4.0",
     "shimmy[openspiel]>=1.3.0",
+]
+
+# Melting Pot multi-agent social scenarios (Google DeepMind) via Shimmy PettingZoo wrapper
+# Paper: "Melting Pot: an evaluation suite for multi-agent reinforcement learning"
+# Repository: https://github.com/google-deepmind/meltingpot
+# Shimmy: https://shimmy.farama.org/environments/meltingpot/
+# Includes: 50+ substrates (collaborative_cooking, prisoners_dilemma, territory, clean_up, etc.)
+# Features: Up to 16 agents, social interactions (cooperation, competition, deception, trust)
+# NOTE: Linux/macOS only (Windows NOT supported)
+meltingpot = [
+    "shimmy[meltingpot]>=1.3.0",
+    "dm-tree>=0.1.8",
+    "immutabledict>=2.2.0",
+]
+
+# Overcooked-AI cooperative cooking (UC Berkeley CHAI)
+# Paper: Carroll et al. (2019). "On the Utility of Learning about Humans for Human-AI Coordination"
+# Repository: https://github.com/HumanCompatibleAI/overcooked_ai
+# Location: 3rd_party/overcooked_ai/
+# Includes: 50+ layouts (cramped_room, asymmetric_advantages, coordination_ring, etc.)
+# Features: 2-agent cooperative, simultaneous stepping, sparse rewards, zero-shot coordination
+# NOTE: Install from local path: pip install -e 3rd_party/overcooked_ai/
+# WARNING: Python 3.10 ONLY (requires >=3.10,<3.11) - incompatible with Python 3.11+
+overcooked = [
+    "dill",
+    "gymnasium>=1.1.0",
+    "ipywidgets",
+    "numpy<2.0.0",
+    "opencv-python",
+    "pygame",
+    "scipy",
+    "setuptools>=77.0.3",
+    "tqdm",
 ]
 
 # =============================================================================
@@ -278,7 +329,7 @@ all-gymnasium = [
 
 # All environment families (single + multi-agent)
 all-envs = [
-    "mosaic[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom,nethack,crafter,procgen,textworld,jumanji,pybullet-drones,openspiel]",
+    "mosaic[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom,nethack,crafter,procgen,textworld,babaisai,multigrid,jumanji,pybullet-drones,openspiel,meltingpot,overcooked]",
 ]
 
 # Full development setup
@@ -295,8 +346,10 @@ where = [
     "3rd_party/ray_worker",
     "3rd_party/xuance_worker",
     "3rd_party/chess_worker",
-    "3rd_party/human_worker",
     "3rd_party/mctx_worker",
+    # MOSAIC native workers
+    "3rd_party/mosaic/human_worker",
+    "3rd_party/mosaic/llm_worker",
 ]
 include = [
     "gym_gui*",
@@ -306,8 +359,10 @@ include = [
     "ray_worker*",
     "xuance_worker*",
     "chess_worker*",
-    "human_worker*",
     "mctx_worker*",
+    # MOSAIC native workers (under 3rd_party/mosaic/)
+    "human_worker*",
+    "llm_worker*",
 ]
 
 [project.entry-points."mosaic.workers"]
@@ -317,8 +372,10 @@ cleanrl = "cleanrl_worker:get_worker_metadata"
 ray = "ray_worker:get_worker_metadata"
 xuance = "xuance_worker:get_worker_metadata"
 chess = "chess_worker:get_worker_metadata"
-human = "human_worker:get_worker_metadata"
 mctx = "mctx_worker:get_worker_metadata"
+# MOSAIC native workers (under 3rd_party/mosaic/)
+human = "human_worker:get_worker_metadata"
+llm = "llm_worker:get_worker_metadata"
 
 [project.urls]
 Homepage = "https://github.com/Abdulhamid97Mousa/MOSAIC"

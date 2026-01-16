@@ -1,0 +1,37 @@
+# =============================================================================
+# gym-multigrid Environment Dependencies
+# =============================================================================
+# gym-multigrid is a multi-agent extension of MiniGrid for training cooperative
+# and competitive multi-agent RL policies. All agents act simultaneously.
+#
+# USAGE:
+#   pip install -r requirements/multigrid.txt
+#
+# FEATURES:
+#   - Multi-agent environments (2-4 agents)
+#   - Simultaneous stepping paradigm (all agents act at once)
+#   - Cooperative and competitive reward structures
+#   - MiniGrid-style grid worlds with partial observability
+#   - Compatible with RLlib multi-agent training
+#
+# ENVIRONMENTS:
+#   - MultiGrid-Soccer-v0: 4 agents, 2v2 soccer (zero-sum)
+#   - MultiGrid-Collect-v0: 3 agents, ball collection (competitive)
+#
+# REPOSITORY:
+#   https://github.com/ArnaudFickinger/gym-multigrid
+#
+# LOCAL INSTALLATION (from 3rd_party):
+#   pip install -e 3rd_party/gym-multigrid/
+# =============================================================================
+
+# Include core GUI + shared dependencies
+-r base.txt
+
+# gym-multigrid requires old gym API (not gymnasium)
+# Install from local 3rd_party directory:
+#   pip install -e 3rd_party/gym-multigrid/
+#
+# Dependencies:
+gym>=0.21.0,<0.26.0
+numpy>=1.18.0

@@ -8,13 +8,16 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Any, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 from qtpy import QtCore, QtWidgets
 
 from gym_gui.services.operator import OperatorConfig
 from gym_gui.ui.widgets.operator_render_container import OperatorRenderContainer
+
+if TYPE_CHECKING:
+    from gym_gui.core.enums import GameId
 
 # Use operators namespace for dedicated operators.log routing
 _LOGGER = logging.getLogger("gym_gui.operators.multi_render_view")
@@ -30,9 +33,16 @@ class MultiOperatorRenderView(QtWidgets.QWidget):
     - 5-6 operators: 2x3 grid
     - 7-9 operators: 3x3 grid
     - etc.
+
+    For Human operators, this view routes interaction signals from containers
+    to the main window for processing.
     """
 
     operator_status_changed = pyqtSignal(str, str)  # operator_id, new_status
+    # Human interaction signals (aggregated from containers)
+    human_action_submitted = pyqtSignal(str, int)  # operator_id, action_index
+    board_game_move_made = pyqtSignal(str, str, str)  # operator_id, from_square, to_square
+    chess_move_button_clicked = pyqtSignal(str, str)  # operator_id, uci_move (e.g., "e2e4")
 
     def __init__(
         self,
@@ -113,6 +123,11 @@ class MultiOperatorRenderView(QtWidgets.QWidget):
 
         container = OperatorRenderContainer(config, parent=self._grid_container)
         container.status_changed.connect(self.operator_status_changed.emit)
+
+        # Connect human interaction signals (for human operators)
+        container.human_action_submitted.connect(self.human_action_submitted.emit)
+        container.board_game_move_made.connect(self.board_game_move_made.emit)
+        container.chess_move_button_clicked.connect(self.chess_move_button_clicked.emit)
 
         self._containers[config.operator_id] = container
         self._operator_order.append(config.operator_id)
@@ -297,6 +312,91 @@ class MultiOperatorRenderView(QtWidgets.QWidget):
     def operator_count(self) -> int:
         """Get the number of operator containers."""
         return len(self._containers)
+
+    # --- Human Operator Methods ---
+
+    def set_interactive(self, operator_id: str, enabled: bool) -> None:
+        """Enable or disable interactive mode for an operator.
+
+        Args:
+            operator_id: The operator's ID.
+            enabled: True to enable user interaction (for human operators).
+        """
+        container = self._containers.get(operator_id)
+        if container:
+            container.set_interactive(enabled)
+            _LOGGER.debug(f"Set interactive={enabled} for operator: {operator_id}")
+
+    def set_game_id(self, operator_id: str, game_id: "GameId") -> None:
+        """Set the game ID for an operator to configure keyboard mappings.
+
+        Args:
+            operator_id: The operator's ID.
+            game_id: The GameId for the current environment.
+        """
+        container = self._containers.get(operator_id)
+        if container:
+            container.set_game_id(game_id)
+            _LOGGER.debug(f"Set game_id={game_id.value} for operator: {operator_id}")
+
+    def set_human_turn(self, operator_id: str, is_their_turn: bool) -> None:
+        """Set the 'Your Turn' indicator for a human operator.
+
+        Args:
+            operator_id: The human operator's ID.
+            is_their_turn: True to show indicator, False to hide.
+        """
+        container = self._containers.get(operator_id)
+        if container and container.is_interactive:
+            container.set_your_turn(is_their_turn)
+            if is_their_turn:
+                # Set focus to the human operator's container
+                container.setFocus()
+                _LOGGER.debug(f"Set focus to human operator: {operator_id}")
+
+    def set_available_actions(
+        self, operator_id: str, actions: List[int], labels: Optional[List[str]] = None
+    ) -> None:
+        """Set available actions for a human operator.
+
+        Args:
+            operator_id: The human operator's ID.
+            actions: List of valid action indices.
+            labels: Optional human-readable labels.
+        """
+        container = self._containers.get(operator_id)
+        if container and container.is_interactive:
+            container.set_available_actions(actions, labels)
+
+    def get_human_operator_ids(self) -> List[str]:
+        """Get list of human operator IDs.
+
+        Returns:
+            List of operator IDs for human operators.
+        """
+        return [
+            op_id for op_id, container in self._containers.items()
+            if container.is_interactive
+        ]
+
+    def set_chess_legal_moves(
+        self,
+        operator_id: str,
+        moves: List[str],
+        current_player: str = "",
+        fen: str = ""
+    ) -> None:
+        """Set legal chess moves for a human operator.
+
+        Args:
+            operator_id: The human operator's ID.
+            moves: List of legal moves in UCI notation (e.g., ["e2e4", "d2d4"]).
+            current_player: Current player ("white" or "black").
+            fen: Current FEN position.
+        """
+        container = self._containers.get(operator_id)
+        if container and container.is_interactive:
+            container.set_chess_legal_moves(moves, current_player, fen)
 
 
 __all__ = ["MultiOperatorRenderView"]
