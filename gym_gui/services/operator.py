@@ -231,7 +231,7 @@ class WorkerAssignment:
 
     def __post_init__(self) -> None:
         """Validate worker assignment."""
-        valid_types = ("llm", "vlm", "rl", "human")
+        valid_types = ("llm", "vlm", "rl", "human", "baseline")
         if self.worker_type not in valid_types:
             raise ValueError(f"worker_type must be one of {valid_types}, got '{self.worker_type}'")
 
@@ -346,6 +346,7 @@ class OperatorConfig:
     workers: Dict[str, WorkerAssignment] = field(default_factory=dict)
     run_id: str | None = None  # Assigned when operator starts
     execution_mode: str = "aec"  # "aec" (turn-based) or "parallel" (simultaneous) for multi-agent
+    max_steps: int | None = None  # Maximum steps per episode before truncation (None = use env default)
 
     # MultiGrid-specific settings (for LLM workers in multi-agent environments)
     observation_mode: str = "visible_teammates"  # "egocentric" or "visible_teammates"
@@ -478,6 +479,7 @@ class OperatorConfig:
         env_name: str = "babyai",
         task: str = "BabyAI-GoToRedBall-v0",
         settings: Dict[str, Any] | None = None,
+        max_steps: int | None = None,
     ) -> "OperatorConfig":
         """Create a single-agent operator config.
 
@@ -489,6 +491,7 @@ class OperatorConfig:
             env_name: Environment family.
             task: Specific task/level.
             settings: Worker-specific settings.
+            max_steps: Maximum steps per episode before truncation.
 
         Returns:
             OperatorConfig with single worker assigned to "agent".
@@ -498,6 +501,7 @@ class OperatorConfig:
             display_name=display_name,
             env_name=env_name,
             task=task,
+            max_steps=max_steps,
             workers={
                 "agent": WorkerAssignment(
                     worker_id=worker_id,
@@ -518,6 +522,7 @@ class OperatorConfig:
         execution_mode: str = "aec",
         observation_mode: str = "visible_teammates",
         coordination_level: int = 1,
+        max_steps: int | None = None,
     ) -> "OperatorConfig":
         """Create a multi-agent operator config.
 
@@ -530,6 +535,7 @@ class OperatorConfig:
             execution_mode: Execution paradigm - "aec" (turn-based) or "parallel" (simultaneous).
             observation_mode: Observation mode for MultiGrid - "egocentric" or "visible_teammates".
             coordination_level: Coordination strategy level (1=Emergent, 2=Basic Hints, 3=Role-Based).
+            max_steps: Maximum steps per episode before truncation.
 
         Returns:
             OperatorConfig with multiple workers for multi-agent env.
@@ -539,6 +545,7 @@ class OperatorConfig:
             display_name=display_name,
             env_name=env_name,
             task=task,
+            max_steps=max_steps,
             workers=player_workers,
             execution_mode=execution_mode,
             observation_mode=observation_mode,

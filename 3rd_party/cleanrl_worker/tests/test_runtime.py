@@ -199,6 +199,80 @@ def test_run_uses_launcher_and_writes_logs(monkeypatch, tmp_path: Path) -> None:
     assert "localhost" in launched["env"]["NO_PROXY"]
 
 
+def test_run_sets_fastlane_env_vars_in_training_mode(monkeypatch, tmp_path: Path) -> None:
+    """Test that FastLane environment variables are passed to training subprocess.
+
+    This is critical for grid video mode - the subprocess needs these env vars
+    to enable the correct FastLane video mode and grid limit.
+    """
+    config = _make_config(
+        extras={
+            "fastlane_only": True,
+            "fastlane_slot": 0,
+            "fastlane_video_mode": "grid",
+            "fastlane_grid_limit": 4,
+            "algo_params": {"num_envs": 4},
+        }
+    )
+    run_dir = tmp_path / "trainer"
+
+    runtime = CleanRLWorkerRuntime(
+        config,
+        use_grpc=False,
+        grpc_target="127.0.0.1:50055",
+        dry_run=False,
+    )
+
+    monkeypatch.setattr(
+        CleanRLWorkerRuntime, "_register_with_trainer", lambda self: None
+    )
+    monkeypatch.setattr(
+        "cleanrl_worker.runtime.VAR_TRAINER_DIR",
+        run_dir,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        "cleanrl_worker.runtime.ensure_var_directories",
+        lambda: None,
+    )
+
+    captured_env: dict[str, Any] = {}
+
+    class DummyProc:
+        def __init__(self, cmd, cwd, stdout, stderr, env):
+            captured_env.update(env)
+            self._polled = False
+
+        def poll(self):
+            if not self._polled:
+                self._polled = True
+                return 0
+            return 0
+
+    monkeypatch.setattr(
+        "cleanrl_worker.runtime.subprocess.Popen",
+        DummyProc,
+    )
+
+    runtime.run()
+
+    # Verify FastLane env vars are set correctly
+    assert captured_env.get("GYM_GUI_FASTLANE_ONLY") == "1", \
+        "FASTLANE_ONLY should be '1' when fastlane_only=True"
+    assert captured_env.get("GYM_GUI_FASTLANE_VIDEO_MODE") == "grid", \
+        "FASTLANE_VIDEO_MODE should be 'grid'"
+    assert captured_env.get("GYM_GUI_FASTLANE_GRID_LIMIT") == "4", \
+        "FASTLANE_GRID_LIMIT should be '4'"
+    assert captured_env.get("GYM_GUI_FASTLANE_SLOT") == "0", \
+        "FASTLANE_SLOT should be '0'"
+    assert captured_env.get("CLEANRL_NUM_ENVS") == "4", \
+        "CLEANRL_NUM_ENVS should match algo_params.num_envs"
+    assert captured_env.get("CLEANRL_RUN_ID") == config.run_id, \
+        "CLEANRL_RUN_ID should be set to the run_id"
+    assert captured_env.get("CLEANRL_SEED") == "42", \
+        "CLEANRL_SEED should be set when seed is provided"
+
+
 def test_write_eval_tensorboard_emits_scalars(monkeypatch, tmp_path: Path) -> None:
     runtime = CleanRLWorkerRuntime(
         _make_config(),

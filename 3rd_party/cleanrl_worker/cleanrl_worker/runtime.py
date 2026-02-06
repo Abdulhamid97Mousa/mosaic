@@ -117,7 +117,7 @@ AlgoRegistry = Mapping[str, str]
 
 DEFAULT_ALGO_REGISTRY: AlgoRegistry = {
     # PPO family
-    "ppo": "cleanrl_worker.algorithms.ppo_with_save",
+    "ppo": "cleanrl_worker.algorithms.ppo",
     "ppo_continuous_action": "cleanrl.ppo_continuous_action",
     "ppo_atari": "cleanrl.ppo_atari",
     "ppo_atari_multigpu": "cleanrl.ppo_atari_multigpu",
@@ -538,6 +538,26 @@ class CleanRLWorkerRuntime:
         else:
             env.pop("MOSAIC_CAPTURE_VIDEO", None)
             env.pop("MOSAIC_VIDEOS_DIR", None)
+
+        # FastLane environment variables for live video streaming during training
+        # These must be set BEFORE the subprocess starts since fastlane.py reads them at import time
+        #
+        # IMPORTANT: Use setdefault() to preserve existing values from dispatcher/custom scripts.
+        # Default to ENABLED ("1") so FastLane works out-of-the-box for standard training.
+        algo_params = extras.get("algo_params", {}) if isinstance(extras, dict) else {}
+        num_envs_from_config = int(algo_params.get("num_envs", 1))
+        num_envs = max(1, int(env.get("CLEANRL_NUM_ENVS", num_envs_from_config)))
+        grid_limit = max(1, min(int(extras.get("fastlane_grid_limit", num_envs)), num_envs))
+        # Default FastLane to ENABLED - only disable if explicitly set to False
+        env.setdefault(TelemetryEnv.FASTLANE_ONLY, "1")
+        env.setdefault(TelemetryEnv.FASTLANE_SLOT, str(extras.get("fastlane_slot", 0)))
+        env.setdefault(TelemetryEnv.FASTLANE_VIDEO_MODE, extras.get("fastlane_video_mode", VideoModes.SINGLE))
+        env.setdefault(TelemetryEnv.FASTLANE_GRID_LIMIT, str(grid_limit))
+        env.setdefault("CLEANRL_NUM_ENVS", str(num_envs))
+        # CRITICAL: Preserve dispatcher's CLEANRL_RUN_ID for FastLane buffer name matching
+        env.setdefault("CLEANRL_RUN_ID", self._config.run_id)
+        if self._config.seed is not None:
+            env.setdefault("CLEANRL_SEED", str(self._config.seed))
 
         if tensorboard_dir and isinstance(tensorboard_dir, str):
             env["CLEANRL_TENSORBOARD_DIR"] = str(tb_path)

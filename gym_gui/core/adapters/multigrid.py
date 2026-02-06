@@ -3,14 +3,28 @@
 gym-multigrid is a multi-agent extension of MiniGrid for training cooperative
 and competitive multi-agent RL policies. Agents act simultaneously each step.
 
-Repository: https://github.com/ArnaudFickinger/gym-multigrid
-Location: 3rd_party/gym-multigrid/
+Supported packages:
+- Old gym-multigrid (ArnaudFickinger): Soccer, Collect
+  Repository: https://github.com/ArnaudFickinger/gym-multigrid
+  Location: 3rd_party/gym-multigrid/
+
+- New multigrid (INI): 13 environments including Empty, RedBlueDoors, LockedHallway, etc.
+  Repository: https://github.com/ini/multigrid
+  Location: 3rd_party/multigrid-ini/
 
 Key characteristics:
 - Multi-agent: Multiple agents controlled by Operators
 - Simultaneous stepping: All agents act at once (PARALLEL paradigm)
 - Old gym API: Uses `import gym` (not gymnasium)
 - Returns lists: obs/rewards/actions are all lists indexed by agent
+
+Reproducibility Fix:
+- Legacy gym-multigrid has a bug where step() uses np.random.permutation()
+  instead of self.np_random.permutation(), ignoring seeds set via env.seed().
+- This adapter wraps legacy environments with ReproducibleMultiGridWrapper
+  which seeds np.random from env.np_random before each step().
+- This fix is transparent to Operators (human play) and only affects
+  training/evaluation reproducibility.
 """
 
 from __future__ import annotations
@@ -35,6 +49,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_ADAPTER_ENV_RESET,
     LOG_ADAPTER_STEP_SUMMARY,
 )
+from gym_gui.core.wrappers.multigrid_reproducibility import ReproducibleMultiGridWrapper
 
 try:  # pragma: no cover - import guard
     import gym
@@ -47,9 +62,25 @@ except ImportError:  # pragma: no cover
     SoccerGame4HEnv10x15N2 = None  # type: ignore[assignment, misc]
     CollectGame4HEnv10x10N2 = None  # type: ignore[assignment, misc]
 
+# Try importing INI multigrid environments (new package)
+try:  # pragma: no cover - import guard
+    import sys
+    import os
+    # Add INI multigrid to path if available
+    ini_multigrid_path = os.path.join(
+        os.path.dirname(__file__), "..", "..", "..", "3rd_party", "multigrid-ini"
+    )
+    if os.path.exists(ini_multigrid_path) and ini_multigrid_path not in sys.path:
+        sys.path.insert(0, ini_multigrid_path)
 
-# MultiGrid action names (from gym_multigrid.multigrid.Actions)
-MULTIGRID_ACTIONS: List[str] = [
+    from multigrid.envs import CONFIGURATIONS as INI_CONFIGURATIONS
+except ImportError:  # pragma: no cover
+    INI_CONFIGURATIONS = {}  # type: ignore[assignment]
+
+
+# Legacy gym-multigrid action names (8 actions - includes STILL)
+# Used by: Soccer, Collect (ArnaudFickinger's gym-multigrid)
+LEGACY_MULTIGRID_ACTIONS: List[str] = [
     "STILL",    # 0 - Do nothing
     "LEFT",     # 1 - Turn left
     "RIGHT",    # 2 - Turn right
@@ -59,6 +90,22 @@ MULTIGRID_ACTIONS: List[str] = [
     "TOGGLE",   # 6 - Toggle/activate object
     "DONE",     # 7 - Done (not used by default)
 ]
+
+# INI multigrid action names (7 actions - NO STILL)
+# Used by: BlockedUnlockPickup, Empty, LockedHallway, RedBlueDoors, Playground
+# Repository: https://github.com/ini/multigrid
+INI_MULTIGRID_ACTIONS: List[str] = [
+    "LEFT",     # 0 - Turn left
+    "RIGHT",    # 1 - Turn right
+    "FORWARD",  # 2 - Move forward
+    "PICKUP",   # 3 - Pick up object
+    "DROP",     # 4 - Drop object
+    "TOGGLE",   # 5 - Toggle/activate object
+    "DONE",     # 6 - Done
+]
+
+# Backwards compatibility alias
+MULTIGRID_ACTIONS = LEGACY_MULTIGRID_ACTIONS
 
 # Log frequency for step events
 _MULTIGRID_STEP_LOG_FREQUENCY = 50
@@ -82,6 +129,7 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
     default_render_mode = RenderMode.RGB_ARRAY
     supported_render_modes = (RenderMode.RGB_ARRAY,)
     supported_control_modes = (
+        ControlMode.HUMAN_ONLY,  # Multi-human multi-keyboard gameplay
         ControlMode.AGENT_ONLY,
         ControlMode.MULTI_AGENT_COOP,
         ControlMode.MULTI_AGENT_COMPETITIVE,
@@ -120,6 +168,23 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
         self._num_agents = 0
         self._agent_observations: List[np.ndarray] = []
         self._agent_rewards: List[float] = []
+        self._is_ini_env = self._check_is_ini_environment()
+
+    def _check_is_ini_environment(self) -> bool:
+        """Check if this is an INI multigrid environment (vs legacy gym-multigrid).
+
+        INI multigrid environments use 7 actions (no STILL).
+        Legacy gym-multigrid (Soccer, Collect) uses 8 actions (with STILL at index 0).
+        """
+        # Legacy gym-multigrid environments
+        if self._env_id in ("soccer", "collect", "MultiGrid-Soccer-v0", "MultiGrid-Collect-v0"):
+            return False
+        # INI multigrid environments (or check if in INI_CONFIGURATIONS)
+        if self._env_id in INI_CONFIGURATIONS:
+            return True
+        # Check by name pattern - INI environments include these
+        ini_patterns = ("Empty", "BlockedUnlockPickup", "LockedHallway", "RedBlueDoors", "Playground")
+        return any(pattern in self._env_id for pattern in ini_patterns)
 
     @property
     def id(self) -> str:  # type: ignore[override]
@@ -155,6 +220,10 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
                         "Install from: 3rd_party/gym-multigrid/"
                     )
                 env = SoccerGame4HEnv10x15N2()
+                # Wrap with ReproducibleMultiGridWrapper to fix np.random.permutation bug
+                # in step() that ignores env.np_random seeding. This ensures reproducible
+                # trajectories for training/evaluation without affecting Operators.
+                env = ReproducibleMultiGridWrapper(env)
             elif self._env_id == "collect" or self._env_id == "MultiGrid-Collect-v0":
                 if CollectGame4HEnv10x10N2 is None:
                     raise RuntimeError(
@@ -162,14 +231,26 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
                         "Install from: 3rd_party/gym-multigrid/"
                     )
                 env = CollectGame4HEnv10x10N2()
+                # Wrap with ReproducibleMultiGridWrapper to fix np.random.permutation bug
+                env = ReproducibleMultiGridWrapper(env)
+            elif self._env_id in INI_CONFIGURATIONS:
+                # INI multigrid environment - instantiate directly from configurations
+                env_cls, config_kwargs = INI_CONFIGURATIONS[self._env_id]
+                # Add num_agents parameter if specified in config
+                if self._config.num_agents is not None:
+                    config_kwargs = {**config_kwargs, "agents": self._config.num_agents}
+                # INI multigrid uses Gymnasium API - must pass render_mode at creation
+                config_kwargs = {**config_kwargs, "render_mode": "rgb_array"}
+                env = env_cls(**config_kwargs)
             else:
                 # Try to make via gym.make if registered
                 try:
                     env = gym.make(self._env_id)
                 except Exception as e:
+                    available_envs = list(INI_CONFIGURATIONS.keys()) + ["soccer", "collect"]
                     raise RuntimeError(
                         f"Unknown MultiGrid environment: {self._env_id}. "
-                        f"Available: soccer, collect. Error: {e}"
+                        f"Available: {', '.join(available_envs)}. Error: {e}"
                     )
 
             self._env = env
@@ -205,13 +286,36 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
         """
         env = self._require_env()
 
-        # Seed if provided (gym-multigrid uses seed() method)
-        if seed is not None:
-            env.seed(seed)
+        # Handle seeding based on environment type:
+        # - Legacy gym-multigrid (Soccer, Collect): Old Gym API with env.seed() method
+        # - INI multigrid (BlockedUnlockPickup, etc.): Gymnasium API with reset(seed=seed)
+        #
+        # This distinction is important for REPRODUCIBILITY in research!
+        # See: https://gymnasium.farama.org/introduction/migration_guide/
 
-        # Reset returns list of observations (old gym API)
-        raw_obs = env.reset()
-        self._agent_observations = list(raw_obs)
+        if self._is_ini_env:
+            # INI multigrid uses Gymnasium API: reset(seed=seed) -> (obs, info)
+            # Seed is passed directly to reset() for proper PRNG initialization
+            if seed is not None:
+                reset_result = env.reset(seed=seed)
+            else:
+                reset_result = env.reset()
+
+            # Gymnasium API returns (obs, info) tuple
+            if isinstance(reset_result, tuple) and len(reset_result) == 2:
+                raw_obs = reset_result[0]
+            else:
+                raw_obs = reset_result
+        else:
+            # Legacy gym-multigrid uses old Gym API: env.seed() then env.reset() -> obs
+            if seed is not None and hasattr(env, 'seed'):
+                env.seed(seed)
+            raw_obs = env.reset()
+        # Convert observations dict to list (INI uses {0: obs0, 1: obs1})
+        if isinstance(raw_obs, dict):
+            self._agent_observations = [raw_obs[i] for i in range(self._num_agents)]
+        else:
+            self._agent_observations = list(raw_obs)
         self._agent_rewards = [0.0] * self._num_agents
         self._step_counter = 0
         # Reset episode tracking (from base class)
@@ -257,29 +361,83 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
                     f"Expected {self._num_agents} actions, got {len(actions)}"
                 )
 
-        # Step returns (obs_list, rewards_list, done, info) - old gym API
-        raw_obs, rewards, done, info = env.step(actions)
+        # Handle step() API differences:
+        # - Legacy gym-multigrid (Old Gym): returns (obs, rewards, done, info) - 4 values
+        #   Action format: List[int] e.g., [0, 1, 2, 3]
+        # - INI multigrid (Gymnasium): returns (obs, rewards, terminated, truncated, info) - 5 values
+        #   Action format: Dict[AgentID, Action] e.g., {0: Action.left, 1: Action.right}
+        #
+        # CRITICAL: INI multigrid expects a DICT mapping agent index to action,
+        # NOT a list! If you pass a list, the environment checks `if i not in actions`
+        # which checks if the agent INDEX is a VALUE in the list (wrong!) instead of
+        # checking if it's a KEY in the dict (correct), causing actions to be skipped.
+        if self._is_ini_env:
+            # Convert list to dict for INI multigrid: [2, 6] -> {0: 2, 1: 6}
+            actions_dict = {i: actions[i] for i in range(len(actions))}
+            step_result = env.step(actions_dict)
+        else:
+            # Legacy gym-multigrid uses list format
+            step_result = env.step(actions)
 
-        self._agent_observations = list(raw_obs)
-        self._agent_rewards = [float(r) for r in rewards]
+        if self._is_ini_env:
+            # INI multigrid uses Gymnasium API (5 values)
+            if len(step_result) == 5:
+                raw_obs, rewards, terminated, truncated, info = step_result
+            else:
+                # Fallback for unexpected format
+                raw_obs, rewards, done, info = step_result[:4]
+                terminated = bool(done)
+                truncated = False
+        else:
+            # Legacy gym-multigrid uses old Gym API (4 values)
+            raw_obs, rewards, done, info = step_result
+            terminated = bool(done)
+            truncated = False
+
+        # Convert dict terminated/truncated to bool for multi-agent environments
+        # Gymnasium multi-agent envs return dicts like {"agent_0": False, "__all__": True}
+        if isinstance(terminated, dict):
+            # Use __all__ key if present, otherwise any agent terminated
+            terminated = terminated.get("__all__", any(terminated.values()))
+        if isinstance(truncated, dict):
+            # Use __all__ key if present, otherwise any agent truncated
+            truncated = truncated.get("__all__", any(truncated.values()))
+
+        # Convert observations dict to list (INI uses {0: obs0, 1: obs1})
+        if isinstance(raw_obs, dict):
+            self._agent_observations = [raw_obs[i] for i in range(self._num_agents)]
+        else:
+            self._agent_observations = list(raw_obs)
+        # Handle rewards - could be dict (per-agent) or list
+        # INI multigrid uses integer keys: {0: 0.5, 1: 0.5}
+        # Legacy gym-multigrid may use string keys: {"agent_0": 0.5}
+        if isinstance(rewards, dict):
+            # Try integer keys first (INI multigrid), then string keys (legacy)
+            self._agent_rewards = []
+            for i in range(self._num_agents):
+                if i in rewards:
+                    self._agent_rewards.append(float(rewards[i]))
+                elif f"agent_{i}" in rewards:
+                    self._agent_rewards.append(float(rewards[f"agent_{i}"]))
+                else:
+                    self._agent_rewards.append(0.0)
+        else:
+            self._agent_rewards = [float(r) for r in rewards] if hasattr(rewards, '__iter__') else [float(rewards)] * self._num_agents
 
         # Prepare info dict
-        step_info: Dict[str, Any] = dict(info) if info else {}
+        step_info: Dict[str, Any] = dict(info) if isinstance(info, dict) else {}
         step_info["num_agents"] = self._num_agents
         step_info["agent_observations"] = self._agent_observations
         step_info["agent_rewards"] = self._agent_rewards
         step_info["actions"] = actions
+        action_list = INI_MULTIGRID_ACTIONS if self._is_ini_env else LEGACY_MULTIGRID_ACTIONS
         step_info["action_names"] = [
-            MULTIGRID_ACTIONS[a] if 0 <= a < len(MULTIGRID_ACTIONS) else str(a)
+            action_list[a] if 0 <= a < len(action_list) else str(a)
             for a in actions
         ]
 
         # Sum rewards for total episode reward tracking
         total_reward = float(sum(self._agent_rewards))
-
-        # Old gym API uses single 'done' flag
-        terminated = bool(done)
-        truncated = False
 
         # Update episode tracking (from base class)
         self._step_counter += 1
@@ -313,11 +471,29 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
         """
         env = self._require_env()
         try:
-            # Render with agent view highlighting
-            frame = env.render(
-                mode="rgb_array",
-                highlight=self._config.highlight,
-            )
+            # Handle render() API differences:
+            # - Legacy gym-multigrid: env.render(mode="rgb_array", highlight=True)
+            # - INI multigrid (Gymnasium): env.render() - mode set at creation time
+            if self._is_ini_env:
+                # Gymnasium API: render_mode is set during env creation
+                # Just call render() without arguments
+                frame = env.render()
+            else:
+                # Legacy gym API: pass mode and highlight arguments
+                frame = env.render(
+                    mode="rgb_array",
+                    highlight=self._config.highlight,
+                )
+
+            if frame is None:
+                # Some environments return None before first step
+                return {
+                    "mode": RenderMode.RGB_ARRAY.value,
+                    "rgb": np.zeros((320, 480, 3), dtype=np.uint8),
+                    "game_id": self._env_id,
+                    "num_agents": self._num_agents,
+                }
+
             array = np.asarray(frame)
             return {
                 "mode": RenderMode.RGB_ARRAY.value,
@@ -326,8 +502,10 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
                 "num_agents": self._num_agents,
                 "step": self._step_counter,
             }
-        except Exception:
+        except Exception as e:
             # Return empty frame if render fails
+            import logging
+            logging.getLogger(__name__).warning(f"Render failed for {self._env_id}: {e}")
             return {
                 "mode": RenderMode.RGB_ARRAY.value,
                 "rgb": np.zeros((320, 480, 3), dtype=np.uint8),
@@ -415,9 +593,11 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
         """Get human-readable action names.
 
         Returns:
-            List of action names
+            List of action names (7 for INI multigrid, 8 for legacy gym-multigrid)
         """
-        return MULTIGRID_ACTIONS.copy()
+        if self._is_ini_env:
+            return INI_MULTIGRID_ACTIONS.copy()
+        return LEGACY_MULTIGRID_ACTIONS.copy()
 
     def sample_action(self) -> List[int]:
         """Sample random actions for all agents.
@@ -426,7 +606,8 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
             List of random action indices
         """
         import random
-        return [random.randint(0, len(MULTIGRID_ACTIONS) - 1) for _ in range(self._num_agents)]
+        action_list = INI_MULTIGRID_ACTIONS if self._is_ini_env else LEGACY_MULTIGRID_ACTIONS
+        return [random.randint(0, len(action_list) - 1) for _ in range(self._num_agents)]
 
     def sample_single_action(self) -> int:
         """Sample a random action for one agent.
@@ -435,7 +616,8 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
             Random action index
         """
         import random
-        return random.randint(0, len(MULTIGRID_ACTIONS) - 1)
+        action_list = INI_MULTIGRID_ACTIONS if self._is_ini_env else LEGACY_MULTIGRID_ACTIONS
+        return random.randint(0, len(action_list) - 1)
 
 
 # Specific adapter classes for each environment variant
@@ -469,8 +651,23 @@ class MultiGridCollectAdapter(MultiGridAdapter):
 
 # Adapter registry for factory pattern
 MULTIGRID_ADAPTERS: Dict[GameId, type[MultiGridAdapter]] = {
+    # Legacy gym-multigrid environments (with dedicated adapter classes)
     GameId.MULTIGRID_SOCCER: MultiGridSoccerAdapter,
     GameId.MULTIGRID_COLLECT: MultiGridCollectAdapter,
+    # INI multigrid environments (all use generic MultiGridAdapter)
+    GameId.MULTIGRID_BLOCKED_UNLOCK_PICKUP: MultiGridAdapter,
+    GameId.MULTIGRID_EMPTY_5X5: MultiGridAdapter,
+    GameId.MULTIGRID_EMPTY_RANDOM_5X5: MultiGridAdapter,
+    GameId.MULTIGRID_EMPTY_6X6: MultiGridAdapter,
+    GameId.MULTIGRID_EMPTY_RANDOM_6X6: MultiGridAdapter,
+    GameId.MULTIGRID_EMPTY_8X8: MultiGridAdapter,
+    GameId.MULTIGRID_EMPTY_16X16: MultiGridAdapter,
+    GameId.MULTIGRID_LOCKED_HALLWAY_2ROOMS: MultiGridAdapter,
+    GameId.MULTIGRID_LOCKED_HALLWAY_4ROOMS: MultiGridAdapter,
+    GameId.MULTIGRID_LOCKED_HALLWAY_6ROOMS: MultiGridAdapter,
+    GameId.MULTIGRID_PLAYGROUND: MultiGridAdapter,
+    GameId.MULTIGRID_RED_BLUE_DOORS_6X6: MultiGridAdapter,
+    GameId.MULTIGRID_RED_BLUE_DOORS_8X8: MultiGridAdapter,
 }
 
 
@@ -499,6 +696,8 @@ __all__ = [
     "MultiGridSoccerAdapter",
     "MultiGridCollectAdapter",
     "MULTIGRID_ADAPTERS",
-    "MULTIGRID_ACTIONS",
+    "MULTIGRID_ACTIONS",  # Backwards compatibility (alias for LEGACY_MULTIGRID_ACTIONS)
+    "LEGACY_MULTIGRID_ACTIONS",
+    "INI_MULTIGRID_ACTIONS",
     "create_multigrid_adapter",
 ]

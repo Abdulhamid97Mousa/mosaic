@@ -123,11 +123,31 @@ _ENV_SLOT_COUNTER = count()
 _GRID_COORDINATORS: dict[str, "_GridCoordinator"] = {}
 
 
-def maybe_wrap_env(env: Any) -> Any:
-    """Attach the FastLane wrapper if fastlane streaming is enabled."""
+def reset_slot_counter() -> None:
+    """Reset the FastLane slot counter.
 
+    Call this at the start of training to ensure slot assignments start from 0.
+    This is important for curriculum learning where environments may be recreated
+    during task transitions - without resetting, replacement envs get slots
+    >= grid_limit and won't contribute to GRID mode rendering.
+    """
+    global _ENV_SLOT_COUNTER
+    _ENV_SLOT_COUNTER = count()
+
+
+def maybe_wrap_env(env: Any) -> Any:
+    """Attach the FastLane wrapper if fastlane streaming is enabled.
+
+    Note: If FASTLANE_SKIP_WRAP=1 is set, wrapping is skipped. This is used
+    by curriculum learning to prevent re-wrapping replacement environments.
+    """
     if not _CONFIG.enabled or _CONFIG.video_mode == VideoModes.OFF:
         return env
+
+    # Skip wrapping if explicitly disabled (e.g., for replacement envs in curriculum)
+    if os.getenv("FASTLANE_SKIP_WRAP") == "1":
+        return env
+
     slot_index = next(_ENV_SLOT_COUNTER)
     return FastLaneTelemetryWrapper(env, _CONFIG, slot_index)
 

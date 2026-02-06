@@ -9,12 +9,13 @@ from gym_gui.config.game_configs import (
     CarRacingConfig,
     CliffWalkingConfig,
     FrozenLakeConfig,
-    GameConfig,
     LunarLanderConfig,
+    MeltingPotConfig,
     MiniGridConfig,
+    MultiGridConfig,
     TaxiConfig,
 )
-from gym_gui.core.enums import GameId
+from gym_gui.core.enums import GameId, EnvironmentFamily, ENVIRONMENT_FAMILY_BY_GAME
 
 try:
     from gym_gui.core.adapters.vizdoom import ViZDoomConfig
@@ -43,7 +44,7 @@ class GameConfigBuilder:
     def build_config(
         game_id: GameId,
         overrides: Dict[str, Any],
-    ) -> GameConfig | None:
+    ) -> Any:
         """Build game configuration from control panel overrides."""
         if game_id == GameId.FROZEN_LAKE:
             is_slippery = bool(overrides.get("is_slippery", True))
@@ -278,6 +279,62 @@ class GameConfigBuilder:
                 episode_timeout=episode_timeout,
                 living_reward=living_reward,
                 death_penalty=death_penalty,
+            )
+
+        # MultiGrid environments (gym-multigrid)
+        family = ENVIRONMENT_FAMILY_BY_GAME.get(game_id)
+        if family == EnvironmentFamily.MULTIGRID:
+            # Use the game_id value directly as env_id (e.g., "MultiGrid-BlockedUnlockPickup-v0")
+            env_id = game_id.value
+            num_agents = overrides.get("num_agents")
+            seed = overrides.get("seed")
+            highlight = bool(overrides.get("highlight", True))
+
+            # Validate num_agents if provided
+            if num_agents is not None:
+                try:
+                    num_agents = int(num_agents)
+                except (TypeError, ValueError):
+                    num_agents = None
+
+            # Default to 2 agents for INI cooperative multi-agent environments
+            # (BlockedUnlockPickup, Empty, LockedHallway, etc. are designed for multi-agent)
+            # Legacy environments (Soccer=4, Collect=3) have fixed agent counts
+            if num_agents is None:
+                if "Soccer" in env_id:
+                    num_agents = 4  # 2v2 teams
+                elif "Collect" in env_id:
+                    num_agents = 3  # 3 collectors
+                else:
+                    # INI multigrid environments default to 2 for cooperative play
+                    num_agents = 2
+
+            # Validate seed if provided
+            if seed is not None:
+                try:
+                    seed = int(seed)
+                except (TypeError, ValueError):
+                    seed = None
+
+            return MultiGridConfig(
+                env_id=env_id,
+                num_agents=num_agents,
+                seed=seed,
+                highlight=highlight,
+            )
+
+        # MeltingPot environments
+        if family == EnvironmentFamily.MELTINGPOT:
+            # Extract substrate name from game_id value (e.g., "meltingpot/clean_up" -> "clean_up")
+            substrate_name = game_id.value.replace("meltingpot/", "")
+            render_scale = overrides.get("render_scale", 2)
+            try:
+                render_scale_value = int(render_scale)
+            except (TypeError, ValueError):
+                render_scale_value = 2
+            return MeltingPotConfig(
+                substrate_name=substrate_name,
+                render_scale=render_scale_value,
             )
 
         return None

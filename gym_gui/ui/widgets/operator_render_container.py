@@ -601,8 +601,9 @@ class OperatorRenderContainer(QtWidgets.QFrame):
 
         # Force layout update
         self.updateGeometry()
-        if self.parent():
-            self.parent().updateGeometry()
+        parent = self.parent()
+        if parent is not None and hasattr(parent, 'updateGeometry'):
+            parent.updateGeometry()  # type: ignore[union-attr]
 
         _LOGGER.debug(f"Set display size to {width}x{height} for {self._config.operator_id}")
 
@@ -1167,14 +1168,17 @@ class OperatorRenderContainer(QtWidgets.QFrame):
                 for sequence in mapping.key_sequences:
                     # QKeySequence stores the key code - need to handle Qt5/Qt6 differences
                     if sequence.count() > 0:
-                        # In Qt6, sequence[0] returns QKeyCombination, need .key()
+                        # In Qt6, sequence[0] returns QKeyCombination, need .toCombined()
                         # In Qt5, it returns int directly
-                        qt_key = sequence[0]
-                        if hasattr(qt_key, 'key'):
-                            qt_key = int(qt_key.key())
+                        qt_key_raw = sequence[0]
+                        qt_key_int: int
+                        if hasattr(qt_key_raw, 'toCombined'):
+                            qt_key_int = qt_key_raw.toCombined()  # type: ignore[union-attr]
+                        elif hasattr(qt_key_raw, 'key'):
+                            qt_key_int = int(qt_key_raw.key())  # type: ignore[union-attr]
                         else:
-                            qt_key = int(qt_key)
-                        self._key_mappings[qt_key] = action
+                            qt_key_int = int(qt_key_raw)  # type: ignore[arg-type]
+                        self._key_mappings[qt_key_int] = action
 
             _LOGGER.info(
                 f"Configured {len(self._key_mappings)} key mappings for {game_id.value}",
@@ -1218,8 +1222,10 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         # Clear existing buttons
         while self._action_buttons_layout.count():
             item = self._action_buttons_layout.takeAt(0)
-            if item and item.widget():
-                item.widget().deleteLater()
+            if item is not None:
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
 
         # Create buttons for ALL actions (FlowLayout handles wrapping)
         for action_idx, label in zip(actions, labels):
@@ -1357,8 +1363,10 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         # Clear existing buttons
         while self._chess_buttons_layout.count():
             item = self._chess_buttons_layout.takeAt(0)
-            if item and item.widget():
-                item.widget().deleteLater()
+            if item is not None:
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
 
         if not moves:
             return

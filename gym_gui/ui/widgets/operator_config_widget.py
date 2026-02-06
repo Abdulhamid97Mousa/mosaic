@@ -193,7 +193,27 @@ ENV_FAMILIES: Dict[str, Tuple[str, ...]] = {
         "draughts/international_draughts",  # Custom: 10x10, backward captures, flying kings
     ),
     # gym-multigrid multi-agent environments (simultaneous stepping)
-    "multigrid": ("MultiGrid-Soccer-v0", "MultiGrid-Collect-v0"),
+    # Legacy gym-multigrid (ArnaudFickinger) + Modern INI multigrid
+    "multigrid": (
+        # Legacy environments
+        "MultiGrid-Soccer-v0",
+        "MultiGrid-Collect-v0",
+        # INI environments - Empty series
+        "MultiGrid-Empty-5x5-v0",
+        "MultiGrid-Empty-Random-5x5-v0",
+        "MultiGrid-Empty-6x6-v0",
+        "MultiGrid-Empty-Random-6x6-v0",
+        "MultiGrid-Empty-8x8-v0",
+        "MultiGrid-Empty-16x16-v0",
+        # INI environments - Puzzles
+        "MultiGrid-RedBlueDoors-6x6-v0",
+        "MultiGrid-RedBlueDoors-8x8-v0",
+        "MultiGrid-LockedHallway-2Rooms-v0",
+        "MultiGrid-LockedHallway-4Rooms-v0",
+        "MultiGrid-LockedHallway-6Rooms-v0",
+        "MultiGrid-BlockedUnlockPickup-v0",
+        "MultiGrid-Playground-v0",
+    ),
     # Melting Pot multi-agent social scenarios (DeepMind)
     "meltingpot": (),  # Loaded dynamically from available substrates
     # Overcooked-AI cooperative cooking (UC Berkeley CHAI)
@@ -241,7 +261,7 @@ def _auto_detect_agent_count(env_family: str, env_id: str) -> int:
 
             adapter = create_adapter(game_id)
             adapter.load()
-            num_agents = adapter.num_agents
+            num_agents = getattr(adapter, 'num_agents', 0)
             adapter.close()
             return num_agents
 
@@ -255,7 +275,7 @@ def _auto_detect_agent_count(env_family: str, env_id: str) -> int:
                 game_id = GameId(env_id)
                 adapter = create_adapter(game_id)
                 adapter.load()
-                num_agents = adapter.num_agents
+                num_agents = getattr(adapter, 'num_agents', 0)
                 adapter.close()
                 return num_agents
             except (ValueError, Exception):
@@ -1693,8 +1713,10 @@ class OperatorConfigRow(QtWidgets.QWidget):
         # Clear layout
         while self._role_selectors_layout.count():
             item = self._role_selectors_layout.takeAt(0)
-            if item and item.widget():
-                item.widget().deleteLater()
+            if item is not None:
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
 
         # Get current environment
         env_family = self._env_combo.currentText()

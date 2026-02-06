@@ -7,6 +7,7 @@ from pathlib import Path
 
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 _REPO_ROOT = _PACKAGE_ROOT.parent
+_3RD_PARTY_ROOT = _REPO_ROOT / "3rd_party"
 
 # Writable runtime artifacts (shared with worker stack). Prefer repo-level var/.
 VAR_ROOT = (_REPO_ROOT / "var").resolve()
@@ -19,6 +20,7 @@ VAR_TRAINER_DIR = VAR_ROOT / "trainer"
 VAR_TENSORBOARD_DIR = VAR_TRAINER_DIR / "runs"
 VAR_WANDB_DIR = VAR_TRAINER_DIR / "runs"  # WANDB manifests stored per-run like TensorBoard
 VAR_TRAINER_DB = VAR_TRAINER_DIR / "trainer.sqlite"
+VAR_CUSTOM_SCRIPTS_DIR = VAR_TRAINER_DIR / "custom_scripts"  # Custom script phase configs and checkpoints
 VAR_DATA_DIR = VAR_ROOT / "data"
 VAR_MODELS_DIR = VAR_ROOT / "models"  # LLM models for vLLM serving
 VAR_MODELS_HF_CACHE = VAR_MODELS_DIR / "huggingface"  # HuggingFace cache
@@ -29,6 +31,10 @@ VAR_OPERATORS_LOGS_DIR = VAR_OPERATORS_DIR / "logs"  # Operator subprocess logs
 VAR_OPERATORS_TELEMETRY_DIR = VAR_OPERATORS_DIR / "telemetry"  # Operator telemetry (steps, episodes)
 VAR_VLLM_DIR = VAR_ROOT / "vllm"  # vLLM server logs and state
 VAR_BIN_DIR = VAR_ROOT / "bin"  # Project-local binaries (KataGo, etc.)
+
+# Custom training scripts directories
+CLEANRL_SCRIPTS_DIR = _3RD_PARTY_ROOT / "cleanrl_worker" / "cleanrl_worker" / "scripts"
+XUANCE_SCRIPTS_DIR = _3RD_PARTY_ROOT / "xuance_worker" / "xuance_worker" / "scripts"
 
 
 def ensure_var_directories() -> None:
@@ -54,6 +60,7 @@ def ensure_var_directories() -> None:
         VAR_OPERATORS_TELEMETRY_DIR,
         VAR_VLLM_DIR,
         VAR_BIN_DIR,
+        VAR_CUSTOM_SCRIPTS_DIR,
     ):
         path.mkdir(parents=True, exist_ok=True)
 
@@ -79,5 +86,8 @@ __all__ = [
     "VAR_OPERATORS_TELEMETRY_DIR",
     "VAR_VLLM_DIR",
     "VAR_BIN_DIR",
+    "VAR_CUSTOM_SCRIPTS_DIR",
+    "CLEANRL_SCRIPTS_DIR",
+    "XUANCE_SCRIPTS_DIR",
     "ensure_var_directories",
 ]

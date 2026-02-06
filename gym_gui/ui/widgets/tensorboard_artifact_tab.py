@@ -19,6 +19,11 @@ try:  # Optional dependency for embedded browser support
 except Exception:  # pragma: no cover - optional feature not available in tests
     QWebEngineView = None
 
+try:
+    from gym_gui.ui.widgets.filtered_web_engine import FilteredWebEnginePage
+except ImportError:  # pragma: no cover - optional feature
+    FilteredWebEnginePage = None  # type: ignore[assignment, misc]
+
 WEB_ENGINE_AVAILABLE = QWebEngineView is not None
 
 from gym_gui.constants.constants_tensorboard import DEFAULT_TENSORBOARD
@@ -387,7 +392,8 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
         return (
             f"{DEFAULT_TENSORBOARD.cli_executable} --logdir \"{log_dir}\" "
             f"--host {DEFAULT_TENSORBOARD.server_host} "
-            f"--port {DEFAULT_TENSORBOARD.default_port}"
+            f"--port {DEFAULT_TENSORBOARD.default_port} "
+            f"--reload_multifile=true"
         )
 
     # ------------------------------------------------------------------
@@ -542,6 +548,8 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
             str(port),
             "--host",
             DEFAULT_TENSORBOARD.server_host,
+            # Enable multifile loading for XuanCe's nested event file structure
+            "--reload_multifile=true",
         ]
         try:
             # nosemgrep: python.lang.security.audit.subprocess-shell-true.subprocess-shell-true
@@ -626,6 +634,8 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
 
         if self._web_view is None:
             web_view = QWebEngineView(self)
+            if FilteredWebEnginePage is not None:
+                web_view.setPage(FilteredWebEnginePage(web_view))
             web_view.setUrl(QtCore.QUrl(url))
             web_view.urlChanged.connect(self._update_nav_controls)
             web_view.loadFinished.connect(lambda _: self._update_nav_controls())

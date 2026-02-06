@@ -83,6 +83,7 @@ class OvercookedAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
     default_render_mode = RenderMode.RGB_ARRAY
     supported_render_modes = (RenderMode.RGB_ARRAY,)
     supported_control_modes = (
+        ControlMode.HUMAN_ONLY,  # Multi-human multi-keyboard gameplay (2 players)
         ControlMode.AGENT_ONLY,
         ControlMode.MULTI_AGENT_COOP,
     )

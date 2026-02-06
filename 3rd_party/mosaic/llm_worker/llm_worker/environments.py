@@ -162,8 +162,8 @@ def generate_multigrid_description(
     Returns:
         Natural language description of observation
     """
-    # Import MOSAIC extension
-    from mosaic_extension.multigrid import observations
+    # Import MOSAIC extension (now in llm_worker.environments.multigrid)
+    from llm_worker.environments.multigrid import observations
 
     if observation_mode == "egocentric":
         return observations.describe_observation_egocentric(
@@ -197,8 +197,8 @@ def get_multigrid_instruction_prompt(
     Returns:
         Instruction prompt for the specified coordination level
     """
-    # Import MOSAIC extension
-    from mosaic_extension.multigrid import prompts
+    # Import MOSAIC extension (now in llm_worker.environments.multigrid)
+    from llm_worker.environments.multigrid import prompts
 
     # Determine team (Soccer: agents 0,1=team0, 2,3=team1)
     team = agent_id // 2 if "Soccer" in env_id else agent_id

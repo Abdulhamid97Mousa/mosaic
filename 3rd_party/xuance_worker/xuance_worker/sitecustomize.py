@@ -7,6 +7,7 @@ XuanCe sources.
 
 from __future__ import annotations
 
+import logging as _logging  # Import at module level to ensure it's always available
 import os
 from pathlib import Path
 
@@ -45,24 +46,86 @@ except Exception:  # pragma: no cover - wandb optional
 try:  # pragma: no cover - gym optional
     import gymnasium as gym
 
+    # Import FastLane helpers
+    try:
+        from xuance_worker.fastlane import is_fastlane_enabled, maybe_wrap_env
+    except ImportError:
+        from .fastlane import is_fastlane_enabled, maybe_wrap_env
+
     if hasattr(gym.make, "_mosaic_wrapped"):
         _ORIG_MAKE = getattr(gym.make, "_mosaic_orig_make")
     else:
         _ORIG_MAKE = gym.make
 
     def _wrapped_make(env_id, *args, **kwargs):
-        """Wrap gym.make to support MOSAIC environment variables."""
+        """Wrap gym.make to support MOSAIC environment variables and FastLane."""
         render_kwargs = dict(kwargs)
 
-        # Auto-enable rgb_array for Fast Lane telemetry
-        if os.getenv("MOSAIC_FASTLANE_ENABLED") == "1" and "render_mode" not in render_kwargs:
+        # Auto-import environment packages to register their environments
+        _is_minigrid_env = False
+        if isinstance(env_id, str):
+            if env_id.startswith("MiniGrid") or env_id.startswith("BabyAI"):
+                _is_minigrid_env = True
+                try:
+                    import minigrid  # noqa: F401 - registers MiniGrid/BabyAI envs
+                except ImportError:
+                    pass
+
+        # CRITICAL: Force rgb_array for FastLane telemetry
+        # XuanCe defaults to render_mode="human" but FastLane needs rgb_array
+        # We must OVERRIDE whatever render_mode was passed, not just add if missing
+        if is_fastlane_enabled():
+            render_kwargs["render_mode"] = "rgb_array"
             try:
-                env = _ORIG_MAKE(env_id, *args, render_mode="rgb_array", **render_kwargs)
+                env = _ORIG_MAKE(env_id, *args, **render_kwargs)
             except TypeError:
+                # Fallback if env doesn't support render_mode kwarg
+                render_kwargs.pop("render_mode", None)
                 env = _ORIG_MAKE(env_id, *args, **render_kwargs)
         else:
             env = _ORIG_MAKE(env_id, *args, **render_kwargs)
 
+        # Wrap MiniGrid/BabyAI environments to flatten Dict observation to Box
+        # SKIP for XuanCe - it has its own MiniGridEnv wrapper that handles observation space
+        # XuanCe's MiniGridEnv expects raw Dict obs and does its own ImgObsWrapper handling
+        _is_xuance = os.getenv("XUANCE_RUN_ID") is not None
+        if _is_minigrid_env and env is not None and not _is_xuance:
+            try:
+                from minigrid.wrappers import ImgObsWrapper
+                # ImgObsWrapper extracts just the image (7,7,3), then flatten to (147,)
+                env = ImgObsWrapper(env)
+                env = gym.wrappers.FlattenObservation(env)
+            except Exception:
+                pass
+
+        # Wrap with ProceduralGenerationWrapper if requested
+        procedural_gen = os.getenv("CLEANRL_PROCEDURAL_GENERATION", "").lower()
+        if procedural_gen in ("1", "true", "yes") and env is not None:
+            try:
+                from cleanrl_worker.wrappers.procedural_generation import ProceduralGenerationWrapper  # type: ignore[import-not-found]
+                # Enable procedural generation (different levels each episode)
+                env = ProceduralGenerationWrapper(
+                    env,
+                    procedural=True,
+                    fixed_seed=None
+                )
+            except Exception:
+                pass
+        elif procedural_gen in ("0", "false", "no") and env is not None:
+            try:
+                from cleanrl_worker.wrappers.procedural_generation import ProceduralGenerationWrapper  # type: ignore[import-not-found]
+                seed_str = os.getenv("CLEANRL_SEED")
+                seed = int(seed_str) if seed_str else 42
+                env = ProceduralGenerationWrapper(
+                    env,
+                    procedural=False,
+                    fixed_seed=seed
+                )
+            except Exception:
+                pass
+
+        # Wrap with FastLane telemetry (THIS WAS MISSING!)
+        env = maybe_wrap_env(env)
         return env
 
     _wrapped_make._mosaic_wrapped = True  # type: ignore[attr-defined]
@@ -72,53 +135,22 @@ except Exception:  # pragma: no cover - gym optional
     pass
 
 # --- XuanCe FastLane environment wrapping ---------------------------------
-try:  # pragma: no cover - xuance optional
-    import logging as _logging
-    from xuance.environment.utils import XuanCeEnvWrapper, XuanCeAtariEnvWrapper, XuanCeMultiAgentEnvWrapper
-    from xuance_worker.fastlane import maybe_wrap_env, is_fastlane_enabled
-
-    _logger = _logging.getLogger("xuance_worker.sitecustomize")
-
-    # Only patch if FastLane is enabled
-    if is_fastlane_enabled():
-        # Patch XuanCeEnvWrapper
-        _ORIG_XUANCE_ENV_INIT = XuanCeEnvWrapper.__init__
-
-        def _patched_xuance_env_init(self, env):
-            """Wrap XuanCe environments with FastLane telemetry."""
-            # Call original __init__
-            _ORIG_XUANCE_ENV_INIT(self, env)
-            # Wrap the internal env with FastLane
-            self.env = maybe_wrap_env(self.env)
-
-        XuanCeEnvWrapper.__init__ = _patched_xuance_env_init
-
-        # Patch XuanCeAtariEnvWrapper
-        _ORIG_ATARI_ENV_INIT = XuanCeAtariEnvWrapper.__init__
-
-        def _patched_atari_env_init(self, env):
-            """Wrap XuanCe Atari environments with FastLane telemetry."""
-            _ORIG_ATARI_ENV_INIT(self, env)
-            self.env = maybe_wrap_env(self.env)
-
-        XuanCeAtariEnvWrapper.__init__ = _patched_atari_env_init
-
-        # Patch XuanCeMultiAgentEnvWrapper
-        _ORIG_MAENV_INIT = XuanCeMultiAgentEnvWrapper.__init__
-
-        def _patched_maenv_init(self, env):
-            """Wrap XuanCe multi-agent environments with FastLane telemetry."""
-            _ORIG_MAENV_INIT(self, env)
-            self.env = maybe_wrap_env(self.env)
-
-        XuanCeMultiAgentEnvWrapper.__init__ = _patched_maenv_init
-
-        _logger.info("XuanCe FastLane environment wrapping enabled")
-except Exception as e:  # pragma: no cover - xuance optional
-    _logging.getLogger("xuance_worker.sitecustomize").warning(
-        "XuanCe FastLane wrapping failed: %s", e, exc_info=True
-    )
-    pass
+# NOTE: XuanCeEnvWrapper patching is DISABLED because importing xuance at
+# module load time can hang indefinitely (xuance initialization issue).
+# The gym.make() patching above is sufficient for FastLane wrapping since
+# XuanCe internally uses gym.make() to create environments.
+#
+# If you need to re-enable XuanCe wrapper patching, it should be done lazily
+# (e.g., only when the wrapper is first instantiated) to avoid blocking imports.
+#
+# Original code kept for reference:
+# try:
+#     from xuance.environment.utils import XuanCeEnvWrapper, ...
+#     if is_fastlane_enabled():
+#         # Patch XuanCeEnvWrapper.__init__ to call maybe_wrap_env()
+#         ...
+# except Exception:
+#     pass
 
 # --- PyTorch save helper ----------------------------------------
 try:  # pragma: no cover - torch optional
@@ -162,48 +194,23 @@ except Exception:  # pragma: no cover - tensorboard optional
     pass
 
 # --- XuanCe config override support ----------------------------------------
-try:  # pragma: no cover - xuance optional
-    import xuance
-
-    # Store original get_config if available
-    if hasattr(xuance, "get_config"):
-        _ORIG_GET_CONFIG = xuance.get_config
-
-        def _patched_get_config(*args, **kwargs):
-            """Patch XuanCe config loading to respect MOSAIC overrides."""
-            config = _ORIG_GET_CONFIG(*args, **kwargs)
-
-            # Apply MOSAIC environment variable overrides
-            if os.getenv("XUANCE_DEVICE"):
-                config.device = os.getenv("XUANCE_DEVICE")
-            if os.getenv("XUANCE_SEED"):
-                try:
-                    config.seed = int(os.getenv("XUANCE_SEED"))
-                except ValueError:
-                    pass
-            if os.getenv("XUANCE_PARALLELS"):
-                try:
-                    config.parallels = int(os.getenv("XUANCE_PARALLELS"))
-                except ValueError:
-                    pass
-            if os.getenv("XUANCE_RUNNING_STEPS"):
-                try:
-                    config.running_steps = int(os.getenv("XUANCE_RUNNING_STEPS"))
-                except ValueError:
-                    pass
-            if os.getenv("XUANCE_LOG_DIR"):
-                config.log_dir = os.getenv("XUANCE_LOG_DIR")
-            if os.getenv("XUANCE_MODEL_DIR"):
-                config.model_dir = os.getenv("XUANCE_MODEL_DIR")
-
-            return config
-
-        xuance.get_config = _patched_get_config
-except Exception:  # pragma: no cover - xuance optional
-    pass
+# NOTE: XuanCe config patching is DISABLED because importing xuance at
+# module load time can hang indefinitely (xuance initialization issue).
+# Config overrides are now handled via environment variables in the worker
+# config (XuanCeWorkerConfig) and passed through parser_args.
+#
+# Original code kept for reference:
+# try:
+#     import xuance
+#     if hasattr(xuance, "get_config"):
+#         # Patch xuance.get_config to apply env var overrides
+#         ...
+# except Exception:
+#     pass
 
 # --- Checkpoint resume support ----------------------------------------
 try:  # pragma: no cover - torch optional
+    import torch
     import torch.nn as nn
 
     _MOSAIC_MODULE_TO_PATCHED = getattr(nn.Module.to, "_mosaic_patched", False)
@@ -264,8 +271,8 @@ try:  # pragma: no cover - torch optional
 
         return result
 
-    _mosaic_module_to._mosaic_patched = True
-    nn.Module._orig_to = _ORIG_MODULE_TO
+    _mosaic_module_to._mosaic_patched = True  # type: ignore[attr-defined]
+    nn.Module._orig_to = _ORIG_MODULE_TO  # type: ignore[attr-defined]
     nn.Module.to = _mosaic_module_to
 except Exception:  # pragma: no cover - torch optional
     pass

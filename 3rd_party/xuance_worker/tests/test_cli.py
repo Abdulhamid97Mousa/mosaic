@@ -19,6 +19,89 @@ import pytest
 from xuance_worker.cli import parse_args, main
 
 
+def _parse_config_from_output(stdout: str) -> dict:
+    """Parse config output from CLI dry-run.
+
+    The CLI may emit lifecycle events (JSON lines) followed by the main config.
+    This function finds the config JSON by looking for an object with 'method' key.
+
+    The output can be:
+    1. Single-line JSON (lifecycle events)
+    2. Multi-line pretty-printed JSON (config output)
+
+    Args:
+        stdout: Captured standard output from the CLI.
+
+    Returns:
+        Parsed config dictionary.
+
+    Raises:
+        ValueError: If no valid config could be parsed.
+    """
+    lines = stdout.strip().split('\n')
+
+    # First, try to find multi-line pretty-printed JSON at the end
+    # Look for a line starting with '{' and collect until we find matching '}'
+    json_buffer = []
+    brace_count = 0
+    in_json = False
+
+    for line in lines:
+        stripped = line.strip()
+        if not in_json and stripped.startswith('{'):
+            # Check if it's a single-line JSON first
+            try:
+                output = json.loads(stripped)
+                if isinstance(output, dict) and "method" in output:
+                    # Found a single-line config, but keep looking for pretty-printed one
+                    json_buffer = [stripped]
+                    in_json = False
+                    continue
+            except json.JSONDecodeError:
+                pass
+            # Start of multi-line JSON
+            in_json = True
+            json_buffer = [line]
+            brace_count = line.count('{') - line.count('}')
+        elif in_json:
+            json_buffer.append(line)
+            brace_count += line.count('{') - line.count('}')
+            if brace_count == 0:
+                # Complete JSON object found
+                try:
+                    output = json.loads('\n'.join(json_buffer))
+                    if isinstance(output, dict) and "method" in output:
+                        return output
+                except json.JSONDecodeError:
+                    pass
+                # Reset for next potential JSON
+                json_buffer = []
+                in_json = False
+
+    # If we collected something but didn't parse it, try parsing it
+    if json_buffer:
+        try:
+            output = json.loads('\n'.join(json_buffer))
+            if isinstance(output, dict) and "method" in output:
+                return output
+        except json.JSONDecodeError:
+            pass
+
+    # Fallback: try each line in reverse as single-line JSON
+    for line in reversed(lines):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            output = json.loads(stripped)
+            if isinstance(output, dict) and "method" in output:
+                return output
+        except json.JSONDecodeError:
+            continue
+
+    raise ValueError(f"Could not parse config from output: {stdout}")
+
+
 # =============================================================================
 # Argument Parsing Tests
 # =============================================================================
@@ -41,7 +124,6 @@ class TestParseArgs:
         assert args.parallels == 8
         assert args.dl_toolbox == "torch"
         assert args.test is False
-        assert args.benchmark is False
         assert args.dry_run is False
         assert args.run_id is None
         assert args.config_path is None
@@ -114,14 +196,6 @@ class TestParseArgs:
 
         args = parse_args([])
         assert args.test is False
-
-    def test_benchmark_flag(self) -> None:
-        """Test --benchmark flag."""
-        args = parse_args(["--benchmark"])
-        assert args.benchmark is True
-
-        args = parse_args([])
-        assert args.benchmark is False
 
     def test_dry_run_flag(self) -> None:
         """Test --dry-run flag."""
@@ -201,8 +275,7 @@ class TestMainFunction:
 
         assert exit_code == 0
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
-
+        output = _parse_config_from_output(captured.out)
         assert output["method"] == "ppo"
         assert output["env"] == "classic_control"
         assert output["env_id"] == "CartPole-v1"
@@ -224,8 +297,7 @@ class TestMainFunction:
 
         assert exit_code == 0
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
-
+        output = _parse_config_from_output(captured.out)
         assert output["method"] == "dqn"
         assert output["env"] == "atari"
         assert output["env_id"] == "Pong-v5"
@@ -253,8 +325,7 @@ class TestMainFunction:
 
         assert exit_code == 0
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
-
+        output = _parse_config_from_output(captured.out)
         assert output["run_id"] == "json-config-test"
         assert output["method"] == "td3"
         assert output["env"] == "box2d"
@@ -285,7 +356,7 @@ class TestMainFunction:
 
         assert exit_code == 0
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _parse_config_from_output(captured.out)
 
         assert output["run_id"] != ""
         assert len(output["run_id"]) == 8  # UUID[:8]
@@ -300,7 +371,7 @@ class TestMainFunction:
 
         assert exit_code == 0
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _parse_config_from_output(captured.out)
 
         assert output["run_id"] == "my-custom-id"
 
@@ -335,24 +406,6 @@ class TestMainFunction:
         assert exit_code == 1
 
     @patch("xuance_worker.cli.XuanCeWorkerRuntime")
-    def test_benchmark_mode_called(self, mock_runtime_cls) -> None:
-        """Test that benchmark mode calls runtime.benchmark()."""
-        mock_runtime = MagicMock()
-        mock_runtime.benchmark.return_value = MagicMock(
-            status="completed", runner_type="RunnerDRL"
-        )
-        mock_runtime_cls.return_value = mock_runtime
-
-        exit_code = main([
-            "--method", "ppo",
-            "--benchmark",
-        ])
-
-        assert exit_code == 0
-        mock_runtime.benchmark.assert_called_once()
-        mock_runtime.run.assert_not_called()
-
-    @patch("xuance_worker.cli.XuanCeWorkerRuntime")
     def test_normal_run_mode_called(self, mock_runtime_cls) -> None:
         """Test that normal mode calls runtime.run()."""
         mock_runtime = MagicMock()
@@ -367,7 +420,6 @@ class TestMainFunction:
 
         assert exit_code == 0
         mock_runtime.run.assert_called_once()
-        mock_runtime.benchmark.assert_not_called()
 
 
 # =============================================================================
@@ -388,7 +440,7 @@ class TestBackendSelection:
 
         assert exit_code == 0
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _parse_config_from_output(captured.out)
         assert output["dl_toolbox"] == "torch"
 
     def test_tensorflow_backend_dry_run(self, capsys) -> None:
@@ -401,7 +453,7 @@ class TestBackendSelection:
 
         assert exit_code == 0
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _parse_config_from_output(captured.out)
         assert output["dl_toolbox"] == "tensorflow"
 
     def test_mindspore_backend_dry_run(self, capsys) -> None:
@@ -414,7 +466,7 @@ class TestBackendSelection:
 
         assert exit_code == 0
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _parse_config_from_output(captured.out)
         assert output["dl_toolbox"] == "mindspore"
 
 
@@ -436,7 +488,7 @@ class TestTestMode:
 
         assert exit_code == 0
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _parse_config_from_output(captured.out)
         assert output["test_mode"] is True
 
     def test_no_test_mode_flag(self, capsys) -> None:
@@ -448,7 +500,7 @@ class TestTestMode:
 
         assert exit_code == 0
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _parse_config_from_output(captured.out)
         assert output["test_mode"] is False
 
 
@@ -510,7 +562,7 @@ class TestMOSAICIntegration:
 
         assert exit_code == 0
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _parse_config_from_output(captured.out)
 
         assert output["method"] == "ppo"
         assert output["worker_id"] == "test-worker"
@@ -530,7 +582,7 @@ class TestMultiAgentCLI:
 
         assert exit_code == 0
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _parse_config_from_output(captured.out)
 
         assert output["method"] == "mappo"
         assert output["env"] == "mpe"
@@ -547,7 +599,7 @@ class TestMultiAgentCLI:
 
         assert exit_code == 0
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _parse_config_from_output(captured.out)
 
         assert output["method"] == "qmix"
         assert output["env"] == "smac"
@@ -564,7 +616,7 @@ class TestMultiAgentCLI:
 
         assert exit_code == 0
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _parse_config_from_output(captured.out)
 
         assert output["method"] == "maddpg"
         assert output["env"] == "mpe"

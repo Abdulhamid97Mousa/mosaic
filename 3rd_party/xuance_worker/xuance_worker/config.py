@@ -77,14 +77,19 @@ class XuanCeWorkerConfig:
         if not self.env_id:
             raise ValueError("env_id is required")
 
-        # Protocol compliance assertion (only if gym_gui available)
-        try:
-            from gym_gui.core.worker import WorkerConfig as WorkerConfigProtocol
-            assert isinstance(self, WorkerConfigProtocol), (
-                "XuanCeWorkerConfig must implement WorkerConfig protocol"
-            )
-        except ImportError:
-            pass  # gym_gui not available, skip protocol check
+        # Protocol compliance assertion DISABLED to avoid circular import
+        # This was causing MOSAIC startup to hang because worker discovery
+        # imports xuance_worker, which then tries to import gym_gui.core.worker,
+        # creating a circular dependency.
+        # The protocol is verified at runtime when the worker is actually used.
+        #
+        # try:
+        #     from gym_gui.core.worker import WorkerConfig as WorkerConfigProtocol
+        #     assert isinstance(self, WorkerConfigProtocol), (
+        #         "XuanCeWorkerConfig must implement WorkerConfig protocol"
+        #     )
+        # except ImportError:
+        #     pass  # gym_gui not available, skip protocol check
 
     @classmethod
     def from_json_file(cls, path: Path) -> "XuanCeWorkerConfig":

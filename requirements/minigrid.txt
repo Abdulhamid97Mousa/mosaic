@@ -1,0 +1,20 @@
+# MiniGrid with BALROG/GLAM BabyAI tasks (BartekCupial's fork)
+# ============================================================
+# Required for: BabyAI-MixedTrainLocal-v0, BabyAI-MixedTestLocal-v0
+# These environments are used by BALROG benchmark and GLAM paper
+#
+# Usage options:
+#   1. Install from git:  pip install -r requirements/minigrid_balrog.txt
+#   2. Install editable:  pip install -e 3rd_party/Minigrid/
+#   3. Install via extra: pip install -e ".[minigrid-balrog]"
+#
+# NOTE: This REPLACES standard minigrid - don't install both!
+# ============================================================
+
+gymnasium>=1.1.0
+
+# Option A: Install from GitHub (recommended for reproducibility)
+minigrid @ git+https://github.com/BartekCupial/Minigrid.git
+
+# Option B: Install from local clone (uncomment below, comment above)
+# -e ./3rd_party/Minigrid/

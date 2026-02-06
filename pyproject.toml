@@ -91,6 +91,17 @@ minigrid = [
     "minigrid>=2.0.0,<3.0.0",
 ]
 
+# MiniGrid with BALROG/GLAM BabyAI tasks (BartekCupial's fork)
+# Required for: BabyAI-MixedTrainLocal-v0, BabyAI-MixedTestLocal-v0
+# These environments are used by BALROG benchmark and GLAM paper
+# Source: https://github.com/BartekCupial/Minigrid
+# Local path: 3rd_party/Minigrid/
+# NOTE: This REPLACES standard minigrid - don't install both!
+minigrid-balrog = [
+    "gymnasium>=1.1.0",
+    "minigrid @ git+https://github.com/BartekCupial/Minigrid.git",
+]
+
 # PettingZoo multi-agent environments (Chess, Go, MPE, etc.)
 pettingzoo = [
     "pettingzoo[classic,butterfly,mpe,sisl]>=1.24.0",
@@ -285,6 +296,8 @@ xuance = [
 
 # BALROG worker for LLM-based agents on BALROG benchmarks
 # Supports BabyAI, MiniHack, Crafter environments with OpenAI/Claude/Gemini
+# NOTE: For BabyAI tasks, also install minigrid-balrog extra:
+#       pip install -e ".[balrog,minigrid-balrog]"
 balrog = [
     "omegaconf>=2.3.0",
     "openai>=1.0.0",
@@ -315,6 +328,7 @@ mctx = [
 dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
+    "pytest-qt>=4.5.0",
     "pyright>=1.1.0",
 ]
 
@@ -370,7 +384,9 @@ jumanji = "jumanji_worker:get_worker_metadata"
 balrog = "balrog_worker:get_worker_metadata"
 cleanrl = "cleanrl_worker:get_worker_metadata"
 ray = "ray_worker:get_worker_metadata"
-xuance = "xuance_worker:get_worker_metadata"
+# TEMPORARILY DISABLED - xuance_worker import hangs during worker discovery
+# TODO: Fix circular import or blocking code in xuance_worker
+# xuance = "xuance_worker:get_worker_metadata"
 chess = "chess_worker:get_worker_metadata"
 mctx = "mctx_worker:get_worker_metadata"
 # MOSAIC native workers (under 3rd_party/mosaic/)

@@ -80,6 +80,37 @@ _METHOD_NAME_MAP: dict[str, str] = {
 }
 
 
+# Environments that use RunnerCompetition and their group counts
+# These require passing method as a list to get_runner()
+_COMPETITION_ENV_GROUPS: dict[str, dict[str, int]] = {
+    "multigrid": {
+        "soccer": 2,      # 2 teams (Red vs Blue)
+        "collect": 3,     # 3 independent agents
+    },
+}
+
+
+def _get_competition_num_groups(env: str, env_id: str) -> int | None:
+    """Get number of groups for competition environments.
+
+    Returns the number of separate policies needed for adversarial training.
+    Returns None if the environment doesn't use competition mode.
+
+    Args:
+        env: Environment family (e.g., "multigrid")
+        env_id: Specific environment ID (e.g., "soccer")
+
+    Returns:
+        Number of groups/teams, or None if not a competition environment.
+    """
+    env_lower = env.lower()
+    env_id_lower = env_id.lower()
+
+    if env_lower in _COMPETITION_ENV_GROUPS:
+        return _COMPETITION_ENV_GROUPS[env_lower].get(env_id_lower)
+    return None
+
+
 def _normalize_method_name(method: str) -> str:
     """Normalize method name for XuanCe config lookup.
 
@@ -121,11 +152,21 @@ try:
         LOG_WORKER_XUANCE_AGENT_CREATED,
         LOG_WORKER_XUANCE_DEBUG,
     )
+    from gym_gui.config.paths import VAR_TRAINER_DIR
     _HAS_GYM_GUI = True
 except ImportError:
     _HAS_GYM_GUI = False
     StandardTelemetryEmitter = None
     log_constant = None
+
+# Register MOSAIC custom environments with XuanCe
+# This adds MultiGrid and other environments to XuanCe's registry
+try:
+    from xuance_worker.environments import register_mosaic_environments
+    register_mosaic_environments()
+except ImportError:
+    pass  # Environments module not available or XuanCe not installed
+    VAR_TRAINER_DIR = None
 
 # Import analytics manifest writer
 try:
@@ -148,6 +189,8 @@ class XuanCeRuntimeSummary:
         env_id: Environment that was used.
         runner_type: XuanCe runner class name (RunnerDRL, RunnerMARL, etc.).
         config: Dictionary representation of the run configuration.
+        mode: Optional execution mode ("benchmark", etc.).
+        analytics_manifest: Optional path to analytics manifest file.
     """
 
     status: str
@@ -155,6 +198,8 @@ class XuanCeRuntimeSummary:
     env_id: str
     runner_type: str
     config: Dict[str, Any]
+    mode: Optional[str] = None
+    analytics_manifest: Optional[str] = None
 
 
 class XuanCeWorkerRuntime:
@@ -252,14 +297,14 @@ class XuanCeWorkerRuntime:
 
         return args
 
-    def run(self) -> Dict[str, Any]:
+    def run(self) -> XuanCeRuntimeSummary:
         """Execute the configured XuanCe algorithm.
 
         This method creates a XuanCe runner and calls its run() method,
         which handles both training and testing based on the test_mode flag.
 
         Returns:
-            Dictionary with execution results (compatible with standardized interface).
+            XuanCeRuntimeSummary with execution results.
 
         Raises:
             RuntimeError: If XuanCe is not installed.
@@ -287,21 +332,63 @@ class XuanCeWorkerRuntime:
                 self._config.env,
                 self._config.env_id,
             )
-            summary = {
-                "status": "dry-run",
-                "method": self._config.method,
-                "env_id": self._config.env_id,
-                "runner_type": "unknown",
-                "config": self._config.to_dict(),
-            }
+            summary = XuanCeRuntimeSummary(
+                status="dry-run",
+                method=self._config.method,
+                env_id=self._config.env_id,
+                runner_type="unknown",
+                config=self._config.to_dict(),
+            )
             if self._lifecycle_emitter:
-                self._lifecycle_emitter.run_completed(summary)
+                self._lifecycle_emitter.run_completed({
+                    "status": summary.status,
+                    "method": summary.method,
+                    "env_id": summary.env_id,
+                    "runner_type": summary.runner_type,
+                    "config": summary.config,
+                })
             return summary
+
+        # Create run directory for outputs (tensorboard, checkpoints, analytics)
+        # This MUST happen before XuanCe tries to write any files
+        # Follow CleanRL's pattern for directory structure
+        run_dir = None
+        tensorboard_dir = None
+        tensorboard_dirname_relative = None
+        if VAR_TRAINER_DIR is not None:
+            run_dir = (VAR_TRAINER_DIR / "runs" / self._config.run_id).resolve()
+            run_dir.mkdir(parents=True, exist_ok=True)
+
+            # Create logs directory
+            logs_dir = run_dir / "logs"
+            logs_dir.mkdir(parents=True, exist_ok=True)
+
+            # Create tensorboard directory (use "tensorboard" as default, or from extras)
+            tensorboard_dirname_relative = self._config.extras.get("tensorboard_dir", "tensorboard")
+            if tensorboard_dirname_relative:
+                tensorboard_dir = run_dir / tensorboard_dirname_relative
+                tensorboard_dir.mkdir(parents=True, exist_ok=True)
+
+            # Create checkpoints directory
+            checkpoints_dir = run_dir / "checkpoints"
+            checkpoints_dir.mkdir(parents=True, exist_ok=True)
+
+            # Create videos directory (for potential video capture)
+            videos_dir = run_dir / "videos"
+            videos_dir.mkdir(parents=True, exist_ok=True)
+
+            LOGGER.info("Created run directory: %s", run_dir)
+            LOGGER.info("  - logs: %s", logs_dir)
+            LOGGER.info("  - tensorboard: %s", tensorboard_dir)
+            LOGGER.info("  - checkpoints: %s", checkpoints_dir)
+            LOGGER.info("  - videos: %s", videos_dir)
 
         try:
             # Import XuanCe here to avoid import issues when not installed
+            LOGGER.info("Importing XuanCe get_runner...")
             try:
                 from xuance import get_runner
+                LOGGER.info("XuanCe get_runner imported successfully")
             except ImportError as e:
                 raise RuntimeError(
                     "XuanCe is not installed. Install with: pip install -e 3rd_party/xuance_worker"
@@ -323,14 +410,83 @@ class XuanCeWorkerRuntime:
 
             parser_args = self._build_parser_args()
 
-            runner = get_runner(
-                method=normalized_method,
-                env=self._config.env,
-                env_id=self._config.env_id,
-                config_path=self._config.config_path,
-                parser_args=parser_args,
-                is_test=self._config.test_mode,
-            )
+            # CRITICAL: Set log_dir in parser_args to redirect TensorBoard to our directory
+            # XuanCe constructs its SummaryWriter path using log_dir, so we must override it
+            # This ensures TensorBoard events appear where the GUI expects them
+            if tensorboard_dir is not None:
+                parser_args.log_dir = str(tensorboard_dir)
+                LOGGER.info("Set parser_args.log_dir = %s", parser_args.log_dir)
+
+            # Also set model_dir to keep checkpoints organized in our run directory
+            if run_dir is not None:
+                parser_args.model_dir = str(run_dir / "checkpoints")
+                LOGGER.info("Set parser_args.model_dir = %s", parser_args.model_dir)
+
+            # =================================================================
+            # DEBUG: Trace get_runner() call parameters
+            # =================================================================
+            LOGGER.info("=" * 60)
+            LOGGER.info("DEBUG: Preparing get_runner() call")
+            LOGGER.info("DEBUG: normalized_method = %s (type=%s)", normalized_method, type(normalized_method).__name__)
+            LOGGER.info("DEBUG: env = %s", self._config.env)
+            LOGGER.info("DEBUG: env_id = %s", self._config.env_id)
+            LOGGER.info("DEBUG: config_path = %s", self._config.config_path)
+            LOGGER.info("DEBUG: parser_args type = %s", type(parser_args).__name__)
+            LOGGER.info("DEBUG: parser_args.__dict__ = %s", vars(parser_args) if hasattr(parser_args, '__dict__') else 'N/A')
+            LOGGER.info("DEBUG: is_test = %s", self._config.test_mode)
+
+            # Check if this is a competition environment requiring multiple policies
+            # RunnerCompetition expects method as a list (one per team/group)
+            num_groups = _get_competition_num_groups(self._config.env, self._config.env_id)
+            LOGGER.info("DEBUG: _get_competition_num_groups returned: %s", num_groups)
+
+            if num_groups is not None:
+                # Competition mode: pass method as list for separate policies per team
+                # e.g., ["mappo", "mappo"] for 2-team Soccer
+                method_for_runner = [normalized_method] * num_groups
+                LOGGER.info(
+                    "DEBUG: Competition mode - method_for_runner = %s (type=%s)",
+                    method_for_runner,
+                    type(method_for_runner).__name__,
+                )
+            else:
+                # Standard mode: single method string
+                method_for_runner = normalized_method
+                LOGGER.info(
+                    "DEBUG: Standard mode - method_for_runner = %s (type=%s)",
+                    method_for_runner,
+                    type(method_for_runner).__name__,
+                )
+
+            LOGGER.info("DEBUG: Calling get_runner() now...")
+            LOGGER.info("=" * 60)
+
+            try:
+                runner = get_runner(
+                    method=method_for_runner,
+                    env=self._config.env,
+                    env_id=self._config.env_id,
+                    config_path=self._config.config_path,
+                    parser_args=parser_args,
+                    is_test=self._config.test_mode,
+                )
+                LOGGER.info("DEBUG: get_runner() returned successfully")
+                LOGGER.info("DEBUG: runner type = %s", type(runner).__name__)
+            except Exception as e:
+                LOGGER.error("=" * 60)
+                LOGGER.error("DEBUG: get_runner() FAILED with exception:")
+                LOGGER.error("DEBUG: Exception type: %s", type(e).__name__)
+                LOGGER.error("DEBUG: Exception message: %s", str(e))
+                import traceback
+                LOGGER.error("DEBUG: Full traceback:\n%s", traceback.format_exc())
+                LOGGER.error("=" * 60)
+                LOGGER.error("DEBUG: Parameters that caused failure:")
+                LOGGER.error("DEBUG:   method = %s (type=%s)", method_for_runner, type(method_for_runner).__name__)
+                LOGGER.error("DEBUG:   env = %s", self._config.env)
+                LOGGER.error("DEBUG:   env_id = %s", self._config.env_id)
+                LOGGER.error("DEBUG:   config_path = %s", self._config.config_path)
+                LOGGER.error("DEBUG:   parser_args = %s", vars(parser_args) if hasattr(parser_args, '__dict__') else parser_args)
+                raise
 
             runner_type = type(runner).__name__
             LOGGER.info("Created XuanCe runner: %s", runner_type)
@@ -382,31 +538,42 @@ class XuanCeWorkerRuntime:
                     },
                 )
 
-            # Generate analytics manifest
+            # Generate analytics manifest with relative paths
             manifest_path = None
-            if _HAS_ANALYTICS:
+            if _HAS_ANALYTICS and run_dir is not None:
                 try:
                     manifest_path = write_analytics_manifest(
                         self._config,
                         notes=f"XuanCe {self._config.method} training on {self._config.env_id}",
+                        tensorboard_dir=tensorboard_dirname_relative,
+                        checkpoints_dir="checkpoints",
+                        logs_dir="logs",
+                        videos_dir="videos",
+                        run_dir=run_dir,
                     )
                     LOGGER.info("Analytics manifest written to: %s", manifest_path)
                 except Exception as e:
                     LOGGER.warning("Failed to write analytics manifest: %s", e)
 
-            summary = {
-                "status": "completed",
-                "method": self._config.method,
-                "env_id": self._config.env_id,
-                "runner_type": runner_type,
-                "config": self._config.to_dict(),
-                "analytics_manifest": str(manifest_path) if manifest_path else None,
-            }
+            summary = XuanCeRuntimeSummary(
+                status="completed",
+                method=self._config.method,
+                env_id=self._config.env_id,
+                runner_type=runner_type,
+                config=self._config.to_dict(),
+                analytics_manifest=str(manifest_path) if manifest_path else None,
+            )
 
             # Emit run_completed lifecycle event
             if self._lifecycle_emitter:
                 self._lifecycle_emitter.run_completed(
-                    summary,
+                    {
+                        "status": summary.status,
+                        "method": summary.method,
+                        "env_id": summary.env_id,
+                        "runner_type": summary.runner_type,
+                        "config": summary.config,
+                    },
                     constant=LOG_WORKER_XUANCE_RUNTIME_STOPPED,
                 )
 
@@ -417,188 +584,6 @@ class XuanCeWorkerRuntime:
 
             error_summary = {
                 "status": "failed",
-                "method": self._config.method,
-                "env_id": self._config.env_id,
-                "error": str(e),
-                "config": self._config.to_dict(),
-            }
-
-            # Emit run_failed lifecycle event
-            if self._lifecycle_emitter:
-                self._lifecycle_emitter.run_failed(
-                    error_summary,
-                    constant=LOG_WORKER_XUANCE_RUNTIME_ERROR,
-                )
-
-            raise
-
-    def benchmark(self) -> Dict[str, Any]:
-        """Execute benchmark mode (training with periodic evaluation).
-
-        This method uses XuanCe's benchmark() function which trains
-        for eval_interval steps, evaluates, and saves the best model.
-
-        Returns:
-            Dictionary with execution results (compatible with standardized interface).
-
-        Raises:
-            RuntimeError: If XuanCe is not installed.
-            Exception: Propagated from XuanCe runner on failure.
-        """
-        # Emit run_started lifecycle event
-        if self._lifecycle_emitter:
-            self._lifecycle_emitter.run_started(
-                {
-                    "mode": "benchmark",
-                    "method": self._config.method,
-                    "env": self._config.env,
-                    "env_id": self._config.env_id,
-                    "dl_toolbox": self._config.dl_toolbox,
-                    "running_steps": self._config.running_steps,
-                },
-                constant=LOG_WORKER_XUANCE_RUNTIME_STARTED,
-            )
-
-        if self._dry_run:
-            LOGGER.info(
-                "Dry-run benchmark mode | method=%s env=%s env_id=%s",
-                self._config.method,
-                self._config.env,
-                self._config.env_id,
-            )
-            summary = {
-                "status": "dry-run",
-                "mode": "benchmark",
-                "method": self._config.method,
-                "env_id": self._config.env_id,
-                "runner_type": "unknown",
-                "config": self._config.to_dict(),
-            }
-            if self._lifecycle_emitter:
-                self._lifecycle_emitter.run_completed(summary)
-            return summary
-
-        try:
-            try:
-                from xuance import get_runner
-            except ImportError as e:
-                raise RuntimeError(
-                    "XuanCe is not installed. Install with: pip install -e 3rd_party/xuance_worker"
-                ) from e
-
-            # Normalize method name for XuanCe config lookup
-            normalized_method = _normalize_method_name(self._config.method)
-
-            LOGGER.info(
-                "Starting XuanCe benchmark | method=%s (normalized=%s) env=%s env_id=%s backend=%s steps=%d",
-                self._config.method,
-                normalized_method,
-                self._config.env,
-                self._config.env_id,
-                self._config.dl_toolbox,
-                self._config.running_steps,
-            )
-
-            parser_args = self._build_parser_args()
-
-            runner = get_runner(
-                method=normalized_method,
-                env=self._config.env,
-                env_id=self._config.env_id,
-                config_path=self._config.config_path,
-                parser_args=parser_args,
-                is_test=self._config.test_mode,
-            )
-
-            runner_type = type(runner).__name__
-            LOGGER.info("Created XuanCe runner for benchmark: %s", runner_type)
-
-            # Log agent/runner created
-            if _HAS_GYM_GUI and log_constant:
-                log_constant(
-                    LOGGER,
-                    LOG_WORKER_XUANCE_AGENT_CREATED,
-                    extra={
-                        "run_id": self._config.run_id,
-                        "runner_type": runner_type,
-                        "method": self._config.method,
-                        "mode": "benchmark",
-                    },
-                )
-
-            # Log training started
-            if _HAS_GYM_GUI and log_constant:
-                log_constant(
-                    LOGGER,
-                    LOG_WORKER_XUANCE_TRAINING_STARTED,
-                    extra={
-                        "run_id": self._config.run_id,
-                        "method": self._config.method,
-                        "env_id": self._config.env_id,
-                        "mode": "benchmark",
-                    },
-                )
-
-            # Execute benchmark
-            runner.benchmark()
-
-            LOGGER.info(
-                "XuanCe benchmark completed | method=%s runner=%s",
-                self._config.method,
-                runner_type,
-            )
-
-            # Log training completed
-            if _HAS_GYM_GUI and log_constant:
-                log_constant(
-                    LOGGER,
-                    LOG_WORKER_XUANCE_TRAINING_COMPLETED,
-                    extra={
-                        "run_id": self._config.run_id,
-                        "method": self._config.method,
-                        "env_id": self._config.env_id,
-                        "runner_type": runner_type,
-                        "mode": "benchmark",
-                    },
-                )
-
-            # Generate analytics manifest
-            manifest_path = None
-            if _HAS_ANALYTICS:
-                try:
-                    manifest_path = write_analytics_manifest(
-                        self._config,
-                        notes=f"XuanCe {self._config.method} benchmark on {self._config.env_id}",
-                    )
-                    LOGGER.info("Analytics manifest written to: %s", manifest_path)
-                except Exception as e:
-                    LOGGER.warning("Failed to write analytics manifest: %s", e)
-
-            summary = {
-                "status": "completed",
-                "mode": "benchmark",
-                "method": self._config.method,
-                "env_id": self._config.env_id,
-                "runner_type": runner_type,
-                "config": self._config.to_dict(),
-                "analytics_manifest": str(manifest_path) if manifest_path else None,
-            }
-
-            # Emit run_completed lifecycle event
-            if self._lifecycle_emitter:
-                self._lifecycle_emitter.run_completed(
-                    summary,
-                    constant=LOG_WORKER_XUANCE_RUNTIME_STOPPED,
-                )
-
-            return summary
-
-        except Exception as e:
-            LOGGER.error("XuanCe benchmark failed: %s", e, exc_info=True)
-
-            error_summary = {
-                "status": "failed",
-                "mode": "benchmark",
                 "method": self._config.method,
                 "env_id": self._config.env_id,
                 "error": str(e),

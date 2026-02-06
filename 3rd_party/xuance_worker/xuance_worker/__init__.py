@@ -106,6 +106,7 @@ def get_worker_metadata() -> tuple:
             "football",            # Google Research Football
             "minigrid",            # MiniGrid environments
             "babyai",              # BabyAI language-grounded environments
+            "multigrid",           # MultiGrid team-based environments (Soccer, Collect)
         ),
         action_spaces=("discrete", "continuous", "multi_discrete"),
         observation_spaces=("vector", "image", "dict"),

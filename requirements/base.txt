@@ -11,7 +11,7 @@ PyQt6-Qt6==6.9.2
 PyQt6-sip==13.10.2
 PyQt6-WebEngine==6.9.0
 qtpy==2.4.3
-qasync==0.9.5
+qasync==0.27.0
 # Core dependencies
 packaging==25.0
 PyYAML>=6.0
@@ -20,13 +20,14 @@ jsonschema==4.23.0
 # gRPC for trainer communication
 grpcio==1.67.1
 grpcio-tools==1.67.1
-protobuf==5.27.2
+protobuf==5.28.3
 
 # Run ID generation
 python-ulid==2.7.0
 numpy==2.3.4
 pytest==8.4.2
-pydantic==2.8.0
+pytest-qt>=4.5.0
+pydantic==2.12.0
 Pillow==10.4.0
 
 # HDF5 for replay storage (frames, observations)
@@ -41,3 +42,7 @@ gymnasium
 minigrid>=2,<3.0.0
 
 autorom[accept-rom-license]==0.6.1
+
+# Curriculum Learning (algorithm-agnostic, works with CleanRL, XuanCe, RLlib, etc.)
+# Syllabus-RL provides TaskWrapper for switching environments during training
+-e ./3rd_party/Syllabus

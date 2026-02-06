@@ -61,6 +61,12 @@ from gym_gui.game_docs.PettingZoo import (
     GO_HTML,
 )
 
+from gym_gui.game_docs.MultiGrid import (
+    MULTIGRID_SOCCER_HTML,
+    MULTIGRID_COLLECT_HTML,
+    get_multigrid_html,
+)
+
 from gym_gui.game_docs.Procgen import (
     PROCGEN_BIGFISH_HTML,
     PROCGEN_BOSSFIGHT_HTML,
@@ -280,6 +286,10 @@ GAME_INFO[GameId.CHESS] = CHESS_HTML
 GAME_INFO[GameId.CONNECT_FOUR] = CONNECT_FOUR_HTML
 GAME_INFO[GameId.GO] = GO_HTML
 
+# MultiGrid mappings (multi-agent extensions of MiniGrid)
+GAME_INFO[GameId.MULTIGRID_SOCCER] = MULTIGRID_SOCCER_HTML
+GAME_INFO[GameId.MULTIGRID_COLLECT] = MULTIGRID_COLLECT_HTML
+
 # Procgen mappings
 GAME_INFO.update({
     GameId.PROCGEN_BIGFISH: PROCGEN_BIGFISH_HTML,
@@ -413,9 +423,12 @@ except ImportError:
     pass  # Jumanji docs optional
 
 
+from gym_gui.game_docs.mosaic_welcome import MULTI_KEYBOARD_HTML
+
+
 def get_game_info(game_id: GameId) -> str:
     """Return HTML documentation for the specified environment."""
-    
+
     # Handle Empty variants dynamically
     if game_id in (GameId.MINIGRID_EMPTY_5x5, GameId.MINIGRID_EMPTY_RANDOM_5x5,
                    GameId.MINIGRID_EMPTY_6x6, GameId.MINIGRID_EMPTY_RANDOM_6x6,
@@ -457,8 +470,55 @@ def get_game_info(game_id: GameId) -> str:
     # Handle RedBlueDoors variants dynamically
     if game_id in (GameId.MINIGRID_REDBLUE_DOORS_6x6, GameId.MINIGRID_REDBLUE_DOORS_8x8):
         return get_redbluedoors_html(game_id.value)
-    
-    return GAME_INFO.get(game_id, _DEFAULT_DOC)
+
+    # Handle MultiGrid variants dynamically (all INI multigrid environments)
+    _multigrid_variants = (
+        GameId.MULTIGRID_EMPTY_5X5,
+        GameId.MULTIGRID_EMPTY_RANDOM_5X5,
+        GameId.MULTIGRID_EMPTY_6X6,
+        GameId.MULTIGRID_EMPTY_RANDOM_6X6,
+        GameId.MULTIGRID_EMPTY_8X8,
+        GameId.MULTIGRID_EMPTY_16X16,
+        GameId.MULTIGRID_RED_BLUE_DOORS_6X6,
+        GameId.MULTIGRID_RED_BLUE_DOORS_8X8,
+        GameId.MULTIGRID_LOCKED_HALLWAY_2ROOMS,
+        GameId.MULTIGRID_LOCKED_HALLWAY_4ROOMS,
+        GameId.MULTIGRID_LOCKED_HALLWAY_6ROOMS,
+        GameId.MULTIGRID_BLOCKED_UNLOCK_PICKUP,
+        GameId.MULTIGRID_PLAYGROUND,
+    )
+    if game_id in _multigrid_variants:
+        # Get MultiGrid-specific documentation and append keyboard controls
+        multigrid_doc = get_multigrid_html(game_id.value)
+        return multigrid_doc + "\n\n" + MULTI_KEYBOARD_HTML
+
+    # Get base documentation
+    base_doc = GAME_INFO.get(game_id, _DEFAULT_DOC)
+
+    # Append multi-keyboard documentation for ALL multi-agent environments
+    # Check if this is a MeltingPot, MultiGrid, or Overcooked environment by family
+    from gym_gui.core.enums import ENVIRONMENT_FAMILY_BY_GAME, EnvironmentFamily
+    family = ENVIRONMENT_FAMILY_BY_GAME.get(game_id)
+    if family in (EnvironmentFamily.MELTINGPOT, EnvironmentFamily.MULTIGRID, EnvironmentFamily.OVERCOOKED):
+        return base_doc + "\n\n" + MULTI_KEYBOARD_HTML
+
+    # Legacy explicit list for backwards compatibility
+    multi_agent_games = (
+        # MultiGrid environments (2 legacy environments - others handled dynamically above)
+        GameId.MULTIGRID_SOCCER,
+        GameId.MULTIGRID_COLLECT,
+        # Overcooked environments (5 total)
+        GameId.OVERCOOKED_CRAMPED_ROOM,
+        GameId.OVERCOOKED_ASYMMETRIC_ADVANTAGES,
+        GameId.OVERCOOKED_COORDINATION_RING,
+        GameId.OVERCOOKED_FORCED_COORDINATION,
+        GameId.OVERCOOKED_COUNTER_CIRCUIT,
+    )
+
+    if game_id in multi_agent_games:
+        return base_doc + "\n\n" + MULTI_KEYBOARD_HTML
+
+    return base_doc
 
 
 __all__ = ["GAME_INFO", "get_game_info"]

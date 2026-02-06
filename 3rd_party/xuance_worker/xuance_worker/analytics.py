@@ -39,6 +39,7 @@ def write_analytics_manifest(
     checkpoints_dir: Optional[str] = None,
     logs_dir: Optional[str] = None,
     videos_dir: Optional[str] = None,
+    run_dir: Optional[Path] = None,
 ) -> Path:
     """Build and write analytics manifest for a XuanCe run.
 
@@ -49,6 +50,8 @@ def write_analytics_manifest(
         checkpoints_dir: Optional checkpoints directory (relative to run directory).
         logs_dir: Optional logs directory (relative to run directory).
         videos_dir: Optional videos directory (relative to run directory).
+        run_dir: Optional run directory path. If provided, manifest is written to
+            run_dir/analytics.json. Otherwise uses cwd/{run_id}_analytics.json.
 
     Returns:
         Path to the written manifest file.
@@ -71,7 +74,7 @@ def write_analytics_manifest(
         format=checkpoint_format,
     )
 
-    # Build artifacts metadata
+    # Build artifacts metadata with relative paths for portability
     artifacts = ArtifactsMetadata(
         tensorboard=tensorboard_dir,
         wandb=None,  # XuanCe supports WandB but not configured by default
@@ -97,8 +100,13 @@ def write_analytics_manifest(
     if notes:
         metadata["notes"] = notes
 
-    # Determine manifest path (use current working directory + run_id)
-    manifest_path = Path.cwd() / f"{config.run_id}_analytics.json"
+    # Determine manifest path:
+    # - If run_dir provided: write to run_dir/analytics.json (like CleanRL)
+    # - Otherwise: use cwd/{run_id}_analytics.json (legacy behavior)
+    if run_dir is not None:
+        manifest_path = run_dir / "analytics.json"
+    else:
+        manifest_path = Path.cwd() / f"{config.run_id}_analytics.json"
 
     # Create the manifest
     manifest = WorkerAnalyticsManifest(

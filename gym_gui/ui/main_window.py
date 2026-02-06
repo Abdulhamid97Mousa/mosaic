@@ -6,6 +6,9 @@ import logging
 from datetime import datetime
 from pathlib import Path
 from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
+
+if TYPE_CHECKING:
+    from gym_gui.core.adapters.base import AdapterStep
 import json
 import threading
 import grpc
@@ -791,6 +794,14 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._control_panel.stop_operators_requested.connect(self._on_stop_operators)
         self._control_panel.initialize_operator_requested.connect(self._on_initialize_operator)
         self._control_panel.human_action_requested.connect(self._on_human_action_submitted)
+
+        # Script execution manager signals (separate from Manual Mode)
+        script_mgr = self._control_panel.operators_tab.script_execution_manager
+        script_mgr.launch_operator.connect(self._on_script_launch_operator)
+        script_mgr.reset_operator.connect(self._on_script_reset_operator)
+        script_mgr.step_operator.connect(self._on_script_step_operator)
+        script_mgr.stop_operator.connect(self._on_script_stop_operator)
+
         # Game configuration handlers (delegated)
         self._control_panel.slippery_toggled.connect(self._game_config_handler.on_slippery_toggled)
         self._control_panel.frozen_v2_config_changed.connect(self._game_config_handler.on_frozen_v2_config_changed)
@@ -845,6 +856,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # Human operator interaction signals (from Multi-Operator view)
         self._render_tabs.human_action_submitted.connect(self._on_human_action_submitted)
         self._render_tabs.board_game_move_made.connect(self._on_human_board_game_move)
+
+        # Keyboard assignment widget signals (multi-human gameplay)
+        self._control_panel._keyboard_widget.assignment_changed.connect(self._on_keyboard_assignment_changed)
 
         self._session.seed_applied.connect(self._on_seed_applied)
 
@@ -1483,7 +1497,21 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         for human_op_id in human_operator_ids:
             self._render_tabs.set_human_turn(human_op_id, True)
 
-        count = len(started_ids)
+        # Send reset commands to ALREADY-RUNNING operators (for subsequent episodes)
+        already_running_ids = [op_id for op_id in active_operators if op_id not in started_ids and op_id not in failed_ids]
+        reset_count = 0
+        for operator_id in already_running_ids:
+            handle = self._operator_launcher.get_handle(operator_id)
+            if handle and handle.is_running:
+                if handle.send_reset(seed):
+                    reset_count += 1
+                    self.log_constant(
+                        LOG_UI_MAINWINDOW_TRACE,
+                        message=f"Sent reset command to already-running operator",
+                        extra={"operator_id": operator_id, "seed": seed},
+                    )
+
+        count = len(started_ids) + reset_count
         if failed_ids:
             self._status_bar.showMessage(
                 f"Reset {count} operator{'s' if count != 1 else ''} (seed={seed}), {len(failed_ids)} failed",
@@ -1497,7 +1525,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self.log_constant(
             LOG_OPERATOR_RESET_ALL_STARTED,
             message=f"Reset {count} operators with shared seed",
-            extra={"operator_ids": started_ids, "failed_ids": failed_ids, "seed": seed},
+            extra={"operator_ids": started_ids + already_running_ids, "failed_ids": failed_ids, "seed": seed, "newly_started": len(started_ids), "already_running_reset": reset_count},
         )
 
     def _on_reset_pettingzoo_multiagent(self, seed: int, config: "OperatorConfig") -> None:
@@ -2557,7 +2585,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         if env_name == "multigrid":
             # Import and create MultiGrid environment
             try:
-                from gym_multigrid.envs import CollectGame, Soccer
+                from gym_multigrid.envs import CollectGame, Soccer  # type: ignore[import-not-found]
             except ImportError:
                 import gymnasium as gym
                 # Fallback: try to create via gym.make
@@ -2892,6 +2920,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 },
             )
 
+            # Notify script execution manager for automatic stepping
+            script_mgr = self._control_panel.operators_tab.script_execution_manager
+            script_mgr.on_step_received(operator_id)
+
         elif response_type == "ready":
             # Build payload to reset stats and display initial render
             # Include observation for conversation tracker (system prompt/initial context)
@@ -2911,6 +2943,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 extra={"operator_id": operator_id, "seed": response.get("seed")},
             )
 
+            # Notify script execution manager (start stepping after reset)
+            script_mgr = self._control_panel.operators_tab.script_execution_manager
+            script_mgr.on_ready_received(operator_id)
+
         elif response_type == "error":
             self.log_constant(
                 LOG_UI_MAINWINDOW_ERROR,
@@ -2918,6 +2954,37 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 extra={"operator_id": operator_id},
             )
             self._render_tabs.set_operator_status(operator_id, "error")
+
+        elif response_type == "episode_end":
+            # Episode completed - display final state and notify operators tab
+            payload = {
+                "step_index": response.get("episode_steps", 0),
+                "episode_index": response.get("episode_index", 0),
+                "reward": response.get("reward", 0.0),
+                "total_reward": response.get("episode_return", 0.0),
+                "terminated": response.get("terminated", False),
+                "truncated": response.get("truncated", False),
+                "render_payload": response.get("render_payload"),
+            }
+            self._render_tabs.display_operator_payload(operator_id, payload)
+            self.log_constant(
+                LOG_UI_MAINWINDOW_INFO,
+                message=f"Episode ended",
+                extra={
+                    "operator_id": operator_id,
+                    "return": payload["total_reward"],
+                    "steps": payload["step_index"],
+                    "terminated": payload["terminated"],
+                },
+            )
+
+            # Notify script execution manager for automatic execution
+            script_mgr = self._control_panel.operators_tab.script_execution_manager
+            script_mgr.on_episode_ended(
+                operator_id,
+                response.get("terminated", False),
+                response.get("truncated", False)
+            )
 
         elif response_type == "stopped":
             self._multi_operator_service.set_operator_state(operator_id, "stopped")
@@ -3330,31 +3397,64 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
             elif env_name == "multigrid":
                 # gym-multigrid uses old gym API (not gymnasium)
+                # Supports both legacy gym-multigrid (Soccer, Collect) and modern INI multigrid
                 try:
                     import gym
-                    from gym_multigrid.envs import SoccerGame4HEnv10x15N2, CollectGame4HEnv10x10N2
+                    import sys
+                    import os
+
+                    # Add INI multigrid to path if available
+                    ini_multigrid_path = os.path.join(
+                        os.path.dirname(__file__), "..", "..", "3rd_party", "multigrid-ini"
+                    )
+                    if os.path.exists(ini_multigrid_path) and ini_multigrid_path not in sys.path:
+                        sys.path.insert(0, ini_multigrid_path)
+
+                    # Try importing INI configurations
+                    try:
+                        from multigrid.envs import CONFIGURATIONS as INI_CONFIGURATIONS
+                    except ImportError:
+                        INI_CONFIGURATIONS = {}
+
+                    # Get agent count from operator configuration
+                    num_agents = len(config.workers) if config.workers else 1
 
                     # Create environment based on task
+                    is_legacy_multigrid = False  # Track if legacy gym-multigrid (supports highlight)
+
                     if task == "MultiGrid-Soccer-v0":
+                        from gym_multigrid.envs import SoccerGame4HEnv10x15N2
                         env = SoccerGame4HEnv10x15N2()
                         # Set render_mode to avoid deprecation warning (MultiGrid doesn't support in constructor)
                         env.render_mode = 'rgb_array'
+                        is_legacy_multigrid = True
                     elif task == "MultiGrid-Collect-v0":
+                        from gym_multigrid.envs import CollectGame4HEnv10x10N2
                         env = CollectGame4HEnv10x10N2()
                         # Set render_mode to avoid deprecation warning (MultiGrid doesn't support in constructor)
+                        env.render_mode = 'rgb_array'
+                        is_legacy_multigrid = True
+                    elif task in INI_CONFIGURATIONS:
+                        # INI multigrid environment - instantiate directly from configurations
+                        env_cls, config_kwargs = INI_CONFIGURATIONS[task]
+                        # Pass configured agent count to INI environment
+                        config_kwargs = {**config_kwargs, "agents": num_agents}
+                        env = env_cls(**config_kwargs)
                         env.render_mode = 'rgb_array'
                     else:
                         # Try gym.make as fallback (render_mode already set)
                         env = gym.make(task, render_mode="rgb_array")
 
                     env.reset()
-                    # Use newer render API (render_mode set above, so don't pass mode argument)
-                    # Note: highlight parameter is MultiGrid-specific and still needed
-                    rgb_frame = env.render(highlight=True)
+                    # Render - legacy gym-multigrid supports highlight parameter, INI multigrid doesn't
+                    if is_legacy_multigrid:
+                        rgb_frame = env.render(highlight=True)
+                    else:
+                        rgb_frame = env.render()
                     env.close()
-                except ImportError:
+                except ImportError as import_err:
                     self._status_bar.showMessage(
-                        "gym-multigrid not installed - cannot preview",
+                        f"gym-multigrid not installed - cannot preview: {import_err}",
                         5000
                     )
                     return
@@ -3755,7 +3855,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         except Exception:
             mode_label = mode
         self._status_bar.showMessage(f"Loaded {game_id} in {mode_label} mode - Click 'Start Game' to begin")
-        self.log_constant( 
+        self.log_constant(
             LOG_UI_MAINWINDOW_INFO,
             message=f"Loaded {game_id} ({mode_label})",
             extra={"game_id": getattr(game_id, "value", str(game_id)), "mode": mode_label},
@@ -3779,6 +3879,44 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._session.action_space,
             overrides=overrides,
         )
+
+        # Update keyboard widget for multi-agent environments
+        # Cast to AdapterStep for type checking (signal passes object due to PyQt limitations)
+        step = cast("AdapterStep[Any]", _step)
+        step_info: Dict[str, Any] = dict(getattr(step, 'info', {}) or {})
+        if step_info:
+            # Debug: Log the raw step info for multi-agent detection
+            _LOGGER.info(
+                f"_on_session_initialized: step.info keys={list(step_info.keys())}, "
+                f"num_agents={step_info.get('num_agents')}, "
+                f"agents={step_info.get('agents')}"
+            )
+            num_agents = step_info.get('num_agents')
+            if num_agents and isinstance(num_agents, int) and num_agents > 1:
+                # Multi-agent environment - show widget and update agent list
+                # Use actual agent names from environment if available (e.g., 'player_0' for MeltingPot)
+                # Fall back to generic 'agent_X' naming for environments that don't provide names
+                agent_names = step_info.get('agents')
+                if agent_names and isinstance(agent_names, (list, tuple)) and len(agent_names) == num_agents:
+                    agent_list = list(agent_names)
+                else:
+                    agent_list = [f"agent_{i}" for i in range(num_agents)]
+                self._control_panel._keyboard_widget.set_available_agents(agent_list)
+                self._control_panel._keyboard_widget.setVisible(True)
+
+                # Update human input controller with agent count and names
+                self._human_input.set_num_agents(num_agents)
+                self._human_input.set_agent_names(agent_list)
+
+                self.log_constant(
+                    LOG_UI_MAINWINDOW_TRACE,
+                    message=f"Updated keyboard widget for {num_agents} agents",
+                    extra={"num_agents": num_agents, "agents": agent_list},
+                )
+            else:
+                # Single-agent environment - hide widget
+                self._control_panel._keyboard_widget.setVisible(False)
+                self._human_input.set_num_agents(1)
         self._configure_mouse_capture()  # Configure FPS-style mouse capture for ViZDoom
         self._control_panel.set_auto_running(False)
         self._control_panel.set_game_started(False)  # Reset game state on new load
@@ -3872,6 +4010,54 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         else:
             message = "Seed applied. Episode will reuse this value until it finishes."
         self._status_bar.showMessage(message, 4000)
+
+    def _on_keyboard_assignment_changed(self, device_path: str, agent_id: object) -> None:
+        """Handle keyboard assignment changes from the evdev keyboard widget.
+
+        Updates the human input controller with the current evdev keyboard assignments.
+        """
+        # Get all current assignments from the widget
+        assignments = self._control_panel._keyboard_widget.get_assignments()
+
+        # Setup evdev monitoring with the new assignments
+        if assignments:
+            from gym_gui.logging_config.log_constants import (
+                LOG_KEYBOARD_EVDEV_SETUP_START,
+                LOG_KEYBOARD_EVDEV_SETUP_SUCCESS,
+                LOG_KEYBOARD_EVDEV_SETUP_FAILED,
+            )
+
+            self.log_constant(
+                LOG_KEYBOARD_EVDEV_SETUP_START,
+                message=f"Setting up evdev for {len(assignments)} keyboards",
+                extra={"num_keyboards": len(assignments), "assignments": assignments},
+            )
+
+            success = self._human_input.setup_evdev_keyboards(assignments)
+
+            if not success:
+                self.log_constant(
+                    LOG_KEYBOARD_EVDEV_SETUP_FAILED,
+                    message="Evdev setup failed - check permissions",
+                    extra={"assignments": assignments},
+                )
+                return
+
+            self.log_constant(
+                LOG_KEYBOARD_EVDEV_SETUP_SUCCESS,
+                message=f"Evdev monitoring started for {len(assignments)} keyboards",
+                extra={"num_keyboards": len(assignments)},
+            )
+        else:
+            _LOGGER.warning("No keyboard assignments to apply")
+
+        agent_str = agent_id if agent_id else "unassigned"
+        device_name = device_path.split("/")[-1] if "/" in device_path else device_path
+        self.log_constant(
+            LOG_UI_MAINWINDOW_TRACE,
+            message=f"Keyboard {device_name} assigned to {agent_str}",
+            extra={"device_path": device_path, "agent_id": agent_str},
+        )
 
     def _on_status_message(self, message: str) -> None:
         self._status_bar.showMessage(message, 5000)
@@ -4565,7 +4751,11 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             enable_input = False
         elif mode == ControlMode.HUMAN_ONLY:
             enable_input = True
+        elif mode in (ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE):
+            # Simultaneous multi-agent: always enabled when game is running
+            enable_input = True
         elif mode in self._HUMAN_INPUT_MODES:
+            # Turn-based: only when awaiting human input
             enable_input = self._awaiting_human
 
         self._human_input.set_enabled(enable_input)
@@ -4623,6 +4813,124 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             message="All settings reset to defaults",
         )
         self._status_bar.showMessage("All settings reset to defaults (restart required)", 5000)
+
+    # ===== Script Mode Handlers (Independent from Manual Mode) =====
+
+    def _on_script_launch_operator(
+        self,
+        operator_id: str,
+        config: OperatorConfig,
+        seed: int
+    ) -> None:
+        """Handle launch request from script execution manager.
+
+        This is separate from Manual Mode's initialize_operator signal.
+        Launches operator and sends reset - responses handled asynchronously.
+
+        Args:
+            operator_id: Operator ID to launch.
+            config: Operator configuration.
+            seed: Initial seed for the operator.
+        """
+        self.log_constant(
+            LOG_UI_MAINWINDOW_INFO,
+            message=f"Script Mode: Launching operator {operator_id} with seed {seed}",
+            extra={"operator_id": operator_id, "seed": seed},
+        )
+
+        # DON'T add to multi_operator_service - that triggers Manual Mode UI updates!
+        # Script Mode manages its own operators independently
+
+        # Add operator view to render tabs
+        self._render_tabs.add_operator_view(config)
+
+        # Launch operator subprocess in INTERACTIVE mode (required for stdin commands!)
+        try:
+            handle = self._operator_launcher.launch_operator(config, interactive=True)
+            if handle is None:
+                self.log_constant(
+                    LOG_UI_MAINWINDOW_ERROR,
+                    message=f"Failed to launch operator {operator_id}",
+                    extra={"operator_id": operator_id},
+                )
+                return
+
+            # Send reset command - response will come back asynchronously via polling
+            if handle.send_reset(seed):
+                self.log_constant(
+                    LOG_UI_MAINWINDOW_INFO,
+                    message=f"Script Mode: Sent reset to {operator_id}",
+                    extra={"operator_id": operator_id, "seed": seed},
+                )
+
+                # Start polling for responses (same pattern as Manual Mode)
+                from PyQt6.QtCore import QTimer
+                QTimer.singleShot(100, lambda: self._poll_operator_responses([(operator_id, handle)]))
+
+        except Exception as e:
+            self.log_constant(
+                LOG_UI_MAINWINDOW_ERROR,
+                message=f"Exception launching operator {operator_id}: {e}",
+                extra={"operator_id": operator_id, "error": str(e)},
+            )
+
+    def _on_script_reset_operator(self, operator_id: str, seed: int) -> None:
+        """Handle reset request from script execution manager.
+
+        Sends reset - response handled asynchronously via existing polling.
+
+        Args:
+            operator_id: Operator ID to reset.
+            seed: Seed for the new episode.
+        """
+        handle = self._operator_launcher.get_handle(operator_id)
+        if handle is None or not handle.is_running:
+            self.log_constant(
+                LOG_UI_MAINWINDOW_WARNING,
+                message=f"Operator {operator_id} not running, cannot reset",
+                extra={"operator_id": operator_id},
+            )
+            return
+
+        # Send reset command (don't block!)
+        if handle.send_reset(seed):
+            # Start polling for "ready" response
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(100, lambda: self._poll_operator_responses([(operator_id, handle)]))
+
+    def _on_script_step_operator(self, operator_id: str) -> None:
+        """Handle step request from script execution manager.
+
+        Sends step - response handled asynchronously via existing polling.
+
+        Args:
+            operator_id: Operator ID to step.
+        """
+        handle = self._operator_launcher.get_handle(operator_id)
+        if handle is None or not handle.is_running:
+            return
+
+        # Send step command (don't block!)
+        if handle.send_step():
+            # Start polling for "step" response
+            from PyQt6.QtCore import QTimer
+            QTimer.singleShot(100, lambda: self._poll_operator_responses([(operator_id, handle)]))
+
+    def _on_script_stop_operator(self, operator_id: str) -> None:
+        """Handle stop request from script execution manager.
+
+        Args:
+            operator_id: Operator ID to stop.
+        """
+        self.log_constant(
+            LOG_UI_MAINWINDOW_INFO,
+            message=f"Script Mode: Stopping operator {operator_id}",
+            extra={"operator_id": operator_id},
+        )
+
+        handle = self._operator_launcher.get_handle(operator_id)
+        if handle and handle.is_running:
+            handle.stop()
 
     def closeEvent(self, a0: QtGui.QCloseEvent | None) -> None:
         logging.getLogger().removeHandler(self._log_handler)

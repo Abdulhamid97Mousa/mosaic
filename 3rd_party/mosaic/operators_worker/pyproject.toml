@@ -1,0 +1,90 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "operators-worker"
+version = "0.1.0"
+description = "Baseline operators for credit assignment experiments in hybrid agent teams"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "MOSAIC Project"},
+]
+keywords = ["reinforcement-learning", "multi-agent", "baseline", "credit-assignment"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "gymnasium>=0.29.0",
+    "numpy>=1.20.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+# Specific environments (user installs as needed)
+babyai = [
+    "minigrid>=2.0.0",
+    "babyai>=1.1",
+]
+minigrid = [
+    "minigrid>=2.0.0",
+]
+multigrid = [
+    "multigrid>=0.1.0",
+]
+
+[project.scripts]
+operators-worker = "operators_worker.cli:main"
+
+[project.urls]
+Homepage = "https://github.com/your-org/GUI_BDI_RL"
+Documentation = "https://github.com/your-org/GUI_BDI_RL/tree/main/3rd_party/mosaic/operators_worker"
+Repository = "https://github.com/your-org/GUI_BDI_RL"
+Issues = "https://github.com/your-org/GUI_BDI_RL/issues"
+
+[tool.setuptools]
+packages = ["operators_worker"]
+
+[tool.setuptools.package-data]
+operators_worker = ["py.typed"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--strict-markers",
+    "--strict-config",
+    "-ra",
+]
+
+[tool.coverage.run]
+source = ["operators_worker"]
+omit = ["tests/*"]
+
+[tool.coverage.report]
+exclude_lines = [
+    "pragma: no cover",
+    "def __repr__",
+    "raise AssertionError",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+    "class .*\\bProtocol\\):",
+    "@(abc\\.)?abstractmethod",
+]

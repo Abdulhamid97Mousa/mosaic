@@ -8,10 +8,13 @@ This module provides two input modes:
 
 The state-based mode tracks all currently pressed keys and computes combined actions
 (e.g., Up+Right → diagonal movement) on each game tick.
+
+For multi-keyboard support on Linux, uses evdev to bypass X11 keyboard merging.
 """
 
 from dataclasses import dataclass
 import logging
+import sys
 from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 import gymnasium.spaces as spaces
@@ -22,8 +25,24 @@ from qtpy.QtGui import QKeyEvent, QKeySequence, QShortcut
 from gym_gui.core.enums import ControlMode, EnvironmentFamily, GameId, InputMode
 from gym_gui.controllers.session import SessionController
 from gym_gui.logging_config.helpers import LogConstantMixin
-from gym_gui.logging_config.log_constants import LOG_INPUT_CONTROLLER_ERROR
+from gym_gui.logging_config.log_constants import (
+    LOG_INPUT_CONTROLLER_ERROR,
+    LOG_KEY_RESOLVER_INITIALIZED,
+    LOG_KEY_RESOLVER_UNAVAILABLE,
+    LOG_INPUT_MODE_CONFIGURED,
+    LOG_EVDEV_KEY_PRESSED,
+    LOG_EVDEV_KEY_RELEASED,
+)
 
+# Import evdev support for multi-keyboard (Linux only)
+_HAS_EVDEV = False
+if sys.platform.startswith('linux'):
+    try:
+        from gym_gui.controllers.evdev_keyboard_monitor import EvdevKeyboardMonitor, KeyboardDevice
+        from gym_gui.controllers.keycode_translation import linux_keycode_to_qt_key
+        _HAS_EVDEV = True
+    except ImportError:
+        pass
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -54,10 +73,15 @@ _KEY_D = _get_qt_key("Key_D")
 _KEY_SPACE = _get_qt_key("Key_Space")
 _KEY_Q = _get_qt_key("Key_Q")
 _KEY_E = _get_qt_key("Key_E")
+_KEY_G = _get_qt_key("Key_G")
+_KEY_H = _get_qt_key("Key_H")
+_KEY_RETURN = _get_qt_key("Key_Return")
 _KEY_Z = _get_qt_key("Key_Z")
 _KEY_C = _get_qt_key("Key_C")
+_KEY_X = _get_qt_key("Key_X")
 _KEY_1 = _get_qt_key("Key_1")
 _KEY_2 = _get_qt_key("Key_2")
+_KEY_3 = _get_qt_key("Key_3")
 
 # Sets for direction detection
 _KEYS_UP = {_KEY_UP, _KEY_W}
@@ -82,6 +106,246 @@ class KeyCombinationResolver:
             Action index, or None if no recognized action.
         """
         raise NotImplementedError
+
+
+class MiniGridKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for MiniGrid environments (LEGACY).
+
+    MiniGrid action space (7 discrete actions):
+    0: turn left
+    1: turn right
+    2: move forward
+    3: pick up object
+    4: drop object
+    5: toggle/activate (open door, use switch)
+    6: done/noop
+
+    NOTE: For MultiGrid environments, use MultiGridKeyCombinationResolver instead.
+    """
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        """Map pressed keys to MiniGrid actions.
+
+        Priority order:
+        1. Action buttons (pickup, drop, toggle, done)
+        2. Movement (forward, turn left/right)
+        """
+        # Check direction keys
+        left = bool(pressed_keys & _KEYS_LEFT)
+        right = bool(pressed_keys & _KEYS_RIGHT)
+        forward = bool(pressed_keys & _KEYS_UP)
+
+        # Action buttons (higher priority)
+        if _KEY_G in pressed_keys or _KEY_SPACE in pressed_keys:
+            return 3  # pick up
+        if _KEY_H in pressed_keys:
+            return 4  # drop
+        if _KEY_E in pressed_keys or _KEY_RETURN in pressed_keys:
+            return 5  # toggle/use
+        if _KEY_Q in pressed_keys:
+            return 6  # done/noop
+
+        # Movement (only if no action button pressed)
+        if left:
+            return 0  # turn left
+        if right:
+            return 1  # turn right
+        if forward:
+            return 2  # move forward
+
+        return None  # No action - idle
+
+
+class MultiGridKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for LEGACY gym-multigrid environments (Soccer, Collect).
+
+    Legacy gym-multigrid action space (8 discrete actions):
+    0: STILL - Do nothing
+    1: LEFT - Turn left
+    2: RIGHT - Turn right
+    3: FORWARD - Move forward
+    4: PICKUP - Pick up object
+    5: DROP - Drop object
+    6: TOGGLE - Toggle/activate object
+    7: DONE - Done action (not used by default)
+
+    NOTE: This is for the OLD gym-multigrid package (ArnaudFickinger).
+    For INI multigrid environments, use INIMultiGridKeyCombinationResolver.
+    """
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        """Map pressed keys to legacy MultiGrid actions.
+
+        Priority order:
+        1. Action buttons (pickup, drop, toggle, done)
+        2. Movement (forward, turn left/right)
+        3. No keys = None (caller should use STILL action)
+        """
+        # Check direction keys
+        left = bool(pressed_keys & _KEYS_LEFT)
+        right = bool(pressed_keys & _KEYS_RIGHT)
+        forward = bool(pressed_keys & _KEYS_UP)
+
+        # Action buttons (higher priority)
+        if _KEY_G in pressed_keys or _KEY_SPACE in pressed_keys:
+            return 4  # PICKUP
+        if _KEY_H in pressed_keys:
+            return 5  # DROP
+        if _KEY_E in pressed_keys or _KEY_RETURN in pressed_keys:
+            return 6  # TOGGLE
+        if _KEY_Q in pressed_keys:
+            return 7  # DONE
+
+        # Movement (only if no action button pressed)
+        if left:
+            return 1  # LEFT (turn left)
+        if right:
+            return 2  # RIGHT (turn right)
+        if forward:
+            return 3  # FORWARD (move forward)
+
+        return None  # No action - caller should use STILL (action 0)
+
+
+class INIMultiGridKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for INI multigrid environments.
+
+    INI multigrid action space (7 discrete actions - NO STILL):
+    0: LEFT - Turn left
+    1: RIGHT - Turn right
+    2: FORWARD - Move forward
+    3: PICKUP - Pick up object
+    4: DROP - Drop object
+    5: TOGGLE - Toggle/activate object
+    6: DONE - Done action
+
+    This is for INI multigrid environments: BlockedUnlockPickup, Empty,
+    LockedHallway, RedBlueDoors, Playground.
+
+    Repository: https://github.com/ini/multigrid
+    """
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        """Map pressed keys to INI MultiGrid actions.
+
+        Priority order:
+        1. Action buttons (pickup, drop, toggle, done)
+        2. Movement (forward, turn left/right)
+        3. No keys = None (no STILL action in INI multigrid)
+        """
+        # Check direction keys
+        left = bool(pressed_keys & _KEYS_LEFT)
+        right = bool(pressed_keys & _KEYS_RIGHT)
+        forward = bool(pressed_keys & _KEYS_UP)
+
+        # Action buttons (higher priority)
+        if _KEY_G in pressed_keys or _KEY_SPACE in pressed_keys:
+            return 3  # PICKUP (action 3 in INI)
+        if _KEY_H in pressed_keys:
+            return 4  # DROP (action 4 in INI)
+        if _KEY_E in pressed_keys or _KEY_RETURN in pressed_keys:
+            return 5  # TOGGLE (action 5 in INI)
+        if _KEY_Q in pressed_keys:
+            return 6  # DONE (action 6 in INI)
+
+        # Movement (only if no action button pressed)
+        if left:
+            return 0  # LEFT (action 0 in INI - turn left)
+        if right:
+            return 1  # RIGHT (action 1 in INI - turn right)
+        if forward:
+            return 2  # FORWARD (action 2 in INI - move forward)
+
+        return None  # No action pressed
+
+
+class MeltingPotKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for Melting Pot multi-agent environments.
+
+    MeltingPot action space varies by substrate:
+    - 8 actions (basic): NOOP, FORWARD, BACKWARD, LEFT, RIGHT, TURN_LEFT, TURN_RIGHT, INTERACT
+    - 9 actions: Adds FIRE_1 (e.g., fireZap in some substrates)
+    - 11 actions (e.g., clean_up): Adds FIRE_1 (fireZap), FIRE_2 (fireClean), FIRE_3
+
+    Action indices:
+    0: NOOP - Do nothing
+    1: FORWARD - Move forward
+    2: BACKWARD - Move backward
+    3: LEFT - Strafe left
+    4: RIGHT - Strafe right
+    5: TURN_LEFT - Turn left
+    6: TURN_RIGHT - Turn right
+    7: INTERACT - Interact/use
+    8: FIRE_1 - Secondary action (e.g., fireZap in clean_up) - key Z or 1
+    9: FIRE_2 - Tertiary action (e.g., fireClean in clean_up) - key C or 2
+    10: FIRE_3 - Quaternary action - key X or 3
+
+    This resolver provides FPS-style controls for MeltingPot social scenarios.
+    Enables multi-keyboard support for simultaneous multi-agent gameplay.
+    """
+
+    def __init__(self, num_actions: int = 8) -> None:
+        """Initialize with the number of available actions.
+
+        Args:
+            num_actions: Number of discrete actions in the action space.
+                         Determines which key bindings are active.
+        """
+        self._num_actions = num_actions
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        """Map pressed keys to MeltingPot actions.
+
+        Priority order:
+        1. Extra fire actions (Z/C/X or 1/2/3) - only if action space supports them
+        2. Interact button (space/G)
+        3. Turning (Q/E)
+        4. Movement (WASD for forward/backward/strafe)
+        5. No keys = None (caller should use NOOP action)
+        """
+        # Check direction keys
+        up = bool(pressed_keys & _KEYS_UP)  # W or Up arrow
+        down = bool(pressed_keys & _KEYS_DOWN)  # S or Down arrow
+        left = bool(pressed_keys & _KEYS_LEFT)  # A or Left arrow
+        right = bool(pressed_keys & _KEYS_RIGHT)  # D or Right arrow
+
+        # Extra fire actions (only available in expanded action spaces)
+        # FIRE_3 (action 10) - key X or 3
+        if self._num_actions > 10:
+            if _KEY_X in pressed_keys or _KEY_3 in pressed_keys:
+                return 10  # FIRE_3
+
+        # FIRE_2 (action 9) - key C or 2 (e.g., fireClean in clean_up)
+        if self._num_actions > 9:
+            if _KEY_C in pressed_keys or _KEY_2 in pressed_keys:
+                return 9  # FIRE_2
+
+        # FIRE_1 (action 8) - key Z or 1 (e.g., fireZap in clean_up)
+        if self._num_actions > 8:
+            if _KEY_Z in pressed_keys or _KEY_1 in pressed_keys:
+                return 8  # FIRE_1
+
+        # Interact button (highest priority among base actions)
+        if _KEY_G in pressed_keys or _KEY_SPACE in pressed_keys:
+            return 7  # INTERACT
+
+        # Turning (Q/E keys)
+        if _KEY_Q in pressed_keys:
+            return 5  # TURN_LEFT
+        if _KEY_E in pressed_keys:
+            return 6  # TURN_RIGHT
+
+        # Movement (WASD)
+        if up:
+            return 1  # FORWARD
+        if down:
+            return 2  # BACKWARD
+        if left:
+            return 3  # LEFT (strafe)
+        if right:
+            return 4  # RIGHT (strafe)
+
+        return None  # No action - caller should use NOOP (action 0)
 
 
 class ProcgenKeyCombinationResolver(KeyCombinationResolver):
@@ -325,11 +589,19 @@ class ViZDoomKeyCombinationResolver(KeyCombinationResolver):
 
 
 # Map environment families to their resolvers
-def get_key_combination_resolver(game_id: GameId) -> Optional[KeyCombinationResolver]:
+def get_key_combination_resolver(
+    game_id: GameId,
+    action_space: Optional[spaces.Space] = None,
+) -> Optional[KeyCombinationResolver]:
     """Get the appropriate key combination resolver for a game.
 
     Returns a resolver that maps key combinations to game actions, or None
     if no resolver is available for this game type.
+
+    Args:
+        game_id: The game identifier.
+        action_space: Optional action space to determine number of actions.
+                      Used for environments with variable action spaces (e.g., MeltingPot).
 
     The resolver is determined by:
     1. Checking for game-specific resolvers (e.g., CarRacing, LunarLander)
@@ -337,6 +609,14 @@ def get_key_combination_resolver(game_id: GameId) -> Optional[KeyCombinationReso
     3. Falling back to checking game ID prefixes/patterns
     """
     from gym_gui.core.enums import ENVIRONMENT_FAMILY_BY_GAME
+
+    # Helper to extract number of actions from action space
+    def _get_num_actions() -> int:
+        if action_space is None:
+            return 8  # Default for MeltingPot
+        if isinstance(action_space, spaces.Discrete):
+            return int(action_space.n)
+        return 8  # Fallback
 
     # Game-specific resolvers for Box2D (each has unique action space)
     if game_id == GameId.CAR_RACING:
@@ -355,9 +635,35 @@ def get_key_combination_resolver(game_id: GameId) -> Optional[KeyCombinationReso
         return AleKeyCombinationResolver()
     if family == EnvironmentFamily.VIZDOOM:
         return ViZDoomKeyCombinationResolver(game_id)
+    if family == EnvironmentFamily.MELTINGPOT:
+        return MeltingPotKeyCombinationResolver(num_actions=_get_num_actions())
+    if family == EnvironmentFamily.MULTIGRID:
+        # Distinguish between legacy gym-multigrid (Soccer, Collect) and INI multigrid
+        game_name = game_id.value if hasattr(game_id, 'value') else str(game_id)
+        # Legacy gym-multigrid: Soccer, Collect (8 actions with STILL at index 0)
+        if "Soccer" in game_name or "Collect" in game_name:
+            return MultiGridKeyCombinationResolver()
+        # INI multigrid: All other MultiGrid envs (7 actions, no STILL)
+        return INIMultiGridKeyCombinationResolver()
 
     # Fallback: check by game ID prefix/name for games not in the mapping
     game_name = game_id.value if hasattr(game_id, 'value') else str(game_id)
+
+    # MultiGrid environments - check if legacy or INI
+    if game_name.startswith("MultiGrid"):
+        # Legacy gym-multigrid: Soccer, Collect (8 actions with STILL at index 0)
+        if "Soccer" in game_name or "Collect" in game_name:
+            return MultiGridKeyCombinationResolver()
+        # INI multigrid: All other MultiGrid envs (7 actions, no STILL)
+        return INIMultiGridKeyCombinationResolver()
+
+    # MeltingPot environments (variable actions: 8-11 depending on substrate)
+    if game_name.startswith("meltingpot/") or game_name.startswith("MeltingPot"):
+        return MeltingPotKeyCombinationResolver(num_actions=_get_num_actions())
+
+    # MiniGrid environments (7 actions: LEFT, RIGHT, FORWARD, PICKUP, DROP, TOGGLE, DONE)
+    if game_name.startswith("MiniGrid"):
+        return MiniGridKeyCombinationResolver()
 
     if game_name.startswith("procgen:") or game_name.startswith("procgen/"):
         return ProcgenKeyCombinationResolver()
@@ -417,16 +723,47 @@ _TOY_TEXT_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
     ),
 }
 
+# Standard MiniGrid action mapping (7 discrete actions)
+# MiniGrid action indices: 0=LEFT, 1=RIGHT, 2=FORWARD, 3=PICKUP, 4=DROP, 5=TOGGLE, 6=DONE
+_STANDARD_MINIGRID_ACTIONS = (
+    _mapping(("Key_Left", "Key_A"), 0),    # turn left
+    _mapping(("Key_Right", "Key_D"), 1),   # turn right
+    _mapping(("Key_Up", "Key_W"), 2),      # move forward
+    _mapping(("Key_G", "Key_Space"), 3),   # pick up
+    _mapping(("Key_H",), 4),                # drop (rarely used)
+    _mapping(("Key_E", "Key_Return"), 5),  # toggle / use
+    _mapping(("Key_Q",), 6),                # done / no-op
+)
+
+# Standard MultiGrid action mapping for LEGACY gym-multigrid (8 discrete actions)
+# Legacy MultiGrid action indices: 0=STILL, 1=LEFT, 2=RIGHT, 3=FORWARD, 4=PICKUP, 5=DROP, 6=TOGGLE, 7=DONE
+# Used by: Soccer, Collect (ArnaudFickinger's gym-multigrid)
+_LEGACY_MULTIGRID_ACTIONS = (
+    _mapping(("Key_Left", "Key_A"), 1),    # turn left (action 1, not 0!)
+    _mapping(("Key_Right", "Key_D"), 2),   # turn right (action 2, not 1!)
+    _mapping(("Key_Up", "Key_W"), 3),      # move forward (action 3, not 2!)
+    _mapping(("Key_G", "Key_Space"), 4),   # pick up (action 4, not 3!)
+    _mapping(("Key_H",), 5),                # drop (action 5, not 4!)
+    _mapping(("Key_E", "Key_Return"), 6),  # toggle / use (action 6, not 5!)
+    _mapping(("Key_Q",), 7),                # done / no-op (action 7, not 6!)
+)
+
+# INI MultiGrid action mapping (7 discrete actions - NO STILL)
+# INI MultiGrid action indices: 0=LEFT, 1=RIGHT, 2=FORWARD, 3=PICKUP, 4=DROP, 5=TOGGLE, 6=DONE
+# Used by: BlockedUnlockPickup, Empty, LockedHallway, RedBlueDoors, Playground (INI's multigrid)
+# NOTE: Same as MiniGrid action mapping!
+_INI_MULTIGRID_ACTIONS = (
+    _mapping(("Key_Left", "Key_A"), 0),    # turn left (action 0)
+    _mapping(("Key_Right", "Key_D"), 1),   # turn right (action 1)
+    _mapping(("Key_Up", "Key_W"), 2),      # move forward (action 2)
+    _mapping(("Key_G", "Key_Space"), 3),   # pick up (action 3)
+    _mapping(("Key_H",), 4),                # drop (action 4)
+    _mapping(("Key_E", "Key_Return"), 5),  # toggle / use (action 5)
+    _mapping(("Key_Q",), 6),                # done (action 6)
+)
+
 _MINIG_GRID_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
-    GameId.MINIGRID_EMPTY_5x5: (
-        _mapping(("Key_Left", "Key_A"), 0),    # turn left
-        _mapping(("Key_Right", "Key_D"), 1),   # turn right
-        _mapping(("Key_Up", "Key_W"), 2),      # move forward
-        _mapping(("Key_G", "Key_Space"), 3),   # pick up
-        _mapping(("Key_H",), 4),                # drop (rarely used)
-        _mapping(("Key_E", "Key_Return"), 5),  # toggle / use
-        _mapping(("Key_Q",), 6),                # done / no-op
-    ),
+    GameId.MINIGRID_EMPTY_5x5: _STANDARD_MINIGRID_ACTIONS,
     GameId.MINIGRID_EMPTY_RANDOM_5x5: (
         _mapping(("Key_Left", "Key_A"), 0),
         _mapping(("Key_Right", "Key_D"), 1),
@@ -661,6 +998,29 @@ _MINIG_GRID_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
         _mapping(("Key_E", "Key_Return"), 5),
         _mapping(("Key_Q",), 6),
     ),
+}
+
+# MultiGrid has different action indices depending on package version:
+# Legacy gym-multigrid (Soccer, Collect): 0=STILL, 1=LEFT, 2=RIGHT, 3=FORWARD, etc. (8 actions)
+# INI multigrid (BlockedUnlockPickup, Empty, etc.): 0=LEFT, 1=RIGHT, 2=FORWARD, etc. (7 actions, no STILL)
+_MULTIGRID_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
+    # Legacy gym-multigrid environments (8 actions with STILL at index 0)
+    GameId.MULTIGRID_SOCCER: _LEGACY_MULTIGRID_ACTIONS,
+    GameId.MULTIGRID_COLLECT: _LEGACY_MULTIGRID_ACTIONS,
+    # INI multigrid environments (7 actions, no STILL - same as MiniGrid)
+    GameId.MULTIGRID_BLOCKED_UNLOCK_PICKUP: _INI_MULTIGRID_ACTIONS,
+    GameId.MULTIGRID_EMPTY_5X5: _INI_MULTIGRID_ACTIONS,
+    GameId.MULTIGRID_EMPTY_RANDOM_5X5: _INI_MULTIGRID_ACTIONS,
+    GameId.MULTIGRID_EMPTY_6X6: _INI_MULTIGRID_ACTIONS,
+    GameId.MULTIGRID_EMPTY_RANDOM_6X6: _INI_MULTIGRID_ACTIONS,
+    GameId.MULTIGRID_EMPTY_8X8: _INI_MULTIGRID_ACTIONS,
+    GameId.MULTIGRID_EMPTY_16X16: _INI_MULTIGRID_ACTIONS,
+    GameId.MULTIGRID_LOCKED_HALLWAY_2ROOMS: _INI_MULTIGRID_ACTIONS,
+    GameId.MULTIGRID_LOCKED_HALLWAY_4ROOMS: _INI_MULTIGRID_ACTIONS,
+    GameId.MULTIGRID_LOCKED_HALLWAY_6ROOMS: _INI_MULTIGRID_ACTIONS,
+    GameId.MULTIGRID_PLAYGROUND: _INI_MULTIGRID_ACTIONS,
+    GameId.MULTIGRID_RED_BLUE_DOORS_6X6: _INI_MULTIGRID_ACTIONS,
+    GameId.MULTIGRID_RED_BLUE_DOORS_8X8: _INI_MULTIGRID_ACTIONS,
 }
 
 _BOX_2D_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
@@ -1180,6 +1540,17 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
         self._key_resolver: Optional[KeyCombinationResolver] = None
         self._current_game_id: Optional[GameId] = None
 
+        # Multi-agent keyboard tracking
+        self._agent_pressed_keys: Dict[str, Set[int]] = {}  # {agent_id: set of pressed keys}
+        self._keyboard_assignments: Dict[int, str] = {}  # {system_id: agent_id}  # OLD: Qt device IDs
+        self._num_agents: int = 1
+        self._agent_names: List[str] = []  # Actual agent names from environment (e.g., 'player_0')
+
+        # Evdev multi-keyboard support (Linux only)
+        self._use_evdev = False
+        self._evdev_monitor: Optional[EvdevKeyboardMonitor] = None
+        self._evdev_device_to_agent: Dict[str, str] = {}  # {device_path: agent_id}
+
         # Install event filter for state-based input
         self._widget.installEventFilter(self)
 
@@ -1188,7 +1559,13 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
 
         This captures keyPressEvent and keyReleaseEvent to maintain a set of
         currently pressed keys, enabling simultaneous key combination detection.
+
+        For multi-agent environments, routes keys to agents based on keyboard device.
         """
+        # If evdev is active, skip Qt keyboard processing entirely
+        if self._use_evdev:
+            return False  # Let evdev handle all keyboard input
+
         if not self._use_state_based_input:
             return False  # Let shortcuts handle it
 
@@ -1201,7 +1578,26 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
             key_event = event  # type: QKeyEvent
             if hasattr(key_event, 'isAutoRepeat') and key_event.isAutoRepeat():
                 return False  # Ignore OS auto-repeat
+
             key = key_event.key()
+
+            # Multi-agent: check which keyboard device sent this event
+            if self._num_agents > 1 and self._keyboard_assignments:
+                device = key_event.device()
+                if device is not None:
+                    system_id = device.systemId()
+                    agent_id = self._keyboard_assignments.get(system_id)
+                    if agent_id:
+                        # Track key for specific agent
+                        if agent_id not in self._agent_pressed_keys:
+                            self._agent_pressed_keys[agent_id] = set()
+                        if key not in self._agent_pressed_keys[agent_id]:
+                            self._agent_pressed_keys[agent_id].add(key)
+                            _LOGGER.debug(f"Key {key} pressed by {agent_id} (keyboard {system_id})")
+                            self._emit_multi_agent_action()
+                        return True
+
+            # Single-agent or no keyboard assignment
             if key not in self._pressed_keys:
                 self._pressed_keys.add(key)
                 _LOGGER.debug("Key pressed: %s, pressed_keys=%s", key, self._pressed_keys)
@@ -1213,7 +1609,21 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
             key_event = event  # type: QKeyEvent
             if hasattr(key_event, 'isAutoRepeat') and key_event.isAutoRepeat():
                 return False  # Ignore OS auto-repeat
+
             key = key_event.key()
+
+            # Multi-agent: check which keyboard device sent this event
+            if self._num_agents > 1 and self._keyboard_assignments:
+                device = key_event.device()
+                if device is not None:
+                    system_id = device.systemId()
+                    agent_id = self._keyboard_assignments.get(system_id)
+                    if agent_id and agent_id in self._agent_pressed_keys:
+                        self._agent_pressed_keys[agent_id].discard(key)
+                        _LOGGER.debug(f"Key {key} released by {agent_id} (keyboard {system_id})")
+                        return True
+
+            # Single-agent
             self._pressed_keys.discard(key)
             _LOGGER.debug("Key released: %s, pressed_keys=%s", key, self._pressed_keys)
             return True  # Consume the event
@@ -1223,6 +1633,9 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
             if self._pressed_keys:
                 _LOGGER.debug("Focus lost, clearing pressed keys")
                 self._pressed_keys.clear()
+            if self._agent_pressed_keys:
+                _LOGGER.debug("Focus lost, clearing all agent pressed keys")
+                self._agent_pressed_keys.clear()
 
         return False
 
@@ -1231,6 +1644,104 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
         action = self.get_current_action()
         if action is not None:
             self._session.perform_human_action(action, key_label="combo")
+
+    def _get_default_idle_action(self) -> int:
+        """Get the default action to use when an agent has no keyboard input.
+
+        For environments without a NOOP action, returns the least disruptive action.
+
+        Returns:
+            Default idle action index:
+            - Legacy multigrid: 0 (STILL) - do nothing
+            - MeltingPot: 0 (NOOP) - do nothing
+            - INI multigrid: 6 (DONE) - no visible effect, agent stays still
+        """
+        # INI MultiGrid has NO NOOP/STILL action - all actions cause movement/rotation
+        # Use DONE (action 6) as the idle since it doesn't cause visible changes
+        if isinstance(self._key_resolver, INIMultiGridKeyCombinationResolver):
+            return 6  # DONE - no visible effect in INI multigrid
+
+        # Other environments use action 0 as idle:
+        # - Legacy multigrid: 0 = STILL (do nothing)
+        # - MeltingPot: 0 = NOOP (do nothing)
+        return 0
+
+    def _emit_multi_agent_action(self) -> None:
+        """Compute and emit actions for all agents based on their keyboard states."""
+        actions = self.get_multi_agent_actions()
+        if actions:
+            # Build detailed logging: show agent -> action
+            agent_names = self._agent_names if self._agent_names else [f"agent_{i}" for i in range(self._num_agents)]
+            action_details = []
+            agents_with_input = []
+
+            for i, action in enumerate(actions):
+                agent_id = agent_names[i] if i < len(agent_names) else f"agent_{i}"
+
+                # Check if this agent has active input (has pressed keys)
+                has_pressed_keys = bool(self._agent_pressed_keys.get(agent_id))
+
+                if has_pressed_keys:
+                    agents_with_input.append(agent_id)
+                    action_name = self._get_action_name(action)
+                    action_details.append(f"{agent_id}→{action_name}")
+                else:
+                    # No input - show the actual idle action being sent
+                    idle_action_name = self._get_action_name(action)
+                    action_details.append(f"{agent_id}→{idle_action_name}(idle)")
+
+            # Log the complete multi-agent action
+            if agents_with_input:
+                _LOGGER.info(
+                    f"Multi-agent actions: {', '.join(action_details)} | "
+                    f"Active agents: {', '.join(agents_with_input)}"
+                )
+            else:
+                _LOGGER.debug(f"Multi-agent actions: all agents waiting for input")
+
+            self._session.perform_human_action(actions, key_label="multi_agent")
+
+    def _get_action_name(self, action: int) -> str:
+        """Get human-readable action name for logging.
+
+        Uses the actual Action enums from the respective packages.
+
+        Args:
+            action: Action index
+
+        Returns:
+            Action name string
+        """
+        # INI MultiGrid - use the official Action enum
+        if isinstance(self._key_resolver, INIMultiGridKeyCombinationResolver):
+            try:
+                from multigrid.core.actions import Action as INIAction
+                return INIAction(action).name.upper()
+            except (ImportError, ValueError):
+                pass
+
+        # Legacy gym-multigrid - use the Actions class
+        if isinstance(self._key_resolver, MultiGridKeyCombinationResolver):
+            try:
+                from gym_multigrid.multigrid import Actions as LegacyActions
+                # Reverse lookup: find action name by value
+                for name in LegacyActions.available:
+                    if getattr(LegacyActions, name, None) == action:
+                        return name.upper()
+            except (ImportError, AttributeError):
+                pass
+
+        # MeltingPot action names (no official enum available)
+        if isinstance(self._key_resolver, MeltingPotKeyCombinationResolver):
+            meltingpot_actions = [
+                "NOOP", "FORWARD", "BACKWARD", "STRAFE_LEFT", "STRAFE_RIGHT",
+                "TURN_LEFT", "TURN_RIGHT", "INTERACT", "FIRE_1", "FIRE_2", "FIRE_3"
+            ]
+            if 0 <= action < len(meltingpot_actions):
+                return meltingpot_actions[action]
+
+        # Fallback for other resolvers or out-of-range actions
+        return f"action_{action}"
 
     def get_current_action(self) -> Optional[int]:
         """Get the action corresponding to currently pressed keys.
@@ -1242,13 +1753,327 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
             return None
         return self._key_resolver.resolve(self._pressed_keys)
 
+    def get_multi_agent_actions(self) -> Optional[List[int]]:
+        """Get actions for all agents based on their keyboard states.
+
+        Returns:
+            List of actions (one per agent by index), or None if not in multi-agent mode.
+            Agents without keyboard input get a default idle action.
+
+        Note:
+            For INI multigrid (no NOOP action), uses LEFT (turn left) as the least
+            disruptive default since it doesn't move or interact with objects.
+        """
+        if self._num_agents <= 1 or self._key_resolver is None:
+            return None
+
+        # Get the appropriate idle action for the current game type
+        default_idle = self._get_default_idle_action()
+
+        # Use agent names for keyboard lookup, but return list by index
+        agent_names = self._agent_names if self._agent_names else [f"agent_{i}" for i in range(self._num_agents)]
+
+        actions: List[int] = []
+        for agent_id in agent_names:
+            pressed_keys = self._agent_pressed_keys.get(agent_id, set())
+            if pressed_keys:
+                action = self._key_resolver.resolve(pressed_keys)
+                # If resolver returns None (no meaningful keys), use default idle
+                actions.append(action if action is not None else default_idle)
+            else:
+                # No keys pressed for this agent = default idle action
+                actions.append(default_idle)
+
+        return actions
+
     def has_keys_pressed(self) -> bool:
         """Return True if any tracked keys are currently pressed."""
-        return bool(self._pressed_keys)
+        return bool(self._pressed_keys) or bool(self._agent_pressed_keys)
 
     def clear_pressed_keys(self) -> None:
         """Clear all tracked pressed keys (e.g., on game pause/stop)."""
         self._pressed_keys.clear()
+        self._agent_pressed_keys.clear()
+
+    def set_keyboard_assignments(self, assignments: Dict[int, str]) -> None:
+        """Update keyboard-to-agent assignments for multi-human gameplay.
+
+        Args:
+            assignments: Dict mapping keyboard system_id to agent_id
+        """
+        self._keyboard_assignments = assignments
+        _LOGGER.info(f"Updated keyboard assignments: {assignments}")
+
+    def set_num_agents(self, num_agents: int) -> None:
+        """Update the number of agents for multi-agent environments.
+
+        Args:
+            num_agents: Number of agents in the environment
+        """
+        self._num_agents = num_agents
+        _LOGGER.info(f"Set num_agents to {num_agents}")
+
+    def set_agent_names(self, agent_names: List[str]) -> None:
+        """Update the agent names for multi-agent environments.
+
+        This enables proper mapping between keyboard assignments and environment agents.
+        Different environments use different naming conventions (e.g., 'player_0' for
+        MeltingPot, 'agent_0' for MultiGrid).
+
+        Args:
+            agent_names: List of agent identifiers as used by the environment.
+        """
+        self._agent_names = agent_names
+        _LOGGER.info(f"Set agent_names to {agent_names}")
+
+    # =========================================================================
+    # Evdev Multi-Keyboard Support (Linux only)
+    # =========================================================================
+
+    def setup_evdev_keyboards(self, device_assignments: Dict[str, str]) -> bool:
+        """Setup evdev keyboard monitoring for multi-keyboard support.
+
+        This enables true multi-keyboard support on Linux by using evdev to read
+        keyboard events directly from /dev/input devices, bypassing X11's device merging.
+
+        Args:
+            device_assignments: Dict mapping device_path → agent_id
+                Example: {
+                    "/dev/input/by-path/...usb-0:5.1:1.0-event-kbd": "agent_0",
+                    "/dev/input/by-path/...usb-0:5.2:1.0-event-kbd": "agent_1",
+                }
+
+        Returns:
+            True if evdev monitoring was successfully started
+        """
+        if not _HAS_EVDEV:
+            _LOGGER.warning("Evdev not available (not Linux or module not installed)")
+            return False
+
+        if not device_assignments:
+            _LOGGER.warning("No keyboard assignments provided for evdev")
+            return False
+
+        # IMPORTANT: Stop any existing monitor before creating a new one
+        # This prevents duplicate monitors from running concurrently
+        if self._evdev_monitor is not None:
+            _LOGGER.info("Stopping existing evdev monitor before re-setup")
+            self.stop_evdev_monitoring()
+            self._evdev_device_to_agent.clear()
+            self._agent_pressed_keys.clear()
+
+        _LOGGER.info(f"Setting up evdev keyboard monitoring with {len(device_assignments)} devices")
+
+        try:
+            # Create evdev monitor
+            self._evdev_monitor = EvdevKeyboardMonitor()
+
+            # Connect signals
+            self._evdev_monitor.key_pressed.connect(self._on_evdev_key_pressed)
+            self._evdev_monitor.key_released.connect(self._on_evdev_key_released)
+            self._evdev_monitor.error_occurred.connect(self._on_evdev_error)
+
+            # Discover keyboards
+            keyboards = self._evdev_monitor.discover_keyboards()
+            _LOGGER.info(f"Discovered {len(keyboards)} keyboards via evdev")
+
+            # Add assigned keyboards
+            added_count = 0
+            for kbd in keyboards:
+                agent_id = device_assignments.get(kbd.device_path)
+                if agent_id:
+                    if self._evdev_monitor.add_device(kbd):
+                        self._evdev_device_to_agent[kbd.device_path] = agent_id
+                        _LOGGER.info(f"Added {kbd.name} for {agent_id}")
+                        added_count += 1
+                    else:
+                        _LOGGER.error(f"Failed to add device {kbd.device_path}")
+
+            if added_count == 0:
+                _LOGGER.error("No keyboards could be added (check permissions)")
+                return False
+
+            # Start monitoring
+            self._evdev_monitor.start_monitoring()
+            self._use_evdev = True
+
+            # Disable Qt shortcuts when evdev is active
+            self._update_shortcuts_enabled()
+
+            _LOGGER.info(f"Evdev monitoring started for {added_count} keyboard(s)")
+            return True
+
+        except Exception as e:
+            _LOGGER.error(f"Failed to setup evdev keyboards: {e}", exc_info=True)
+            return False
+
+    def stop_evdev_monitoring(self) -> None:
+        """Stop evdev keyboard monitoring."""
+        if self._evdev_monitor:
+            _LOGGER.info("Stopping evdev monitoring")
+            self._evdev_monitor.stop_monitoring()
+            self._use_evdev = False
+
+            # Re-enable Qt shortcuts when evdev is stopped
+            self._update_shortcuts_enabled()
+
+    def _on_evdev_key_pressed(self, device_path: str, keycode: int, timestamp: int) -> None:
+        """Handle key press from evdev monitor.
+
+        Args:
+            device_path: Path to the keyboard device
+            keycode: Linux input keycode
+            timestamp: Event timestamp in milliseconds
+        """
+        if not self._mode_allows_input or not self._requested_enabled:
+            return
+
+        # Get agent ID for this device
+        agent_id = self._evdev_device_to_agent.get(device_path)
+        if not agent_id:
+            _LOGGER.debug(f"evdev: Key from unassigned device: {device_path}")
+            return
+
+        # Convert Linux keycode to Qt key
+        qt_key_enum = linux_keycode_to_qt_key(keycode)
+        if qt_key_enum == Qt.Key.Key_unknown:
+            _LOGGER.debug(f"evdev: Unknown keycode: {keycode}")
+            return
+
+        # CRITICAL: Convert Qt.Key enum to int for consistent comparison
+        # The key constants (_KEY_W, _KEY_A, etc.) are integers, so we must
+        # store integers in pressed_keys for set intersection to work correctly
+        qt_key = int(qt_key_enum)
+
+        # Get device name for logging
+        device_name = "Unknown"
+        if self._evdev_monitor:
+            for kbd in self._evdev_monitor.get_monitored_devices():
+                if kbd.device_path == device_path:
+                    device_name = kbd.name
+                    break
+
+        # Track key for this agent
+        if agent_id not in self._agent_pressed_keys:
+            self._agent_pressed_keys[agent_id] = set()
+
+        if qt_key not in self._agent_pressed_keys[agent_id]:
+            self._agent_pressed_keys[agent_id].add(qt_key)
+
+            # Enhanced logging: keyboard name -> agent -> key
+            key_name = Qt.Key(qt_key).name if hasattr(Qt.Key(qt_key), 'name') else f"key_{qt_key}"
+            self.log_constant(
+                LOG_EVDEV_KEY_PRESSED,
+                message=f"[{device_name}] ({device_path}) → {agent_id} → {key_name}",
+                extra={
+                    "device_path": device_path,
+                    "device_name": device_name,
+                    "agent_id": agent_id,
+                    "key_name": key_name,
+                    "keycode": keycode,
+                },
+            )
+
+            self._emit_multi_agent_action()
+
+    def _on_evdev_key_released(self, device_path: str, keycode: int, timestamp: int) -> None:
+        """Handle key release from evdev monitor.
+
+        Args:
+            device_path: Path to the keyboard device
+            keycode: Linux input keycode
+            timestamp: Event timestamp in milliseconds
+        """
+        # Get agent ID for this device
+        agent_id = self._evdev_device_to_agent.get(device_path)
+        if not agent_id:
+            return
+
+        # Convert Linux keycode to Qt key
+        qt_key_enum = linux_keycode_to_qt_key(keycode)
+        if qt_key_enum == Qt.Key.Key_unknown:
+            return
+
+        # Convert Qt.Key enum to int for consistent comparison (matches key press handler)
+        qt_key = int(qt_key_enum)
+
+        # Remove key from agent's pressed keys
+        if agent_id in self._agent_pressed_keys:
+            self._agent_pressed_keys[agent_id].discard(qt_key)
+
+            # Get device name for logging
+            device_name = "Unknown"
+            if self._evdev_monitor:
+                for kbd in self._evdev_monitor.get_monitored_devices():
+                    if kbd.device_path == device_path:
+                        device_name = kbd.name
+                        break
+
+            key_name = Qt.Key(qt_key).name if hasattr(Qt.Key(qt_key), 'name') else f"key_{qt_key}"
+            self.log_constant(
+                LOG_EVDEV_KEY_RELEASED,
+                message=f"[{device_name}] ({device_path}) → {agent_id} → {key_name}",
+                extra={
+                    "device_path": device_path,
+                    "device_name": device_name,
+                    "agent_id": agent_id,
+                    "key_name": key_name,
+                    "keycode": keycode,
+                },
+            )
+
+    def _on_evdev_error(self, error_msg: str) -> None:
+        """Handle error from evdev monitor.
+
+        Args:
+            error_msg: Error message
+        """
+        _LOGGER.error(f"Evdev error: {error_msg}")
+
+    def is_using_evdev(self) -> bool:
+        """Check if evdev monitoring is active.
+
+        Returns:
+            True if evdev monitoring is active
+        """
+        return self._use_evdev
+
+    def get_evdev_devices(self) -> List[KeyboardDevice]:
+        """Get list of available evdev keyboard devices.
+
+        Returns:
+            List of KeyboardDevice objects, or empty list if evdev not available
+        """
+        if not _HAS_EVDEV:
+            return []
+
+        try:
+            monitor = EvdevKeyboardMonitor()
+            return monitor.discover_keyboards()
+        except Exception as e:
+            _LOGGER.error(f"Failed to discover evdev keyboards: {e}")
+            return []
+
+    def set_evdev_keyboard_assignments(self, assignments: Dict[str, str]) -> None:
+        """Update evdev keyboard-to-agent assignments.
+
+        Args:
+            assignments: Dict mapping device_path to agent_id
+        """
+        if not self._use_evdev or not self._evdev_monitor:
+            # Start evdev monitoring with these assignments
+            self.setup_evdev_keyboards(assignments)
+        else:
+            # Update existing assignments
+            self._evdev_device_to_agent = assignments
+            _LOGGER.info(f"Updated evdev keyboard assignments: {assignments}")
+
+    def clear_evdev_keyboards(self) -> None:
+        """Clear all evdev keyboard tracking and stop monitoring."""
+        self.stop_evdev_monitoring()
+        self._evdev_device_to_agent.clear()
+        self._agent_pressed_keys.clear()
+        _LOGGER.info("Cleared evdev keyboard tracking")
 
     def configure(
         self,
@@ -1283,28 +2108,60 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
         if overrides:
             input_mode = overrides.get("input_mode", InputMode.SHORTCUT_BASED.value)
 
+        # CRITICAL: Force state-based mode for multi-agent environments
+        # Shortcut-based mode conflicts with evdev multi-keyboard monitoring
+        from gym_gui.core.enums import ENVIRONMENT_FAMILY_BY_GAME, EnvironmentFamily
+        env_family = ENVIRONMENT_FAMILY_BY_GAME.get(game_id)
+        is_multi_agent = env_family in (
+            EnvironmentFamily.MULTIGRID,
+            EnvironmentFamily.MELTINGPOT,
+            EnvironmentFamily.OVERCOOKED,
+        )
+
+        if is_multi_agent and input_mode != InputMode.STATE_BASED.value:
+            _LOGGER.warning(
+                "Multi-agent environment %s REQUIRES state-based input mode "
+                "(shortcut-based mode conflicts with multi-keyboard evdev monitoring). "
+                "Forcing input_mode to 'state_based'.",
+                game_id.value if hasattr(game_id, 'value') else game_id,
+            )
+            input_mode = InputMode.STATE_BASED.value
+            # Update overrides to reflect the forced mode
+            if overrides is not None:
+                overrides["input_mode"] = InputMode.STATE_BASED.value
+
         use_state_based = (input_mode == InputMode.STATE_BASED.value)
 
-        _LOGGER.info(
-            "Configuring input for %s: mode=%s",
-            game_id.value if hasattr(game_id, 'value') else game_id,
-            input_mode,
+        self.log_constant(
+            LOG_INPUT_MODE_CONFIGURED,
+            extra={
+                "game_id": game_id.value if hasattr(game_id, 'value') else str(game_id),
+                "input_mode": input_mode,
+                "forced_multi_agent": is_multi_agent,
+            },
         )
 
         if use_state_based:
             # Try to get a key combination resolver for this game
-            self._key_resolver = get_key_combination_resolver(game_id)
+            # Pass action_space to enable action-space-aware resolvers (e.g., MeltingPot)
+            space_arg = action_space if isinstance(action_space, spaces.Space) else None
+            self._key_resolver = get_key_combination_resolver(game_id, space_arg)
             if self._key_resolver is not None:
                 self._use_state_based_input = True
-                _LOGGER.info(
-                    "Using state-based input with %s resolver",
-                    type(self._key_resolver).__name__,
+                self.log_constant(
+                    LOG_KEY_RESOLVER_INITIALIZED,
+                    extra={
+                        "game_id": game_id.value if hasattr(game_id, 'value') else str(game_id),
+                        "resolver_type": type(self._key_resolver).__name__,
+                    },
                 )
                 return  # Don't set up shortcuts for state-based games
             else:
-                _LOGGER.warning(
-                    "No key combination resolver available for %s, falling back to shortcuts",
-                    game_id.value if hasattr(game_id, 'value') else game_id,
+                self.log_constant(
+                    LOG_KEY_RESOLVER_UNAVAILABLE,
+                    extra={
+                        "game_id": game_id.value if hasattr(game_id, 'value') else str(game_id),
+                    },
                 )
 
         # Fall back to shortcut-based input for turn-based games
@@ -1312,6 +2169,8 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
             mappings = _TOY_TEXT_MAPPINGS.get(game_id)
             if mappings is None:
                 mappings = _MINIG_GRID_MAPPINGS.get(game_id)
+            if mappings is None:
+                mappings = _MULTIGRID_MAPPINGS.get(game_id)
             if mappings is None:
                 mappings = _BOX_2D_MAPPINGS.get(game_id)
             if mappings is None:
@@ -1400,6 +2259,8 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
             ControlMode.HUMAN_ONLY,
             ControlMode.HYBRID_TURN_BASED,
             ControlMode.HYBRID_HUMAN_AGENT,
+            ControlMode.MULTI_AGENT_COOP,
+            ControlMode.MULTI_AGENT_COMPETITIVE,
         }
         self._update_shortcuts_enabled()
         if not self._mode_allows_input:
@@ -1407,11 +2268,17 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
 
     def _update_shortcuts_enabled(self) -> None:
         """Enable or disable all shortcuts based on current state."""
-        enabled = self._mode_allows_input and self._requested_enabled
+        # Disable Qt shortcuts when evdev is active (evdev handles input directly)
+        if self._use_evdev:
+            enabled = False
+            _LOGGER.debug("Shortcuts disabled (evdev mode active)")
+        else:
+            enabled = self._mode_allows_input and self._requested_enabled
+            _LOGGER.debug("Shortcuts enabled=%s (mode_allows=%s, requested=%s)",
+                          enabled, self._mode_allows_input, self._requested_enabled)
+
         for shortcut in self._shortcuts:
             shortcut.setEnabled(enabled)
-        _LOGGER.debug("Shortcuts enabled=%s (mode_allows=%s, requested=%s)",
-                          enabled, self._mode_allows_input, self._requested_enabled)
 
 
 __all__ = [
@@ -1419,6 +2286,10 @@ __all__ = [
     "get_vizdoom_mouse_turn_actions",
     "get_key_combination_resolver",
     "KeyCombinationResolver",
+    "MiniGridKeyCombinationResolver",
+    "MultiGridKeyCombinationResolver",
+    "INIMultiGridKeyCombinationResolver",
+    "MeltingPotKeyCombinationResolver",
     "ProcgenKeyCombinationResolver",
     "AleKeyCombinationResolver",
     "LunarLanderKeyCombinationResolver",

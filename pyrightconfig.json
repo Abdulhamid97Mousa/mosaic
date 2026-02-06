@@ -14,5 +14,9 @@
   ],
   // Match the repo's virtual environment so stubs resolve correctly.
   "venv": ".venv",
-  "venvPath": "."
+  "venvPath": ".",
+  "exclude": [
+    "**/*.md",
+    "**/docs/**",
+  ]
 }

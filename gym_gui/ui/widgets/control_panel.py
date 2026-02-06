@@ -60,14 +60,25 @@ from gym_gui.ui.config_panels.single_agent.procgen import (
     ControlCallbacks as ProcgenControlCallbacks,
     build_procgen_controls,
 )
+from gym_gui.ui.config_panels.multi_agent.meltingpot import (
+    MELTINGPOT_GAME_IDS,
+    ControlCallbacks as MeltingPotControlCallbacks,
+    build_meltingpot_controls,
+)
+from gym_gui.ui.config_panels.multi_agent.multigrid import (
+    MULTIGRID_GAME_IDS,
+    ControlCallbacks as MultiGridControlCallbacks,
+    build_multigrid_controls,
+)
 from gym_gui.core.adapters.vizdoom import ViZDoomConfig
-from gym_gui.config.game_configs import ProcgenConfig
+from gym_gui.config.game_configs import ProcgenConfig, MeltingPotConfig, MultiGridConfig
 from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
 from gym_gui.ui.widgets.mujoco_mpc_tab import MuJoCoMPCTab
 from gym_gui.ui.widgets.multi_agent_tab import MultiAgentTab
 from gym_gui.ui.widgets.single_agent_tab import SingleAgentTab
 from gym_gui.ui.widgets.operators_tab import OperatorsTab
 from gym_gui.ui.widgets.godot_ge_tab import GodotGETab
+from gym_gui.ui.widgets.keyboard_assignment_widget import KeyboardAssignmentWidget
 from gym_gui.telemetry.semconv import (
     TelemetryModes,
     TELEMETRY_MODE_DESCRIPTORS,
@@ -695,6 +706,15 @@ class ControlPanelWidget(QtWidgets.QWidget):
         human_layout.addWidget(self._create_mode_group(self._human_tab))
         self._control_buttons_widget = self._create_control_group(self._human_tab)
         human_layout.addWidget(self._control_buttons_widget)
+
+        # Keyboard Assignment Widget for multi-human gameplay
+        self._keyboard_widget = KeyboardAssignmentWidget(
+            available_agents=["agent_0", "agent_1"],
+            parent=self._human_tab
+        )
+        self._keyboard_widget.setVisible(False)  # Hidden until multi-agent env loaded
+        human_layout.addWidget(self._keyboard_widget)
+
         human_layout.addWidget(self._create_telemetry_mode_group(self._human_tab))
         human_layout.addWidget(self._create_status_group(self._human_tab))
         # Minimal stretch at end so Game Configuration gets more space
@@ -1559,6 +1579,16 @@ class ControlPanelWidget(QtWidgets.QWidget):
 
         This adds a combo box to select between state-based (real-time) and
         shortcut-based (immediate) keyboard input modes.
+
+        CRITICAL RESTRICTION FOR MULTI-AGENT ENVIRONMENTS:
+        Multi-agent environments (MultiGrid, Overcooked, MeltingPot) can ONLY use
+        state-based mode. Shortcut-based mode is fundamentally incompatible with
+        evdev multi-keyboard monitoring because:
+        - Shortcut-based uses Qt's global event system (all keyboards merged)
+        - evdev reads per-device input (/dev/input/eventX)
+        - Mixing both causes one keyboard to control all agents
+
+        For multi-agent environments, the combo box only shows state-based mode.
         """
         if self._current_game is None:
             return
@@ -1566,14 +1596,34 @@ class ControlPanelWidget(QtWidgets.QWidget):
         current_game = self._current_game
         overrides = self._game_overrides.setdefault(current_game, {})
 
+        # Check if current game is multi-agent (requires state-based for multi-keyboard)
+        env_family = ENVIRONMENT_FAMILY_BY_GAME.get(current_game)
+        is_multi_agent = env_family in (
+            EnvironmentFamily.MULTIGRID,
+            EnvironmentFamily.MELTINGPOT,
+            EnvironmentFamily.OVERCOOKED,
+        )
+
         # Create combo box
         input_mode_combo = QtWidgets.QComboBox(self._config_group)
-        for mode in InputMode:
+
+        if is_multi_agent:
+            # RESTRICTION: Multi-agent environments can ONLY use state-based mode
+            # Shortcut-based mode is disabled to prevent conflicts with evdev monitoring
+            mode = InputMode.STATE_BASED
             label, _ = INPUT_MODE_INFO[mode]
             input_mode_combo.addItem(label, mode.value)
+            # Force the override to state-based to prevent accidental misconfiguration
+            overrides["input_mode"] = InputMode.STATE_BASED.value
+        else:
+            # Other games: Allow both modes
+            for mode in InputMode:
+                label, _ = INPUT_MODE_INFO[mode]
+                input_mode_combo.addItem(label, mode.value)
 
-        # Set current input mode (default to shortcut_based for safety)
-        current_input_mode = overrides.get("input_mode", InputMode.SHORTCUT_BASED.value)
+        # Set current input mode (state-based for multi-agent, shortcut-based for others)
+        default_mode = InputMode.STATE_BASED.value if is_multi_agent else InputMode.SHORTCUT_BASED.value
+        current_input_mode = overrides.get("input_mode", default_mode)
         for i in range(input_mode_combo.count()):
             if input_mode_combo.itemData(i) == current_input_mode:
                 input_mode_combo.setCurrentIndex(i)
@@ -1589,6 +1639,11 @@ class ControlPanelWidget(QtWidgets.QWidget):
             try:
                 mode = InputMode(mode_value)
                 _, description = INPUT_MODE_INFO[mode]
+
+                # Add multi-agent environment note
+                if is_multi_agent:
+                    description += "\n\n✓ Required for multi-keyboard support. Shortcut-based mode is disabled to prevent conflicts with evdev monitoring."
+
                 input_mode_desc.setText(description)
             except (ValueError, KeyError):
                 input_mode_desc.setText("")
@@ -1747,6 +1802,32 @@ class ControlPanelWidget(QtWidgets.QWidget):
                 defaults=defaults,
                 callbacks=callbacks,
             )
+        elif self._current_game is not None and self._current_game in MELTINGPOT_GAME_IDS:
+            current_game = self._current_game
+            overrides = self._game_overrides.setdefault(current_game, {})
+            callbacks = MeltingPotControlCallbacks(on_change=self._on_meltingpot_config_changed)
+            defaults = MeltingPotConfig()
+            build_meltingpot_controls(
+                parent=self._config_group,
+                layout=self._config_layout,
+                game_id=current_game,
+                overrides=overrides,
+                defaults=defaults,
+                callbacks=callbacks,
+            )
+        elif self._current_game is not None and self._current_game in MULTIGRID_GAME_IDS:
+            current_game = self._current_game
+            overrides = self._game_overrides.setdefault(current_game, {})
+            callbacks = MultiGridControlCallbacks(on_change=self._on_multigrid_config_changed)
+            defaults = MultiGridConfig()
+            build_multigrid_controls(
+                parent=self._config_group,
+                layout=self._config_layout,
+                game_id=current_game,
+                overrides=overrides,
+                defaults=defaults,
+                callbacks=callbacks,
+            )
         else:
             label = QtWidgets.QLabel(
                 "No additional configuration options for this environment.",
@@ -1771,6 +1852,20 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self.vizdoom_config_changed.emit(param_name, value)
 
     def _on_procgen_config_changed(self, param_name: str, value: object) -> None:
+        current_game = self._current_game
+        if current_game is None:
+            return
+        overrides = self._game_overrides.setdefault(current_game, {})
+        overrides[param_name] = value
+
+    def _on_meltingpot_config_changed(self, param_name: str, value: object) -> None:
+        current_game = self._current_game
+        if current_game is None:
+            return
+        overrides = self._game_overrides.setdefault(current_game, {})
+        overrides[param_name] = value
+
+    def _on_multigrid_config_changed(self, param_name: str, value: object) -> None:
         current_game = self._current_game
         if current_game is None:
             return

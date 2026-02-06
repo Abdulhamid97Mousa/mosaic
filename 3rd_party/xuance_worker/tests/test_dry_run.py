@@ -57,6 +57,81 @@ def _multi_agent_config() -> dict[str, Any]:
     }
 
 
+def _parse_config_from_output(stdout: str) -> dict:
+    """Parse config output from CLI dry-run.
+
+    The CLI may emit lifecycle events (JSON lines) followed by the main config.
+    This function finds the config JSON by looking for an object with 'method' key.
+
+    Args:
+        stdout: Captured standard output from the CLI.
+
+    Returns:
+        Parsed config dictionary.
+
+    Raises:
+        ValueError: If no valid config could be parsed.
+    """
+    lines = stdout.strip().split('\n')
+
+    # First, try to find multi-line pretty-printed JSON at the end
+    json_buffer: list[str] = []
+    brace_count = 0
+    in_json = False
+
+    for line in lines:
+        stripped = line.strip()
+        if not in_json and stripped.startswith('{'):
+            # Check if it's a single-line JSON first
+            try:
+                output = json.loads(stripped)
+                if isinstance(output, dict) and "method" in output:
+                    json_buffer = [stripped]
+                    in_json = False
+                    continue
+            except json.JSONDecodeError:
+                pass
+            # Start of multi-line JSON
+            in_json = True
+            json_buffer = [line]
+            brace_count = line.count('{') - line.count('}')
+        elif in_json:
+            json_buffer.append(line)
+            brace_count += line.count('{') - line.count('}')
+            if brace_count == 0:
+                try:
+                    output = json.loads('\n'.join(json_buffer))
+                    if isinstance(output, dict) and "method" in output:
+                        return output
+                except json.JSONDecodeError:
+                    pass
+                json_buffer = []
+                in_json = False
+
+    # If we collected something, try parsing it
+    if json_buffer:
+        try:
+            output = json.loads('\n'.join(json_buffer))
+            if isinstance(output, dict) and "method" in output:
+                return output
+        except json.JSONDecodeError:
+            pass
+
+    # Fallback: try each line in reverse as single-line JSON
+    for line in reversed(lines):
+        stripped = line.strip()
+        if not stripped:
+            continue
+        try:
+            output = json.loads(stripped)
+            if isinstance(output, dict) and "method" in output:
+                return output
+        except json.JSONDecodeError:
+            continue
+
+    raise ValueError(f"Could not parse config from output: {stdout}")
+
+
 # =============================================================================
 # CLI Dry-Run Tests
 # =============================================================================
@@ -77,7 +152,7 @@ class TestCLIDryRun:
         assert exit_code == 0
 
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _parse_config_from_output(captured.out)
 
         assert output["method"] == "ppo"
         assert output["env"] == "classic_control"
@@ -94,7 +169,7 @@ class TestCLIDryRun:
         assert exit_code == 0
 
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _parse_config_from_output(captured.out)
 
         assert output["seed"] == 42
 
@@ -109,7 +184,7 @@ class TestCLIDryRun:
         assert exit_code == 0
 
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _parse_config_from_output(captured.out)
 
         assert output["device"] == "cuda:0"
 
@@ -124,7 +199,7 @@ class TestCLIDryRun:
         assert exit_code == 0
 
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _parse_config_from_output(captured.out)
 
         assert output["dl_toolbox"] == "tensorflow"
 
@@ -142,7 +217,7 @@ class TestCLIDryRun:
         assert exit_code == 0
 
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _parse_config_from_output(captured.out)
 
         assert output["run_id"] == "dry-run-test"
 
@@ -166,16 +241,6 @@ class TestRuntimeDryRun:
         assert summary.method == "ppo"
         assert summary.env_id == "CartPole-v1"
         assert summary.runner_type == "unknown"
-
-    def test_runtime_dry_run_benchmark_method(self) -> None:
-        """Test runtime.benchmark() in dry-run mode."""
-        config = XuanCeWorkerConfig.from_dict(_minimal_config())
-        runtime = XuanCeWorkerRuntime(config, dry_run=True)
-
-        summary = runtime.benchmark()
-
-        assert summary.status == "dry-run"
-        assert summary.method == "ppo"
 
     def test_runtime_dry_run_preserves_config(self) -> None:
         """Test that dry-run preserves full configuration."""
@@ -454,7 +519,7 @@ class TestJsonRoundtrip:
         captured = capsys.readouterr()
 
         # Should be valid JSON
-        output = json.loads(captured.out)
+        output = _parse_config_from_output(captured.out)
 
         # Should contain all fields
         assert "run_id" in output

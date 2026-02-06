@@ -65,7 +65,6 @@ gym_gui/
          __init__.py
          base.py               # Shared adapter contract
          toy_text.py           # FrozenLake/CliffWalking/Taxi adapters
-         toy_text_demo.py      # CLI smoke harness
    env_adapters/
       __init__.py             # Re-export adapters for backwards compatibility
    logging_config/

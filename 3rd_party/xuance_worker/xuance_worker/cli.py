@@ -16,11 +16,25 @@ Usage:
 
 from __future__ import annotations
 
+# CRITICAL: Set MPI environment variables BEFORE any imports that might load mpi4py.
+# mpi4py initializes MPI on import, which can hang indefinitely in single-process mode
+# or when spawned as a subprocess. Setting MPI4PY_RC_INITIALIZE=false prevents this.
+import os
+os.environ.setdefault('MPI4PY_RC_INITIALIZE', 'false')
+os.environ.setdefault('OMPI_MCA_btl', '^openib')
+os.environ.setdefault('OMPI_MCA_btl_base_warn_component_unused', '0')
+
+# NOTE: sitecustomize import is DEFERRED until after arg parsing
+# to avoid loading heavy dependencies (torch, gymnasium, mpi4py) in dry-run mode.
+# This prevents MPI from hanging the process on exit during validation.
+# See: _import_sitecustomize() function below.
+
 import argparse
 import json
 import logging
 import sys
 import uuid
+from dataclasses import asdict
 from pathlib import Path
 
 from .config import XuanCeWorkerConfig
@@ -105,14 +119,14 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
         help="Run in test mode (load model and evaluate)",
     )
     parser.add_argument(
-        "--benchmark",
-        action="store_true",
-        help="Run benchmark mode (training with periodic evaluation)",
-    )
-    parser.add_argument(
         "--dry-run",
         action="store_true",
-        help="Print configuration without executing",
+        help="Validate configuration without executing training",
+    )
+    parser.add_argument(
+        "--emit-summary",
+        action="store_true",
+        help="Emit resolved configuration summary as JSON (use with --dry-run)",
     )
     parser.add_argument(
         "--run-id",
@@ -247,10 +261,34 @@ def main(args: list[str] | None = None) -> int:
         config.device,
     )
 
-    # Dry-run mode: print config and exit
+    # Dry-run mode: validate configuration without executing training
     if parsed.dry_run:
-        print(json.dumps(config.to_dict(), indent=2))
-        return 0
+        runtime = XuanCeWorkerRuntime(config, dry_run=True)
+        try:
+            summary = runtime.run()
+            if parsed.emit_summary:
+                # Emit resolved configuration as JSON for GUI validation
+                # Convert dataclass to dict for JSON serialization
+                print(json.dumps(asdict(summary), indent=2, sort_keys=True))
+            else:
+                # Legacy behavior: just print config
+                print(json.dumps(config.to_dict(), indent=2))
+            return 0
+        except Exception as e:
+            logger.error("Dry-run validation failed: %s", e)
+            if parsed.emit_summary:
+                error_summary = {
+                    "status": "error",
+                    "error": str(e),
+                    "config": config.to_dict(),
+                }
+                print(json.dumps(error_summary, indent=2, sort_keys=True))
+            return 1
+
+    # CRITICAL: Import sitecustomize NOW to patch gym.make() with FastLane wrapper
+    # This is deferred from module-level to avoid loading heavy dependencies
+    # (torch, gymnasium, mpi4py) in dry-run mode, which can hang on MPI cleanup.
+    from . import sitecustomize  # noqa: F401 - patches gym.make for FastLane
 
     # Interactive mode: run step-by-step policy evaluation
     if parsed.interactive:
@@ -271,15 +309,26 @@ def main(args: list[str] | None = None) -> int:
         runtime.run()
         return 0
 
+    # Check for curriculum training mode
+    from .curriculum_training import is_curriculum_config
+    if is_curriculum_config(config):
+        logger.info("Detected curriculum_schedule in config - using curriculum training mode")
+        from .curriculum_training import CurriculumTrainingConfig, run_curriculum_training
+
+        try:
+            curriculum_config = CurriculumTrainingConfig.from_worker_config(config)
+            result = run_curriculum_training(curriculum_config)
+            logger.info(f"Curriculum training complete: {result}")
+            return 0
+        except Exception as e:
+            logger.exception(f"Curriculum training failed: {e}")
+            return 1
+
     # Create runtime and execute
     runtime = XuanCeWorkerRuntime(config, dry_run=False)
 
     try:
-        if parsed.benchmark:
-            logger.info("Running in benchmark mode")
-            summary = runtime.benchmark()
-        else:
-            summary = runtime.run()
+        summary = runtime.run()
 
         logger.info(
             "Run completed: status=%s runner=%s",

@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Iterable, Mapping, TypeVar
+from typing import Any, Iterable, Mapping, TypeVar
 
 from gym_gui.cache.memory import memoize
 from gym_gui.config.game_configs import (
@@ -16,6 +16,9 @@ from gym_gui.config.game_configs import (
     TaxiConfig,
     BlackjackConfig,
     MultiGridConfig,
+    MeltingPotConfig,
+    OvercookedConfig,
+    GameConfig,
 )
 from gym_gui.core.adapters.base import AdapterContext, EnvironmentAdapter
 from gym_gui.core.adapters.toy_text import TOY_TEXT_ADAPTERS
@@ -24,16 +27,7 @@ from gym_gui.core.adapters.minigrid import MINIGRID_ADAPTERS
 from gym_gui.core.adapters.babyai import BABYAI_ADAPTERS
 from gym_gui.core.adapters.ale import ALE_ADAPTERS, ALEAdapter
 
-if TYPE_CHECKING:
-    from gym_gui.core.adapters.vizdoom import ViZDoomConfig as _ViZDoomConfigType
-    from gym_gui.core.adapters.minihack import MiniHackConfig as _MiniHackConfigType
-    from gym_gui.core.adapters.nethack import NetHackConfig as _NetHackConfigType
-    from gym_gui.config.game_configs import CrafterConfig as _CrafterConfigType
-    from gym_gui.config.game_configs import ProcgenConfig as _ProcgenConfigType
-    from gym_gui.config.game_configs import TextWorldConfig as _TextWorldConfigType
-    from gym_gui.config.game_configs import JumanjiConfig as _JumanjiConfigType
-    from gym_gui.core.adapters.pybullet_drones import PyBulletDronesConfig as _PyBulletDronesConfigType
-    from gym_gui.config.game_configs import MeltingPotConfig as _MeltingPotConfigType
+# TYPE_CHECKING imports removed - using GameConfig type alias instead
 
 try:  # Optional dependency
     from gym_gui.core.adapters.vizdoom import (  # pragma: no cover - optional
@@ -177,22 +171,18 @@ try:  # Optional dependency - Melting Pot (multi-agent social scenarios via Shim
         MELTINGPOT_ADAPTERS,
         MeltingPotAdapter,
     )
-    from gym_gui.config.game_configs import MeltingPotConfig
 except Exception:  # pragma: no cover - meltingpot optional
     MELTINGPOT_ADAPTERS: dict[Any, Any] = {}
     MeltingPotAdapter = None  # type: ignore[misc, assignment]
-    MeltingPotConfig = None  # type: ignore[misc, assignment]
 
 try:  # pragma: no cover - optional dep: overcooked
     from gym_gui.core.adapters.overcooked import (  # pragma: no cover - optional
         OVERCOOKED_ADAPTERS,
         OvercookedAdapter,
     )
-    from gym_gui.config.game_configs import OvercookedConfig
 except Exception:  # pragma: no cover - overcooked optional
     OVERCOOKED_ADAPTERS: dict[Any, Any] = {}
     OvercookedAdapter = None  # type: ignore[misc, assignment]
-    OvercookedConfig = None  # type: ignore[misc, assignment]
 
 from gym_gui.core.enums import GameId
 
@@ -254,28 +244,7 @@ def create_adapter(
     game_id: GameId,
     context: AdapterContext | None = None,
     *,
-    game_config: (
-        FrozenLakeConfig
-        | TaxiConfig
-        | CliffWalkingConfig
-        | BlackjackConfig
-        | LunarLanderConfig
-        | CarRacingConfig
-        | BipedalWalkerConfig
-        | MiniGridConfig
-        | ALEConfig
-        | MultiGridConfig
-        | "_ViZDoomConfigType"
-        | "_MiniHackConfigType"
-        | "_NetHackConfigType"
-        | "_CrafterConfigType"
-        | "_ProcgenConfigType"
-        | "_TextWorldConfigType"
-        | "_JumanjiConfigType"
-        | "_PyBulletDronesConfigType"
-        | "_MeltingPotConfigType"
-        | None
-    ) = None,
+    game_config: GameConfig | None = None,
 ) -> EnvironmentAdapter:
     """Instantiate the adapter bound to the optional ``context`` and ``game_config``."""
 

@@ -164,17 +164,6 @@ class TestXuanCeWorkerRuntimeDryRun:
         assert summary.runner_type == "unknown"
         assert summary.config["method"] == "ppo"
 
-    def test_benchmark_dry_run_returns_summary(self) -> None:
-        """Test that benchmark() in dry-run mode returns a summary."""
-        config = _make_config(method="dqn", env_id="Pong-v5")
-        runtime = XuanCeWorkerRuntime(config, dry_run=True)
-
-        summary = runtime.benchmark()
-
-        assert summary.status == "dry-run"
-        assert summary.method == "dqn"
-        assert summary.env_id == "Pong-v5"
-
     def test_dry_run_does_not_import_xuance(self) -> None:
         """Test that dry-run mode doesn't attempt to import XuanCe."""
         config = _make_config()
@@ -316,34 +305,6 @@ class TestXuanCeWorkerRuntimeRun:
 
 
 # =============================================================================
-# Benchmark Method Tests
-# =============================================================================
-
-
-class TestXuanCeWorkerRuntimeBenchmark:
-    """Tests for benchmark() method."""
-
-    def test_benchmark_dry_run(self) -> None:
-        """Test benchmark() in dry-run mode."""
-        config = _make_config(method="sac", env_id="HalfCheetah-v4")
-        runtime = XuanCeWorkerRuntime(config, dry_run=True)
-
-        summary = runtime.benchmark()
-
-        assert summary.status == "dry-run"
-        assert summary.method == "sac"
-        assert summary.env_id == "HalfCheetah-v4"
-
-    def test_benchmark_xuance_not_installed_raises_error(self) -> None:
-        """Test that benchmark() raises RuntimeError if XuanCe is not installed."""
-        config = _make_config()
-        runtime = XuanCeWorkerRuntime(config, dry_run=False)
-
-        with pytest.raises(RuntimeError, match="XuanCe is not installed"):
-            runtime.benchmark()
-
-
-# =============================================================================
 # Integration Tests
 # =============================================================================
 
@@ -401,24 +362,6 @@ class TestXuanCeWorkerRuntimeIntegration:
         assert summary.method == "mappo"
         assert summary.env_id == "simple_spread_v3"
         assert summary.config["extras"]["n_agents"] == 3
-
-    def test_benchmark_dry_run_workflow(self) -> None:
-        """Test complete benchmark dry-run workflow."""
-        config = XuanCeWorkerConfig(
-            run_id="benchmark-test",
-            method="dqn",
-            env="atari",
-            env_id="Pong-v5",
-            running_steps=1000000,
-            extras={"eval_interval": 10000},
-        )
-
-        runtime = XuanCeWorkerRuntime(config, dry_run=True)
-        summary = runtime.benchmark()
-
-        assert summary.status == "dry-run"
-        assert summary.method == "dqn"
-
 
 # =============================================================================
 # Backend-Specific Tests

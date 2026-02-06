@@ -3,7 +3,6 @@
 These tests cover the main UI flows for the xuance_train_form.py widget:
 1. Train Agent flow - training with selected backend and algorithm
 2. Test/Evaluate flow - loading model and evaluating
-3. Benchmark flow - training with periodic evaluation
 
 Each flow validates:
 - Configuration handling
@@ -21,10 +20,8 @@ from typing import Any
 import pytest
 
 from xuance_worker.config import XuanCeWorkerConfig
-from xuance_worker.runtime import XuanCeWorkerRuntime, XuanCeRuntimeSummary
+from xuance_worker.runtime import XuanCeWorkerRuntime
 from xuance_worker.algorithm_registry import (
-    Backend,
-    Paradigm,
     get_algorithms,
     get_algorithm_choices,
     get_algorithms_by_category,
@@ -268,50 +265,6 @@ class TestEvaluatePolicyFlow:
 
         assert config.extras["model_dir_load"] == "/path/to/trained/model"
         assert config.extras["test_episode"] == 10
-
-
-# =============================================================================
-# UI Flow 3: Benchmark Mode Tests
-# =============================================================================
-
-
-class TestBenchmarkFlow:
-    """Tests for the 'Benchmark' mode flow.
-
-    This flow:
-    - Trains with periodic evaluation
-    - Saves best models during training
-    """
-
-    def test_benchmark_dry_run_returns_summary(self) -> None:
-        """Test that benchmark dry run returns proper summary."""
-        config = _make_config(
-            method="PPO_Clip",
-            extras={
-                "eval_interval": 10000,
-                "test_episode": 5,
-            },
-        )
-        runtime = _make_runtime(config, dry_run=True)
-
-        summary = runtime.benchmark()
-
-        assert summary.status == "dry-run"
-        assert summary.method == "PPO_Clip"
-
-    def test_benchmark_with_eval_params(self) -> None:
-        """Test benchmark with evaluation parameters."""
-        config = _make_config(
-            extras={
-                "eval_interval": 5000,
-                "test_episode": 10,
-                "save_best": True,
-            },
-        )
-
-        assert config.extras["eval_interval"] == 5000
-        assert config.extras["test_episode"] == 10
-        assert config.extras["save_best"] is True
 
 
 # =============================================================================

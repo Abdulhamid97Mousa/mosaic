@@ -522,14 +522,23 @@ class TrainerDispatcher:
                 if key and value is not None:
                     env[str(key)] = str(value)
 
-        # CRITICAL: Set RAY_FASTLANE_RUN_ID to use the actual run_id (ULID)
+        # CRITICAL: Set FastLane run_id to use the actual run_id (ULID)
         # The form generates a human-readable run_name but the trainer assigns the actual ULID.
         # FastLane requires the actual run_id to match between UI and worker.
-        # We set this whenever FastLane is enabled (RAY_FASTLANE_ENABLED=1)
+        # We set this whenever FastLane is enabled for Ray workers (RAY_FASTLANE_ENABLED=1)
         if env.get("RAY_FASTLANE_ENABLED") == "1":
             env["RAY_FASTLANE_RUN_ID"] = run.run_id
             _LOGGER.debug(
                 "Set RAY_FASTLANE_RUN_ID to actual run_id",
+                extra={"run_id": run.run_id},
+            )
+
+        # CRITICAL: Also set XUANCE_RUN_ID for XuanCe workers when FastLane is enabled
+        # Same issue as Ray - the form sets a human-readable name but FastLane needs the ULID
+        if env.get("MOSAIC_FASTLANE_ENABLED") == "1" or env.get("GYM_GUI_FASTLANE_ONLY") == "1":
+            env["XUANCE_RUN_ID"] = run.run_id
+            _LOGGER.debug(
+                "Set XUANCE_RUN_ID to actual run_id for FastLane",
                 extra={"run_id": run.run_id},
             )
 

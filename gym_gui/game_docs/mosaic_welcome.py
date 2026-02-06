@@ -221,4 +221,23 @@ to create cohesive intelligent systems — like tiles in a mosaic forming a comp
 </p>
 """
 
-__all__ = ["MOSAIC_WELCOME_HTML"]
+MULTI_KEYBOARD_HTML = """
+<h4>Multi-Keyboard Setup</h4>
+<p>Multiple humans can play together using separate USB keyboards (Linux X11 recommended).</p>
+<ol>
+  <li><strong>Connect Keyboards</strong>: Plug in USB keyboards</li>
+  <li><strong>Assign in Human Control tab</strong>: Use the Keyboard Assignment widget to map each keyboard to an agent</li>
+  <li><strong>Start Game</strong>: Each player uses their assigned keyboard</li>
+</ol>
+
+<table border="1" style="border-collapse: collapse; margin: 10px 0; font-size: 0.9em;">
+  <tr>
+    <th style="padding: 4px;">Platform</th>
+    <th style="padding: 4px;">Support</th>
+  </tr>
+  <tr><td style="padding: 4px;">Linux X11</td><td style="padding: 4px; color: green;">✓ Full</td></tr>
+  <tr><td style="padding: 4px;">Windows/macOS/Wayland</td><td style="padding: 4px; color: orange;">⚠ Limited</td></tr>
+</table>
+"""
+
+__all__ = ["MOSAIC_WELCOME_HTML", "MULTI_KEYBOARD_HTML"]

@@ -91,61 +91,14 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
     HEADER_ROW = 0
     SERVER_ROW_OFFSET = 1
 
-    # Modern stylesheet for consistent cross-platform appearance
-    WIDGET_STYLESHEET = """
-        QGroupBox {
-            font-size: 13px;
-            font-weight: bold;
-            border: 1px solid #d0d0d0;
-            border-radius: 6px;
-            margin-top: 12px;
-            padding-top: 8px;
-            background-color: #fafafa;
-        }
-        QGroupBox::title {
-            subcontrol-origin: margin;
-            subcontrol-position: top left;
-            left: 12px;
-            padding: 0 6px;
-            background-color: #fafafa;
-            color: #333;
-        }
-        QLabel {
-            font-size: 12px;
-            color: #333;
-            background: transparent;
-            border: none;
-        }
-        QComboBox {
-            font-size: 12px;
-            padding: 4px 8px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            background-color: white;
-        }
-        QComboBox:hover {
-            border-color: #999;
-        }
-        QComboBox::drop-down {
-            border: none;
-            width: 20px;
-        }
-        QSpinBox {
-            font-size: 12px;
-            padding: 2px 4px;
-            border: 1px solid #ccc;
-            border-radius: 4px;
-            background-color: white;
-        }
-    """
-
     def __init__(
         self,
         max_servers: int = 2,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
-        super().__init__("vLLM Servers (Local Inference)", parent)
-        self.setStyleSheet(self.WIDGET_STYLESHEET)
+        # No title - the CollapsibleSection already provides the header
+        super().__init__(parent)
+        # No custom styling - let Qt handle it naturally
         self._max_servers = max(1, min(8, max_servers))  # Clamp 1-8
         self._current_server_count = self._max_servers
         self._server_rows: Dict[int, ServerRowWidgets] = {}
@@ -214,14 +167,14 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
         header_layout.setSpacing(8)
 
         self._info_label = QtWidgets.QLabel(self._get_gpu_info_text(), self)
-        self._info_label.setStyleSheet("color: #666; font-size: 11px; font-weight: normal; background: transparent;")
+        # No custom styling - let Qt handle dark/light mode
         header_layout.addWidget(self._info_label)
 
         header_layout.addStretch()
 
         # Server count spinbox
         servers_label = QtWidgets.QLabel("Servers:", self)
-        servers_label.setStyleSheet("color: #555; font-size: 12px; font-weight: normal; background: transparent;")
+        # No custom styling - let Qt handle dark/light mode
         header_layout.addWidget(servers_label)
 
         self._server_count_spinbox = QtWidgets.QSpinBox(self)
@@ -256,16 +209,25 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
 
         btn_layout.addStretch()
 
+        # Start All - same green as individual Start buttons
         self._start_all_btn = QtWidgets.QPushButton("Start All", self)
         self._start_all_btn.setToolTip("Start all configured servers")
+        self._start_all_btn.setStyleSheet(
+            "QPushButton { font-weight: bold; background-color: #4CAF50; color: white; }"
+        )
         self._start_all_btn.clicked.connect(self._on_start_all)
         btn_layout.addWidget(self._start_all_btn)
 
+        # Stop All - same red as individual Stop buttons
         self._stop_all_btn = QtWidgets.QPushButton("Stop All", self)
         self._stop_all_btn.setToolTip("Stop all running servers")
+        self._stop_all_btn.setStyleSheet(
+            "QPushButton { font-weight: bold; background-color: #F44336; color: white; }"
+        )
         self._stop_all_btn.clicked.connect(self._on_stop_all)
         btn_layout.addWidget(self._stop_all_btn)
 
+        # Refresh - standard button style
         self._refresh_btn = QtWidgets.QPushButton("↻ Refresh", self)
         self._refresh_btn.setToolTip("Refresh model list from disk")
         self._refresh_btn.clicked.connect(self._refresh_models)
@@ -275,26 +237,19 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
 
     def _add_header_row(self) -> None:
         """Add the header row to the grid."""
-        header_style = "font-weight: 600; color: #444; font-size: 11px; background: transparent; border: none; padding-bottom: 4px;"
-
         server_header = QtWidgets.QLabel("Server", self)
-        server_header.setStyleSheet(header_style)
         self._grid_layout.addWidget(server_header, self.HEADER_ROW, self.COL_SERVER)
 
         port_header = QtWidgets.QLabel("Port", self)
-        port_header.setStyleSheet(header_style)
         self._grid_layout.addWidget(port_header, self.HEADER_ROW, self.COL_PORT)
 
         model_header = QtWidgets.QLabel("Model", self)
-        model_header.setStyleSheet(header_style)
         self._grid_layout.addWidget(model_header, self.HEADER_ROW, self.COL_MODEL)
 
         status_header = QtWidgets.QLabel("Status", self)
-        status_header.setStyleSheet(header_style)
         self._grid_layout.addWidget(status_header, self.HEADER_ROW, self.COL_STATUS)
 
         actions_header = QtWidgets.QLabel("Actions", self)
-        actions_header.setStyleSheet(header_style)
         self._grid_layout.addWidget(actions_header, self.HEADER_ROW, self.COL_START, 1, 2)
 
     def _add_server_row(self, server_id: int) -> None:
@@ -304,13 +259,12 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
 
         # Server label
         server_label = QtWidgets.QLabel(f"{server_id}", self)
-        server_label.setStyleSheet("font-weight: 600; font-size: 12px; background: transparent; border: none;")
         server_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
         self._grid_layout.addWidget(server_label, row, self.COL_SERVER)
 
         # Port label
         port_label = QtWidgets.QLabel(f":{port}", self)
-        port_label.setStyleSheet("color: #555; font-size: 12px; background: transparent; border: none;")
+        # No custom styling - let Qt handle dark/light mode
         self._grid_layout.addWidget(port_label, row, self.COL_PORT)
 
         # Model dropdown
@@ -326,32 +280,24 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
 
         # Status label (combined indicator + text)
         status_label = QtWidgets.QLabel("○ Stopped", self)
-        status_label.setStyleSheet("color: #666; font-size: 12px; background: transparent; border: none;")
+        # No custom styling - status colors set dynamically in _update_row_state
         status_label.setMinimumWidth(80)
         self._grid_layout.addWidget(status_label, row, self.COL_STATUS)
 
-        # Start button
+        # Start button - same style as Execution Controls "Step All" (green)
         start_btn = QtWidgets.QPushButton("Start", self)
-        start_btn.setFixedWidth(55)
         start_btn.setToolTip("Start vLLM server with selected model")
         start_btn.setStyleSheet(
-            "QPushButton { background-color: #4CAF50; color: white; border: none; border-radius: 4px; padding: 5px 10px; font-size: 12px; font-weight: 500; }"
-            "QPushButton:hover { background-color: #43A047; }"
-            "QPushButton:pressed { background-color: #388E3C; }"
-            "QPushButton:disabled { background-color: #C8E6C9; color: #A5D6A7; }"
+            "QPushButton { font-weight: bold; background-color: #4CAF50; color: white; }"
         )
         start_btn.clicked.connect(lambda checked, sid=server_id: self._on_start_requested(sid))
         self._grid_layout.addWidget(start_btn, row, self.COL_START)
 
-        # Stop button
+        # Stop button - same style as Execution Controls "Stop All" (red)
         stop_btn = QtWidgets.QPushButton("Stop", self)
-        stop_btn.setFixedWidth(55)
         stop_btn.setToolTip("Stop vLLM server")
         stop_btn.setStyleSheet(
-            "QPushButton { background-color: #EF5350; color: white; border: none; border-radius: 4px; padding: 5px 10px; font-size: 12px; font-weight: 500; }"
-            "QPushButton:hover { background-color: #E53935; }"
-            "QPushButton:pressed { background-color: #D32F2F; }"
-            "QPushButton:disabled { background-color: #FFCDD2; color: #EF9A9A; }"
+            "QPushButton { font-weight: bold; background-color: #F44336; color: white; }"
         )
         stop_btn.setEnabled(False)
         stop_btn.clicked.connect(lambda checked, sid=server_id: self._on_stop_requested(sid))
@@ -514,35 +460,33 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
         row = self._server_rows[server_id]
         self._server_states[server_id] = state
 
-        # Base style for status labels
-        base_style = "font-size: 12px; background: transparent; border: none;"
-
         # Update status label and buttons based on state
+        # Semantic colors: green=running, orange=starting, red=error
         if state.status == "running":
             status_text = "● Running"
             if state.memory_gb > 0:
                 status_text += f" ({state.memory_gb:.1f}GB)"
             row.status_label.setText(status_text)
-            row.status_label.setStyleSheet(f"color: #4CAF50; font-weight: 600; {base_style}")
+            row.status_label.setStyleSheet("color: #4CAF50;")
             row.start_btn.setEnabled(False)
             row.stop_btn.setEnabled(True)
             row.model_combo.setEnabled(False)
         elif state.status == "starting":
             row.status_label.setText("◐ Starting...")
-            row.status_label.setStyleSheet(f"color: #FF9800; {base_style}")
+            row.status_label.setStyleSheet("color: #FF9800;")
             row.start_btn.setEnabled(False)
             row.stop_btn.setEnabled(False)
             row.model_combo.setEnabled(False)
         elif state.status == "error":
             row.status_label.setText("✕ Error")
-            row.status_label.setStyleSheet(f"color: #F44336; {base_style}")
+            row.status_label.setStyleSheet("color: #F44336;")
             row.status_label.setToolTip(state.error_message or "Unknown error")
             row.start_btn.setEnabled(True)
             row.stop_btn.setEnabled(False)
             row.model_combo.setEnabled(True)
         else:  # stopped
             row.status_label.setText("○ Stopped")
-            row.status_label.setStyleSheet(f"color: #666; {base_style}")
+            row.status_label.setStyleSheet("")  # System default
             row.status_label.setToolTip("")
             row.start_btn.setEnabled(True)
             row.stop_btn.setEnabled(False)

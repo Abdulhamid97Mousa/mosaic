@@ -241,3 +241,18 @@ _vizdoom.ini
 
 # Paper drafts and research documents (private)
 docs/my_paper/
+
+
+#  
+experiments/*
+
+# 
+3rd_party/mosaic/llm_worker.backup/llm_worker/environments/nle/tiles.pkl
+3rd_party/mosaic/llm_worker.backup/llm_worker/environments/nle/Hack-Regular.ttf
+
+
+#
+_vizdoom.ini
+
+#
+.claude

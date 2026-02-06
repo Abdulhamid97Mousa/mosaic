@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from .config import WorkerConfig, load_worker_config
 from .runtime import CleanRLWorkerRuntime, RuntimeSummary
+from . import wrappers
 
 from gym_gui.core.worker import WorkerMetadata, WorkerCapabilities
 
@@ -54,6 +55,7 @@ __all__ = [
     "WorkerConfig",
     "load_worker_config",
     "get_worker_metadata",
+    "wrappers",
 ]
 
 __version__ = "0.1.0"

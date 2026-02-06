@@ -19,6 +19,11 @@ try:
 except Exception:  # pragma: no cover - optional feature not available in tests
     QNetworkProxy = None
 
+try:
+    from gym_gui.ui.widgets.filtered_web_engine import FilteredWebEnginePage
+except ImportError:  # pragma: no cover - optional feature
+    FilteredWebEnginePage = None  # type: ignore[assignment, misc]
+
 WEB_ENGINE_AVAILABLE = QWebEngineView is not None
 # Disable auto-embed by default since WANDB blocks iframe embedding for security
 # Set GYM_GUI_ENABLE_WANDB_AUTO_EMBED=1 to force enable (will show blank page)
@@ -539,6 +544,8 @@ class WandbArtifactTab(QtWidgets.QWidget, LogConstantMixin):
         try:
             if self._web_view is None:
                 self._web_view = QWebEngineView(self)  # type: ignore[assignment]
+                if FilteredWebEnginePage is not None and self._web_view is not None:
+                    self._web_view.setPage(FilteredWebEnginePage(self._web_view))
                 # Get the layout and find the placeholder's position
                 main_layout = self.layout()
                 if main_layout is not None and self._placeholder is not None:

@@ -124,6 +124,37 @@ try:  # pragma: no cover - gym optional
             except Exception:
                 pass
 
+        # Wrap with ProceduralGenerationWrapper if requested
+        procedural_gen = os.getenv("CLEANRL_PROCEDURAL_GENERATION", "").lower()
+        if procedural_gen in ("1", "true", "yes") and env is not None:
+            try:
+                from cleanrl_worker.wrappers.procedural_generation import ProceduralGenerationWrapper
+                # Enable procedural generation (different levels each episode)
+                # Don't pass fixed_seed - let each parallel env get its own random RNG
+                # This ensures different layouts across parallel environments
+                env = ProceduralGenerationWrapper(
+                    env,
+                    procedural=True,
+                    fixed_seed=None
+                )
+            except Exception:
+                pass
+        elif procedural_gen in ("0", "false", "no") and env is not None:
+            try:
+                from cleanrl_worker.wrappers.procedural_generation import ProceduralGenerationWrapper
+                # Get seed from environment variable
+                seed_str = os.getenv("CLEANRL_SEED")
+                seed = int(seed_str) if seed_str else 42  # Default seed for fixed mode
+
+                # Disable procedural generation (same level each episode)
+                env = ProceduralGenerationWrapper(
+                    env,
+                    procedural=False,
+                    fixed_seed=seed
+                )
+            except Exception:
+                pass
+
         if os.getenv("MOSAIC_CAPTURE_VIDEO") == "1" and not isinstance(env, RecordVideo):
             render_mode = getattr(env, "render_mode", None)
             if render_mode in _RGB_MODES:

@@ -124,3 +124,15 @@
 [submodule "BALROG"]
   path = 3rd_party/balrog_worker/BALROG
   url = https://github.com/balrog-ai/BALROG.git
+
+
+[submodule "multigrid"]
+  path = 3rd_party/multigrid-ini
+  url = https://github.com/ini/multigrid.git
+
+# https://github.com/openai/procgen.git 
+
+[submodule "procgen"]
+  path = 3rd_party/procgen 
+  url = https://github.com/openai/procgen.git
+

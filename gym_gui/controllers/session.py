@@ -6,7 +6,7 @@ from dataclasses import dataclass, asdict, is_dataclass
 import hashlib
 import logging
 from datetime import datetime
-from typing import Any, Mapping, Optional, cast
+from typing import Any, Dict, Mapping, Optional, cast
 
 import gymnasium.spaces as spaces
 import numpy as np
@@ -387,7 +387,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             return JumanjiArcadeInteractionController(self, target_hz=10)
         return TurnBasedInteractionController()
 
-    def perform_human_action(self, action: int, *, key_label: str | None = None) -> None:
+    def perform_human_action(self, action: int | list[int], *, key_label: str | None = None) -> None:
         if self._adapter is None:
             return
         if not self._game_started:
@@ -598,7 +598,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             self.error_occurred.emit(str(exc))
         return None
 
-    def _apply_action(self, action: int) -> None:
+    def _apply_action(self, action: int | list[int]) -> None:
         if self._adapter is None:
             return
         try:
@@ -622,9 +622,17 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         self._last_step = step
         step_timestamp = datetime.utcnow()
         source_label = self._pending_input_label or "unknown"
+
+        # For recording, use first action from list or the single action
+        record_action: int | None
+        if isinstance(action, list):
+            record_action = action[0] if action else 0
+        else:
+            record_action = action
+
         self._record_step(
             step,
-            action=action,
+            action=record_action,
             timestamp=step_timestamp,
             input_source=source_label,
         )
@@ -637,7 +645,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         except Exception:
             pass
         self._update_status(step)
-        self._log_step_outcome(action, step)
+        self._log_step_outcome(record_action, step)
 
         # Clear the label so future steps require explicit attribution
         self._pending_input_label = None
@@ -1380,7 +1388,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
                 return position  # type: ignore[return-value]
         return None
 
-    def _log_step_outcome(self, action: int, step: AdapterStep) -> None:
+    def _log_step_outcome(self, action: int | list[int] | None, step: AdapterStep) -> None:
         input_label = self._pending_input_label or "system"
         self._pending_input_label = None
 
@@ -1446,13 +1454,17 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             return f"config=[{', '.join(config_parts)}]"
         return ""
     
-    def _detect_slippage(self, action: int, delta: tuple[int, int] | None) -> str:
+    def _detect_slippage(self, action: int | list[int] | None, delta: tuple[int, int] | None) -> str:
         """Detect if movement differs from intended action (slippage)."""
         if delta is None or self._game_id is None:
             return ""
-        
+
         # Only check for discrete action games with directional movement
         if self._game_id not in {GameId.FROZEN_LAKE, GameId.CLIFF_WALKING}:
+            return ""
+
+        # Skip slippage detection for multi-agent actions (list) or None
+        if not isinstance(action, int):
             return ""
         
         # Map actions to expected deltas for toy-text games

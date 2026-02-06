@@ -670,10 +670,19 @@ class MultiGridConfig:
 
     Repository: https://github.com/ArnaudFickinger/gym-multigrid
     Location: 3rd_party/gym-multigrid/
+
+    IMPORTANT: MultiGrid environments REQUIRE state-based input mode for multi-keyboard
+    support. Shortcut-based mode is incompatible with evdev multi-keyboard monitoring
+    and will cause all agents to respond to any keyboard input.
     """
 
     env_id: str = "soccer"
     """Environment variant: 'soccer' (2v2, 4 agents) or 'collect' (3 agents)."""
+
+    num_agents: int | None = None
+    """Number of agents in the environment. If None, uses environment default.
+    For INI multigrid environments, defaults to 1 if not specified.
+    For legacy environments (Soccer, Collect), this is ignored (fixed agent count)."""
 
     seed: int | None = None
     """Random seed for reproducibility."""
@@ -683,6 +692,19 @@ class MultiGridConfig:
 
     env_kwargs: Dict[str, Any] | None = None
     """Additional environment-specific kwargs."""
+
+    @property
+    def required_input_mode(self) -> str:
+        """Return the required input mode for MultiGrid environments.
+
+        MultiGrid environments MUST use state-based input mode to support
+        multi-keyboard control via evdev. Shortcut-based mode conflicts with
+        per-device keyboard monitoring.
+
+        Returns:
+            "state_based" - Always returns state-based mode requirement
+        """
+        return "state_based"
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary."""
@@ -716,6 +738,10 @@ class MeltingPotConfig:
     Shimmy: https://shimmy.farama.org/environments/meltingpot/
 
     NOTE: Linux/macOS only (Windows NOT supported)
+
+    IMPORTANT: MeltingPot environments REQUIRE state-based input mode for multi-keyboard
+    support. Shortcut-based mode is incompatible with evdev multi-keyboard monitoring
+    and will cause all agents to respond to any keyboard input.
     """
 
     substrate_name: str = "collaborative_cooking__circuit"
@@ -727,14 +753,33 @@ class MeltingPotConfig:
     seed: int | None = None
     """Random seed for reproducibility."""
 
+    render_scale: int = 2
+    """Scale factor for rendered image (1 = native, 2 = 2x, 4 = 4x).
+    Native resolution varies by substrate (40×72 to 312×184).
+    Higher values improve visibility but may impact performance."""
+
     env_kwargs: Dict[str, Any] | None = None
     """Additional environment-specific kwargs passed to Shimmy wrapper."""
+
+    @property
+    def required_input_mode(self) -> str:
+        """Return the required input mode for MeltingPot environments.
+
+        MeltingPot environments MUST use state-based input mode to support
+        multi-keyboard control via evdev. Shortcut-based mode conflicts with
+        per-device keyboard monitoring.
+
+        Returns:
+            "state_based" - Always returns state-based mode requirement
+        """
+        return "state_based"
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary."""
         return {
             "substrate_name": self.substrate_name,
             "seed": self.seed,
+            "render_scale": self.render_scale,
             "env_kwargs": self.env_kwargs or {},
         }
 
@@ -744,6 +789,7 @@ class MeltingPotConfig:
         return cls(
             substrate_name=data.get("substrate_name", "collaborative_cooking__circuit"),
             seed=data.get("seed"),
+            render_scale=data.get("render_scale", 2),
             env_kwargs=data.get("env_kwargs"),
         )
 
@@ -760,6 +806,10 @@ class OvercookedConfig:
     Paper: https://arxiv.org/abs/1910.05789 (NeurIPS 2019)
 
     Research focus: Human-AI coordination, zero-shot coordination, behavior cloning
+
+    IMPORTANT: Overcooked environments REQUIRE state-based input mode for multi-keyboard
+    support. Shortcut-based mode is incompatible with evdev multi-keyboard monitoring
+    and will cause all agents to respond to any keyboard input.
     """
 
     layout_name: str = "cramped_room"
@@ -783,6 +833,19 @@ class OvercookedConfig:
 
     seed: int | None = None
     """Random seed for reproducibility (used in MDP generation)."""
+
+    @property
+    def required_input_mode(self) -> str:
+        """Return the required input mode for Overcooked environments.
+
+        Overcooked environments MUST use state-based input mode to support
+        multi-keyboard control via evdev. Shortcut-based mode conflicts with
+        per-device keyboard monitoring.
+
+        Returns:
+            "state_based" - Always returns state-based mode requirement
+        """
+        return "state_based"
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary."""
@@ -813,6 +876,7 @@ GameConfig: TypeAlias = (
     FrozenLakeConfig
     | TaxiConfig
     | CliffWalkingConfig
+    | BlackjackConfig
     | LunarLanderConfig
     | CarRacingConfig
     | BipedalWalkerConfig
@@ -842,7 +906,7 @@ DEFAULT_MULTIGRID_COLLECT_CONFIG = MultiGridConfig(env_id="collect", highlight=T
 
 # Default Melting Pot configurations for each substrate
 DEFAULT_MELTINGPOT_COLLABORATIVE_COOKING_CONFIG = MeltingPotConfig(substrate_name="collaborative_cooking__circuit")
-DEFAULT_MELTINGPOT_CLEAN_UP_CONFIG = MeltingPotConfig(substrate_name="clean_up__repeated")
+DEFAULT_MELTINGPOT_CLEAN_UP_CONFIG = MeltingPotConfig(substrate_name="clean_up")
 DEFAULT_MELTINGPOT_COMMONS_HARVEST_CONFIG = MeltingPotConfig(substrate_name="commons_harvest__open")
 DEFAULT_MELTINGPOT_TERRITORY_CONFIG = MeltingPotConfig(substrate_name="territory__rooms")
 DEFAULT_MELTINGPOT_KING_OF_THE_HILL_CONFIG = MeltingPotConfig(substrate_name="king_of_the_hill__repeated")

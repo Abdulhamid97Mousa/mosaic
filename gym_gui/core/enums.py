@@ -422,31 +422,108 @@ class GameId(StrEnum):
 
     # ─────────────────────────────────────────────────────────────────────────
     # gym-multigrid (Multi-Agent Grid Environments)
-    # Repository: https://github.com/ArnaudFickinger/gym-multigrid
-    # Location: 3rd_party/gym-multigrid/
+    # Repository (old): https://github.com/ArnaudFickinger/gym-multigrid
+    # Repository (new): https://github.com/ini/multigrid
+    # Location: 3rd_party/gym-multigrid/ and 3rd_party/multigrid-ini/
     # ─────────────────────────────────────────────────────────────────────────
+    # Legacy gym-multigrid environments (ArnaudFickinger)
     MULTIGRID_SOCCER = "MultiGrid-Soccer-v0"  # 4 agents, 2v2 soccer
     MULTIGRID_COLLECT = "MultiGrid-Collect-v0"  # 3 agents, collect balls
+    # INI multigrid environments (https://github.com/ini/multigrid)
+    MULTIGRID_BLOCKED_UNLOCK_PICKUP = "MultiGrid-BlockedUnlockPickup-v0"  # Blocked door puzzle
+    MULTIGRID_EMPTY_5X5 = "MultiGrid-Empty-5x5-v0"  # Empty 5x5 grid
+    MULTIGRID_EMPTY_RANDOM_5X5 = "MultiGrid-Empty-Random-5x5-v0"  # Empty 5x5 with random start
+    MULTIGRID_EMPTY_6X6 = "MultiGrid-Empty-6x6-v0"  # Empty 6x6 grid
+    MULTIGRID_EMPTY_RANDOM_6X6 = "MultiGrid-Empty-Random-6x6-v0"  # Empty 6x6 with random start
+    MULTIGRID_EMPTY_8X8 = "MultiGrid-Empty-8x8-v0"  # Empty 8x8 grid
+    MULTIGRID_EMPTY_16X16 = "MultiGrid-Empty-16x16-v0"  # Empty 16x16 grid
+    MULTIGRID_LOCKED_HALLWAY_2ROOMS = "MultiGrid-LockedHallway-2Rooms-v0"  # 2 rooms with locked doors
+    MULTIGRID_LOCKED_HALLWAY_4ROOMS = "MultiGrid-LockedHallway-4Rooms-v0"  # 4 rooms with locked doors
+    MULTIGRID_LOCKED_HALLWAY_6ROOMS = "MultiGrid-LockedHallway-6Rooms-v0"  # 6 rooms with locked doors
+    MULTIGRID_PLAYGROUND = "MultiGrid-Playground-v0"  # Playground with various objects
+    MULTIGRID_RED_BLUE_DOORS_6X6 = "MultiGrid-RedBlueDoors-6x6-v0"  # Red/Blue door puzzle 6x6
+    MULTIGRID_RED_BLUE_DOORS_8X8 = "MultiGrid-RedBlueDoors-8x8-v0"  # Red/Blue door puzzle 8x8
 
     # ─────────────────────────────────────────────────────────────────────────
     # Melting Pot (Multi-Agent Social Scenarios - Google DeepMind)
     # Repository: https://github.com/google-deepmind/meltingpot
     # Shimmy: https://shimmy.farama.org/environments/meltingpot/
     # NOTE: Linux/macOS only (Windows NOT supported)
+    # All 49 substrates organized by category
     # ─────────────────────────────────────────────────────────────────────────
-    # Cooperative Scenarios
-    MELTINGPOT_COLLABORATIVE_COOKING = "meltingpot/collaborative_cooking__circuit"  # Up to 9 agents, cooking cooperation
-    MELTINGPOT_CLEAN_UP = "meltingpot/clean_up__repeated"  # Up to 7 agents, public goods game
-    MELTINGPOT_COMMONS_HARVEST = "meltingpot/commons_harvest__open"  # Up to 16 agents, tragedy of the commons
-
-    # Competitive Scenarios
-    MELTINGPOT_TERRITORY = "meltingpot/territory__rooms"  # Up to 8 agents, territory control
-    MELTINGPOT_KING_OF_THE_HILL = "meltingpot/king_of_the_hill__repeated"  # Up to 16 agents, area control
-
-    # Mixed-Motive (Cooperation + Competition)
-    MELTINGPOT_PRISONERS_DILEMMA = "meltingpot/prisoners_dilemma_in_the_matrix__repeated"  # 2 agents, game theory classic
-    MELTINGPOT_STAG_HUNT = "meltingpot/stag_hunt_in_the_matrix__repeated"  # 2 agents, coordination dilemma
-    MELTINGPOT_ALLELOPATHIC_HARVEST = "meltingpot/allelopathic_harvest__open"  # Up to 16 agents, resource competition
+    # Allelopathic Harvest (resource competition with color preferences)
+    MELTINGPOT_ALLELOPATHIC_HARVEST__OPEN = "meltingpot/allelopathic_harvest__open"
+    # Bach or Stravinsky (coordination game)
+    MELTINGPOT_BACH_OR_STRAVINSKY_IN_THE_MATRIX__ARENA = "meltingpot/bach_or_stravinsky_in_the_matrix__arena"
+    MELTINGPOT_BACH_OR_STRAVINSKY_IN_THE_MATRIX__REPEATED = "meltingpot/bach_or_stravinsky_in_the_matrix__repeated"
+    # Boat Race (team racing)
+    MELTINGPOT_BOAT_RACE__EIGHT_RACES = "meltingpot/boat_race__eight_races"
+    # Chemistry (metabolic cycles cooperation)
+    MELTINGPOT_CHEMISTRY__THREE_METABOLIC_CYCLES = "meltingpot/chemistry__three_metabolic_cycles"
+    MELTINGPOT_CHEMISTRY__THREE_METABOLIC_CYCLES_WITH_PLENTIFUL_DISTRACTORS = "meltingpot/chemistry__three_metabolic_cycles_with_plentiful_distractors"
+    MELTINGPOT_CHEMISTRY__TWO_METABOLIC_CYCLES = "meltingpot/chemistry__two_metabolic_cycles"
+    MELTINGPOT_CHEMISTRY__TWO_METABOLIC_CYCLES_WITH_DISTRACTORS = "meltingpot/chemistry__two_metabolic_cycles_with_distractors"
+    # Chicken (anti-coordination game)
+    MELTINGPOT_CHICKEN_IN_THE_MATRIX__ARENA = "meltingpot/chicken_in_the_matrix__arena"
+    MELTINGPOT_CHICKEN_IN_THE_MATRIX__REPEATED = "meltingpot/chicken_in_the_matrix__repeated"
+    # Clean Up (public goods / tragedy of the commons)
+    MELTINGPOT_CLEAN_UP = "meltingpot/clean_up"
+    # Coins (simple resource collection)
+    MELTINGPOT_COINS = "meltingpot/coins"
+    # Collaborative Cooking (cooperative cooking scenarios)
+    MELTINGPOT_COLLABORATIVE_COOKING__ASYMMETRIC = "meltingpot/collaborative_cooking__asymmetric"
+    MELTINGPOT_COLLABORATIVE_COOKING__CIRCUIT = "meltingpot/collaborative_cooking__circuit"
+    MELTINGPOT_COLLABORATIVE_COOKING__CRAMPED = "meltingpot/collaborative_cooking__cramped"
+    MELTINGPOT_COLLABORATIVE_COOKING__CROWDED = "meltingpot/collaborative_cooking__crowded"
+    MELTINGPOT_COLLABORATIVE_COOKING__FIGURE_EIGHT = "meltingpot/collaborative_cooking__figure_eight"
+    MELTINGPOT_COLLABORATIVE_COOKING__FORCED = "meltingpot/collaborative_cooking__forced"
+    MELTINGPOT_COLLABORATIVE_COOKING__RING = "meltingpot/collaborative_cooking__ring"
+    # Commons Harvest (tragedy of the commons)
+    MELTINGPOT_COMMONS_HARVEST__CLOSED = "meltingpot/commons_harvest__closed"
+    MELTINGPOT_COMMONS_HARVEST__OPEN = "meltingpot/commons_harvest__open"
+    MELTINGPOT_COMMONS_HARVEST__PARTNERSHIP = "meltingpot/commons_harvest__partnership"
+    # Coop Mining (cooperative resource extraction)
+    MELTINGPOT_COOP_MINING = "meltingpot/coop_mining"
+    # Daycare (supervision and care)
+    MELTINGPOT_DAYCARE = "meltingpot/daycare"
+    # Externality Mushrooms (externalities in resource collection)
+    MELTINGPOT_EXTERNALITY_MUSHROOMS__DENSE = "meltingpot/externality_mushrooms__dense"
+    # Factory Commons (production dilemma)
+    MELTINGPOT_FACTORY_COMMONS__EITHER_OR = "meltingpot/factory_commons__either_or"
+    # Fruit Market (trading scenario)
+    MELTINGPOT_FRUIT_MARKET__CONCENTRIC_RIVERS = "meltingpot/fruit_market__concentric_rivers"
+    # Gift Refinements (gift giving and reciprocity)
+    MELTINGPOT_GIFT_REFINEMENTS = "meltingpot/gift_refinements"
+    # Hidden Agenda (deception and inference)
+    MELTINGPOT_HIDDEN_AGENDA = "meltingpot/hidden_agenda"
+    # Paintball (team competition)
+    MELTINGPOT_PAINTBALL__CAPTURE_THE_FLAG = "meltingpot/paintball__capture_the_flag"
+    MELTINGPOT_PAINTBALL__KING_OF_THE_HILL = "meltingpot/paintball__king_of_the_hill"
+    # Predator Prey (asymmetric competition)
+    MELTINGPOT_PREDATOR_PREY__ALLEY_HUNT = "meltingpot/predator_prey__alley_hunt"
+    MELTINGPOT_PREDATOR_PREY__OPEN = "meltingpot/predator_prey__open"
+    MELTINGPOT_PREDATOR_PREY__ORCHARD = "meltingpot/predator_prey__orchard"
+    MELTINGPOT_PREDATOR_PREY__RANDOM_FOREST = "meltingpot/predator_prey__random_forest"
+    # Prisoners Dilemma (classic game theory)
+    MELTINGPOT_PRISONERS_DILEMMA_IN_THE_MATRIX__ARENA = "meltingpot/prisoners_dilemma_in_the_matrix__arena"
+    MELTINGPOT_PRISONERS_DILEMMA_IN_THE_MATRIX__REPEATED = "meltingpot/prisoners_dilemma_in_the_matrix__repeated"
+    # Pure Coordination (coordination game)
+    MELTINGPOT_PURE_COORDINATION_IN_THE_MATRIX__ARENA = "meltingpot/pure_coordination_in_the_matrix__arena"
+    MELTINGPOT_PURE_COORDINATION_IN_THE_MATRIX__REPEATED = "meltingpot/pure_coordination_in_the_matrix__repeated"
+    # Rationalizable Coordination (coordination with rationality)
+    MELTINGPOT_RATIONALIZABLE_COORDINATION_IN_THE_MATRIX__ARENA = "meltingpot/rationalizable_coordination_in_the_matrix__arena"
+    MELTINGPOT_RATIONALIZABLE_COORDINATION_IN_THE_MATRIX__REPEATED = "meltingpot/rationalizable_coordination_in_the_matrix__repeated"
+    # Running With Scissors (rock-paper-scissors variant)
+    MELTINGPOT_RUNNING_WITH_SCISSORS_IN_THE_MATRIX__ARENA = "meltingpot/running_with_scissors_in_the_matrix__arena"
+    MELTINGPOT_RUNNING_WITH_SCISSORS_IN_THE_MATRIX__ONE_SHOT = "meltingpot/running_with_scissors_in_the_matrix__one_shot"
+    MELTINGPOT_RUNNING_WITH_SCISSORS_IN_THE_MATRIX__REPEATED = "meltingpot/running_with_scissors_in_the_matrix__repeated"
+    # Stag Hunt (coordination dilemma)
+    MELTINGPOT_STAG_HUNT_IN_THE_MATRIX__ARENA = "meltingpot/stag_hunt_in_the_matrix__arena"
+    MELTINGPOT_STAG_HUNT_IN_THE_MATRIX__REPEATED = "meltingpot/stag_hunt_in_the_matrix__repeated"
+    # Territory (area control)
+    MELTINGPOT_TERRITORY__INSIDE_OUT = "meltingpot/territory__inside_out"
+    MELTINGPOT_TERRITORY__OPEN = "meltingpot/territory__open"
+    MELTINGPOT_TERRITORY__ROOMS = "meltingpot/territory__rooms"
 
     # ─────────────────────────────────────────────────────────────────────────
     # Overcooked-AI (Cooperative Cooking - Human-AI Coordination)
@@ -1001,15 +1078,69 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     # gym-multigrid (multi-agent grid environments)
     GameId.MULTIGRID_SOCCER: EnvironmentFamily.MULTIGRID,
     GameId.MULTIGRID_COLLECT: EnvironmentFamily.MULTIGRID,
-    # Melting Pot (multi-agent social scenarios)
-    GameId.MELTINGPOT_COLLABORATIVE_COOKING: EnvironmentFamily.MELTINGPOT,
+    GameId.MULTIGRID_BLOCKED_UNLOCK_PICKUP: EnvironmentFamily.MULTIGRID,
+    GameId.MULTIGRID_EMPTY_5X5: EnvironmentFamily.MULTIGRID,
+    GameId.MULTIGRID_EMPTY_RANDOM_5X5: EnvironmentFamily.MULTIGRID,
+    GameId.MULTIGRID_EMPTY_6X6: EnvironmentFamily.MULTIGRID,
+    GameId.MULTIGRID_EMPTY_RANDOM_6X6: EnvironmentFamily.MULTIGRID,
+    GameId.MULTIGRID_EMPTY_8X8: EnvironmentFamily.MULTIGRID,
+    GameId.MULTIGRID_EMPTY_16X16: EnvironmentFamily.MULTIGRID,
+    GameId.MULTIGRID_LOCKED_HALLWAY_2ROOMS: EnvironmentFamily.MULTIGRID,
+    GameId.MULTIGRID_LOCKED_HALLWAY_4ROOMS: EnvironmentFamily.MULTIGRID,
+    GameId.MULTIGRID_LOCKED_HALLWAY_6ROOMS: EnvironmentFamily.MULTIGRID,
+    GameId.MULTIGRID_PLAYGROUND: EnvironmentFamily.MULTIGRID,
+    GameId.MULTIGRID_RED_BLUE_DOORS_6X6: EnvironmentFamily.MULTIGRID,
+    GameId.MULTIGRID_RED_BLUE_DOORS_8X8: EnvironmentFamily.MULTIGRID,
+    # Melting Pot (all 49 multi-agent social scenarios)
+    GameId.MELTINGPOT_ALLELOPATHIC_HARVEST__OPEN: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_BACH_OR_STRAVINSKY_IN_THE_MATRIX__ARENA: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_BACH_OR_STRAVINSKY_IN_THE_MATRIX__REPEATED: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_BOAT_RACE__EIGHT_RACES: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_CHEMISTRY__THREE_METABOLIC_CYCLES: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_CHEMISTRY__THREE_METABOLIC_CYCLES_WITH_PLENTIFUL_DISTRACTORS: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_CHEMISTRY__TWO_METABOLIC_CYCLES: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_CHEMISTRY__TWO_METABOLIC_CYCLES_WITH_DISTRACTORS: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_CHICKEN_IN_THE_MATRIX__ARENA: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_CHICKEN_IN_THE_MATRIX__REPEATED: EnvironmentFamily.MELTINGPOT,
     GameId.MELTINGPOT_CLEAN_UP: EnvironmentFamily.MELTINGPOT,
-    GameId.MELTINGPOT_COMMONS_HARVEST: EnvironmentFamily.MELTINGPOT,
-    GameId.MELTINGPOT_TERRITORY: EnvironmentFamily.MELTINGPOT,
-    GameId.MELTINGPOT_KING_OF_THE_HILL: EnvironmentFamily.MELTINGPOT,
-    GameId.MELTINGPOT_PRISONERS_DILEMMA: EnvironmentFamily.MELTINGPOT,
-    GameId.MELTINGPOT_STAG_HUNT: EnvironmentFamily.MELTINGPOT,
-    GameId.MELTINGPOT_ALLELOPATHIC_HARVEST: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_COINS: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__ASYMMETRIC: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__CIRCUIT: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__CRAMPED: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__CROWDED: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__FIGURE_EIGHT: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__FORCED: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__RING: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_COMMONS_HARVEST__CLOSED: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_COMMONS_HARVEST__OPEN: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_COMMONS_HARVEST__PARTNERSHIP: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_COOP_MINING: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_DAYCARE: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_EXTERNALITY_MUSHROOMS__DENSE: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_FACTORY_COMMONS__EITHER_OR: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_FRUIT_MARKET__CONCENTRIC_RIVERS: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_GIFT_REFINEMENTS: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_HIDDEN_AGENDA: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_PAINTBALL__CAPTURE_THE_FLAG: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_PAINTBALL__KING_OF_THE_HILL: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_PREDATOR_PREY__ALLEY_HUNT: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_PREDATOR_PREY__OPEN: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_PREDATOR_PREY__ORCHARD: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_PREDATOR_PREY__RANDOM_FOREST: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_PRISONERS_DILEMMA_IN_THE_MATRIX__ARENA: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_PRISONERS_DILEMMA_IN_THE_MATRIX__REPEATED: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_PURE_COORDINATION_IN_THE_MATRIX__ARENA: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_PURE_COORDINATION_IN_THE_MATRIX__REPEATED: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_RATIONALIZABLE_COORDINATION_IN_THE_MATRIX__ARENA: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_RATIONALIZABLE_COORDINATION_IN_THE_MATRIX__REPEATED: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_RUNNING_WITH_SCISSORS_IN_THE_MATRIX__ARENA: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_RUNNING_WITH_SCISSORS_IN_THE_MATRIX__ONE_SHOT: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_RUNNING_WITH_SCISSORS_IN_THE_MATRIX__REPEATED: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_STAG_HUNT_IN_THE_MATRIX__ARENA: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_STAG_HUNT_IN_THE_MATRIX__REPEATED: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_TERRITORY__INSIDE_OUT: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_TERRITORY__OPEN: EnvironmentFamily.MELTINGPOT,
+    GameId.MELTINGPOT_TERRITORY__ROOMS: EnvironmentFamily.MELTINGPOT,
     # Overcooked-AI (cooperative cooking)
     GameId.OVERCOOKED_CRAMPED_ROOM: EnvironmentFamily.OVERCOOKED,
     GameId.OVERCOOKED_ASYMMETRIC_ADVANTAGES: EnvironmentFamily.OVERCOOKED,
@@ -1235,15 +1366,69 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     # gym-multigrid (multi-agent grid environments)
     GameId.MULTIGRID_SOCCER: RenderMode.RGB_ARRAY,
     GameId.MULTIGRID_COLLECT: RenderMode.RGB_ARRAY,
-    # Melting Pot (multi-agent social scenarios via Shimmy)
-    GameId.MELTINGPOT_COLLABORATIVE_COOKING: RenderMode.RGB_ARRAY,
+    GameId.MULTIGRID_BLOCKED_UNLOCK_PICKUP: RenderMode.RGB_ARRAY,
+    GameId.MULTIGRID_EMPTY_5X5: RenderMode.RGB_ARRAY,
+    GameId.MULTIGRID_EMPTY_RANDOM_5X5: RenderMode.RGB_ARRAY,
+    GameId.MULTIGRID_EMPTY_6X6: RenderMode.RGB_ARRAY,
+    GameId.MULTIGRID_EMPTY_RANDOM_6X6: RenderMode.RGB_ARRAY,
+    GameId.MULTIGRID_EMPTY_8X8: RenderMode.RGB_ARRAY,
+    GameId.MULTIGRID_EMPTY_16X16: RenderMode.RGB_ARRAY,
+    GameId.MULTIGRID_LOCKED_HALLWAY_2ROOMS: RenderMode.RGB_ARRAY,
+    GameId.MULTIGRID_LOCKED_HALLWAY_4ROOMS: RenderMode.RGB_ARRAY,
+    GameId.MULTIGRID_LOCKED_HALLWAY_6ROOMS: RenderMode.RGB_ARRAY,
+    GameId.MULTIGRID_PLAYGROUND: RenderMode.RGB_ARRAY,
+    GameId.MULTIGRID_RED_BLUE_DOORS_6X6: RenderMode.RGB_ARRAY,
+    GameId.MULTIGRID_RED_BLUE_DOORS_8X8: RenderMode.RGB_ARRAY,
+    # Melting Pot (all 49 multi-agent social scenarios via Shimmy)
+    GameId.MELTINGPOT_ALLELOPATHIC_HARVEST__OPEN: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_BACH_OR_STRAVINSKY_IN_THE_MATRIX__ARENA: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_BACH_OR_STRAVINSKY_IN_THE_MATRIX__REPEATED: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_BOAT_RACE__EIGHT_RACES: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_CHEMISTRY__THREE_METABOLIC_CYCLES: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_CHEMISTRY__THREE_METABOLIC_CYCLES_WITH_PLENTIFUL_DISTRACTORS: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_CHEMISTRY__TWO_METABOLIC_CYCLES: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_CHEMISTRY__TWO_METABOLIC_CYCLES_WITH_DISTRACTORS: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_CHICKEN_IN_THE_MATRIX__ARENA: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_CHICKEN_IN_THE_MATRIX__REPEATED: RenderMode.RGB_ARRAY,
     GameId.MELTINGPOT_CLEAN_UP: RenderMode.RGB_ARRAY,
-    GameId.MELTINGPOT_COMMONS_HARVEST: RenderMode.RGB_ARRAY,
-    GameId.MELTINGPOT_TERRITORY: RenderMode.RGB_ARRAY,
-    GameId.MELTINGPOT_KING_OF_THE_HILL: RenderMode.RGB_ARRAY,
-    GameId.MELTINGPOT_PRISONERS_DILEMMA: RenderMode.RGB_ARRAY,
-    GameId.MELTINGPOT_STAG_HUNT: RenderMode.RGB_ARRAY,
-    GameId.MELTINGPOT_ALLELOPATHIC_HARVEST: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_COINS: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__ASYMMETRIC: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__CIRCUIT: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__CRAMPED: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__CROWDED: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__FIGURE_EIGHT: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__FORCED: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__RING: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_COMMONS_HARVEST__CLOSED: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_COMMONS_HARVEST__OPEN: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_COMMONS_HARVEST__PARTNERSHIP: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_COOP_MINING: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_DAYCARE: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_EXTERNALITY_MUSHROOMS__DENSE: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_FACTORY_COMMONS__EITHER_OR: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_FRUIT_MARKET__CONCENTRIC_RIVERS: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_GIFT_REFINEMENTS: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_HIDDEN_AGENDA: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_PAINTBALL__CAPTURE_THE_FLAG: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_PAINTBALL__KING_OF_THE_HILL: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_PREDATOR_PREY__ALLEY_HUNT: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_PREDATOR_PREY__OPEN: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_PREDATOR_PREY__ORCHARD: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_PREDATOR_PREY__RANDOM_FOREST: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_PRISONERS_DILEMMA_IN_THE_MATRIX__ARENA: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_PRISONERS_DILEMMA_IN_THE_MATRIX__REPEATED: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_PURE_COORDINATION_IN_THE_MATRIX__ARENA: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_PURE_COORDINATION_IN_THE_MATRIX__REPEATED: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_RATIONALIZABLE_COORDINATION_IN_THE_MATRIX__ARENA: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_RATIONALIZABLE_COORDINATION_IN_THE_MATRIX__REPEATED: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_RUNNING_WITH_SCISSORS_IN_THE_MATRIX__ARENA: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_RUNNING_WITH_SCISSORS_IN_THE_MATRIX__ONE_SHOT: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_RUNNING_WITH_SCISSORS_IN_THE_MATRIX__REPEATED: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_STAG_HUNT_IN_THE_MATRIX__ARENA: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_STAG_HUNT_IN_THE_MATRIX__REPEATED: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_TERRITORY__INSIDE_OUT: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_TERRITORY__OPEN: RenderMode.RGB_ARRAY,
+    GameId.MELTINGPOT_TERRITORY__ROOMS: RenderMode.RGB_ARRAY,
     # Overcooked-AI (cooperative cooking)
     GameId.OVERCOOKED_CRAMPED_ROOM: RenderMode.RGB_ARRAY,
     GameId.OVERCOOKED_ASYMMETRIC_ADVANTAGES: RenderMode.RGB_ARRAY,
@@ -1913,24 +2098,78 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
     GameId.AMERICAN_CHECKERS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     GameId.RUSSIAN_CHECKERS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     GameId.INTERNATIONAL_DRAUGHTS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
-    # gym-multigrid - Multi-agent environments (simultaneous stepping)
-    GameId.MULTIGRID_SOCCER: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
-    GameId.MULTIGRID_COLLECT: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
-    # Melting Pot - Multi-agent social scenarios (parallel stepping)
-    GameId.MELTINGPOT_COLLABORATIVE_COOKING: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.MELTINGPOT_CLEAN_UP: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.MELTINGPOT_COMMONS_HARVEST: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
-    GameId.MELTINGPOT_TERRITORY: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COMPETITIVE),
-    GameId.MELTINGPOT_KING_OF_THE_HILL: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COMPETITIVE),
-    GameId.MELTINGPOT_PRISONERS_DILEMMA: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COMPETITIVE),
-    GameId.MELTINGPOT_STAG_HUNT: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.MELTINGPOT_ALLELOPATHIC_HARVEST: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COMPETITIVE),
-    # Overcooked-AI - 2-agent cooperative cooking
-    GameId.OVERCOOKED_CRAMPED_ROOM: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.OVERCOOKED_ASYMMETRIC_ADVANTAGES: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.OVERCOOKED_COORDINATION_RING: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.OVERCOOKED_FORCED_COORDINATION: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.OVERCOOKED_COUNTER_CIRCUIT: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    # gym-multigrid - Multi-agent environments (simultaneous stepping, multi-human gameplay)
+    GameId.MULTIGRID_SOCCER: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MULTIGRID_COLLECT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MULTIGRID_BLOCKED_UNLOCK_PICKUP: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MULTIGRID_EMPTY_5X5: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MULTIGRID_EMPTY_RANDOM_5X5: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MULTIGRID_EMPTY_6X6: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MULTIGRID_EMPTY_RANDOM_6X6: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MULTIGRID_EMPTY_8X8: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MULTIGRID_EMPTY_16X16: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MULTIGRID_LOCKED_HALLWAY_2ROOMS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MULTIGRID_LOCKED_HALLWAY_4ROOMS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MULTIGRID_LOCKED_HALLWAY_6ROOMS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MULTIGRID_PLAYGROUND: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MULTIGRID_RED_BLUE_DOORS_6X6: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MULTIGRID_RED_BLUE_DOORS_8X8: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    # Melting Pot - All 49 multi-agent social scenarios (parallel stepping, multi-human gameplay)
+    GameId.MELTINGPOT_ALLELOPATHIC_HARVEST__OPEN: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_BACH_OR_STRAVINSKY_IN_THE_MATRIX__ARENA: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_BACH_OR_STRAVINSKY_IN_THE_MATRIX__REPEATED: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_BOAT_RACE__EIGHT_RACES: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_CHEMISTRY__THREE_METABOLIC_CYCLES: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_CHEMISTRY__THREE_METABOLIC_CYCLES_WITH_PLENTIFUL_DISTRACTORS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_CHEMISTRY__TWO_METABOLIC_CYCLES: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_CHEMISTRY__TWO_METABOLIC_CYCLES_WITH_DISTRACTORS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_CHICKEN_IN_THE_MATRIX__ARENA: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_CHICKEN_IN_THE_MATRIX__REPEATED: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_CLEAN_UP: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_COINS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__ASYMMETRIC: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__CIRCUIT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__CRAMPED: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__CROWDED: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__FIGURE_EIGHT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__FORCED: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__RING: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_COMMONS_HARVEST__CLOSED: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_COMMONS_HARVEST__OPEN: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_COMMONS_HARVEST__PARTNERSHIP: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_COOP_MINING: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_DAYCARE: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_EXTERNALITY_MUSHROOMS__DENSE: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_FACTORY_COMMONS__EITHER_OR: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_FRUIT_MARKET__CONCENTRIC_RIVERS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_GIFT_REFINEMENTS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_HIDDEN_AGENDA: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_PAINTBALL__CAPTURE_THE_FLAG: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_PAINTBALL__KING_OF_THE_HILL: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_PREDATOR_PREY__ALLEY_HUNT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_PREDATOR_PREY__OPEN: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_PREDATOR_PREY__ORCHARD: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_PREDATOR_PREY__RANDOM_FOREST: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_PRISONERS_DILEMMA_IN_THE_MATRIX__ARENA: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_PRISONERS_DILEMMA_IN_THE_MATRIX__REPEATED: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_PURE_COORDINATION_IN_THE_MATRIX__ARENA: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_PURE_COORDINATION_IN_THE_MATRIX__REPEATED: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_RATIONALIZABLE_COORDINATION_IN_THE_MATRIX__ARENA: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_RATIONALIZABLE_COORDINATION_IN_THE_MATRIX__REPEATED: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_RUNNING_WITH_SCISSORS_IN_THE_MATRIX__ARENA: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_RUNNING_WITH_SCISSORS_IN_THE_MATRIX__ONE_SHOT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_RUNNING_WITH_SCISSORS_IN_THE_MATRIX__REPEATED: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_STAG_HUNT_IN_THE_MATRIX__ARENA: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_STAG_HUNT_IN_THE_MATRIX__REPEATED: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MELTINGPOT_TERRITORY__INSIDE_OUT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_TERRITORY__OPEN: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MELTINGPOT_TERRITORY__ROOMS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COMPETITIVE),
+    # Overcooked-AI - 2-agent cooperative cooking (multi-human gameplay)
+    GameId.OVERCOOKED_CRAMPED_ROOM: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.OVERCOOKED_ASYMMETRIC_ADVANTAGES: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.OVERCOOKED_COORDINATION_RING: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.OVERCOOKED_FORCED_COORDINATION: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.OVERCOOKED_COUNTER_CIRCUIT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
 }
 
 

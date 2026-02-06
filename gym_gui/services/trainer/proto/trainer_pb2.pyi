@@ -10,19 +10,21 @@ DESCRIPTOR: _descriptor.FileDescriptor
 class RunStatus(int, metaclass=_enum_type_wrapper.EnumTypeWrapper):
     __slots__ = ()
     RUN_STATUS_UNSPECIFIED: _ClassVar[RunStatus]
-    RUN_STATUS_PENDING: _ClassVar[RunStatus]
-    RUN_STATUS_DISPATCHING: _ClassVar[RunStatus]
-    RUN_STATUS_RUNNING: _ClassVar[RunStatus]
-    RUN_STATUS_COMPLETED: _ClassVar[RunStatus]
-    RUN_STATUS_FAILED: _ClassVar[RunStatus]
-    RUN_STATUS_CANCELLED: _ClassVar[RunStatus]
+    RUN_STATUS_INIT: _ClassVar[RunStatus]
+    RUN_STATUS_HSHK: _ClassVar[RunStatus]
+    RUN_STATUS_RDY: _ClassVar[RunStatus]
+    RUN_STATUS_EXEC: _ClassVar[RunStatus]
+    RUN_STATUS_PAUSE: _ClassVar[RunStatus]
+    RUN_STATUS_FAULT: _ClassVar[RunStatus]
+    RUN_STATUS_TERM: _ClassVar[RunStatus]
 RUN_STATUS_UNSPECIFIED: RunStatus
-RUN_STATUS_PENDING: RunStatus
-RUN_STATUS_DISPATCHING: RunStatus
-RUN_STATUS_RUNNING: RunStatus
-RUN_STATUS_COMPLETED: RunStatus
-RUN_STATUS_FAILED: RunStatus
-RUN_STATUS_CANCELLED: RunStatus
+RUN_STATUS_INIT: RunStatus
+RUN_STATUS_HSHK: RunStatus
+RUN_STATUS_RDY: RunStatus
+RUN_STATUS_EXEC: RunStatus
+RUN_STATUS_PAUSE: RunStatus
+RUN_STATUS_FAULT: RunStatus
+RUN_STATUS_TERM: RunStatus
 
 class SubmitRunRequest(_message.Message):
     __slots__ = ("run_id", "config_json")
@@ -49,6 +51,48 @@ class CancelRunRequest(_message.Message):
 class CancelRunResponse(_message.Message):
     __slots__ = ()
     def __init__(self) -> None: ...
+
+class RegisterWorkerRequest(_message.Message):
+    __slots__ = ("run_id", "worker_id", "worker_kind", "proto_version", "schema_id", "schema_version", "supports_pause", "supports_checkpoint")
+    RUN_ID_FIELD_NUMBER: _ClassVar[int]
+    WORKER_ID_FIELD_NUMBER: _ClassVar[int]
+    WORKER_KIND_FIELD_NUMBER: _ClassVar[int]
+    PROTO_VERSION_FIELD_NUMBER: _ClassVar[int]
+    SCHEMA_ID_FIELD_NUMBER: _ClassVar[int]
+    SCHEMA_VERSION_FIELD_NUMBER: _ClassVar[int]
+    SUPPORTS_PAUSE_FIELD_NUMBER: _ClassVar[int]
+    SUPPORTS_CHECKPOINT_FIELD_NUMBER: _ClassVar[int]
+    run_id: str
+    worker_id: str
+    worker_kind: str
+    proto_version: str
+    schema_id: str
+    schema_version: int
+    supports_pause: bool
+    supports_checkpoint: bool
+    def __init__(self, run_id: _Optional[str] = ..., worker_id: _Optional[str] = ..., worker_kind: _Optional[str] = ..., proto_version: _Optional[str] = ..., schema_id: _Optional[str] = ..., schema_version: _Optional[int] = ..., supports_pause: bool = ..., supports_checkpoint: bool = ...) -> None: ...
+
+class RegisterWorkerResponse(_message.Message):
+    __slots__ = ("accepted_version", "session_token")
+    ACCEPTED_VERSION_FIELD_NUMBER: _ClassVar[int]
+    SESSION_TOKEN_FIELD_NUMBER: _ClassVar[int]
+    accepted_version: str
+    session_token: str
+    def __init__(self, accepted_version: _Optional[str] = ..., session_token: _Optional[str] = ...) -> None: ...
+
+class ControlEvent(_message.Message):
+    __slots__ = ("run_id", "grant_steps", "pause", "resume", "max_rate_hz")
+    RUN_ID_FIELD_NUMBER: _ClassVar[int]
+    GRANT_STEPS_FIELD_NUMBER: _ClassVar[int]
+    PAUSE_FIELD_NUMBER: _ClassVar[int]
+    RESUME_FIELD_NUMBER: _ClassVar[int]
+    MAX_RATE_HZ_FIELD_NUMBER: _ClassVar[int]
+    run_id: str
+    grant_steps: int
+    pause: bool
+    resume: bool
+    max_rate_hz: int
+    def __init__(self, run_id: _Optional[str] = ..., grant_steps: _Optional[int] = ..., pause: bool = ..., resume: bool = ..., max_rate_hz: _Optional[int] = ...) -> None: ...
 
 class RunRecord(_message.Message):
     __slots__ = ("run_id", "status", "digest", "created_at", "updated_at", "last_heartbeat", "gpu_slot", "failure_reason", "gpu_slots", "seq_id")

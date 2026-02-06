@@ -186,6 +186,22 @@ def main(argv: Optional[list[str]] = None) -> int:
         extras=_parse_extras_overrides(args.extras),
     )
 
+    # Check for curriculum training mode
+    from .curriculum_training import is_curriculum_config
+    if is_curriculum_config(overrides):
+        logger.info("Detected curriculum_schedule in config - using curriculum training mode")
+        from .curriculum_training import CurriculumTrainingConfig, run_curriculum_training
+
+        try:
+            curriculum_config = CurriculumTrainingConfig.from_worker_config(overrides)
+            result = run_curriculum_training(curriculum_config)
+            logger.info(f"Curriculum training complete: {result}")
+            return 0
+        except Exception as e:
+            logger.exception(f"Curriculum training failed: {e}")
+            return 1
+
+    # Standard training mode
     from .runtime import CleanRLWorkerRuntime
     runtime = CleanRLWorkerRuntime(
         overrides,

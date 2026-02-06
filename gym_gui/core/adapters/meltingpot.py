@@ -78,6 +78,7 @@ class MeltingPotAdapter(EnvironmentAdapter[Dict[str, np.ndarray], Dict[str, int]
     default_render_mode = RenderMode.RGB_ARRAY
     supported_render_modes = (RenderMode.RGB_ARRAY,)
     supported_control_modes = (
+        ControlMode.HUMAN_ONLY,  # Multi-human multi-keyboard gameplay
         ControlMode.AGENT_ONLY,
         ControlMode.MULTI_AGENT_COOP,
         ControlMode.MULTI_AGENT_COMPETITIVE,
@@ -124,7 +125,8 @@ class MeltingPotAdapter(EnvironmentAdapter[Dict[str, np.ndarray], Dict[str, int]
         # Map substrate_name to proper GameId format
         substrate_map = {
             "collaborative_cooking__circuit": "meltingpot/collaborative_cooking__circuit",
-            "clean_up__repeated": "meltingpot/clean_up__repeated",
+            "clean_up": "meltingpot/clean_up",
+            "clean_up__repeated": "meltingpot/clean_up",  # Legacy name (incorrect)
             "commons_harvest__open": "meltingpot/commons_harvest__open",
             "territory__rooms": "meltingpot/territory__rooms",
             "king_of_the_hill__repeated": "meltingpot/king_of_the_hill__repeated",
@@ -148,8 +150,12 @@ class MeltingPotAdapter(EnvironmentAdapter[Dict[str, np.ndarray], Dict[str, int]
             )
 
         try:
-            # Create environment via Shimmy wrapper
-            self._env = MeltingPotCompatibilityV0(substrate_name=self._substrate_name)
+            # Create environment via Shimmy wrapper with rgb_array render mode
+            # This enables env.render() to return a higher-resolution world view
+            self._env = MeltingPotCompatibilityV0(
+                substrate_name=self._substrate_name,
+                render_mode="rgb_array",
+            )
 
             # Get agent list
             self._agent_names = list(self._env.agents)
@@ -302,44 +308,57 @@ class MeltingPotAdapter(EnvironmentAdapter[Dict[str, np.ndarray], Dict[str, int]
     def render(self) -> Dict[str, Any]:
         """Render the environment.
 
-        Returns RGB array from the first agent's perspective.
-        Prefers WORLD.RGB (40×72 full world view) over individual RGB (40×40).
+        Uses env.render() to get a higher-resolution global world view.
+        Falls back to per-agent RGB observation if render() is unavailable.
+        Applies render_scale for enhanced visibility (using PIL NEAREST for speed).
 
         Returns:
             Dictionary with RGB array and metadata
         """
+        from PIL import Image
+
         env = self._require_env()
+        frame: np.ndarray | None = None
+
         try:
-            # Get RGB from first agent's observation
-            if self._agent_names and self._agent_observations:
+            # Primary: Use env.render() for higher resolution world view
+            # With render_mode='rgb_array', this returns ~240×232 pixels (varies by substrate)
+            rgb_array = env.render()
+            if rgb_array is not None:
+                frame = np.asarray(rgb_array, dtype=np.uint8)
+
+            # Fallback: Get RGB from first agent's observation (88×88 per-agent view)
+            if frame is None and self._agent_names and self._agent_observations:
                 first_agent = self._agent_names[0]
                 obs = self._agent_observations.get(first_agent, {})
-
-                # Prefer WORLD.RGB (higher resolution) over individual RGB
-                rgb_array = obs.get('WORLD.RGB')
-                if rgb_array is None:
-                    rgb_array = obs.get('RGB')
-
+                rgb_array = obs.get('RGB')
                 if rgb_array is not None:
-                    return {
-                        "mode": RenderMode.RGB_ARRAY.value,
-                        "rgb": np.asarray(rgb_array),
-                        "substrate_name": self._substrate_name,
-                        "num_agents": self._num_agents,
-                        "step": self._step_counter,
-                    }
+                    frame = np.asarray(rgb_array, dtype=np.uint8)
 
-            # Fallback: return empty frame (size matches WORLD.RGB)
+            # Last resort: return empty frame
+            if frame is None:
+                frame = np.zeros((240, 232, 3), dtype=np.uint8)
+
+            # Apply render_scale if > 1 (using NEAREST for fast real-time rendering)
+            scale = self._config.render_scale
+            if scale > 1:
+                img = Image.fromarray(frame)
+                new_size = (frame.shape[1] * scale, frame.shape[0] * scale)
+                img = img.resize(new_size, Image.Resampling.NEAREST)
+                frame = np.array(img)
+
             return {
                 "mode": RenderMode.RGB_ARRAY.value,
-                "rgb": np.zeros((40, 72, 3), dtype=np.uint8),
+                "rgb": frame,
                 "substrate_name": self._substrate_name,
+                "num_agents": self._num_agents,
+                "step": self._step_counter,
             }
         except Exception:
-            # Return empty frame if render fails (size matches WORLD.RGB)
+            # Return empty frame if render fails
             return {
                 "mode": RenderMode.RGB_ARRAY.value,
-                "rgb": np.zeros((40, 72, 3), dtype=np.uint8),
+                "rgb": np.zeros((240, 232, 3), dtype=np.uint8),
                 "substrate_name": self._substrate_name,
             }
 
@@ -475,7 +494,7 @@ class CleanUpAdapter(MeltingPotAdapter):
         config: MeltingPotConfig | None = None,
     ) -> None:
         if config is None:
-            config = MeltingPotConfig(substrate_name="clean_up__repeated")
+            config = MeltingPotConfig(substrate_name="clean_up")
         super().__init__(context, config=config)
 
 
@@ -563,16 +582,58 @@ class AllelopathicHarvestAdapter(MeltingPotAdapter):
         super().__init__(context, config=config)
 
 
-# Adapter registry for factory pattern
+# Adapter registry for factory pattern - all 49 substrates use the base MeltingPotAdapter
+# The substrate name is determined from the GameId value (e.g., "meltingpot/clean_up" -> "clean_up")
 MELTINGPOT_ADAPTERS: Dict[GameId, type[MeltingPotAdapter]] = {
-    GameId.MELTINGPOT_COLLABORATIVE_COOKING: CollaborativeCookingAdapter,
-    GameId.MELTINGPOT_CLEAN_UP: CleanUpAdapter,
-    GameId.MELTINGPOT_COMMONS_HARVEST: CommonsHarvestAdapter,
-    GameId.MELTINGPOT_TERRITORY: TerritoryAdapter,
-    GameId.MELTINGPOT_KING_OF_THE_HILL: KingOfTheHillAdapter,
-    GameId.MELTINGPOT_PRISONERS_DILEMMA: PrisonersDilemmaAdapter,
-    GameId.MELTINGPOT_STAG_HUNT: StagHuntAdapter,
-    GameId.MELTINGPOT_ALLELOPATHIC_HARVEST: AllelopathicHarvestAdapter,
+    GameId.MELTINGPOT_ALLELOPATHIC_HARVEST__OPEN: MeltingPotAdapter,
+    GameId.MELTINGPOT_BACH_OR_STRAVINSKY_IN_THE_MATRIX__ARENA: MeltingPotAdapter,
+    GameId.MELTINGPOT_BACH_OR_STRAVINSKY_IN_THE_MATRIX__REPEATED: MeltingPotAdapter,
+    GameId.MELTINGPOT_BOAT_RACE__EIGHT_RACES: MeltingPotAdapter,
+    GameId.MELTINGPOT_CHEMISTRY__THREE_METABOLIC_CYCLES: MeltingPotAdapter,
+    GameId.MELTINGPOT_CHEMISTRY__THREE_METABOLIC_CYCLES_WITH_PLENTIFUL_DISTRACTORS: MeltingPotAdapter,
+    GameId.MELTINGPOT_CHEMISTRY__TWO_METABOLIC_CYCLES: MeltingPotAdapter,
+    GameId.MELTINGPOT_CHEMISTRY__TWO_METABOLIC_CYCLES_WITH_DISTRACTORS: MeltingPotAdapter,
+    GameId.MELTINGPOT_CHICKEN_IN_THE_MATRIX__ARENA: MeltingPotAdapter,
+    GameId.MELTINGPOT_CHICKEN_IN_THE_MATRIX__REPEATED: MeltingPotAdapter,
+    GameId.MELTINGPOT_CLEAN_UP: MeltingPotAdapter,
+    GameId.MELTINGPOT_COINS: MeltingPotAdapter,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__ASYMMETRIC: MeltingPotAdapter,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__CIRCUIT: MeltingPotAdapter,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__CRAMPED: MeltingPotAdapter,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__CROWDED: MeltingPotAdapter,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__FIGURE_EIGHT: MeltingPotAdapter,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__FORCED: MeltingPotAdapter,
+    GameId.MELTINGPOT_COLLABORATIVE_COOKING__RING: MeltingPotAdapter,
+    GameId.MELTINGPOT_COMMONS_HARVEST__CLOSED: MeltingPotAdapter,
+    GameId.MELTINGPOT_COMMONS_HARVEST__OPEN: MeltingPotAdapter,
+    GameId.MELTINGPOT_COMMONS_HARVEST__PARTNERSHIP: MeltingPotAdapter,
+    GameId.MELTINGPOT_COOP_MINING: MeltingPotAdapter,
+    GameId.MELTINGPOT_DAYCARE: MeltingPotAdapter,
+    GameId.MELTINGPOT_EXTERNALITY_MUSHROOMS__DENSE: MeltingPotAdapter,
+    GameId.MELTINGPOT_FACTORY_COMMONS__EITHER_OR: MeltingPotAdapter,
+    GameId.MELTINGPOT_FRUIT_MARKET__CONCENTRIC_RIVERS: MeltingPotAdapter,
+    GameId.MELTINGPOT_GIFT_REFINEMENTS: MeltingPotAdapter,
+    GameId.MELTINGPOT_HIDDEN_AGENDA: MeltingPotAdapter,
+    GameId.MELTINGPOT_PAINTBALL__CAPTURE_THE_FLAG: MeltingPotAdapter,
+    GameId.MELTINGPOT_PAINTBALL__KING_OF_THE_HILL: MeltingPotAdapter,
+    GameId.MELTINGPOT_PREDATOR_PREY__ALLEY_HUNT: MeltingPotAdapter,
+    GameId.MELTINGPOT_PREDATOR_PREY__OPEN: MeltingPotAdapter,
+    GameId.MELTINGPOT_PREDATOR_PREY__ORCHARD: MeltingPotAdapter,
+    GameId.MELTINGPOT_PREDATOR_PREY__RANDOM_FOREST: MeltingPotAdapter,
+    GameId.MELTINGPOT_PRISONERS_DILEMMA_IN_THE_MATRIX__ARENA: MeltingPotAdapter,
+    GameId.MELTINGPOT_PRISONERS_DILEMMA_IN_THE_MATRIX__REPEATED: MeltingPotAdapter,
+    GameId.MELTINGPOT_PURE_COORDINATION_IN_THE_MATRIX__ARENA: MeltingPotAdapter,
+    GameId.MELTINGPOT_PURE_COORDINATION_IN_THE_MATRIX__REPEATED: MeltingPotAdapter,
+    GameId.MELTINGPOT_RATIONALIZABLE_COORDINATION_IN_THE_MATRIX__ARENA: MeltingPotAdapter,
+    GameId.MELTINGPOT_RATIONALIZABLE_COORDINATION_IN_THE_MATRIX__REPEATED: MeltingPotAdapter,
+    GameId.MELTINGPOT_RUNNING_WITH_SCISSORS_IN_THE_MATRIX__ARENA: MeltingPotAdapter,
+    GameId.MELTINGPOT_RUNNING_WITH_SCISSORS_IN_THE_MATRIX__ONE_SHOT: MeltingPotAdapter,
+    GameId.MELTINGPOT_RUNNING_WITH_SCISSORS_IN_THE_MATRIX__REPEATED: MeltingPotAdapter,
+    GameId.MELTINGPOT_STAG_HUNT_IN_THE_MATRIX__ARENA: MeltingPotAdapter,
+    GameId.MELTINGPOT_STAG_HUNT_IN_THE_MATRIX__REPEATED: MeltingPotAdapter,
+    GameId.MELTINGPOT_TERRITORY__INSIDE_OUT: MeltingPotAdapter,
+    GameId.MELTINGPOT_TERRITORY__OPEN: MeltingPotAdapter,
+    GameId.MELTINGPOT_TERRITORY__ROOMS: MeltingPotAdapter,
 }
 
 

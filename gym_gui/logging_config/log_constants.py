@@ -135,6 +135,105 @@ LOG_INPUT_CONTROLLER_ERROR = _constant(
     tags=_tags("input", "controller"),
 )
 
+LOG_KEYBOARD_DETECTED = _constant(
+    "LOG406",
+    "INFO",
+    "Keyboard device detected for multi-human gameplay",
+    component="Controller",
+    subcomponent="Input",
+    tags=_tags("keyboard", "multi-agent", "device"),
+)
+
+LOG_KEYBOARD_ASSIGNED = _constant(
+    "LOG407",
+    "INFO",
+    "Keyboard assigned to agent",
+    component="Controller",
+    subcomponent="Input",
+    tags=_tags("keyboard", "multi-agent", "assignment"),
+)
+
+LOG_KEYBOARD_DETECTION_ERROR = _constant(
+    "LOG4071",
+    "ERROR",
+    "Keyboard detection failed",
+    component="Controller",
+    subcomponent="Input",
+    tags=_tags("keyboard", "multi-agent", "error"),
+)
+
+LOG_KEYBOARD_EVDEV_SETUP_START = _constant(
+    "LOG4072",
+    "INFO",
+    "Starting evdev keyboard monitoring setup",
+    component="Controller",
+    subcomponent="Input",
+    tags=_tags("keyboard", "evdev", "multi-agent", "setup"),
+)
+
+LOG_KEYBOARD_EVDEV_SETUP_SUCCESS = _constant(
+    "LOG4073",
+    "INFO",
+    "Evdev keyboard monitoring setup completed successfully",
+    component="Controller",
+    subcomponent="Input",
+    tags=_tags("keyboard", "evdev", "multi-agent", "setup"),
+)
+
+LOG_KEYBOARD_EVDEV_SETUP_FAILED = _constant(
+    "LOG4074",
+    "ERROR",
+    "Evdev keyboard monitoring setup failed",
+    component="Controller",
+    subcomponent="Input",
+    tags=_tags("keyboard", "evdev", "multi-agent", "error"),
+)
+
+LOG_KEY_RESOLVER_INITIALIZED = _constant(
+    "LOG4075",
+    "INFO",
+    "Key combination resolver initialized for game",
+    component="Controller",
+    subcomponent="Input",
+    tags=_tags("input", "keyboard", "resolver"),
+)
+
+LOG_KEY_RESOLVER_UNAVAILABLE = _constant(
+    "LOG4076",
+    "WARNING",
+    "No key combination resolver available for game",
+    component="Controller",
+    subcomponent="Input",
+    tags=_tags("input", "keyboard", "resolver", "warning"),
+)
+
+LOG_INPUT_MODE_CONFIGURED = _constant(
+    "LOG4077",
+    "INFO",
+    "Input mode configured for game",
+    component="Controller",
+    subcomponent="Input",
+    tags=_tags("input", "keyboard", "mode"),
+)
+
+LOG_EVDEV_KEY_PRESSED = _constant(
+    "LOG4078",
+    "INFO",
+    "Evdev key pressed",
+    component="Controller",
+    subcomponent="Input",
+    tags=_tags("evdev", "keyboard", "key", "multi-agent"),
+)
+
+LOG_EVDEV_KEY_RELEASED = _constant(
+    "LOG4079",
+    "DEBUG",
+    "Evdev key released",
+    component="Controller",
+    subcomponent="Input",
+    tags=_tags("evdev", "keyboard", "key", "multi-agent"),
+)
+
 LOG_LIVE_CONTROLLER_INITIALIZED = _constant(
     "LOG408",
     "INFO",
@@ -1326,6 +1425,99 @@ LOG_OPERATOR_STOP_ALL_COMPLETED = _constant(
     component="UI",
     subcomponent="MainWindow",
     tags=_tags("operator", "interactive", "stop"),
+)
+
+# ---------------------------------------------------------------------------
+# Baseline Operator constants (LOG4080–LOG4089)
+# ---------------------------------------------------------------------------
+LOG_BASELINE_OPERATOR_LAUNCHED = _constant(
+    "LOG4080",
+    "INFO",
+    "Baseline operator launched for ablation study",
+    component="Service",
+    subcomponent="OperatorLauncher",
+    tags=_tags("operator", "baseline", "launch", "ablation"),
+)
+
+LOG_BASELINE_OPERATOR_BEHAVIOR_SET = _constant(
+    "LOG4081",
+    "DEBUG",
+    "Baseline operator behavior configured",
+    component="Service",
+    subcomponent="OperatorLauncher",
+    tags=_tags("operator", "baseline", "config", "behavior"),
+)
+
+LOG_BASELINE_OPERATOR_EPISODE_START = _constant(
+    "LOG4082",
+    "INFO",
+    "Baseline operator episode started",
+    component="Worker",
+    subcomponent="OperatorsWorker",
+    tags=_tags("operator", "baseline", "episode", "start"),
+)
+
+LOG_BASELINE_OPERATOR_EPISODE_END = _constant(
+    "LOG4083",
+    "INFO",
+    "Baseline operator episode completed",
+    component="Worker",
+    subcomponent="OperatorsWorker",
+    tags=_tags("operator", "baseline", "episode", "end"),
+)
+
+LOG_BASELINE_OPERATOR_TELEMETRY_EMITTED = _constant(
+    "LOG4084",
+    "DEBUG",
+    "Baseline operator telemetry written to JSONL",
+    component="Worker",
+    subcomponent="OperatorsWorker",
+    tags=_tags("operator", "baseline", "telemetry", "jsonl"),
+)
+
+LOG_BASELINE_SCRIPT_LOADED = _constant(
+    "LOG4085",
+    "INFO",
+    "Baseline operator script loaded from file",
+    component="UI",
+    subcomponent="ScriptWidget",
+    tags=_tags("operator", "baseline", "script", "load"),
+)
+
+LOG_BASELINE_SCRIPT_PARSED = _constant(
+    "LOG4086",
+    "INFO",
+    "Baseline operator script parsed successfully",
+    component="UI",
+    subcomponent="ScriptWidget",
+    tags=_tags("operator", "baseline", "script", "parse"),
+)
+
+LOG_BASELINE_SCRIPT_VALIDATION_FAILED = _constant(
+    "LOG4087",
+    "WARNING",
+    "Baseline operator script validation failed",
+    component="UI",
+    subcomponent="ScriptWidget",
+    tags=_tags("operator", "baseline", "script", "validation", "error"),
+)
+
+LOG_BASELINE_AUTO_EXECUTION_STARTED = _constant(
+    "LOG4088",
+    "INFO",
+    "Baseline operator auto-execution started",
+    component="UI",
+    subcomponent="OperatorsTab",
+    tags=_tags("operator", "baseline", "auto-execution", "start"),
+)
+
+LOG_BASELINE_AUTO_EXECUTION_COMPLETED = _constant(
+    "LOG4089",
+    "INFO",
+    "Baseline operator auto-execution completed",
+    component="UI",
+    subcomponent="OperatorsTab",
+    tags=_tags("operator", "baseline", "auto-execution", "complete"),
 )
 
 # ---------------------------------------------------------------------------
@@ -4198,6 +4390,17 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_SESSION_EPISODE_ERROR,
     LOG_SESSION_TIMER_PRECISION_WARNING,
     LOG_INPUT_CONTROLLER_ERROR,
+    LOG_KEYBOARD_DETECTED,
+    LOG_KEYBOARD_ASSIGNED,
+    LOG_KEYBOARD_DETECTION_ERROR,
+    LOG_KEYBOARD_EVDEV_SETUP_START,
+    LOG_KEYBOARD_EVDEV_SETUP_SUCCESS,
+    LOG_KEYBOARD_EVDEV_SETUP_FAILED,
+    LOG_KEY_RESOLVER_INITIALIZED,
+    LOG_KEY_RESOLVER_UNAVAILABLE,
+    LOG_INPUT_MODE_CONFIGURED,
+    LOG_EVDEV_KEY_PRESSED,
+    LOG_EVDEV_KEY_RELEASED,
     LOG_LIVE_CONTROLLER_INITIALIZED,
     LOG_LIVE_CONTROLLER_THREAD_STARTED,
     LOG_LIVE_CONTROLLER_THREAD_STOPPED,
@@ -4320,6 +4523,16 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_OPERATOR_RESET_ALL_STARTED,
     LOG_OPERATOR_STEP_ALL_COMPLETED,
     LOG_OPERATOR_STOP_ALL_COMPLETED,
+    LOG_BASELINE_OPERATOR_LAUNCHED,
+    LOG_BASELINE_OPERATOR_BEHAVIOR_SET,
+    LOG_BASELINE_OPERATOR_EPISODE_START,
+    LOG_BASELINE_OPERATOR_EPISODE_END,
+    LOG_BASELINE_OPERATOR_TELEMETRY_EMITTED,
+    LOG_BASELINE_SCRIPT_LOADED,
+    LOG_BASELINE_SCRIPT_PARSED,
+    LOG_BASELINE_SCRIPT_VALIDATION_FAILED,
+    LOG_BASELINE_AUTO_EXECUTION_STARTED,
+    LOG_BASELINE_AUTO_EXECUTION_COMPLETED,
     LOG_OPERATOR_INIT_AGENT_SENT,
     LOG_OPERATOR_SELECT_ACTION_SENT,
     LOG_OPERATOR_MULTIAGENT_LAUNCHED,
@@ -4543,6 +4756,17 @@ __all__ = (
     "LOG_SESSION_EPISODE_ERROR",
     "LOG_SESSION_TIMER_PRECISION_WARNING",
     "LOG_INPUT_CONTROLLER_ERROR",
+    "LOG_KEYBOARD_DETECTED",
+    "LOG_KEYBOARD_ASSIGNED",
+    "LOG_KEYBOARD_DETECTION_ERROR",
+    "LOG_KEYBOARD_EVDEV_SETUP_START",
+    "LOG_KEYBOARD_EVDEV_SETUP_SUCCESS",
+    "LOG_KEYBOARD_EVDEV_SETUP_FAILED",
+    "LOG_KEY_RESOLVER_INITIALIZED",
+    "LOG_KEY_RESOLVER_UNAVAILABLE",
+    "LOG_INPUT_MODE_CONFIGURED",
+    "LOG_EVDEV_KEY_PRESSED",
+    "LOG_EVDEV_KEY_RELEASED",
     "LOG_LIVE_CONTROLLER_INITIALIZED",
     "LOG_LIVE_CONTROLLER_THREAD_STARTED",
     "LOG_LIVE_CONTROLLER_THREAD_STOPPED",
@@ -4661,6 +4885,16 @@ __all__ = (
     "LOG_OPERATOR_RESET_ALL_STARTED",
     "LOG_OPERATOR_STEP_ALL_COMPLETED",
     "LOG_OPERATOR_STOP_ALL_COMPLETED",
+    "LOG_BASELINE_OPERATOR_LAUNCHED",
+    "LOG_BASELINE_OPERATOR_BEHAVIOR_SET",
+    "LOG_BASELINE_OPERATOR_EPISODE_START",
+    "LOG_BASELINE_OPERATOR_EPISODE_END",
+    "LOG_BASELINE_OPERATOR_TELEMETRY_EMITTED",
+    "LOG_BASELINE_SCRIPT_LOADED",
+    "LOG_BASELINE_SCRIPT_PARSED",
+    "LOG_BASELINE_SCRIPT_VALIDATION_FAILED",
+    "LOG_BASELINE_AUTO_EXECUTION_STARTED",
+    "LOG_BASELINE_AUTO_EXECUTION_COMPLETED",
     "LOG_OPERATOR_INIT_AGENT_SENT",
     "LOG_OPERATOR_SELECT_ACTION_SENT",
     "LOG_OPERATOR_MULTIAGENT_LAUNCHED",

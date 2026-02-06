@@ -1,4 +1,6 @@
 # docs and experiment results can be found at https://docs.cleanrl.dev/rl-algorithms/ppo/#ppopy
+# Extended to support MiniGrid/BabyAI environments with CNN architecture
+import logging
 import os
 import random
 import time
@@ -10,8 +12,14 @@ import torch
 import torch.nn as nn
 import torch.optim as optim
 import tyro
-from torch.distributions.categorical import Categorical
 from torch.utils.tensorboard import SummaryWriter
+
+# Import algorithm-agnostic components
+from cleanrl_worker.agents import MinigridAgent, MLPAgent
+from cleanrl_worker.wrappers.minigrid import is_minigrid_env, make_env
+
+# Setup logger for this module
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -48,6 +56,8 @@ class Args:
     """the learning rate of the optimizer"""
     num_envs: int = 4
     """the number of parallel game environments"""
+    procedural_generation: bool = True
+    """if toggled, each episode will use different random level layouts (standard RL training). If False, all episodes use the same fixed layout."""
     num_steps: int = 128
     """the number of steps to run in each environment per policy rollout"""
     anneal_lr: bool = True
@@ -75,6 +85,12 @@ class Args:
     target_kl: float = None
     """the target KL divergence threshold"""
 
+    # MiniGrid/BabyAI specific arguments
+    max_episode_steps: int = 256
+    """maximum steps per episode for MiniGrid/BabyAI environments"""
+    reward_scale: float = 1.0
+    """reward scaling factor (BabyAI paper uses 20.0)"""
+
     # to be filled in runtime
     batch_size: int = 0
     """the batch size (computed in runtime)"""
@@ -84,56 +100,14 @@ class Args:
     """the number of iterations (computed in runtime)"""
 
 
-def make_env(env_id, idx, capture_video, run_name, gamma=0.99):
-    def thunk():
-        if capture_video and idx == 0:
-            env = gym.make(env_id, render_mode="rgb_array")
-            env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
-        else:
-            env = gym.make(env_id)
-        env = gym.wrappers.RecordEpisodeStatistics(env)
-        return env
-
-    return thunk
-
-
-def layer_init(layer, std=np.sqrt(2), bias_const=0.0):
-    torch.nn.init.orthogonal_(layer.weight, std)
-    torch.nn.init.constant_(layer.bias, bias_const)
-    return layer
-
-
-class Agent(nn.Module):
-    def __init__(self, envs):
-        super().__init__()
-        obs_dim = int(np.array(envs.single_observation_space.shape).prod())
-        self.critic = nn.Sequential(
-            layer_init(nn.Linear(obs_dim, 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, 1), std=1.0),
-        )
-        self.actor = nn.Sequential(
-            layer_init(nn.Linear(obs_dim, 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, envs.single_action_space.n), std=0.01),
-        )
-
-    def get_value(self, x):
-        return self.critic(x)
-
-    def get_action_and_value(self, x, action=None):
-        logits = self.actor(x)
-        probs = Categorical(logits=logits)
-        if action is None:
-            action = probs.sample()
-        return action, probs.log_prob(action), probs.entropy(), self.critic(x)
-
-
 if __name__ == "__main__":
+    # Configure logging for the script
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s | %(levelname)-8s | %(name)s | %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
     args = tyro.cli(Args)
     args.batch_size = int(args.num_envs * args.num_steps)
     args.minibatch_size = int(args.batch_size // args.num_minibatches)
@@ -167,11 +141,22 @@ if __name__ == "__main__":
 
     # env setup
     envs = gym.vector.SyncVectorEnv(
-        [make_env(args.env_id, i, args.capture_video, run_name) for i in range(args.num_envs)],
+        [make_env(
+            args.env_id, i, args.capture_video, run_name,
+            procedural_generation=args.procedural_generation,
+            seed=args.seed,
+            max_episode_steps=args.max_episode_steps,
+            reward_scale=args.reward_scale,
+        ) for i in range(args.num_envs)],
     )
     assert isinstance(envs.single_action_space, gym.spaces.Discrete), "only discrete action space is supported"
 
-    agent = Agent(envs).to(device)
+    # Select agent architecture based on environment type
+    if is_minigrid_env(args.env_id):
+        logger.info("Using MinigridAgent (CNN) for %s", args.env_id)
+        agent = MinigridAgent(envs).to(device)
+    else:
+        agent = MLPAgent(envs).to(device)
     optimizer = optim.Adam(agent.parameters(), lr=args.learning_rate, eps=1e-5)
 
     # ALGO Logic: Storage setup
@@ -188,13 +173,14 @@ if __name__ == "__main__":
     if resume_global_step is not None:
         try:
             global_step = int(resume_global_step)
-            print(f"[MOSAIC] Resuming from global_step={global_step}")
+            logger.info("Resuming from global_step=%d", global_step)
         except ValueError:
             global_step = 0
     else:
         global_step = 0
     start_time = time.time()
-    next_obs, _ = envs.reset(seed=args.seed)
+    # ProceduralGenerationWrapper handles seeding internally
+    next_obs, _ = envs.reset()
     next_obs = torch.Tensor(next_obs).to(device)
     next_done = torch.zeros(args.num_envs).to(device)
 
@@ -223,12 +209,18 @@ if __name__ == "__main__":
             rewards[step] = torch.tensor(reward).to(device).view(-1)
             next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
 
-            if "final_info" in infos:
-                for info in infos["final_info"]:
-                    if info and "episode" in info:
-                        print(f"global_step={global_step}, episodic_return={info['episode']['r']}")
-                        writer.add_scalar("charts/episodic_return", info["episode"]["r"], global_step)
-                        writer.add_scalar("charts/episodic_length", info["episode"]["l"], global_step)
+            # Handle episode info from vectorized environments
+            # Gymnasium uses "episode" key (with "_episode" for mask)
+            if "episode" in infos:
+                # Get the mask of completed episodes
+                episode_mask = infos.get("_episode", np.ones(args.num_envs, dtype=bool))
+                for env_idx in range(args.num_envs):
+                    if episode_mask[env_idx]:
+                        ep_return = float(infos["episode"]["r"][env_idx])
+                        ep_length = int(infos["episode"]["l"][env_idx])
+                        logger.info("global_step=%d, episodic_return=%.3f, length=%d", global_step, ep_return, ep_length)
+                        writer.add_scalar("charts/episodic_return", ep_return, global_step)
+                        writer.add_scalar("charts/episodic_length", ep_length, global_step)
 
         # bootstrap value if not done
         with torch.no_grad():
@@ -321,7 +313,7 @@ if __name__ == "__main__":
         writer.add_scalar("losses/approx_kl", approx_kl.item(), global_step)
         writer.add_scalar("losses/clipfrac", np.mean(clipfracs), global_step)
         writer.add_scalar("losses/explained_variance", explained_var, global_step)
-        print("SPS:", int(global_step / (time.time() - start_time)))
+        logger.debug("SPS: %d", int(global_step / (time.time() - start_time)))
         writer.add_scalar("charts/SPS", int(global_step / (time.time() - start_time)), global_step)
 
     if args.save_model:
@@ -333,7 +325,7 @@ if __name__ == "__main__":
             "iteration": args.num_iterations,  # Final iteration
         }
         torch.save(checkpoint, model_path)
-        print(f"model saved to {model_path}")
+        logger.info("Model saved to %s", model_path)
 
         from cleanrl_utils.evals.ppo_eval import evaluate
 
@@ -343,7 +335,7 @@ if __name__ == "__main__":
             args.env_id,
             eval_episodes=10,
             run_name=f"{run_name}-eval",
-            Model=Agent,
+            Model=MLPAgent,
             device=device,
             capture_video=args.capture_video,
             gamma=args.gamma,

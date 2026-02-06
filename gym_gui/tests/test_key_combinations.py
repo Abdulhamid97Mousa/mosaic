@@ -24,6 +24,7 @@ from gym_gui.controllers.human_input import (
     AleKeyCombinationResolver,
     Box2DKeyCombinationResolver,
     ViZDoomKeyCombinationResolver,
+    MeltingPotKeyCombinationResolver,
     get_key_combination_resolver,
     KeyCombinationResolver,
     _KEYS_UP,
@@ -39,6 +40,15 @@ from gym_gui.controllers.human_input import (
     _KEY_A,
     _KEY_S,
     _KEY_D,
+    _KEY_Q,
+    _KEY_E,
+    _KEY_G,
+    _KEY_Z,
+    _KEY_C,
+    _KEY_X,
+    _KEY_1,
+    _KEY_2,
+    _KEY_3,
 )
 from gym_gui.core.enums import EnvironmentFamily, GameId, InputMode, INPUT_MODE_INFO
 
@@ -391,10 +401,11 @@ class TestInputModeConfiguration:
         resolver = get_key_combination_resolver(GameId.FROZEN_LAKE)
         assert resolver is None
 
-    def test_minigrid_no_resolver(self):
-        """Test MiniGrid games don't have a key combination resolver."""
+    def test_minigrid_has_resolver(self):
+        """Test MiniGrid games now have a key combination resolver for multi-keyboard support."""
+        from gym_gui.controllers.human_input import MiniGridKeyCombinationResolver
         resolver = get_key_combination_resolver(GameId.MINIGRID_EMPTY_RANDOM_5x5)
-        assert resolver is None
+        assert isinstance(resolver, MiniGridKeyCombinationResolver)
 
 
 
@@ -479,3 +490,208 @@ class TestEdgeCases:
         wasd_result = procgen_resolver.resolve({_KEY_W, _KEY_D})
         arrow_result = procgen_resolver.resolve({_KEY_UP, _KEY_RIGHT})
         assert wasd_result == arrow_result == 8
+
+
+# =============================================================================
+# MeltingPot Resolver Tests
+# =============================================================================
+
+@pytest.fixture
+def meltingpot_resolver_8() -> MeltingPotKeyCombinationResolver:
+    """Create a MeltingPot resolver with 8 actions (basic substrates)."""
+    return MeltingPotKeyCombinationResolver(num_actions=8)
+
+
+@pytest.fixture
+def meltingpot_resolver_11() -> MeltingPotKeyCombinationResolver:
+    """Create a MeltingPot resolver with 11 actions (e.g., clean_up)."""
+    return MeltingPotKeyCombinationResolver(num_actions=11)
+
+
+class TestMeltingPotKeyCombinationResolver:
+    """Test key combination resolution for MeltingPot multi-agent environments.
+
+    MeltingPot action space (varies by substrate):
+    0: NOOP - Do nothing
+    1: FORWARD - Move forward
+    2: BACKWARD - Move backward
+    3: LEFT - Strafe left
+    4: RIGHT - Strafe right
+    5: TURN_LEFT - Turn left
+    6: TURN_RIGHT - Turn right
+    7: INTERACT - Interact/use
+    8: FIRE_1 - Secondary action (e.g., fireZap) - only in 9+ action substrates
+    9: FIRE_2 - Tertiary action (e.g., fireClean) - only in 10+ action substrates
+    10: FIRE_3 - Quaternary action - only in 11+ action substrates
+    """
+
+    # ----- Movement Tests -----
+
+    def test_forward_w_key(self, meltingpot_resolver_8: MeltingPotKeyCombinationResolver):
+        """Test W key produces FORWARD action (1)."""
+        pressed = {_KEY_W}
+        assert meltingpot_resolver_8.resolve(pressed) == 1
+
+    def test_forward_up_arrow(self, meltingpot_resolver_8: MeltingPotKeyCombinationResolver):
+        """Test Up arrow produces FORWARD action (1)."""
+        pressed = {_KEY_UP}
+        assert meltingpot_resolver_8.resolve(pressed) == 1
+
+    def test_backward_s_key(self, meltingpot_resolver_8: MeltingPotKeyCombinationResolver):
+        """Test S key produces BACKWARD action (2)."""
+        pressed = {_KEY_S}
+        assert meltingpot_resolver_8.resolve(pressed) == 2
+
+    def test_backward_down_arrow(self, meltingpot_resolver_8: MeltingPotKeyCombinationResolver):
+        """Test Down arrow produces BACKWARD action (2)."""
+        pressed = {_KEY_DOWN}
+        assert meltingpot_resolver_8.resolve(pressed) == 2
+
+    def test_strafe_left_a_key(self, meltingpot_resolver_8: MeltingPotKeyCombinationResolver):
+        """Test A key produces LEFT strafe action (3)."""
+        pressed = {_KEY_A}
+        assert meltingpot_resolver_8.resolve(pressed) == 3
+
+    def test_strafe_right_d_key(self, meltingpot_resolver_8: MeltingPotKeyCombinationResolver):
+        """Test D key produces RIGHT strafe action (4)."""
+        pressed = {_KEY_D}
+        assert meltingpot_resolver_8.resolve(pressed) == 4
+
+    # ----- Turning Tests -----
+
+    def test_turn_left_q_key(self, meltingpot_resolver_8: MeltingPotKeyCombinationResolver):
+        """Test Q key produces TURN_LEFT action (5)."""
+        pressed = {_KEY_Q}
+        assert meltingpot_resolver_8.resolve(pressed) == 5
+
+    def test_turn_right_e_key(self, meltingpot_resolver_8: MeltingPotKeyCombinationResolver):
+        """Test E key produces TURN_RIGHT action (6)."""
+        pressed = {_KEY_E}
+        assert meltingpot_resolver_8.resolve(pressed) == 6
+
+    # ----- Interact Tests -----
+
+    def test_interact_space_key(self, meltingpot_resolver_8: MeltingPotKeyCombinationResolver):
+        """Test Space key produces INTERACT action (7)."""
+        pressed = {_KEY_SPACE}
+        assert meltingpot_resolver_8.resolve(pressed) == 7
+
+    def test_interact_g_key(self, meltingpot_resolver_8: MeltingPotKeyCombinationResolver):
+        """Test G key produces INTERACT action (7)."""
+        pressed = {_KEY_G}
+        assert meltingpot_resolver_8.resolve(pressed) == 7
+
+    # ----- Extended Action Tests (11-action substrates) -----
+
+    def test_fire1_z_key_11_actions(self, meltingpot_resolver_11: MeltingPotKeyCombinationResolver):
+        """Test Z key produces FIRE_1 action (8) in 11-action substrates."""
+        pressed = {_KEY_Z}
+        assert meltingpot_resolver_11.resolve(pressed) == 8
+
+    def test_fire1_key1_11_actions(self, meltingpot_resolver_11: MeltingPotKeyCombinationResolver):
+        """Test 1 key produces FIRE_1 action (8) in 11-action substrates."""
+        pressed = {_KEY_1}
+        assert meltingpot_resolver_11.resolve(pressed) == 8
+
+    def test_fire2_c_key_11_actions(self, meltingpot_resolver_11: MeltingPotKeyCombinationResolver):
+        """Test C key produces FIRE_2 action (9) in 11-action substrates."""
+        pressed = {_KEY_C}
+        assert meltingpot_resolver_11.resolve(pressed) == 9
+
+    def test_fire2_key2_11_actions(self, meltingpot_resolver_11: MeltingPotKeyCombinationResolver):
+        """Test 2 key produces FIRE_2 action (9) in 11-action substrates."""
+        pressed = {_KEY_2}
+        assert meltingpot_resolver_11.resolve(pressed) == 9
+
+    def test_fire3_x_key_11_actions(self, meltingpot_resolver_11: MeltingPotKeyCombinationResolver):
+        """Test X key produces FIRE_3 action (10) in 11-action substrates."""
+        pressed = {_KEY_X}
+        assert meltingpot_resolver_11.resolve(pressed) == 10
+
+    def test_fire3_key3_11_actions(self, meltingpot_resolver_11: MeltingPotKeyCombinationResolver):
+        """Test 3 key produces FIRE_3 action (10) in 11-action substrates."""
+        pressed = {_KEY_3}
+        assert meltingpot_resolver_11.resolve(pressed) == 10
+
+    # ----- Action Space Boundary Tests -----
+
+    def test_fire1_ignored_in_8_action_substrate(self, meltingpot_resolver_8: MeltingPotKeyCombinationResolver):
+        """Test Z key is ignored in 8-action substrates (no FIRE_1 available)."""
+        pressed = {_KEY_Z}
+        # Should return None since FIRE_1 (action 8) doesn't exist in 8-action space
+        assert meltingpot_resolver_8.resolve(pressed) is None
+
+    def test_fire2_ignored_in_8_action_substrate(self, meltingpot_resolver_8: MeltingPotKeyCombinationResolver):
+        """Test C key is ignored in 8-action substrates (no FIRE_2 available)."""
+        pressed = {_KEY_C}
+        assert meltingpot_resolver_8.resolve(pressed) is None
+
+    def test_fire3_ignored_in_8_action_substrate(self, meltingpot_resolver_8: MeltingPotKeyCombinationResolver):
+        """Test X key is ignored in 8-action substrates (no FIRE_3 available)."""
+        pressed = {_KEY_X}
+        assert meltingpot_resolver_8.resolve(pressed) is None
+
+    # ----- Priority Tests -----
+
+    def test_fire_priority_over_movement(self, meltingpot_resolver_11: MeltingPotKeyCombinationResolver):
+        """Test fire actions have priority over movement in 11-action substrates."""
+        # Z + W pressed: Z (FIRE_1) should take priority
+        pressed = {_KEY_Z, _KEY_W}
+        assert meltingpot_resolver_11.resolve(pressed) == 8  # FIRE_1
+
+    def test_interact_priority_over_movement(self, meltingpot_resolver_8: MeltingPotKeyCombinationResolver):
+        """Test interact has priority over movement."""
+        # Space + W pressed: Space (INTERACT) should take priority
+        pressed = {_KEY_SPACE, _KEY_W}
+        assert meltingpot_resolver_8.resolve(pressed) == 7  # INTERACT
+
+    def test_turn_priority_over_movement(self, meltingpot_resolver_8: MeltingPotKeyCombinationResolver):
+        """Test turning has priority over movement."""
+        # Q + W pressed: Q (TURN_LEFT) should take priority
+        pressed = {_KEY_Q, _KEY_W}
+        assert meltingpot_resolver_8.resolve(pressed) == 5  # TURN_LEFT
+
+    # ----- No Keys Test -----
+
+    def test_no_keys_returns_none(self, meltingpot_resolver_8: MeltingPotKeyCombinationResolver):
+        """Test empty key set returns None (caller should use NOOP action 0)."""
+        pressed: Set[int] = set()
+        assert meltingpot_resolver_8.resolve(pressed) is None
+
+
+class TestMeltingPotResolverFactory:
+    """Test that MeltingPot games get correct resolvers via factory."""
+
+    def test_meltingpot_game_gets_resolver(self):
+        """Test MeltingPot games get MeltingPotKeyCombinationResolver."""
+        resolver = get_key_combination_resolver(GameId.MELTINGPOT_CLEAN_UP)
+        assert isinstance(resolver, MeltingPotKeyCombinationResolver)
+
+    def test_meltingpot_resolver_with_action_space(self):
+        """Test MeltingPot resolver respects action space size."""
+        from gymnasium import spaces
+
+        # Simulate an 11-action space (like clean_up)
+        action_space = spaces.Discrete(11)
+        resolver = get_key_combination_resolver(
+            GameId.MELTINGPOT_CLEAN_UP,
+            action_space=action_space,
+        )
+
+        assert isinstance(resolver, MeltingPotKeyCombinationResolver)
+        # Should allow FIRE_1 (action 8)
+        assert resolver.resolve({_KEY_Z}) == 8
+
+    def test_meltingpot_resolver_with_8_action_space(self):
+        """Test MeltingPot resolver with 8-action space ignores extended actions."""
+        from gymnasium import spaces
+
+        action_space = spaces.Discrete(8)
+        resolver = get_key_combination_resolver(
+            GameId.MELTINGPOT_COINS,  # Basic substrate
+            action_space=action_space,
+        )
+
+        assert isinstance(resolver, MeltingPotKeyCombinationResolver)
+        # Should NOT allow FIRE_1 (action 8) since action space is only 8
+        assert resolver.resolve({_KEY_Z}) is None

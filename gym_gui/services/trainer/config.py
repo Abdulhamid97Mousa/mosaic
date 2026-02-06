@@ -301,8 +301,19 @@ def validate_train_run_config(raw: Mapping[str, Any]) -> TrainRunConfig:
 
     environment = canonical.get("environment")
     if isinstance(environment, MutableMapping):
+        # Update CleanRL run_id
         if "CLEANRL_RUN_ID" in environment:
             environment["CLEANRL_RUN_ID"] = run_id
+
+        # Update XuanCe run_id and related paths
+        if "XUANCE_RUN_ID" in environment:
+            environment["XUANCE_RUN_ID"] = run_id
+        if "XUANCE_TENSORBOARD_DIR" in environment:
+            # Replace the old run_id in the path with the new ULID
+            old_tb_dir = environment["XUANCE_TENSORBOARD_DIR"]
+            # Path format: var/trainer/runs/{old_run_id}/tensorboard
+            # We need to replace with: var/trainer/runs/{new_run_id}/tensorboard
+            environment["XUANCE_TENSORBOARD_DIR"] = f"var/trainer/runs/{run_id}/tensorboard"
 
     return TrainRunConfig(payload=canonical, metadata=metadata)
 

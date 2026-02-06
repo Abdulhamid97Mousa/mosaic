@@ -141,17 +141,33 @@ class OperatorProcessHandle:
             )
             return False
 
-    def send_reset(self, seed: Optional[int] = None) -> bool:
-        """Send reset command to initialize environment with seed."""
+    def send_reset(self, seed: Optional[int] = None, max_steps: Optional[int] = None) -> bool:
+        """Send reset command to initialize environment with seed and max_steps.
+
+        Args:
+            seed: Random seed for environment reset
+            max_steps: Maximum steps per episode before truncation (optional)
+
+        Returns:
+            True if command was sent successfully
+        """
         cmd: Dict[str, Any] = {"cmd": "reset"}
         if seed is not None:
             cmd["seed"] = seed
+
+        # Get max_steps from config if not provided as parameter
+        if max_steps is None and hasattr(self.config, 'max_steps'):
+            max_steps = self.config.max_steps
+
+        if max_steps is not None:
+            cmd["max_steps"] = max_steps
+
         result = self.send_command(cmd)
         if result:
             log_constant(
                 LOGGER, LOG_OPERATOR_RESET_COMMAND_SENT,
-                message=f"Reset command sent with seed={seed}",
-                extra={"operator_id": self.operator_id, "seed": seed},
+                message=f"Reset command sent with seed={seed}, max_steps={max_steps}",
+                extra={"operator_id": self.operator_id, "seed": seed, "max_steps": max_steps},
             )
         return result
 
@@ -596,6 +612,8 @@ class OperatorLauncher:
             cmd = self._build_rl_command(config, run_id, interactive=interactive)
         elif config.operator_type == "human":
             cmd = self._build_human_command(config, run_id)
+        elif config.operator_type == "baseline":
+            cmd = self._build_baseline_command(config, run_id, interactive=interactive)
         else:
             log_file.close()
             raise OperatorLaunchError(f"Unknown operator type: {config.operator_type}")
@@ -1062,6 +1080,82 @@ class OperatorLauncher:
             player_name,
             config.env_name,
             config.task,
+        )
+
+        return cmd
+
+    def _build_baseline_command(
+        self,
+        config: OperatorConfig,
+        run_id: str,
+        *,
+        interactive: bool = False,
+    ) -> list[str]:
+        """Build command line for baseline operator.
+
+        Uses operators_worker for simple baseline behaviors (random, noop, cycling).
+        Baseline operators are used for ablation studies and credit assignment research.
+
+        Args:
+            config: Operator configuration with baseline settings.
+            run_id: Run ID for telemetry.
+            interactive: If True, add --interactive flag for step-by-step control.
+
+        Returns:
+            Command arguments list.
+
+        Raises:
+            OperatorLaunchError: If required settings are missing.
+        """
+        settings = config.settings or {}
+
+        # Get baseline-specific settings
+        behavior = settings.get("behavior", "random")
+        seed = settings.get("seed")
+
+        # Validate behavior
+        valid_behaviors = ("random", "noop", "cycling")
+        if behavior not in valid_behaviors:
+            raise OperatorLaunchError(
+                f"Invalid baseline behavior '{behavior}'. Must be one of {valid_behaviors}"
+            )
+
+        # Determine environment ID (task field contains the full env ID)
+        env_id = config.task
+        if not env_id:
+            raise OperatorLaunchError(
+                operator_id=config.operator_id,
+                message="Baseline operator requires 'task' (environment ID)",
+            )
+
+        # Determine environment name
+        env_name = config.env_name or "babyai"
+
+        # Build operators-worker command
+        cmd = [
+            self._python_executable,
+            "-m", "operators_worker",
+            "--run-id", run_id,
+            "--behavior", behavior,
+            "--env-name", env_name,
+            "--task", env_id,
+            "--telemetry-dir", str(VAR_OPERATORS_TELEMETRY_DIR),
+        ]
+
+        # Add interactive mode flag (required for GUI control)
+        if interactive:
+            cmd.append("--interactive")
+
+        # Add seed if provided
+        if seed is not None:
+            cmd.extend(["--seed", str(seed)])
+
+        LOGGER.info(
+            "Built baseline command for operator %s | behavior=%s env=%s task=%s",
+            config.operator_id,
+            behavior,
+            env_name,
+            env_id,
         )
 
         return cmd

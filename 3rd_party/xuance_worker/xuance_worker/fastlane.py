@@ -156,6 +156,28 @@ _ENV_SLOT_COUNTER = count()
 _GRID_COORDINATORS: dict[str, "_GridCoordinator"] = {}
 
 
+def reset_slot_counter() -> None:
+    """Reset the FastLane slot counter.
+
+    Call this at the start of training to ensure slot assignments start from 0.
+    This is important for curriculum learning where environments may be recreated
+    during task transitions - without resetting, replacement envs get slots
+    >= grid_limit and won't contribute to GRID mode rendering.
+    """
+    global _ENV_SLOT_COUNTER
+    _ENV_SLOT_COUNTER = count()
+
+
+def reload_fastlane_config() -> _FastLaneConfig:
+    """Recompute FastLane config from environment variables.
+
+    Useful for testing or when environment variables change after module import.
+    """
+    global _CONFIG
+    _CONFIG = _resolve_config()
+    return _CONFIG
+
+
 def maybe_wrap_env(env: Any) -> Any:
     """Attach the FastLane wrapper if fastlane streaming is enabled.
 
@@ -164,22 +186,50 @@ def maybe_wrap_env(env: Any) -> Any:
 
     Returns:
         Wrapped or original environment
+
+    Note: If FASTLANE_SKIP_WRAP=1 is set, wrapping is skipped. This is used
+    by curriculum learning to prevent re-wrapping replacement environments.
+    When using curriculum learning (e.g., Syllabus ReinitTaskWrapper), apply
+    FastLane wrapper at the OUTERMOST level after all curriculum wrappers.
     """
+    global _CONFIG
+
+    _LOGGER.info(
+        "maybe_wrap_env called: _CONFIG.enabled=%s is_fastlane_enabled()=%s video_mode=%s",
+        _CONFIG.enabled, is_fastlane_enabled(), _CONFIG.video_mode
+    )
+
+    # Check env vars dynamically - they may have been set after module import
+    # This is important because subprocess env vars are available at runtime
+    # but the module may have been imported before they were set
+    if not _CONFIG.enabled and is_fastlane_enabled():
+        # Env vars are now set, reload config
+        _CONFIG = _resolve_config()
+        _LOGGER.info("FastLane config reloaded: enabled=%s run_id=%s", _CONFIG.enabled, _CONFIG.run_id)
+
     if not _CONFIG.enabled or _CONFIG.video_mode == VideoModes.OFF:
+        _LOGGER.info("FastLane wrapping SKIPPED: enabled=%s video_mode=%s", _CONFIG.enabled, _CONFIG.video_mode)
         return env
+
+    # Skip wrapping if explicitly disabled (e.g., for replacement envs in curriculum)
+    if os.getenv("FASTLANE_SKIP_WRAP") == "1":
+        _LOGGER.info("FastLane wrapping SKIPPED: FASTLANE_SKIP_WRAP=1")
+        return env
+
     slot_index = next(_ENV_SLOT_COUNTER)
+    _LOGGER.info("FastLane wrapping env with slot_index=%d run_id=%s", slot_index, _CONFIG.run_id)
     return FastLaneTelemetryWrapper(env, _CONFIG, slot_index)
 
 
-class FastLaneTelemetryWrapper:
+class FastLaneTelemetryWrapper(gym.Wrapper):
     """Wrapper that emits FastLane telemetry on every step.
 
     Works with both Gymnasium and XuanCe's environment wrappers.
-    Does NOT inherit from gym.Wrapper to work with XuanCe's custom wrappers.
+    Inherits from gym.Wrapper to be compatible with standard Gym wrapper chains.
     """
 
     def __init__(self, env: Any, config: _FastLaneConfig, slot_index: int) -> None:
-        self.env = env
+        super().__init__(env)
         self._config = config
         self._slot = slot_index
         self._video_mode = config.video_mode
@@ -199,10 +249,11 @@ class FastLaneTelemetryWrapper:
         self._last_emit_ns = 0
 
         # XuanCe-specific throttling env var
-        self._throttle_interval_ns = int(float(os.getenv("XUANCE_FASTLANE_INTERVAL_MS", "0")) * 1e6)
+        # Default to 33ms (~30fps) to prevent CPU starvation from rendering every step
+        self._throttle_interval_ns = int(float(os.getenv("XUANCE_FASTLANE_INTERVAL_MS", "33")) * 1e6)
         self._downscale_max_dim = int(os.getenv("XUANCE_FASTLANE_MAX_DIM", "0"))
 
-        self._writer: Optional[FastLaneWriter] = None  # type: ignore[assignment]
+        self._writer: Optional[Any] = None  # FastLaneWriter when created
         self._last_metrics_ts: Optional[float] = None
         self._debug_counter = 0
 
@@ -255,18 +306,23 @@ class FastLaneTelemetryWrapper:
 
     def _emit_single_step(self, reward: float) -> None:
         """Emit a single frame for this step."""
+        # Check throttle BEFORE rendering to avoid CPU starvation
+        if self._should_throttle():
+            return
         frame_array = self._grab_frame()
         if frame_array is None:
             if self._debug_counter < 5:
                 _LOGGER.debug("FastLane frame skipped (render failed)")
-            return
-        if self._should_throttle():
             return
         self._publish_array_frame(frame_array, reward)
 
     def _handle_grid_step(self, reward: float) -> None:
         """Handle grid mode (multiple envs in one frame)."""
         if self._grid_coordinator is None or not self._grid_contributor:
+            return
+        # Check throttle BEFORE rendering to avoid CPU starvation
+        # Only the active slot (slot 0) checks throttling to coordinate grid timing
+        if self._active and self._should_throttle():
             return
         frame_array = self._grab_frame()
         if frame_array is None:
@@ -278,8 +334,6 @@ class FastLaneTelemetryWrapper:
         if result is None:
             return
         composite, publisher_reward = result
-        if self._should_throttle():
-            return
         self._publish_array_frame(composite, publisher_reward)
 
     def _emit_episode(self) -> None:
@@ -345,7 +399,9 @@ class FastLaneTelemetryWrapper:
             new_w = int(w * scale)
             new_h = int(h * scale)
             img = Image.fromarray(arr)
-            img = img.resize((new_w, new_h), Image.LANCZOS)
+            # Use Resampling.LANCZOS for PIL 10+ or fallback to LANCZOS constant
+            resample = getattr(Image.Resampling, "LANCZOS", getattr(Image, "LANCZOS", 1))
+            img = img.resize((new_w, new_h), resample)
             return np.array(img)
         except ImportError:
             return arr
@@ -361,28 +417,43 @@ class FastLaneTelemetryWrapper:
         return False
 
     def _publish_array_frame(self, frame: np.ndarray, reward: float) -> None:
-        """Publish frame to FastLane shared memory."""
+        """Publish frame to FastLane shared memory.
+
+        Uses the same API as cleanrl_worker's fastlane.py for compatibility.
+        """
+        if FastLaneWriter is None or FastLaneConfig is None or FastLaneMetrics is None:
+            return
+
+        height, width, channels = frame.shape
+        frame_bytes = frame.tobytes()
+
         if self._writer is None:
-            try:
-                self._writer = FastLaneWriter(
-                    run_id=self._config.run_id,
-                    agent_id=self._config.agent_id,
-                    shape=frame.shape,
-                )
-            except Exception as exc:
-                if self._debug_counter == 0:
-                    _LOGGER.error("Failed to create FastLane writer: %s", exc, exc_info=True)
+            config = FastLaneConfig(
+                width=width,
+                height=height,
+                channels=channels,
+                pixel_format="RGB" if channels == 3 else "RGBA",
+            )
+            self._writer = self._create_writer(config)
+            if self._writer is None:
                 return
 
+        # Calculate step rate
+        now = time.perf_counter()
+        if self._last_metrics_ts is None:
+            step_rate = 0.0
+        else:
+            delta = now - self._last_metrics_ts
+            step_rate = 1.0 / delta if delta > 0 else 0.0
+        self._last_metrics_ts = now
+
+        metrics = FastLaneMetrics(
+            last_reward=float(reward),
+            rolling_return=float(self._episode_return + reward),
+            step_rate_hz=step_rate,
+        )
         try:
-            metrics = FastLaneMetrics(
-                episode=self._episode_index,
-                step=self._step_index,
-                reward=reward,
-                cumulative_reward=self._episode_return,
-                timestamp_ns=time.time_ns(),
-            )
-            self._writer.write_frame(frame, metrics)
+            self._writer.publish(frame_bytes, metrics=metrics)
             self._debug_counter += 1
             if self._debug_counter % 100 == 0:
                 _LOGGER.debug(
@@ -392,6 +463,33 @@ class FastLaneTelemetryWrapper:
         except Exception as exc:
             if self._debug_counter < 10:
                 _LOGGER.warning("Failed to write FastLane frame: %s", exc, exc_info=True)
+            self._close_writer()
+
+    def _create_writer(self, config: Any) -> Optional[Any]:
+        """Create FastLane writer with proper error handling.
+
+        Matches cleanrl_worker's implementation for compatibility.
+        """
+        _LOGGER.info("Creating FastLane writer for run_id=%s", self._config.run_id)
+        try:
+            writer = FastLaneWriter.create(self._config.run_id, config)  # type: ignore[union-attr]
+            _LOGGER.info("FastLane writer created successfully for run_id=%s", self._config.run_id)
+            return writer
+        except FileExistsError:
+            _LOGGER.info("FastLane buffer already exists, connecting to existing for run_id=%s", self._config.run_id)
+            # Buffer already exists, try to connect to it
+            if create_fastlane_name is None:
+                return None
+            try:
+                from multiprocessing import shared_memory
+                name = create_fastlane_name(self._config.run_id)
+                shm = shared_memory.SharedMemory(name=name, create=False)
+                return FastLaneWriter(shm, config)  # type: ignore[call-arg]
+            except Exception:
+                return None
+        except Exception as exc:
+            _LOGGER.error("Failed to create FastLane writer: %s", exc, exc_info=True)
+            return None
 
     def _close_writer(self) -> None:
         """Close FastLane writer."""
@@ -402,9 +500,7 @@ class FastLaneTelemetryWrapper:
                 pass
             self._writer = None
 
-    def __getattr__(self, name):
-        """Proxy to underlying environment."""
-        return getattr(self.env, name)
+    # Note: __getattr__ removed - gym.Wrapper handles attribute proxying
 
 
 # Grid coordinator for tiling multiple environment views
@@ -453,5 +549,7 @@ def _get_grid_coordinator(config: _FastLaneConfig) -> _GridCoordinator:
 __all__ = [
     "is_fastlane_enabled",
     "maybe_wrap_env",
+    "reset_slot_counter",
+    "reload_fastlane_config",
     "FastLaneTelemetryWrapper",
 ]

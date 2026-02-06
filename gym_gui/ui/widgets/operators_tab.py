@@ -23,9 +23,13 @@ from gym_gui.logging_config.log_constants import (
     LOG_UI_BOARD_CONFIG_STATE_APPLIED,
     LOG_OP_GRID_CONFIG_DIALOG_OPENED,
     LOG_OP_GRID_CONFIG_STATE_APPLIED,
+    LOG_BASELINE_SCRIPT_PARSED,
+    LOG_BASELINE_AUTO_EXECUTION_STARTED,
+    LOG_BASELINE_AUTO_EXECUTION_COMPLETED,
 )
 from gym_gui.services.operator import OperatorConfig
 from gym_gui.ui.widgets.operator_config_widget import OperatorConfigWidget, VLLMServerInfo
+from gym_gui.ui.widgets.script_experiment_widget import ScriptExperimentWidget
 from gym_gui.ui.widgets.vllm_server_widget import VLLMServerWidget
 
 # Use operators namespace for dedicated operators.log routing
@@ -133,8 +137,10 @@ class CollapsibleSection(QtWidgets.QWidget):
         # Clear existing content
         while self._content_layout.count():
             item = self._content_layout.takeAt(0)
-            if item.widget():
-                item.widget().setParent(None)
+            if item is not None:
+                old_widget = item.widget()
+                if old_widget is not None:
+                    old_widget.setParent(None)
 
         self._content_layout.addWidget(widget)
 
@@ -200,7 +206,11 @@ class OperatorsTab(QtWidgets.QWidget):
         # Turn-based execution tracking
         self._operator_order: list[str] = []  # Ordered list of operator IDs
         self._operator_types: dict[str, str] = {}  # operator_id -> "human", "llm", "rl", etc.
+        self._operator_states: dict[str, str] = {}  # operator_id -> "stopped", "running"
         self._current_agent_index: int = 0  # Which agent's turn it is (0-based)
+
+        # Script-based execution is now handled by OperatorScriptExecutionManager
+        # (no state needed in OperatorsTab)
 
         self._build_ui()
 
@@ -224,7 +234,7 @@ class OperatorsTab(QtWidgets.QWidget):
         )
         explanation_text.setWordWrap(True)
         explanation_text.setTextFormat(QtCore.Qt.TextFormat.RichText)
-        explanation_text.setStyleSheet("QLabel { color: #555; padding: 8px; background: white; }")
+        # No custom styling - let Qt handle dark/light mode automatically
         self._explanation_section.add_widget(explanation_text)
         layout.addWidget(self._explanation_section)
 
@@ -237,27 +247,7 @@ class OperatorsTab(QtWidgets.QWidget):
 
         # Configure Operators section (always visible, takes remaining space)
         config_group = QtWidgets.QGroupBox("Configure Operators", self)
-        config_group.setStyleSheet(
-            """
-            QGroupBox {
-                font-size: 13px;
-                font-weight: bold;
-                border: 1px solid #d0d0d0;
-                border-radius: 6px;
-                margin-top: 12px;
-                padding-top: 8px;
-                background-color: #fafafa;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top left;
-                left: 12px;
-                padding: 0 6px;
-                background-color: #fafafa;
-                color: #333;
-            }
-            """
-        )
+        # No custom styling - let Qt handle dark/light mode automatically
         config_group.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding,
             QtWidgets.QSizePolicy.Policy.Expanding
@@ -265,8 +255,15 @@ class OperatorsTab(QtWidgets.QWidget):
         config_layout = QtWidgets.QVBoxLayout(config_group)
         config_layout.setContentsMargins(8, 12, 8, 8)
 
-        # Multi-operator configuration widget - expands to fill available space
-        self._operator_config_widget = OperatorConfigWidget(max_operators=8, parent=config_group)
+        # Tab widget for Manual vs Script mode
+        self._config_tabs = QtWidgets.QTabWidget(config_group)
+        self._config_tabs.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Expanding
+        )
+
+        # Tab 1: Manual Mode (existing widget)
+        self._operator_config_widget = OperatorConfigWidget(max_operators=8, parent=self._config_tabs)
         self._operator_config_widget.setSizePolicy(
             QtWidgets.QSizePolicy.Policy.Expanding,
             QtWidgets.QSizePolicy.Policy.Expanding
@@ -275,47 +272,26 @@ class OperatorsTab(QtWidgets.QWidget):
         self._operator_config_widget.initialize_requested.connect(self._on_initialize_requested)
         self._operator_config_widget.configure_requested.connect(self._on_configure_requested)
         self._operator_config_widget.vllm_refresh_requested.connect(self.refresh_vllm_servers)
-        config_layout.addWidget(self._operator_config_widget, 1)  # Stretch factor for expansion
+        self._config_tabs.addTab(self._operator_config_widget, "Manual Mode")
+
+        # Tab 2: Script Experiments (clean one-click execution)
+        # Script execution logic is handled by OperatorScriptExecutionManager (not OperatorsTab)
+        self._script_experiment_widget = ScriptExperimentWidget(parent=self._config_tabs)
+        self._script_experiment_widget.setSizePolicy(
+            QtWidgets.QSizePolicy.Policy.Expanding,
+            QtWidgets.QSizePolicy.Policy.Expanding
+        )
+        # MainWindow will connect to the execution manager's signals directly
+        self._config_tabs.addTab(self._script_experiment_widget, "Script Experiments")
+
+        config_layout.addWidget(self._config_tabs, 1)  # Stretch factor for expansion
 
         # Add with stretch=1 so config_group expands to fill available vertical space
         layout.addWidget(config_group, 1)
 
         # Scientific Execution Controls (inspired by BALROG methodology)
         exec_group = QtWidgets.QGroupBox("Execution Controls (Scientific Comparison)", self)
-        exec_group.setStyleSheet(
-            """
-            QGroupBox {
-                font-size: 13px;
-                font-weight: bold;
-                border: 1px solid #d0d0d0;
-                border-radius: 6px;
-                margin-top: 12px;
-                padding-top: 8px;
-                background-color: #fafafa;
-            }
-            QGroupBox::title {
-                subcontrol-origin: margin;
-                subcontrol-position: top left;
-                left: 12px;
-                padding: 0 6px;
-                background-color: #fafafa;
-                color: #333;
-            }
-            QLabel {
-                font-size: 12px;
-                color: #444;
-                background: transparent;
-                border: none;
-            }
-            QSpinBox {
-                font-size: 12px;
-                padding: 4px;
-                border: 1px solid #ccc;
-                border-radius: 4px;
-                background-color: white;
-            }
-            """
-        )
+        # No custom styling - let Qt handle dark/light mode automatically
         exec_layout = QtWidgets.QVBoxLayout(exec_group)
         exec_layout.setContentsMargins(12, 12, 12, 12)
 
@@ -341,7 +317,6 @@ class OperatorsTab(QtWidgets.QWidget):
 
         self._random_seed_button = QtWidgets.QPushButton("Random", exec_group)
         self._random_seed_button.setToolTip("Generate a new random seed")
-        self._random_seed_button.setStyleSheet("QPushButton { padding: 4px 8px; }")
         self._random_seed_button.clicked.connect(self._on_random_seed_clicked)
         seed_row.addWidget(self._random_seed_button)
 
@@ -357,10 +332,7 @@ class OperatorsTab(QtWidgets.QWidget):
             "All environments will have identical starting conditions."
         )
         self._reset_all_button.setStyleSheet(
-            "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #FF9800; color: white; }"
-            "QPushButton:hover { background-color: #F57C00; }"
-            "QPushButton:pressed { background-color: #EF6C00; }"
-            "QPushButton:disabled { background-color: #FFCC80; color: #FFF3E0; }"
+            "QPushButton { font-weight: bold; background-color: #FF9800; color: white; }"
         )
         self._reset_all_button.setEnabled(False)
         self._reset_all_button.clicked.connect(self._on_reset_all_clicked)
@@ -372,10 +344,7 @@ class OperatorsTab(QtWidgets.QWidget):
             "Disabled when waiting for a Human to take their turn."
         )
         self._step_all_button.setStyleSheet(
-            "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #4CAF50; color: white; }"
-            "QPushButton:hover { background-color: #45a049; }"
-            "QPushButton:pressed { background-color: #388E3C; }"
-            "QPushButton:disabled { background-color: #A5D6A7; color: #E8F5E9; }"
+            "QPushButton { font-weight: bold; background-color: #4CAF50; color: white; }"
         )
         self._step_all_button.setEnabled(False)
         self._step_all_button.clicked.connect(self._on_step_all_clicked)
@@ -389,10 +358,7 @@ class OperatorsTab(QtWidgets.QWidget):
             "Enabled only when it's a Human operator's turn."
         )
         self._human_step_button.setStyleSheet(
-            "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #FF5722; color: white; }"
-            "QPushButton:hover { background-color: #E64A19; }"
-            "QPushButton:pressed { background-color: #D84315; }"
-            "QPushButton:disabled { background-color: #FFAB91; color: #FBE9E7; }"
+            "QPushButton { font-weight: bold; background-color: #FF5722; color: white; }"
         )
         self._human_step_button.setEnabled(False)
         self._human_step_button.setVisible(False)  # Hidden until human operator is configured
@@ -403,10 +369,7 @@ class OperatorsTab(QtWidgets.QWidget):
         self._step_player_0_btn = QtWidgets.QPushButton("Step White", exec_group)
         self._step_player_0_btn.setToolTip("Step player_0 (White) - their turn to move")
         self._step_player_0_btn.setStyleSheet(
-            "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #4CAF50; color: white; }"
-            "QPushButton:hover { background-color: #45a049; }"
-            "QPushButton:pressed { background-color: #388E3C; }"
-            "QPushButton:disabled { background-color: #A5D6A7; color: #E8F5E9; }"
+            "QPushButton { font-weight: bold; background-color: #4CAF50; color: white; }"
         )
         self._step_player_0_btn.setEnabled(False)
         self._step_player_0_btn.setVisible(False)  # Hidden by default
@@ -416,10 +379,7 @@ class OperatorsTab(QtWidgets.QWidget):
         self._step_player_1_btn = QtWidgets.QPushButton("Step Black", exec_group)
         self._step_player_1_btn.setToolTip("Step player_1 (Black) - their turn to move")
         self._step_player_1_btn.setStyleSheet(
-            "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #4CAF50; color: white; }"
-            "QPushButton:hover { background-color: #45a049; }"
-            "QPushButton:pressed { background-color: #388E3C; }"
-            "QPushButton:disabled { background-color: #A5D6A7; color: #E8F5E9; }"
+            "QPushButton { font-weight: bold; background-color: #4CAF50; color: white; }"
         )
         self._step_player_1_btn.setEnabled(False)
         self._step_player_1_btn.setVisible(False)  # Hidden by default
@@ -429,10 +389,7 @@ class OperatorsTab(QtWidgets.QWidget):
         self._stop_operators_button = QtWidgets.QPushButton("Stop All", exec_group)
         self._stop_operators_button.setToolTip("Stop all running operators and release resources")
         self._stop_operators_button.setStyleSheet(
-            "QPushButton { font-weight: bold; padding: 6px 12px; background-color: #F44336; color: white; }"
-            "QPushButton:hover { background-color: #E53935; }"
-            "QPushButton:pressed { background-color: #D32F2F; }"
-            "QPushButton:disabled { background-color: #EF9A9A; color: #FFEBEE; }"
+            "QPushButton { font-weight: bold; background-color: #F44336; color: white; }"
         )
         self._stop_operators_button.setEnabled(False)
         self._stop_operators_button.clicked.connect(self._on_stop_operators_clicked)
@@ -445,24 +402,16 @@ class OperatorsTab(QtWidgets.QWidget):
         status_row.setSpacing(12)
 
         self._step_count_label = QtWidgets.QLabel("Steps: 0", exec_group)
-        self._step_count_label.setStyleSheet(
-            "QLabel { font-weight: bold; color: #1976D2; padding: 4px 8px; "
-            "background-color: #E3F2FD; border-radius: 4px; }"
-        )
+        self._step_count_label.setStyleSheet("QLabel { font-weight: bold; }")
         status_row.addWidget(self._step_count_label)
 
         self._status_label = QtWidgets.QLabel("Ready", exec_group)
-        self._status_label.setStyleSheet(
-            "QLabel { color: #666; padding: 4px; font-style: italic; }"
-        )
+        # No custom styling - let Qt handle dark/light mode
         status_row.addWidget(self._status_label)
 
         # Turn indicator for PettingZoo multi-agent games
         self._turn_indicator_label = QtWidgets.QLabel("", exec_group)
-        self._turn_indicator_label.setStyleSheet(
-            "QLabel { font-weight: bold; color: #F57C00; padding: 4px 8px; "
-            "background-color: #FFF3E0; border-radius: 4px; }"
-        )
+        self._turn_indicator_label.setStyleSheet("QLabel { font-weight: bold; }")
         self._turn_indicator_label.setVisible(False)  # Hidden by default
         status_row.addWidget(self._turn_indicator_label)
 
@@ -474,11 +423,9 @@ class OperatorsTab(QtWidgets.QWidget):
 
         # Human Actions Panel (visible only when human operator is waiting)
         self._human_actions_group = QtWidgets.QGroupBox("Human Actions", self)
+        # Keep orange border for attention, but no background color for dark mode compatibility
         self._human_actions_group.setStyleSheet(
-            "QGroupBox { font-weight: bold; border: 2px solid #FF5722; border-radius: 6px; "
-            "margin-top: 8px; padding: 8px; background-color: #FFF3E0; }"
-            "QGroupBox::title { color: #FF5722; subcontrol-origin: margin; "
-            "subcontrol-position: top left; padding: 2px 8px; }"
+            "QGroupBox { font-weight: bold; border: 2px solid #FF5722; }"
         )
         self._human_actions_group.setVisible(False)  # Hidden by default
 
@@ -491,7 +438,6 @@ class OperatorsTab(QtWidgets.QWidget):
             "Your turn! Click an action button or use keyboard shortcuts:",
             self._human_actions_group
         )
-        self._human_instructions_label.setStyleSheet("font-weight: normal; color: #555;")
         self._human_instructions_label.setWordWrap(True)
         human_actions_layout.addWidget(self._human_instructions_label)
 
@@ -507,7 +453,6 @@ class OperatorsTab(QtWidgets.QWidget):
             "Keyboard: WASD/Arrows for movement, Space/G for pickup, E for toggle",
             self._human_actions_group
         )
-        self._keyboard_hint_label.setStyleSheet("font-size: 9px; color: #888; font-style: italic;")
         self._keyboard_hint_label.setWordWrap(True)
         human_actions_layout.addWidget(self._keyboard_hint_label)
 
@@ -521,9 +466,10 @@ class OperatorsTab(QtWidgets.QWidget):
         has_operators = len(configs) > 0
         self._reset_all_button.setEnabled(has_operators)
 
-        # Build operator order and types for turn-based execution
+        # Build operator order, types, and initial states for turn-based execution
         self._operator_order = [cfg.operator_id for cfg in configs]
         self._operator_types = {}
+        # Initialize all operators as "stopped" (will be updated to "running" when launched)
         for cfg in configs:
             # Determine operator type based on worker_id
             if cfg.worker_id == "human_worker":
@@ -533,6 +479,10 @@ class OperatorsTab(QtWidgets.QWidget):
             else:
                 # LLM, VLM, etc.
                 self._operator_types[cfg.operator_id] = "llm"
+
+            # Initialize state as "stopped" if not already tracked
+            if cfg.operator_id not in self._operator_states:
+                self._operator_states[cfg.operator_id] = "stopped"
 
         # Detect human operators (worker_id == "human_worker")
         self._human_operator_ids = [
@@ -550,11 +500,14 @@ class OperatorsTab(QtWidgets.QWidget):
         if not has_operators:
             self._step_all_button.setEnabled(False)
             self._human_step_button.setEnabled(False)
-            self._stop_operators_button.setEnabled(False)
 
-        # Update status to show human operator info
-        if self._has_human_operator:
-            self._status_label.setText(f"Human operator(s): {len(self._human_operator_ids)}")
+    # Script execution methods removed - now handled by OperatorScriptExecutionManager
+    # (see gym_gui/services/operator_script_execution_manager.py)
+
+    @property
+    def script_execution_manager(self):
+        """Get the script execution manager for MainWindow to wire up signals."""
+        return self._script_experiment_widget.execution_manager
 
     def _on_random_seed_clicked(self) -> None:
         """Generate a random seed."""
@@ -608,6 +561,10 @@ class OperatorsTab(QtWidgets.QWidget):
         self._step_all_button.setEnabled(False)
         self._stop_operators_button.setEnabled(False)
         self._status_label.setText("Stopped")
+
+        # Mark all operators as stopped
+        for operator_id in self._operator_states:
+            self._operator_states[operator_id] = "stopped"
 
     def _on_initialize_requested(self, operator_id: str, config: OperatorConfig) -> None:
         """Handle initialize request from an operator row.
@@ -931,8 +888,10 @@ class OperatorsTab(QtWidgets.QWidget):
         # Clear existing buttons
         while self._human_action_buttons_layout.count():
             item = self._human_action_buttons_layout.takeAt(0)
-            if item.widget():
-                item.widget().deleteLater()
+            if item is not None:
+                widget = item.widget()
+                if widget is not None:
+                    widget.deleteLater()
 
         # Create buttons in a grid (4 columns max)
         cols = 4
@@ -943,10 +902,7 @@ class OperatorsTab(QtWidgets.QWidget):
             btn = QtWidgets.QPushButton(f"{label}", self._human_action_buttons_widget)
             btn.setToolTip(f"Action {action_idx}: {label}")
             btn.setStyleSheet(
-                "QPushButton { padding: 8px 12px; background-color: #FF5722; color: white; "
-                "font-weight: bold; border-radius: 4px; min-width: 80px; }"
-                "QPushButton:hover { background-color: #E64A19; }"
-                "QPushButton:pressed { background-color: #D84315; }"
+                "QPushButton { font-weight: bold; background-color: #FF5722; color: white; }"
             )
             btn.clicked.connect(lambda checked, a=action_idx: self._on_human_action_button_clicked(a))
             self._human_action_buttons_layout.addWidget(btn, row, col)
