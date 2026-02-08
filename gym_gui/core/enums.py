@@ -38,7 +38,8 @@ class EnvironmentFamily(StrEnum):
     PETTINGZOO = "pettingzoo"
     PETTINGZOO_CLASSIC = "pettingzoo_classic"  # PettingZoo Classic: turn-based games (Chess, Go, Connect Four, etc.)
     OPEN_SPIEL = "open_spiel"  # OpenSpiel + custom draughts variants (American, Russian, International)
-    MULTIGRID = "multigrid"  # gym-multigrid multi-agent grid environments (Soccer, Collect)
+    MOSAIC_MULTIGRID = "mosaic_multigrid"  # mosaic_multigrid (PyPI): Competitive team-based (Soccer, Collect) - view_size=3
+    INI_MULTIGRID = "ini_multigrid"  # INI multigrid: Cooperative exploration (Empty, BlockedUnlockPickup, etc.) - view_size=7
     MELTINGPOT = "meltingpot"  # Melting Pot multi-agent social scenarios (Google DeepMind) via Shimmy
     OVERCOOKED = "overcooked"  # Overcooked-AI cooperative cooking (2 agents, human-AI coordination)
     OTHER = "other"  # Fallback for unknown environments (not displayed in UI)
@@ -424,25 +425,33 @@ class GameId(StrEnum):
     # gym-multigrid (Multi-Agent Grid Environments)
     # Repository (old): https://github.com/ArnaudFickinger/gym-multigrid
     # Repository (new): https://github.com/ini/multigrid
-    # Location: 3rd_party/gym-multigrid/ and 3rd_party/multigrid-ini/
     # ─────────────────────────────────────────────────────────────────────────
-    # mosaic_multigrid environments (PyPI: mosaic-multigrid v1.0.0+)
-    MULTIGRID_SOCCER = "MosaicMultiGrid-Soccer-v0"  # 4 agents, 2v2 soccer
-    MULTIGRID_COLLECT = "MosaicMultiGrid-Collect-v0"  # 3 agents, collect balls
-    # INI multigrid environments (https://github.com/ini/multigrid)
-    MULTIGRID_BLOCKED_UNLOCK_PICKUP = "MultiGrid-BlockedUnlockPickup-v0"  # Blocked door puzzle
-    MULTIGRID_EMPTY_5X5 = "MultiGrid-Empty-5x5-v0"  # Empty 5x5 grid
-    MULTIGRID_EMPTY_RANDOM_5X5 = "MultiGrid-Empty-Random-5x5-v0"  # Empty 5x5 with random start
-    MULTIGRID_EMPTY_6X6 = "MultiGrid-Empty-6x6-v0"  # Empty 6x6 grid
-    MULTIGRID_EMPTY_RANDOM_6X6 = "MultiGrid-Empty-Random-6x6-v0"  # Empty 6x6 with random start
-    MULTIGRID_EMPTY_8X8 = "MultiGrid-Empty-8x8-v0"  # Empty 8x8 grid
-    MULTIGRID_EMPTY_16X16 = "MultiGrid-Empty-16x16-v0"  # Empty 16x16 grid
-    MULTIGRID_LOCKED_HALLWAY_2ROOMS = "MultiGrid-LockedHallway-2Rooms-v0"  # 2 rooms with locked doors
-    MULTIGRID_LOCKED_HALLWAY_4ROOMS = "MultiGrid-LockedHallway-4Rooms-v0"  # 4 rooms with locked doors
-    MULTIGRID_LOCKED_HALLWAY_6ROOMS = "MultiGrid-LockedHallway-6Rooms-v0"  # 6 rooms with locked doors
-    MULTIGRID_PLAYGROUND = "MultiGrid-Playground-v0"  # Playground with various objects
-    MULTIGRID_RED_BLUE_DOORS_6X6 = "MultiGrid-RedBlueDoors-6x6-v0"  # Red/Blue door puzzle 6x6
-    MULTIGRID_RED_BLUE_DOORS_8X8 = "MultiGrid-RedBlueDoors-8x8-v0"  # Red/Blue door puzzle 8x8
+    # MOSAIC MultiGrid (PyPI: mosaic-multigrid v1.0.0+)
+    # Competitive team-based multi-agent games with view_size=3
+    # PyPI: https://pypi.org/project/mosaic-multigrid/
+    # GitHub: https://github.com/Abdulhamid97Mousa/mosaic_multigrid
+    # ─────────────────────────────────────────────────────────────────────────
+    MOSAIC_MULTIGRID_SOCCER = "MosaicMultiGrid-Soccer-v0"  # 4 agents, 2v2 soccer, zero-sum
+    MOSAIC_MULTIGRID_COLLECT = "MosaicMultiGrid-Collect-v0"  # 3 agents, collect balls, competitive
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # INI MultiGrid (Local: 3rd_party/multigrid-ini/)
+    # Cooperative exploration tasks with view_size=7
+    # GitHub: https://github.com/ini/multigrid
+    # ─────────────────────────────────────────────────────────────────────────
+    INI_MULTIGRID_BLOCKED_UNLOCK_PICKUP = "MultiGrid-BlockedUnlockPickup-v0"  # Blocked door puzzle
+    INI_MULTIGRID_EMPTY_5X5 = "MultiGrid-Empty-5x5-v0"  # Empty 5x5 grid
+    INI_MULTIGRID_EMPTY_RANDOM_5X5 = "MultiGrid-Empty-Random-5x5-v0"  # Empty 5x5 with random start
+    INI_MULTIGRID_EMPTY_6X6 = "MultiGrid-Empty-6x6-v0"  # Empty 6x6 grid
+    INI_MULTIGRID_EMPTY_RANDOM_6X6 = "MultiGrid-Empty-Random-6x6-v0"  # Empty 6x6 with random start
+    INI_MULTIGRID_EMPTY_8X8 = "MultiGrid-Empty-8x8-v0"  # Empty 8x8 grid (default)
+    INI_MULTIGRID_EMPTY_16X16 = "MultiGrid-Empty-16x16-v0"  # Empty 16x16 grid
+    INI_MULTIGRID_LOCKED_HALLWAY_2ROOMS = "MultiGrid-LockedHallway-2Rooms-v0"  # 2 rooms with locked doors
+    INI_MULTIGRID_LOCKED_HALLWAY_4ROOMS = "MultiGrid-LockedHallway-4Rooms-v0"  # 4 rooms with locked doors
+    INI_MULTIGRID_LOCKED_HALLWAY_6ROOMS = "MultiGrid-LockedHallway-6Rooms-v0"  # 6 rooms with locked doors
+    INI_MULTIGRID_PLAYGROUND = "MultiGrid-Playground-v0"  # Playground with various objects
+    INI_MULTIGRID_RED_BLUE_DOORS_6X6 = "MultiGrid-RedBlueDoors-6x6-v0"  # Red/Blue door puzzle 6x6
+    INI_MULTIGRID_RED_BLUE_DOORS_8X8 = "MultiGrid-RedBlueDoors-8x8-v0"  # Red/Blue door puzzle 8x8
 
     # ─────────────────────────────────────────────────────────────────────────
     # Melting Pot (Multi-Agent Social Scenarios - Google DeepMind)
@@ -1075,22 +1084,23 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.AMERICAN_CHECKERS: EnvironmentFamily.OPEN_SPIEL,  # Custom implementation
     GameId.RUSSIAN_CHECKERS: EnvironmentFamily.OPEN_SPIEL,  # Custom implementation
     GameId.INTERNATIONAL_DRAUGHTS: EnvironmentFamily.OPEN_SPIEL,  # Custom implementation
-    # gym-multigrid (multi-agent grid environments)
-    GameId.MULTIGRID_SOCCER: EnvironmentFamily.MULTIGRID,
-    GameId.MULTIGRID_COLLECT: EnvironmentFamily.MULTIGRID,
-    GameId.MULTIGRID_BLOCKED_UNLOCK_PICKUP: EnvironmentFamily.MULTIGRID,
-    GameId.MULTIGRID_EMPTY_5X5: EnvironmentFamily.MULTIGRID,
-    GameId.MULTIGRID_EMPTY_RANDOM_5X5: EnvironmentFamily.MULTIGRID,
-    GameId.MULTIGRID_EMPTY_6X6: EnvironmentFamily.MULTIGRID,
-    GameId.MULTIGRID_EMPTY_RANDOM_6X6: EnvironmentFamily.MULTIGRID,
-    GameId.MULTIGRID_EMPTY_8X8: EnvironmentFamily.MULTIGRID,
-    GameId.MULTIGRID_EMPTY_16X16: EnvironmentFamily.MULTIGRID,
-    GameId.MULTIGRID_LOCKED_HALLWAY_2ROOMS: EnvironmentFamily.MULTIGRID,
-    GameId.MULTIGRID_LOCKED_HALLWAY_4ROOMS: EnvironmentFamily.MULTIGRID,
-    GameId.MULTIGRID_LOCKED_HALLWAY_6ROOMS: EnvironmentFamily.MULTIGRID,
-    GameId.MULTIGRID_PLAYGROUND: EnvironmentFamily.MULTIGRID,
-    GameId.MULTIGRID_RED_BLUE_DOORS_6X6: EnvironmentFamily.MULTIGRID,
-    GameId.MULTIGRID_RED_BLUE_DOORS_8X8: EnvironmentFamily.MULTIGRID,
+    # MOSAIC MultiGrid (PyPI: mosaic-multigrid - competitive team-based)
+    GameId.MOSAIC_MULTIGRID_SOCCER: EnvironmentFamily.MOSAIC_MULTIGRID,
+    GameId.MOSAIC_MULTIGRID_COLLECT: EnvironmentFamily.MOSAIC_MULTIGRID,
+    # INI MultiGrid (Local: cooperative exploration)
+    GameId.INI_MULTIGRID_BLOCKED_UNLOCK_PICKUP: EnvironmentFamily.INI_MULTIGRID,
+    GameId.INI_MULTIGRID_EMPTY_5X5: EnvironmentFamily.INI_MULTIGRID,
+    GameId.INI_MULTIGRID_EMPTY_RANDOM_5X5: EnvironmentFamily.INI_MULTIGRID,
+    GameId.INI_MULTIGRID_EMPTY_6X6: EnvironmentFamily.INI_MULTIGRID,
+    GameId.INI_MULTIGRID_EMPTY_RANDOM_6X6: EnvironmentFamily.INI_MULTIGRID,
+    GameId.INI_MULTIGRID_EMPTY_8X8: EnvironmentFamily.INI_MULTIGRID,
+    GameId.INI_MULTIGRID_EMPTY_16X16: EnvironmentFamily.INI_MULTIGRID,
+    GameId.INI_MULTIGRID_LOCKED_HALLWAY_2ROOMS: EnvironmentFamily.INI_MULTIGRID,
+    GameId.INI_MULTIGRID_LOCKED_HALLWAY_4ROOMS: EnvironmentFamily.INI_MULTIGRID,
+    GameId.INI_MULTIGRID_LOCKED_HALLWAY_6ROOMS: EnvironmentFamily.INI_MULTIGRID,
+    GameId.INI_MULTIGRID_PLAYGROUND: EnvironmentFamily.INI_MULTIGRID,
+    GameId.INI_MULTIGRID_RED_BLUE_DOORS_6X6: EnvironmentFamily.INI_MULTIGRID,
+    GameId.INI_MULTIGRID_RED_BLUE_DOORS_8X8: EnvironmentFamily.INI_MULTIGRID,
     # Melting Pot (all 49 multi-agent social scenarios)
     GameId.MELTINGPOT_ALLELOPATHIC_HARVEST__OPEN: EnvironmentFamily.MELTINGPOT,
     GameId.MELTINGPOT_BACH_OR_STRAVINSKY_IN_THE_MATRIX__ARENA: EnvironmentFamily.MELTINGPOT,
@@ -1364,21 +1374,21 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.RUSSIAN_CHECKERS: RenderMode.RGB_ARRAY,
     GameId.INTERNATIONAL_DRAUGHTS: RenderMode.RGB_ARRAY,
     # gym-multigrid (multi-agent grid environments)
-    GameId.MULTIGRID_SOCCER: RenderMode.RGB_ARRAY,
-    GameId.MULTIGRID_COLLECT: RenderMode.RGB_ARRAY,
-    GameId.MULTIGRID_BLOCKED_UNLOCK_PICKUP: RenderMode.RGB_ARRAY,
-    GameId.MULTIGRID_EMPTY_5X5: RenderMode.RGB_ARRAY,
-    GameId.MULTIGRID_EMPTY_RANDOM_5X5: RenderMode.RGB_ARRAY,
-    GameId.MULTIGRID_EMPTY_6X6: RenderMode.RGB_ARRAY,
-    GameId.MULTIGRID_EMPTY_RANDOM_6X6: RenderMode.RGB_ARRAY,
-    GameId.MULTIGRID_EMPTY_8X8: RenderMode.RGB_ARRAY,
-    GameId.MULTIGRID_EMPTY_16X16: RenderMode.RGB_ARRAY,
-    GameId.MULTIGRID_LOCKED_HALLWAY_2ROOMS: RenderMode.RGB_ARRAY,
-    GameId.MULTIGRID_LOCKED_HALLWAY_4ROOMS: RenderMode.RGB_ARRAY,
-    GameId.MULTIGRID_LOCKED_HALLWAY_6ROOMS: RenderMode.RGB_ARRAY,
-    GameId.MULTIGRID_PLAYGROUND: RenderMode.RGB_ARRAY,
-    GameId.MULTIGRID_RED_BLUE_DOORS_6X6: RenderMode.RGB_ARRAY,
-    GameId.MULTIGRID_RED_BLUE_DOORS_8X8: RenderMode.RGB_ARRAY,
+    GameId.MOSAIC_MULTIGRID_SOCCER: RenderMode.RGB_ARRAY,
+    GameId.MOSAIC_MULTIGRID_COLLECT: RenderMode.RGB_ARRAY,
+    GameId.INI_MULTIGRID_BLOCKED_UNLOCK_PICKUP: RenderMode.RGB_ARRAY,
+    GameId.INI_MULTIGRID_EMPTY_5X5: RenderMode.RGB_ARRAY,
+    GameId.INI_MULTIGRID_EMPTY_RANDOM_5X5: RenderMode.RGB_ARRAY,
+    GameId.INI_MULTIGRID_EMPTY_6X6: RenderMode.RGB_ARRAY,
+    GameId.INI_MULTIGRID_EMPTY_RANDOM_6X6: RenderMode.RGB_ARRAY,
+    GameId.INI_MULTIGRID_EMPTY_8X8: RenderMode.RGB_ARRAY,
+    GameId.INI_MULTIGRID_EMPTY_16X16: RenderMode.RGB_ARRAY,
+    GameId.INI_MULTIGRID_LOCKED_HALLWAY_2ROOMS: RenderMode.RGB_ARRAY,
+    GameId.INI_MULTIGRID_LOCKED_HALLWAY_4ROOMS: RenderMode.RGB_ARRAY,
+    GameId.INI_MULTIGRID_LOCKED_HALLWAY_6ROOMS: RenderMode.RGB_ARRAY,
+    GameId.INI_MULTIGRID_PLAYGROUND: RenderMode.RGB_ARRAY,
+    GameId.INI_MULTIGRID_RED_BLUE_DOORS_6X6: RenderMode.RGB_ARRAY,
+    GameId.INI_MULTIGRID_RED_BLUE_DOORS_8X8: RenderMode.RGB_ARRAY,
     # Melting Pot (all 49 multi-agent social scenarios via Shimmy)
     GameId.MELTINGPOT_ALLELOPATHIC_HARVEST__OPEN: RenderMode.RGB_ARRAY,
     GameId.MELTINGPOT_BACH_OR_STRAVINSKY_IN_THE_MATRIX__ARENA: RenderMode.RGB_ARRAY,
@@ -2099,21 +2109,21 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
     GameId.RUSSIAN_CHECKERS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     GameId.INTERNATIONAL_DRAUGHTS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     # gym-multigrid - Multi-agent environments (simultaneous stepping, multi-human gameplay)
-    GameId.MULTIGRID_SOCCER: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
-    GameId.MULTIGRID_COLLECT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
-    GameId.MULTIGRID_BLOCKED_UNLOCK_PICKUP: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.MULTIGRID_EMPTY_5X5: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.MULTIGRID_EMPTY_RANDOM_5X5: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.MULTIGRID_EMPTY_6X6: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.MULTIGRID_EMPTY_RANDOM_6X6: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.MULTIGRID_EMPTY_8X8: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.MULTIGRID_EMPTY_16X16: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.MULTIGRID_LOCKED_HALLWAY_2ROOMS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.MULTIGRID_LOCKED_HALLWAY_4ROOMS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.MULTIGRID_LOCKED_HALLWAY_6ROOMS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.MULTIGRID_PLAYGROUND: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.MULTIGRID_RED_BLUE_DOORS_6X6: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
-    GameId.MULTIGRID_RED_BLUE_DOORS_8X8: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.MOSAIC_MULTIGRID_SOCCER: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MOSAIC_MULTIGRID_COLLECT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.INI_MULTIGRID_BLOCKED_UNLOCK_PICKUP: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.INI_MULTIGRID_EMPTY_5X5: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.INI_MULTIGRID_EMPTY_RANDOM_5X5: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.INI_MULTIGRID_EMPTY_6X6: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.INI_MULTIGRID_EMPTY_RANDOM_6X6: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.INI_MULTIGRID_EMPTY_8X8: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.INI_MULTIGRID_EMPTY_16X16: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.INI_MULTIGRID_LOCKED_HALLWAY_2ROOMS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.INI_MULTIGRID_LOCKED_HALLWAY_4ROOMS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.INI_MULTIGRID_LOCKED_HALLWAY_6ROOMS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.INI_MULTIGRID_PLAYGROUND: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.INI_MULTIGRID_RED_BLUE_DOORS_6X6: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.INI_MULTIGRID_RED_BLUE_DOORS_8X8: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
     # Melting Pot - All 49 multi-agent social scenarios (parallel stepping, multi-human gameplay)
     GameId.MELTINGPOT_ALLELOPATHIC_HARVEST__OPEN: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
     GameId.MELTINGPOT_BACH_OR_STRAVINSKY_IN_THE_MATRIX__ARENA: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
