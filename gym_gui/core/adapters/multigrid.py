@@ -15,16 +15,8 @@ Supported packages:
 Key characteristics:
 - Multi-agent: Multiple agents controlled by Operators
 - Simultaneous stepping: All agents act at once (PARALLEL paradigm)
-- Old gym API: Uses `import gym` (not gymnasium)
-- Returns lists: obs/rewards/actions are all lists indexed by agent
-
-Reproducibility Fix:
-- Legacy mosaic_multigrid has a bug where step() uses np.random.permutation()
-  instead of self.np_random.permutation(), ignoring seeds set via env.seed().
-- This adapter wraps legacy environments with ReproducibleMultiGridWrapper
-  which seeds np.random from env.np_random before each step().
-- This fix is transparent to Operators (human play) and only affects
-  training/evaluation reproducibility.
+- Modern mosaic_multigrid v1.0.0+ uses Gymnasium API (from PyPI)
+- Legacy support: Old gym API compatibility maintained for backwards compatibility
 """
 
 from __future__ import annotations
@@ -49,7 +41,6 @@ from gym_gui.logging_config.log_constants import (
     LOG_ADAPTER_ENV_RESET,
     LOG_ADAPTER_STEP_SUMMARY,
 )
-from gym_gui.core.wrappers.multigrid_reproducibility import ReproducibleMultiGridWrapper
 
 try:  # pragma: no cover - import guard
     import gym
@@ -57,6 +48,8 @@ except ImportError:  # pragma: no cover
     gym = None  # type: ignore[assignment]
 
 try:  # pragma: no cover - import guard
+    # Import mosaic_multigrid environments - this triggers gymnasium registration
+    import mosaic_multigrid.envs  # noqa: F401 - needed for gym.register() side effect
     from mosaic_multigrid.envs import SoccerGame4HEnv10x15N2, CollectGame4HEnv10x10N2
 except ImportError:  # pragma: no cover
     SoccerGame4HEnv10x15N2 = None  # type: ignore[assignment, misc]
