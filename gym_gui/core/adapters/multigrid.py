@@ -1,12 +1,12 @@
 """MultiGrid environment adapter for the MOSAIC GUI.
 
-gym-multigrid is a multi-agent extension of MiniGrid for training cooperative
+mosaic_multigrid is a multi-agent extension of MiniGrid for training cooperative
 and competitive multi-agent RL policies. Agents act simultaneously each step.
 
 Supported packages:
-- Old gym-multigrid (ArnaudFickinger): Soccer, Collect
-  Repository: https://github.com/ArnaudFickinger/gym-multigrid
-  Location: 3rd_party/gym-multigrid/
+- Old mosaic_multigrid (ArnaudFickinger): Soccer, Collect
+  Repository: https://github.com/ArnaudFickinger/mosaic_multigrid
+  Location: 3rd_party/mosaic_multigrid/
 
 - New multigrid (INI): 13 environments including Empty, RedBlueDoors, LockedHallway, etc.
   Repository: https://github.com/ini/multigrid
@@ -19,7 +19,7 @@ Key characteristics:
 - Returns lists: obs/rewards/actions are all lists indexed by agent
 
 Reproducibility Fix:
-- Legacy gym-multigrid has a bug where step() uses np.random.permutation()
+- Legacy mosaic_multigrid has a bug where step() uses np.random.permutation()
   instead of self.np_random.permutation(), ignoring seeds set via env.seed().
 - This adapter wraps legacy environments with ReproducibleMultiGridWrapper
   which seeds np.random from env.np_random before each step().
@@ -57,7 +57,7 @@ except ImportError:  # pragma: no cover
     gym = None  # type: ignore[assignment]
 
 try:  # pragma: no cover - import guard
-    from gym_multigrid.envs import SoccerGame4HEnv10x15N2, CollectGame4HEnv10x10N2
+    from mosaic_multigrid.envs import SoccerGame4HEnv10x15N2, CollectGame4HEnv10x10N2
 except ImportError:  # pragma: no cover
     SoccerGame4HEnv10x15N2 = None  # type: ignore[assignment, misc]
     CollectGame4HEnv10x10N2 = None  # type: ignore[assignment, misc]
@@ -78,8 +78,8 @@ except ImportError:  # pragma: no cover
     INI_CONFIGURATIONS = {}  # type: ignore[assignment]
 
 
-# Legacy gym-multigrid action names (8 actions - includes STILL)
-# Used by: Soccer, Collect (ArnaudFickinger's gym-multigrid)
+# Legacy mosaic_multigrid action names (8 actions - includes STILL)
+# Used by: Soccer, Collect (ArnaudFickinger's mosaic_multigrid)
 LEGACY_MULTIGRID_ACTIONS: List[str] = [
     "STILL",    # 0 - Do nothing
     "LEFT",     # 1 - Turn left
@@ -112,9 +112,9 @@ _MULTIGRID_STEP_LOG_FREQUENCY = 50
 
 
 class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
-    """Adapter for gym-multigrid multi-agent environments.
+    """Adapter for mosaic_multigrid multi-agent environments.
 
-    This adapter handles the unique characteristics of gym-multigrid:
+    This adapter handles the unique characteristics of mosaic_multigrid:
     - Multiple agents acting simultaneously
     - List-based observations, actions, and rewards
     - Old gym API compatibility
@@ -171,17 +171,27 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
         self._is_ini_env = self._check_is_ini_environment()
 
     def _check_is_ini_environment(self) -> bool:
-        """Check if this is an INI multigrid environment (vs legacy gym-multigrid).
+        """Check if this is an INI-style multigrid environment (7 actions, no STILL).
 
-        INI multigrid environments use 7 actions (no STILL).
-        Legacy gym-multigrid (Soccer, Collect) uses 8 actions (with STILL at index 0).
+        Modern environments use 7 actions (no STILL):
+        - New mosaic_multigrid v1.0.0+ (MosaicMultiGrid-Soccer-v0, MosaicMultiGrid-Collect-v0)
+        - INI multigrid (Empty, BlockedUnlockPickup, etc.)
+
+        Legacy environments use 8 actions (with STILL at index 0):
+        - Old gym-multigrid (MultiGrid-Soccer-v0, MultiGrid-Collect-v0) - deprecated
         """
-        # Legacy gym-multigrid environments
+        # OLD legacy environments with 8 actions (deprecated - kept for backwards compatibility)
         if self._env_id in ("soccer", "collect", "MultiGrid-Soccer-v0", "MultiGrid-Collect-v0"):
             return False
-        # INI multigrid environments (or check if in INI_CONFIGURATIONS)
+
+        # NEW mosaic_multigrid v1.0.0+ (7 actions - matches INI multigrid)
+        if self._env_id.startswith("MosaicMultiGrid-"):
+            return True
+
+        # INI multigrid environments
         if self._env_id in INI_CONFIGURATIONS:
             return True
+
         # Check by name pattern - INI environments include these
         ini_patterns = ("Empty", "BlockedUnlockPickup", "LockedHallway", "RedBlueDoors", "Playground")
         return any(pattern in self._env_id for pattern in ini_patterns)
@@ -191,9 +201,9 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
         """Return the environment identifier."""
         # Map env_id to proper GameId format
         if self._env_id == "soccer":
-            return "MultiGrid-Soccer-v0"
+            return "MosaicMultiGrid-Soccer-v0"  # Use new PyPI package name
         elif self._env_id == "collect":
-            return "MultiGrid-Collect-v0"
+            return "MosaicMultiGrid-Collect-v0"  # Use new PyPI package name
         else:
             # For already-formatted IDs, return as-is
             return self._env_id
@@ -216,23 +226,19 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
             if self._env_id == "soccer" or self._env_id == "MultiGrid-Soccer-v0":
                 if SoccerGame4HEnv10x15N2 is None:
                     raise RuntimeError(
-                        "gym-multigrid not installed. "
-                        "Install from: 3rd_party/gym-multigrid/"
+                        "mosaic_multigrid not installed. "
+                        "Install from: 3rd_party/mosaic_multigrid/"
                     )
+                # mosaic_multigrid uses Gymnasium API - already reproducible (no wrapper needed)
                 env = SoccerGame4HEnv10x15N2()
-                # Wrap with ReproducibleMultiGridWrapper to fix np.random.permutation bug
-                # in step() that ignores env.np_random seeding. This ensures reproducible
-                # trajectories for training/evaluation without affecting Operators.
-                env = ReproducibleMultiGridWrapper(env)
             elif self._env_id == "collect" or self._env_id == "MultiGrid-Collect-v0":
                 if CollectGame4HEnv10x10N2 is None:
                     raise RuntimeError(
-                        "gym-multigrid not installed. "
-                        "Install from: 3rd_party/gym-multigrid/"
+                        "mosaic_multigrid not installed. "
+                        "Install from: 3rd_party/mosaic_multigrid/"
                     )
+                # mosaic_multigrid uses Gymnasium API - already reproducible (no wrapper needed)
                 env = CollectGame4HEnv10x10N2()
-                # Wrap with ReproducibleMultiGridWrapper to fix np.random.permutation bug
-                env = ReproducibleMultiGridWrapper(env)
             elif self._env_id in INI_CONFIGURATIONS:
                 # INI multigrid environment - instantiate directly from configurations
                 env_cls, config_kwargs = INI_CONFIGURATIONS[self._env_id]
@@ -287,7 +293,7 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
         env = self._require_env()
 
         # Handle seeding based on environment type:
-        # - Legacy gym-multigrid (Soccer, Collect): Old Gym API with env.seed() method
+        # - Legacy mosaic_multigrid (Soccer, Collect): Old Gym API with env.seed() method
         # - INI multigrid (BlockedUnlockPickup, etc.): Gymnasium API with reset(seed=seed)
         #
         # This distinction is important for REPRODUCIBILITY in research!
@@ -307,7 +313,7 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
             else:
                 raw_obs = reset_result
         else:
-            # Legacy gym-multigrid uses old Gym API: env.seed() then env.reset() -> obs
+            # Legacy mosaic_multigrid uses old Gym API: env.seed() then env.reset() -> obs
             if seed is not None and hasattr(env, 'seed'):
                 env.seed(seed)
             raw_obs = env.reset()
@@ -362,7 +368,7 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
                 )
 
         # Handle step() API differences:
-        # - Legacy gym-multigrid (Old Gym): returns (obs, rewards, done, info) - 4 values
+        # - Legacy mosaic_multigrid (Old Gym): returns (obs, rewards, done, info) - 4 values
         #   Action format: List[int] e.g., [0, 1, 2, 3]
         # - INI multigrid (Gymnasium): returns (obs, rewards, terminated, truncated, info) - 5 values
         #   Action format: Dict[AgentID, Action] e.g., {0: Action.left, 1: Action.right}
@@ -376,7 +382,7 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
             actions_dict = {i: actions[i] for i in range(len(actions))}
             step_result = env.step(actions_dict)
         else:
-            # Legacy gym-multigrid uses list format
+            # Legacy mosaic_multigrid uses list format
             step_result = env.step(actions)
 
         if self._is_ini_env:
@@ -389,7 +395,7 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
                 terminated = bool(done)
                 truncated = False
         else:
-            # Legacy gym-multigrid uses old Gym API (4 values)
+            # Legacy mosaic_multigrid uses old Gym API (4 values)
             raw_obs, rewards, done, info = step_result
             terminated = bool(done)
             truncated = False
@@ -410,7 +416,7 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
             self._agent_observations = list(raw_obs)
         # Handle rewards - could be dict (per-agent) or list
         # INI multigrid uses integer keys: {0: 0.5, 1: 0.5}
-        # Legacy gym-multigrid may use string keys: {"agent_0": 0.5}
+        # Legacy mosaic_multigrid may use string keys: {"agent_0": 0.5}
         if isinstance(rewards, dict):
             # Try integer keys first (INI multigrid), then string keys (legacy)
             self._agent_rewards = []
@@ -472,7 +478,7 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
         env = self._require_env()
         try:
             # Handle render() API differences:
-            # - Legacy gym-multigrid: env.render(mode="rgb_array", highlight=True)
+            # - Legacy mosaic_multigrid: env.render(mode="rgb_array", highlight=True)
             # - INI multigrid (Gymnasium): env.render() - mode set at creation time
             if self._is_ini_env:
                 # Gymnasium API: render_mode is set during env creation
@@ -593,7 +599,7 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
         """Get human-readable action names.
 
         Returns:
-            List of action names (7 for INI multigrid, 8 for legacy gym-multigrid)
+            List of action names (7 for INI multigrid, 8 for legacy mosaic_multigrid)
         """
         if self._is_ini_env:
             return INI_MULTIGRID_ACTIONS.copy()
@@ -651,7 +657,7 @@ class MultiGridCollectAdapter(MultiGridAdapter):
 
 # Adapter registry for factory pattern
 MULTIGRID_ADAPTERS: Dict[GameId, type[MultiGridAdapter]] = {
-    # Legacy gym-multigrid environments (with dedicated adapter classes)
+    # Legacy mosaic_multigrid environments (with dedicated adapter classes)
     GameId.MULTIGRID_SOCCER: MultiGridSoccerAdapter,
     GameId.MULTIGRID_COLLECT: MultiGridCollectAdapter,
     # INI multigrid environments (all use generic MultiGridAdapter)

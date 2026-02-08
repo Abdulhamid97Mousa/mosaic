@@ -426,9 +426,9 @@ class GameId(StrEnum):
     # Repository (new): https://github.com/ini/multigrid
     # Location: 3rd_party/gym-multigrid/ and 3rd_party/multigrid-ini/
     # ─────────────────────────────────────────────────────────────────────────
-    # Legacy gym-multigrid environments (ArnaudFickinger)
-    MULTIGRID_SOCCER = "MultiGrid-Soccer-v0"  # 4 agents, 2v2 soccer
-    MULTIGRID_COLLECT = "MultiGrid-Collect-v0"  # 3 agents, collect balls
+    # mosaic_multigrid environments (PyPI: mosaic-multigrid v1.0.0+)
+    MULTIGRID_SOCCER = "MosaicMultiGrid-Soccer-v0"  # 4 agents, 2v2 soccer
+    MULTIGRID_COLLECT = "MosaicMultiGrid-Collect-v0"  # 3 agents, collect balls
     # INI multigrid environments (https://github.com/ini/multigrid)
     MULTIGRID_BLOCKED_UNLOCK_PICKUP = "MultiGrid-BlockedUnlockPickup-v0"  # Blocked door puzzle
     MULTIGRID_EMPTY_5X5 = "MultiGrid-Empty-5x5-v0"  # Empty 5x5 grid
