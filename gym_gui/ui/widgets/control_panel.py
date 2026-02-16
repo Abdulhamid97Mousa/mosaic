@@ -70,8 +70,17 @@ from gym_gui.ui.config_panels.multi_agent.multigrid import (
     ControlCallbacks as MultiGridControlCallbacks,
     build_multigrid_controls,
 )
+from gym_gui.ui.config_panels.multi_agent.smac import (
+    ALL_SMAC_GAME_IDS,
+    ControlCallbacks as SMACControlCallbacks,
+    build_smac_controls,
+)
+from gym_gui.ui.config_panels.multi_agent.rware import (
+    ALL_RWARE_GAME_IDS,
+    build_rware_controls,
+)
 from gym_gui.core.adapters.vizdoom import ViZDoomConfig
-from gym_gui.config.game_configs import ProcgenConfig, MeltingPotConfig, MultiGridConfig
+from gym_gui.config.game_configs import ProcgenConfig, MeltingPotConfig, MultiGridConfig, SMACConfig, RWAREConfig
 from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
 from gym_gui.ui.widgets.mujoco_mpc_tab import MuJoCoMPCTab
 from gym_gui.ui.widgets.multi_agent_tab import MultiAgentTab
@@ -145,6 +154,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
     train_agent_requested = pyqtSignal(str)  # Start fresh headless training
     trained_agent_requested = pyqtSignal(str)  # Load trained policy for evaluation
     resume_training_requested = pyqtSignal(str)  # Resume training from checkpoint
+    custom_script_requested = pyqtSignal(str)  # Launch custom bash script training
     # MuJoCo MPC signals - emitted when user launches from sidebar
     mpc_launch_requested = pyqtSignal(str)  # Launch with display mode ("external" or "embedded")
     mpc_stop_all_requested = pyqtSignal()  # Stop all MJPC instances
@@ -538,6 +548,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         episode_duration: str,
         outcome_time: str = "—",
         outcome_wall_clock: str | None = None,
+        team_rewards: dict[int, float] | None = None,
     ) -> None:
         self._step_label.setText(str(step))
         self._reward_label.setText(f"{reward:.2f}")
@@ -552,6 +563,37 @@ class ControlPanelWidget(QtWidgets.QWidget):
             outcome_time,
             outcome_timestamp=outcome_wall_clock,
         )
+        self._update_team_rewards(team_rewards)
+
+    def _update_team_rewards(self, team_rewards: dict[int, float] | None) -> None:
+        """Dynamically create/update per-team reward labels in the status grid."""
+        layout: QtWidgets.QGridLayout = self._status_group.layout()  # type: ignore[assignment]
+
+        if team_rewards is None or len(team_rewards) < 2:
+            # Hide team labels for single-team or non-team environments
+            for title_lbl, value_lbl in self._team_reward_labels.values():
+                title_lbl.hide()
+                value_lbl.hide()
+            return
+
+        for team_idx, cumulative_reward in sorted(team_rewards.items()):
+            if team_idx not in self._team_reward_labels:
+                # Create new labels for this team
+                title_lbl = QtWidgets.QLabel(f"Team {team_idx}", self._status_group)
+                title_lbl.setAlignment(
+                    QtCore.Qt.AlignmentFlag.AlignLeft | QtCore.Qt.AlignmentFlag.AlignVCenter
+                )
+                value_lbl = QtWidgets.QLabel("0.00", self._status_group)
+                self._team_reward_labels[team_idx] = (title_lbl, value_lbl)
+                # Place in right column, below existing fields
+                row = layout.rowCount()
+                layout.addWidget(title_lbl, row, 2)
+                layout.addWidget(value_lbl, row, 3)
+
+            title_lbl, value_lbl = self._team_reward_labels[team_idx]
+            value_lbl.setText(f"{cumulative_reward:+.2f}")
+            title_lbl.show()
+            value_lbl.show()
 
     def set_turn(self, turn: str) -> None:
         self._turn_label.setText(turn)
@@ -746,6 +788,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._single_agent_tab.train_requested.connect(self._emit_train_agent_requested)
         self._single_agent_tab.evaluate_requested.connect(self._emit_trained_agent_requested)
         self._single_agent_tab.resume_requested.connect(self._emit_resume_training_requested)
+        self._single_agent_tab.script_requested.connect(self._emit_custom_script_requested)
 
         # Multi-Agent Mode Tab with subtabs
         self._multi_agent_tab = MultiAgentTab(self)
@@ -783,14 +826,23 @@ class ControlPanelWidget(QtWidgets.QWidget):
 
         layout.addWidget(QtWidgets.QLabel("Family", group), 0, 0)
         self._family_combo = QtWidgets.QComboBox(group)
+        family_view = QtWidgets.QListView(self._family_combo)
+        family_view.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        family_view.setUniformItemSizes(True)
+        self._family_combo.setView(family_view)
+        self._family_combo.setStyleSheet("QComboBox { combobox-popup: 0; }")
         self._family_combo.setMaxVisibleItems(10)
         layout.addWidget(self._family_combo, 0, 1, 1, 2)
 
         layout.addWidget(QtWidgets.QLabel("Environment", group), 1, 0)
         self._game_combo = QtWidgets.QComboBox(group)
+        game_view = QtWidgets.QListView(self._game_combo)
+        game_view.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        game_view.setUniformItemSizes(True)
+        self._game_combo.setView(game_view)
         self._game_combo.setSizeAdjustPolicy(QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToContents)
-        self._game_combo.setMaxVisibleItems(10)
         self._game_combo.setStyleSheet("QComboBox { combobox-popup: 0; }")
+        self._game_combo.setMaxVisibleItems(10)
         layout.addWidget(self._game_combo, 1, 1, 1, 2)
 
         layout.addWidget(QtWidgets.QLabel("Seed", group), 2, 0)
@@ -894,6 +946,12 @@ class ControlPanelWidget(QtWidgets.QWidget):
             return
         self._selected_family = data
         self._rebuild_game_combo(data, None)
+        # _rebuild_game_combo blocks signals on the game combo, so
+        # _on_game_changed / _emit_game_changed never fire.  We must
+        # call _emit_game_changed manually so that update_modes() runs
+        # and _current_mode is corrected for the newly-selected game
+        # (e.g. switching to SMAC which has no HUMAN_ONLY support).
+        self._emit_game_changed(self._current_game)
 
     def _create_config_group(self, parent: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
         self._config_group = QtWidgets.QGroupBox("Game Configuration", parent)
@@ -1124,6 +1182,9 @@ class ControlPanelWidget(QtWidgets.QWidget):
         self._outcome_time_label = QtWidgets.QLabel("—", self._status_group)
         self._fps_label = QtWidgets.QLabel("—", self._status_group)
         self._telemetry_status_label = QtWidgets.QLabel("—", self._status_group)
+
+        # Dynamic team reward labels (created on demand by _update_team_rewards)
+        self._team_reward_labels: dict[int, tuple[QtWidgets.QLabel, QtWidgets.QLabel]] = {}
 
         fields = [
             ("Step", self._step_label),
@@ -1530,6 +1591,12 @@ class ControlPanelWidget(QtWidgets.QWidget):
             return
         self.trained_agent_requested.emit(worker_id)
 
+    def _emit_custom_script_requested(self) -> None:
+        worker_id = self._current_worker_id
+        if worker_id is None:
+            return
+        self.custom_script_requested.emit(worker_id)
+
     def _update_operator_description(self) -> None:
         if self._active_operator_id is None:
             self._operator_description.setText("—")
@@ -1599,7 +1666,8 @@ class ControlPanelWidget(QtWidgets.QWidget):
         # Check if current game is multi-agent (requires state-based for multi-keyboard)
         env_family = ENVIRONMENT_FAMILY_BY_GAME.get(current_game)
         is_multi_agent = env_family in (
-            EnvironmentFamily.MULTIGRID,
+            EnvironmentFamily.MOSAIC_MULTIGRID,
+            EnvironmentFamily.INI_MULTIGRID,
             EnvironmentFamily.MELTINGPOT,
             EnvironmentFamily.OVERCOOKED,
         )
@@ -1828,6 +1896,29 @@ class ControlPanelWidget(QtWidgets.QWidget):
                 defaults=defaults,
                 callbacks=callbacks,
             )
+        elif self._current_game is not None and self._current_game in ALL_SMAC_GAME_IDS:
+            current_game = self._current_game
+            overrides = self._game_overrides.setdefault(current_game, {})
+            callbacks = SMACControlCallbacks(on_change=self._on_smac_config_changed)
+            defaults = SMACConfig()
+            build_smac_controls(
+                parent=self._config_group,
+                layout=self._config_layout,
+                game_id=current_game,
+                overrides=overrides,
+                defaults=defaults,
+                callbacks=callbacks,
+            )
+        elif self._current_game is not None and self._current_game in ALL_RWARE_GAME_IDS:
+            current_game = self._current_game
+            overrides = self._game_overrides.setdefault(current_game, {})
+            build_rware_controls(
+                parent=self._config_group,
+                layout=self._config_layout,
+                game_id=current_game,
+                overrides=overrides,
+                on_change=self._on_rware_config_changed,
+            )
         else:
             label = QtWidgets.QLabel(
                 "No additional configuration options for this environment.",
@@ -1871,6 +1962,17 @@ class ControlPanelWidget(QtWidgets.QWidget):
             return
         overrides = self._game_overrides.setdefault(current_game, {})
         overrides[param_name] = value
+
+    def _on_smac_config_changed(self, param_name: str, value: object) -> None:
+        current_game = self._current_game
+        if current_game is None:
+            return
+        overrides = self._game_overrides.setdefault(current_game, {})
+        overrides[param_name] = value
+
+    def _on_rware_config_changed(self, overrides: Dict[str, Any]) -> None:
+        """Handle RWARE config changes (overrides dict already mutated in-place)."""
+        pass  # overrides dict is shared; mutation already applied by build_rware_controls
 
     # ------------------------------------------------------------------
     # Multi-Agent Tab Handlers

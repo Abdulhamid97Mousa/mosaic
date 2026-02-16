@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import sys
 import asyncio
+from collections import deque
 from datetime import datetime, timedelta, timezone
 import logging
 import os
@@ -102,6 +103,9 @@ def _re_emit_worker_log(run_id: str, code: str, extra: dict[str, Any]) -> None:
         )
 
 
+_STDERR_TAIL_LINES = 20
+
+
 class WorkerHandle:
     """Tracks a subprocess worker and its metadata."""
 
@@ -117,6 +121,9 @@ class WorkerHandle:
         self.gpu_slots = gpu_slots
         self.started_at = started_at
         self.cancelled = False
+        self.stderr_tail: deque[str] = deque(maxlen=_STDERR_TAIL_LINES)
+        self.stdout_log: Any = None
+        self.stderr_log: Any = None
 
 
 class TrainerDispatcher:
@@ -262,9 +269,55 @@ class TrainerDispatcher:
             except Exception as e:
                 _LOGGER.warning(f"Failed to emit training_started signal: {e}", extra={"run_id": run.run_id})
 
+        # Create log files for custom script runs.
+        # Standard training workers (cleanrl_worker.cli, xuance_worker.cli) manage
+        # their own log files in runtime.py.  Custom scripts (bash) don't, so the
+        # dispatcher tees stdout/stderr to disk.
+        self._maybe_open_log_files(handle, env)
+
         # Start log streaming tasks
         asyncio.create_task(self._stream_stdout(handle), name=f"stdout-{run.run_id}")
         asyncio.create_task(self._stream_stderr(handle), name=f"stderr-{run.run_id}")
+
+    def _maybe_open_log_files(
+        self, handle: WorkerHandle, env: dict[str, str]
+    ) -> None:
+        """Open log files for custom script runs.
+
+        Custom scripts don't use runtime.py, which normally creates log files
+        in ``var/trainer/runs/{run_id}/logs/``.  Instead, the dispatcher tees
+        captured stdout/stderr to ``{MOSAIC_RUN_DIR}/logs/``.
+        """
+        config_raw = self._registry.get_run_config_json(handle.run_id)
+        if not config_raw:
+            return
+        try:
+            cfg = json.loads(config_raw)
+        except json.JSONDecodeError:
+            return
+        wmeta = cfg.get("metadata", {}).get("worker", {}) if isinstance(cfg, dict) else {}
+        if not isinstance(wmeta, dict):
+            return
+        # Only open log files for custom scripts (script set, no module).
+        if not wmeta.get("script") or wmeta.get("module"):
+            return
+        run_dir_str = env.get("MOSAIC_RUN_DIR")
+        if not run_dir_str:
+            return
+        try:
+            logs_dir = Path(run_dir_str) / "logs"
+            logs_dir.mkdir(parents=True, exist_ok=True)
+            handle.stdout_log = open(logs_dir / "worker.stdout.log", "w", encoding="utf-8")
+            handle.stderr_log = open(logs_dir / "worker.stderr.log", "w", encoding="utf-8")
+            _LOGGER.debug(
+                "Opened log files for custom script",
+                extra={"run_id": handle.run_id, "logs_dir": str(logs_dir)},
+            )
+        except OSError as exc:
+            _LOGGER.warning(
+                "Failed to create log files for custom script",
+                extra={"run_id": handle.run_id, "error": str(exc)},
+            )
 
     def _build_worker_command(self, run: RunRecord) -> list[str]:
         """Build the subprocess command for the trainer worker."""
@@ -554,9 +607,10 @@ class TrainerDispatcher:
 
     async def _stream_stdout(self, handle: WorkerHandle) -> None:
         """Stream stdout from worker subprocess.
-        
+
         Attempts to parse structured LOG_CODE lines and re-emit as log constants.
         Falls back to plain DEBUG logging for unstructured output.
+        When ``handle.stdout_log`` is set (custom scripts), also writes to disk.
         """
         if not handle.process.stdout:
             return
@@ -564,7 +618,15 @@ class TrainerDispatcher:
         try:
             async for line in handle.process.stdout:
                 decoded = line.decode("utf-8", errors="replace").rstrip()
-                
+
+                # Tee to log file (custom scripts only)
+                if handle.stdout_log:
+                    try:
+                        handle.stdout_log.write(decoded + "\n")
+                        handle.stdout_log.flush()
+                    except OSError:
+                        pass
+
                 # Try to parse as structured log
                 code, extra = _parse_structured_log_line(decoded)
                 if code is not None and extra is not None:
@@ -579,13 +641,27 @@ class TrainerDispatcher:
             pass
 
     async def _stream_stderr(self, handle: WorkerHandle) -> None:
-        """Stream stderr from worker subprocess."""
+        """Stream stderr from worker subprocess and buffer the tail.
+
+        When ``handle.stderr_log`` is set (custom scripts), also writes to disk.
+        """
         if not handle.process.stderr:
             return
         _LOGGER.debug("Starting worker stderr stream", extra={"run_id": handle.run_id})
         try:
             async for line in handle.process.stderr:
                 decoded = line.decode("utf-8", errors="replace").rstrip()
+                if decoded:
+                    handle.stderr_tail.append(decoded)
+
+                # Tee to log file (custom scripts only)
+                if handle.stderr_log:
+                    try:
+                        handle.stderr_log.write(decoded + "\n")
+                        handle.stderr_log.flush()
+                    except OSError:
+                        pass
+
                 _LOGGER.warning("Worker stderr", extra={"run_id": handle.run_id, "line": decoded})
         except asyncio.CancelledError:
             pass
@@ -617,16 +693,29 @@ class TrainerDispatcher:
 
     async def _reconcile_worker(self, handle: WorkerHandle) -> None:
         """Reconcile terminal worker state and release resources."""
+        # Close log files opened by _maybe_open_log_files()
+        for fh in (handle.stdout_log, handle.stderr_log):
+            if fh:
+                with contextlib.suppress(OSError):
+                    fh.close()
+        handle.stdout_log = None
+        handle.stderr_log = None
+
         exit_code = handle.process.returncode
         if handle.cancelled:
             outcome = "canceled"
-            reason = "user_cancel"
+            failure_reason = "user_cancel"
         elif exit_code == 0:
             outcome = "succeeded"
-            reason = None
+            failure_reason = None
         else:
             outcome = "failed"
-            reason = f"exit_code_{exit_code}"
+            failure_reason = f"exit_code_{exit_code}"
+
+        # Build a human-readable reason from the last stderr lines.
+        reason: str | None = None
+        if handle.stderr_tail:
+            reason = "\n".join(handle.stderr_tail)
 
         _LOGGER.info(
             "Worker finished",
@@ -637,7 +726,8 @@ class TrainerDispatcher:
             run_id=handle.run_id,
             status=RunStatus.TERMINATED,
             outcome=outcome,
-            failure_reason=reason,
+            failure_reason=failure_reason,
+            reason=reason,
         )
         self._gpu_allocator.release_many([handle.run_id])
         self._registry.update_gpu_slots(handle.run_id, [])
@@ -683,6 +773,11 @@ class TrainerDispatcher:
         """Terminate all active workers during shutdown."""
         for handle in list(self._workers.values()):
             await self._terminate_worker(handle, reason="daemon_shutdown")
+            # Close log files that won't be cleaned up by _reconcile_worker
+            for fh in (handle.stdout_log, handle.stderr_log):
+                if fh:
+                    with contextlib.suppress(OSError):
+                        fh.close()
         self._workers.clear()
 
     # ------------------------------------------------------------------

@@ -21,7 +21,7 @@ Phase 2 - Packing Environments:
 
 Phase 3 - Routing Environments:
     - Cleaner-v0: Grid cleaning task
-    - Connector-v2: Path connection puzzle
+    - Connector-v3: Path connection puzzle
     - CVRP-v1: Capacitated Vehicle Routing
     - Maze-v0: Maze navigation
     - MMST-v0: Minimum Spanning Tree

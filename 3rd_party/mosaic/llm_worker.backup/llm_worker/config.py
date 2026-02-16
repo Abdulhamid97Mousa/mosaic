@@ -14,7 +14,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 # Valid environment names supported by MOSAIC LLM Worker
 ENV_NAMES = (
-    "multigrid",      # gym-multigrid multi-agent environments
+    "multigrid",      # mosaic_multigrid multi-agent environments
     "pettingzoo",     # PettingZoo multi-agent games
     "gymnasium",      # Standard Gymnasium environments
     "minigrid",       # Single-agent MiniGrid

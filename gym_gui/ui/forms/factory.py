@@ -11,6 +11,7 @@ TrainFormFactory = Callable[..., QtWidgets.QDialog]
 PolicyFormFactory = Callable[..., QtWidgets.QDialog]
 ResumeFormFactory = Callable[..., QtWidgets.QDialog]
 EvaluationFormFactory = Callable[..., QtWidgets.QDialog]
+ScriptFormFactory = Callable[..., QtWidgets.QDialog]
 
 
 class WorkerFormFactory:
@@ -28,6 +29,7 @@ class WorkerFormFactory:
         self._policy_forms: Dict[str, PolicyFormFactory] = {}
         self._resume_forms: Dict[str, ResumeFormFactory] = {}
         self._evaluation_forms: Dict[str, EvaluationFormFactory] = {}
+        self._script_forms: Dict[str, ScriptFormFactory] = {}
 
     # ------------------------------------------------------------------
     def register_train_form(self, worker_id: str, factory: TrainFormFactory) -> None:
@@ -53,6 +55,11 @@ class WorkerFormFactory:
                 f"Evaluation form already registered for worker '{worker_id}'"
             )
         self._evaluation_forms[worker_id] = factory
+
+    def register_script_form(self, worker_id: str, factory: ScriptFormFactory) -> None:
+        if worker_id in self._script_forms:
+            raise ValueError(f"Script form already registered for worker '{worker_id}'")
+        self._script_forms[worker_id] = factory
 
     # ------------------------------------------------------------------
     def create_train_form(self, worker_id: str, *args, **kwargs) -> QtWidgets.QDialog:
@@ -81,6 +88,12 @@ class WorkerFormFactory:
             raise KeyError(f"No evaluation form registered for worker '{worker_id}'")
         return factory(*args, **kwargs)
 
+    def create_script_form(self, worker_id: str, *args, **kwargs) -> QtWidgets.QDialog:
+        factory = self._script_forms.get(worker_id)
+        if factory is None:
+            raise KeyError(f"No script form registered for worker '{worker_id}'")
+        return factory(*args, **kwargs)
+
     # ------------------------------------------------------------------
     def has_train_form(self, worker_id: str) -> bool:
         return worker_id in self._train_forms
@@ -93,6 +106,9 @@ class WorkerFormFactory:
 
     def has_evaluation_form(self, worker_id: str) -> bool:
         return worker_id in self._evaluation_forms
+
+    def has_script_form(self, worker_id: str) -> bool:
+        return worker_id in self._script_forms
 
 
 _factory = WorkerFormFactory()

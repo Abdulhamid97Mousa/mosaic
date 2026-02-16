@@ -422,8 +422,11 @@ class FastLaneTabHandler:
             return False
 
         ui_meta = metadata.get("ui") if isinstance(metadata, dict) else None
-        if isinstance(ui_meta, dict) and _is_truthy(ui_meta.get("fastlane_only")):
-            return True
+        if isinstance(ui_meta, dict):
+            fl_only = ui_meta.get("fastlane_only")
+            if fl_only is not None:
+                # Explicitly set: respect True/False without falling through
+                return _is_truthy(fl_only)
 
         worker_meta = metadata.get("worker") if isinstance(metadata, dict) else None
         if not isinstance(worker_meta, dict):

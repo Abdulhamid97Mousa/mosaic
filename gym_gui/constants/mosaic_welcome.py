@@ -279,6 +279,66 @@ SATELLITES = [
         features=["Hardware-accelerated (JAX)", "2048, Sudoku, Rubik's Cube", "Minesweeper, Graph Coloring", "github.com/instadeepai/jumanji"],
         ring_index=4
     ),
+    SatelliteConfig(
+        name="SMAC",
+        color=(26, 35, 126),  # Deep indigo
+        orbit_radius=1.0,
+        speed=0.33,
+        phase=150,
+        description="SMAC - StarCraft Multi-Agent Challenge",
+        features=["Cooperative micromanagement", "Hand-designed maps (3m, 8m, MMM2)", "WhiRL / Oxford benchmark", "github.com/oxwhirl/smac"],
+        ring_index=3
+    ),
+    SatelliteConfig(
+        name="SMACv2",
+        color=(0, 96, 100),  # Dark teal
+        orbit_radius=1.0,
+        speed=0.28,
+        phase=240,
+        description="SMACv2 - Procedural StarCraft Scenarios",
+        features=["Procedural unit generation", "Terran, Protoss, Zerg factions", "Robustness testing", "github.com/oxwhirl/smacv2"],
+        ring_index=3
+    ),
+    SatelliteConfig(
+        name="RWARE",
+        color=(56, 142, 60),  # Green
+        orbit_radius=1.0,
+        speed=0.36,
+        phase=180,
+        description="RWARE - Robotic Warehouse Environment",
+        features=["Cooperative delivery tasks", "2-8 agents", "Tiny/Small/Medium/Large grids", "github.com/semitable/robotic-warehouse"],
+        ring_index=5
+    ),
+    SatelliteConfig(
+        name="Melting Pot",
+        color=(239, 108, 0),  # Orange
+        orbit_radius=1.0,
+        speed=0.34,
+        phase=30,
+        description="Melting Pot - Multi-Agent Social Scenarios (DeepMind)",
+        features=["50+ substrates", "Up to 16 agents", "Social dilemmas & cooperation", "github.com/google-deepmind/meltingpot"],
+        ring_index=4
+    ),
+    SatelliteConfig(
+        name="Overcooked",
+        color=(245, 124, 0),  # Deep orange
+        orbit_radius=1.0,
+        speed=0.31,
+        phase=200,
+        description="Overcooked-AI - Cooperative Cooking (UC Berkeley CHAI)",
+        features=["2-agent coordination", "Human-AI collaboration", "Layout-based challenges", "github.com/HumanCompatibleAI/overcooked_ai"],
+        ring_index=5
+    ),
+    SatelliteConfig(
+        name="PyBullet Drones",
+        color=(0, 105, 92),  # Teal green
+        orbit_radius=1.0,
+        speed=0.29,
+        phase=90,
+        description="PyBullet Drones - Quadcopter Control (University of Toronto)",
+        features=["Realistic physics simulation", "Multi-agent swarms", "Hover & flocking tasks", "github.com/utiasDSL/gym-pybullet-drones"],
+        ring_index=4
+    ),
 ]
 
 # Satellite visual settings
@@ -389,7 +449,7 @@ TOOLTIP_SHADOW_COLOR = (0, 0, 0, 80)
 # UI Text
 # =============================================================================
 
-SUBTITLE_TEXT = "Multi-Agent Orchestration System with Adaptive Intelligent Control for Heterogeneous Agent Workloads"
+SUBTITLE_TEXT = "Multi-Agent Orchestration System"
 INSTRUCTION_TEXT = "Select an environment from the sidebar and click 'Load Environment' to begin"
 
 HINT_TEXTS = [

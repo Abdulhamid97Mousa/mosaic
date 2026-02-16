@@ -17,7 +17,8 @@ This guide provides comprehensive instructions for developing standardized worke
 5. [Testing Your Worker](#testing-your-worker)
 6. [Best Practices](#best-practices)
 7. [Common Pitfalls](#common-pitfalls)
-8. [Reference Examples](#reference-examples)
+8. [GUI Integration](#gui-integration)
+9. [Reference Examples](#reference-examples)
 
 ---
 
@@ -1045,6 +1046,159 @@ pytest tests/
 
 ---
 
+## GUI Integration
+
+**IMPORTANT**: Creating a worker package alone is NOT sufficient for the worker to be usable from the MOSAIC GUI. Workers must also be integrated with the UI layer through three additional registration steps described below.
+
+Without GUI integration, a worker is discoverable via entry points (and usable via CLI), but will NOT appear in the training form dropdown or be launchable from the GUI.
+
+### Architecture: Worker-to-UI Connection
+
+The connection between a worker package and the MOSAIC GUI involves three layers:
+
+```
+Worker Package                    GUI Layer
+(3rd_party/my_worker/)           (gym_gui/ui/)
+
+config.py   ────────────────>    widgets/my_train_form.py
+runtime.py                        (QDialog that builds config dict)
+analytics.py                             |
+cli.py                                   v
+__init__.py ────────────────>    worker_catalog/catalog.py
+  (get_worker_metadata)           (WorkerDefinition for UI display)
+                                         |
+                                         v
+                                  forms/__init__.py
+                                   (side-effect import for registration)
+                                         |
+                                         v
+                                  forms/factory.py
+                                   (WorkerFormFactory singleton)
+```
+
+### Step 1: Create a Train Form Widget
+
+Create `gym_gui/ui/widgets/<worker>_train_form.py` -- a `QDialog` subclass that:
+
+1. **Collects user configuration** via Qt widgets (combos, spinboxes, checkboxes)
+2. **Builds a trainer config dict** consumed by the MOSAIC trainer daemon
+3. **Self-registers** with the `WorkerFormFactory` at module load time
+
+The config dict must follow this standard structure:
+
+```python
+config = {
+    "run_name": run_id,
+    "entry_point": sys.executable,
+    "arguments": ["-m", "my_worker.cli"],
+    "environment": {"MY_WORKER_RUN_ID": run_id, ...},  # env vars
+    "resources": {
+        "cpus": 4,
+        "memory_mb": 4096,
+        "gpus": {"requested": 1, "mandatory": False},
+    },
+    "metadata": {
+        "ui": {"worker_id": "my_worker", ...},  # UI display info
+        "worker": {
+            "worker_id": "my_worker",
+            "module": "my_worker.cli",     # CLI module path
+            "config": worker_config,       # Worker-specific config dict
+        },
+    },
+    "artifacts": {
+        "output_prefix": f"runs/{run_id}",
+        "persist_logs": True,
+        "keep_checkpoints": True,
+    },
+}
+```
+
+Key patterns to follow:
+
+- **`LogConstantMixin`**: Mix it into your dialog class and set `self._logger = _LOGGER` in `__init__`. This enables structured logging via `self.log_constant(LOG_UI_TRAIN_FORM_INFO, ...)`.
+- **`_FormState` frozen dataclass**: Capture all widget values atomically via `_collect_state()` before building config. This prevents stale reads during config construction.
+- **`get_config()`**: Public method that returns the config dict (called by the trainer handler after dialog is accepted).
+- **Self-registration at module bottom**: Register with `WorkerFormFactory` using a `try/except ImportError` guard.
+
+Self-registration pattern:
+
+```python
+# Bottom of my_train_form.py
+try:
+    from gym_gui.ui.forms import get_worker_form_factory
+    _factory = get_worker_form_factory()
+    if not _factory.has_train_form("my_worker"):
+        _factory.register_train_form(
+            "my_worker",
+            lambda parent=None, **kwargs: MyTrainForm(parent=parent, **kwargs),
+        )
+except ImportError:
+    pass  # Form factory not available
+```
+
+**Reference implementations** (in order of complexity):
+- `mctx_train_form.py` -- Simplest: no LogConstantMixin, basic form groups
+- `marllib_train_form.py` -- Medium: paradigm filter, linked dropdowns, LogConstantMixin
+- `xuance_train_form.py` -- Complex: backend tabs, dynamic schemas, FastLane, WandB, custom scripts
+- `cleanrl_train_form.py` -- Most complex: schema-based params, curriculum scripts, all features
+
+### Step 2: Add a WorkerDefinition to the Catalog
+
+Edit `gym_gui/ui/worker_catalog/catalog.py` and add a `WorkerDefinition` entry inside `get_worker_catalog()`:
+
+```python
+WorkerDefinition(
+    worker_id="my_worker",             # Must match entry-point name
+    display_name="My Worker",          # Shown in UI dropdowns
+    description="Description...",      # Tooltip / detail text
+    supports_training=True,            # Has a train form?
+    supports_policy_load=False,        # Has a policy form?
+    requires_live_telemetry=False,     # Needs real-time telemetry?
+    provides_fast_analytics=False,     # Pre-computed analytics?
+    supports_multi_agent=True,         # Multi-agent capable?
+),
+```
+
+### Step 3: Register the Form Import
+
+Edit `gym_gui/ui/forms/__init__.py` and add a side-effect import for your form module:
+
+```python
+from gym_gui.ui.widgets.my_train_form import MyTrainForm  # noqa: F401
+```
+
+This import triggers the self-registration code at the bottom of your form file. Without this line, the `WorkerFormFactory` will not know about your form.
+
+Also add the form class to `__all__`:
+
+```python
+__all__ = [
+    ...
+    "MyTrainForm",
+]
+```
+
+### Step 4 (Optional): Create a Validation Module
+
+Create `gym_gui/validations/validation_my_worker_form.py` with a `run_my_dry_run()` function that spawns `my_worker.cli --dry-run` as a subprocess. This validates the config before training starts.
+
+See `validation_xuance_worker_form.py` or `validation_marllib_worker_form.py` for the standard pattern.
+
+### Checklist
+
+Before a new worker is fully integrated:
+
+- [ ] Worker package created (`3rd_party/my_worker/`) with config, runtime, analytics, CLI, metadata
+- [ ] Entry point registered in root `pyproject.toml` under `[project.entry-points."mosaic.workers"]`
+- [ ] Train form widget created (`gym_gui/ui/widgets/my_train_form.py`)
+- [ ] WorkerDefinition added to `gym_gui/ui/worker_catalog/catalog.py`
+- [ ] Form import added to `gym_gui/ui/forms/__init__.py`
+- [ ] (Optional) Validation module created in `gym_gui/validations/`
+- [ ] (Optional) Policy form, resume form, or evaluation form if worker supports those modes
+- [ ] `pip install -e .` run to re-register entry points
+
+---
+
 ## Reference Examples
 
 ### CleanRL Worker
@@ -1066,6 +1220,11 @@ Location: `3rd_party/barlog_worker/`
 Location: `3rd_party/xuance_worker/`
 
 **Good for**: Multi-backend (PyTorch/TensorFlow), 46+ algorithms, multi-agent
+
+### MARLlib Worker
+Location: `3rd_party/marllib_worker/`
+
+**Good for**: Multi-agent RL with 18 algorithms across 3 paradigms (IL/CC/VD), 19 environments, Ray/RLlib backend
 
 ---
 

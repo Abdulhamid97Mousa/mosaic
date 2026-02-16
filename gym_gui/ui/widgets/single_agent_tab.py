@@ -17,6 +17,7 @@ from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import pyqtSignal
 
 from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
+from gym_gui.ui.forms.factory import get_worker_form_factory
 
 _LOGGER = logging.getLogger("gym_gui.ui.single_agent_tab")
 
@@ -32,6 +33,7 @@ class WorkersSubTab(QtWidgets.QWidget):
     train_requested = pyqtSignal()
     evaluate_requested = pyqtSignal()
     resume_requested = pyqtSignal()
+    script_requested = pyqtSignal()
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
@@ -130,6 +132,20 @@ class WorkersSubTab(QtWidgets.QWidget):
         )
         training_layout.addWidget(self._resume_training_button)
 
+        self._custom_script_button = QtWidgets.QPushButton("Custom Script", training_group)
+        self._custom_script_button.setToolTip(
+            "Run a custom bash script for multi-phase or curriculum training.\n"
+            "The script controls all training parameters (algorithm, environment, timesteps)."
+        )
+        self._custom_script_button.setEnabled(False)
+        self._custom_script_button.setStyleSheet(
+            "QPushButton { padding: 8px; font-weight: bold; background-color: #7b1fa2; color: white; }"
+            "QPushButton:hover { background-color: #6a1b9a; }"
+            "QPushButton:pressed { background-color: #4a148c; }"
+            "QPushButton:disabled { background-color: #ce93d8; color: #f3e5f5; }"
+        )
+        training_layout.addWidget(self._custom_script_button)
+
         layout.addWidget(training_group)
 
         layout.addStretch(1)
@@ -148,6 +164,7 @@ class WorkersSubTab(QtWidgets.QWidget):
         self._train_agent_button.clicked.connect(self._on_train_clicked)
         self._evaluate_policy_button.clicked.connect(self._on_evaluate_clicked)
         self._resume_training_button.clicked.connect(self._on_resume_clicked)
+        self._custom_script_button.clicked.connect(self._on_script_clicked)
 
     def _on_worker_selection_changed(self, index: int) -> None:
         """Handle worker selection change."""
@@ -159,6 +176,9 @@ class WorkersSubTab(QtWidgets.QWidget):
             self._train_agent_button.setEnabled(worker.supports_training)
             self._evaluate_policy_button.setEnabled(worker.supports_policy_load)
             self._resume_training_button.setEnabled(worker.supports_training)
+            # Custom Script button enabled only when a script form is registered
+            factory = get_worker_form_factory()
+            self._custom_script_button.setEnabled(factory.has_script_form(worker.worker_id))
 
     def _update_worker_description(self, index: int) -> None:
         """Update the worker description label."""
@@ -193,6 +213,10 @@ class WorkersSubTab(QtWidgets.QWidget):
         """Handle resume button click."""
         self.resume_requested.emit()
 
+    def _on_script_clicked(self) -> None:
+        """Handle custom script button click."""
+        self.script_requested.emit()
+
     @property
     def current_worker_id(self) -> Optional[str]:
         """Get the currently selected worker ID."""
@@ -226,6 +250,11 @@ class WorkersSubTab(QtWidgets.QWidget):
         """Get the resume training button (for backward compatibility)."""
         return self._resume_training_button
 
+    @property
+    def custom_script_button(self) -> QtWidgets.QPushButton:
+        """Get the custom script button."""
+        return self._custom_script_button
+
 
 class SingleAgentTab(QtWidgets.QWidget):
     """Single-Agent Mode tab with Workers subtab for training backends.
@@ -241,6 +270,7 @@ class SingleAgentTab(QtWidgets.QWidget):
     train_requested = pyqtSignal()
     evaluate_requested = pyqtSignal()
     resume_requested = pyqtSignal()
+    script_requested = pyqtSignal()
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
@@ -272,6 +302,7 @@ class SingleAgentTab(QtWidgets.QWidget):
         self._workers_tab.train_requested.connect(self.train_requested)
         self._workers_tab.evaluate_requested.connect(self.evaluate_requested)
         self._workers_tab.resume_requested.connect(self.resume_requested)
+        self._workers_tab.script_requested.connect(self.script_requested)
 
     @property
     def workers_subtab(self) -> WorkersSubTab:

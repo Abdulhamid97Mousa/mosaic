@@ -24,9 +24,6 @@ MOSAIC supports four stepping paradigms:
    * - SIMULTANEOUS
      - All agents act together (POSG)
      - MPE, Cooperative control
-   * - HIERARCHICAL
-     - Goal-driven with sub-goals
-     - BDI agents, LLM planners
 
 Policy Mapping
 --------------

@@ -43,8 +43,8 @@ LEARNING_RATE="0.0001"
 GAE_LAMBDA="0.99"
 REWARD_SCALE="20.0"
 
-# Create run-specific directory
-RUN_DIR="$SCRIPTS_DIR/$RUN_ID"
+# Artifact directory -- uses var/trainer/runs/{run_id} when launched from GUI
+RUN_DIR="${MOSAIC_RUN_DIR:-$SCRIPTS_DIR/$RUN_ID}"
 mkdir -p "$RUN_DIR/checkpoints"
 mkdir -p "$RUN_DIR/tensorboard"
 
@@ -64,7 +64,8 @@ echo ""
 # Build training config
 # ============================================================================
 
-TRAINING_CONFIG="$RUN_DIR/quick_test_config.json"
+mkdir -p "$RUN_DIR/config"
+TRAINING_CONFIG="$RUN_DIR/config/quick_test_config.json"
 
 jq --argjson steps "$TOTAL_TIMESTEPS" \
    --argjson num_envs "$NUM_ENVS" \

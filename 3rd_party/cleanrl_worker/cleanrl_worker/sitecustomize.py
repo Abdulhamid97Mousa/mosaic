@@ -114,16 +114,6 @@ try:  # pragma: no cover - gym optional
         else:
             env = _ORIG_MAKE(env_id, *args, **render_kwargs)
 
-        # Wrap MiniGrid/BabyAI environments to flatten Dict observation to Box
-        if _is_minigrid_env and env is not None:
-            try:
-                from minigrid.wrappers import ImgObsWrapper
-                # ImgObsWrapper extracts just the image (7,7,3), then flatten to (147,)
-                env = ImgObsWrapper(env)
-                env = gym.wrappers.FlattenObservation(env)
-            except Exception:
-                pass
-
         # Wrap with ProceduralGenerationWrapper if requested
         procedural_gen = os.getenv("CLEANRL_PROCEDURAL_GENERATION", "").lower()
         if procedural_gen in ("1", "true", "yes") and env is not None:

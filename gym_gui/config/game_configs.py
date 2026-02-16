@@ -663,13 +663,13 @@ class JumanjiConfig:
 
 @dataclass
 class MultiGridConfig:
-    """Configuration payload for gym-multigrid multi-agent environments.
+    """Configuration payload for mosaic_multigrid multi-agent environments.
 
-    gym-multigrid is a multi-agent extension of MiniGrid for training cooperative
+    mosaic_multigrid is a multi-agent extension of MiniGrid for training cooperative
     and competitive multi-agent RL policies. All agents act simultaneously.
 
-    Repository: https://github.com/ArnaudFickinger/gym-multigrid
-    Location: 3rd_party/gym-multigrid/
+    Repository: https://github.com/Abdulhamid97Mousa/mosaic_multigrid
+    Package: pip install mosaic-multigrid
 
     IMPORTANT: MultiGrid environments REQUIRE state-based input mode for multi-keyboard
     support. Shortcut-based mode is incompatible with evdev multi-keyboard monitoring
@@ -871,6 +871,103 @@ class OvercookedConfig:
         )
 
 
+@dataclass
+class SMACConfig:
+    """Configuration for SMAC/SMACv2 StarCraft Multi-Agent Challenge environments.
+
+    Shared by both EnvironmentFamily.SMAC (v1 hand-designed maps) and
+    EnvironmentFamily.SMACV2 (procedural generation).  The adapter import
+    path determines which SMAC package is used; this config is family-agnostic
+    (same pattern as MultiGridConfig for MOSAIC vs INI MultiGrid).
+
+    Repositories:
+        - SMAC v1: https://github.com/oxwhirl/smac
+        - SMACv2:  https://github.com/oxwhirl/smacv2
+
+    Requirements: StarCraft II Linux binary + smac or smacv2 pip package.
+    """
+
+    map_name: str = "3s5z"
+    """SMAC map name passed to StarCraft2Env(map_name=...).
+    v1 examples: '3m', '8m', '2s3z', '3s5z', '5m_vs_6m', 'MMM2'.
+    v2 examples: '10gen_terran', '10gen_protoss', '10gen_zerg'."""
+
+    difficulty: str = "7"
+    """StarCraft II built-in AI difficulty (1-10).
+    Default '7' is the standard SMAC benchmark difficulty."""
+
+    reward_sparse: bool = False
+    """If True, use sparse reward (+1 win, 0 otherwise).
+    If False (default), use shaped reward (damage dealt + kills + win bonus)."""
+
+    reward_only_positive: bool = True
+    """If True, clip negative rewards to zero."""
+
+    reward_scale: bool = True
+    """If True, normalize total episode reward by max_reward."""
+
+    reward_scale_rate: float = 20.0
+    """Scaling factor for reward normalization."""
+
+    obs_own_health: bool = True
+    """Include the agent's own health in its observation vector."""
+
+    obs_pathing_grid: bool = False
+    """Include pathing grid features in observation (increases obs size)."""
+
+    obs_terrain_height: bool = False
+    """Include terrain height features in observation."""
+
+    seed: int | None = None
+    """Random seed for reproducibility."""
+
+    episode_limit: int | None = None
+    """Override episode step limit. If None, uses map default."""
+
+    sc2_path: str | None = None
+    """Path to StarCraft II installation. If None, uses SC2PATH env var."""
+
+    renderer: str = "3d"
+    """Renderer style: '3d' (GPU-rendered SC2 engine), 'heatmap' (multi-panel feature layers),
+    or 'classic' (PyGame circles)."""
+
+
+@dataclass
+class RWAREConfig:
+    """Configuration for Robotic Warehouse (RWARE) multi-agent environments.
+
+    RWARE simulates a warehouse with autonomous robots that cooperatively
+    pick up shelves, deliver them to goal workstations, and return them.
+
+    Paper: Papoudakis et al. (2021). "Benchmarking Multi-Agent Deep RL
+           Algorithms in Cooperative Tasks"
+    Source: 3rd_party/robotic-warehouse/
+    """
+
+    observation_type: str = "flattened"
+    """Observation format: 'flattened' (1D vector), 'dict' (nested dict),
+    'image' (multi-channel grid), 'image_dict' (image + dict)."""
+
+    sensor_range: int = 1
+    """How many cells each agent can see around itself (1-5)."""
+
+    reward_type: str = "individual"
+    """Reward distribution: 'global' (shared), 'individual' (per-agent),
+    'two_stage' (delivery + return)."""
+
+    msg_bits: int = 0
+    """Communication bits per agent (0 = silent, >0 = message channels)."""
+
+    max_steps: int = 500
+    """Maximum steps per episode."""
+
+    seed: int | None = None
+    """Random seed for reproducibility (None = random)."""
+
+    render_mode: str = "rgb_array"
+    """Render mode for MOSAIC display."""
+
+
 # Type alias for all game configuration types
 GameConfig: TypeAlias = (
     FrozenLakeConfig
@@ -889,6 +986,8 @@ GameConfig: TypeAlias = (
     | MultiGridConfig
     | MeltingPotConfig
     | OvercookedConfig
+    | SMACConfig
+    | RWAREConfig
 )
 
 

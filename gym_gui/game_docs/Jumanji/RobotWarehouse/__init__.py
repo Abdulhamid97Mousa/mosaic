@@ -38,11 +38,15 @@ requested items and deliver them to workstations.
 </ul>
 
 <h4>Action Space</h4>
-<p><code>MultiDiscrete</code> - Per-robot actions:</p>
+<p><code>MultiDiscrete([5] * num_agents)</code> - Each robot selects one of 5 actions:</p>
 <ul>
-    <li><strong>Move</strong>: Up, Down, Left, Right, Stay</li>
-    <li><strong>Toggle</strong>: Pick up or put down shelf</li>
+    <li><strong>0</strong>: No-op (stay)</li>
+    <li><strong>1</strong>: Move forward</li>
+    <li><strong>2</strong>: Turn left</li>
+    <li><strong>3</strong>: Turn right</li>
+    <li><strong>4</strong>: Toggle load (pick up / put down shelf)</li>
 </ul>
+<p><em>All robots act simultaneously each step.</em></p>
 
 <h4>Rewards</h4>
 <ul>

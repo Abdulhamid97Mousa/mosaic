@@ -35,9 +35,9 @@ def test_allowed_entry_modules_includes_cleanrl_aliases() -> None:
 
     modules = runtime._allowed_entry_modules()
 
-    assert "cleanrl_worker.algorithms.ppo_with_save" in modules
+    assert "cleanrl_worker.algorithms.ppo" in modules
     assert (
-        "cleanrl_worker.cleanrl_worker.algorithms.ppo_with_save" in modules
+        "cleanrl_worker.cleanrl_worker.algorithms.ppo" in modules
     )
 
 
@@ -100,7 +100,7 @@ def test_build_cleanrl_args_respects_cli_overrides() -> None:
 
     args = runtime.build_cleanrl_args()
     assert "--cuda" not in args
-    assert "--capture-video=true" in args
+    assert "--capture-video" in args
     assert "--wandb-project-name=test-project" in args
 
 
@@ -179,7 +179,7 @@ def test_run_uses_launcher_and_writes_logs(monkeypatch, tmp_path: Path) -> None:
 
     assert launched["cmd"][2] == "cleanrl_worker.launcher"
     assert launched["cmd"][3] in {
-        "cleanrl_worker.algorithms.ppo_with_save",
+        "cleanrl_worker.algorithms.ppo",
         "cleanrl.ppo",
         "cleanrl_worker.cleanrl.ppo",
     }

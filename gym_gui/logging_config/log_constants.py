@@ -620,6 +620,44 @@ LOG_ADAPTER_ALE_METADATA_PROBE_FAILED = _constant(
 )
 
 
+# MOSAIC MultiGrid event tracking constants (LOG525-LOG527)
+LOG_MOSAIC_MULTIGRID_GOAL_SCORED = _constant(
+    "LOG525",
+    "INFO",
+    "MOSAIC MultiGrid goal scored",
+    component="Adapter",
+    subcomponent="MosaicMultiGrid",
+    tags=_tags("mosaic", "multigrid", "goal", "event"),
+)
+
+LOG_MOSAIC_MULTIGRID_PASS_COMPLETED = _constant(
+    "LOG526",
+    "INFO",
+    "MOSAIC MultiGrid pass completed",
+    component="Adapter",
+    subcomponent="MosaicMultiGrid",
+    tags=_tags("mosaic", "multigrid", "pass", "event"),
+)
+
+LOG_MOSAIC_MULTIGRID_STEAL_COMPLETED = _constant(
+    "LOG527",
+    "INFO",
+    "MOSAIC MultiGrid steal completed",
+    component="Adapter",
+    subcomponent="MosaicMultiGrid",
+    tags=_tags("mosaic", "multigrid", "steal", "event"),
+)
+
+LOG_MOSAIC_MULTIGRID_VISIBILITY = _constant(
+    "LOG528",
+    "INFO",
+    "MOSAIC MultiGrid agent visibility",
+    component="Adapter",
+    subcomponent="MosaicMultiGrid",
+    tags=_tags("mosaic", "multigrid", "visibility", "observation"),
+)
+
+
 # ---------------------------------------------------------------------------
 # Crafter adapter specific constants (LOG530–LOG534)
 # ---------------------------------------------------------------------------
@@ -2780,6 +2818,153 @@ LOG_UI_FASTLANE_EVAL_SUMMARY_WARNING = _constant(
 
 
 # ---------------------------------------------------------------------------
+# SMAC Adapter constants (LOG960–LOG969)
+# ---------------------------------------------------------------------------
+LOG_SMAC_ENV_CREATED = _constant(
+    "LOG960",
+    "INFO",
+    "SMAC environment created",
+    component="Adapter",
+    subcomponent="SMAC",
+    tags=_tags("smac", "env", "created"),
+)
+
+LOG_SMAC_ENV_RESET = _constant(
+    "LOG961",
+    "INFO",
+    "SMAC environment reset",
+    component="Adapter",
+    subcomponent="SMAC",
+    tags=_tags("smac", "env", "reset"),
+)
+
+LOG_SMAC_STEP_SUMMARY = _constant(
+    "LOG962",
+    "DEBUG",
+    "SMAC step summary",
+    component="Adapter",
+    subcomponent="SMAC",
+    tags=_tags("smac", "step", "summary"),
+)
+
+LOG_SMAC_ENV_CLOSED = _constant(
+    "LOG963",
+    "INFO",
+    "SMAC environment closed",
+    component="Adapter",
+    subcomponent="SMAC",
+    tags=_tags("smac", "env", "closed"),
+)
+
+LOG_SMAC_RENDER_ERROR = _constant(
+    "LOG964",
+    "WARNING",
+    "SMAC render failed",
+    component="Adapter",
+    subcomponent="SMAC",
+    tags=_tags("smac", "render", "error"),
+)
+
+LOG_SMAC_SC2_PATH_MISSING = _constant(
+    "LOG965",
+    "ERROR",
+    "StarCraft II installation not found (SC2PATH)",
+    component="Adapter",
+    subcomponent="SMAC",
+    tags=_tags("smac", "sc2", "path", "error"),
+)
+
+LOG_SMAC_IMPORT_FALLBACK = _constant(
+    "LOG966",
+    "INFO",
+    "SMAC import fallback triggered",
+    component="Adapter",
+    subcomponent="SMAC",
+    tags=_tags("smac", "import", "fallback"),
+)
+
+LOG_SMAC_REPLAY_SAVED = _constant(
+    "LOG967",
+    "INFO",
+    "SMAC replay saved",
+    component="Adapter",
+    subcomponent="SMAC",
+    tags=_tags("smac", "replay", "saved"),
+)
+
+LOG_SMAC_ACTION_MASK_WARN = _constant(
+    "LOG968",
+    "WARNING",
+    "SMAC action mask unavailable",
+    component="Adapter",
+    subcomponent="SMAC",
+    tags=_tags("smac", "action_mask", "warning"),
+)
+
+LOG_SMAC_BATTLE_RESULT = _constant(
+    "LOG969",
+    "INFO",
+    "SMAC battle result",
+    component="Adapter",
+    subcomponent="SMAC",
+    tags=_tags("smac", "battle", "result"),
+)
+
+
+# ---------------------------------------------------------------------------
+# RWARE (Robotic Warehouse) Adapter constants (LOG970-LOG975)
+# ---------------------------------------------------------------------------
+LOG_RWARE_ENV_CREATED = _constant(
+    "LOG970",
+    "INFO",
+    "RWARE environment created",
+    component="Adapter",
+    subcomponent="RWARE",
+    tags=_tags("rware", "environment", "lifecycle"),
+)
+LOG_RWARE_ENV_RESET = _constant(
+    "LOG971",
+    "INFO",
+    "RWARE environment reset",
+    component="Adapter",
+    subcomponent="RWARE",
+    tags=_tags("rware", "episode", "lifecycle"),
+)
+LOG_RWARE_STEP_SUMMARY = _constant(
+    "LOG972",
+    "DEBUG",
+    "RWARE step summary",
+    component="Adapter",
+    subcomponent="RWARE",
+    tags=_tags("rware", "step"),
+)
+LOG_RWARE_ENV_CLOSED = _constant(
+    "LOG973",
+    "INFO",
+    "RWARE environment closed",
+    component="Adapter",
+    subcomponent="RWARE",
+    tags=_tags("rware", "environment", "lifecycle"),
+)
+LOG_RWARE_RENDER_ERROR = _constant(
+    "LOG974",
+    "WARNING",
+    "RWARE render error",
+    component="Adapter",
+    subcomponent="RWARE",
+    tags=_tags("rware", "render", "error"),
+)
+LOG_RWARE_DELIVERY = _constant(
+    "LOG975",
+    "INFO",
+    "RWARE shelf delivery event",
+    component="Adapter",
+    subcomponent="RWARE",
+    tags=_tags("rware", "delivery", "reward"),
+)
+
+
+# ---------------------------------------------------------------------------
 # Utility constants (LOG801–LOG809)
 # ---------------------------------------------------------------------------
 LOG_UTIL_QT_RESEED_SKIPPED = _constant(
@@ -4443,6 +4628,10 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_ENV_MINIGRID_RENDER_WARNING,
     LOG_ADAPTER_ALE_NAMESPACE_IMPORT_FAILED,
     LOG_ADAPTER_ALE_METADATA_PROBE_FAILED,
+    LOG_MOSAIC_MULTIGRID_GOAL_SCORED,
+    LOG_MOSAIC_MULTIGRID_PASS_COMPLETED,
+    LOG_MOSAIC_MULTIGRID_STEAL_COMPLETED,
+    LOG_MOSAIC_MULTIGRID_VISIBILITY,
     LOG_ENV_CRAFTER_BOOT,
     LOG_ENV_CRAFTER_STEP,
     LOG_ENV_CRAFTER_ERROR,
@@ -4809,6 +4998,10 @@ __all__ = (
     "LOG_ENV_MINIGRID_RENDER_WARNING",
     "LOG_ADAPTER_ALE_NAMESPACE_IMPORT_FAILED",
     "LOG_ADAPTER_ALE_METADATA_PROBE_FAILED",
+    "LOG_MOSAIC_MULTIGRID_GOAL_SCORED",
+    "LOG_MOSAIC_MULTIGRID_PASS_COMPLETED",
+    "LOG_MOSAIC_MULTIGRID_STEAL_COMPLETED",
+    "LOG_MOSAIC_MULTIGRID_VISIBILITY",
     "LOG_ENV_CRAFTER_BOOT",
     "LOG_ENV_CRAFTER_STEP",
     "LOG_ENV_CRAFTER_ERROR",

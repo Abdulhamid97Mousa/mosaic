@@ -47,53 +47,97 @@ Why MOSAIC?
 -----------
 
 Today's AI landscape offers powerful but **fragmented** tools: RL frameworks (CleanRL, RLlib, XuanCe),
-symbolic AI (Jason BDI, SPADE), language models (GPT, Claude), robotics simulators (MuJoCo), and
+language models (GPT, Claude), robotics simulators (MuJoCo), and
 3D game engines (Godot). Each excels in isolation, but **no platform bridges them together**
 under a unified, visual-first interface.
 
 MOSAIC provides:
 
-- **Unified Framework Bridge**: Connect RL, LLM, BDI, Robotics, and 3D Simulation in a single platform
+- **Unified Framework Bridge**: Connect RL, LLM, Robotics, and 3D Simulation in a single platform
 - **Visual-First Design**: Configure experiments through an intuitive PyQt6 interface — no code required
-- **Heterogeneous Agent Mixing**: Run Human + RL + BDI + LLM agents in the same environment
+- **Heterogeneous Agent Mixing**: Run Human + RL + LLM agents in the same environment
 - **Resource Management & Quotas**: GPU allocation, queue limits, credit-based backpressure, health monitoring
 - **Per-Agent Policy Binding**: Route each agent to different workers via ``PolicyMappingService``
 - **Worker Lifecycle Orchestration**: Subprocess management with heartbeat monitoring and graceful termination
 
-Supported Paradigms
--------------------
+Supported Environment Families
+------------------------------
+
+MOSAIC supports **26 environment families** spanning single-agent, multi-agent,
+and cooperative/competitive paradigms.  See the full
+:doc:`Environment Families <documents/environments/index>` reference for
+installation instructions, environment lists, and academic citations.
 
 .. list-table::
-   :widths: 20 40 40
+   :widths: 28 42 30
    :header-rows: 1
 
-   * - Paradigm
+   * - Family
      - Description
      - Example Environments
    * - **Gymnasium**
-     - Standard single-agent RL API
-     - CartPole, MountainCar, Atari, MuJoCo
-   * - **PettingZoo AEC**
-     - Turn-based multi-agent (Alternating Environment Cycle)
-     - Chess, Go, Tic-Tac-Toe, Connect Four
-   * - **PettingZoo Parallel**
-     - Simultaneous multi-agent environments
-     - MPE, SISL, Butterfly
+     - Standard single-agent RL (Toy Text, Classic Control, Box2D, MuJoCo)
+     - CartPole, LunarLander, Ant, FrozenLake
+   * - **Atari / ALE**
+     - 128 classic Atari 2600 games
+     - Breakout, Pong, SpaceInvaders
    * - **MiniGrid**
-     - Procedural grid-world environments
-     - Empty, DoorKey, MultiRoom, RedBlueDoors
+     - Procedural grid-world navigation
+     - Empty, DoorKey, LavaGap, MultiRoom
+   * - **BabyAI**
+     - Language-grounded instruction following
+     - GoTo, Open, Pickup, Unlock, BossLevel
    * - **ViZDoom**
-     - Doom-based visual RL platform
-     - Basic, Deadly Corridor, Defend the Center
-   * - **MuJoCo MPC**
-     - Model Predictive Control for robotics
-     - Humanoid, Quadruped, Manipulation tasks
-   * - **Godot UE**
-     - Custom 3D game environments
-     - Custom game AI training scenarios
-   * - **ALE Atari**
-     - Arcade Learning Environment
-     - Breakout, Pong, Space Invaders
+     - Doom-based first-person visual RL
+     - Basic, DeadlyCorridor, Deathmatch
+   * - **MiniHack / NetHack**
+     - Roguelike dungeon crawling (NLE)
+     - Room, MazeWalk, NetHackChallenge
+   * - **Crafter**
+     - Open-world survival benchmark
+     - CrafterReward, CrafterNoReward
+   * - **Procgen**
+     - 16 procedurally generated environments
+     - CoinRun, StarPilot, Maze, Heist
+   * - **TextWorld**
+     - Text-based interactive fiction
+     - CoinCollector, TreasureHunter, Cooking
+   * - **BabaIsAI**
+     - Rule-manipulation puzzles
+     - BabaIsAI-Default
+   * - **Jumanji**
+     - JAX-accelerated logic/routing/packing (25 envs)
+     - Game2048, Tetris, PacMan, Snake
+   * - **PyBullet Drones**
+     - Quadcopter physics simulation
+     - HoverAviary, MultiHoverAviary
+   * - **PettingZoo Classic**
+     - Turn-based board games (AEC)
+     - Chess, Go, Connect Four, TicTacToe
+   * - **OpenSpiel**
+     - Board games + draughts variants (AEC)
+     - Checkers, International Draughts
+   * - **MOSAIC MultiGrid**
+     - Competitive team sports (view_size=3)
+     - Soccer 2v2, Collect, Basketball 3v3
+   * - **INI MultiGrid**
+     - Cooperative exploration (view_size=7)
+     - Empty, LockedHallway, RedBlueDoors
+   * - **Melting Pot**
+     - Social multi-agent scenarios (up to 16 agents)
+     - CleanUp, Territory, Cooking, PrisonersDilemma
+   * - **Overcooked**
+     - Cooperative cooking (2 agents)
+     - CrampedRoom, CoordinationRing
+   * - **SMAC**
+     - StarCraft Multi-Agent Challenge (hand-designed maps)
+     - 3m, 8m, 2s3z, MMM2
+   * - **SMACv2**
+     - StarCraft Multi-Agent Challenge v2 (procedural units)
+     - 10gen_terran, 10gen_protoss, 10gen_zerg
+   * - **RWARE**
+     - Cooperative warehouse delivery
+     - tiny/small/medium/large (2–8 agents)
 
 Supported Workers
 -----------------
@@ -101,8 +145,6 @@ Supported Workers
 * **CleanRL** - Single-file RL implementations (PPO, DQN, SAC, TD3)
 * **XuanCe** - Multi-agent algorithms (MAPPO, QMIX, MADDPG)
 * **RLlib** - Distributed training with Ray
-* **Jason BDI** - AgentSpeak agents via Java/gRPC bridge
-* **SPADE BDI** - Python-native BDI agents
 * **MuJoCo MPC** - Model Predictive Control worker
 * **Godot** - 3D game engine integration
 * **LLM** - Language model agents (planned)
@@ -153,7 +195,7 @@ Architecture Overview
    * - **Adapters**
      - ParadigmAdapter, PettingZooAdapter, ViZDoomAdapter
    * - **Workers**
-     - CleanRL, XuanCe, RLlib, Jason BDI, SPADE, LLM
+     - CleanRL, XuanCe, RLlib, LLM
 
 Core Features
 -------------
@@ -163,7 +205,7 @@ Core Features
    without changing your agent code.
 
 **Agent Integration**
-   Human, RL (CleanRL, Ray), BDI (SPADE, Jason), and future LLM agents in the same framework.
+   Human, RL (CleanRL, Ray), and future LLM agents in the same framework.
 
 **Policy Mapping**
    Assign different policies to different agents with flexible configuration through the
@@ -184,17 +226,15 @@ MOSAIC is designed for:
 - **Researchers** exploring multi-agent RL with heterogeneous agents
 - **Developers** building RL applications with visual configuration
 - **Students** learning about different RL paradigms and agent architectures
-- **AI practitioners** interested in combining symbolic AI (BDI) with neural methods (RL)
+- **AI practitioners** interested in combining language models (LLM) with neural methods (RL)
 - **Game developers** training AI agents in custom 3D environments
 
 .. raw:: html
 
    <br><hr>
 
-Contents
---------
-
 .. toctree::
+   :hidden:
    :maxdepth: 2
    :caption: Getting Started
 
@@ -203,15 +243,25 @@ Contents
    documents/tutorials/basic_usage
 
 .. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: Environments
+
+   documents/environments/index
+
+.. toctree::
+   :hidden:
    :maxdepth: 2
    :caption: Architecture
 
    documents/architecture/overview
    documents/architecture/paradigms
    documents/architecture/policy_mapping
-   documents/architecture/workers
+   documents/architecture/workers/index
+   documents/architecture/operators/index
 
 .. toctree::
+   :hidden:
    :maxdepth: 2
    :caption: API Reference
 

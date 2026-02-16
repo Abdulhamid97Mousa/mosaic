@@ -8,7 +8,7 @@ These tests validate:
 - ReproducibleMultiGridWrapper integration
 - Registration with XuanCe registry
 
-Note: These tests mock heavy imports (XuanCe, gym-multigrid) to avoid
+Note: These tests mock heavy imports (XuanCe, mosaic_multigrid) to avoid
 slow initialization times during testing.
 """
 
@@ -153,7 +153,7 @@ class TestEnvironmentRegistration:
             ),
         }):
             with patch(
-                'xuance_worker.environments.multigrid.MultiGrid_Env',
+                'xuance_worker.environments.mosaic_multigrid.MultiGrid_Env',
                 mock_multigrid_env
             ):
                 # Now import and call register

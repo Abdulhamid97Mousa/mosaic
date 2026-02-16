@@ -44,9 +44,6 @@ DB_SINK_WRITER_QUEUE_SIZE = 16384
 # Telemetry service history
 TELEMETRY_SERVICE_HISTORY_LIMIT = 512
 
-# Health monitor configuration
-HEALTH_MONITOR_HEARTBEAT_INTERVAL_S = 5.0
-
 # ================================================================
 # Logging Levels for Telemetry
 # ================================================================
@@ -108,7 +105,7 @@ __all__ = [
     "DB_SINK_CHECKPOINT_INTERVAL",
     "DB_SINK_WRITER_QUEUE_SIZE",
     "TELEMETRY_SERVICE_HISTORY_LIMIT",
-    "HEALTH_MONITOR_HEARTBEAT_INTERVAL_S",
+
     "STEP_LOG_LEVEL",
     "BATCH_LOG_LEVEL",
     "ERROR_LOG_LEVEL",

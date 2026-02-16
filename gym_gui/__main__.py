@@ -13,7 +13,7 @@ import sys
 # Must be set before ANY imports that might trigger keras/tensorflow imports
 warnings.filterwarnings("ignore", message=r".*np\.object.*", category=FutureWarning)
 
-# Suppress ALL old gym library warnings (required by: baba-is-ai, gym-multigrid, procgen, overcooked)
+# Suppress ALL old gym library warnings (required by: baba-is-ai, mosaic_multigrid, procgen, overcooked)
 # The gym deprecation message is printed at import time, not via warnings module
 os.environ['GYM_IGNORE_DEPRECATION_WARNING'] = '1'
 warnings.filterwarnings("ignore", category=DeprecationWarning, module="gym")
@@ -24,7 +24,7 @@ warnings.filterwarnings("ignore", category=UserWarning, module="gym")
 warnings.filterwarnings("ignore", message=r".*Overriding environment.*already in registry.*")
 
 # Suppress old gym library deprecation warnings
-# gym (not gymnasium) is required by: baba-is-ai, gym-multigrid, procgen-mirror
+# gym (not gymnasium) is required by: baba-is-ai, mosaic_multigrid, procgen-mirror
 # These packages haven't migrated to gymnasium yet
 warnings.filterwarnings("ignore", message=r".*rng\.randint.*deprecated.*", category=DeprecationWarning)
 warnings.filterwarnings("ignore", message=r".*render method.*deprecated.*", category=DeprecationWarning)

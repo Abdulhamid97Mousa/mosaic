@@ -29,8 +29,17 @@ VAR_MODELS_GO_AI_DIR = VAR_MODELS_DIR / "go_ai"  # Go AI engines config/models
 VAR_OPERATORS_DIR = VAR_ROOT / "operators"  # Operator subprocess data
 VAR_OPERATORS_LOGS_DIR = VAR_OPERATORS_DIR / "logs"  # Operator subprocess logs
 VAR_OPERATORS_TELEMETRY_DIR = VAR_OPERATORS_DIR / "telemetry"  # Operator telemetry (steps, episodes)
+VAR_EVALUATOR_DIR = VAR_ROOT / "evaluator"  # LLM evaluator episode logs (CSV, JSON, images)
 VAR_VLLM_DIR = VAR_ROOT / "vllm"  # vLLM server logs and state
 VAR_BIN_DIR = VAR_ROOT / "bin"  # Project-local binaries (KataGo, etc.)
+
+# StarCraft II / SMAC directories
+# SC2 unzips into a StarCraftII/ subdirectory, so SC2PATH = var/data/StarCraftII
+VAR_SC2_ROOT = VAR_ROOT / "data"  # Parent dir containing the unzipped SC2 archive
+VAR_SC2_DIR = VAR_SC2_ROOT / "StarCraftII"  # Actual SC2 installation (= SC2PATH)
+VAR_SMAC_MAPS_DIR = VAR_SC2_DIR / "Maps" / "SMAC_Maps"  # SMAC v1 map files
+VAR_SMACV2_MAPS_DIR = VAR_SC2_DIR / "Maps" / "SMACv2_Maps"  # SMACv2 map files
+VAR_SMAC_REPLAYS_DIR = VAR_ROOT / "replay" / "smac"  # SMAC replay files (.SC2Replay)
 
 # Custom training scripts directories
 CLEANRL_SCRIPTS_DIR = _3RD_PARTY_ROOT / "cleanrl_worker" / "cleanrl_worker" / "scripts"
@@ -58,9 +67,12 @@ def ensure_var_directories() -> None:
         VAR_OPERATORS_DIR,
         VAR_OPERATORS_LOGS_DIR,
         VAR_OPERATORS_TELEMETRY_DIR,
+        VAR_EVALUATOR_DIR,
         VAR_VLLM_DIR,
         VAR_BIN_DIR,
         VAR_CUSTOM_SCRIPTS_DIR,
+        # VAR_SC2_ROOT is VAR_DATA_DIR (already created above); no extra mkdir needed.
+        VAR_SMAC_REPLAYS_DIR,
     ):
         path.mkdir(parents=True, exist_ok=True)
 
@@ -84,8 +96,14 @@ __all__ = [
     "VAR_OPERATORS_DIR",
     "VAR_OPERATORS_LOGS_DIR",
     "VAR_OPERATORS_TELEMETRY_DIR",
+    "VAR_EVALUATOR_DIR",
     "VAR_VLLM_DIR",
     "VAR_BIN_DIR",
+    "VAR_SC2_ROOT",
+    "VAR_SC2_DIR",
+    "VAR_SMAC_MAPS_DIR",
+    "VAR_SMACV2_MAPS_DIR",
+    "VAR_SMAC_REPLAYS_DIR",
     "VAR_CUSTOM_SCRIPTS_DIR",
     "CLEANRL_SCRIPTS_DIR",
     "XUANCE_SCRIPTS_DIR",

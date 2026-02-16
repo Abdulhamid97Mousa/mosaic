@@ -42,10 +42,8 @@ from xuance_worker import (
 from gym_gui.telemetry.semconv import VIDEO_MODE_DESCRIPTORS, VideoModes
 from gym_gui.fastlane.worker_helpers import apply_fastlane_environment
 from gym_gui.validations.validation_xuance_worker_form import run_xuance_dry_run
-from gym_gui.config.paths import XUANCE_SCRIPTS_DIR, VAR_CUSTOM_SCRIPTS_DIR
 from gym_gui.core.enums import GameId, EnvironmentFamily, ENVIRONMENT_FAMILY_BY_GAME
 from collections import defaultdict
-import re
 
 
 _LOGGER = logging.getLogger("gym_gui.ui.xuance_train_form")
@@ -524,8 +522,6 @@ class _FormState:
     fastlane_slot: int = 0
     fastlane_video_mode: str = "single"
     fastlane_grid_limit: int = 4
-    # Custom script for curriculum learning
-    custom_script_path: Optional[str] = None
 
 
 class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
@@ -868,19 +864,6 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
         params_layout.addWidget(worker_label, 4, 0)
         params_layout.addWidget(self._worker_id_input, 4, 1)
 
-        # Custom Script for curriculum learning
-        script_label = QtWidgets.QLabel("Custom Script:", self)
-        self._custom_script_combo = QtWidgets.QComboBox(self)
-        self._custom_script_combo.setToolTip(
-            "Select a custom training script for curriculum learning or multi-phase training.\n"
-            "'None' uses standard single-environment training.\n"
-            "'Browse...' lets you import a script from your filesystem."
-        )
-        self._populate_custom_scripts()
-        self._custom_script_combo.currentIndexChanged.connect(self._on_custom_script_changed)
-        params_layout.addWidget(script_label, 4, 2)
-        params_layout.addWidget(self._custom_script_combo, 4, 3)
-
         layout.addWidget(params_group)
 
     def _setup_notes(self, layout: QtWidgets.QVBoxLayout) -> None:
@@ -1136,179 +1119,6 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
         if not fastlane_enabled:
             # Reset to defaults when disabled
             self._fastlane_only_checkbox.setChecked(True)
-
-    def _populate_custom_scripts(self) -> None:
-        """Populate the custom scripts dropdown with available scripts."""
-        self._custom_script_combo.blockSignals(True)
-        self._custom_script_combo.clear()
-
-        # First option: standard training (no script)
-        self._custom_script_combo.addItem("None (Standard Training)", None)
-
-        # Add scripts from XUANCE_SCRIPTS_DIR
-        if XUANCE_SCRIPTS_DIR.is_dir():
-            scripts = sorted(XUANCE_SCRIPTS_DIR.glob("*.sh"))
-            for script_path in scripts:
-                description = self._parse_script_metadata(script_path)
-                label = f"{script_path.stem}"
-                if description:
-                    label = f"{script_path.stem} - {description}"
-                self._custom_script_combo.addItem(label, str(script_path))
-
-        # Last option: browse for custom script
-        self._custom_script_combo.addItem("Browse...", "BROWSE")
-
-        self._custom_script_combo.blockSignals(False)
-
-    def _parse_script_metadata(self, script_path: Path) -> str:
-        """Parse @description metadata from a script file."""
-        try:
-            content = script_path.read_text(encoding="utf-8")
-            for line in content.split("\n")[:30]:
-                if "@description:" in line:
-                    desc = line.split("@description:")[-1].strip()
-                    return desc
-            return ""
-        except Exception:
-            return ""
-
-    def _parse_script_full_metadata(self, script_path: Path) -> Dict[str, Any]:
-        """Parse all metadata from a script file including environments."""
-        metadata: Dict[str, Any] = {
-            "description": "",
-            "env_family": None,
-            "phases": None,
-            "total_timesteps": None,
-            "environments": [],
-        }
-        try:
-            content = script_path.read_text(encoding="utf-8")
-            lines = content.split("\n")
-
-            for line in lines[:30]:
-                if "@description:" in line:
-                    metadata["description"] = line.split("@description:")[-1].strip()
-                elif "@env_family:" in line:
-                    metadata["env_family"] = line.split("@env_family:")[-1].strip()
-                elif "@phases:" in line:
-                    try:
-                        metadata["phases"] = int(line.split("@phases:")[-1].strip())
-                    except ValueError:
-                        pass
-                elif "@total_timesteps:" in line:
-                    try:
-                        metadata["total_timesteps"] = int(line.split("@total_timesteps:")[-1].strip())
-                    except ValueError:
-                        pass
-
-            env_pattern = re.compile(r'PHASE\d+_ENV="([^"]+)"')
-            for match in env_pattern.finditer(content):
-                env_id = match.group(1)
-                if env_id not in metadata["environments"]:
-                    metadata["environments"].append(env_id)
-
-        except Exception:
-            pass
-        return metadata
-
-    def _on_custom_script_changed(self, index: int) -> None:
-        """Handle custom script combo selection."""
-        data = self._custom_script_combo.itemData(index)
-        if data == "BROWSE":
-            file_path, _ = QtWidgets.QFileDialog.getOpenFileName(
-                self,
-                "Select Custom Training Script",
-                str(XUANCE_SCRIPTS_DIR) if XUANCE_SCRIPTS_DIR.is_dir() else str(Path.home()),
-                "Shell Scripts (*.sh);;All Files (*)",
-            )
-            if file_path:
-                script_name = Path(file_path).stem
-                description = self._parse_script_metadata(Path(file_path))
-                label = f"{script_name} (imported)"
-                if description:
-                    label = f"{script_name} - {description} (imported)"
-
-                insert_index = self._custom_script_combo.count() - 1
-                self._custom_script_combo.blockSignals(True)
-                self._custom_script_combo.insertItem(insert_index, label, file_path)
-                self._custom_script_combo.setCurrentIndex(insert_index)
-                self._custom_script_combo.blockSignals(False)
-            else:
-                self._custom_script_combo.blockSignals(True)
-                self._custom_script_combo.setCurrentIndex(0)
-                self._custom_script_combo.blockSignals(False)
-
-        # Update form controls based on script selection
-        self._update_script_mode_controls()
-
-    def _update_script_mode_controls(self) -> None:
-        """Enable/disable form controls based on custom script selection.
-
-        When a custom script is selected, the script controls the algorithm,
-        environments, and training parameters - so those form fields should be
-        disabled to indicate they'll be overridden.
-
-        Note: XuanCe uses tabbed paradigms (single-agent/multi-agent), so we
-        need to disable controls in both tabs.
-        """
-        custom_script_data = self._custom_script_combo.currentData()
-        is_script_mode = custom_script_data is not None and custom_script_data != "BROWSE"
-
-        # Disable algorithm/environment controls in both paradigm tabs
-        self._sa_algo_combo.setEnabled(not is_script_mode)
-        self._sa_env_family_combo.setEnabled(not is_script_mode)
-        self._sa_env_combo.setEnabled(not is_script_mode)
-
-        self._ma_algo_combo.setEnabled(not is_script_mode)
-        self._ma_env_family_combo.setEnabled(not is_script_mode)
-        self._ma_env_combo.setEnabled(not is_script_mode)
-
-        # Disable training steps and algorithm parameters group
-        self._steps_spin.setEnabled(not is_script_mode)
-        self._algo_param_group.setEnabled(not is_script_mode)
-
-        # Update tooltips to explain why controls are disabled
-        if is_script_mode:
-            script_name = Path(str(custom_script_data)).stem if custom_script_data else "script"
-            disabled_tooltip = f"Controlled by custom script: {script_name}"
-
-            # Single-agent controls
-            self._sa_algo_combo.setToolTip(disabled_tooltip)
-            self._sa_env_family_combo.setToolTip(disabled_tooltip)
-            self._sa_env_combo.setToolTip(disabled_tooltip)
-
-            # Multi-agent controls
-            self._ma_algo_combo.setToolTip(disabled_tooltip)
-            self._ma_env_family_combo.setToolTip(disabled_tooltip)
-            self._ma_env_combo.setToolTip(disabled_tooltip)
-
-            # Training parameters
-            self._steps_spin.setToolTip(disabled_tooltip)
-            self._algo_param_group.setToolTip(disabled_tooltip)
-
-            # Auto-set GRID mode for custom scripts (curriculum learning typically uses multiple envs)
-            # User can still change this if needed since FastLane controls remain enabled
-            if hasattr(self, "_video_mode_combo"):
-                grid_index = self._video_mode_combo.findData(VideoModes.GRID)
-                if grid_index >= 0:
-                    self._video_mode_combo.setCurrentIndex(grid_index)
-            if hasattr(self, "_grid_limit_spin"):
-                self._grid_limit_spin.setValue(4)
-            # Enable FastLane if not already enabled for script mode
-            if hasattr(self, "_fastlane_checkbox") and not self._fastlane_checkbox.isChecked():
-                self._fastlane_checkbox.setChecked(True)
-        else:
-            # Restore original tooltips
-            self._sa_algo_combo.setToolTip("Select the RL algorithm")
-            self._sa_env_family_combo.setToolTip("Select the environment family")
-            self._sa_env_combo.setToolTip("Select the specific environment")
-
-            self._ma_algo_combo.setToolTip("Select the RL algorithm")
-            self._ma_env_family_combo.setToolTip("Select the environment family")
-            self._ma_env_combo.setToolTip("Select the specific environment")
-
-            self._steps_spin.setToolTip("Total training steps")
-            self._algo_param_group.setToolTip("")
 
     def _setup_buttons(self, layout: QtWidgets.QVBoxLayout) -> None:
         """Set up dialog buttons."""
@@ -1630,12 +1440,6 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
         video_mode_data = self._video_mode_combo.currentData()
         video_mode = video_mode_data if isinstance(video_mode_data, str) else VideoModes.SINGLE
 
-        # Custom script selection
-        custom_script_data = self._custom_script_combo.currentData()
-        custom_script_path: Optional[str] = None
-        if custom_script_data and custom_script_data != "BROWSE":
-            custom_script_path = str(custom_script_data)
-
         return _FormState(
             backend=self._backend_combo.currentData() or "torch",
             paradigm=paradigm,
@@ -1651,14 +1455,11 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
             worker_id=self._worker_id_input.text().strip() or None,
             notes=self._notes_edit.toPlainText().strip() or None,
             algo_params=algo_params,
-            # FastLane settings
             fastlane_enabled=self._fastlane_checkbox.isChecked(),
             fastlane_only=self._fastlane_only_checkbox.isChecked(),
             fastlane_slot=self._fastlane_slot_spin.value(),
             fastlane_video_mode=video_mode,
             fastlane_grid_limit=self._grid_limit_spin.value(),
-            # Custom script
-            custom_script_path=custom_script_path,
         )
 
     def _build_config(
@@ -1809,66 +1610,8 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
             # Also set the master switch for XuanCe sitecustomize
             environment["MOSAIC_FASTLANE_ENABLED"] = "1"
 
-        # Handle custom script mode vs standard training mode
-        if state.custom_script_path:
-            # Custom script mode: run bash script with config passed via environment
-            config_file_path = VAR_CUSTOM_SCRIPTS_DIR / run_id / "base_config.json"
-            VAR_CUSTOM_SCRIPTS_DIR.mkdir(parents=True, exist_ok=True)
-            (VAR_CUSTOM_SCRIPTS_DIR / run_id).mkdir(parents=True, exist_ok=True)
-
-            # Parse script metadata to get the actual environments
-            script_metadata = self._parse_script_full_metadata(Path(state.custom_script_path))
-            script_envs = script_metadata.get("environments", [])
-            script_env_family = script_metadata.get("env_family", "")
-            script_name = Path(state.custom_script_path).stem
-
-            # Override env_id with script's first environment or a descriptive name
-            if script_envs:
-                script_env_id = script_envs[0]  # First phase environment
-            elif script_env_family:
-                script_env_id = f"{script_env_family}-curriculum"
-            else:
-                script_env_id = f"{script_name}"
-
-            # Update worker_config with script's environment
-            worker_config["env_id"] = script_env_id
-
-            # In custom script mode, the script controls ALL parameters.
-            # Clear form-sourced algo_params completely - the script is self-contained
-            # and defines its own algorithm, environment, and training settings.
-            if "extras" in worker_config:
-                worker_config["extras"]["algo_params"] = {}
-
-            # Update metadata env_id for tab naming
-            metadata["ui"]["env_id"] = script_env_id
-
-            # Write worker_config to the config file for the script to read
-            config_file_path.write_text(json.dumps(worker_config, indent=2))
-
-            # Add MOSAIC environment variables for script
-            environment["MOSAIC_CONFIG_FILE"] = str(config_file_path)
-            environment["MOSAIC_RUN_ID"] = run_id
-            environment["MOSAIC_CUSTOM_SCRIPTS_DIR"] = str(VAR_CUSTOM_SCRIPTS_DIR)
-            environment["MOSAIC_CHECKPOINT_DIR"] = str(VAR_CUSTOM_SCRIPTS_DIR / run_id / "checkpoints")
-
-            # Update metadata to reflect script mode
-            metadata["ui"]["custom_script"] = state.custom_script_path
-            metadata["ui"]["custom_script_name"] = script_name
-
-            # CRITICAL: Update metadata.worker to use script instead of module
-            # The dispatcher reads metadata.worker.script, NOT the top-level entry_point
-            # If module is present, dispatcher runs 'python -m module' instead of bash script
-            # This prevents the script's jq overrides from ever executing!
-            del metadata["worker"]["module"]  # Remove the default module
-            metadata["worker"]["script"] = "/bin/bash"  # Use bash to execute
-            metadata["worker"]["arguments"] = [state.custom_script_path]  # Script path as argument
-
-            entry_point = "/bin/bash"
-            arguments = [state.custom_script_path]
-        else:
-            # Standard training mode: run xuance_worker.cli directly
-            entry_point = sys.executable
-            arguments = ["-m", "xuance_worker.cli"]
+        entry_point = sys.executable
+        arguments = ["-m", "xuance_worker.cli"]
 
         config: Dict[str, Any] = {
             "run_name": run_id,
@@ -1909,10 +1652,6 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
         """
         config = self._build_config(state, run_id=run_id)
 
-        # Handle custom script mode differently
-        if state.custom_script_path:
-            return self._run_script_validation(state, config, run_id, persist_config)
-
         # Extract worker config for validation (the actual config passed to xuance_worker)
         worker_config = config.get("metadata", {}).get("worker", {}).get("config", {})
 
@@ -1924,169 +1663,6 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
             success, output = run_xuance_dry_run(worker_config)
         finally:
             QtWidgets.QApplication.restoreOverrideCursor()
-
-        self._set_validation_result(success, output)
-        self._append_validation_notes(success, output)
-
-        if persist_config and success:
-            self._last_config = copy.deepcopy(config)
-        elif not persist_config:
-            self._last_config = None
-
-        return success, (copy.deepcopy(config) if success else None)
-
-    def _run_script_validation(
-        self,
-        state: _FormState,
-        config: Dict[str, Any],
-        run_id: str,
-        persist_config: bool,
-    ) -> tuple[bool, Optional[Dict[str, Any]]]:
-        """Validate a custom script configuration."""
-        script_path = Path(state.custom_script_path) if state.custom_script_path else None
-
-        # Log validation start
-        self.log_constant(
-            LOG_UI_TRAIN_FORM_TRACE,
-            message="Starting custom script validation",
-            extra={
-                "run_id": run_id,
-                "script_path": state.custom_script_path,
-                "method": state.method,
-                "backend": state.backend,
-            },
-        )
-
-        self._validation_status_label.setText("Validating custom script configuration...")
-        self._validation_status_label.setStyleSheet("color: #1565c0;")
-
-        errors: List[str] = []
-        warnings: List[str] = []
-        script_metadata: Dict[str, Any] = {}
-
-        # Check script file exists
-        if script_path is None or not script_path.exists():
-            errors.append(f"Script file not found: {state.custom_script_path}")
-        elif not script_path.is_file():
-            errors.append(f"Path is not a file: {state.custom_script_path}")
-        else:
-            # Parse full script metadata
-            script_metadata = self._parse_script_full_metadata(script_path)
-
-            # Log script metadata extraction
-            self.log_constant(
-                LOG_UI_TRAIN_FORM_TRACE,
-                message="Parsed custom script metadata",
-                extra={
-                    "run_id": run_id,
-                    "script_name": script_path.name,
-                    "env_family": script_metadata.get("env_family"),
-                    "phases": script_metadata.get("phases"),
-                    "environments": script_metadata.get("environments", []),
-                },
-            )
-
-            # Check script is readable and has shebang
-            try:
-                content = script_path.read_text(encoding="utf-8")
-                lines = content.split("\n")
-                if not lines or not lines[0].startswith("#!"):
-                    warnings.append("Script missing shebang (e.g., #!/bin/bash)")
-                elif "bash" not in lines[0] and "sh" not in lines[0]:
-                    warnings.append(f"Unexpected shebang: {lines[0]}")
-
-                # Check script references MOSAIC_CONFIG_FILE
-                if "MOSAIC_CONFIG_FILE" not in content:
-                    warnings.append("Script doesn't reference $MOSAIC_CONFIG_FILE - may not read config")
-
-            except Exception as e:
-                errors.append(f"Cannot read script: {e}")
-
-        # NOTE: We do NOT validate worker_config.method in script mode
-        # The script is responsible for specifying its own algorithm
-
-        # Build output message
-        success = len(errors) == 0
-        output_lines: List[str] = []
-
-        if success:
-            output_lines.append("[PASSED] Custom Script Validation")
-            output_lines.append("")
-            output_lines.append(f"Script: {script_path.name if script_path else 'N/A'}")
-            if script_metadata.get("description"):
-                output_lines.append(f"Description: {script_metadata['description']}")
-            output_lines.append("")
-
-            # Show what the script will ACTUALLY do
-            output_lines.append("--- Script Configuration ---")
-            if script_metadata.get("env_family"):
-                output_lines.append(f"Target Environment Family: {script_metadata['env_family']}")
-            if script_metadata.get("phases"):
-                output_lines.append(f"Training Phases: {script_metadata['phases']}")
-            if script_metadata.get("total_timesteps"):
-                output_lines.append(f"Total Timesteps: {script_metadata['total_timesteps']:,}")
-
-            if script_metadata.get("environments"):
-                output_lines.append("")
-                output_lines.append("Environments (in order):")
-                for i, env in enumerate(script_metadata["environments"], 1):
-                    output_lines.append(f"  Phase {i}: {env}")
-
-            # Only show settings that are actually passed to and used by the script
-            output_lines.append("")
-            output_lines.append("--- Settings Inherited by Script ---")
-            output_lines.append(f"Seed: {state.seed if state.seed else 'Not set (script/algorithm decides)'}")
-            output_lines.append(f"Device: {state.device}")
-            if state.fastlane_enabled:
-                output_lines.append(f"FastLane: {state.fastlane_video_mode} mode")
-
-            if warnings:
-                output_lines.append("")
-                output_lines.append("Warnings:")
-                for w in warnings:
-                    output_lines.append(f"  - {w}")
-
-            output_lines.append("")
-            output_lines.append("Note: Script controls algorithm, environments, and timesteps.")
-        else:
-            output_lines.append("[FAILED] Custom Script Validation")
-            output_lines.append("")
-            output_lines.append("Errors:")
-            for e in errors:
-                output_lines.append(f"  - {e}")
-
-            if warnings:
-                output_lines.append("")
-                output_lines.append("Warnings:")
-                for w in warnings:
-                    output_lines.append(f"  - {w}")
-
-        output = "\n".join(output_lines)
-
-        # Log validation outcome
-        if success:
-            self.log_constant(
-                LOG_UI_TRAIN_FORM_INFO,
-                message="Custom script validation passed",
-                extra={
-                    "run_id": run_id,
-                    "script_name": script_path.name if script_path else None,
-                    "phases": script_metadata.get("phases"),
-                    "environments": script_metadata.get("environments", []),
-                    "warnings_count": len(warnings),
-                },
-            )
-        else:
-            self.log_constant(
-                LOG_UI_TRAIN_FORM_ERROR,
-                message="Custom script validation failed",
-                extra={
-                    "run_id": run_id,
-                    "script_path": state.custom_script_path,
-                    "errors": errors,
-                    "warnings": warnings,
-                },
-            )
 
         self._set_validation_result(success, output)
         self._append_validation_notes(success, output)
@@ -2148,39 +1724,19 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
         """Handle validate button click - run dry-run without persisting config."""
         state = self._collect_state()
 
-        # Branch validation based on mode: custom script vs standard training
-        if state.custom_script_path:
-            # Custom script mode: script controls algo/env/timesteps, only validate script exists
-            script_path = Path(state.custom_script_path)
-            if not script_path.exists():
-                self.log_constant(
-                    LOG_UI_TRAIN_FORM_ERROR,
-                    message="Validation rejected: custom script not found",
-                    extra={"script_path": state.custom_script_path},
-                )
-                QtWidgets.QMessageBox.warning(
-                    self,
-                    "Script Not Found",
-                    f"Custom script not found:\n{state.custom_script_path}",
-                )
-                return
-            script_name = script_path.stem.replace("_", "-")
-            run_id = _generate_run_id("xuance-script", script_name)
-        else:
-            # Standard training mode: validate form fields
-            if not state.method or not state.env_id:
-                self.log_constant(
-                    LOG_UI_TRAIN_FORM_WARNING,
-                    message="Validation rejected: incomplete configuration",
-                    extra={"has_method": bool(state.method), "has_env_id": bool(state.env_id)},
-                )
-                QtWidgets.QMessageBox.warning(
-                    self,
-                    "Incomplete Configuration",
-                    "Select an algorithm and environment before running validation.",
-                )
-                return
-            run_id = _generate_run_id("xuance", state.method)
+        if not state.method or not state.env_id:
+            self.log_constant(
+                LOG_UI_TRAIN_FORM_WARNING,
+                message="Validation rejected: incomplete configuration",
+                extra={"has_method": bool(state.method), "has_env_id": bool(state.env_id)},
+            )
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Incomplete Configuration",
+                "Select an algorithm and environment before running validation.",
+            )
+            return
+        run_id = _generate_run_id("xuance", state.method)
 
         self._run_validation(state, run_id=run_id, persist_config=False)
 
@@ -2188,62 +1744,36 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
         """Handle OK button click - validates before accepting."""
         state = self._collect_state()
 
-        # Branch validation based on mode: custom script vs standard training
-        if state.custom_script_path:
-            # Custom script mode: script controls algo/env/timesteps, only validate script exists
-            script_path = Path(state.custom_script_path)
-            if not script_path.exists():
-                self.log_constant(
-                    LOG_UI_TRAIN_FORM_ERROR,
-                    message="Custom script not found",
-                    extra={"script_path": state.custom_script_path},
-                )
-                QtWidgets.QMessageBox.warning(
-                    self,
-                    "Script Not Found",
-                    f"Custom script not found:\n{state.custom_script_path}",
-                )
-                return
-            # Use script name for run_id generation
-            script_name = script_path.stem.replace("_", "-")
-            run_id = _generate_run_id("xuance-script", script_name)
+        if not state.method:
             self.log_constant(
-                LOG_UI_TRAIN_FORM_INFO,
-                message="Accepting custom script training config",
-                extra={"script_name": script_path.stem, "run_id": run_id},
+                LOG_UI_TRAIN_FORM_WARNING,
+                message="Accept rejected: algorithm not selected",
             )
-        else:
-            # Standard training mode: validate form fields
-            if not state.method:
-                self.log_constant(
-                    LOG_UI_TRAIN_FORM_WARNING,
-                    message="Accept rejected: algorithm not selected",
-                )
-                QtWidgets.QMessageBox.warning(
-                    self,
-                    "Algorithm Required",
-                    "Please select an algorithm before proceeding.",
-                )
-                return
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Algorithm Required",
+                "Please select an algorithm before proceeding.",
+            )
+            return
 
-            if not state.env_id:
-                self.log_constant(
-                    LOG_UI_TRAIN_FORM_WARNING,
-                    message="Accept rejected: environment not selected",
-                )
-                QtWidgets.QMessageBox.warning(
-                    self,
-                    "Environment Required",
-                    "Please select an environment before proceeding.",
-                )
-                return
-
-            run_id = _generate_run_id("xuance", state.method)
+        if not state.env_id:
             self.log_constant(
-                LOG_UI_TRAIN_FORM_INFO,
-                message="Accepting standard training config",
-                extra={"method": state.method, "env_id": state.env_id, "run_id": run_id},
+                LOG_UI_TRAIN_FORM_WARNING,
+                message="Accept rejected: environment not selected",
             )
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Environment Required",
+                "Please select an environment before proceeding.",
+            )
+            return
+
+        run_id = _generate_run_id("xuance", state.method)
+        self.log_constant(
+            LOG_UI_TRAIN_FORM_INFO,
+            message="Accepting training config",
+            extra={"method": state.method, "env_id": state.env_id, "run_id": run_id},
+        )
 
         # Run validation before accepting
         success, config = self._run_validation(state, run_id=run_id, persist_config=True)
@@ -2282,7 +1812,7 @@ __all__ = ["XuanCeTrainForm"]
 
 # Register with form factory
 try:
-    from gym_gui.ui.forms import get_worker_form_factory
+    from gym_gui.ui.forms.factory import get_worker_form_factory
 
     _factory = get_worker_form_factory()
     if not _factory.has_train_form("xuance_worker"):

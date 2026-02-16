@@ -105,9 +105,14 @@ def _resolve_config() -> _FastLaneConfig:
     except ValueError:
         slot = 0
 
-    # XuanCe uses 'parallels' instead of 'num_envs'
+    # XuanCe uses 'parallels' instead of 'num_envs'.
+    # Check both XUANCE_PARALLELS (set by train form) and XUANCE_NUM_ENVS
+    # (set by shell scripts) to support grid mode from either launch path.
     try:
-        total_envs = max(1, int(os.getenv("XUANCE_PARALLELS", "1")))
+        total_envs = max(1, int(
+            os.getenv("XUANCE_PARALLELS")
+            or os.getenv("XUANCE_NUM_ENVS", "1")
+        ))
     except ValueError:
         total_envs = 1
 
@@ -166,6 +171,52 @@ def reset_slot_counter() -> None:
     """
     global _ENV_SLOT_COUNTER
     _ENV_SLOT_COUNTER = count()
+
+
+def cleanup_fastlane_buffer(run_id: Optional[str] = None) -> None:
+    """Unlink the FastLane shared memory buffer so a new one can be created.
+
+    Call this during curriculum phase transitions when the new environment
+    produces frames of a different size (e.g. collect_1vs1 10x10 -> soccer_1vs1
+    16x11).  The old buffer is sized for the old frame dimensions; without
+    unlinking, new writers fall back to the old buffer and corrupt the rendering.
+
+    POSIX semantics: ``shm_unlink`` removes the name from /dev/shm but existing
+    mappings (e.g. the GUI reader) stay valid until they close.  The GUI will
+    reconnect when the new buffer appears under the same name.
+    """
+    target_run_id = run_id or _CONFIG.run_id
+    if create_fastlane_name is None:
+        return
+    name = create_fastlane_name(target_run_id)
+    try:
+        from multiprocessing import shared_memory as _shm
+        shm = _shm.SharedMemory(name=name, create=False)
+
+        # Signal the GUI reader to detach before we unlink the name.
+        # The reader's mmap points to the same physical memory, so it will
+        # see the flag on the very next poll (≤16 ms).
+        try:
+            from gym_gui.fastlane.buffer import FastLaneBase
+            base = FastLaneBase(shm)
+            base.invalidate()
+            # Release our memoryview/buffer references so shm.close() works
+            base._mv.release()
+            base._buffer.release()
+            _LOGGER.info("Marked FastLane buffer as invalidated: %s", name)
+        except Exception as inv_exc:
+            _LOGGER.debug("Could not invalidate buffer header: %s", inv_exc)
+
+        shm.close()
+        shm.unlink()
+        _LOGGER.info("Unlinked FastLane buffer: %s", name)
+    except FileNotFoundError:
+        _LOGGER.debug("FastLane buffer not found (already cleaned): %s", name)
+    except Exception as exc:
+        _LOGGER.warning("Could not unlink FastLane buffer %s: %s", name, exc)
+
+    # Clear stale grid coordinator so it doesn't hold old frame references
+    _GRID_COORDINATORS.pop(target_run_id, None)
 
 
 def reload_fastlane_config() -> _FastLaneConfig:
@@ -550,6 +601,7 @@ __all__ = [
     "is_fastlane_enabled",
     "maybe_wrap_env",
     "reset_slot_counter",
+    "cleanup_fastlane_buffer",
     "reload_fastlane_config",
     "FastLaneTelemetryWrapper",
 ]

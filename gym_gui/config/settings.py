@@ -64,7 +64,10 @@ class Settings:
 
     # vLLM Server settings
     vllm_max_servers: int = 4  # Maximum number of vLLM server instances
-    vllm_gpu_memory_utilization: float = 0.9  # GPU memory fraction per server (0.9 = 90%)
+    vllm_gpu_memory_utilization: float = 0.85  # GPU memory fraction per server (0.85 = 85%, leaves 15% for system)
+
+    # UI settings
+    chat_panel_collapsed: bool = True  # Start with Chat panel collapsed
 
     @property
     def video_dir(self) -> Path | None:
@@ -122,6 +125,12 @@ def get_settings() -> Settings:
     except (TypeError, ValueError):
         vllm_gpu_memory_utilization = defaults.vllm_gpu_memory_utilization
 
+    # UI settings
+    chat_panel_collapsed = _normalize_bool(
+        os.getenv("CHAT_PANEL_COLLAPSED"),
+        default=defaults.chat_panel_collapsed,
+    )
+
     return Settings(
         qt_api=qt_api,
         gym_default_env=gym_default_env,
@@ -132,6 +141,7 @@ def get_settings() -> Settings:
         allow_seed_reuse=allow_seed_reuse,
         vllm_max_servers=max(1, min(8, vllm_max_servers)),  # Clamp to 1-8
         vllm_gpu_memory_utilization=max(0.1, min(0.95, vllm_gpu_memory_utilization)),  # Clamp to 0.1-0.95
+        chat_panel_collapsed=chat_panel_collapsed,
     )
 
 

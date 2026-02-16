@@ -241,5 +241,93 @@ def test_stop_experiment(execution_manager):
     assert stop_signals[0] == "op1"
 
 
+def test_fixed_mode_uses_same_seed(execution_manager):
+    """Test that fixed environment mode reuses seeds[0] for every episode.
+
+    Fixed mode isolates agent behavior variance by keeping the environment
+    layout identical across episodes (Contextual MDP with fixed context).
+    """
+    configs = [
+        OperatorConfig.single_agent(
+            operator_id="op1",
+            display_name="Op 1",
+            worker_id="operators_worker",
+            worker_type="baseline",
+            env_name="minigrid",
+            task="MiniGrid-Empty-8x8-v0",
+            settings={"behavior": "random"},
+            max_steps=100,
+        )
+    ]
+    execution_config = {
+        "num_episodes": 3,
+        "seeds": [1000, 1001, 1002],
+        "environment_mode": "fixed",
+    }
+
+    # Track reset signals
+    reset_signals = []
+    execution_manager.reset_operator.connect(
+        lambda op_id, seed: reset_signals.append((op_id, seed))
+    )
+
+    execution_manager.start_experiment(configs, execution_config)
+
+    # Complete episode 1 -> should reset with seed 1000 (not 1001)
+    execution_manager.on_episode_ended("op1", True, False)
+    assert len(reset_signals) == 1
+    assert reset_signals[0] == ("op1", 1000)
+
+    # Simulate ready + complete episode 2 -> should still use seed 1000
+    execution_manager.on_ready_received("op1")
+    execution_manager.on_episode_ended("op1", True, False)
+    assert len(reset_signals) == 2
+    assert reset_signals[1] == ("op1", 1000)
+
+
+def test_procedural_mode_uses_different_seeds(execution_manager):
+    """Test that procedural mode (default) uses different seeds per episode.
+
+    Procedural mode tests generalization by giving each episode a unique
+    seed, producing different environment layouts (ProcGen-style evaluation).
+    """
+    configs = [
+        OperatorConfig.single_agent(
+            operator_id="op1",
+            display_name="Op 1",
+            worker_id="operators_worker",
+            worker_type="baseline",
+            env_name="minigrid",
+            task="MiniGrid-Empty-8x8-v0",
+            settings={"behavior": "random"},
+            max_steps=100,
+        )
+    ]
+    execution_config = {
+        "num_episodes": 3,
+        "seeds": [1000, 1001, 1002],
+        "environment_mode": "procedural",
+    }
+
+    # Track reset signals
+    reset_signals = []
+    execution_manager.reset_operator.connect(
+        lambda op_id, seed: reset_signals.append((op_id, seed))
+    )
+
+    execution_manager.start_experiment(configs, execution_config)
+
+    # Complete episode 1 -> should reset with seed 1001 (next in sequence)
+    execution_manager.on_episode_ended("op1", True, False)
+    assert len(reset_signals) == 1
+    assert reset_signals[0] == ("op1", 1001)
+
+    # Simulate ready + complete episode 2 -> should use seed 1002
+    execution_manager.on_ready_received("op1")
+    execution_manager.on_episode_ended("op1", True, False)
+    assert len(reset_signals) == 2
+    assert reset_signals[1] == ("op1", 1002)
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v", "-s"])

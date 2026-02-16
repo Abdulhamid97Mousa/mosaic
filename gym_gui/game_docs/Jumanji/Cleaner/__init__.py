@@ -39,9 +39,9 @@ four cardinal directions.
 <p><code>Discrete(4)</code> - Movement directions:</p>
 <ul>
     <li><strong>0</strong>: Up</li>
-    <li><strong>1</strong>: Down</li>
-    <li><strong>2</strong>: Left</li>
-    <li><strong>3</strong>: Right</li>
+    <li><strong>1</strong>: Right</li>
+    <li><strong>2</strong>: Down</li>
+    <li><strong>3</strong>: Left</li>
 </ul>
 
 <h4>Rewards</h4>
@@ -63,10 +63,10 @@ four cardinal directions.
         <th style="border: 1px solid #ddd; padding: 8px;">Key</th>
         <th style="border: 1px solid #ddd; padding: 8px;">Action</th>
     </tr>
-    <tr><td style="border: 1px solid #ddd; padding: 8px;">Up Arrow</td><td style="border: 1px solid #ddd; padding: 8px;">Move Up</td></tr>
-    <tr><td style="border: 1px solid #ddd; padding: 8px;">Down Arrow</td><td style="border: 1px solid #ddd; padding: 8px;">Move Down</td></tr>
-    <tr><td style="border: 1px solid #ddd; padding: 8px;">Left Arrow</td><td style="border: 1px solid #ddd; padding: 8px;">Move Left</td></tr>
-    <tr><td style="border: 1px solid #ddd; padding: 8px;">Right Arrow</td><td style="border: 1px solid #ddd; padding: 8px;">Move Right</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">W / Up Arrow</td><td style="border: 1px solid #ddd; padding: 8px;">Move Up (action 0)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">D / Right Arrow</td><td style="border: 1px solid #ddd; padding: 8px;">Move Right (action 1)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">S / Down Arrow</td><td style="border: 1px solid #ddd; padding: 8px;">Move Down (action 2)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">A / Left Arrow</td><td style="border: 1px solid #ddd; padding: 8px;">Move Left (action 3)</td></tr>
 </table>
 
 <h4>References</h4>

@@ -192,8 +192,8 @@ ENV_FAMILIES: Dict[str, Tuple[str, ...]] = {
         "draughts/russian_checkers",     # Custom: 8x8, men capture backward, flying kings
         "draughts/international_draughts",  # Custom: 10x10, backward captures, flying kings
     ),
-    # gym-multigrid multi-agent environments (simultaneous stepping)
-    # Legacy gym-multigrid (ArnaudFickinger) + Modern INI multigrid
+    # mosaic_multigrid multi-agent environments (simultaneous stepping)
+    # mosaic_multigrid (Soccer, Collect) + Modern INI multigrid
     "multigrid": (
         # Legacy environments
         "MultiGrid-Soccer-v0",

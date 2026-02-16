@@ -55,16 +55,53 @@ from gym_gui.game_docs.ALE import (
     ASSAULT_HTML,
 )
 
+from gym_gui.game_docs.crafter import (
+    CRAFTER_REWARD_HTML,
+    CRAFTER_NO_REWARD_HTML,
+)
+
+from gym_gui.game_docs.OpenSpiel import (
+    CHECKERS_HTML,
+)
+
+from gym_gui.game_docs.Draughts import (
+    AMERICAN_CHECKERS_HTML,
+    RUSSIAN_CHECKERS_HTML,
+    INTERNATIONAL_DRAUGHTS_HTML,
+)
+
 from gym_gui.game_docs.PettingZoo import (
     CHESS_HTML,
     CONNECT_FOUR_HTML,
     GO_HTML,
 )
 
-from gym_gui.game_docs.MultiGrid import (
-    MULTIGRID_SOCCER_HTML,
-    MULTIGRID_COLLECT_HTML,
-    get_multigrid_html,
+from gym_gui.game_docs.Mosaic_MultiGrid import (
+    MOSAIC_SOCCER_HTML,
+    MOSAIC_SOCCER_BASE_HTML,
+    MOSAIC_COLLECT_HTML,
+    MOSAIC_COLLECT_BASE_HTML,
+    MOSAIC_COLLECT2VS2_HTML,
+    MOSAIC_COLLECT2VS2_BASE_HTML,
+    get_mosaic_multigrid_html,
+)
+from gym_gui.game_docs.MultiGrid_INI import (
+    get_ini_multigrid_html,
+)
+
+from gym_gui.game_docs.SMAC import (
+    SMAC_3M_HTML,
+    SMAC_8M_HTML,
+    SMAC_2S3Z_HTML,
+    SMAC_3S5Z_HTML,
+    SMAC_5M_VS_6M_HTML,
+    SMAC_MMM2_HTML,
+)
+
+from gym_gui.game_docs.SMACv2 import (
+    SMACV2_TERRAN_HTML,
+    SMACV2_PROTOSS_HTML,
+    SMACV2_ZERG_HTML,
 )
 
 from gym_gui.game_docs.Procgen import (
@@ -201,6 +238,8 @@ GAME_INFO: Dict[GameId, str] = {
     GameId.REACHER: REACHER_HTML,
     GameId.SWIMMER: SWIMMER_HTML,
     GameId.WALKER2D: WALKER2D_HTML,
+    GameId.CRAFTER_REWARD: CRAFTER_REWARD_HTML,
+    GameId.CRAFTER_NO_REWARD: CRAFTER_NO_REWARD_HTML,
 }
 
 _MINIGRID_EMPTY_VARIANTS = (
@@ -286,9 +325,74 @@ GAME_INFO[GameId.CHESS] = CHESS_HTML
 GAME_INFO[GameId.CONNECT_FOUR] = CONNECT_FOUR_HTML
 GAME_INFO[GameId.GO] = GO_HTML
 
-# MultiGrid mappings (multi-agent extensions of MiniGrid)
-GAME_INFO[GameId.MULTIGRID_SOCCER] = MULTIGRID_SOCCER_HTML
-GAME_INFO[GameId.MULTIGRID_COLLECT] = MULTIGRID_COLLECT_HTML
+# OpenSpiel mappings
+GAME_INFO[GameId.OPEN_SPIEL_CHECKERS] = CHECKERS_HTML
+
+# Draughts/Checkers variants (custom MOSAIC implementations)
+GAME_INFO[GameId.AMERICAN_CHECKERS] = AMERICAN_CHECKERS_HTML
+GAME_INFO[GameId.RUSSIAN_CHECKERS] = RUSSIAN_CHECKERS_HTML
+GAME_INFO[GameId.INTERNATIONAL_DRAUGHTS] = INTERNATIONAL_DRAUGHTS_HTML
+
+# MOSAIC MultiGrid mappings (competitive team-based environments)
+GAME_INFO[GameId.MOSAIC_MULTIGRID_SOCCER] = MOSAIC_SOCCER_BASE_HTML
+GAME_INFO[GameId.MOSAIC_MULTIGRID_COLLECT] = MOSAIC_COLLECT_BASE_HTML
+GAME_INFO[GameId.MOSAIC_MULTIGRID_COLLECT2VS2] = MOSAIC_COLLECT2VS2_BASE_HTML
+GAME_INFO[GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_INDAGOBS] = MOSAIC_SOCCER_HTML
+GAME_INFO[GameId.MOSAIC_MULTIGRID_COLLECT_INDAGOBS] = MOSAIC_COLLECT_HTML
+GAME_INFO[GameId.MOSAIC_MULTIGRID_COLLECT2VS2_INDAGOBS] = MOSAIC_COLLECT2VS2_HTML
+GAME_INFO[GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_TEAMOBS] = MOSAIC_SOCCER_HTML
+GAME_INFO[GameId.MOSAIC_MULTIGRID_COLLECT2VS2_TEAMOBS] = MOSAIC_COLLECT2VS2_HTML
+
+# SMAC v1 mappings (hand-designed cooperative micromanagement maps)
+GAME_INFO.update({
+    GameId.SMAC_3M: SMAC_3M_HTML,
+    GameId.SMAC_8M: SMAC_8M_HTML,
+    GameId.SMAC_2S3Z: SMAC_2S3Z_HTML,
+    GameId.SMAC_3S5Z: SMAC_3S5Z_HTML,
+    GameId.SMAC_5M_VS_6M: SMAC_5M_VS_6M_HTML,
+    GameId.SMAC_MMM2: SMAC_MMM2_HTML,
+})
+
+# SMACv2 mappings (procedural unit generation)
+GAME_INFO.update({
+    GameId.SMACV2_TERRAN: SMACV2_TERRAN_HTML,
+    GameId.SMACV2_PROTOSS: SMACV2_PROTOSS_HTML,
+    GameId.SMACV2_ZERG: SMACV2_ZERG_HTML,
+})
+
+# RWARE (Robotic Warehouse) mappings
+try:
+    from gym_gui.game_docs.RWARE import (
+        RWARE_TINY_2AG_HTML,
+        RWARE_TINY_4AG_HTML,
+        RWARE_SMALL_2AG_HTML,
+        RWARE_SMALL_4AG_HTML,
+        RWARE_MEDIUM_2AG_HTML,
+        RWARE_MEDIUM_4AG_HTML,
+        RWARE_MEDIUM_4AG_EASY_HTML,
+        RWARE_MEDIUM_4AG_HARD_HTML,
+        RWARE_LARGE_4AG_HTML,
+        RWARE_LARGE_4AG_HARD_HTML,
+        RWARE_LARGE_8AG_HTML,
+        RWARE_LARGE_8AG_HARD_HTML,
+    )
+
+    GAME_INFO.update({
+        GameId.RWARE_TINY_2AG: RWARE_TINY_2AG_HTML,
+        GameId.RWARE_TINY_4AG: RWARE_TINY_4AG_HTML,
+        GameId.RWARE_SMALL_2AG: RWARE_SMALL_2AG_HTML,
+        GameId.RWARE_SMALL_4AG: RWARE_SMALL_4AG_HTML,
+        GameId.RWARE_MEDIUM_2AG: RWARE_MEDIUM_2AG_HTML,
+        GameId.RWARE_MEDIUM_4AG: RWARE_MEDIUM_4AG_HTML,
+        GameId.RWARE_MEDIUM_4AG_EASY: RWARE_MEDIUM_4AG_EASY_HTML,
+        GameId.RWARE_MEDIUM_4AG_HARD: RWARE_MEDIUM_4AG_HARD_HTML,
+        GameId.RWARE_LARGE_4AG: RWARE_LARGE_4AG_HTML,
+        GameId.RWARE_LARGE_4AG_HARD: RWARE_LARGE_4AG_HARD_HTML,
+        GameId.RWARE_LARGE_8AG: RWARE_LARGE_8AG_HTML,
+        GameId.RWARE_LARGE_8AG_HARD: RWARE_LARGE_8AG_HARD_HTML,
+    })
+except ImportError:
+    pass  # rware docs not available
 
 # Procgen mappings
 GAME_INFO.update({
@@ -426,6 +530,66 @@ except ImportError:
 from gym_gui.game_docs.mosaic_welcome import MULTI_KEYBOARD_HTML
 
 
+def _get_meltingpot_doc(env_id: str) -> str:
+    """Return HTML documentation for a MeltingPot substrate.
+
+    Extracts the base substrate name from env_id (e.g.
+    ``"meltingpot/collaborative_cooking__ring"`` -> ``"collaborative_cooking"``)
+    and maps it to the corresponding documentation module.
+    """
+    from gym_gui.game_docs.MeltingPot import (
+        MELTINGPOT_COLLABORATIVE_COOKING_HTML,
+        MELTINGPOT_CLEAN_UP_HTML,
+        MELTINGPOT_COMMONS_HARVEST_HTML,
+        MELTINGPOT_TERRITORY_HTML,
+        MELTINGPOT_KING_OF_THE_HILL_HTML,
+        MELTINGPOT_PRISONERS_DILEMMA_HTML,
+        MELTINGPOT_STAG_HUNT_HTML,
+        MELTINGPOT_ALLELOPATHIC_HARVEST_HTML,
+    )
+
+    _DOC_MAP = {
+        "allelopathic_harvest": MELTINGPOT_ALLELOPATHIC_HARVEST_HTML,
+        "clean_up": MELTINGPOT_CLEAN_UP_HTML,
+        "collaborative_cooking": MELTINGPOT_COLLABORATIVE_COOKING_HTML,
+        "commons_harvest": MELTINGPOT_COMMONS_HARVEST_HTML,
+        "paintball": MELTINGPOT_KING_OF_THE_HILL_HTML,
+        "prisoners_dilemma_in_the_matrix": MELTINGPOT_PRISONERS_DILEMMA_HTML,
+        "stag_hunt_in_the_matrix": MELTINGPOT_STAG_HUNT_HTML,
+        "territory": MELTINGPOT_TERRITORY_HTML,
+    }
+
+    # "meltingpot/collaborative_cooking__ring" -> "collaborative_cooking"
+    substrate = env_id.split("/", 1)[-1]
+    base = substrate.split("__")[0]
+
+    return _DOC_MAP.get(base, _DEFAULT_DOC)
+
+
+def _get_overcooked_doc(env_id: str) -> str:
+    """Return HTML documentation for an Overcooked layout."""
+    from gym_gui.game_docs.Overcooked import (
+        OVERCOOKED_CRAMPED_ROOM_HTML,
+        OVERCOOKED_ASYMMETRIC_ADVANTAGES_HTML,
+        OVERCOOKED_COORDINATION_RING_HTML,
+        OVERCOOKED_FORCED_COORDINATION_HTML,
+        OVERCOOKED_COUNTER_CIRCUIT_HTML,
+    )
+
+    _DOC_MAP = {
+        "cramped_room": OVERCOOKED_CRAMPED_ROOM_HTML,
+        "asymmetric_advantages": OVERCOOKED_ASYMMETRIC_ADVANTAGES_HTML,
+        "coordination_ring": OVERCOOKED_COORDINATION_RING_HTML,
+        "forced_coordination": OVERCOOKED_FORCED_COORDINATION_HTML,
+        "counter_circuit": OVERCOOKED_COUNTER_CIRCUIT_HTML,
+    }
+
+    # "overcooked/cramped_room" -> "cramped_room"
+    layout = env_id.split("/", 1)[-1]
+
+    return _DOC_MAP.get(layout, _DEFAULT_DOC)
+
+
 def get_game_info(game_id: GameId) -> str:
     """Return HTML documentation for the specified environment."""
 
@@ -471,53 +635,55 @@ def get_game_info(game_id: GameId) -> str:
     if game_id in (GameId.MINIGRID_REDBLUE_DOORS_6x6, GameId.MINIGRID_REDBLUE_DOORS_8x8):
         return get_redbluedoors_html(game_id.value)
 
-    # Handle MultiGrid variants dynamically (all INI multigrid environments)
-    _multigrid_variants = (
-        GameId.MULTIGRID_EMPTY_5X5,
-        GameId.MULTIGRID_EMPTY_RANDOM_5X5,
-        GameId.MULTIGRID_EMPTY_6X6,
-        GameId.MULTIGRID_EMPTY_RANDOM_6X6,
-        GameId.MULTIGRID_EMPTY_8X8,
-        GameId.MULTIGRID_EMPTY_16X16,
-        GameId.MULTIGRID_RED_BLUE_DOORS_6X6,
-        GameId.MULTIGRID_RED_BLUE_DOORS_8X8,
-        GameId.MULTIGRID_LOCKED_HALLWAY_2ROOMS,
-        GameId.MULTIGRID_LOCKED_HALLWAY_4ROOMS,
-        GameId.MULTIGRID_LOCKED_HALLWAY_6ROOMS,
-        GameId.MULTIGRID_BLOCKED_UNLOCK_PICKUP,
-        GameId.MULTIGRID_PLAYGROUND,
+    # Handle INI MultiGrid variants dynamically
+    _ini_multigrid_variants = (
+        GameId.INI_MULTIGRID_EMPTY_5X5,
+        GameId.INI_MULTIGRID_EMPTY_RANDOM_5X5,
+        GameId.INI_MULTIGRID_EMPTY_6X6,
+        GameId.INI_MULTIGRID_EMPTY_RANDOM_6X6,
+        GameId.INI_MULTIGRID_EMPTY_8X8,
+        GameId.INI_MULTIGRID_EMPTY_16X16,
+        GameId.INI_MULTIGRID_RED_BLUE_DOORS_6X6,
+        GameId.INI_MULTIGRID_RED_BLUE_DOORS_8X8,
+        GameId.INI_MULTIGRID_LOCKED_HALLWAY_2ROOMS,
+        GameId.INI_MULTIGRID_LOCKED_HALLWAY_4ROOMS,
+        GameId.INI_MULTIGRID_LOCKED_HALLWAY_6ROOMS,
+        GameId.INI_MULTIGRID_BLOCKED_UNLOCK_PICKUP,
+        GameId.INI_MULTIGRID_PLAYGROUND,
     )
-    if game_id in _multigrid_variants:
-        # Get MultiGrid-specific documentation and append keyboard controls
-        multigrid_doc = get_multigrid_html(game_id.value)
-        return multigrid_doc + "\n\n" + MULTI_KEYBOARD_HTML
+    if game_id in _ini_multigrid_variants:
+        ini_doc = get_ini_multigrid_html(game_id.value)
+        return ini_doc + "\n\n" + MULTI_KEYBOARD_HTML
 
-    # Get base documentation
-    base_doc = GAME_INFO.get(game_id, _DEFAULT_DOC)
+    # Handle MOSAIC MultiGrid variants dynamically
+    _mosaic_multigrid_variants = (
+        GameId.MOSAIC_MULTIGRID_SOCCER,
+        GameId.MOSAIC_MULTIGRID_COLLECT,
+        GameId.MOSAIC_MULTIGRID_COLLECT2VS2,
+        GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_INDAGOBS,
+        GameId.MOSAIC_MULTIGRID_COLLECT_INDAGOBS,
+        GameId.MOSAIC_MULTIGRID_COLLECT2VS2_INDAGOBS,
+        GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_TEAMOBS,
+        GameId.MOSAIC_MULTIGRID_COLLECT2VS2_TEAMOBS,
+    )
+    if game_id in _mosaic_multigrid_variants:
+        mosaic_doc = get_mosaic_multigrid_html(game_id.value)
+        return mosaic_doc + "\n\n" + MULTI_KEYBOARD_HTML
 
-    # Append multi-keyboard documentation for ALL multi-agent environments
-    # Check if this is a MeltingPot, MultiGrid, or Overcooked environment by family
+    # Handle MeltingPot variants by substrate name
     from gym_gui.core.enums import ENVIRONMENT_FAMILY_BY_GAME, EnvironmentFamily
     family = ENVIRONMENT_FAMILY_BY_GAME.get(game_id)
-    if family in (EnvironmentFamily.MELTINGPOT, EnvironmentFamily.MULTIGRID, EnvironmentFamily.OVERCOOKED):
-        return base_doc + "\n\n" + MULTI_KEYBOARD_HTML
+    if family == EnvironmentFamily.MELTINGPOT:
+        doc = _get_meltingpot_doc(game_id.value)
+        return doc + "\n\n" + MULTI_KEYBOARD_HTML
 
-    # Legacy explicit list for backwards compatibility
-    multi_agent_games = (
-        # MultiGrid environments (2 legacy environments - others handled dynamically above)
-        GameId.MULTIGRID_SOCCER,
-        GameId.MULTIGRID_COLLECT,
-        # Overcooked environments (5 total)
-        GameId.OVERCOOKED_CRAMPED_ROOM,
-        GameId.OVERCOOKED_ASYMMETRIC_ADVANTAGES,
-        GameId.OVERCOOKED_COORDINATION_RING,
-        GameId.OVERCOOKED_FORCED_COORDINATION,
-        GameId.OVERCOOKED_COUNTER_CIRCUIT,
-    )
+    # Handle Overcooked variants by layout name
+    if family == EnvironmentFamily.OVERCOOKED:
+        doc = _get_overcooked_doc(game_id.value)
+        return doc + "\n\n" + MULTI_KEYBOARD_HTML
 
-    if game_id in multi_agent_games:
-        return base_doc + "\n\n" + MULTI_KEYBOARD_HTML
-
+    # Get base documentation from flat dict
+    base_doc = GAME_INFO.get(game_id, _DEFAULT_DOC)
     return base_doc
 
 

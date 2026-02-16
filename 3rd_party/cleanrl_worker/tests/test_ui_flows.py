@@ -24,7 +24,7 @@ import torch
 import torch.nn as nn
 
 from cleanrl_worker.config import WorkerConfig, parse_worker_config
-from cleanrl_worker.runtime import CleanRLWorkerRuntime, RuntimeSummary
+from cleanrl_worker.runtime import CleanRLWorkerRuntime
 
 
 # =============================================================================
@@ -154,9 +154,9 @@ class TestTrainAgentFlow:
 
         summary = runtime.run()
 
-        assert summary.status == "dry-run"
-        assert "ppo" in summary.module
-        assert summary.config["algo"] == "ppo"
+        assert summary["status"] == "dry-run"
+        assert "ppo" in summary["module"]
+        assert summary["config"]["algo"] == "ppo"
 
     def test_train_builds_correct_cli_args(self) -> None:
         """Test that CLI arguments are correctly built for training."""
@@ -205,7 +205,7 @@ class TestTrainAgentFlow:
         summary = runtime.run()
 
         # Dry run should return summary
-        assert summary.status == "dry-run"
+        assert summary["status"] == "dry-run"
 
     def test_train_config_from_json(self, tmp_path: Path) -> None:
         """Test parsing configuration from JSON file (as GUI would create)."""
@@ -267,16 +267,9 @@ class TestEvaluatePolicyFlow:
 
     def test_eval_config_requires_policy_path(self) -> None:
         """Test that policy_eval mode requires policy_path."""
-        config = _make_config(
-            extras={
-                "mode": "policy_eval",
-            }
-        )
-        runtime = _make_runtime(config, dry_run=False)
-
-        # Should raise because policy_path is missing
+        # Config __post_init__ validates that policy_eval needs policy_path
         with pytest.raises(ValueError, match="policy_path"):
-            runtime.run()
+            _make_config(extras={"mode": "policy_eval"})
 
     def test_eval_config_parsing(self, sample_checkpoint: Path) -> None:
         """Test that evaluation configuration is properly parsed."""
@@ -309,8 +302,8 @@ class TestEvaluatePolicyFlow:
 
         summary = runtime.run()
 
-        assert summary.status == "dry-run"
-        assert summary.extras["mode"] == "policy_eval"
+        assert summary["status"] == "dry-run"
+        assert summary["extras"]["mode"] == "policy_eval"
 
     def test_eval_tensorboard_dir_is_separate(self) -> None:
         """Test that eval uses tensorboard_eval, not tensorboard."""
@@ -430,8 +423,8 @@ class TestResumeTrainingFlow:
 
         summary = runtime.run()
 
-        assert summary.status == "dry-run"
-        assert summary.config["algo"] == "ppo"
+        assert summary["status"] == "dry-run"
+        assert summary["config"]["algo"] == "ppo"
 
     def test_resume_tensorboard_dir_is_tensorboard(self) -> None:
         """Test that resume uses tensorboard, not tensorboard_eval."""
@@ -641,7 +634,7 @@ class TestIntegration:
         train_runtime = _make_runtime(train_config, dry_run=True)
         train_summary = train_runtime.run()
 
-        assert train_summary.status == "dry-run"
+        assert train_summary["status"] == "dry-run"
 
         # Step 2: Simulate checkpoint creation
         checkpoint_path = tmp_path / "trained_model.cleanrl_model"
@@ -661,8 +654,8 @@ class TestIntegration:
         eval_runtime = _make_runtime(eval_config, dry_run=True)
         eval_summary = eval_runtime.run()
 
-        assert eval_summary.status == "dry-run"
-        assert eval_summary.extras["mode"] == "policy_eval"
+        assert eval_summary["status"] == "dry-run"
+        assert eval_summary["extras"]["mode"] == "policy_eval"
 
     def test_train_then_resume_flow(self, tmp_path: Path) -> None:
         """Test the complete flow: train → save checkpoint → resume training."""
@@ -696,8 +689,8 @@ class TestIntegration:
         resume_runtime = _make_runtime(resume_config, dry_run=True)
         resume_summary = resume_runtime.run()
 
-        assert resume_summary.status == "dry-run"
-        assert resume_summary.config["total_timesteps"] == 50000
+        assert resume_summary["status"] == "dry-run"
+        assert resume_summary["config"]["total_timesteps"] == 50000
 
     def test_multiple_eval_runs(self, tmp_path: Path) -> None:
         """Test running multiple evaluations on same checkpoint."""
@@ -720,5 +713,5 @@ class TestIntegration:
             runtime = _make_runtime(config, dry_run=True)
             summary = runtime.run()
 
-            assert summary.status == "dry-run"
-            assert summary.extras["eval_episodes"] == eval_episodes
+            assert summary["status"] == "dry-run"
+            assert summary["extras"]["eval_episodes"] == eval_episodes

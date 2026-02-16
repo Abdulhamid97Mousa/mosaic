@@ -309,11 +309,28 @@ def main(args: list[str] | None = None) -> int:
         runtime.run()
         return 0
 
-    # Check for curriculum training mode
-    from .curriculum_training import is_curriculum_config
+    # Check for multi-agent curriculum first (more specific: env=multigrid + schedule)
+    from .multi_agent_curriculum_training import is_multi_agent_curriculum_config
+    if is_multi_agent_curriculum_config(config):
+        logger.info("Detected multi-agent curriculum_schedule - using MARL curriculum mode")
+        from .multi_agent_curriculum_training import (
+            MultiAgentCurriculumConfig, run_multi_agent_curriculum_training,
+        )
+
+        try:
+            ma_config = MultiAgentCurriculumConfig.from_worker_config(config)
+            result = run_multi_agent_curriculum_training(ma_config)
+            logger.info(f"Multi-agent curriculum training complete: {result}")
+            return 0
+        except Exception as e:
+            logger.exception(f"Multi-agent curriculum training failed: {e}")
+            return 1
+
+    # Check for single-agent curriculum (BabyAI/MiniGrid with Syllabus-RL)
+    from .single_agent_curriculum_training import is_curriculum_config
     if is_curriculum_config(config):
-        logger.info("Detected curriculum_schedule in config - using curriculum training mode")
-        from .curriculum_training import CurriculumTrainingConfig, run_curriculum_training
+        logger.info("Detected curriculum_schedule in config - using single-agent curriculum mode")
+        from .single_agent_curriculum_training import CurriculumTrainingConfig, run_curriculum_training
 
         try:
             curriculum_config = CurriculumTrainingConfig.from_worker_config(config)

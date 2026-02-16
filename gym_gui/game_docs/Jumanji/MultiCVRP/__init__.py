@@ -39,7 +39,13 @@ and must coordinate with others to serve all customers efficiently.
 </ul>
 
 <h4>Action Space</h4>
-<p><code>Discrete</code> - Select next customer for current vehicle</p>
+<p><code>BoundedArray(shape=(num_vehicles,), dtype=int16, min=0, max=num_customers+1)</code></p>
+<ul>
+    <li>Each element selects the next customer for one vehicle</li>
+    <li><strong>0</strong>: Return to depot</li>
+    <li><strong>1 to num_customers</strong>: Visit that customer</li>
+    <li>All vehicles choose their next destination simultaneously</li>
+</ul>
 
 <h4>Rewards</h4>
 <ul>

@@ -83,6 +83,10 @@ class OperatorScriptExecutionManager(QtCore.QObject):
         # Without this, steps fire faster than the UI can repaint, causing visual jitter.
         self._step_delay_ms: int = 50  # default 50ms between steps
 
+        # Environment mode: "procedural" = different seed per episode (ProcGen-style),
+        # "fixed" = same seed every episode (isolate agent variance).
+        self._environment_mode: str = "procedural"
+
         # Track which operators are running
         self._operator_states: Dict[str, str] = {}  # operator_id -> "stopped", "running"
 
@@ -105,6 +109,7 @@ class OperatorScriptExecutionManager(QtCore.QObject):
         num_episodes = execution_config.get("num_episodes", 10)
         seeds = list(execution_config.get("seeds", range(1000, 1000 + num_episodes)))
         self._step_delay_ms = execution_config.get("step_delay_ms", 50)
+        self._environment_mode = execution_config.get("environment_mode", "procedural")
 
         # Extend seeds if user requested more episodes than script defined
         if len(seeds) < num_episodes:
@@ -125,7 +130,8 @@ class OperatorScriptExecutionManager(QtCore.QObject):
 
         _LOGGER.info(
             f"Starting script experiment: {len(operator_configs)} operators, "
-            f"{len(self._seeds)} episodes, seeds {self._seeds[0]}-{self._seeds[-1]}"
+            f"{len(self._seeds)} episodes, seeds {self._seeds[0]}-{self._seeds[-1]}, "
+            f"environment_mode={self._environment_mode}"
         )
 
         # Check if operators are already running (from previous experiment)
@@ -265,8 +271,12 @@ class OperatorScriptExecutionManager(QtCore.QObject):
             _LOGGER.warning("Attempted to start episode beyond seed list")
             return
 
-        # Get seed for this episode
-        seed = self._seeds[self._current_episode_idx]
+        # Fixed mode: reuse seeds[0] every episode (identical layout for credit assignment)
+        # Procedural mode: advance seed per episode (generalization across layouts)
+        if self._environment_mode == "fixed":
+            seed = self._seeds[0]
+        else:
+            seed = self._seeds[self._current_episode_idx]
         episode_num = self._current_episode_idx + 1
 
         _LOGGER.info(f"Starting episode {episode_num}/{len(self._seeds)} with seed {seed}")

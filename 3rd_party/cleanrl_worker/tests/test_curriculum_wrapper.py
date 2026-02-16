@@ -397,78 +397,21 @@ class TestPresetCurricula:
 
 
 class TestFastLaneEnvSetup:
-    """Tests for FastLane environment variable setup."""
+    """Tests for FastLane environment variable setup.
 
+    Note: _setup_fastlane_env was removed from curriculum_training.py.
+    FastLane env vars are now set by runtime.py when launching subprocesses.
+    These tests are kept as placeholders for future FastLane env setup tests.
+    """
+
+    @pytest.mark.skip(reason="_setup_fastlane_env removed; FastLane env setup moved to runtime.py")
     def test_setup_fastlane_env_sets_variables(self):
         """_setup_fastlane_env should set the correct environment variables."""
-        import os
-        from cleanrl_worker.curriculum_training import (
-            CurriculumTrainingConfig,
-            _setup_fastlane_env,
-        )
 
-        config = CurriculumTrainingConfig(
-            run_id="test-fastlane-run",
-            curriculum_schedule=[{"env_id": "MiniGrid-Empty-5x5-v0"}],
-            total_timesteps=1000,
-            num_envs=4,
-            fastlane_only=True,
-            fastlane_slot=0,
-            fastlane_video_mode="grid",
-            fastlane_grid_limit=4,
-        )
-
-        # Clear any existing values
-        for var in ["GYM_GUI_FASTLANE_ONLY", "GYM_GUI_FASTLANE_SLOT",
-                    "GYM_GUI_FASTLANE_VIDEO_MODE", "GYM_GUI_FASTLANE_GRID_LIMIT",
-                    "CLEANRL_NUM_ENVS", "CLEANRL_RUN_ID"]:
-            os.environ.pop(var, None)
-
-        _setup_fastlane_env(config)
-
-        assert os.environ["GYM_GUI_FASTLANE_ONLY"] == "1"
-        assert os.environ["GYM_GUI_FASTLANE_SLOT"] == "0"
-        assert os.environ["GYM_GUI_FASTLANE_VIDEO_MODE"] == "grid"
-        assert os.environ["GYM_GUI_FASTLANE_GRID_LIMIT"] == "4"
-        assert os.environ["CLEANRL_NUM_ENVS"] == "4"
-        assert os.environ["CLEANRL_RUN_ID"] == "test-fastlane-run"
-
+    @pytest.mark.skip(reason="_setup_fastlane_env removed; FastLane env setup moved to runtime.py")
     def test_setup_fastlane_env_respects_disabled(self):
         """_setup_fastlane_env should set FASTLANE_ONLY=0 when disabled."""
-        import os
-        from cleanrl_worker.curriculum_training import (
-            CurriculumTrainingConfig,
-            _setup_fastlane_env,
-        )
 
-        config = CurriculumTrainingConfig(
-            run_id="test-disabled",
-            curriculum_schedule=[{"env_id": "MiniGrid-Empty-5x5-v0"}],
-            total_timesteps=1000,
-            num_envs=2,
-            fastlane_only=False,  # Disabled
-        )
-
-        _setup_fastlane_env(config)
-
-        assert os.environ["GYM_GUI_FASTLANE_ONLY"] == "0"
-
+    @pytest.mark.skip(reason="_setup_fastlane_env removed; FastLane env setup moved to runtime.py")
     def test_setup_fastlane_env_defaults_grid_limit_to_num_envs(self):
         """_setup_fastlane_env should use num_envs as grid_limit when None."""
-        import os
-        from cleanrl_worker.curriculum_training import (
-            CurriculumTrainingConfig,
-            _setup_fastlane_env,
-        )
-
-        config = CurriculumTrainingConfig(
-            run_id="test-grid-default",
-            curriculum_schedule=[{"env_id": "MiniGrid-Empty-5x5-v0"}],
-            total_timesteps=1000,
-            num_envs=8,
-            fastlane_grid_limit=None,  # Should default to num_envs
-        )
-
-        _setup_fastlane_env(config)
-
-        assert os.environ["GYM_GUI_FASTLANE_GRID_LIMIT"] == "8"

@@ -95,15 +95,25 @@ class HumanVsAgentTab(QtWidgets.QWidget):
         # Family selection
         env_layout.addWidget(QtWidgets.QLabel("Family", env_group), 0, 0)
         self._family_combo = QtWidgets.QComboBox(env_group)
+        family_view = QtWidgets.QListView(self._family_combo)
+        family_view.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        family_view.setUniformItemSizes(True)
+        self._family_combo.setView(family_view)
+        self._family_combo.setStyleSheet("QComboBox { combobox-popup: 0; }")
         self._family_combo.setMaxVisibleItems(10)
         env_layout.addWidget(self._family_combo, 0, 1, 1, 2)
 
         # Game selection
         env_layout.addWidget(QtWidgets.QLabel("Game", env_group), 1, 0)
         self._env_combo = QtWidgets.QComboBox(env_group)
+        env_view = QtWidgets.QListView(self._env_combo)
+        env_view.setVerticalScrollBarPolicy(QtCore.Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+        env_view.setUniformItemSizes(True)
+        self._env_combo.setView(env_view)
         self._env_combo.setSizeAdjustPolicy(
             QtWidgets.QComboBox.SizeAdjustPolicy.AdjustToContents
         )
+        self._env_combo.setStyleSheet("QComboBox { combobox-popup: 0; }")
         self._env_combo.setMaxVisibleItems(10)
         env_layout.addWidget(self._env_combo, 1, 1, 1, 2)
 

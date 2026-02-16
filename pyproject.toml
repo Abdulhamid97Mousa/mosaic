@@ -82,6 +82,7 @@ mujoco = [
 # Atari environments (Breakout, Pong, SpaceInvaders, etc.)
 atari = [
     "gymnasium[atari]>=1.1.0",
+    "ale-py==0.10.1",  # Pin to 0.10.1 for gymnasium 1.0.0 compatibility (0.11+ needs >=1.1.0)
     "autorom[accept-rom-license]>=0.6.0",
 ]
 
@@ -155,15 +156,63 @@ babaisai = [
     "baba-is-ai @ git+https://github.com/nacloos/baba-is-ai",
 ]
 
-# gym-multigrid multi-agent grid environments
-# Repository: https://github.com/ArnaudFickinger/gym-multigrid
-# Location: 3rd_party/gym-multigrid/
-# Includes: MultiGrid-Soccer (4 agents, 2v2), MultiGrid-Collect (3 agents)
-# Features: Simultaneous stepping, cooperative/competitive rewards, RLlib compatible
-# NOTE: Install from local path: pip install -e 3rd_party/gym-multigrid/
-multigrid = [
-    "gym>=0.21.0,<0.26.0",
-    "numpy>=1.18.0",
+# mosaic_multigrid - Modernized multi-agent sports environments (REPLACES gym-multigrid)
+# PyPI: https://pypi.org/project/mosaic-multigrid/
+# Includes: Soccer 2v2/1v1, Collect 3-agent/2v2/1v1, Basketball 3v3 (IndAgObs + TeamObs variants)
+# v4.4.0: Agent position logging in info dict, defaultdict key population fix for event injection
+# Features: Gymnasium 1.0+ API, competitive/cooperative, ball passing/stealing, wrappers, PettingZoo API
+# NOTE: Now installs from local dev: pip install -e 3rd_party/mosaic_multigrid/
+mosaic_multigrid = [
+    "mosaic-multigrid==4.4.0",
+]
+
+# multigrid_ini - INI cooperative exploration multi-agent environments
+# Local: 3rd_party/multigrid-ini/
+# GitHub: https://github.com/ini/multigrid
+# Includes: MultiGrid-Empty, MultiGrid-RedBlueDoors, MultiGrid-LockedHallway, etc.
+# Features: Gymnasium 1.0+ API, cooperative puzzle-solving, door-opening, multi-room navigation
+# NOTE: Different from mosaic_multigrid - focuses on exploration, not sports
+# Installation: pip install -e 3rd_party/multigrid-ini/
+multigrid_ini = [
+    "gymnasium>=1.1.0",
+    "numpy>=1.24.0",
+    "pygame>=2.5.0",
+]
+
+# SMAC v1: StarCraft Multi-Agent Challenge (Oxford / WhiRL)
+# Paper: Samvelyan et al. (2019). "The StarCraft Multi-Agent Challenge"
+# Repository: https://github.com/oxwhirl/smac
+# Includes: 30+ hand-designed cooperative micromanagement maps (3m, 8m, 2s3z, 3s5z, 5m_vs_6m, MMM2, etc.)
+# Features: CTDE paradigm, action masking, global state for centralised critics, PyGame renderer
+# SYSTEM REQUIREMENT: StarCraft II binary (set SC2PATH env var)
+# Download: https://github.com/Blizzard/s2client-proto#linux-packages
+smac = [
+    "smac @ git+https://github.com/oxwhirl/smac.git",
+    "pygame>=2.1.0",
+]
+
+# SMACv2: StarCraft Multi-Agent Challenge v2 (Oxford / WhiRL)
+# Paper: Ellis et al. (2023). "SMACv2: An Improved Benchmark for Cooperative MARL"
+# Repository: https://github.com/oxwhirl/smacv2
+# Extends SMAC v1 with procedural unit generation: team compositions vary per episode
+# Maps: 10gen_terran, 10gen_protoss, 10gen_zerg (procedural instead of hand-designed)
+# SYSTEM REQUIREMENT: StarCraft II binary (set SC2PATH env var)
+smacv2 = [
+    "smacv2 @ git+https://github.com/oxwhirl/smacv2.git",
+    "pygame>=2.1.0",
+]
+
+# Robotic Warehouse (RWARE) multi-agent cooperative environment (University of Edinburgh)
+# Paper: Papoudakis et al. (2021). "Benchmarking Multi-Agent Deep RL Algorithms in Cooperative Tasks"
+# Repository: https://github.com/uoe-agents/robotic-warehouse
+# Local: 3rd_party/robotic-warehouse/
+# Includes: tiny/small/medium/large warehouses with 2-19 agents, 3 reward types, 4 observation types
+# Features: Cooperative shelf delivery, collision resolution, communication channels
+# Installation: pip install -e 3rd_party/robotic-warehouse/
+rware = [
+    "gymnasium>=1.1.0",
+    "pyglet<2.0.0",
+    "networkx>=2.8.0",
 ]
 
 # Jumanji JAX-based RL environments (Google DeepMind)
@@ -343,7 +392,7 @@ all-gymnasium = [
 
 # All environment families (single + multi-agent)
 all-envs = [
-    "mosaic[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom,nethack,crafter,procgen,textworld,babaisai,multigrid,jumanji,pybullet-drones,openspiel,meltingpot,overcooked]",
+    "mosaic[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom,nethack,crafter,procgen,textworld,babaisai,mosaic_multigrid,multigrid_ini,jumanji,pybullet-drones,openspiel,meltingpot,overcooked,smac,smacv2,rware]",
 ]
 
 # Full development setup
@@ -361,6 +410,7 @@ where = [
     "3rd_party/xuance_worker",
     "3rd_party/chess_worker",
     "3rd_party/mctx_worker",
+    "3rd_party/marllib_worker",
     # MOSAIC native workers
     "3rd_party/mosaic/human_worker",
     "3rd_party/mosaic/llm_worker",
@@ -374,6 +424,7 @@ include = [
     "xuance_worker*",
     "chess_worker*",
     "mctx_worker*",
+    "marllib_worker*",
     # MOSAIC native workers (under 3rd_party/mosaic/)
     "human_worker*",
     "llm_worker*",
@@ -384,14 +435,13 @@ jumanji = "jumanji_worker:get_worker_metadata"
 balrog = "balrog_worker:get_worker_metadata"
 cleanrl = "cleanrl_worker:get_worker_metadata"
 ray = "ray_worker:get_worker_metadata"
-# TEMPORARILY DISABLED - xuance_worker import hangs during worker discovery
-# TODO: Fix circular import or blocking code in xuance_worker
-# xuance = "xuance_worker:get_worker_metadata"
+xuance = "xuance_worker:get_worker_metadata"
 chess = "chess_worker:get_worker_metadata"
 mctx = "mctx_worker:get_worker_metadata"
 # MOSAIC native workers (under 3rd_party/mosaic/)
 human = "human_worker:get_worker_metadata"
 llm = "llm_worker:get_worker_metadata"
+marllib = "marllib_worker:get_worker_metadata"
 
 [project.urls]
 Homepage = "https://github.com/Abdulhamid97Mousa/MOSAIC"

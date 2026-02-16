@@ -532,7 +532,7 @@ class CleanRlResumeForm(QtWidgets.QDialog, LogConstantMixin):
 
 
 # Register with factory
-from gym_gui.ui.forms import get_worker_form_factory  # noqa: E402
+from gym_gui.ui.forms.factory import get_worker_form_factory  # noqa: E402
 
 _factory = get_worker_form_factory()
 if not _factory.has_resume_form("cleanrl_worker"):

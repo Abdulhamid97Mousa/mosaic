@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -84,8 +85,13 @@ _METHOD_NAME_MAP: dict[str, str] = {
 # These require passing method as a list to get_runner()
 _COMPETITION_ENV_GROUPS: dict[str, dict[str, int]] = {
     "multigrid": {
-        "soccer": 2,      # 2 teams (Red vs Blue)
-        "collect": 3,     # 3 independent agents
+        "soccer": 2,          # 2v2: 2 teams (Green vs Blue)
+        # soccer_1vs1 uses RunnerMARL (not RunnerCompetition):
+        # RunnerCompetition uses the off-policy store_experience signature
+        # which is incompatible with on-policy agents like MAPPO.
+        # RunnerMARL delegates to the agent's own train() loop which
+        # correctly handles log_pi_a, values, and finish_path for GAE.
+        "collect": 3,         # 3 independent agents
     },
 }
 
@@ -109,6 +115,47 @@ def _get_competition_num_groups(env: str, env_id: str) -> int | None:
     if env_lower in _COMPETITION_ENV_GROUPS:
         return _COMPETITION_ENV_GROUPS[env_lower].get(env_id_lower)
     return None
+
+
+# Directory containing custom YAML configs shipped with xuance_worker
+_WORKER_CONFIGS_DIR = Path(__file__).resolve().parent / "configs"
+
+
+def _resolve_custom_config_path(
+    method: str,
+    env: str,
+    env_id: str,
+    num_groups: int | None,
+    config_path: str | None,
+) -> str | list[str] | None:
+    """Resolve config_path for custom environments that live in xuance_worker.
+
+    XuanCe's get_runner() looks for YAML configs in its own ``xuance/configs/``
+    directory.  Environments added by xuance_worker (e.g. soccer_1vs1) keep
+    their YAML in ``xuance_worker/configs/`` instead.  This function checks
+    there first and returns an absolute path so XuanCe can find it.
+
+    For competition mode (num_groups is not None), config_path must be a
+    **list** of paths -- one per group -- as required by get_arguments().
+
+    Returns:
+        Resolved config_path (str, list[str], or None if no custom config).
+    """
+    if config_path is not None:
+        return config_path  # User already provided an explicit path
+
+    yaml_path = _WORKER_CONFIGS_DIR / method / env / f"{env_id}.yaml"
+    if not yaml_path.exists():
+        return None  # Fall back to XuanCe's built-in config lookup
+
+    resolved = str(yaml_path)
+    _logger = logging.getLogger(__name__)
+    _logger.info("Resolved custom config: %s", resolved)
+
+    if num_groups is not None:
+        # Competition mode: replicate path for each group
+        return [resolved] * num_groups
+    return resolved
 
 
 def _normalize_method_name(method: str) -> str:
@@ -356,7 +403,14 @@ class XuanCeWorkerRuntime:
         tensorboard_dir = None
         tensorboard_dirname_relative = None
         if VAR_TRAINER_DIR is not None:
-            run_dir = (VAR_TRAINER_DIR / "runs" / self._config.run_id).resolve()
+            # Custom scripts set MOSAIC_RUN_DIR to custom_scripts/{ULID}/.
+            # Without this check, logs/tensorboard/checkpoints scatter to runs/
+            # even though the script writes everything to custom_scripts/.
+            mosaic_run_dir = os.environ.get("MOSAIC_RUN_DIR")
+            if mosaic_run_dir:
+                run_dir = Path(mosaic_run_dir).resolve()
+            else:
+                run_dir = (VAR_TRAINER_DIR / "runs" / self._config.run_id).resolve()
             run_dir.mkdir(parents=True, exist_ok=True)
 
             # Create logs directory
@@ -458,6 +512,16 @@ class XuanCeWorkerRuntime:
                     type(method_for_runner).__name__,
                 )
 
+            # Resolve custom config path for environments in xuance_worker
+            resolved_config_path = _resolve_custom_config_path(
+                method=normalized_method,
+                env=self._config.env,
+                env_id=self._config.env_id,
+                num_groups=num_groups,
+                config_path=self._config.config_path,
+            )
+            LOGGER.info("DEBUG: resolved_config_path = %s", resolved_config_path)
+
             LOGGER.info("DEBUG: Calling get_runner() now...")
             LOGGER.info("=" * 60)
 
@@ -466,7 +530,7 @@ class XuanCeWorkerRuntime:
                     method=method_for_runner,
                     env=self._config.env,
                     env_id=self._config.env_id,
-                    config_path=self._config.config_path,
+                    config_path=resolved_config_path,
                     parser_args=parser_args,
                     is_test=self._config.test_mode,
                 )
@@ -516,6 +580,22 @@ class XuanCeWorkerRuntime:
                     },
                 )
 
+
+            # ── Pretrained weight loading (curriculum transfer) ──────────
+            pretrained_dir = self._config.extras.get("pretrained_model_dir")
+            if pretrained_dir and not self._config.test_mode:
+                pretrained_path = Path(pretrained_dir)
+                if pretrained_path.exists():
+                    LOGGER.info(
+                        "Loading pretrained weights from: %s", pretrained_path
+                    )
+                    runner.agents.load_model(str(pretrained_path))
+                    LOGGER.info("Pretrained weights loaded successfully")
+                else:
+                    LOGGER.warning(
+                        "pretrained_model_dir does not exist: %s",
+                        pretrained_path,
+                    )
             # Execute training
             runner.run()
 

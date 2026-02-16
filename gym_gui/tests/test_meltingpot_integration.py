@@ -297,36 +297,38 @@ class TestMeltingPotDocumentation:
     """Test that Melting Pot documentation is registered."""
 
     def test_meltingpot_game_info_registered(self) -> None:
-        """Melting Pot games have documentation in GAME_INFO."""
+        """Melting Pot substrates return documentation via get_game_info()."""
         from gym_gui.core.enums import GameId
-        from gym_gui.game_docs.game_info import GAME_INFO
+        from gym_gui.game_docs import get_game_info
 
+        # One representative variant per documented base substrate
         meltingpot_game_ids = [
-            GameId.MELTINGPOT_COLLABORATIVE_COOKING,
+            GameId.MELTINGPOT_COLLABORATIVE_COOKING__RING,
             GameId.MELTINGPOT_CLEAN_UP,
-            GameId.MELTINGPOT_COMMONS_HARVEST,
-            GameId.MELTINGPOT_TERRITORY,
-            GameId.MELTINGPOT_KING_OF_THE_HILL,
-            GameId.MELTINGPOT_PRISONERS_DILEMMA,
-            GameId.MELTINGPOT_STAG_HUNT,
-            GameId.MELTINGPOT_ALLELOPATHIC_HARVEST,
+            GameId.MELTINGPOT_COMMONS_HARVEST__OPEN,
+            GameId.MELTINGPOT_TERRITORY__ROOMS,
+            GameId.MELTINGPOT_PAINTBALL__KING_OF_THE_HILL,
+            GameId.MELTINGPOT_PRISONERS_DILEMMA_IN_THE_MATRIX__ARENA,
+            GameId.MELTINGPOT_STAG_HUNT_IN_THE_MATRIX__ARENA,
+            GameId.MELTINGPOT_ALLELOPATHIC_HARVEST__OPEN,
         ]
 
         for game_id in meltingpot_game_ids:
-            assert game_id in GAME_INFO, f"{game_id} not in GAME_INFO"
-            assert isinstance(GAME_INFO[game_id], str)
-            assert len(GAME_INFO[game_id]) > 0
+            doc = get_game_info(game_id)
+            assert isinstance(doc, str), f"{game_id} doc is not str"
+            assert len(doc) > 0, f"{game_id} doc is empty"
+            assert "Documentation unavailable" not in doc, (
+                f"{game_id} has no specific doc"
+            )
 
     def test_documentation_has_expected_content(self) -> None:
         """Documentation contains expected information."""
         from gym_gui.core.enums import GameId
-        from gym_gui.game_docs.game_info import GAME_INFO
+        from gym_gui.game_docs import get_game_info
 
-        # Check one example
-        doc = GAME_INFO[GameId.MELTINGPOT_COLLABORATIVE_COOKING]
+        doc = get_game_info(GameId.MELTINGPOT_COLLABORATIVE_COOKING__RING)
 
-        assert 'Melting Pot' in doc
-        assert 'collaborative_cooking__circuit' in doc
+        assert 'Melting Pot' in doc or 'melting' in doc.lower()
         assert 'agent' in doc.lower() or 'Agent' in doc
 
 

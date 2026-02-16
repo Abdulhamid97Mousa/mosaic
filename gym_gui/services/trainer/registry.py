@@ -59,6 +59,7 @@ class RunRecord:
     last_heartbeat: Optional[datetime]
     gpu_slot: Optional[int]
     failure_reason: Optional[str]
+    reason: Optional[str] = None
     gpu_slots: list[int] = field(default_factory=list)
     finished_at: Optional[datetime] = None
     outcome: Optional[str] = None
@@ -217,7 +218,8 @@ class RunRegistry:
                     failure_reason TEXT,
                     gpu_slots_json TEXT NOT NULL DEFAULT '[]',
                     finished_at TEXT,
-                    outcome TEXT
+                    outcome TEXT,
+                    reason TEXT
                 );
 
                 CREATE TABLE IF NOT EXISTS gpu_slots (
@@ -237,6 +239,7 @@ class RunRegistry:
             )
             self._migrate_gpu_slots_table(conn)
             self._ensure_gpu_slots_json_column(conn)
+            self._ensure_reason_column(conn)
             self._migrate_status_values(conn)
             # Seed GPU slots up to 8 to match schema limits.
             existing = conn.execute("SELECT COUNT(*) FROM gpu_slots").fetchone()[0]
@@ -280,6 +283,12 @@ class RunRegistry:
         has_column = any(column[1] == "gpu_slots_json" for column in columns)
         if not has_column:
             conn.execute("ALTER TABLE runs ADD COLUMN gpu_slots_json TEXT NOT NULL DEFAULT '[]'")
+
+    def _ensure_reason_column(self, conn: sqlite3.Connection) -> None:
+        columns = conn.execute("PRAGMA table_info(runs)").fetchall()
+        has_column = any(column[1] == "reason" for column in columns)
+        if not has_column:
+            conn.execute("ALTER TABLE runs ADD COLUMN reason TEXT")
 
     def _migrate_status_values(self, conn: sqlite3.Connection) -> None:
         """Normalize legacy run status values to the FSM vocabulary."""
@@ -487,6 +496,7 @@ class RunRegistry:
         outcome: str,
         *,
         failure_reason: Optional[str] = None,
+        reason: Optional[str] = None,
     ) -> None:
         """Update run status, outcome, and finished_at timestamp.
 
@@ -495,12 +505,13 @@ class RunRegistry:
             status: The new FSM state (typically :class:`RunStatus.TERMINATED`).
             outcome: The outcome string (success, failure, cancelled).
             failure_reason: Optional reason for failure.
+            reason: Optional stderr tail from the worker subprocess.
         """
         now = datetime.now(timezone.utc).isoformat()
         with self._lock, self._connect() as conn:
             conn.execute(
-                "UPDATE runs SET status = ?, outcome = ?, finished_at = ?, failure_reason = ?, updated_at = datetime('now') WHERE run_id = ?",
-                (status.value, outcome, now, failure_reason, run_id),
+                "UPDATE runs SET status = ?, outcome = ?, finished_at = ?, failure_reason = ?, reason = ?, updated_at = datetime('now') WHERE run_id = ?",
+                (status.value, outcome, now, failure_reason, reason, run_id),
             )
         _LOGGER.info(
             "Run outcome updated",
@@ -509,6 +520,7 @@ class RunRegistry:
                 "status": status.value,
                 "outcome": outcome,
                 "failure_reason": failure_reason,
+                "reason": reason[:200] if reason else None,
             },
         )
 
@@ -548,7 +560,7 @@ class RunRegistry:
         return str(config_json) if config_json is not None else None
 
     def load_runs(self, statuses: Optional[Iterable[RunStatus]] = None) -> list[RunRecord]:
-        base_query = "SELECT run_id, status, digest, created_at, updated_at, last_heartbeat, gpu_slot, failure_reason, gpu_slots_json, finished_at, outcome FROM runs"
+        base_query = "SELECT run_id, status, digest, created_at, updated_at, last_heartbeat, gpu_slot, failure_reason, gpu_slots_json, finished_at, outcome, reason FROM runs"
         params: tuple[object, ...] = ()
         status_list = list(statuses) if statuses else []
         
@@ -607,6 +619,7 @@ class RunRegistry:
                     last_heartbeat=datetime.fromisoformat(row["last_heartbeat"]) if row["last_heartbeat"] else None,
                     gpu_slot=row["gpu_slot"],
                     failure_reason=row["failure_reason"],
+                    reason=row["reason"],
                     gpu_slots=gpu_slots,
                     finished_at=datetime.fromisoformat(row["finished_at"]) if row["finished_at"] else None,
                     outcome=row["outcome"],
@@ -617,7 +630,7 @@ class RunRegistry:
     def get_run(self, run_id: str) -> Optional[RunRecord]:
         with self._lock, self._connect() as conn:
             row = conn.execute(
-                "SELECT run_id, status, digest, created_at, updated_at, last_heartbeat, gpu_slot, failure_reason, gpu_slots_json, finished_at, outcome FROM runs WHERE run_id = ?",
+                "SELECT run_id, status, digest, created_at, updated_at, last_heartbeat, gpu_slot, failure_reason, gpu_slots_json, finished_at, outcome, reason FROM runs WHERE run_id = ?",
                 (run_id,),
             ).fetchone()
         if not row:
@@ -650,6 +663,7 @@ class RunRegistry:
             last_heartbeat=datetime.fromisoformat(row["last_heartbeat"]) if row["last_heartbeat"] else None,
             gpu_slot=row["gpu_slot"],
             failure_reason=row["failure_reason"],
+            reason=row["reason"],
             gpu_slots=gpu_slots,
             finished_at=datetime.fromisoformat(row["finished_at"]) if row["finished_at"] else None,
             outcome=row["outcome"],

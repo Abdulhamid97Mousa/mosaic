@@ -24,6 +24,7 @@ from pathlib import Path
 from typing import Callable, Optional
 
 from gym_gui.config.paths import VAR_MODELS_DIR, VAR_MODELS_HF_CACHE
+from gym_gui.config.settings import get_settings
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -454,7 +455,7 @@ class VLLMServerManager:
         port: int = 8000,
         dtype: str = "auto",
         max_model_len: Optional[int] = None,
-        gpu_memory_utilization: float = 0.9,
+        gpu_memory_utilization: Optional[float] = None,
     ) -> None:
         """Start the vLLM server with a model.
 
@@ -464,12 +465,16 @@ class VLLMServerManager:
             port: Server port (default: 8000)
             dtype: Data type for model weights
             max_model_len: Maximum sequence length
-            gpu_memory_utilization: GPU memory fraction to use
+            gpu_memory_utilization: GPU memory fraction to use (defaults to settings value)
         """
         with self._lock:
             # Stop existing server if running
             if self._process is not None and self._process.poll() is None:
                 self.stop()
+
+            # Use settings value if not provided
+            if gpu_memory_utilization is None:
+                gpu_memory_utilization = get_settings().vllm_gpu_memory_utilization
 
             # Build command
             model_arg = str(model_path) if model_path else model_id

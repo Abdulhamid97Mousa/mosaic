@@ -187,37 +187,48 @@ def _create_jumanji_env_with_viewer(env_id: str, render_mode: str = "rgb_array")
         else:
             name = env_id.split("-")[0]
 
-        # Create new viewer with rgb_array mode
+        # Create new viewer with rgb_array mode.
+        # Each viewer has a different constructor signature. We use inspect
+        # to discover parameters and pull their values from the existing
+        # viewer instance or the environment itself.
         try:
-            # Try common viewer constructor signatures
-            if hasattr(jumanji_env._viewer, "_board_size"):
-                # Game2048, SlidingPuzzle style
-                jumanji_env._viewer = viewer_class(
-                    name=name,
-                    board_size=jumanji_env._viewer._board_size,
-                    render_mode=render_mode,
-                )
-            elif hasattr(jumanji_env._viewer, "_num_rows"):
-                # Minesweeper style
-                jumanji_env._viewer = viewer_class(
-                    name=name,
-                    num_rows=jumanji_env._viewer._num_rows,
-                    num_cols=jumanji_env._viewer._num_cols,
-                    render_mode=render_mode,
-                )
-            elif hasattr(jumanji_env._viewer, "_cube_size"):
-                # RubiksCube style
-                jumanji_env._viewer = viewer_class(
-                    name=name,
-                    cube_size=jumanji_env._viewer._cube_size,
-                    render_mode=render_mode,
-                )
-            else:
-                # Generic - try just name and render_mode
-                jumanji_env._viewer = viewer_class(
-                    name=name,
-                    render_mode=render_mode,
-                )
+            import inspect
+            sig = inspect.signature(viewer_class.__init__)
+            param_names = [
+                p.name for p in sig.parameters.values() if p.name != "self"
+            ]
+            # Only pass name/render_mode if the constructor accepts them
+            kwargs: dict[str, object] = {}
+            if "name" in param_names:
+                kwargs["name"] = name
+            if "render_mode" in param_names:
+                kwargs["render_mode"] = render_mode
+
+            for param_name, param in sig.parameters.items():
+                if param_name in ("self", "name", "render_mode"):
+                    continue
+                # Skip *args/**kwargs
+                if param.kind in (
+                    inspect.Parameter.VAR_POSITIONAL,
+                    inspect.Parameter.VAR_KEYWORD,
+                ):
+                    continue
+                # Only fill required params (no default value)
+                if param.default is not inspect.Parameter.empty:
+                    continue
+                # Try to find the value on the viewer (e.g. _num_cities)
+                attr = f"_{param_name}"
+                if hasattr(jumanji_env._viewer, attr):
+                    kwargs[param_name] = getattr(jumanji_env._viewer, attr)
+                elif hasattr(jumanji_env._viewer, param_name):
+                    kwargs[param_name] = getattr(jumanji_env._viewer, param_name)
+                # Try to find it on the environment (e.g. num_agents)
+                elif hasattr(jumanji_env, param_name):
+                    kwargs[param_name] = getattr(jumanji_env, param_name)
+                elif hasattr(jumanji_env, attr):
+                    kwargs[param_name] = getattr(jumanji_env, attr)
+
+            jumanji_env._viewer = viewer_class(**kwargs)
             LOGGER.debug(f"Created {viewer_class.__name__} with render_mode={render_mode}")
         except Exception as e:
             LOGGER.warning(f"Could not create viewer with rgb_array mode: {e}")

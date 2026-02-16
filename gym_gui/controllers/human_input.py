@@ -157,9 +157,9 @@ class MiniGridKeyCombinationResolver(KeyCombinationResolver):
 
 
 class MultiGridKeyCombinationResolver(KeyCombinationResolver):
-    """Resolve key combinations for LEGACY gym-multigrid environments (Soccer, Collect).
+    """Resolve key combinations for LEGACY mosaic_multigrid environments (Soccer, Collect).
 
-    Legacy gym-multigrid action space (8 discrete actions):
+    Legacy mosaic_multigrid action space (8 discrete actions):
     0: STILL - Do nothing
     1: LEFT - Turn left
     2: RIGHT - Turn right
@@ -169,7 +169,7 @@ class MultiGridKeyCombinationResolver(KeyCombinationResolver):
     6: TOGGLE - Toggle/activate object
     7: DONE - Done action (not used by default)
 
-    NOTE: This is for the OLD gym-multigrid package (ArnaudFickinger).
+    NOTE: This is for the mosaic_multigrid package (forked from ArnaudFickinger).
     For INI multigrid environments, use INIMultiGridKeyCombinationResolver.
     """
 
@@ -257,6 +257,44 @@ class INIMultiGridKeyCombinationResolver(KeyCombinationResolver):
             return 2  # FORWARD (action 2 in INI - move forward)
 
         return None  # No action pressed
+
+
+class RWAREKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for RWARE (Robotic Warehouse) environments.
+
+    RWARE action space (5 discrete actions):
+    0: NOOP     - Do nothing
+    1: FORWARD  - Move forward one cell
+    2: LEFT     - Turn left 90 degrees
+    3: RIGHT    - Turn right 90 degrees
+    4: TOGGLE_LOAD - Pick up / put down a shelf
+
+    Key mappings:
+    - Arrow Up / W      -> FORWARD (1)
+    - Arrow Left / A    -> LEFT (2)
+    - Arrow Right / D   -> RIGHT (3)
+    - Space / E / Enter -> TOGGLE_LOAD (4)
+    - No keys           -> None (caller uses NOOP)
+    """
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        left = bool(pressed_keys & _KEYS_LEFT)
+        right = bool(pressed_keys & _KEYS_RIGHT)
+        forward = bool(pressed_keys & _KEYS_UP)
+
+        # Action button (higher priority)
+        if _KEY_SPACE in pressed_keys or _KEY_E in pressed_keys or _KEY_RETURN in pressed_keys:
+            return 4  # TOGGLE_LOAD
+
+        # Movement
+        if left:
+            return 2  # LEFT
+        if right:
+            return 3  # RIGHT
+        if forward:
+            return 1  # FORWARD
+
+        return None  # No action - caller should use NOOP (action 0)
 
 
 class MeltingPotKeyCombinationResolver(KeyCombinationResolver):
@@ -637,21 +675,27 @@ def get_key_combination_resolver(
         return ViZDoomKeyCombinationResolver(game_id)
     if family == EnvironmentFamily.MELTINGPOT:
         return MeltingPotKeyCombinationResolver(num_actions=_get_num_actions())
-    if family == EnvironmentFamily.MULTIGRID:
-        # Distinguish between legacy gym-multigrid (Soccer, Collect) and INI multigrid
-        game_name = game_id.value if hasattr(game_id, 'value') else str(game_id)
-        # Legacy gym-multigrid: Soccer, Collect (8 actions with STILL at index 0)
-        if "Soccer" in game_name or "Collect" in game_name:
-            return MultiGridKeyCombinationResolver()
-        # INI multigrid: All other MultiGrid envs (7 actions, no STILL)
+    if family == EnvironmentFamily.MOSAIC_MULTIGRID:
+        # MOSAIC MultiGrid environments (7 actions - same as INI multigrid)
+        # Both original and Enhanced variants use 7 actions: LEFT, RIGHT, FORWARD, PICKUP, DROP, TOGGLE, DONE
         return INIMultiGridKeyCombinationResolver()
+    if family == EnvironmentFamily.INI_MULTIGRID:
+        # INI multigrid environments (7 actions, no STILL)
+        return INIMultiGridKeyCombinationResolver()
+    if family == EnvironmentFamily.RWARE:
+        # RWARE environments (5 actions: NOOP, FORWARD, LEFT, RIGHT, TOGGLE_LOAD)
+        return RWAREKeyCombinationResolver()
 
     # Fallback: check by game ID prefix/name for games not in the mapping
     game_name = game_id.value if hasattr(game_id, 'value') else str(game_id)
 
+    # MOSAIC MultiGrid environments (7 actions - PyPI package mosaic-multigrid)
+    if game_name.startswith("MosaicMultiGrid"):
+        return INIMultiGridKeyCombinationResolver()
+
     # MultiGrid environments - check if legacy or INI
     if game_name.startswith("MultiGrid"):
-        # Legacy gym-multigrid: Soccer, Collect (8 actions with STILL at index 0)
+        # Legacy mosaic_multigrid: Soccer, Collect (8 actions with STILL at index 0)
         if "Soccer" in game_name or "Collect" in game_name:
             return MultiGridKeyCombinationResolver()
         # INI multigrid: All other MultiGrid envs (7 actions, no STILL)
@@ -723,21 +767,85 @@ _TOY_TEXT_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
     ),
 }
 
-# Standard MiniGrid action mapping (7 discrete actions)
+# MiniGrid action space variants (grouped by which actions are NOT unused)
+# Environments are grouped by their actual usable action spaces
+
+# Group A: Movement only (0=LEFT, 1=RIGHT, 2=FORWARD) - 3 actions
+# Used by: CrossingEnv, DynamicObstaclesEnv, EmptyEnv, FourRoomsEnv, LavaGapEnv
+# Actions 3,4,5,6 are UNUSED - do not map keys to them
+_MINIGRID_MOVEMENT_ONLY = (
+    _mapping(("Key_Left", "Key_A"), 0),    # turn left
+    _mapping(("Key_Right", "Key_D"), 1),   # turn right
+    _mapping(("Key_Up", "Key_W"), 2),      # move forward
+)
+
+# Group B: Movement + Done (0=LEFT, 1=RIGHT, 2=FORWARD, 6=DONE) - 4 actions
+# Used by: GoToDoorEnv, GoToObjectEnv
+# Actions 3,4,5 are UNUSED
+_MINIGRID_MOVEMENT_DONE = (
+    _mapping(("Key_Left", "Key_A"), 0),    # turn left
+    _mapping(("Key_Right", "Key_D"), 1),   # turn right
+    _mapping(("Key_Up", "Key_W"), 2),      # move forward
+    _mapping(("Key_Q",), 6),                # done
+)
+
+# Group C: Movement + Pickup (0=LEFT, 1=RIGHT, 2=FORWARD, 3=PICKUP) - 4 actions
+# Used by: FetchEnv, KeyCorridorEnv
+# Actions 4,5,6 are UNUSED
+_MINIGRID_MOVEMENT_PICKUP = (
+    _mapping(("Key_Left", "Key_A"), 0),    # turn left
+    _mapping(("Key_Right", "Key_D"), 1),   # turn right
+    _mapping(("Key_Up", "Key_W"), 2),      # move forward
+    _mapping(("Key_G", "Key_Space"), 3),   # pick up
+)
+
+# Group D: Movement + Pickup + Toggle (0=LEFT, 1=RIGHT, 2=FORWARD, 3=PICKUP, 5=TOGGLE) - 5 actions
+# Used by: DoorKeyEnv, LockedRoomEnv, MemoryEnv, UnlockPickupEnv
+# Actions 4=DROP, 6=DONE are UNUSED
+_MINIGRID_MOVEMENT_PICKUP_TOGGLE = (
+    _mapping(("Key_Left", "Key_A"), 0),    # turn left
+    _mapping(("Key_Right", "Key_D"), 1),   # turn right
+    _mapping(("Key_Up", "Key_W"), 2),      # move forward
+    _mapping(("Key_G", "Key_Space"), 3),   # pick up
+    _mapping(("Key_E", "Key_Return"), 5),  # toggle / use
+)
+
+# Group E: Movement + Toggle (0=LEFT, 1=RIGHT, 2=FORWARD, 5=TOGGLE) - 4 actions
+# Used by: MultiRoomEnv, RedBlueDoorEnv, UnlockEnv
+# Actions 3=PICKUP, 4=DROP, 6=DONE are UNUSED
+_MINIGRID_MOVEMENT_TOGGLE = (
+    _mapping(("Key_Left", "Key_A"), 0),    # turn left
+    _mapping(("Key_Right", "Key_D"), 1),   # turn right
+    _mapping(("Key_Up", "Key_W"), 2),      # move forward
+    _mapping(("Key_E", "Key_Return"), 5),  # toggle / use
+)
+
+# Group F: Movement + Pickup + Drop (0=LEFT, 1=RIGHT, 2=FORWARD, 3=PICKUP, 4=DROP) - 5 actions
+# Used by: PutNearEnv
+# Actions 5=TOGGLE, 6=DONE are UNUSED
+_MINIGRID_MOVEMENT_PICKUP_DROP = (
+    _mapping(("Key_Left", "Key_A"), 0),    # turn left
+    _mapping(("Key_Right", "Key_D"), 1),   # turn right
+    _mapping(("Key_Up", "Key_W"), 2),      # move forward
+    _mapping(("Key_G", "Key_Space"), 3),   # pick up
+    _mapping(("Key_H",), 4),                # drop
+)
+
+# Standard MiniGrid action mapping (7 discrete actions - ALL USED)
 # MiniGrid action indices: 0=LEFT, 1=RIGHT, 2=FORWARD, 3=PICKUP, 4=DROP, 5=TOGGLE, 6=DONE
 _STANDARD_MINIGRID_ACTIONS = (
     _mapping(("Key_Left", "Key_A"), 0),    # turn left
     _mapping(("Key_Right", "Key_D"), 1),   # turn right
     _mapping(("Key_Up", "Key_W"), 2),      # move forward
     _mapping(("Key_G", "Key_Space"), 3),   # pick up
-    _mapping(("Key_H",), 4),                # drop (rarely used)
+    _mapping(("Key_H",), 4),                # drop
     _mapping(("Key_E", "Key_Return"), 5),  # toggle / use
     _mapping(("Key_Q",), 6),                # done / no-op
 )
 
-# Standard MultiGrid action mapping for LEGACY gym-multigrid (8 discrete actions)
+# Standard MultiGrid action mapping for LEGACY mosaic_multigrid (8 discrete actions)
 # Legacy MultiGrid action indices: 0=STILL, 1=LEFT, 2=RIGHT, 3=FORWARD, 4=PICKUP, 5=DROP, 6=TOGGLE, 7=DONE
-# Used by: Soccer, Collect (ArnaudFickinger's gym-multigrid)
+# Used by: Soccer, Collect (mosaic_multigrid)
 _LEGACY_MULTIGRID_ACTIONS = (
     _mapping(("Key_Left", "Key_A"), 1),    # turn left (action 1, not 0!)
     _mapping(("Key_Right", "Key_D"), 2),   # turn right (action 2, not 1!)
@@ -763,264 +871,76 @@ _INI_MULTIGRID_ACTIONS = (
 )
 
 _MINIG_GRID_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
-    GameId.MINIGRID_EMPTY_5x5: _STANDARD_MINIGRID_ACTIONS,
-    GameId.MINIGRID_EMPTY_RANDOM_5x5: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-        _mapping(("Key_G", "Key_Space"), 3),
-        _mapping(("Key_H",), 4),
-        _mapping(("Key_E", "Key_Return"), 5),
-        _mapping(("Key_Q",), 6),
-    ),
-    GameId.MINIGRID_EMPTY_6x6: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-        _mapping(("Key_G", "Key_Space"), 3),
-        _mapping(("Key_H",), 4),
-        _mapping(("Key_E", "Key_Return"), 5),
-        _mapping(("Key_Q",), 6),
-    ),
-    GameId.MINIGRID_EMPTY_RANDOM_6x6: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-        _mapping(("Key_G", "Key_Space"), 3),
-        _mapping(("Key_H",), 4),
-        _mapping(("Key_E", "Key_Return"), 5),
-        _mapping(("Key_Q",), 6),
-    ),
-    GameId.MINIGRID_EMPTY_8x8: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-        _mapping(("Key_G", "Key_Space"), 3),
-        _mapping(("Key_H",), 4),
-        _mapping(("Key_E", "Key_Return"), 5),
-        _mapping(("Key_Q",), 6),
-    ),
-    GameId.MINIGRID_EMPTY_16x16: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-        _mapping(("Key_G", "Key_Space"), 3),
-        _mapping(("Key_H",), 4),
-        _mapping(("Key_E", "Key_Return"), 5),
-        _mapping(("Key_Q",), 6),
-    ),
-    GameId.MINIGRID_DOORKEY_5x5: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-        _mapping(("Key_G", "Key_Space"), 3),
-        _mapping(("Key_H",), 4),
-        _mapping(("Key_E", "Key_Return"), 5),
-        _mapping(("Key_Q",), 6),
-    ),
-    GameId.MINIGRID_DOORKEY_6x6: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-        _mapping(("Key_G", "Key_Space"), 3),
-        _mapping(("Key_H",), 4),
-        _mapping(("Key_E", "Key_Return"), 5),
-        _mapping(("Key_Q",), 6),
-    ),
-    GameId.MINIGRID_DOORKEY_8x8: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-        _mapping(("Key_G", "Key_Space"), 3),
-        _mapping(("Key_H",), 4),
-        _mapping(("Key_E", "Key_Return"), 5),
-        _mapping(("Key_Q",), 6),
-    ),
-    GameId.MINIGRID_DOORKEY_16x16: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-        _mapping(("Key_G", "Key_Space"), 3),
-        _mapping(("Key_H",), 4),
-        _mapping(("Key_E", "Key_Return"), 5),
-        _mapping(("Key_Q",), 6),
-    ),
-    GameId.MINIGRID_LAVAGAP_S5: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-        _mapping(("Key_G", "Key_Space"), 3),
-        _mapping(("Key_H",), 4),
-        _mapping(("Key_E", "Key_Return"), 5),
-        _mapping(("Key_Q",), 6),
-    ),
-    GameId.MINIGRID_LAVAGAP_S6: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-        _mapping(("Key_G", "Key_Space"), 3),
-        _mapping(("Key_H",), 4),
-        _mapping(("Key_E", "Key_Return"), 5),
-        _mapping(("Key_Q",), 6),
-    ),
-    GameId.MINIGRID_LAVAGAP_S7: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-        _mapping(("Key_G", "Key_Space"), 3),
-        _mapping(("Key_H",), 4),
-        _mapping(("Key_E", "Key_Return"), 5),
-        _mapping(("Key_Q",), 6),
-    ),
-    GameId.MINIGRID_DYNAMIC_OBSTACLES_5X5: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-    ),
-    GameId.MINIGRID_DYNAMIC_OBSTACLES_RANDOM_5X5: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-    ),
-    GameId.MINIGRID_DYNAMIC_OBSTACLES_6X6: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-    ),
-    GameId.MINIGRID_DYNAMIC_OBSTACLES_RANDOM_6X6: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-    ),
-    GameId.MINIGRID_DYNAMIC_OBSTACLES_8X8: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-    ),
-    GameId.MINIGRID_DYNAMIC_OBSTACLES_16X16: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-    ),
-    # LavaCrossing environments - 3 actions only (turn left, turn right, move forward)
-    GameId.MINIGRID_LAVA_CROSSING_S9N1: (
-        _mapping(("Key_Left", "Key_A"), 0),    # turn left
-        _mapping(("Key_Right", "Key_D"), 1),   # turn right
-        _mapping(("Key_Up", "Key_W"), 2),      # move forward
-    ),
-    GameId.MINIGRID_LAVA_CROSSING_S9N2: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-    ),
-    GameId.MINIGRID_LAVA_CROSSING_S9N3: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-    ),
-    GameId.MINIGRID_LAVA_CROSSING_S11N5: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-    ),
-    # SimpleCrossing environments - 3 actions only (turn left, turn right, move forward)
-    GameId.MINIGRID_SIMPLE_CROSSING_S9N1: (
-        _mapping(("Key_Left", "Key_A"), 0),    # turn left
-        _mapping(("Key_Right", "Key_D"), 1),   # turn right
-        _mapping(("Key_Up", "Key_W"), 2),      # move forward
-    ),
-    GameId.MINIGRID_SIMPLE_CROSSING_S9N2: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-    ),
-    GameId.MINIGRID_SIMPLE_CROSSING_S9N3: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-    ),
-    GameId.MINIGRID_SIMPLE_CROSSING_S11N5: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-    ),
-    GameId.MINIGRID_BLOCKED_UNLOCK_PICKUP: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-        _mapping(("Key_G", "Key_Space"), 3),
-        _mapping(("Key_H",), 4),
-        _mapping(("Key_E", "Key_Return"), 5),
-        _mapping(("Key_Q",), 6),
-    ),
-    GameId.MINIGRID_MULTIROOM_N2_S4: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-        _mapping(("Key_G", "Key_Space"), 3),
-        _mapping(("Key_H",), 4),
-        _mapping(("Key_E", "Key_Return"), 5),
-        _mapping(("Key_Q",), 6),
-    ),
-    GameId.MINIGRID_MULTIROOM_N4_S5: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-        _mapping(("Key_G", "Key_Space"), 3),
-        _mapping(("Key_H",), 4),
-        _mapping(("Key_E", "Key_Return"), 5),
-        _mapping(("Key_Q",), 6),
-    ),
-    GameId.MINIGRID_MULTIROOM_N6: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-        _mapping(("Key_G", "Key_Space"), 3),
-        _mapping(("Key_H",), 4),
-        _mapping(("Key_E", "Key_Return"), 5),
-        _mapping(("Key_Q",), 6),
-    ),
-    GameId.MINIGRID_OBSTRUCTED_MAZE_1DLHB: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-        _mapping(("Key_G", "Key_Space"), 3),
-        _mapping(("Key_H",), 4),
-        _mapping(("Key_E", "Key_Return"), 5),
-        _mapping(("Key_Q",), 6),
-    ),
-    GameId.MINIGRID_OBSTRUCTED_MAZE_FULL: (
-        _mapping(("Key_Left", "Key_A"), 0),
-        _mapping(("Key_Right", "Key_D"), 1),
-        _mapping(("Key_Up", "Key_W"), 2),
-        _mapping(("Key_G", "Key_Space"), 3),
-        _mapping(("Key_H",), 4),
-        _mapping(("Key_E", "Key_Return"), 5),
-        _mapping(("Key_Q",), 6),
-    ),
+    # Group A: Movement only (actions 0,1,2) - EmptyEnv, FourRoomsEnv, LavaGapEnv
+    GameId.MINIGRID_EMPTY_5x5: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_EMPTY_RANDOM_5x5: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_EMPTY_6x6: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_EMPTY_RANDOM_6x6: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_EMPTY_8x8: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_EMPTY_16x16: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_LAVAGAP_S5: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_LAVAGAP_S6: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_LAVAGAP_S7: _MINIGRID_MOVEMENT_ONLY,
+    # Group A: Movement only - CrossingEnv (LavaCrossing, SimpleCrossing)
+    GameId.MINIGRID_LAVA_CROSSING_S9N1: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_LAVA_CROSSING_S9N2: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_LAVA_CROSSING_S9N3: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_LAVA_CROSSING_S11N5: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_SIMPLE_CROSSING_S9N1: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_SIMPLE_CROSSING_S9N2: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_SIMPLE_CROSSING_S9N3: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_SIMPLE_CROSSING_S11N5: _MINIGRID_MOVEMENT_ONLY,
+    # Group A: Movement only - DynamicObstaclesEnv
+    GameId.MINIGRID_DYNAMIC_OBSTACLES_5X5: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_DYNAMIC_OBSTACLES_RANDOM_5X5: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_DYNAMIC_OBSTACLES_6X6: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_DYNAMIC_OBSTACLES_RANDOM_6X6: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_DYNAMIC_OBSTACLES_8X8: _MINIGRID_MOVEMENT_ONLY,
+    GameId.MINIGRID_DYNAMIC_OBSTACLES_16X16: _MINIGRID_MOVEMENT_ONLY,
+    # Group D: Movement + Pickup + Toggle (actions 0,1,2,3,5) - DoorKeyEnv, LockedRoomEnv, MemoryEnv, UnlockPickupEnv
+    GameId.MINIGRID_DOORKEY_5x5: _MINIGRID_MOVEMENT_PICKUP_TOGGLE,
+    GameId.MINIGRID_DOORKEY_6x6: _MINIGRID_MOVEMENT_PICKUP_TOGGLE,
+    GameId.MINIGRID_DOORKEY_8x8: _MINIGRID_MOVEMENT_PICKUP_TOGGLE,
+    GameId.MINIGRID_DOORKEY_16x16: _MINIGRID_MOVEMENT_PICKUP_TOGGLE,
+    # Group E: Movement + Toggle (actions 0,1,2,5) - MultiRoomEnv, RedBlueDoorEnv, UnlockEnv
+    GameId.MINIGRID_MULTIROOM_N2_S4: _MINIGRID_MOVEMENT_TOGGLE,
+    GameId.MINIGRID_MULTIROOM_N4_S5: _MINIGRID_MOVEMENT_TOGGLE,
+    GameId.MINIGRID_MULTIROOM_N6: _MINIGRID_MOVEMENT_TOGGLE,
+    GameId.MINIGRID_REDBLUE_DOORS_6x6: _MINIGRID_MOVEMENT_TOGGLE,
+    GameId.MINIGRID_REDBLUE_DOORS_8x8: _MINIGRID_MOVEMENT_TOGGLE,
+    # TODO: Need to verify action spaces for remaining environments
+    GameId.MINIGRID_BLOCKED_UNLOCK_PICKUP: _STANDARD_MINIGRID_ACTIONS,
+    GameId.MINIGRID_OBSTRUCTED_MAZE_1DLHB: _STANDARD_MINIGRID_ACTIONS,
+    GameId.MINIGRID_OBSTRUCTED_MAZE_FULL: _STANDARD_MINIGRID_ACTIONS,
 }
 
 # MultiGrid has different action indices depending on package version:
-# Legacy gym-multigrid (Soccer, Collect): 0=STILL, 1=LEFT, 2=RIGHT, 3=FORWARD, etc. (8 actions)
+# MOSAIC multigrid (Soccer, Collect): 0=LEFT, 1=RIGHT, 2=FORWARD, etc. (7 actions, modernized)
 # INI multigrid (BlockedUnlockPickup, Empty, etc.): 0=LEFT, 1=RIGHT, 2=FORWARD, etc. (7 actions, no STILL)
 _MULTIGRID_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
-    # Legacy gym-multigrid environments (8 actions with STILL at index 0)
-    GameId.MULTIGRID_SOCCER: _LEGACY_MULTIGRID_ACTIONS,
-    GameId.MULTIGRID_COLLECT: _LEGACY_MULTIGRID_ACTIONS,
+    # MOSAIC multigrid environments (7 actions - modernized from legacy 8-action version)
+    GameId.MOSAIC_MULTIGRID_SOCCER: _INI_MULTIGRID_ACTIONS,
+    GameId.MOSAIC_MULTIGRID_COLLECT: _INI_MULTIGRID_ACTIONS,
+    GameId.MOSAIC_MULTIGRID_COLLECT2VS2: _INI_MULTIGRID_ACTIONS,
+    GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_INDAGOBS: _INI_MULTIGRID_ACTIONS,
+    GameId.MOSAIC_MULTIGRID_COLLECT_INDAGOBS: _INI_MULTIGRID_ACTIONS,
+    GameId.MOSAIC_MULTIGRID_COLLECT2VS2_INDAGOBS: _INI_MULTIGRID_ACTIONS,
+    GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_TEAMOBS: _INI_MULTIGRID_ACTIONS,
+    GameId.MOSAIC_MULTIGRID_COLLECT2VS2_TEAMOBS: _INI_MULTIGRID_ACTIONS,
     # INI multigrid environments (7 actions, no STILL - same as MiniGrid)
-    GameId.MULTIGRID_BLOCKED_UNLOCK_PICKUP: _INI_MULTIGRID_ACTIONS,
-    GameId.MULTIGRID_EMPTY_5X5: _INI_MULTIGRID_ACTIONS,
-    GameId.MULTIGRID_EMPTY_RANDOM_5X5: _INI_MULTIGRID_ACTIONS,
-    GameId.MULTIGRID_EMPTY_6X6: _INI_MULTIGRID_ACTIONS,
-    GameId.MULTIGRID_EMPTY_RANDOM_6X6: _INI_MULTIGRID_ACTIONS,
-    GameId.MULTIGRID_EMPTY_8X8: _INI_MULTIGRID_ACTIONS,
-    GameId.MULTIGRID_EMPTY_16X16: _INI_MULTIGRID_ACTIONS,
-    GameId.MULTIGRID_LOCKED_HALLWAY_2ROOMS: _INI_MULTIGRID_ACTIONS,
-    GameId.MULTIGRID_LOCKED_HALLWAY_4ROOMS: _INI_MULTIGRID_ACTIONS,
-    GameId.MULTIGRID_LOCKED_HALLWAY_6ROOMS: _INI_MULTIGRID_ACTIONS,
-    GameId.MULTIGRID_PLAYGROUND: _INI_MULTIGRID_ACTIONS,
-    GameId.MULTIGRID_RED_BLUE_DOORS_6X6: _INI_MULTIGRID_ACTIONS,
-    GameId.MULTIGRID_RED_BLUE_DOORS_8X8: _INI_MULTIGRID_ACTIONS,
+    GameId.INI_MULTIGRID_BLOCKED_UNLOCK_PICKUP: _INI_MULTIGRID_ACTIONS,
+    GameId.INI_MULTIGRID_EMPTY_5X5: _INI_MULTIGRID_ACTIONS,
+    GameId.INI_MULTIGRID_EMPTY_RANDOM_5X5: _INI_MULTIGRID_ACTIONS,
+    GameId.INI_MULTIGRID_EMPTY_6X6: _INI_MULTIGRID_ACTIONS,
+    GameId.INI_MULTIGRID_EMPTY_RANDOM_6X6: _INI_MULTIGRID_ACTIONS,
+    GameId.INI_MULTIGRID_EMPTY_8X8: _INI_MULTIGRID_ACTIONS,
+    GameId.INI_MULTIGRID_EMPTY_16X16: _INI_MULTIGRID_ACTIONS,
+    GameId.INI_MULTIGRID_LOCKED_HALLWAY_2ROOMS: _INI_MULTIGRID_ACTIONS,
+    GameId.INI_MULTIGRID_LOCKED_HALLWAY_4ROOMS: _INI_MULTIGRID_ACTIONS,
+    GameId.INI_MULTIGRID_LOCKED_HALLWAY_6ROOMS: _INI_MULTIGRID_ACTIONS,
+    GameId.INI_MULTIGRID_PLAYGROUND: _INI_MULTIGRID_ACTIONS,
+    GameId.INI_MULTIGRID_RED_BLUE_DOORS_6X6: _INI_MULTIGRID_ACTIONS,
+    GameId.INI_MULTIGRID_RED_BLUE_DOORS_8X8: _INI_MULTIGRID_ACTIONS,
 }
 
 _BOX_2D_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
@@ -1417,22 +1337,30 @@ _ALE_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
 # GraphColoring: node x color combinations (complex, may need mouse)
 
 def _game2048_mappings() -> Tuple[ShortcutMapping, ...]:
-    """Arrow keys for 2048 tile sliding."""
+    """Arrow keys for 2048 tile sliding.
+
+    Jumanji Game2048 action space: Discrete(4)
+    [0, 1, 2, 3] -> [Up, Right, Down, Left]
+    """
     return (
         _mapping(("Key_Up", "Key_W"), 0),      # up
-        _mapping(("Key_Down", "Key_S"), 1),    # down
-        _mapping(("Key_Left", "Key_A"), 2),    # left
-        _mapping(("Key_Right", "Key_D"), 3),   # right
+        _mapping(("Key_Right", "Key_D"), 1),   # right
+        _mapping(("Key_Down", "Key_S"), 2),    # down
+        _mapping(("Key_Left", "Key_A"), 3),    # left
     )
 
 
 def _sliding_puzzle_mappings() -> Tuple[ShortcutMapping, ...]:
-    """Arrow keys for sliding tile puzzle."""
+    """Arrow keys for sliding tile puzzle.
+
+    Jumanji SlidingTilePuzzle action space: Discrete(4)
+    [0, 1, 2, 3] -> [Up, Right, Down, Left]
+    """
     return (
         _mapping(("Key_Up", "Key_W"), 0),      # move blank up
-        _mapping(("Key_Down", "Key_S"), 1),    # move blank down
-        _mapping(("Key_Left", "Key_A"), 2),    # move blank left
-        _mapping(("Key_Right", "Key_D"), 3),   # move blank right
+        _mapping(("Key_Right", "Key_D"), 1),   # move blank right
+        _mapping(("Key_Down", "Key_S"), 2),    # move blank down
+        _mapping(("Key_Left", "Key_A"), 3),    # move blank left
     )
 
 
@@ -1494,15 +1422,32 @@ def _snake_mappings() -> Tuple[ShortcutMapping, ...]:
     )
 
 
+def _jumanji_4dir_mappings() -> Tuple[ShortcutMapping, ...]:
+    """Standard 4-direction mapping shared by Maze, Sokoban, and Cleaner.
+
+    Jumanji convention: Discrete(4)
+    [0, 1, 2, 3] -> [Up, Right, Down, Left]
+    """
+    return (
+        _mapping(("Key_Up", "Key_W"), 0),      # up
+        _mapping(("Key_Right", "Key_D"), 1),   # right
+        _mapping(("Key_Down", "Key_S"), 2),    # down
+        _mapping(("Key_Left", "Key_A"), 3),    # left
+    )
+
+
 _JUMANJI_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
     GameId.JUMANJI_GAME2048: _game2048_mappings(),
     GameId.JUMANJI_SLIDING_PUZZLE: _sliding_puzzle_mappings(),
     GameId.JUMANJI_RUBIKS_CUBE: _rubiks_cube_mappings(),
     GameId.JUMANJI_PACMAN: _pacman_mappings(),
     GameId.JUMANJI_SNAKE: _snake_mappings(),
+    GameId.JUMANJI_MAZE: _jumanji_4dir_mappings(),
+    GameId.JUMANJI_SOKOBAN: _jumanji_4dir_mappings(),
+    GameId.JUMANJI_CLEANER: _jumanji_4dir_mappings(),
     # Minesweeper, Sudoku, and GraphColoring use complex action spaces
-    # that are better suited for mouse-based interaction
-    # Tetris uses MultiDiscrete which needs special handling
+    # that are better suited for mouse-based interaction (Tier 3)
+    # Tetris uses MultiDiscrete which needs special handling (Tier 2)
 }
 
 
@@ -1550,6 +1495,11 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
         self._use_evdev = False
         self._evdev_monitor: Optional[EvdevKeyboardMonitor] = None
         self._evdev_device_to_agent: Dict[str, str] = {}  # {device_path: agent_id}
+
+        # Tetris cursor state (MultiDiscrete [rotation, column])
+        self._tetris_rotation: int = 0
+        self._tetris_column: int = 0
+        self._tetris_num_cols: int = 10
 
         # Install event filter for state-based input
         self._widget.installEventFilter(self)
@@ -1684,11 +1634,11 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
                 if has_pressed_keys:
                     agents_with_input.append(agent_id)
                     action_name = self._get_action_name(action)
-                    action_details.append(f"{agent_id}→{action_name}")
+                    action_details.append(f"{agent_id}->{action_name}")
                 else:
                     # No input - show the actual idle action being sent
                     idle_action_name = self._get_action_name(action)
-                    action_details.append(f"{agent_id}→{idle_action_name}(idle)")
+                    action_details.append(f"{agent_id}->{idle_action_name}(idle)")
 
             # Log the complete multi-agent action
             if agents_with_input:
@@ -1720,10 +1670,10 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
             except (ImportError, ValueError):
                 pass
 
-        # Legacy gym-multigrid - use the Actions class
+        # Legacy mosaic_multigrid - use the Actions class
         if isinstance(self._key_resolver, MultiGridKeyCombinationResolver):
             try:
-                from gym_multigrid.multigrid import Actions as LegacyActions
+                from mosaic_multigrid.multigrid import Actions as LegacyActions
                 # Reverse lookup: find action name by value
                 for name in LegacyActions.available:
                     if getattr(LegacyActions, name, None) == action:
@@ -2113,9 +2063,11 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
         from gym_gui.core.enums import ENVIRONMENT_FAMILY_BY_GAME, EnvironmentFamily
         env_family = ENVIRONMENT_FAMILY_BY_GAME.get(game_id)
         is_multi_agent = env_family in (
-            EnvironmentFamily.MULTIGRID,
+            EnvironmentFamily.MOSAIC_MULTIGRID,
+            EnvironmentFamily.INI_MULTIGRID,
             EnvironmentFamily.MELTINGPOT,
             EnvironmentFamily.OVERCOOKED,
+            EnvironmentFamily.RWARE,
         )
 
         if is_multi_agent and input_mode != InputMode.STATE_BASED.value:
@@ -2164,6 +2116,11 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
                     },
                 )
 
+        # Tetris uses MultiDiscrete([4, num_cols]) — cursor-based input
+        if game_id == GameId.JUMANJI_TETRIS and isinstance(action_space, spaces.MultiDiscrete):
+            self._setup_tetris_shortcuts(action_space)
+            return
+
         # Fall back to shortcut-based input for turn-based games
         try:
             mappings = _TOY_TEXT_MAPPINGS.get(game_id)
@@ -2189,6 +2146,11 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
                 mappings = _PROCGEN_MAPPINGS.get(game_id)
             if mappings is None:
                 mappings = _JUMANJI_MAPPINGS.get(game_id)
+            if mappings is None:
+                # BabyAI uses the exact same 7-action space as MiniGrid
+                # (0=left, 1=right, 2=forward, 3=pickup, 4=drop, 5=toggle, 6=done)
+                if env_family == EnvironmentFamily.BABYAI:
+                    mappings = _STANDARD_MINIGRID_ACTIONS
             if mappings is None and isinstance(action_space, spaces.Discrete):
                 mappings = self._fallback_mappings(action_space)
 
@@ -2235,6 +2197,73 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
         while self._shortcuts:
             shortcut = self._shortcuts.pop()
             shortcut.deleteLater()
+
+    # ── Tetris cursor-based input (MultiDiscrete [rotation, column]) ───
+
+    def _setup_tetris_shortcuts(self, action_space: spaces.MultiDiscrete) -> None:
+        """Set up stateful cursor shortcuts for Tetris.
+
+        Jumanji Tetris uses MultiDiscrete([4, num_cols]) — each action is a
+        [rotation, column] pair submitted in one shot.  Arrow/WASD keys adjust
+        the cursor, Space/Enter places the piece.
+        """
+        self._tetris_num_cols = int(action_space.nvec[1])
+        self._tetris_rotation = 0
+        self._tetris_column = self._tetris_num_cols // 2
+
+        bindings: List[Tuple[Tuple[str, ...], Callable[[], None]]] = [
+            (("Key_Left", "Key_A"), self._tetris_move_left),
+            (("Key_Right", "Key_D"), self._tetris_move_right),
+            (("Key_Up", "Key_W"), self._tetris_rotate_cw),
+            (("Key_Down", "Key_S"), self._tetris_rotate_ccw),
+            (("Key_Space", "Key_Return"), self._tetris_place),
+        ]
+        for key_names, callback in bindings:
+            for key_name in key_names:
+                seq = QKeySequence(_qt_key(key_name))
+                shortcut = QShortcut(seq, self._widget)
+                shortcut.setContext(Qt.ShortcutContext.WidgetWithChildrenShortcut)
+                shortcut.activated.connect(callback)
+                self._shortcuts.append(shortcut)
+        self._update_shortcuts_enabled()
+        self._tetris_status_update()
+
+    def _tetris_move_left(self) -> None:
+        self._tetris_column = max(0, self._tetris_column - 1)
+        self._tetris_status_update()
+
+    def _tetris_move_right(self) -> None:
+        self._tetris_column = min(self._tetris_num_cols - 1, self._tetris_column + 1)
+        self._tetris_status_update()
+
+    def _tetris_rotate_cw(self) -> None:
+        self._tetris_rotation = (self._tetris_rotation + 1) % 4
+        self._tetris_status_update()
+
+    def _tetris_rotate_ccw(self) -> None:
+        self._tetris_rotation = (self._tetris_rotation - 1) % 4
+        self._tetris_status_update()
+
+    def _tetris_place(self) -> None:
+        action = [self._tetris_rotation, self._tetris_column]
+        label = f"rot={self._tetris_rotation} col={self._tetris_column}"
+        _LOGGER.debug("Tetris placement: %s", label)
+        self._session.perform_human_action(action, key_label=label)
+        # Reset cursor for next piece
+        self._tetris_rotation = 0
+        self._tetris_column = self._tetris_num_cols // 2
+        self._tetris_status_update()
+
+    def _tetris_status_update(self) -> None:
+        rot_labels = ["0deg", "90deg", "180deg", "270deg"]
+        msg = (
+            f"Tetris: Column {self._tetris_column}/{self._tetris_num_cols - 1}, "
+            f"Rotation {rot_labels[self._tetris_rotation]} "
+            f"[Left/Right=column, Up/Down=rotate, Space=place]"
+        )
+        self._session.status_message.emit(msg)
+
+    # ── End Tetris cursor-based input ──────────────────────────────────
 
     @staticmethod
     def _fallback_mappings(action_space: spaces.Discrete) -> Tuple[ShortcutMapping, ...]:

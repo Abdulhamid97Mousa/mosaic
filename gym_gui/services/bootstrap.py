@@ -30,14 +30,12 @@ from gym_gui.services.telemetry import TelemetryService
 from gym_gui.telemetry import TelemetrySQLiteStore
 from gym_gui.telemetry.db_sink import TelemetryDBSink
 from gym_gui.telemetry.run_bus import get_bus
-from gym_gui.telemetry.health import HealthMonitor
 from gym_gui.constants import (
     TELEMETRY_HUB_MAX_QUEUE,
     TELEMETRY_HUB_BUFFER_SIZE,
     DB_SINK_BATCH_SIZE,
     DB_SINK_CHECKPOINT_INTERVAL,
     DB_SINK_WRITER_QUEUE_SIZE,
-    HEALTH_MONITOR_HEARTBEAT_INTERVAL_S,
     OPERATOR_CATEGORY_HUMAN,
     OPERATOR_CATEGORY_LLM,
     OPERATOR_CATEGORY_RL,
@@ -216,14 +214,6 @@ def bootstrap_default_services() -> ServiceLocator:
     )
     db_sink.start()
 
-    # Initialize and start health monitor for observability
-    # Emits RUN_HEARTBEAT events every 5 seconds
-    health_monitor = HealthMonitor(
-        bus,
-        heartbeat_interval=HEALTH_MONITOR_HEARTBEAT_INTERVAL_S,
-    )
-    health_monitor.start()
-
     locator.register(RendererRegistry, renderer_registry)
     locator.register(TrainerClient, trainer_client)
     locator.register(TrainerClientRunner, trainer_runner)
@@ -231,7 +221,6 @@ def bootstrap_default_services() -> ServiceLocator:
     locator.register(TelemetryAsyncHub, telemetry_hub)
     locator.register(LiveTelemetryController, live_controller)
     locator.register(TelemetryDBSink, db_sink)
-    locator.register(HealthMonitor, health_monitor)
     locator.register(TrainerDaemonHandle, daemon_handle)
 
     # Also register under string keys for convenience in legacy code.

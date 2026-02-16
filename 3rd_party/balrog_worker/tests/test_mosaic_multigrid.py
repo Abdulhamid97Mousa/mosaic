@@ -257,12 +257,12 @@ class TestMultiGridIntegration:
             import sys
             from pathlib import Path
 
-            # Add gym-multigrid to path
-            multigrid_path = Path(__file__).parent.parent.parent.parent / "gym-multigrid"
+            # Add mosaic_multigrid to path
+            multigrid_path = Path(__file__).parent.parent.parent.parent / "mosaic_multigrid"
             if multigrid_path.exists():
                 sys.path.insert(0, str(multigrid_path))
 
-            from gym_multigrid.envs import SoccerGame4HEnv10x15N2
+            from mosaic_multigrid.envs import SoccerGame4HEnv10x15N2
 
             env = SoccerGame4HEnv10x15N2()
             obs = env.reset()

@@ -22,13 +22,6 @@ class TelemetryDBSinkDefaults:
 
 
 @dataclass(frozen=True)
-class HealthMonitorDefaults:
-    """Cadence for the telemetry health monitor."""
-
-    heartbeat_interval_s: float = 5.0
-
-
-@dataclass(frozen=True)
 class RegistryDefaults:
     """Trainer registry persistence bounds."""
 
@@ -40,7 +33,6 @@ class DatabaseDefaults:
     """Aggregated persistence defaults."""
 
     sink: TelemetryDBSinkDefaults = field(default_factory=TelemetryDBSinkDefaults)
-    health: HealthMonitorDefaults = field(default_factory=HealthMonitorDefaults)
     registry: RegistryDefaults = field(default_factory=RegistryDefaults)
 
 
@@ -50,6 +42,6 @@ __all__ = [
     "DB_DEFAULTS",
     "DatabaseDefaults",
     "TelemetryDBSinkDefaults",
-    "HealthMonitorDefaults",
+
     "RegistryDefaults",
 ]

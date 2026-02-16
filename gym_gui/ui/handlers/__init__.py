@@ -72,6 +72,8 @@ from gym_gui.ui.handlers.env_loaders import (
     ChessEnvLoader,
     ConnectFourEnvLoader,
     GoEnvLoader,
+    JumanjiGridClickLoader,
+    SmacCameraLoader,
     TicTacToeEnvLoader,
     VizdoomEnvLoader,
     CheckersEnvLoader,
@@ -100,6 +102,8 @@ __all__ = [
     "ConnectFourEnvLoader",
     "GoEnvLoader",
     "TicTacToeEnvLoader",
+    "JumanjiGridClickLoader",
+    "SmacCameraLoader",
     "VizdoomEnvLoader",
     "CheckersEnvLoader",
 ]

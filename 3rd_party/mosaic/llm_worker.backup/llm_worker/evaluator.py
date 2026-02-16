@@ -21,6 +21,9 @@ from .utils import get_unique_seed
 
 logger = logging.getLogger(__name__)
 
+_REPO_ROOT = Path(__file__).resolve().parent.parent.parent.parent.parent
+_DEFAULT_OUTPUT_DIR = str(_REPO_ROOT / "var" / "evaluator")
+
 
 class EvaluatorManager:
     """Manages evaluation of agents across multiple environments and tasks.
@@ -29,14 +32,17 @@ class EvaluatorManager:
     of evaluation tasks either sequentially or in parallel using multiple workers.
     """
 
-    def __init__(self, config, original_cwd="", output_dir="."):
+    def __init__(self, config, original_cwd="", output_dir=None):
         """Initialize the EvaluatorManager.
 
         Args:
             config (omegaconf.DictConfig): Configuration object containing evaluation settings.
             original_cwd (str, optional): Original current working directory. Defaults to "".
-            output_dir (str, optional): Directory to save evaluation outputs. Defaults to ".".
+            output_dir (str, optional): Directory to save evaluation outputs.
+                Defaults to ``var/evaluator`` under the repository root.
         """
+        if output_dir is None:
+            output_dir = _DEFAULT_OUTPUT_DIR
         self.config = config
         self.original_cwd = original_cwd
         self.output_dir = output_dir
@@ -221,18 +227,19 @@ class Evaluator:
     including loading in-context learning episodes and running episodes with the agent.
     """
 
-    def __init__(self, env_name, config, original_cwd="", output_dir="."):
+    def __init__(self, env_name, config, original_cwd="", output_dir=None):
         """Initialize the Evaluator.
 
         Args:
             env_name (str): Name of the environment to evaluate.
             config (omegaconf.DictConfig): Configuration object containing evaluation settings.
             original_cwd (str, optional): Original current working directory. Defaults to "".
-            output_dir (str, optional): Directory to save evaluation outputs. Defaults to ".".
+            output_dir (str, optional): Directory to save evaluation outputs.
+                Defaults to ``var/evaluator`` under the repository root.
         """
         self.env_name = env_name.strip()
         self.config = config
-        self.output_dir = output_dir
+        self.output_dir = output_dir if output_dir is not None else _DEFAULT_OUTPUT_DIR
         self.tasks = config.tasks[f"{self.env_name}_tasks"]
 
         self.num_episodes = config.eval.num_episodes[self.env_name]

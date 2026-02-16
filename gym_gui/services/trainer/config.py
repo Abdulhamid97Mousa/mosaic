@@ -243,20 +243,6 @@ def validate_train_run_config(raw: Mapping[str, Any]) -> TrainRunConfig:
 
     # Generate sortable run_id using ULID unless a valid ULID was already supplied.
     run_id = existing_run_id or str(ULID())
-    worker_extras = {}
-    if isinstance(worker_config, Mapping):
-        worker_extras = worker_config.get("extras", {}) if isinstance(worker_config.get("extras"), Mapping) else {}
-    tensorboard_dirname = worker_extras.get("tensorboard_dir") if isinstance(worker_extras, Mapping) else None
-    if not isinstance(tensorboard_dirname, str) or not tensorboard_dirname.strip():
-        tensorboard_dirname = "tensorboard"
-    # relative_path should be just the dirname (e.g., "tensorboard"), not full path
-    # The GUI resolves it relative to VAR_TRAINER_DIR/runs/<run_id>/
-    tensorboard_relative = tensorboard_dirname
-    tensorboard_absolute = (VAR_TENSORBOARD_DIR / run_id / tensorboard_dirname).resolve()
-    
-    # WANDB manifest file path (worker will write run_path here after wandb.init())
-    wandb_manifest_file = (VAR_WANDB_DIR / run_id / "wandb.json").resolve()
-    wandb_relative = f"var/trainer/runs/{run_id}/wandb.json"
 
     # CRITICAL: Update worker config with the correct ULID-based run_id
     # The UI builds config with run_name, but we need to use the ULID-based run_id
@@ -267,53 +253,90 @@ def validate_train_run_config(raw: Mapping[str, Any]) -> TrainRunConfig:
         if worker_id_from_config and isinstance(worker_meta, MutableMapping) and not worker_meta.get("worker_id"):
             worker_meta["worker_id"] = worker_id_from_config
 
-    if isinstance(metadata_payload, MutableMapping):
-        artifacts_meta = metadata_payload.get("artifacts")
-        if not isinstance(artifacts_meta, MutableMapping):
-            artifacts_meta = {}
-        tensorboard_meta = artifacts_meta.get("tensorboard") if isinstance(artifacts_meta, MutableMapping) else None
-        if not isinstance(tensorboard_meta, MutableMapping):
-            tensorboard_meta = {}
-            artifacts_meta["tensorboard"] = tensorboard_meta
-        tensorboard_meta["relative_path"] = tensorboard_relative
-        tensorboard_meta.setdefault("enabled", True)
-        tensorboard_meta["log_dir"] = str(tensorboard_absolute)
-        
-        # Initialize WANDB metadata with manifest file path (like TensorBoard)
-        wandb_meta = artifacts_meta.get("wandb")
-        if not isinstance(wandb_meta, MutableMapping):
-            wandb_meta = {}
-            artifacts_meta["wandb"] = wandb_meta
-        
-        # Set enabled based on whether track_wandb flag is present in worker extra config
-        worker_extra = worker_config.get("extras", {}) if isinstance(worker_config, Mapping) else {}
-        track_wandb = bool(worker_extra.get("track_wandb", False))
-        wandb_meta.setdefault("enabled", track_wandb)
-        
-        # Point to manifest file location (worker will write run_path here after wandb.init())
-        wandb_meta["manifest_file"] = str(wandb_manifest_file)
-        wandb_meta["relative_path"] = wandb_relative
-        wandb_meta.setdefault("run_path", "")  # Will be read from manifest file
-        
-        metadata_payload["artifacts"] = artifacts_meta
+    # Custom script detection: the form sets "script" (no "module") in worker
+    # metadata.  Custom script forms are the single source of truth for ALL
+    # paths (tensorboard, wandb, MOSAIC env vars).  We must NOT rewrite them
+    # here -- doing so would redirect artifacts to var/trainer/runs/ instead
+    # of var/trainer/custom_scripts/ where scripts actually write output.
+    is_custom_script = (
+        isinstance(worker_meta, MutableMapping)
+        and worker_meta.get("script")
+        and not worker_meta.get("module")
+    )
+
+    if not is_custom_script:
+        # --- Standard training: compute and inject artifact paths ---
+        worker_extras = {}
+        if isinstance(worker_config, Mapping):
+            worker_extras = worker_config.get("extras", {}) if isinstance(worker_config.get("extras"), Mapping) else {}
+        tensorboard_dirname = worker_extras.get("tensorboard_dir") if isinstance(worker_extras, Mapping) else None
+        if not isinstance(tensorboard_dirname, str) or not tensorboard_dirname.strip():
+            tensorboard_dirname = "tensorboard"
+        tensorboard_relative = tensorboard_dirname
+        tensorboard_absolute = (VAR_TENSORBOARD_DIR / run_id / tensorboard_dirname).resolve()
+
+        # WANDB manifest file path (worker will write run_path here after wandb.init())
+        wandb_manifest_file = (VAR_WANDB_DIR / run_id / "wandb.json").resolve()
+        wandb_relative = f"var/trainer/runs/{run_id}/wandb.json"
+
+        if isinstance(metadata_payload, MutableMapping):
+            artifacts_meta = metadata_payload.get("artifacts")
+            if not isinstance(artifacts_meta, MutableMapping):
+                artifacts_meta = {}
+            tensorboard_meta = artifacts_meta.get("tensorboard") if isinstance(artifacts_meta, MutableMapping) else None
+            if not isinstance(tensorboard_meta, MutableMapping):
+                tensorboard_meta = {}
+                artifacts_meta["tensorboard"] = tensorboard_meta
+            tensorboard_meta["relative_path"] = tensorboard_relative
+            tensorboard_meta.setdefault("enabled", True)
+            tensorboard_meta["log_dir"] = str(tensorboard_absolute)
+
+            wandb_meta = artifacts_meta.get("wandb")
+            if not isinstance(wandb_meta, MutableMapping):
+                wandb_meta = {}
+                artifacts_meta["wandb"] = wandb_meta
+
+            worker_extra = worker_config.get("extras", {}) if isinstance(worker_config, Mapping) else {}
+            track_wandb = bool(worker_extra.get("track_wandb", False))
+            wandb_meta.setdefault("enabled", track_wandb)
+
+            wandb_meta["manifest_file"] = str(wandb_manifest_file)
+            wandb_meta["relative_path"] = wandb_relative
+            wandb_meta.setdefault("run_path", "")
+
+            metadata_payload["artifacts"] = artifacts_meta
 
     metadata = TrainerRunMetadata(run_id=run_id, digest=digest, submitted_at=submitted)
 
     environment = canonical.get("environment")
-    if isinstance(environment, MutableMapping):
-        # Update CleanRL run_id
+    if isinstance(environment, MutableMapping) and not is_custom_script:
+        # --- Standard training: rewrite env vars with canonical ULID ---
         if "CLEANRL_RUN_ID" in environment:
             environment["CLEANRL_RUN_ID"] = run_id
 
-        # Update XuanCe run_id and related paths
         if "XUANCE_RUN_ID" in environment:
             environment["XUANCE_RUN_ID"] = run_id
         if "XUANCE_TENSORBOARD_DIR" in environment:
-            # Replace the old run_id in the path with the new ULID
-            old_tb_dir = environment["XUANCE_TENSORBOARD_DIR"]
-            # Path format: var/trainer/runs/{old_run_id}/tensorboard
-            # We need to replace with: var/trainer/runs/{new_run_id}/tensorboard
             environment["XUANCE_TENSORBOARD_DIR"] = f"var/trainer/runs/{run_id}/tensorboard"
+
+        if "MOSAIC_RUN_ID" in environment:
+            environment["MOSAIC_RUN_ID"] = run_id
+        run_dir = VAR_TENSORBOARD_DIR / run_id
+        if "MOSAIC_RUN_DIR" in environment:
+            environment["MOSAIC_RUN_DIR"] = str(run_dir)
+        if "MOSAIC_CHECKPOINT_DIR" in environment:
+            environment["MOSAIC_CHECKPOINT_DIR"] = str(run_dir / "checkpoints")
+        if "MOSAIC_CONFIG_FILE" in environment:
+            old_config = Path(environment["MOSAIC_CONFIG_FILE"])
+            new_config_dir = run_dir / "config"
+            new_config_dir.mkdir(parents=True, exist_ok=True)
+            new_config_path = new_config_dir / old_config.name
+            if old_config.exists() and not new_config_path.exists():
+                import shutil
+                shutil.move(str(old_config), str(new_config_path))
+            environment["MOSAIC_CONFIG_FILE"] = str(new_config_path)
+        if "MOSAIC_CUSTOM_SCRIPTS_DIR" in environment:
+            environment["MOSAIC_CUSTOM_SCRIPTS_DIR"] = str(run_dir / "config")
 
     return TrainRunConfig(payload=canonical, metadata=metadata)
 

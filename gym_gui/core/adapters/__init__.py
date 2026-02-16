@@ -340,6 +340,249 @@ except Exception:  # pragma: no cover - jumanji optional
     RUBIKS_CUBE_ACTIONS = []  # type: ignore
     _JUMANJI_AVAILABLE = False
 
+try:  # Optional dependency - Procgen (procedural generation benchmark)
+    from .procgen import (  # pragma: no cover - procgen optional
+        ProcgenAdapter,
+        ProcgenBigfishAdapter,
+        ProcgenBossfightAdapter,
+        ProcgenCaveflyerAdapter,
+        ProcgenChaserAdapter,
+        ProcgenClimberAdapter,
+        ProcgenCoinrunAdapter,
+        ProcgenDodgeballAdapter,
+        ProcgenFruitbotAdapter,
+        ProcgenHeistAdapter,
+        ProcgenJumperAdapter,
+        ProcgenLeaperAdapter,
+        ProcgenMazeAdapter,
+        ProcgenMinerAdapter,
+        ProcgenNinjaAdapter,
+        ProcgenPlunderAdapter,
+        ProcgenStarpilotAdapter,
+        PROCGEN_ADAPTERS,
+        PROCGEN_ENV_NAMES,
+        PROCGEN_ACTIONS,
+    )
+    _PROCGEN_AVAILABLE = True
+except Exception:  # pragma: no cover - procgen optional
+    ProcgenAdapter = None  # type: ignore[misc, assignment]
+    PROCGEN_ADAPTERS = {}  # type: ignore[misc]
+    PROCGEN_ENV_NAMES = []  # type: ignore[misc]
+    PROCGEN_ACTIONS = []  # type: ignore[misc]
+    _PROCGEN_AVAILABLE = False
+
+try:  # Optional dependency - BabaIsAI (puzzle game environment)
+    from .babaisai import (  # pragma: no cover - babaisai optional
+        BabaIsAIAdapter,
+        BabaIsAIConfig,
+        BABAISAI_ADAPTERS,
+        BABAISAI_ACTIONS,
+        create_babaisai_adapter,
+    )
+    _BABAISAI_AVAILABLE = True
+except Exception:  # pragma: no cover - babaisai optional
+    BabaIsAIAdapter = None  # type: ignore[misc, assignment]
+    BabaIsAIConfig = None  # type: ignore[misc, assignment]
+    BABAISAI_ADAPTERS = {}  # type: ignore[misc]
+    BABAISAI_ACTIONS = []  # type: ignore[misc]
+    create_babaisai_adapter = None  # type: ignore[misc, assignment]
+    _BABAISAI_AVAILABLE = False
+
+try:  # Optional dependency - MOSAIC MultiGrid (competitive team-based)
+    from .mosaic_multigrid import (  # pragma: no cover - mosaic_multigrid optional
+        MultiGridAdapter as MosaicMultiGridAdapter,
+        MultiGridSoccerAdapter,
+        MultiGridCollect3HAdapter,
+        MultiGridCollect4HAdapter,
+        MultiGridSoccerIndAgObsAdapter,
+        MultiGridSoccer1vs1IndAgObsAdapter,
+        MultiGridCollectIndAgObsAdapter,
+        MultiGridCollect2vs2IndAgObsAdapter,
+        MultiGridCollect1vs1IndAgObsAdapter,
+        MultiGridBasketballIndAgObsAdapter,
+        MultiGridSoccerTeamObsAdapter,
+        MultiGridCollect2vs2TeamObsAdapter,
+        MultiGridBasketballTeamObsAdapter,
+        MOSAIC_MULTIGRID_ADAPTERS,
+        MOSAIC_MULTIGRID_ACTIONS,
+    )
+    _MOSAIC_MULTIGRID_AVAILABLE = True
+except Exception:  # pragma: no cover - mosaic_multigrid optional
+    MosaicMultiGridAdapter = None  # type: ignore[misc, assignment]
+    MOSAIC_MULTIGRID_ADAPTERS = {}  # type: ignore[misc]
+    MOSAIC_MULTIGRID_ACTIONS = []  # type: ignore[misc]
+    _MOSAIC_MULTIGRID_AVAILABLE = False
+
+try:  # Optional dependency - INI MultiGrid (cooperative multi-agent)
+    from .ini_multigrid import (  # pragma: no cover - ini_multigrid optional
+        MultiGridAdapter as INIMultiGridAdapter,
+        INI_MULTIGRID_ADAPTERS,
+        INI_MULTIGRID_ACTIONS,
+    )
+    _INI_MULTIGRID_AVAILABLE = True
+except Exception:  # pragma: no cover - ini_multigrid optional
+    INIMultiGridAdapter = None  # type: ignore[misc, assignment]
+    INI_MULTIGRID_ADAPTERS = {}  # type: ignore[misc]
+    INI_MULTIGRID_ACTIONS = []  # type: ignore[misc]
+    _INI_MULTIGRID_AVAILABLE = False
+
+try:  # Optional dependency - MeltingPot (multi-agent social scenarios)
+    from .meltingpot import (  # pragma: no cover - meltingpot optional
+        MeltingPotAdapter,
+        CollaborativeCookingAdapter,
+        CleanUpAdapter,
+        CommonsHarvestAdapter,
+        TerritoryAdapter,
+        KingOfTheHillAdapter,
+        PrisonersDilemmaAdapter,
+        StagHuntAdapter,
+        AllelopathicHarvestAdapter,
+        MELTINGPOT_ADAPTERS,
+        MELTINGPOT_ACTION_NAMES,
+        create_meltingpot_adapter,
+    )
+    _MELTINGPOT_AVAILABLE = True
+except Exception:  # pragma: no cover - meltingpot optional
+    MeltingPotAdapter = None  # type: ignore[misc, assignment]
+    MELTINGPOT_ADAPTERS = {}  # type: ignore[misc]
+    MELTINGPOT_ACTION_NAMES = []  # type: ignore[misc]
+    create_meltingpot_adapter = None  # type: ignore[misc, assignment]
+    _MELTINGPOT_AVAILABLE = False
+
+try:  # Optional dependency - Overcooked (cooperative cooking)
+    from .overcooked import (  # pragma: no cover - overcooked optional
+        OvercookedAdapter,
+        CrampedRoomAdapter,
+        AsymmetricAdvantagesAdapter,
+        CoordinationRingAdapter,
+        ForcedCoordinationAdapter,
+        CounterCircuitAdapter,
+        OVERCOOKED_ADAPTERS,
+        OVERCOOKED_ACTIONS,
+    )
+    _OVERCOOKED_AVAILABLE = True
+except Exception:  # pragma: no cover - overcooked optional
+    OvercookedAdapter = None  # type: ignore[misc, assignment]
+    OVERCOOKED_ADAPTERS = {}  # type: ignore[misc]
+    OVERCOOKED_ACTIONS = []  # type: ignore[misc]
+    _OVERCOOKED_AVAILABLE = False
+
+try:  # Optional dependency - OpenSpiel (game theory environments)
+    from .open_spiel import (  # pragma: no cover - open_spiel optional
+        CheckersEnvironmentAdapter,
+        CheckersRenderPayload,
+        OPENSPIEL_ADAPTERS,
+    )
+    _OPENSPIEL_AVAILABLE = True
+except Exception:  # pragma: no cover - open_spiel optional
+    CheckersEnvironmentAdapter = None  # type: ignore[misc, assignment]
+    CheckersRenderPayload = None  # type: ignore[misc, assignment]
+    OPENSPIEL_ADAPTERS = {}  # type: ignore[misc]
+    _OPENSPIEL_AVAILABLE = False
+
+try:  # Optional dependency - PyBullet Drones (quadcopter simulation)
+    from .pybullet_drones import (  # pragma: no cover - pybullet_drones optional
+        PyBulletDronesAdapter,
+        PyBulletDronesConfig,
+        HoverAviaryAdapter,
+        MultiHoverAviaryAdapter,
+        CtrlAviaryAdapter,
+        VelocityAviaryAdapter,
+        PYBULLET_DRONES_ADAPTERS,
+    )
+    _PYBULLET_DRONES_AVAILABLE = True
+except Exception:  # pragma: no cover - pybullet_drones optional
+    PyBulletDronesAdapter = None  # type: ignore[misc, assignment]
+    PyBulletDronesConfig = None  # type: ignore[misc, assignment]
+    PYBULLET_DRONES_ADAPTERS = {}  # type: ignore[misc]
+    _PYBULLET_DRONES_AVAILABLE = False
+
+try:  # Optional dependency - PettingZoo Classic (turn-based board games)
+    from .pettingzoo_classic import (  # pragma: no cover - pettingzoo_classic optional
+        ChessEnvironmentAdapter,
+        ChessRenderPayload,
+        ConnectFourEnvironmentAdapter,
+        ConnectFourRenderPayload,
+        GoEnvironmentAdapter,
+        GoRenderPayload,
+        PETTINGZOO_CLASSIC_ADAPTERS,
+    )
+    _PETTINGZOO_CLASSIC_AVAILABLE = True
+except Exception:  # pragma: no cover - pettingzoo_classic optional
+    ChessEnvironmentAdapter = None  # type: ignore[misc, assignment]
+    ChessRenderPayload = None  # type: ignore[misc, assignment]
+    ConnectFourEnvironmentAdapter = None  # type: ignore[misc, assignment]
+    ConnectFourRenderPayload = None  # type: ignore[misc, assignment]
+    GoEnvironmentAdapter = None  # type: ignore[misc, assignment]
+    GoRenderPayload = None  # type: ignore[misc, assignment]
+    PETTINGZOO_CLASSIC_ADAPTERS = {}  # type: ignore[misc]
+    _PETTINGZOO_CLASSIC_AVAILABLE = False
+
+try:  # Optional dependency - Draughts (checkers variants)
+    from .draughts import (  # pragma: no cover - draughts optional
+        BaseDraughtsAdapter,
+        AmericanCheckersAdapter,
+        RussianCheckersAdapter,
+        InternationalDraughtsAdapter,
+        DraughtsState,
+        DraughtsRenderPayload,
+        DRAUGHTS_ADAPTERS,
+    )
+    _DRAUGHTS_AVAILABLE = True
+except Exception:  # pragma: no cover - draughts optional
+    BaseDraughtsAdapter = None  # type: ignore[misc, assignment]
+    AmericanCheckersAdapter = None  # type: ignore[misc, assignment]
+    RussianCheckersAdapter = None  # type: ignore[misc, assignment]
+    InternationalDraughtsAdapter = None  # type: ignore[misc, assignment]
+    DraughtsState = None  # type: ignore[misc, assignment]
+    DraughtsRenderPayload = None  # type: ignore[misc, assignment]
+    DRAUGHTS_ADAPTERS = {}  # type: ignore[misc]
+    _DRAUGHTS_AVAILABLE = False
+
+try:  # Optional dependency - RWARE (robotic warehouse)
+    from .rware import (  # pragma: no cover - rware optional
+        RWAREAdapter,
+        RWARE_ADAPTERS,
+        ALL_RWARE_GAME_IDS,
+    )
+    _RWARE_AVAILABLE = True
+except Exception:  # pragma: no cover - rware optional
+    RWAREAdapter = None  # type: ignore[misc, assignment]
+    RWARE_ADAPTERS = {}  # type: ignore[misc]
+    ALL_RWARE_GAME_IDS = ()  # type: ignore[misc]
+    _RWARE_AVAILABLE = False
+
+try:
+    from .smac import (
+        SMACAdapter,
+        SMAC_ADAPTERS,
+        SMAC3MAdapter,
+        SMAC8MAdapter,
+        SMAC2S3ZAdapter,
+        SMAC3S5ZAdapter,
+        SMAC5Mvs6MAdapter,
+        SMACMMM2Adapter,
+    )
+    _SMAC_AVAILABLE = True
+except Exception:
+    SMACAdapter = None  # type: ignore[misc, assignment]
+    SMAC_ADAPTERS = {}  # type: ignore[misc]
+    _SMAC_AVAILABLE = False
+
+try:
+    from .smacv2 import (
+        SMACv2Adapter,
+        SMACV2_ADAPTERS,
+        SMACv2TerranAdapter,
+        SMACv2ProtossAdapter,
+        SMACv2ZergAdapter,
+    )
+    _SMACV2_AVAILABLE = True
+except Exception:
+    SMACv2Adapter = None  # type: ignore[misc, assignment]
+    SMACV2_ADAPTERS = {}  # type: ignore[misc]
+    _SMACV2_AVAILABLE = False
+
 # Standalone adapters for Human vs Agent mode (simplified state-based interfaces)
 from .chess_adapter import ChessAdapter as ChessHvAAdapter, ChessState
 from .connect_four_adapter import ConnectFourAdapter as ConnectFourHvAAdapter, ConnectFourState
@@ -565,6 +808,161 @@ if _JUMANJI_AVAILABLE:
         "JUMANJI_ENV_NAMES",
         "GAME2048_ACTIONS",
         "RUBIKS_CUBE_ACTIONS",
+    ]
+
+if _PROCGEN_AVAILABLE:
+    __all__ += [
+        "ProcgenAdapter",
+        "ProcgenBigfishAdapter",
+        "ProcgenBossfightAdapter",
+        "ProcgenCaveflyerAdapter",
+        "ProcgenChaserAdapter",
+        "ProcgenClimberAdapter",
+        "ProcgenCoinrunAdapter",
+        "ProcgenDodgeballAdapter",
+        "ProcgenFruitbotAdapter",
+        "ProcgenHeistAdapter",
+        "ProcgenJumperAdapter",
+        "ProcgenLeaperAdapter",
+        "ProcgenMazeAdapter",
+        "ProcgenMinerAdapter",
+        "ProcgenNinjaAdapter",
+        "ProcgenPlunderAdapter",
+        "ProcgenStarpilotAdapter",
+        "PROCGEN_ADAPTERS",
+        "PROCGEN_ENV_NAMES",
+        "PROCGEN_ACTIONS",
+    ]
+
+if _BABAISAI_AVAILABLE:
+    __all__ += [
+        "BabaIsAIAdapter",
+        "BabaIsAIConfig",
+        "BABAISAI_ADAPTERS",
+        "BABAISAI_ACTIONS",
+        "create_babaisai_adapter",
+    ]
+
+if _MOSAIC_MULTIGRID_AVAILABLE:
+    __all__ += [
+        "MosaicMultiGridAdapter",
+        "MultiGridSoccerAdapter",
+        "MultiGridCollect3HAdapter",
+        "MultiGridCollect4HAdapter",
+        "MultiGridSoccerIndAgObsAdapter",
+        "MultiGridSoccer1vs1IndAgObsAdapter",
+        "MultiGridCollectIndAgObsAdapter",
+        "MultiGridCollect2vs2IndAgObsAdapter",
+        "MultiGridCollect1vs1IndAgObsAdapter",
+        "MultiGridBasketballIndAgObsAdapter",
+        "MultiGridSoccerTeamObsAdapter",
+        "MultiGridCollect2vs2TeamObsAdapter",
+        "MultiGridBasketballTeamObsAdapter",
+        "MOSAIC_MULTIGRID_ADAPTERS",
+        "MOSAIC_MULTIGRID_ACTIONS",
+    ]
+
+if _INI_MULTIGRID_AVAILABLE:
+    __all__ += [
+        "INIMultiGridAdapter",
+        "INI_MULTIGRID_ADAPTERS",
+        "INI_MULTIGRID_ACTIONS",
+    ]
+
+if _MELTINGPOT_AVAILABLE:
+    __all__ += [
+        "MeltingPotAdapter",
+        "CollaborativeCookingAdapter",
+        "CleanUpAdapter",
+        "CommonsHarvestAdapter",
+        "TerritoryAdapter",
+        "KingOfTheHillAdapter",
+        "PrisonersDilemmaAdapter",
+        "StagHuntAdapter",
+        "AllelopathicHarvestAdapter",
+        "MELTINGPOT_ADAPTERS",
+        "MELTINGPOT_ACTION_NAMES",
+        "create_meltingpot_adapter",
+    ]
+
+if _OVERCOOKED_AVAILABLE:
+    __all__ += [
+        "OvercookedAdapter",
+        "CrampedRoomAdapter",
+        "AsymmetricAdvantagesAdapter",
+        "CoordinationRingAdapter",
+        "ForcedCoordinationAdapter",
+        "CounterCircuitAdapter",
+        "OVERCOOKED_ADAPTERS",
+        "OVERCOOKED_ACTIONS",
+    ]
+
+if _OPENSPIEL_AVAILABLE:
+    __all__ += [
+        "CheckersEnvironmentAdapter",
+        "CheckersRenderPayload",
+        "OPENSPIEL_ADAPTERS",
+    ]
+
+if _PYBULLET_DRONES_AVAILABLE:
+    __all__ += [
+        "PyBulletDronesAdapter",
+        "PyBulletDronesConfig",
+        "HoverAviaryAdapter",
+        "MultiHoverAviaryAdapter",
+        "CtrlAviaryAdapter",
+        "VelocityAviaryAdapter",
+        "PYBULLET_DRONES_ADAPTERS",
+    ]
+
+if _PETTINGZOO_CLASSIC_AVAILABLE:
+    __all__ += [
+        "ChessEnvironmentAdapter",
+        "ChessRenderPayload",
+        "ConnectFourEnvironmentAdapter",
+        "ConnectFourRenderPayload",
+        "GoEnvironmentAdapter",
+        "GoRenderPayload",
+        "PETTINGZOO_CLASSIC_ADAPTERS",
+    ]
+
+if _DRAUGHTS_AVAILABLE:
+    __all__ += [
+        "BaseDraughtsAdapter",
+        "AmericanCheckersAdapter",
+        "RussianCheckersAdapter",
+        "InternationalDraughtsAdapter",
+        "DraughtsState",
+        "DraughtsRenderPayload",
+        "DRAUGHTS_ADAPTERS",
+    ]
+
+if _RWARE_AVAILABLE:
+    __all__ += [
+        "RWAREAdapter",
+        "RWARE_ADAPTERS",
+        "ALL_RWARE_GAME_IDS",
+    ]
+
+if _SMAC_AVAILABLE:
+    __all__ += [
+        "SMACAdapter",
+        "SMAC_ADAPTERS",
+        "SMAC3MAdapter",
+        "SMAC8MAdapter",
+        "SMAC2S3ZAdapter",
+        "SMAC3S5ZAdapter",
+        "SMAC5Mvs6MAdapter",
+        "SMACMMM2Adapter",
+    ]
+
+if _SMACV2_AVAILABLE:
+    __all__ += [
+        "SMACv2Adapter",
+        "SMACV2_ADAPTERS",
+        "SMACv2TerranAdapter",
+        "SMACv2ProtossAdapter",
+        "SMACv2ZergAdapter",
     ]
 
 # Human vs Agent mode adapters (always available)

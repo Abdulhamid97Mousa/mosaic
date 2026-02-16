@@ -33,7 +33,7 @@ System Layers
    .. grid-item-card:: Worker Layer (gRPC/IPC)
       :class-header: sd-bg-secondary sd-text-white
 
-      CleanRL | XuanCe | RLlib | Jason BDI | SPADE | LLM
+      CleanRL | XuanCe | RLlib | LLM
 
 Visual Layer
 ------------
@@ -82,5 +82,4 @@ External training backends communicate via gRPC/IPC:
 - **CleanRL**: Single-agent RL (PPO, DQN, SAC, TD3)
 - **XuanCe**: Multi-agent RL (MAPPO, QMIX, MADDPG)
 - **RLlib**: Distributed RL with Ray
-- **Jason BDI**: AgentSpeak agents
-- **SPADE BDI**: Python BDI agents
+

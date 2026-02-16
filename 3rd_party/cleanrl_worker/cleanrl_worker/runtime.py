@@ -328,7 +328,8 @@ class CleanRLWorkerRuntime:
         if value is None:
             return []
         if isinstance(value, bool):
-            return [f"{flag}={'true' if value else 'false'}"]
+            # tyro uses --flag / --no-flag (not --flag=true/false)
+            return [flag if value else f"--no-{key.replace('_', '-')}"]
         if isinstance(value, (int, float)):
             return [f"{flag}={value}"]
         if isinstance(value, str):
@@ -339,7 +340,7 @@ class CleanRLWorkerRuntime:
             formatted: list[str] = []
             for item in value:
                 if isinstance(item, bool):
-                    formatted.append(f"{flag}={'true' if item else 'false'}")
+                    formatted.append(flag if item else f"--no-{key.replace('_', '-')}")
                 elif isinstance(item, (int, float, str)):
                     formatted.append(f"{flag}={item}")
             return formatted
@@ -430,7 +431,14 @@ class CleanRLWorkerRuntime:
             }
 
         ensure_var_directories()
-        run_dir = (VAR_TRAINER_DIR / "runs" / self._config.run_id).resolve()
+        # Custom scripts set MOSAIC_RUN_DIR to custom_scripts/{ULID}/.
+        # Without this check, logs/tensorboard/checkpoints scatter to runs/
+        # even though the script writes everything to custom_scripts/.
+        mosaic_run_dir = os.environ.get("MOSAIC_RUN_DIR")
+        if mosaic_run_dir:
+            run_dir = Path(mosaic_run_dir).resolve()
+        else:
+            run_dir = (VAR_TRAINER_DIR / "runs" / self._config.run_id).resolve()
         run_dir.mkdir(parents=True, exist_ok=True)
         logs_dir = run_dir / "logs"
         logs_dir.mkdir(parents=True, exist_ok=True)
@@ -660,13 +668,39 @@ class CleanRLWorkerRuntime:
                 time.sleep(1.0)
 
         if return_code != 0:
-            error_msg = f"CleanRL process exited with code {return_code}"
+            # Read the last 30 lines of stderr to surface the actual error
+            stderr_tail = ""
+            try:
+                raw = stderr_path.read_text(encoding="utf-8", errors="replace")
+                lines = [ln for ln in raw.splitlines() if ln.strip()]
+                # Skip noisy warnings, keep only lines that aren't pydantic/pygame/pkg_resources
+                meaningful = [
+                    ln for ln in lines
+                    if not any(skip in ln for skip in (
+                        "UnsupportedFieldAttributeWarning",
+                        "warnings.warn(",
+                        "pkg_resources is deprecated",
+                        "resource_stream, resource_exists",
+                        "resource_tracker:",
+                    ))
+                ]
+                tail_lines = meaningful[-20:] if meaningful else lines[-20:]
+                stderr_tail = "\n".join(tail_lines)
+            except Exception:
+                stderr_tail = f"(could not read {stderr_path})"
+
+            error_msg = (
+                f"CleanRL process exited with code {return_code}\n"
+                f"--- stderr tail ---\n{stderr_tail}\n---"
+            )
+            LOGGER.error(error_msg)
             self._emitter.run_failed(
                 {
                     "error": error_msg,
                     "error_type": "CalledProcessError",
                     "return_code": return_code,
                     "command": " ".join(cmd),
+                    "stderr_log": str(stderr_path),
                 },
                 constant=LOG_WORKER_CLEANRL_RUNTIME_FAILED,
             )

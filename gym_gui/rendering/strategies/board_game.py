@@ -46,6 +46,7 @@ class BoardGameRendererStrategy(RendererStrategy):
     SUPPORTED_GAMES = frozenset({
         GameId.CHESS, GameId.CONNECT_FOUR, GameId.GO, GameId.TIC_TAC_TOE,
         GameId.JUMANJI_SUDOKU, GameId.OPEN_SPIEL_CHECKERS,
+        GameId.AMERICAN_CHECKERS, GameId.RUSSIAN_CHECKERS, GameId.INTERNATIONAL_DRAUGHTS,
     })
 
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
@@ -151,9 +152,11 @@ class BoardGameRendererStrategy(RendererStrategy):
             return True
         if "checkers" in payload:
             return True
+        if "draughts" in payload:
+            return True
         # Check game_type field (from adapter payloads)
         game_type = payload.get("game_type")
-        if game_type in ("chess", "connect_four", "go", "sudoku", "checkers"):
+        if game_type in ("chess", "connect_four", "go", "sudoku", "checkers", "draughts"):
             return True
         # Check game_id
         game_id = payload.get("game_id")
@@ -206,6 +209,8 @@ class BoardGameRendererStrategy(RendererStrategy):
             return GameId.JUMANJI_SUDOKU
         if "checkers" in payload:
             return GameId.OPEN_SPIEL_CHECKERS
+        if "draughts" in payload:
+            return _resolve_draughts_variant(payload)
 
         # Detect from game_type value (adapter payloads use this)
         game_type = payload.get("game_type")
@@ -219,6 +224,8 @@ class BoardGameRendererStrategy(RendererStrategy):
             return GameId.JUMANJI_SUDOKU
         if game_type == "checkers":
             return GameId.OPEN_SPIEL_CHECKERS
+        if game_type == "draughts":
+            return _resolve_draughts_variant(payload)
 
         return None
 
@@ -235,6 +242,8 @@ class BoardGameRendererStrategy(RendererStrategy):
             return GameId.JUMANJI_SUDOKU
         if "checkers" in payload:
             return GameId.OPEN_SPIEL_CHECKERS
+        if "draughts" in payload:
+            return _resolve_draughts_variant(payload)
 
         # Detect from game_type value (adapter payloads use this)
         game_type = payload.get("game_type")
@@ -248,8 +257,23 @@ class BoardGameRendererStrategy(RendererStrategy):
             return GameId.JUMANJI_SUDOKU
         if game_type == "checkers":
             return GameId.OPEN_SPIEL_CHECKERS
+        if game_type == "draughts":
+            return _resolve_draughts_variant(payload)
 
         return None
+
+
+def _resolve_draughts_variant(payload: Mapping[str, Any]) -> GameId | None:
+    """Resolve which draughts variant based on payload."""
+    variant = payload.get("variant", "").lower()
+    if "american" in variant:
+        return GameId.AMERICAN_CHECKERS
+    elif "russian" in variant:
+        return GameId.RUSSIAN_CHECKERS
+    elif "international" in variant:
+        return GameId.INTERNATIONAL_DRAUGHTS
+    # Default to American if variant not specified
+    return GameId.AMERICAN_CHECKERS
 
 
 # =============================================================================
@@ -323,7 +347,8 @@ class _BoardGameWidget(QtWidgets.QStackedWidget):
             sudoku_data = payload.get("sudoku", payload)
             renderer.update_from_payload(sudoku_data)
             self.setCurrentWidget(renderer)
-        elif game_id == GameId.OPEN_SPIEL_CHECKERS:
+        elif game_id in (GameId.OPEN_SPIEL_CHECKERS, GameId.AMERICAN_CHECKERS, 
+                          GameId.RUSSIAN_CHECKERS, GameId.INTERNATIONAL_DRAUGHTS):
             renderer = self._get_checkers_renderer()
             renderer.update_from_payload(payload)
             self.setCurrentWidget(renderer)
@@ -1984,27 +2009,27 @@ _CHECKERS_HOVER = QtGui.QColor(100, 100, 255, 50)     # Light blue hover
 
 
 class _CheckersBoardRenderer(QtWidgets.QWidget):
-    """Checkers board renderer with interactive piece selection.
+    """Checkers/Draughts board renderer with interactive piece selection.
 
-    Renders an 8x8 checkers board. Board values:
+    Supports both 8x8 (American/Russian) and 10x10 (International) boards.
+    Board values:
     - 0: Empty
     - 1: Black piece (player_0)
     - 2: Black king
     - 3: White piece (player_1)
     - 4: White king
 
-    Note: Only dark squares are playable in checkers.
+    Note: Only dark squares are playable in checkers/draughts.
     """
 
     cell_clicked = QtCore.Signal(int, int)  # row, col
 
-    SIZE = 8  # 8x8 board
-
     def __init__(self, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
 
-        # Board state (0=empty, 1=black, 2=black king, 3=white, 4=white king)
-        self._board: List[List[int]] = [[0] * self.SIZE for _ in range(self.SIZE)]
+        # Board state (dynamically sized - 8x8 or 10x10)
+        self._board_size: int = 8  # Default to 8x8
+        self._board: List[List[int]] = [[0] * self._board_size for _ in range(self._board_size)]
         self._current_player: str = "player_0"
         self._legal_moves: List[int] = []
         self._last_move: Optional[int] = None
@@ -2033,12 +2058,19 @@ class _CheckersBoardRenderer(QtWidgets.QWidget):
         self._update_minimum_size()
 
     def _update_minimum_size(self) -> None:
-        size = self.SIZE * self._cell_size + 2 * self._margin
+        size = self._board_size * self._cell_size + 2 * self._margin
         self.setMinimumSize(size, size)
 
     def update_from_payload(self, payload: Dict[str, Any]) -> None:
-        """Update Checkers board from adapter payload."""
-        # Get board (8x8 array)
+        """Update Checkers/Draughts board from adapter payload."""
+        # Get board size (8x8 or 10x10)
+        board_size = payload.get("board_size", 8)
+        if board_size != self._board_size:
+            self._board_size = board_size
+            self._board = [[0] * self._board_size for _ in range(self._board_size)]
+            self._update_minimum_size()
+        
+        # Get board array
         board = payload.get("board")
         if isinstance(board, list):
             self._board = [row[:] for row in board]
@@ -2112,7 +2144,7 @@ class _CheckersBoardRenderer(QtWidgets.QWidget):
         col = x // self._cell_size
         row = y // self._cell_size
 
-        if row >= self.SIZE or col >= self.SIZE:
+        if row >= self._board_size or col >= self._board_size:
             return None
 
         return (row, col)
@@ -2178,8 +2210,8 @@ class _CheckersBoardRenderer(QtWidgets.QWidget):
         """Handle resize to keep board square and centered."""
         super().resizeEvent(event)
         available = min(self.width(), self.height())
-        self._cell_size = (available - 2 * self._margin) // self.SIZE
-        self._margin = (available - self._cell_size * self.SIZE) // 2
+        self._cell_size = (available - 2 * self._margin) // self._board_size
+        self._margin = (available - self._cell_size * self._board_size) // 2
 
     # -------------------------------------------------------------------------
     # Painting
@@ -2209,8 +2241,8 @@ class _CheckersBoardRenderer(QtWidgets.QWidget):
 
     def _draw_squares(self, painter: QtGui.QPainter) -> None:
         """Draw the checkerboard pattern."""
-        for row in range(self.SIZE):
-            for col in range(self.SIZE):
+        for row in range(self._board_size):
+            for col in range(self._board_size):
                 x, y = self._cell_to_pixel(row, col)
 
                 if self._is_dark_square(row, col):
@@ -2268,8 +2300,8 @@ class _CheckersBoardRenderer(QtWidgets.QWidget):
 
     def _draw_pieces(self, painter: QtGui.QPainter) -> None:
         """Draw checkers pieces on the board."""
-        for row in range(self.SIZE):
-            for col in range(self.SIZE):
+        for row in range(self._board_size):
+            for col in range(self._board_size):
                 piece = self._board[row][col]
                 if piece == 0:
                     continue
@@ -2314,30 +2346,30 @@ class _CheckersBoardRenderer(QtWidgets.QWidget):
         painter.setPen(QtGui.QColor(40, 40, 40))
         font_metrics = QtGui.QFontMetrics(font)
 
-        for i in range(self.SIZE):
+        for i in range(self._board_size):
             # Column labels (a-h)
             file_char = chr(ord("a") + i)
             char_width = font_metrics.horizontalAdvance(file_char)
             x = self._margin + i * self._cell_size + (self._cell_size - char_width) // 2
 
             painter.drawText(x, self._margin - 8, file_char)
-            board_bottom = self._margin + self.SIZE * self._cell_size
+            board_bottom = self._margin + self._board_size * self._cell_size
             painter.drawText(x, board_bottom + font_metrics.ascent() + 5, file_char)
 
             # Row labels (8-1, top to bottom)
-            rank_char = str(self.SIZE - i)
+            rank_char = str(self._board_size - i)
             char_width = font_metrics.horizontalAdvance(rank_char)
             y = self._margin + i * self._cell_size + (self._cell_size + font_metrics.ascent()) // 2
 
             painter.drawText(self._margin - char_width - 8, y, rank_char)
-            board_right = self._margin + self.SIZE * self._cell_size
+            board_right = self._margin + self._board_size * self._cell_size
             painter.drawText(board_right + 8, y, rank_char)
 
     def _draw_game_over(self, painter: QtGui.QPainter) -> None:
         """Draw game over overlay."""
         # Semi-transparent overlay
         overlay = QtGui.QColor(0, 0, 0, 100)
-        board_size = self.SIZE * self._cell_size
+        board_size = self._board_size * self._cell_size
         painter.fillRect(
             self._margin, self._margin, board_size, board_size, overlay
         )

@@ -175,17 +175,9 @@ class TestPolicyEvaluation:
 
     def test_policy_eval_mode_requires_policy_path(self) -> None:
         """Test that policy_eval mode requires policy_path extra."""
-        config = _make_config(extras={"mode": "policy_eval"})
-        runtime = CleanRLWorkerRuntime(
-            config,
-            use_grpc=False,
-            grpc_target="127.0.0.1:50055",
-            dry_run=False,
-        )
-
-        # Should raise because policy_path is missing
+        # Config __post_init__ validates that policy_eval needs policy_path
         with pytest.raises(ValueError, match="policy_path"):
-            runtime.run()
+            _make_config(extras={"mode": "policy_eval"})
 
     def test_policy_eval_mode_with_missing_file(self, tmp_path: Path, monkeypatch) -> None:
         """Test that policy_eval raises FileNotFoundError for missing checkpoint."""
@@ -251,8 +243,8 @@ class TestPolicyEvaluation:
         )
 
         summary = runtime.run()
-        assert summary.status == "dry-run"
-        assert summary.extras["mode"] == "policy_eval"
+        assert summary["status"] == "dry-run"
+        assert summary["extras"]["mode"] == "policy_eval"
 
 
 class TestResumeTrainingConfig:
@@ -287,8 +279,8 @@ class TestResumeTrainingConfig:
         )
 
         summary = runtime.run()
-        assert summary.status == "dry-run"
-        assert summary.config["algo"] == "ppo"
+        assert summary["status"] == "dry-run"
+        assert summary["config"]["algo"] == "ppo"
 
     def test_learning_rate_override_env_var(self, monkeypatch) -> None:
         """Test that CLEANRL_LEARNING_RATE env var is recognized."""

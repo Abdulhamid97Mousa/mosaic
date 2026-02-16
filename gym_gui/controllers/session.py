@@ -48,6 +48,7 @@ from gym_gui.controllers.interaction import (
     ViZDoomInteractionController,
     ProcgenInteractionController,
     JumanjiArcadeInteractionController,
+    SMACInteractionController,
 )
 from gym_gui.logging_config.log_constants import (
     LOG_NORMALIZATION_STATS_DROPPED,
@@ -385,6 +386,9 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         if family == EnvironmentFamily.JUMANJI and self._game_id in self._JUMANJI_ARCADE_GAMES:
             # 10 FPS for arcade feel - ghosts/snake/blocks move automatically
             return JumanjiArcadeInteractionController(self, target_hz=10)
+        if family in (EnvironmentFamily.SMAC, EnvironmentFamily.SMACV2):
+            # SMAC is agent-only: auto-step with random valid actions at 5 FPS
+            return SMACInteractionController(self, target_hz=5)
         return TurnBasedInteractionController()
 
     def perform_human_action(self, action: int | list[int], *, key_label: str | None = None) -> None:
@@ -449,6 +453,14 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             return
         if self._game_paused:
             self.status_message.emit("Game is paused. Click 'Continue' to resume.")
+            return
+        # SMAC: simultaneous multi-agent stepping -- generate actions for all agents
+        interaction = getattr(self, "_interaction", None)
+        if isinstance(interaction, SMACInteractionController):
+            action = interaction.maybe_passive_action()
+            if action is not None:
+                self._pending_input_label = "agent"
+                self._apply_action(action)
             return
         # Get active agent from last step for multi-agent environments
         active_agent = self._get_active_agent()
@@ -522,6 +534,14 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         if self._game_paused:
             # Auto-play should be stopped when paused, but add safety check
             self.stop_auto_play()
+            return
+        # SMAC: simultaneous multi-agent stepping -- generate actions for all agents
+        interaction = getattr(self, "_interaction", None)
+        if isinstance(interaction, SMACInteractionController):
+            action = interaction.maybe_passive_action()
+            if action is not None:
+                self._pending_input_label = "auto_play"
+                self._apply_action(action)
             return
         # Get active agent from last step for multi-agent environments
         active_agent = self._get_active_agent()
@@ -1009,9 +1029,9 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             self._stop_idle_tick()
             return
         interaction = getattr(self, "_interaction", None)
-        # For ALE, ViZDoom, Procgen, and Jumanji arcade games, do not gate on awaiting_human
+        # For ALE, ViZDoom, Procgen, Jumanji arcade, and SMAC games, do not gate on awaiting_human
         # These are continuous games where the world should keep moving regardless of player input
-        require_awaiting = not isinstance(interaction, (AleInteractionController, ViZDoomInteractionController, ProcgenInteractionController, JumanjiArcadeInteractionController))
+        require_awaiting = not isinstance(interaction, (AleInteractionController, ViZDoomInteractionController, ProcgenInteractionController, JumanjiArcadeInteractionController, SMACInteractionController))
         if require_awaiting and not self._awaiting_human:
             return
 

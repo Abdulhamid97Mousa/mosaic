@@ -47,8 +47,19 @@ CLI Usage:
 
 from __future__ import annotations
 
-from .config import XuanCeWorkerConfig
-from .runtime import XuanCeRuntimeSummary, XuanCeWorkerRuntime
+import os
+
+# Prevent mpi4py from calling MPI_Init() at import time.
+# XuanCe's statistic_tools.py does `from mpi4py import MPI` at module level,
+# and OpenMPI's MPI_Init() blocks forever outside an MPI launch environment
+# (e.g. when running inside the MOSAIC GUI).  Setting this env var tells
+# mpi4py to skip auto-initialisation; XuanCe only uses MPI when
+# RunningMeanStd(use_mpi=True) is explicitly requested.
+os.environ.setdefault("MPI4PY_RC_INITIALIZE", "0")
+
+# Heavy modules (.config, .runtime) are deferred via PEP 562 __getattr__
+# because .runtime eagerly imports the xuance library.
+# Lightweight algorithm_registry is safe to import eagerly.
 from .algorithm_registry import (
     Backend,
     Paradigm,
@@ -62,6 +73,35 @@ from .algorithm_registry import (
     is_algorithm_available,
     get_backend_summary,
 )
+
+# Lazy attribute mapping: name -> (module, attribute)
+_LAZY_IMPORTS: dict[str, tuple[str, str]] = {
+    "XuanCeWorkerConfig": (".config", "XuanCeWorkerConfig"),
+    "XuanCeRuntimeSummary": (".runtime", "XuanCeRuntimeSummary"),
+    "XuanCeWorkerRuntime": (".runtime", "XuanCeWorkerRuntime"),
+}
+
+
+def __getattr__(name: str):
+    if name in _LAZY_IMPORTS:
+        import importlib
+        import logging
+
+        module_path, attr = _LAZY_IMPORTS[name]
+        logger = logging.getLogger(__name__)
+        logger.debug(
+            "Lazy-loading %s from %s (xuance runtime may be slow due to "
+            "circular import in xuance/common/statistic_tools.py)",
+            attr,
+            module_path,
+        )
+        mod = importlib.import_module(module_path, __name__)
+        val = getattr(mod, attr)
+        # Cache on the module so __getattr__ is not called again
+        globals()[name] = val
+        logger.debug("Lazy-loaded %s successfully", attr)
+        return val
+    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
 
 __version__ = "0.1.0"
 

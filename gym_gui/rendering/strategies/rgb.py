@@ -44,6 +44,20 @@ class RgbRendererStrategy(RendererStrategy):
         """Enable/disable mouse capture support."""
         self._view.set_mouse_capture_enabled(enabled)
 
+    def set_grid_click_callback(
+        self,
+        callback: Callable[[int, int], None] | None,
+        rows: int = 0,
+        cols: int = 0,
+        grid_rect: tuple[float, float, float, float] | None = None,
+    ) -> None:
+        """Enable grid-click mode on the RGB view."""
+        self._view.set_grid_click_callback(callback, rows, cols, grid_rect=grid_rect)
+
+    def set_scroll_callback(self, callback: Callable[[int], None] | None) -> None:
+        """Set scroll-wheel callback (e.g. for Tetris rotation)."""
+        self._view.set_scroll_callback(callback)
+
     @property
     def widget(self) -> QtWidgets.QWidget:
         return self._view
@@ -119,6 +133,14 @@ class _RgbView(QtWidgets.QWidget):
         self._turn_left_action = 1   # Default: many scenarios use index 1
         self._turn_right_action = 2  # Default: many scenarios use index 2
 
+        # Grid-click mode (for Jumanji Tetris, Minesweeper, etc.)
+        self._grid_click_callback: Callable[[int, int], None] | None = None
+        self._scroll_callback: Callable[[int], None] | None = None
+        self._grid_rows: int = 0
+        self._grid_cols: int = 0
+        self._grid_rect: tuple[float, float, float, float] | None = None
+        self._image_rect: QtCore.QRect | None = None
+
         # Enable focus and mouse tracking
         self.setFocusPolicy(QtCore.Qt.FocusPolicy.StrongFocus)
         self.setMouseTracking(True)
@@ -173,6 +195,76 @@ class _RgbView(QtWidgets.QWidget):
         """Return True if mouse is currently captured."""
         return self._mouse_captured
 
+    # ── Grid-click mode (Jumanji Tetris / Minesweeper) ────────────────
+
+    def set_grid_click_callback(
+        self,
+        callback: Callable[[int, int], None] | None,
+        rows: int = 0,
+        cols: int = 0,
+        grid_rect: tuple[float, float, float, float] | None = None,
+    ) -> None:
+        """Enable grid-click mode: clicks on the image map to (row, col).
+
+        Args:
+            callback: Called with (row, col) when the user clicks a grid cell,
+                      or None to disable grid-click mode.
+            rows: Number of grid rows.
+            cols: Number of grid columns.
+            grid_rect: Normalised (top, left, bottom, right) fractions in [0, 1]
+                       describing where the grid sits inside the rendered image.
+                       For example (0.168, 0.109, 0.950, 0.891) means the grid
+                       starts at 16.8% from the top, 10.9% from the left, etc.
+                       If None, the entire image is treated as the grid.
+        """
+        self._grid_click_callback = callback
+        self._grid_rows = rows
+        self._grid_cols = cols
+        self._grid_rect = grid_rect
+        if callback is not None:
+            self.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        elif not self._mouse_captured:
+            self.setCursor(QtCore.Qt.CursorShape.ArrowCursor)
+
+    def set_scroll_callback(self, callback: Callable[[int], None] | None) -> None:
+        """Set callback for scroll-wheel events (e.g. Tetris rotation).
+
+        Args:
+            callback: Called with +1 (scroll up) or -1 (scroll down),
+                      or None to disable.
+        """
+        self._scroll_callback = callback
+
+    def _pixel_to_grid_cell(self, pos: QtCore.QPoint) -> tuple[int, int] | None:
+        """Map a widget pixel position to a (row, col) grid cell.
+
+        Returns None if the click is outside the grid region.
+        """
+        rect = self._image_rect
+        if rect is None or rect.width() <= 0 or rect.height() <= 0:
+            return None
+
+        # Position relative to the rendered image
+        rel_x = (pos.x() - rect.x()) / rect.width()
+        rel_y = (pos.y() - rect.y()) / rect.height()
+        if rel_x < 0.0 or rel_y < 0.0 or rel_x > 1.0 or rel_y > 1.0:
+            return None
+
+        # Narrow to the grid sub-region (if specified)
+        gr = self._grid_rect
+        if gr is not None:
+            top, left, bottom, right = gr
+            if rel_x < left or rel_x > right or rel_y < top or rel_y > bottom:
+                return None
+            rel_x = (rel_x - left) / (right - left)
+            rel_y = (rel_y - top) / (bottom - top)
+
+        col = min(int(rel_x * self._grid_cols), self._grid_cols - 1)
+        row = min(int(rel_y * self._grid_rows), self._grid_rows - 1)
+        return (row, col)
+
+    # ── End grid-click mode ────────────────────────────────────────────
+
     def _capture_mouse(self) -> None:
         """Capture the mouse for FPS-style control."""
         if self._mouse_captured:
@@ -197,7 +289,24 @@ class _RgbView(QtWidgets.QWidget):
         _LOGGER.debug("Mouse released from FPS control")
 
     def mousePressEvent(self, event: QtGui.QMouseEvent) -> None:  # type: ignore[override]
-        """Handle mouse press - capture mouse on click."""
+        """Handle mouse press - grid click or FPS capture."""
+        # Grid-click mode takes priority over FPS capture
+        if (
+            self._grid_click_callback is not None
+            and self._grid_rows > 0
+            and self._grid_cols > 0
+            and event.button() == QtCore.Qt.MouseButton.LeftButton
+            and not self._mouse_captured
+        ):
+            cell = self._pixel_to_grid_cell(event.position().toPoint())
+            if cell is not None:
+                row, col = cell
+                _LOGGER.debug("Grid click: row=%d col=%d", row, col)
+                self._grid_click_callback(row, col)
+                event.accept()
+                return
+
+        # FPS-style mouse capture
         if not self._mouse_capture_enabled:
             super().mousePressEvent(event)
             return
@@ -259,6 +368,15 @@ class _RgbView(QtWidgets.QWidget):
         if self._mouse_captured:
             self._release_mouse_capture()
         super().focusOutEvent(event)
+
+    def wheelEvent(self, event: QtGui.QWheelEvent) -> None:  # type: ignore[override]
+        """Handle scroll wheel — used for Tetris rotation."""
+        if self._scroll_callback is not None:
+            direction = 1 if event.angleDelta().y() > 0 else -1
+            self._scroll_callback(direction)
+            event.accept()
+            return
+        super().wheelEvent(event)
 
     def render_frame(self, frame: object, *, tooltip_payload: Mapping[str, object] | None = None) -> None:
         """Render an RGB frame array."""
@@ -346,6 +464,7 @@ class _RgbView(QtWidgets.QWidget):
 
             # Draw the pixmap scaled to fit
             target_rect = QtCore.QRect(x, y, scaled_width, scaled_height)
+            self._image_rect = target_rect
             painter.drawPixmap(target_rect, self._current_pixmap)
         else:
             # Fallback: draw at original size if dimensions are invalid

@@ -185,6 +185,57 @@ class TrainingFormHandler:
         self._status("Launching training run...", 5000)
         self._submit_config(config)
 
+    def on_custom_script_requested(self, worker_id: str) -> None:
+        """Handle the 'Custom Script' button - opens script configuration form."""
+        if not worker_id:
+            QMessageBox.information(
+                self._parent,
+                "Worker Required",
+                "Select a worker integration before launching a custom script.",
+            )
+            return
+
+        factory = self._get_form_factory()
+        try:
+            dialog = factory.create_script_form(worker_id, parent=self._parent)
+        except KeyError:
+            QMessageBox.warning(
+                self._parent,
+                "Script form unavailable",
+                f"No custom script form registered for worker '{worker_id}'.",
+            )
+            return
+
+        if dialog.exec() != QDialog.DialogCode.Accepted:
+            return
+
+        get_config = getattr(dialog, "get_config", None)
+        if not callable(get_config):
+            QMessageBox.warning(
+                self._parent,
+                "Unsupported Form",
+                "Selected worker form does not provide a configuration payload.",
+            )
+            return
+
+        config = get_config()
+        if config is None:
+            return
+        if not isinstance(config, dict):
+            QMessageBox.warning(
+                self._parent,
+                "Invalid Configuration",
+                "Worker form returned an unexpected payload. Expected a dictionary.",
+            )
+            return
+
+        self._log(
+            message="Custom script configuration submitted from dialog",
+            extra={"worker_id": worker_id},
+        )
+        self._status("Launching custom script run...", 5000)
+        self._submit_config(config)
+
     def on_resume_training_requested(self, worker_id: str) -> None:
         """Handle the 'Resume Training' button - loads checkpoint and continues training."""
         if not worker_id:

@@ -41,9 +41,10 @@ adjacent cells contain mines.
 </ul>
 
 <h4>Action Space</h4>
-<p><code>Discrete(H * W)</code> - Each action corresponds to revealing a cell:</p>
+<p><code>MultiDiscrete([num_rows, num_cols])</code> - Each action is a 2-element array <code>[row, col]</code>:</p>
 <ul>
-    <li>Action index = row * width + column</li>
+    <li><strong>Dimension 0</strong>: Row index (0 to num_rows - 1)</li>
+    <li><strong>Dimension 1</strong>: Column index (0 to num_cols - 1)</li>
     <li>Only unrevealed cells are valid actions</li>
 </ul>
 
@@ -73,10 +74,15 @@ adjacent cells contain mines.
 </table>
 
 <h4>Controls</h4>
-<p>
-Minesweeper uses a grid-based action space that is best suited for mouse/touch
-interaction. Each cell can be selected by its index.
-</p>
+<table style="width:100%; border-collapse: collapse; margin: 10px 0;">
+    <tr style="background-color: #f0f0f0;">
+        <th style="border: 1px solid #ddd; padding: 8px;">Input</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Action</th>
+    </tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Left Click on cell</td><td style="border: 1px solid #ddd; padding: 8px;">Reveal that cell (action = [row, col])</td></tr>
+</table>
+<p><em>Click directly on the rendered game image to reveal cells.
+The click position is automatically mapped to the grid cell.</em></p>
 
 <h4>Strategies</h4>
 <ul>

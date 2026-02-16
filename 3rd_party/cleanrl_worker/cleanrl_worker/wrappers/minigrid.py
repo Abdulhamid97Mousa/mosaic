@@ -23,6 +23,16 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
+def _has_wrapper(env: gym.Env, wrapper_cls: type) -> bool:
+    """Walk the wrapper chain and return True if *wrapper_cls* is present."""
+    current = env
+    while current is not None:
+        if isinstance(current, wrapper_cls):
+            return True
+        current = getattr(current, "env", None)
+    return False
+
+
 def is_minigrid_env(env_id: str) -> bool:
     """Check if the environment is a MiniGrid or BabyAI environment.
 
@@ -85,12 +95,12 @@ def make_minigrid_env(
         else:
             env = gym.make(env_id)
 
-        # Import MiniGrid wrappers
-        from minigrid.wrappers import ImgObsWrapper
-
         # Apply MiniGrid-specific wrappers
-        # 1. Convert Dict observation to image-only
-        env = ImgObsWrapper(env)
+        # 1. Convert Dict observation to image-only (skip if already Box,
+        #    e.g. when sitecustomize.py already applied ImgObsWrapper)
+        if isinstance(env.observation_space, gym.spaces.Dict):
+            from minigrid.wrappers import ImgObsWrapper
+            env = ImgObsWrapper(env)
 
         # 2. Add time limit (MiniGrid default max_steps=0 means no limit)
         env = gym.wrappers.TimeLimit(env, max_episode_steps=max_episode_steps)
@@ -102,13 +112,15 @@ def make_minigrid_env(
         # 4. Track episode statistics
         env = gym.wrappers.RecordEpisodeStatistics(env)
 
-        # 5. Control procedural generation
+        # 5. Control procedural generation (skip if sitecustomize.py already
+        #    applied ProceduralGenerationWrapper inside gym.make)
         from cleanrl_worker.wrappers.procedural_generation import ProceduralGenerationWrapper
-        env = ProceduralGenerationWrapper(
-            env,
-            procedural=procedural_generation,
-            fixed_seed=seed if not procedural_generation else (seed + idx if seed is not None else None)
-        )
+        if not _has_wrapper(env, ProceduralGenerationWrapper):
+            env = ProceduralGenerationWrapper(
+                env,
+                procedural=procedural_generation,
+                fixed_seed=seed if not procedural_generation else (seed + idx if seed is not None else None)
+            )
 
         return env
 
@@ -220,14 +232,15 @@ def make_env(
 
             env = gym.wrappers.RecordEpisodeStatistics(env)
 
-            # Add procedural generation wrapper if available
+            # Add procedural generation wrapper if not already applied
             try:
                 from cleanrl_worker.wrappers.procedural_generation import ProceduralGenerationWrapper
-                env = ProceduralGenerationWrapper(
-                    env,
-                    procedural=procedural_generation,
-                    fixed_seed=seed if not procedural_generation else (seed + idx if seed is not None else None)
-                )
+                if not _has_wrapper(env, ProceduralGenerationWrapper):
+                    env = ProceduralGenerationWrapper(
+                        env,
+                        procedural=procedural_generation,
+                        fixed_seed=seed if not procedural_generation else (seed + idx if seed is not None else None)
+                    )
             except ImportError:
                 pass
 

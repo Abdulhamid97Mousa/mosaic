@@ -419,7 +419,7 @@ class TestJumanjiSudokuDocumentation:
 
     def test_sudoku_has_documentation(self) -> None:
         """Test that Sudoku has documentation in GAME_INFO."""
-        from gym_gui.game_docs.game_info import GAME_INFO
+        from gym_gui.game_docs import GAME_INFO
 
         assert GameId.JUMANJI_SUDOKU in GAME_INFO
         doc = GAME_INFO[GameId.JUMANJI_SUDOKU]
@@ -428,7 +428,7 @@ class TestJumanjiSudokuDocumentation:
 
     def test_sudoku_documentation_content(self) -> None:
         """Test that Sudoku documentation contains expected content."""
-        from gym_gui.game_docs.game_info import GAME_INFO
+        from gym_gui.game_docs import GAME_INFO
 
         doc = GAME_INFO[GameId.JUMANJI_SUDOKU]
         # Should mention Sudoku

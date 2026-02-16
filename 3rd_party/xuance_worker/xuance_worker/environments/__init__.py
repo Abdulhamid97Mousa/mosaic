@@ -25,7 +25,7 @@ _logger = logging.getLogger(__name__)
 
 # Lazy imports to avoid circular dependencies
 if TYPE_CHECKING:
-    from xuance_worker.environments.multigrid import MultiGrid_Env
+    from xuance_worker.environments.mosaic_multigrid import MultiGrid_Env
 
 _REGISTERED = False
 
@@ -53,7 +53,7 @@ def register_mosaic_environments() -> None:
 
     try:
         from xuance.environment.multi_agent_env import REGISTRY_MULTI_AGENT_ENV
-        from xuance_worker.environments.multigrid import MultiGrid_Env
+        from xuance_worker.environments.mosaic_multigrid import MultiGrid_Env
 
         # Register MultiGrid
         if "multigrid" not in REGISTRY_MULTI_AGENT_ENV:
@@ -90,7 +90,7 @@ def get_registered_environments() -> list[str]:
 # Export for direct import
 def _get_multigrid_env():
     """Lazy import of MultiGrid_Env."""
-    from xuance_worker.environments.multigrid import MultiGrid_Env
+    from xuance_worker.environments.mosaic_multigrid import MultiGrid_Env
     return MultiGrid_Env
 
 

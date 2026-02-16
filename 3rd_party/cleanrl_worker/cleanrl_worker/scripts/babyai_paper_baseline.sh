@@ -81,8 +81,8 @@ REWARD_SCALE="20.0"         # Paper: 20.0 reward scaling
 # We use: batch_size = NUM_ENVS * NUM_STEPS
 NUM_MINIBATCHES="4"
 
-# Create run-specific directory
-RUN_DIR="$SCRIPTS_DIR/$RUN_ID"
+# Artifact directory -- uses var/trainer/runs/{run_id} when launched from GUI
+RUN_DIR="${MOSAIC_RUN_DIR:-$SCRIPTS_DIR/$RUN_ID}"
 mkdir -p "$RUN_DIR/checkpoints"
 mkdir -p "$RUN_DIR/tensorboard"
 
@@ -110,7 +110,8 @@ echo ""
 # Build training config
 # ============================================================================
 
-TRAINING_CONFIG="$RUN_DIR/training_config.json"
+mkdir -p "$RUN_DIR/config"
+TRAINING_CONFIG="$RUN_DIR/config/training_config.json"
 
 jq --argjson steps "$TOTAL_TIMESTEPS" \
    --argjson num_envs "$NUM_ENVS" \

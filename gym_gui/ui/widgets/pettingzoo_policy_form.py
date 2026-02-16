@@ -577,7 +577,7 @@ class PettingZooPolicyForm(QtWidgets.QDialog):
 
 
 # Register form with factory at module load (late import to avoid cycles)
-from gym_gui.ui.forms import get_worker_form_factory  # noqa: E402
+from gym_gui.ui.forms.factory import get_worker_form_factory  # noqa: E402
 
 _factory = get_worker_form_factory()
 if not _factory.has_policy_form("pettingzoo_worker"):

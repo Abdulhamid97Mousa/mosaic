@@ -122,6 +122,17 @@ class XuanCeWorkerConfig:
         Returns:
             XuanCeWorkerConfig instance.
         """
+        # Derive device: explicit "device" key takes priority, otherwise
+        # fall back to extras.cuda flag (set by the GUI's GPU checkbox).
+        extras = dict(data.get("extras", {}))
+        explicit_device = data.get("device")
+        if explicit_device is not None:
+            device = str(explicit_device)
+        elif extras.get("cuda"):
+            device = "cuda:0"
+        else:
+            device = "cpu"
+
         return cls(
             run_id=str(data.get("run_id", "")),
             method=str(data.get("method", data.get("algo", "dqn"))),
@@ -132,12 +143,12 @@ class XuanCeWorkerConfig:
                 data.get("running_steps", data.get("total_timesteps", 1_000_000))
             ),
             seed=data.get("seed"),
-            device=str(data.get("device", "cpu")),
+            device=device,
             parallels=int(data.get("parallels", 8)),
             test_mode=bool(data.get("test_mode", False)),
             config_path=data.get("config_path"),
             worker_id=data.get("worker_id"),
-            extras=dict(data.get("extras", {})),
+            extras=extras,
         )
 
     def to_dict(self) -> dict[str, Any]:

@@ -825,7 +825,7 @@ class JumanjiConnectorAdapter(JumanjiAdapter):
     Action space: Select next cell in path
     Observation: Grid with endpoints and current paths
     """
-    _env_id = "Connector-v2"
+    _env_id = "Connector-v3"
 
     def build_step_state(
         self, observation: np.ndarray, info: Mapping[str, Any]

@@ -68,8 +68,11 @@ def make_env(env_id, idx, procedural_generation=True, seed=None):
 
         # Flatten observation for MiniGrid/BabyAI (converts Dict obs to flat array)
         from minigrid.wrappers import ImgObsWrapper
-        env = ImgObsWrapper(env)  # Use only the image part of observation
+        env = ImgObsWrapper(env)  # Dict → Box(7,7,3): extract image only
+        env = gym.wrappers.FlattenObservation(env)  # Box(7,7,3) → Box(147,): flatten for MLP
 
+        # Force episode termination for short test runs
+        env = gym.wrappers.TimeLimit(env, max_episode_steps=64)
         env = gym.wrappers.RecordEpisodeStatistics(env)
 
         # Add procedural generation wrapper
@@ -169,11 +172,13 @@ def quick_train_ppo(
             rewards[step] = torch.tensor(reward).to(device).view(-1)
             next_obs, next_done = torch.Tensor(next_obs).to(device), torch.Tensor(next_done).to(device)
 
-            # Track episode returns
-            if "final_info" in infos:
-                for info in infos["final_info"]:
-                    if info and "episode" in info:
-                        episode_returns.append(info["episode"]["r"])
+            # Track episode returns (gymnasium SyncVectorEnv format)
+            if "episode" in infos:
+                # infos["_episode"] is a boolean mask: True for envs that finished
+                mask = infos["_episode"]
+                for env_idx in range(num_envs):
+                    if mask[env_idx]:
+                        episode_returns.append(infos["episode"]["r"][env_idx])
 
         # Compute advantages
         with torch.no_grad():

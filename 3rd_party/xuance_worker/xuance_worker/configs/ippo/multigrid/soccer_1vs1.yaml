@@ -1,0 +1,95 @@
+# IPPO configuration for mosaic_multigrid 1vs1 Soccer (IndAgObs)
+# Environment: SoccerGame2HIndAgObsEnv16x11N2
+# Gymnasium ID: MosaicMultiGrid-Soccer-1vs1-IndAgObs-v0
+# Teams: Green (agent_0) vs Blue (agent_1) -- 1 agent per team
+#
+# IPPO vs MAPPO:
+# - IPPO: Each agent trains its own PPO independently (no centralized critic)
+# - MAPPO: Centralized Training, Decentralized Execution (CTDE)
+# - For 1v1 competitive self-play, IPPO is a natural fit since agents are
+#   independent adversaries with opposing objectives. No shared value function.
+#
+# Observation type: IndAgObs (Individual Agent Observations)
+# - Each agent sees a 3x3 egocentric view: (3,3,3) = 27 flattened
+# - IndAgObs (not TeamObs) because:
+#   1. No teammates in 1v1 -- team-shared state is irrelevant
+#   2. Forces agents to learn spatial awareness from local perception
+#   3. Compact input (27 features) suits small MLP networks
+# - 7 discrete actions: left, right, forward, pickup, drop, toggle, done
+# - Short episodes: 200 max_steps, first-to-2-goals
+# - Positive-only rewards (zero_sum=False)
+
+agent: "IPPO"
+env_name: "multigrid"
+env_id: "soccer_1vs1"
+env_seed: 1
+continuous_action: False  # MultiGrid uses 7 discrete actions
+learner: "IPPO_Learner"
+policy: "Categorical_MAAC_Policy"  # Categorical for discrete actions
+representation: "Basic_MLP"
+vectorize: "DummyVecMultiAgentEnv"
+runner: "MARL"  # Registry key for RunnerMARL
+
+# Recurrent settings (disabled -- MLP is sufficient for IndAgObs)
+use_rnn: False
+rnn: "GRU"
+fc_hidden_sizes: [64, 64]
+recurrent_hidden_size: 64
+N_recurrent_layers: 1
+dropout: 0
+normalize: "LayerNorm"
+initialize: "orthogonal"
+gain: 0.01
+
+# Network architecture
+# IndAgObs: (3,3,3) = 27 flattened features
+representation_hidden_size: [64, 64]
+actor_hidden_size: [64, 64]
+critic_hidden_size: [64, 64]
+activation: "relu"
+activation_action: "softmax"
+
+# Multi-agent settings
+use_parameter_sharing: False  # 1v1 competitive: separate policy per agent
+use_actions_mask: False  # All actions always available
+
+# Training hyperparameters
+seed: 1
+parallels: 4
+buffer_size: 200  # Match max_steps (200) for full-episode buffers
+n_epochs: 4
+n_minibatch: 4
+learning_rate: 0.0007  # Slightly higher than MAPPO (0.0005) -- IPPO benefits from faster individual updates
+weight_decay: 0
+
+# PPO-specific
+vf_coef: 0.5
+ent_coef: 0.05  # High entropy to prevent premature convergence in sparse-reward soccer
+target_kl: 0.25
+clip_range: 0.2
+clip_type: 1
+gamma: 0.99
+
+# Training tricks
+use_linear_lr_decay: True
+end_factor_lr_decay: 0.1
+use_global_state: False  # IPPO does not use global state (key difference from MAPPO)
+use_value_clip: True
+value_clip_range: 0.2
+use_value_norm: True
+use_huber_loss: True
+huber_delta: 10.0
+use_advnorm: True
+use_gae: True
+gae_lambda: 0.95
+use_grad_clip: True
+grad_clip_norm: 10.0
+
+# Training duration
+running_steps: 2000000
+eval_interval: 100000
+test_episode: 5
+
+# Logging (overridden by runtime)
+log_dir: "./logs/ippo/"
+model_dir: "./models/ippo/"

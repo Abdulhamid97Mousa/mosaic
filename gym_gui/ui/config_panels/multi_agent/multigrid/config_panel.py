@@ -21,34 +21,46 @@ from gym_gui.core.enums import GameId
 
 # All MultiGrid game IDs
 MULTIGRID_GAME_IDS: tuple[GameId, ...] = (
-    # Legacy gym-multigrid (fixed agent counts)
-    GameId.MULTIGRID_SOCCER,      # 4 agents (2v2)
-    GameId.MULTIGRID_COLLECT,     # 3 agents
+    # MOSAIC multigrid (fixed agent counts)
+    GameId.MOSAIC_MULTIGRID_SOCCER,      # 4 agents (2v2) - Deprecated
+    GameId.MOSAIC_MULTIGRID_COLLECT,     # 3 agents - Deprecated
+    GameId.MOSAIC_MULTIGRID_COLLECT2VS2,  # 4 agents (2v2) - Deprecated
+    GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_INDAGOBS,      # 4 agents (2v2) - IndAgObs
+    GameId.MOSAIC_MULTIGRID_COLLECT_INDAGOBS,     # 3 agents - IndAgObs
+    GameId.MOSAIC_MULTIGRID_COLLECT2VS2_INDAGOBS,  # 4 agents (2v2) - IndAgObs
+    GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_TEAMOBS,       # 4 agents (2v2) - TeamObs
+    GameId.MOSAIC_MULTIGRID_COLLECT2VS2_TEAMOBS,   # 4 agents (2v2) - TeamObs
     # INI multigrid (configurable agent count, default 2)
-    GameId.MULTIGRID_BLOCKED_UNLOCK_PICKUP,
-    GameId.MULTIGRID_EMPTY_5X5,
-    GameId.MULTIGRID_EMPTY_RANDOM_5X5,
-    GameId.MULTIGRID_EMPTY_6X6,
-    GameId.MULTIGRID_EMPTY_RANDOM_6X6,
-    GameId.MULTIGRID_EMPTY_8X8,
-    GameId.MULTIGRID_EMPTY_16X16,
-    GameId.MULTIGRID_LOCKED_HALLWAY_2ROOMS,
-    GameId.MULTIGRID_LOCKED_HALLWAY_4ROOMS,
-    GameId.MULTIGRID_LOCKED_HALLWAY_6ROOMS,
-    GameId.MULTIGRID_PLAYGROUND,
-    GameId.MULTIGRID_RED_BLUE_DOORS_6X6,
-    GameId.MULTIGRID_RED_BLUE_DOORS_8X8,
+    GameId.INI_MULTIGRID_BLOCKED_UNLOCK_PICKUP,
+    GameId.INI_MULTIGRID_EMPTY_5X5,
+    GameId.INI_MULTIGRID_EMPTY_RANDOM_5X5,
+    GameId.INI_MULTIGRID_EMPTY_6X6,
+    GameId.INI_MULTIGRID_EMPTY_RANDOM_6X6,
+    GameId.INI_MULTIGRID_EMPTY_8X8,
+    GameId.INI_MULTIGRID_EMPTY_16X16,
+    GameId.INI_MULTIGRID_LOCKED_HALLWAY_2ROOMS,
+    GameId.INI_MULTIGRID_LOCKED_HALLWAY_4ROOMS,
+    GameId.INI_MULTIGRID_LOCKED_HALLWAY_6ROOMS,
+    GameId.INI_MULTIGRID_PLAYGROUND,
+    GameId.INI_MULTIGRID_RED_BLUE_DOORS_6X6,
+    GameId.INI_MULTIGRID_RED_BLUE_DOORS_8X8,
 )
 
-# Legacy environments with fixed agent counts (cannot be changed)
-LEGACY_FIXED_AGENT_COUNTS: dict[GameId, int] = {
-    GameId.MULTIGRID_SOCCER: 4,   # 2v2 teams
-    GameId.MULTIGRID_COLLECT: 3,  # 3 collectors
+# MOSAIC environments with  agent counts (cannot be changed)
+MOSAIC_AGENT_COUNTS: dict[GameId, int] = {
+    GameId.MOSAIC_MULTIGRID_SOCCER: 4,   # 2v2 teams
+    GameId.MOSAIC_MULTIGRID_COLLECT: 3,  # 3 collectors
+    GameId.MOSAIC_MULTIGRID_COLLECT2VS2: 4,  # 2v2 teams
+    GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_INDAGOBS: 4,   # 2v2 teams
+    GameId.MOSAIC_MULTIGRID_COLLECT_INDAGOBS: 3,  # 3 collectors
+    GameId.MOSAIC_MULTIGRID_COLLECT2VS2_INDAGOBS: 4,  # 2v2 teams
+    GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_TEAMOBS: 4,   # 2v2 teams
+    GameId.MOSAIC_MULTIGRID_COLLECT2VS2_TEAMOBS: 4,  # 2v2 teams
 }
 
 # INI environments that support configurable agent count
 INI_CONFIGURABLE_GAMES: tuple[GameId, ...] = tuple(
-    gid for gid in MULTIGRID_GAME_IDS if gid not in LEGACY_FIXED_AGENT_COUNTS
+    gid for gid in MULTIGRID_GAME_IDS if gid not in MOSAIC_AGENT_COUNTS
 )
 
 
@@ -84,16 +96,16 @@ def build_multigrid_controls(
             callbacks.on_change(key, value)
 
     cfg = defaults if isinstance(defaults, MultiGridConfig) else MultiGridConfig()
-    is_legacy = game_id in LEGACY_FIXED_AGENT_COUNTS
+    is_mosaic = game_id in MOSAIC_AGENT_COUNTS
 
     # -------- Number of Agents --------
-    if is_legacy:
-        # Legacy environments: Show fixed agent count (read-only)
-        fixed_count = LEGACY_FIXED_AGENT_COUNTS[game_id]
-        agents_label = QtWidgets.QLabel(f"{fixed_count} (fixed)", parent)
+    if is_mosaic:
+        # MOSAIC environments: Show agent count (read-only)
+        agent_count = MOSAIC_AGENT_COUNTS[game_id]
+        agents_label = QtWidgets.QLabel(f"{agent_count}", parent)
         agents_label.setToolTip(
-            f"This legacy environment has a fixed agent count of {fixed_count}.\n"
-            "Legacy gym-multigrid environments cannot change agent count."
+            f"This MOSAIC environment has {agent_count} agents.\n"
+            "MOSAIC multigrid environments have predefined agent counts."
         )
         layout.addRow("Number of Agents", agents_label)
     else:
@@ -158,12 +170,12 @@ def build_multigrid_controls(
     layout.addRow("", highlight_check)
 
     # -------- Info Label --------
-    if is_legacy:
-        env_type = "Legacy gym-multigrid"
-        api_info = "Uses old OpenAI Gym API"
+    if is_mosaic:
+        env_type = "MOSAIC MultiGrid"
+        api_info = "Team-based competitive (Soccer/Collect)"
     else:
-        env_type = "INI multigrid"
-        api_info = "Uses Gymnasium API"
+        env_type = "INI MultiGrid"
+        api_info = "Cooperative exploration"
 
     info_label = QtWidgets.QLabel(
         f"<i><b>{env_type}</b> ({api_info})<br><br>"

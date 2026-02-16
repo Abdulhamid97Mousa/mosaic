@@ -41,8 +41,8 @@ export XUANCE_NUM_ENVS="${XUANCE_NUM_ENVS:-4}"
 export XUANCE_SEED="${XUANCE_SEED:-}"
 export TRACK_TENSORBOARD="${TRACK_TENSORBOARD:-1}"
 
-# Create run-specific directory
-RUN_DIR="$SCRIPTS_DIR/$RUN_ID"
+# Artifact directory -- uses var/trainer/runs/{run_id} when launched from GUI
+RUN_DIR="${MOSAIC_RUN_DIR:-$SCRIPTS_DIR/$RUN_ID}"
 mkdir -p "$RUN_DIR/checkpoints"
 
 # Total timesteps across all curriculum stages
@@ -67,7 +67,8 @@ echo ""
 # Build curriculum config with schedule
 # ============================================================================
 
-CURRICULUM_CONFIG="$RUN_DIR/curriculum_config.json"
+mkdir -p "$RUN_DIR/config"
+CURRICULUM_CONFIG="$RUN_DIR/config/curriculum_config.json"
 
 # Create curriculum schedule and inject into config
 # The CLI will detect curriculum_schedule and use Syllabus-RL training

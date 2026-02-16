@@ -844,6 +844,55 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
                 if hasattr(view, "set_mouse_sensitivity"):
                     view.set_mouse_sensitivity(sensitivity)
 
+    def configure_grid_click(
+        self,
+        callback: "Callable[[int, int], None] | None",
+        rows: int,
+        cols: int,
+        *,
+        scroll_callback: "Callable[[int], None] | None" = None,
+        grid_rect: "tuple[float, float, float, float] | None" = None,
+    ) -> None:
+        """Configure grid-click mode on the Video (RGB) tab.
+
+        When enabled, clicking on the rendered image maps the pixel position
+        to a (row, col) grid cell and invokes the callback.  Used for Jumanji
+        games like Tetris (click column) and Minesweeper (click cell).
+
+        Args:
+            callback: Called with (row, col) on left-click, or None to disable.
+            rows: Grid row count.
+            cols: Grid column count.
+            scroll_callback: Optional callback for scroll-wheel (+1 up, -1 down).
+            grid_rect: Normalised (top, left, bottom, right) fractions in [0, 1]
+                       describing the grid sub-region within the rendered image.
+                       If None, the entire image is treated as the grid.
+        """
+        if self._video_host is None:
+            return
+        strategy = self._video_host._strategy
+        if not hasattr(strategy, "set_grid_click_callback"):
+            return
+        strategy.set_grid_click_callback(callback, rows, cols, grid_rect=grid_rect)
+        if hasattr(strategy, "set_scroll_callback"):
+            strategy.set_scroll_callback(scroll_callback)
+
+    def set_scroll_callback(
+        self,
+        callback: "Callable[[int], None] | None",
+    ) -> None:
+        """Set scroll-wheel callback on the Video (RGB) tab.
+
+        Args:
+            callback: Called with +1 (scroll up) or -1 (scroll down),
+                      or None to disable.
+        """
+        if self._video_host is None:
+            return
+        strategy = self._video_host._strategy
+        if hasattr(strategy, "set_scroll_callback"):
+            strategy.set_scroll_callback(callback)
+
     def _update_game_from_payload(self, payload: Mapping[str, object]) -> None:
         raw_game = payload.get("game_id")
         if raw_game is None:

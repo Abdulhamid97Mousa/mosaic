@@ -21,6 +21,7 @@ from PyQt6.QtCore import QTimer, pyqtSignal
 from qtpy import QtCore, QtWidgets
 
 from gym_gui.config.paths import VAR_MODELS_HF_CACHE, VAR_VLLM_DIR
+from gym_gui.config.settings import get_settings
 from gym_gui.logging_config.helpers import log_constant
 from gym_gui.logging_config.log_constants import (
     LOG_VLLM_SERVER_COUNT_CHANGED,
@@ -145,7 +146,8 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
 
     def _get_gpu_info_text(self) -> str:
         """Get the GPU memory info text for the header."""
-        per_server_pct = (0.8 / max(1, self._current_server_count)) * 100
+        gpu_util = get_settings().vllm_gpu_memory_utilization
+        per_server_pct = (gpu_util / max(1, self._current_server_count)) * 100
         total_used = sum(self._server_gpu_usage.values())
         free_gb = self._get_gpu_free_memory()
         if total_used > 0:
@@ -246,7 +248,7 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
         model_header = QtWidgets.QLabel("Model", self)
         self._grid_layout.addWidget(model_header, self.HEADER_ROW, self.COL_MODEL)
 
-        status_header = QtWidgets.QLabel("Status", self)
+        status_header = QtWidgets.QLabel("", self)
         self._grid_layout.addWidget(status_header, self.HEADER_ROW, self.COL_STATUS)
 
         actions_header = QtWidgets.QLabel("Actions", self)
@@ -278,10 +280,11 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
         self._populate_model_combo(model_combo)
         self._grid_layout.addWidget(model_combo, row, self.COL_MODEL)
 
-        # Status label (combined indicator + text)
-        status_label = QtWidgets.QLabel("○ Stopped", self)
-        # No custom styling - status colors set dynamically in _update_row_state
-        status_label.setMinimumWidth(80)
+        # Status label (indicator only, no text)
+        status_label = QtWidgets.QLabel("●", self)
+        status_label.setAlignment(QtCore.Qt.AlignmentFlag.AlignCenter)
+        status_label.setStyleSheet("color: #F44336; font-size: 16px;")  # Red for stopped
+        status_label.setMinimumWidth(30)
         self._grid_layout.addWidget(status_label, row, self.COL_STATUS)
 
         # Start button - same style as Execution Controls "Step All" (green)
@@ -404,7 +407,8 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
         # Update info label to show new per-server allocation
         self._update_info_label()
 
-        per_server_pct = (0.8 / max(1, count)) * 100
+        gpu_util = get_settings().vllm_gpu_memory_utilization
+        per_server_pct = (gpu_util / max(1, count)) * 100
         log_constant(
             _LOGGER, LOG_VLLM_SERVER_COUNT_CHANGED,
             message=f"Server count changed to {count}, {per_server_pct:.0f}% GPU per server",
@@ -460,34 +464,36 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
         row = self._server_rows[server_id]
         self._server_states[server_id] = state
 
-        # Update status label and buttons based on state
-        # Semantic colors: green=running, orange=starting, red=error
+        # Update status indicator (colored circle only)
+        # Semantic colors: green=running, yellow=starting, red=stopped/error
         if state.status == "running":
-            status_text = "● Running"
+            row.status_label.setText("●")
+            row.status_label.setStyleSheet("color: #4CAF50; font-size: 16px;")  # Green
+            tooltip = "Running"
             if state.memory_gb > 0:
-                status_text += f" ({state.memory_gb:.1f}GB)"
-            row.status_label.setText(status_text)
-            row.status_label.setStyleSheet("color: #4CAF50;")
+                tooltip += f" ({state.memory_gb:.1f}GB)"
+            row.status_label.setToolTip(tooltip)
             row.start_btn.setEnabled(False)
             row.stop_btn.setEnabled(True)
             row.model_combo.setEnabled(False)
         elif state.status == "starting":
-            row.status_label.setText("◐ Starting...")
-            row.status_label.setStyleSheet("color: #FF9800;")
+            row.status_label.setText("●")
+            row.status_label.setStyleSheet("color: #FF9800; font-size: 16px;")  # Yellow
+            row.status_label.setToolTip("Starting...")
             row.start_btn.setEnabled(False)
             row.stop_btn.setEnabled(False)
             row.model_combo.setEnabled(False)
         elif state.status == "error":
-            row.status_label.setText("✕ Error")
-            row.status_label.setStyleSheet("color: #F44336;")
-            row.status_label.setToolTip(state.error_message or "Unknown error")
+            row.status_label.setText("●")
+            row.status_label.setStyleSheet("color: #F44336; font-size: 16px;")  # Red
+            row.status_label.setToolTip(state.error_message or "Error")
             row.start_btn.setEnabled(True)
             row.stop_btn.setEnabled(False)
             row.model_combo.setEnabled(True)
         else:  # stopped
-            row.status_label.setText("○ Stopped")
-            row.status_label.setStyleSheet("")  # System default
-            row.status_label.setToolTip("")
+            row.status_label.setText("●")
+            row.status_label.setStyleSheet("color: #F44336; font-size: 16px;")  # Red
+            row.status_label.setToolTip("Stopped")
             row.start_btn.setEnabled(True)
             row.stop_btn.setEnabled(False)
             row.model_combo.setEnabled(True)
@@ -550,9 +556,10 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
 
         # Calculate per-server GPU allocation
         # vLLM pre-allocates for KV cache, so we MUST divide GPU among servers
-        # Use 0.8 total (leaving 20% for system), divided by server count
-        # e.g., 2 servers = 0.4 each, 3 servers = 0.27 each
-        per_server_gpu = 0.8 / max(1, self._current_server_count)
+        # Get configured GPU utilization from settings (default 0.85 = 85%, leaves 15% for system)
+        # Divide by server count, e.g., 0.85 with 2 servers = 0.425 each
+        gpu_util = get_settings().vllm_gpu_memory_utilization
+        per_server_gpu = gpu_util / max(1, self._current_server_count)
 
         # Use served-model-name for proper API compatibility
         cmd = [
@@ -804,7 +811,8 @@ class VLLMServerWidget(QtWidgets.QGroupBox):
                     f"{free_gb:.1f}GB free / {total_gb:.1f}GB total"
                 )
 
-                # Consider memory freed if we gained back most of what was used
+                # Consider memory freed if we gained back at least 80% of what was used
+                # (some memory may be retained by CUDA context)
                 if free_gb >= initial_free + (expected_freed * 0.8):
                     log_constant(
                         _LOGGER, LOG_VLLM_GPU_MEMORY_FREED,

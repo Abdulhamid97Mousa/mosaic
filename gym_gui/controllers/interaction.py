@@ -1,7 +1,9 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Optional, Any
+from typing import Optional, Any, List
+
+import numpy as np
 
 
 class InteractionController(ABC):
@@ -203,6 +205,69 @@ class ProcgenInteractionController(InteractionController):
         (no movement, no action). Action 0 is actually DOWN_LEFT!
         """
         return 4
+
+    def step_dt(self) -> float:
+        return 0.0
+
+
+class SMACInteractionController(InteractionController):
+    """Idle controller for SMAC/SMACv2: step continuously with random valid actions.
+
+    SMAC environments are multi-agent cooperative benchmarks where all agents
+    act simultaneously each timestep.  In AGENT_ONLY mode (the only supported
+    mode for SMAC), the game should auto-step with random valid actions so the
+    user can observe the battle unfolding after clicking "Start Game".
+
+    Each ``maybe_passive_action()`` call returns a ``List[int]`` -- one random
+    valid action per agent, respecting the action masks that SMAC exposes via
+    ``get_avail_agent_actions()``.  Dead agents can only perform NO-OP (0).
+    """
+
+    def __init__(self, owner: Any, target_hz: int = 5) -> None:
+        self._owner = owner
+        self._interval_ms = max(1, int(1000 / float(target_hz)))  # 200ms for 5 FPS
+
+    def idle_interval_ms(self) -> Optional[int]:
+        return self._interval_ms
+
+    def should_idle_tick(self) -> bool:
+        o = self._owner
+        if o._adapter is None or o._game_id is None:
+            return False
+        if not getattr(o, "_game_started", False):
+            return False
+        if o._game_paused:
+            return False
+        # SMAC supports AGENT_ONLY and MULTI_AGENT_COOP -- both need auto-stepping
+        mode_name = getattr(o._control_mode, "name", "")
+        if mode_name not in ("AGENT_ONLY", "MULTI_AGENT_COOP"):
+            return False
+        if o._last_step is not None and (o._last_step.terminated or o._last_step.truncated):
+            return False
+        return True
+
+    def maybe_passive_action(self) -> Optional[List[int]]:
+        """Sample random valid actions for all SMAC agents using action masks."""
+        adapter = getattr(self._owner, "_adapter", None)
+        if adapter is None:
+            return None
+        # Access the adapter's get_avail_actions() for mask-based sampling
+        if not hasattr(adapter, "get_avail_actions"):
+            return None
+        try:
+            avail = adapter.get_avail_actions()
+            if not avail:
+                return None
+            actions: List[int] = []
+            for mask in avail:
+                valid_indices = [i for i, v in enumerate(mask) if v == 1]
+                if valid_indices:
+                    actions.append(int(np.random.choice(valid_indices)))
+                else:
+                    actions.append(0)  # NO-OP fallback for dead agents
+            return actions
+        except Exception:
+            return None
 
     def step_dt(self) -> float:
         return 0.0

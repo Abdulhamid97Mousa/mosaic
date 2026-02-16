@@ -43,10 +43,12 @@ total completion time (makespan).
 </ul>
 
 <h4>Action Space</h4>
-<p><code>Discrete</code> - Select next operation to schedule:</p>
+<p><code>MultiDiscrete([num_jobs+1] * num_machines)</code> - Assign a job to each machine simultaneously:</p>
 <ul>
-    <li>Each action schedules a ready operation on its machine</li>
-    <li>Operation is ready when all predecessors in its job are complete</li>
+    <li>One decision per machine (shape = num_machines)</li>
+    <li><strong>0 to num_jobs-1</strong>: Schedule next operation of that job on the machine</li>
+    <li><strong>num_jobs</strong>: No-op (machine idles this step)</li>
+    <li>Operations must respect precedence within each job</li>
 </ul>
 
 <h4>Rewards</h4>

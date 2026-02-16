@@ -37,131 +37,6 @@ _LOGGER = logging.getLogger("gym_gui.operators.operators_tab")
 _log = partial(log_constant, _LOGGER)
 
 
-class CollapsibleSection(QtWidgets.QWidget):
-    """A collapsible section with a header button to show/hide content.
-
-    The section starts collapsed by default to save vertical space.
-    """
-
-    def __init__(
-        self,
-        title: str,
-        parent: Optional[QtWidgets.QWidget] = None,
-        collapsed: bool = True,
-    ) -> None:
-        super().__init__(parent)
-        self._title = title
-        self._is_collapsed = collapsed
-
-        self._build_ui()
-
-    def _build_ui(self) -> None:
-        """Build the collapsible section UI."""
-        layout = QtWidgets.QVBoxLayout(self)
-        layout.setContentsMargins(0, 0, 0, 0)
-        layout.setSpacing(0)
-
-        # Header with toggle button
-        self._header = QtWidgets.QPushButton(self)
-        self._header.setCheckable(True)
-        self._header.setChecked(not self._is_collapsed)
-        self._header.clicked.connect(self._on_toggle)
-        self._header.setStyleSheet(
-            """
-            QPushButton {
-                text-align: left;
-                padding: 8px 12px;
-                font-size: 13px;
-                font-weight: 600;
-                color: #333;
-                background-color: #f5f5f5;
-                border: 1px solid #d0d0d0;
-                border-radius: 6px;
-            }
-            QPushButton:hover {
-                background-color: #ebebeb;
-                border-color: #bbb;
-            }
-            QPushButton:checked {
-                background-color: #f0f0f0;
-                border-bottom-left-radius: 0;
-                border-bottom-right-radius: 0;
-                border-bottom-color: transparent;
-            }
-            """
-        )
-        layout.addWidget(self._header)
-
-        # Content container
-        self._content_widget = QtWidgets.QWidget(self)
-        self._content_layout = QtWidgets.QVBoxLayout(self._content_widget)
-        self._content_layout.setContentsMargins(12, 12, 12, 12)
-        self._content_widget.setStyleSheet(
-            """
-            QWidget {
-                background-color: #fafafa;
-                border: 1px solid #d0d0d0;
-                border-top: none;
-                border-bottom-left-radius: 6px;
-                border-bottom-right-radius: 6px;
-            }
-            QLabel {
-                background: transparent;
-                border: none;
-                font-size: 12px;
-                color: #444;
-            }
-            """
-        )
-        layout.addWidget(self._content_widget)
-
-        # Set initial state
-        self._update_header_text()
-        self._content_widget.setVisible(not self._is_collapsed)
-
-    def _update_header_text(self) -> None:
-        """Update header text with expand/collapse indicator."""
-        arrow = "▼" if not self._is_collapsed else "▶"
-        action = "Hide" if not self._is_collapsed else "Show"
-        self._header.setText(f"{arrow} {self._title} ({action})")
-
-    def _on_toggle(self) -> None:
-        """Toggle the collapsed state."""
-        self._is_collapsed = not self._is_collapsed
-        self._content_widget.setVisible(not self._is_collapsed)
-        self._header.setChecked(not self._is_collapsed)
-        self._update_header_text()
-
-    def set_content_widget(self, widget: QtWidgets.QWidget) -> None:
-        """Set the content widget for this collapsible section."""
-        # Clear existing content
-        while self._content_layout.count():
-            item = self._content_layout.takeAt(0)
-            if item is not None:
-                old_widget = item.widget()
-                if old_widget is not None:
-                    old_widget.setParent(None)
-
-        self._content_layout.addWidget(widget)
-
-    def add_widget(self, widget: QtWidgets.QWidget) -> None:
-        """Add a widget to the content area."""
-        self._content_layout.addWidget(widget)
-
-    def content_layout(self) -> QtWidgets.QVBoxLayout:
-        """Get the content layout for adding widgets."""
-        return self._content_layout
-
-    def is_collapsed(self) -> bool:
-        """Return whether the section is collapsed."""
-        return self._is_collapsed
-
-    def set_collapsed(self, collapsed: bool) -> None:
-        """Set the collapsed state."""
-        if self._is_collapsed != collapsed:
-            self._on_toggle()
-
-
 class OperatorsTab(QtWidgets.QWidget):
     """Main tab for configuring Operators.
 
@@ -220,8 +95,9 @@ class OperatorsTab(QtWidgets.QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
-        # Explanation section (collapsible, starts collapsed)
-        self._explanation_section = CollapsibleSection("What are Operators?", self, collapsed=True)
+        # Explanation section (always visible)
+        explanation_group = QtWidgets.QGroupBox("What are Operators?", self)
+        explanation_layout = QtWidgets.QVBoxLayout(explanation_group)
         explanation_text = QtWidgets.QLabel(
             "<p><b>Operators</b> are action-selecting entities that control agents in environments. "
             "MOSAIC introduces a unified <i>Operator</i> abstraction that bridges:</p>"
@@ -230,20 +106,21 @@ class OperatorsTab(QtWidgets.QWidget):
             "<li><b>RL Policies</b> - Trained neural network policies</li>"
             "</ul>"
             "<p>Add multiple operators below to run them in parallel and compare their performance side-by-side.</p>",
-            self
+            explanation_group
         )
         explanation_text.setWordWrap(True)
         explanation_text.setTextFormat(QtCore.Qt.TextFormat.RichText)
         # No custom styling - let Qt handle dark/light mode automatically
-        self._explanation_section.add_widget(explanation_text)
-        layout.addWidget(self._explanation_section)
+        explanation_layout.addWidget(explanation_text)
+        layout.addWidget(explanation_group)
 
-        # vLLM Servers section (collapsible, starts collapsed)
-        self._vllm_section = CollapsibleSection("vLLM Servers (Local Inference)", self, collapsed=True)
-        self._vllm_server_widget = VLLMServerWidget(max_servers=2, parent=self)
+        # vLLM Servers section (always visible)
+        vllm_group = QtWidgets.QGroupBox("vLLM Servers (Local Inference)", self)
+        vllm_layout = QtWidgets.QVBoxLayout(vllm_group)
+        self._vllm_server_widget = VLLMServerWidget(max_servers=2, parent=vllm_group)
         self._vllm_server_widget.server_status_changed.connect(self._on_vllm_server_status_changed)
-        self._vllm_section.add_widget(self._vllm_server_widget)
-        layout.addWidget(self._vllm_section)
+        vllm_layout.addWidget(self._vllm_server_widget)
+        layout.addWidget(vllm_group)
 
         # Configure Operators section (always visible, takes remaining space)
         config_group = QtWidgets.QGroupBox("Configure Operators", self)

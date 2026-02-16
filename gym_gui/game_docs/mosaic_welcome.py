@@ -156,7 +156,7 @@ to create cohesive intelligent systems — like tiles in a mosaic forming a comp
     <td style="background-color: #e8f5e9; border-left: 4px solid #43a047; width: 33%;">
         <b style="color: #43a047;">MultiGrid</b><br/>
         <span style="color: #666; font-size: 11px;">Multi-agent MiniGrid extensions (Soccer, Collect)</span><br/>
-        <a href="https://github.com/ArnaudFickinger/gym-multigrid" style="color: #1565c0; font-size: 10px;">GitHub</a>
+        <a href="https://github.com/Abdulhamid97Mousa/mosaic_multigrid" style="color: #1565c0; font-size: 10px;">GitHub</a>
     </td>
 </tr>
 <tr>
@@ -180,45 +180,24 @@ to create cohesive intelligent systems — like tiles in a mosaic forming a comp
         <a href="https://arxiv.org/abs/2103.02142" style="color: #1565c0; font-size: 10px;">Paper</a>
     </td>
 </tr>
-</table>
-
-<h3 style="color: #333; margin-top: 15px; margin-bottom: 10px;">Core Features</h3>
-<table width="100%" cellpadding="8" cellspacing="4">
 <tr>
-    <td style="background-color: #f5f5f5; border-left: 4px solid #5b4b8a;">
-        <b style="color: #333;">Multi-Paradigm Support</b><br/>
-        <span style="color: #666; font-size: 12px;">Single-agent, multi-agent (AEC/Parallel), and hybrid environments</span>
+    <td style="background-color: #c5cae9; border-left: 4px solid #1a237e; width: 33%;">
+        <b style="color: #1a237e;">SMAC</b><br/>
+        <span style="color: #666; font-size: 11px;">Cooperative StarCraft II micromanagement benchmark (WhiRL, Oxford)</span><br/>
+        <a href="https://github.com/oxwhirl/smac" style="color: #1565c0; font-size: 10px;">GitHub</a> |
+        <a href="https://arxiv.org/abs/1902.04043" style="color: #1565c0; font-size: 10px;">Paper</a>
     </td>
-</tr>
-<tr>
-    <td style="background-color: #f5f5f5; border-left: 4px solid #2e7d32;">
-        <b style="color: #333;">Agent Integration</b><br/>
-        <span style="color: #666; font-size: 12px;">Human, RL (CleanRL, Ray RLlib, XuanCe), and LLM agents</span>
+    <td style="background-color: #b2ebf2; border-left: 4px solid #006064; width: 33%;">
+        <b style="color: #006064;">SMACv2</b><br/>
+        <span style="color: #666; font-size: 11px;">Procedural StarCraft II scenarios for robustness (WhiRL, Oxford)</span><br/>
+        <a href="https://github.com/oxwhirl/smacv2" style="color: #1565c0; font-size: 10px;">GitHub</a> |
+        <a href="https://arxiv.org/abs/2212.07489" style="color: #1565c0; font-size: 10px;">Paper</a>
     </td>
-</tr>
-<tr>
-    <td style="background-color: #f5f5f5; border-left: 4px solid #1565c0;">
-        <b style="color: #333;">Policy Mapping</b><br/>
-        <span style="color: #666; font-size: 12px;">Assign different policies to different agents with flexible configuration</span>
-    </td>
+    <td style="background-color: #f5f5f5; width: 33%;"></td>
 </tr>
 </table>
 
-<table width="100%" cellpadding="10" cellspacing="0" style="background-color: #e8f5e9; margin-top: 12px;">
-<tr><td>
-    <b style="color: #2e7d32; font-size: 13px;">Getting Started</b>
-    <ol style="margin: 8px 0 0 0; padding-left: 20px; color: #444; font-size: 12px;">
-        <li><b>Select Environment</b> — Choose from the dropdown in the sidebar</li>
-        <li><b>Configure Settings</b> — Adjust parameters for your environment</li>
-        <li><b>Load Environment</b> — Click "Load" to initialize</li>
-        <li><b>Start Training/Playing</b> — Begin your experiment</li>
-    </ol>
-</td></tr>
-</table>
 
-<p style="color: #888; font-size: 11px; margin-top: 12px; text-align: center;">
-    <i>Select an environment from the sidebar to see detailed documentation.</i>
-</p>
 """
 
 MULTI_KEYBOARD_HTML = """

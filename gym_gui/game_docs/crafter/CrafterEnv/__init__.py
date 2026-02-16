@@ -20,7 +20,7 @@ def get_crafter_html(env_id: str) -> str:
     Returns:
         HTML string containing environment documentation.
     """
-    reward_enabled = "Reward" in env_id
+    reward_enabled = "CrafterReward" in env_id  # Check for CrafterReward, not just Reward
 
     return f"""
 <h2>{env_id}</h2>

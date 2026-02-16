@@ -13,6 +13,7 @@ from gym_gui.config.game_configs import (
     MeltingPotConfig,
     MiniGridConfig,
     MultiGridConfig,
+    SMACConfig,
     TaxiConfig,
 )
 from gym_gui.core.enums import GameId, EnvironmentFamily, ENVIRONMENT_FAMILY_BY_GAME
@@ -281,9 +282,9 @@ class GameConfigBuilder:
                 death_penalty=death_penalty,
             )
 
-        # MultiGrid environments (gym-multigrid)
+        # MultiGrid environments (MOSAIC and INI multigrid)
         family = ENVIRONMENT_FAMILY_BY_GAME.get(game_id)
-        if family == EnvironmentFamily.MULTIGRID:
+        if family in (EnvironmentFamily.MOSAIC_MULTIGRID, EnvironmentFamily.INI_MULTIGRID):
             # Use the game_id value directly as env_id (e.g., "MultiGrid-BlockedUnlockPickup-v0")
             env_id = game_id.value
             num_agents = overrides.get("num_agents")
@@ -323,6 +324,100 @@ class GameConfigBuilder:
                 highlight=highlight,
             )
 
+        # SMAC v1 environments (hand-designed cooperative micromanagement maps)
+        if family == EnvironmentFamily.SMAC:
+            # Extract map name from GameId value: "SMAC-3m-v0" -> "3m"
+            raw = game_id.value
+            map_name = raw.replace("SMAC-", "").replace("-v0", "")
+            difficulty = str(overrides.get("difficulty", "7"))
+            reward_sparse = bool(overrides.get("reward_sparse", False))
+            reward_only_positive = bool(overrides.get("reward_only_positive", True))
+            reward_scale = bool(overrides.get("reward_scale", True))
+            reward_scale_rate = float(overrides.get("reward_scale_rate", 20.0))
+            obs_own_health = bool(overrides.get("obs_own_health", True))
+            obs_pathing_grid = bool(overrides.get("obs_pathing_grid", False))
+            obs_terrain_height = bool(overrides.get("obs_terrain_height", False))
+            seed = overrides.get("seed")
+            if seed is not None:
+                try:
+                    seed = int(seed)
+                except (TypeError, ValueError):
+                    seed = None
+            episode_limit = overrides.get("episode_limit")
+            if episode_limit is not None:
+                try:
+                    episode_limit = int(episode_limit)
+                    if episode_limit <= 0:
+                        episode_limit = None
+                except (TypeError, ValueError):
+                    episode_limit = None
+            sc2_path = overrides.get("sc2_path")
+            if sc2_path is not None and not str(sc2_path).strip():
+                sc2_path = None
+            renderer = str(overrides.get("renderer", "3d"))
+            return SMACConfig(
+                map_name=map_name,
+                difficulty=difficulty,
+                reward_sparse=reward_sparse,
+                reward_only_positive=reward_only_positive,
+                reward_scale=reward_scale,
+                reward_scale_rate=reward_scale_rate,
+                obs_own_health=obs_own_health,
+                obs_pathing_grid=obs_pathing_grid,
+                obs_terrain_height=obs_terrain_height,
+                seed=seed,
+                episode_limit=episode_limit,
+                sc2_path=sc2_path,
+                renderer=renderer,
+            )
+
+        # SMACv2 environments (procedural unit generation)
+        if family == EnvironmentFamily.SMACV2:
+            # Extract map name from GameId value: "SMACv2-10gen_terran-v0" -> "10gen_terran"
+            raw = game_id.value
+            map_name = raw.replace("SMACv2-", "").replace("-v0", "")
+            difficulty = str(overrides.get("difficulty", "7"))
+            reward_sparse = bool(overrides.get("reward_sparse", False))
+            reward_only_positive = bool(overrides.get("reward_only_positive", True))
+            reward_scale = bool(overrides.get("reward_scale", True))
+            reward_scale_rate = float(overrides.get("reward_scale_rate", 20.0))
+            obs_own_health = bool(overrides.get("obs_own_health", True))
+            obs_pathing_grid = bool(overrides.get("obs_pathing_grid", False))
+            obs_terrain_height = bool(overrides.get("obs_terrain_height", False))
+            seed = overrides.get("seed")
+            if seed is not None:
+                try:
+                    seed = int(seed)
+                except (TypeError, ValueError):
+                    seed = None
+            episode_limit = overrides.get("episode_limit")
+            if episode_limit is not None:
+                try:
+                    episode_limit = int(episode_limit)
+                    if episode_limit <= 0:
+                        episode_limit = None
+                except (TypeError, ValueError):
+                    episode_limit = None
+            sc2_path = overrides.get("sc2_path")
+            if sc2_path is not None and not str(sc2_path).strip():
+                sc2_path = None
+            renderer = str(overrides.get("renderer", "3d"))
+            return SMACConfig(
+                map_name=map_name,
+                difficulty=difficulty,
+                reward_sparse=reward_sparse,
+                reward_only_positive=reward_only_positive,
+                reward_scale=reward_scale,
+                reward_scale_rate=reward_scale_rate,
+                obs_own_health=obs_own_health,
+                obs_pathing_grid=obs_pathing_grid,
+                obs_terrain_height=obs_terrain_height,
+                seed=seed,
+                episode_limit=episode_limit,
+                sc2_path=sc2_path,
+                renderer=renderer,
+            )
+
         # MeltingPot environments
         if family == EnvironmentFamily.MELTINGPOT:
             # Extract substrate name from game_id value (e.g., "meltingpot/clean_up" -> "clean_up")
@@ -335,6 +430,27 @@ class GameConfigBuilder:
             return MeltingPotConfig(
                 substrate_name=substrate_name,
                 render_scale=render_scale_value,
+            )
+
+        # RWARE (Robotic Warehouse) environments
+        if family == EnvironmentFamily.RWARE:
+            from gym_gui.config.game_configs import RWAREConfig
+
+            observation_type = overrides.get("observation_type", "flattened")
+            sensor_range = int(overrides.get("sensor_range", 1))
+            reward_type = overrides.get("reward_type", "individual")
+            msg_bits = int(overrides.get("msg_bits", 0))
+            max_steps = int(overrides.get("max_steps", 500))
+            seed_val = overrides.get("seed")
+            seed = int(seed_val) if seed_val is not None and int(seed_val) >= 0 else None
+
+            return RWAREConfig(
+                observation_type=observation_type,
+                sensor_range=sensor_range,
+                reward_type=reward_type,
+                msg_bits=msg_bits,
+                max_steps=max_steps,
+                seed=seed,
             )
 
         return None

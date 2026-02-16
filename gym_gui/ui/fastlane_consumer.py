@@ -60,6 +60,19 @@ class FastLaneConsumer(QtCore.QObject):
             self._attach_reader()
             return
         try:
+            # Detect buffer invalidation (e.g. curriculum phase transition).
+            # The worker sets FLAG_INVALIDATED in the header before unlinking
+            # the old segment and creating a new one.
+            if reader.is_invalidated:
+                _LOGGER.info(
+                    "FastLane buffer invalidated (phase transition), reconnecting: %s",
+                    self._run_id,
+                )
+                self._close_reader()
+                self._reader = None
+                self.status_changed.emit("reconnecting")
+                return
+
             if reader.capacity <= 0 or reader.slot_size <= 0:
                 if not self._header_warning_emitted:
                     log_constant(

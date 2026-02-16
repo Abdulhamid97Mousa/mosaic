@@ -268,7 +268,7 @@ def make_multigrid_env(
         register_all()
     except ImportError:
         raise ImportError(
-            "MultiGrid not installed. Install with: pip install -e 3rd_party/gym-multigrid/"
+            "MultiGrid not installed. Install with: pip install mosaic-multigrid"
         )
 
     return gym.make(task, render_mode=render_mode, **kwargs)

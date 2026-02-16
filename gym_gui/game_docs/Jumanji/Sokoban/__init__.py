@@ -42,9 +42,9 @@ be pushed, not pulled.
 <p><code>Discrete(4)</code> - Movement directions:</p>
 <ul>
     <li><strong>0</strong>: Up (push box if in front)</li>
-    <li><strong>1</strong>: Down</li>
-    <li><strong>2</strong>: Left</li>
-    <li><strong>3</strong>: Right</li>
+    <li><strong>1</strong>: Right</li>
+    <li><strong>2</strong>: Down</li>
+    <li><strong>3</strong>: Left</li>
 </ul>
 
 <h4>Rewards</h4>
@@ -84,7 +84,10 @@ be pushed, not pulled.
         <th style="border: 1px solid #ddd; padding: 8px;">Key</th>
         <th style="border: 1px solid #ddd; padding: 8px;">Action</th>
     </tr>
-    <tr><td style="border: 1px solid #ddd; padding: 8px;">Arrow Keys</td><td style="border: 1px solid #ddd; padding: 8px;">Move/Push</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">W / Up Arrow</td><td style="border: 1px solid #ddd; padding: 8px;">Move/Push Up (action 0)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">D / Right Arrow</td><td style="border: 1px solid #ddd; padding: 8px;">Move/Push Right (action 1)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">S / Down Arrow</td><td style="border: 1px solid #ddd; padding: 8px;">Move/Push Down (action 2)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">A / Left Arrow</td><td style="border: 1px solid #ddd; padding: 8px;">Move/Push Left (action 3)</td></tr>
 </table>
 
 <h4>References</h4>

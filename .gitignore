@@ -170,6 +170,14 @@ ml-agents/
 # PettingZoo worker (submodule content)
 3rd_party/pettingzoo_worker/PettingZoo/
 
+# MARLIB worker )
+3rd_party/marllib_worker/marllib_worker/__pycache__
+3rd_party/marllib_worker/**/__pycache__/
+
+# MARLIB worker )
+3rd_party/marllib_worker/marllib_worker/__pycache__
+3rd_party/marllib_worker/**/__pycache__/
+
 # ViZDoom worker (submodule content)
 3rd_party/vizdoom_worker/ViZDoom/
 

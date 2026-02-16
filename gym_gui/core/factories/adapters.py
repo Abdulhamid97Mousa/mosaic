@@ -18,6 +18,8 @@ from gym_gui.config.game_configs import (
     MultiGridConfig,
     MeltingPotConfig,
     OvercookedConfig,
+    SMACConfig,
+    RWAREConfig,
     GameConfig,
 )
 from gym_gui.core.adapters.base import AdapterContext, EnvironmentAdapter
@@ -157,14 +159,23 @@ except Exception:  # pragma: no cover - babaisai optional
     BabaIsAIAdapter = None  # type: ignore[misc, assignment]
     BabaIsAIConfig = None  # type: ignore[misc, assignment]
 
-try:  # Optional dependency - gym-multigrid (multi-agent grid environments)
-    from gym_gui.core.adapters.multigrid import (  # pragma: no cover - optional
-        MULTIGRID_ADAPTERS,
-        MultiGridAdapter,
+try:  # Optional dependency - MOSAIC MultiGrid (competitive team-based PyPI package)
+    from gym_gui.core.adapters.mosaic_multigrid import (  # pragma: no cover - optional
+        MOSAIC_MULTIGRID_ADAPTERS,
+        MultiGridAdapter as MosaicMultiGridAdapter,
     )
-except Exception:  # pragma: no cover - multigrid optional
-    MULTIGRID_ADAPTERS: dict[Any, Any] = {}
-    MultiGridAdapter = None  # type: ignore[misc, assignment]
+except Exception:  # pragma: no cover - mosaic_multigrid optional
+    MOSAIC_MULTIGRID_ADAPTERS: dict[Any, Any] = {}
+    MosaicMultiGridAdapter = None  # type: ignore[misc, assignment]
+
+try:  # Optional dependency - INI MultiGrid (cooperative exploration local package)
+    from gym_gui.core.adapters.ini_multigrid import (  # pragma: no cover - optional
+        INI_MULTIGRID_ADAPTERS,
+        MultiGridAdapter as INIMultiGridAdapter,
+    )
+except Exception:  # pragma: no cover - ini_multigrid optional
+    INI_MULTIGRID_ADAPTERS: dict[Any, Any] = {}
+    INIMultiGridAdapter = None  # type: ignore[misc, assignment]
 
 try:  # Optional dependency - Melting Pot (multi-agent social scenarios via Shimmy)
     from gym_gui.core.adapters.meltingpot import (  # pragma: no cover - optional
@@ -183,6 +194,33 @@ try:  # pragma: no cover - optional dep: overcooked
 except Exception:  # pragma: no cover - overcooked optional
     OVERCOOKED_ADAPTERS: dict[Any, Any] = {}
     OvercookedAdapter = None  # type: ignore[misc, assignment]
+
+try:  # Optional dependency - SMAC v1 (StarCraft Multi-Agent Challenge)
+    from gym_gui.core.adapters.smac import (  # pragma: no cover - optional
+        SMAC_ADAPTERS,
+        SMACAdapter,
+    )
+except Exception:  # pragma: no cover - smac optional
+    SMAC_ADAPTERS: dict[Any, Any] = {}
+    SMACAdapter = None  # type: ignore[misc, assignment]
+
+try:  # Optional dependency - SMACv2 (procedural unit generation)
+    from gym_gui.core.adapters.smacv2 import (  # pragma: no cover - optional
+        SMACV2_ADAPTERS,
+        SMACv2Adapter,
+    )
+except Exception:  # pragma: no cover - smacv2 optional
+    SMACV2_ADAPTERS: dict[Any, Any] = {}
+    SMACv2Adapter = None  # type: ignore[misc, assignment]
+
+try:  # Optional dependency - RWARE (Robotic Warehouse)
+    from gym_gui.core.adapters.rware import (  # pragma: no cover - optional
+        RWARE_ADAPTERS,
+        RWAREAdapter,
+    )
+except Exception:  # pragma: no cover - rware optional
+    RWARE_ADAPTERS: dict[Any, Any] = {}
+    RWAREAdapter = None  # type: ignore[misc, assignment]
 
 from gym_gui.core.enums import GameId
 
@@ -219,9 +257,13 @@ def _registry() -> Mapping[GameId, type[EnvironmentAdapter]]:
         **OPENSPIEL_ADAPTERS,
         **DRAUGHTS_ADAPTERS,
         **BABAISAI_ADAPTERS,
-        **MULTIGRID_ADAPTERS,
+        **MOSAIC_MULTIGRID_ADAPTERS,
+        **INI_MULTIGRID_ADAPTERS,
         **MELTINGPOT_ADAPTERS,
         **OVERCOOKED_ADAPTERS,
+        **SMAC_ADAPTERS,
+        **SMACV2_ADAPTERS,
+        **RWARE_ADAPTERS,
     }
 
 
@@ -363,8 +405,14 @@ def create_adapter(
         ):
             adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
         elif (
-            MultiGridAdapter is not None
-            and issubclass(adapter_cls, MultiGridAdapter)
+            MosaicMultiGridAdapter is not None
+            and issubclass(adapter_cls, MosaicMultiGridAdapter)
+            and isinstance(game_config, MultiGridConfig)
+        ):
+            adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
+        elif (
+            INIMultiGridAdapter is not None
+            and issubclass(adapter_cls, INIMultiGridAdapter)
             and isinstance(game_config, MultiGridConfig)
         ):
             adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
@@ -380,6 +428,24 @@ def create_adapter(
             and issubclass(adapter_cls, OvercookedAdapter)
             and OvercookedConfig is not None
             and isinstance(game_config, OvercookedConfig)
+        ):
+            adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
+        elif (
+            SMACAdapter is not None
+            and issubclass(adapter_cls, SMACAdapter)
+            and isinstance(game_config, SMACConfig)
+        ):
+            adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
+        elif (
+            SMACv2Adapter is not None
+            and issubclass(adapter_cls, SMACv2Adapter)
+            and isinstance(game_config, SMACConfig)
+        ):
+            adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
+        elif (
+            RWAREAdapter is not None
+            and issubclass(adapter_cls, RWAREAdapter)
+            and isinstance(game_config, RWAREConfig)
         ):
             adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
         else:

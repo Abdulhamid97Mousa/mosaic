@@ -14,7 +14,6 @@ class Topic(Enum):
     """Event topics for the telemetry Pub/Sub bus."""
 
     RUN_STARTED = auto()          # Training run initialized
-    RUN_HEARTBEAT = auto()        # Periodic heartbeat during training
     RUN_COMPLETED = auto()        # Training finished (success/failure)
     STEP_APPENDED = auto()        # New step recorded
     EPISODE_FINALIZED = auto()    # Episode completed

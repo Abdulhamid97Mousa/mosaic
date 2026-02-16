@@ -75,6 +75,7 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
         self._nav_copy_btn: QtWidgets.QAbstractButton | None = None
         self._nav_external_btn: QtWidgets.QAbstractButton | None = None
         self._pending_launch = False
+        self._data_seen = False
         self._last_status: tuple[str, int, bool] | None = None
         self.statusChanged.connect(self._handle_status_change)
         self._setup_ui()
@@ -95,6 +96,7 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
             self._path_field.setText(str(self._log_dir))
             self._path_field.setCursorPosition(0)
         self._pending_launch = False
+        self._data_seen = False
         self._last_status = None
         self._refresh_status()
 
@@ -287,16 +289,30 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
     def _refresh_status(self) -> None:
         exists = self._log_dir.exists()
         event_count = self._count_event_files(self._log_dir) if exists else 0
-        if exists:
+        has_data = self._has_scalar_data(self._log_dir) if exists else False
+        if exists and has_data:
             message = (
                 f"Found TensorBoard directory at {self._log_dir}. "
                 f"Detected {event_count} event file(s)."
+            )
+        elif exists:
+            message = (
+                f"Found TensorBoard directory at {self._log_dir}. "
+                f"Detected {event_count} event file(s) — waiting for training data…"
             )
         else:
             message = (
                 f"Waiting for logs… Directory {self._log_dir} does not exist yet. "
                 "It will appear once the worker emits TensorBoard data."
             )
+
+        # When data first appears, reload the embedded TensorBoard page so it
+        # picks up the scalars instead of showing "No dashboards".
+        if has_data and not self._data_seen:
+            self._data_seen = True
+            if self._web_view is not None and self._tensorboard_port is not None:
+                self._web_view.reload()
+
         snapshot = (message, event_count, exists)
         if self._last_status != snapshot:
             self.statusChanged.emit(message, event_count, exists)
@@ -313,6 +329,25 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
                 yield candidate
 
         return sum(1 for _ in iter_events())
+
+    # ------------------------------------------------------------------
+    @staticmethod
+    def _has_scalar_data(root: Path) -> bool:
+        """Check if any event file contains data beyond the initial header.
+
+        SummaryWriter creates the event file immediately (~88 bytes for the
+        file header alone).  Until the training loop calls ``add_scalar``,
+        TensorBoard shows "No dashboards".  A size threshold distinguishes
+        header-only files from files with actual data.
+        """
+        _HEADER_SIZE = 130  # generous: real headers are ~88 bytes
+        for candidate in root.rglob("events.out.tfevents.*"):
+            try:
+                if candidate.stat().st_size > _HEADER_SIZE:
+                    return True
+            except OSError:
+                continue
+        return False
 
     # ------------------------------------------------------------------
     def _copy_to_clipboard(self, value: str) -> None:
@@ -344,6 +379,7 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
         if self._command_field is not None:
             self._command_field.setText(self._cli_command)
             self._command_field.setCursorPosition(0)
+        self._data_seen = False
         self._last_status = None
         self._refresh_status()
 

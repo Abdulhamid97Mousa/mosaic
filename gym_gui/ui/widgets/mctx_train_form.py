@@ -754,7 +754,7 @@ class MCTXTrainForm(QtWidgets.QDialog):
 def _register_mctx_train_form() -> None:
     """Register MCTX train form with factory (deferred to avoid circular import)."""
     try:
-        from gym_gui.ui.forms import get_worker_form_factory
+        from gym_gui.ui.forms.factory import get_worker_form_factory
         factory = get_worker_form_factory()
         if not factory.has_train_form("mctx_worker"):
             factory.register_train_form(

@@ -176,6 +176,23 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
             provides_fast_analytics=True,  # TensorBoard logging
             supports_multi_agent=True,  # Two-player games
         ),
+        WorkerDefinition(
+            worker_id="marllib_worker",
+            display_name="MARLlib Worker",
+            description=(
+                "Multi-Agent RLlib (MARLlib) with 18 algorithms across 3 paradigms. "
+                "Independent Learning (IL): IA2C, IDDPG, ITRPO, IPPO. "
+                "Centralized Critic (CC): MAA2C, MADDPG, MAPPO, MATRPO, HAPPO, HATRPO, COMA. "
+                "Value Decomposition (VD): VDA2C, VDPPO, FACMAC, IQL, VDN, QMIX. "
+                "Supports 19 environments: MPE, SMAC, Football, MAMuJoCo, Hanabi, and more. "
+                "Built on Ray/RLlib with configurable policy sharing and network architectures."
+            ),
+            supports_training=True,
+            supports_policy_load=False,
+            requires_live_telemetry=False,
+            provides_fast_analytics=False,
+            supports_multi_agent=True,
+        ),
         # NOTE: PettingZoo is an environment library, not an algorithm provider.
         # PettingZoo environments are supported BY other workers (CleanRL, XuanCe, Ray RLlib, Chess, Human, MCTX).
     )

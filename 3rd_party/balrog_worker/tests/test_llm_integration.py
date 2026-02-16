@@ -16,7 +16,7 @@ import requests
 
 # Add paths
 sys.path.insert(0, str(Path(__file__).parent.parent))
-sys.path.insert(0, str(Path(__file__).parent.parent.parent / "gym-multigrid"))
+sys.path.insert(0, str(Path(__file__).parent.parent.parent / "mosaic_multigrid"))
 
 from mosaic_extension.multigrid import (
     get_instruction_prompt_level1,
@@ -71,7 +71,7 @@ def test_llm_level1_soccer(api_key: str):
     print("Testing Level 1 (Emergent) Coordination - Soccer")
     print("="*70)
 
-    from gym_multigrid.envs import SoccerGame4HEnv10x15N2
+    from mosaic_multigrid.envs import SoccerGame4HEnv10x15N2
 
     # Create environment
     env = SoccerGame4HEnv10x15N2()
@@ -133,7 +133,7 @@ def test_llm_level2_soccer(api_key: str):
     print("Testing Level 2 (Basic Hints) Coordination - Soccer")
     print("="*70)
 
-    from gym_multigrid.envs import SoccerGame4HEnv10x15N2
+    from mosaic_multigrid.envs import SoccerGame4HEnv10x15N2
 
     # Create environment
     env = SoccerGame4HEnv10x15N2()
@@ -195,7 +195,7 @@ def test_llm_level3_soccer(api_key: str):
     print("Testing Level 3 (Role-Based) Coordination - Soccer Forward")
     print("="*70)
 
-    from gym_multigrid.envs import SoccerGame4HEnv10x15N2
+    from mosaic_multigrid.envs import SoccerGame4HEnv10x15N2
 
     # Create environment
     env = SoccerGame4HEnv10x15N2()
@@ -259,7 +259,7 @@ def test_llm_observation_mode_egocentric(api_key: str):
     print("Testing Observation Mode: EGOCENTRIC (Own view only)")
     print("="*70)
 
-    from gym_multigrid.envs import SoccerGame4HEnv10x15N2
+    from mosaic_multigrid.envs import SoccerGame4HEnv10x15N2
 
     # Create environment
     env = SoccerGame4HEnv10x15N2()
@@ -312,7 +312,7 @@ def test_llm_observation_mode_teammates(api_key: str):
     print("Testing Observation Mode: VISIBLE TEAMMATES (Theory of Mind)")
     print("="*70)
 
-    from gym_multigrid.envs import SoccerGame4HEnv10x15N2
+    from mosaic_multigrid.envs import SoccerGame4HEnv10x15N2
 
     # Create environment
     env = SoccerGame4HEnv10x15N2()
@@ -371,7 +371,7 @@ def test_llm_compare_observation_modes(api_key: str):
     print("Comparing Observation Modes: Egocentric vs Visible Teammates")
     print("="*70)
 
-    from gym_multigrid.envs import SoccerGame4HEnv10x15N2
+    from mosaic_multigrid.envs import SoccerGame4HEnv10x15N2
 
     # Create environment
     env = SoccerGame4HEnv10x15N2()
@@ -437,7 +437,7 @@ def test_llm_multi_turn(api_key: str):
     print("Testing Multi-Turn LLM Interaction (5 steps)")
     print("="*70)
 
-    from gym_multigrid.envs import SoccerGame4HEnv10x15N2
+    from mosaic_multigrid.envs import SoccerGame4HEnv10x15N2
 
     # Create environment
     env = SoccerGame4HEnv10x15N2()

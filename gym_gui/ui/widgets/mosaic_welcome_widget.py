@@ -357,60 +357,61 @@ class MosaicWelcomeWidget(QWidget):
     def paintEvent(self, event) -> None:
         """Paint the interactive space scene."""
         painter = QPainter(self)
-        painter.setRenderHint(QPainter.RenderHint.Antialiasing)
-        painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
+        try:
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+            painter.setRenderHint(QPainter.RenderHint.SmoothPixmapTransform)
 
-        width = self.width()
-        height = self.height()
+            width = self.width()
+            height = self.height()
 
-        center_x = width / 2
-        center_y = height / 2
+            center_x = width / 2
+            center_y = height / 2
 
-        # Draw deep space background
-        self._draw_deep_space(painter, width, height)
+            # Draw deep space background
+            self._draw_deep_space(painter, width, height)
 
-        # Draw nebulae with parallax
-        self._draw_nebulae(painter, width, height)
+            # Draw nebulae with parallax
+            self._draw_nebulae(painter, width, height)
 
-        # Draw star field with parallax layers
-        self._draw_stars(painter, width, height)
+            # Draw star field with parallax layers
+            self._draw_stars(painter, width, height)
 
-        # Draw ambient particles
-        self._draw_particles(painter, width, height)
+            # Draw ambient particles
+            self._draw_particles(painter, width, height)
 
-        # Draw shooting stars
-        self._draw_shooting_stars(painter, width, height)
+            # Draw shooting stars
+            self._draw_shooting_stars(painter, width, height)
 
-        # Calculate planet size with zoom
-        planet_radius = min(width, height) * const.PLANET_RADIUS_FACTOR * self._zoom
-        orbit_base_radius = min(width, height) * const.ORBIT_BASE_RADIUS_FACTOR * self._zoom
+            # Calculate planet size with zoom
+            planet_radius = min(width, height) * const.PLANET_RADIUS_FACTOR * self._zoom
+            orbit_base_radius = min(width, height) * const.ORBIT_BASE_RADIUS_FACTOR * self._zoom
 
-        # Draw back half of orbit rings
-        self._draw_orbit_rings(painter, center_x, center_y, orbit_base_radius, front=False)
+            # Draw back half of orbit rings
+            self._draw_orbit_rings(painter, center_x, center_y, orbit_base_radius, front=False)
 
-        # Draw satellites behind planet
-        self._draw_satellites(painter, center_x, center_y, orbit_base_radius, behind=True)
+            # Draw satellites behind planet
+            self._draw_satellites(painter, center_x, center_y, orbit_base_radius, behind=True)
 
-        # Draw the MOSAIC planet
-        self._draw_planet(painter, center_x, center_y, planet_radius)
+            # Draw the MOSAIC planet
+            self._draw_planet(painter, center_x, center_y, planet_radius)
 
-        # Draw front half of orbit rings
-        self._draw_orbit_rings(painter, center_x, center_y, orbit_base_radius, front=True)
+            # Draw front half of orbit rings
+            self._draw_orbit_rings(painter, center_x, center_y, orbit_base_radius, front=True)
 
-        # Draw satellites in front of planet
-        self._draw_satellites(painter, center_x, center_y, orbit_base_radius, behind=False)
+            # Draw satellites in front of planet
+            self._draw_satellites(painter, center_x, center_y, orbit_base_radius, behind=False)
 
-        # Draw hover tooltip
-        if self._tooltip_opacity > 0.05:
-            self._draw_tooltip(painter, width, height)
+            # Draw hover tooltip
+            if self._tooltip_opacity > 0.05:
+                self._draw_tooltip(painter, width, height)
 
-        # Draw bottom text overlay
-        self._draw_text_overlay(painter, width / 2, height)
+            # Draw bottom text overlay
+            self._draw_text_overlay(painter, width / 2, height)
 
-        # Draw interaction hints
-        self._draw_hints(painter, width, height)
-
-        painter.end()
+            # Draw interaction hints
+            self._draw_hints(painter, width, height)
+        finally:
+            painter.end()
 
     def _draw_deep_space(self, painter: QPainter, width: int, height: int) -> None:
         """Draw deep space gradient background."""

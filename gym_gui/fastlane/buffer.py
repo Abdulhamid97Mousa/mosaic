@@ -30,11 +30,15 @@ VERSION = 1
 _HEADER_STRUCT = struct.Struct("<4sIIIIIIIIIQQddd")
 _HEADER_SIZE = _HEADER_STRUCT.size
 
+_IDX_FLAGS = 2
 _IDX_HEAD = 10
 _IDX_TAIL = 11
 _IDX_LAST_REWARD = 12
 _IDX_ROLLING = 13
 _IDX_STEP_RATE = 14
+
+# Flag bits stored in the header flags field.
+FLAG_INVALIDATED = 0x1  # Buffer is stale; readers must detach and reattach.
 
 # Slot meta layout: seq(u64) | payload_len(u32) | reserved(u32)
 _SLOT_META_STRUCT = struct.Struct("<QII")
@@ -121,6 +125,21 @@ class FastLaneBase:
     @property
     def channels(self) -> int:
         return _HEADER_STRUCT.unpack_from(self._mv, 0)[8]
+
+    @property
+    def flags(self) -> int:
+        return _HEADER_STRUCT.unpack_from(self._mv, 0)[_IDX_FLAGS]
+
+    @property
+    def is_invalidated(self) -> bool:
+        """True when the writer has marked this buffer as stale."""
+        return bool(self.flags & FLAG_INVALIDATED)
+
+    def invalidate(self) -> None:
+        """Mark this buffer as invalidated so readers detach and reattach."""
+        header = list(_HEADER_STRUCT.unpack_from(self._mv, 0))
+        header[_IDX_FLAGS] = header[_IDX_FLAGS] | FLAG_INVALIDATED
+        _HEADER_STRUCT.pack_into(self._mv, 0, *header)
 
     @property
     def head(self) -> int:

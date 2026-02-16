@@ -97,7 +97,7 @@ class HumanInteractiveRuntime:
         if env_name == "multigrid":
             try:
                 import gym as old_gym
-                from gym_multigrid.envs import SoccerGame4HEnv10x15N2, CollectGame4HEnv10x10N2
+                from mosaic_multigrid.envs import SoccerGame4HEnv10x15N2, CollectGame4HEnv10x10N2
 
                 logger.info(f"Creating MultiGrid environment: {task}")
 
@@ -111,7 +111,7 @@ class HumanInteractiveRuntime:
                 env.reset()
                 return env
             except ImportError as e:
-                logger.warning(f"gym-multigrid not installed: {e}")
+                logger.warning(f"mosaic_multigrid not installed: {e}")
                 raise
 
         # Crafter uses its own API, not gym.make()

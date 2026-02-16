@@ -53,9 +53,9 @@ numbered tiles on a 4x4 grid to combine them and create a tile with the number 2
         <th style="border: 1px solid #ddd; padding: 8px;">Key</th>
     </tr>
     <tr><td style="border: 1px solid #ddd; padding: 8px;">0</td><td style="border: 1px solid #ddd; padding: 8px;">Up</td><td style="border: 1px solid #ddd; padding: 8px;">W / Up Arrow</td></tr>
-    <tr><td style="border: 1px solid #ddd; padding: 8px;">1</td><td style="border: 1px solid #ddd; padding: 8px;">Down</td><td style="border: 1px solid #ddd; padding: 8px;">S / Down Arrow</td></tr>
-    <tr><td style="border: 1px solid #ddd; padding: 8px;">2</td><td style="border: 1px solid #ddd; padding: 8px;">Left</td><td style="border: 1px solid #ddd; padding: 8px;">A / Left Arrow</td></tr>
-    <tr><td style="border: 1px solid #ddd; padding: 8px;">3</td><td style="border: 1px solid #ddd; padding: 8px;">Right</td><td style="border: 1px solid #ddd; padding: 8px;">D / Right Arrow</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">1</td><td style="border: 1px solid #ddd; padding: 8px;">Right</td><td style="border: 1px solid #ddd; padding: 8px;">D / Right Arrow</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">2</td><td style="border: 1px solid #ddd; padding: 8px;">Down</td><td style="border: 1px solid #ddd; padding: 8px;">S / Down Arrow</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">3</td><td style="border: 1px solid #ddd; padding: 8px;">Left</td><td style="border: 1px solid #ddd; padding: 8px;">A / Left Arrow</td></tr>
 </table>
 
 <h4>Rewards</h4>

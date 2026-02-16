@@ -13,12 +13,16 @@ Available loaders:
 - GoEnvLoader: Human vs Agent Go game loading
 - TicTacToeEnvLoader: Human vs Agent Tic-Tac-Toe game loading
 - VizdoomEnvLoader: ViZDoom environment loading with mouse capture
+- JumanjiGridClickLoader: Grid-click mouse input for Jumanji games (Tetris, Minesweeper)
+- SmacCameraLoader: Mouse-driven 3D camera panning for SMAC/SMACv2 environments
 """
 
 from gym_gui.ui.handlers.env_loaders.checkers import CheckersEnvLoader
 from gym_gui.ui.handlers.env_loaders.chess import ChessEnvLoader
 from gym_gui.ui.handlers.env_loaders.connect_four import ConnectFourEnvLoader
 from gym_gui.ui.handlers.env_loaders.go import GoEnvLoader
+from gym_gui.ui.handlers.env_loaders.jumanji_grid import JumanjiGridClickLoader
+from gym_gui.ui.handlers.env_loaders.smac_camera import SmacCameraLoader
 from gym_gui.ui.handlers.env_loaders.tictactoe import TicTacToeEnvLoader
 from gym_gui.ui.handlers.env_loaders.vizdoom import VizdoomEnvLoader
 
@@ -27,6 +31,8 @@ __all__ = [
     "ChessEnvLoader",
     "ConnectFourEnvLoader",
     "GoEnvLoader",
+    "JumanjiGridClickLoader",
+    "SmacCameraLoader",
     "TicTacToeEnvLoader",
     "VizdoomEnvLoader",
 ]

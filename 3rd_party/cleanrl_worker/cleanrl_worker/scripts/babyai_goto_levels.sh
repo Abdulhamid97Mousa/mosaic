@@ -66,8 +66,8 @@ LEVEL2_TIMESTEPS="${BABYAI_LEVEL2_TIMESTEPS:-2000000}"
 LEVEL3_ENV="BabyAI-GoToLocal-v0"
 LEVEL3_TIMESTEPS="${BABYAI_LEVEL3_TIMESTEPS:-5000000}"
 
-# Create run-specific directory
-RUN_DIR="$SCRIPTS_DIR/$RUN_ID"
+# Artifact directory -- uses var/trainer/runs/{run_id} when launched from GUI
+RUN_DIR="${MOSAIC_RUN_DIR:-$SCRIPTS_DIR/$RUN_ID}"
 mkdir -p "$RUN_DIR/checkpoints"
 mkdir -p "$RUN_DIR/tensorboard"
 
@@ -101,7 +101,8 @@ train_level() {
     echo "Timesteps: $timesteps"
     echo ""
 
-    LEVEL_CONFIG="$RUN_DIR/level${level_num}_config.json"
+    mkdir -p "$RUN_DIR/config"
+    LEVEL_CONFIG="$RUN_DIR/config/level${level_num}_config.json"
 
     jq --argjson steps "$timesteps" \
        --argjson num_envs "$NUM_ENVS" \

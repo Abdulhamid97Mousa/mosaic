@@ -25,7 +25,7 @@ from gym_gui.config import game_configs
 from gym_gui.constants import UI_DEFAULTS, TRAINER_DEFAULTS
 from gym_gui.config.game_config_builder import GameConfigBuilder
 from gym_gui.config.paths import VAR_TRAINER_DIR
-from gym_gui.config.settings import Settings
+from gym_gui.config.settings import Settings, get_settings
 from gym_gui.core.enums import ControlMode, GameId
 from gym_gui.rendering import RendererRegistry
 from gym_gui.core.factories.adapters import available_games
@@ -100,7 +100,7 @@ else:
     ChatPanel = None  # type: ignore[misc, assignment]
 from gym_gui.ui.widgets.settings import SettingsDialog
 from gym_gui.ui.panels.analytics_tabs import AnalyticsTabManager
-from gym_gui.ui.forms import get_worker_form_factory
+from gym_gui.ui.forms import get_worker_form_factory, ensure_all_forms_registered
 from gym_gui.ui.handlers import (
     GameConfigHandler,
     LogHandler,
@@ -116,8 +116,10 @@ from gym_gui.ui.handlers import (
     ChessEnvLoader,
     ConnectFourEnvLoader,
     GoEnvLoader,
+    SmacCameraLoader,
     TicTacToeEnvLoader,
     VizdoomEnvLoader,
+    JumanjiGridClickLoader,
     # New composed handlers for extracted functionality
     MultiAgentGameHandler,
     TrainingFormHandler,
@@ -177,6 +179,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
     def __init__(self, settings: Settings, parent: QtWidgets.QWidget | None = None) -> None:
         super().__init__(parent)
+        ensure_all_forms_registered()
         self._logger = _LOGGER
         self._settings = settings
         self._session = SessionController(settings, self)
@@ -269,6 +272,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._go_env_loader: GoEnvLoader
         self._tictactoe_env_loader: TicTacToeEnvLoader
         self._vizdoom_env_loader: VizdoomEnvLoader
+        self._jumanji_grid_loader: JumanjiGridClickLoader
+        self._smac_camera_loader: SmacCameraLoader
 
         # Get live telemetry controller from service locator
         live_controller = locator.resolve(LiveTelemetryController)
@@ -496,11 +501,13 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             info_log_splitter.setStretchFactor(0, 2)  # Game Info
             info_log_splitter.setStretchFactor(1, 1)  # Runtime Log
             info_log_splitter.setStretchFactor(2, 2)  # Chat
+            # Check if chat should be collapsed by default
+            chat_default_size = 0 if get_settings().chat_panel_collapsed else (layout_defaults.info_default_width // 2)
             info_log_splitter.setSizes(
                 [
                     layout_defaults.info_default_width // 2,
                     layout_defaults.log_default_width,
-                    layout_defaults.info_default_width // 2,
+                    chat_default_size,
                 ]
             )
         else:
@@ -701,6 +708,12 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._vizdoom_env_loader = VizdoomEnvLoader(
             render_tabs=self._render_tabs,
         )
+        self._jumanji_grid_loader = JumanjiGridClickLoader(
+            render_tabs=self._render_tabs,
+        )
+        self._smac_camera_loader = SmacCameraLoader(
+            render_tabs=self._render_tabs,
+        )
 
         # Multi-agent game routing handler
         self._multi_agent_game_handler = MultiAgentGameHandler(
@@ -776,6 +789,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         )
         self._control_panel.resume_training_requested.connect(
             self._training_form_handler.on_resume_training_requested
+        )
+        self._control_panel.custom_script_requested.connect(
+            self._training_form_handler.on_custom_script_requested
         )
         self._control_panel.start_game_requested.connect(self._on_start_game)
         self._control_panel.pause_game_requested.connect(self._on_pause_game)
@@ -2585,7 +2601,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         if env_name == "multigrid":
             # Import and create MultiGrid environment
             try:
-                from gym_multigrid.envs import CollectGame, Soccer  # type: ignore[import-not-found]
+                from mosaic_multigrid.envs import CollectGame, Soccer  # type: ignore[import-not-found]
             except ImportError:
                 import gymnasium as gym
                 # Fallback: try to create via gym.make
@@ -3396,8 +3412,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     return
 
             elif env_name == "multigrid":
-                # gym-multigrid uses old gym API (not gymnasium)
-                # Supports both legacy gym-multigrid (Soccer, Collect) and modern INI multigrid
+                # mosaic_multigrid uses old gym API (not gymnasium)
+                # Supports both mosaic_multigrid (Soccer, Collect) and modern INI multigrid
                 try:
                     import gym
                     import sys
@@ -3420,16 +3436,16 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     num_agents = len(config.workers) if config.workers else 1
 
                     # Create environment based on task
-                    is_legacy_multigrid = False  # Track if legacy gym-multigrid (supports highlight)
+                    is_legacy_multigrid = False  # Track if mosaic_multigrid (supports highlight)
 
                     if task == "MultiGrid-Soccer-v0":
-                        from gym_multigrid.envs import SoccerGame4HEnv10x15N2
+                        from mosaic_multigrid.envs import SoccerGame4HEnv10x15N2
                         env = SoccerGame4HEnv10x15N2()
                         # Set render_mode to avoid deprecation warning (MultiGrid doesn't support in constructor)
                         env.render_mode = 'rgb_array'
                         is_legacy_multigrid = True
                     elif task == "MultiGrid-Collect-v0":
-                        from gym_multigrid.envs import CollectGame4HEnv10x10N2
+                        from mosaic_multigrid.envs import CollectGame4HEnv10x10N2
                         env = CollectGame4HEnv10x10N2()
                         # Set render_mode to avoid deprecation warning (MultiGrid doesn't support in constructor)
                         env.render_mode = 'rgb_array'
@@ -3446,7 +3462,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                         env = gym.make(task, render_mode="rgb_array")
 
                     env.reset()
-                    # Render - legacy gym-multigrid supports highlight parameter, INI multigrid doesn't
+                    # Render - mosaic_multigrid supports highlight parameter, INI multigrid doesn't
                     if is_legacy_multigrid:
                         rgb_frame = env.render(highlight=True)
                     else:
@@ -3454,7 +3470,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     env.close()
                 except ImportError as import_err:
                     self._status_bar.showMessage(
-                        f"gym-multigrid not installed - cannot preview: {import_err}",
+                        f"mosaic_multigrid not installed - cannot preview: {import_err}",
                         5000
                     )
                     return
@@ -3947,12 +3963,16 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._game_info.setHtml(html)
 
     def _configure_mouse_capture(self) -> None:
-        """Configure FPS-style mouse capture for ViZDoom games.
+        """Configure mouse input for the loaded game.
 
-        Delegates to VizdoomEnvLoader for all ViZDoom-specific mouse capture setup.
-        Click on the Video tab to capture the mouse, ESC or focus-loss to release.
+        Delegates to environment-specific loaders:
+        - VizdoomEnvLoader: FPS-style mouse capture for ViZDoom games
+        - JumanjiGridClickLoader: Grid-click for Tetris, Minesweeper, etc.
+        - SmacCameraLoader: 3D camera panning for SMAC/SMACv2 environments
         """
         self._vizdoom_env_loader.configure_mouse_capture(self._session)
+        self._jumanji_grid_loader.configure_grid_click(self._session)
+        self._smac_camera_loader.configure_mouse_capture(self._session)
 
     def _on_step_processed(self, step: object, index: int) -> None:
         """Handle step processed from session controller."""
@@ -3962,6 +3982,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         terminated = getattr(step, "terminated", False)
         truncated = getattr(step, "truncated", False)
         render_payload = getattr(step, "render_payload", None)
+
+        # Extract per-team rewards from step info (MOSAIC MultiGrid competitive envs)
+        step_info = getattr(step, "info", {}) or {}
+        team_rewards = step_info.get("team_episode_rewards")
 
         # Update control panel status (awaiting_human and turn updated via separate signals)
         self._control_panel.set_status(
@@ -3977,6 +4001,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             episode_duration=self._session._timers.episode_duration_formatted(),
             outcome_time=self._session._timers.outcome_elapsed_formatted(),
             outcome_wall_clock=self._session._timers.outcome_wall_clock_formatted(),
+            team_rewards=team_rewards,
         )
         
         self._render_tabs.display_payload(render_payload)

@@ -42,6 +42,9 @@ class EnvironmentFamily(StrEnum):
     INI_MULTIGRID = "ini_multigrid"  # INI multigrid: Cooperative exploration (Empty, BlockedUnlockPickup, etc.) - view_size=7
     MELTINGPOT = "meltingpot"  # Melting Pot multi-agent social scenarios (Google DeepMind) via Shimmy
     OVERCOOKED = "overcooked"  # Overcooked-AI cooperative cooking (2 agents, human-AI coordination)
+    SMAC = "smac"  # SMAC v1: StarCraft Multi-Agent Challenge - hand-designed cooperative micromanagement maps
+    SMACV2 = "smacv2"  # SMACv2: StarCraft Multi-Agent Challenge v2 - procedural unit generation
+    RWARE = "rware"  # Robotic Warehouse: cooperative multi-agent shelf delivery
     OTHER = "other"  # Fallback for unknown environments (not displayed in UI)
 
 
@@ -385,7 +388,7 @@ class GameId(StrEnum):
     JUMANJI_TETRIS = "jumanji/Tetris-v0"
     # Jumanji Phase 3: Routing Environments
     JUMANJI_CLEANER = "jumanji/Cleaner-v0"
-    JUMANJI_CONNECTOR = "jumanji/Connector-v2"
+    JUMANJI_CONNECTOR = "jumanji/Connector-v3"
     JUMANJI_CVRP = "jumanji/CVRP-v1"
     JUMANJI_MAZE = "jumanji/Maze-v0"
     JUMANJI_MMST = "jumanji/MMST-v0"
@@ -422,17 +425,32 @@ class GameId(StrEnum):
     INTERNATIONAL_DRAUGHTS = "draughts/international_draughts"
 
     # ─────────────────────────────────────────────────────────────────────────
-    # gym-multigrid (Multi-Agent Grid Environments)
+    # mosaic_multigrid (Multi-Agent Grid Environments)
     # Repository (old): https://github.com/ArnaudFickinger/gym-multigrid
     # Repository (new): https://github.com/ini/multigrid
     # ─────────────────────────────────────────────────────────────────────────
-    # MOSAIC MultiGrid (PyPI: mosaic-multigrid v1.0.0+)
+    # MOSAIC MultiGrid (PyPI: mosaic-multigrid v2.0.0+)
     # Competitive team-based multi-agent games with view_size=3
     # PyPI: https://pypi.org/project/mosaic-multigrid/
     # GitHub: https://github.com/Abdulhamid97Mousa/mosaic_multigrid
     # ─────────────────────────────────────────────────────────────────────────
-    MOSAIC_MULTIGRID_SOCCER = "MosaicMultiGrid-Soccer-v0"  # 4 agents, 2v2 soccer, zero-sum
-    MOSAIC_MULTIGRID_COLLECT = "MosaicMultiGrid-Collect-v0"  # 3 agents, collect balls, competitive
+    MOSAIC_MULTIGRID_SOCCER = "MosaicMultiGrid-Soccer-v0"  # 4 agents, 2v2 soccer, zero-sum (Deprecated)
+    MOSAIC_MULTIGRID_COLLECT = "MosaicMultiGrid-Collect-v0"  # 3 agents, individual competition (Deprecated)
+    MOSAIC_MULTIGRID_COLLECT2VS2 = "MosaicMultiGrid-Collect-2vs2-v0"  # 4 agents, 2v2 teams, 7 balls (no draws) (Deprecated)
+    MOSAIC_MULTIGRID_COLLECT_1VS1 = "MosaicMultiGrid-Collect-1vs1-v0"  # 2 agents, 1v1 teams, 3 balls (Deprecated)
+
+    # IndAgObs variants (v4.0.0) - Individual Agent Observations, RECOMMENDED for RL training
+    MOSAIC_MULTIGRID_SOCCER_2VS2_INDAGOBS = "MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0"  # Ball respawn, first-to-2-goals, 16x11 FIFA grid
+    MOSAIC_MULTIGRID_SOCCER_1VS1_INDAGOBS = "MosaicMultiGrid-Soccer-1vs1-IndAgObs-v0"  # 1v1 soccer, same FIFA grid
+    MOSAIC_MULTIGRID_COLLECT_INDAGOBS = "MosaicMultiGrid-Collect-IndAgObs-v0"  # Natural termination, 35x faster
+    MOSAIC_MULTIGRID_COLLECT2VS2_INDAGOBS = "MosaicMultiGrid-Collect-2vs2-IndAgObs-v0"  # Natural termination, 7 balls
+    MOSAIC_MULTIGRID_COLLECT_1VS1_INDAGOBS = "MosaicMultiGrid-Collect-1vs1-IndAgObs-v0"  # Natural termination, 3 balls
+    MOSAIC_MULTIGRID_BASKETBALL_INDAGOBS = "MosaicMultiGrid-Basketball-3vs3-IndAgObs-v0"  # 6 agents, 3v3 basketball, court rendering
+
+    # TeamObs variants (v4.0.0) - SMAC-style teammate awareness
+    MOSAIC_MULTIGRID_SOCCER_2VS2_TEAMOBS = "MosaicMultiGrid-Soccer-2vs2-TeamObs-v0"  # IndAgObs + teammate features
+    MOSAIC_MULTIGRID_COLLECT2VS2_TEAMOBS = "MosaicMultiGrid-Collect-2vs2-TeamObs-v0"  # IndAgObs + teammate features
+    MOSAIC_MULTIGRID_BASKETBALL_TEAMOBS = "MosaicMultiGrid-Basketball-3vs3-TeamObs-v0"  # IndAgObs + teammate features
 
     # ─────────────────────────────────────────────────────────────────────────
     # INI MultiGrid (Local: 3rd_party/multigrid-ini/)
@@ -545,6 +563,42 @@ class GameId(StrEnum):
     OVERCOOKED_COORDINATION_RING = "overcooked/coordination_ring"  # 2 agents, circular kitchen layout
     OVERCOOKED_FORCED_COORDINATION = "overcooked/forced_coordination"  # 2 agents, explicit coordination required
     OVERCOOKED_COUNTER_CIRCUIT = "overcooked/counter_circuit"  # 2 agents, circuit-style counter layout
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # SMAC v1 (StarCraft Multi-Agent Challenge - Hand-Designed Maps)
+    # Repository: https://github.com/oxwhirl/smac
+    # Paper: https://arxiv.org/abs/1902.04043
+    # Location: pip install smac (requires StarCraft II binary)
+    # ─────────────────────────────────────────────────────────────────────────
+    SMAC_3M = "SMAC-3m-v0"  # 3 Marines vs 3 Marines (Easy, symmetric)
+    SMAC_8M = "SMAC-8m-v0"  # 8 Marines vs 8 Marines (Easy, symmetric)
+    SMAC_2S3Z = "SMAC-2s3z-v0"  # 2 Stalkers + 3 Zealots vs same (Easy, mixed)
+    SMAC_3S5Z = "SMAC-3s5z-v0"  # 3 Stalkers + 5 Zealots vs same (Easy, mixed)
+    SMAC_5M_VS_6M = "SMAC-5m_vs_6m-v0"  # 5 Marines vs 6 Marines (Hard, asymmetric)
+    SMAC_MMM2 = "SMAC-MMM2-v0"  # 1 Medivac + 2 Marauders + 7 Marines (Super Hard, mixed)
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # SMACv2 (StarCraft Multi-Agent Challenge v2 - Procedural Generation)
+    # Repository: https://github.com/oxwhirl/smacv2
+    # Location: pip install smacv2 (requires StarCraft II binary)
+    # ─────────────────────────────────────────────────────────────────────────
+    SMACV2_TERRAN = "SMACv2-10gen_terran-v0"  # 10 units, random Terran composition per episode
+    SMACV2_PROTOSS = "SMACv2-10gen_protoss-v0"  # 10 units, random Protoss composition per episode
+    SMACV2_ZERG = "SMACv2-10gen_zerg-v0"  # 10 units, random Zerg composition per episode
+
+    # ── RWARE (Robotic Warehouse) ────────────────────────────────────
+    RWARE_TINY_2AG = "rware-tiny-2ag-v2"
+    RWARE_TINY_4AG = "rware-tiny-4ag-v2"
+    RWARE_SMALL_2AG = "rware-small-2ag-v2"
+    RWARE_SMALL_4AG = "rware-small-4ag-v2"
+    RWARE_MEDIUM_2AG = "rware-medium-2ag-v2"
+    RWARE_MEDIUM_4AG = "rware-medium-4ag-v2"
+    RWARE_MEDIUM_4AG_EASY = "rware-medium-4ag-easy-v2"
+    RWARE_MEDIUM_4AG_HARD = "rware-medium-4ag-hard-v2"
+    RWARE_LARGE_4AG = "rware-large-4ag-v2"
+    RWARE_LARGE_4AG_HARD = "rware-large-4ag-hard-v2"
+    RWARE_LARGE_8AG = "rware-large-8ag-v2"
+    RWARE_LARGE_8AG_HARD = "rware-large-8ag-hard-v2"
 
 
 def get_game_display_name(game_id: GameId) -> str:
@@ -1087,6 +1141,19 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     # MOSAIC MultiGrid (PyPI: mosaic-multigrid - competitive team-based)
     GameId.MOSAIC_MULTIGRID_SOCCER: EnvironmentFamily.MOSAIC_MULTIGRID,
     GameId.MOSAIC_MULTIGRID_COLLECT: EnvironmentFamily.MOSAIC_MULTIGRID,
+    GameId.MOSAIC_MULTIGRID_COLLECT2VS2: EnvironmentFamily.MOSAIC_MULTIGRID,
+    GameId.MOSAIC_MULTIGRID_COLLECT_1VS1: EnvironmentFamily.MOSAIC_MULTIGRID,
+    GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_INDAGOBS: EnvironmentFamily.MOSAIC_MULTIGRID,
+    GameId.MOSAIC_MULTIGRID_SOCCER_1VS1_INDAGOBS: EnvironmentFamily.MOSAIC_MULTIGRID,
+    GameId.MOSAIC_MULTIGRID_COLLECT_INDAGOBS: EnvironmentFamily.MOSAIC_MULTIGRID,
+    GameId.MOSAIC_MULTIGRID_COLLECT2VS2_INDAGOBS: EnvironmentFamily.MOSAIC_MULTIGRID,
+    GameId.MOSAIC_MULTIGRID_COLLECT_1VS1_INDAGOBS: EnvironmentFamily.MOSAIC_MULTIGRID,
+    # IndAgObs + TeamObs Basketball (v4.0.0)
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_INDAGOBS: EnvironmentFamily.MOSAIC_MULTIGRID,
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_TEAMOBS: EnvironmentFamily.MOSAIC_MULTIGRID,
+    # TeamObs variants (v4.0.0)
+    GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_TEAMOBS: EnvironmentFamily.MOSAIC_MULTIGRID,
+    GameId.MOSAIC_MULTIGRID_COLLECT2VS2_TEAMOBS: EnvironmentFamily.MOSAIC_MULTIGRID,
     # INI MultiGrid (Local: cooperative exploration)
     GameId.INI_MULTIGRID_BLOCKED_UNLOCK_PICKUP: EnvironmentFamily.INI_MULTIGRID,
     GameId.INI_MULTIGRID_EMPTY_5X5: EnvironmentFamily.INI_MULTIGRID,
@@ -1157,6 +1224,30 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.OVERCOOKED_COORDINATION_RING: EnvironmentFamily.OVERCOOKED,
     GameId.OVERCOOKED_FORCED_COORDINATION: EnvironmentFamily.OVERCOOKED,
     GameId.OVERCOOKED_COUNTER_CIRCUIT: EnvironmentFamily.OVERCOOKED,
+    # SMAC v1 (StarCraft Multi-Agent Challenge - hand-designed maps)
+    GameId.SMAC_3M: EnvironmentFamily.SMAC,
+    GameId.SMAC_8M: EnvironmentFamily.SMAC,
+    GameId.SMAC_2S3Z: EnvironmentFamily.SMAC,
+    GameId.SMAC_3S5Z: EnvironmentFamily.SMAC,
+    GameId.SMAC_5M_VS_6M: EnvironmentFamily.SMAC,
+    GameId.SMAC_MMM2: EnvironmentFamily.SMAC,
+    # SMACv2 (procedural unit generation)
+    GameId.SMACV2_TERRAN: EnvironmentFamily.SMACV2,
+    GameId.SMACV2_PROTOSS: EnvironmentFamily.SMACV2,
+    GameId.SMACV2_ZERG: EnvironmentFamily.SMACV2,
+    # RWARE (Robotic Warehouse)
+    GameId.RWARE_TINY_2AG: EnvironmentFamily.RWARE,
+    GameId.RWARE_TINY_4AG: EnvironmentFamily.RWARE,
+    GameId.RWARE_SMALL_2AG: EnvironmentFamily.RWARE,
+    GameId.RWARE_SMALL_4AG: EnvironmentFamily.RWARE,
+    GameId.RWARE_MEDIUM_2AG: EnvironmentFamily.RWARE,
+    GameId.RWARE_MEDIUM_4AG: EnvironmentFamily.RWARE,
+    GameId.RWARE_MEDIUM_4AG_EASY: EnvironmentFamily.RWARE,
+    GameId.RWARE_MEDIUM_4AG_HARD: EnvironmentFamily.RWARE,
+    GameId.RWARE_LARGE_4AG: EnvironmentFamily.RWARE,
+    GameId.RWARE_LARGE_4AG_HARD: EnvironmentFamily.RWARE,
+    GameId.RWARE_LARGE_8AG: EnvironmentFamily.RWARE,
+    GameId.RWARE_LARGE_8AG_HARD: EnvironmentFamily.RWARE,
 }
 
 
@@ -1373,9 +1464,20 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.AMERICAN_CHECKERS: RenderMode.RGB_ARRAY,
     GameId.RUSSIAN_CHECKERS: RenderMode.RGB_ARRAY,
     GameId.INTERNATIONAL_DRAUGHTS: RenderMode.RGB_ARRAY,
-    # gym-multigrid (multi-agent grid environments)
+    # mosaic_multigrid (multi-agent grid environments)
     GameId.MOSAIC_MULTIGRID_SOCCER: RenderMode.RGB_ARRAY,
     GameId.MOSAIC_MULTIGRID_COLLECT: RenderMode.RGB_ARRAY,
+    GameId.MOSAIC_MULTIGRID_COLLECT2VS2: RenderMode.RGB_ARRAY,
+    GameId.MOSAIC_MULTIGRID_COLLECT_1VS1: RenderMode.RGB_ARRAY,
+    GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_INDAGOBS: RenderMode.RGB_ARRAY,
+    GameId.MOSAIC_MULTIGRID_SOCCER_1VS1_INDAGOBS: RenderMode.RGB_ARRAY,
+    GameId.MOSAIC_MULTIGRID_COLLECT_INDAGOBS: RenderMode.RGB_ARRAY,
+    GameId.MOSAIC_MULTIGRID_COLLECT2VS2_INDAGOBS: RenderMode.RGB_ARRAY,
+    GameId.MOSAIC_MULTIGRID_COLLECT_1VS1_INDAGOBS: RenderMode.RGB_ARRAY,
+    GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_TEAMOBS: RenderMode.RGB_ARRAY,
+    GameId.MOSAIC_MULTIGRID_COLLECT2VS2_TEAMOBS: RenderMode.RGB_ARRAY,
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_INDAGOBS: RenderMode.RGB_ARRAY,
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_TEAMOBS: RenderMode.RGB_ARRAY,
     GameId.INI_MULTIGRID_BLOCKED_UNLOCK_PICKUP: RenderMode.RGB_ARRAY,
     GameId.INI_MULTIGRID_EMPTY_5X5: RenderMode.RGB_ARRAY,
     GameId.INI_MULTIGRID_EMPTY_RANDOM_5X5: RenderMode.RGB_ARRAY,
@@ -1445,6 +1547,30 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.OVERCOOKED_COORDINATION_RING: RenderMode.RGB_ARRAY,
     GameId.OVERCOOKED_FORCED_COORDINATION: RenderMode.RGB_ARRAY,
     GameId.OVERCOOKED_COUNTER_CIRCUIT: RenderMode.RGB_ARRAY,
+    # SMAC v1 (StarCraft Multi-Agent Challenge)
+    GameId.SMAC_3M: RenderMode.RGB_ARRAY,
+    GameId.SMAC_8M: RenderMode.RGB_ARRAY,
+    GameId.SMAC_2S3Z: RenderMode.RGB_ARRAY,
+    GameId.SMAC_3S5Z: RenderMode.RGB_ARRAY,
+    GameId.SMAC_5M_VS_6M: RenderMode.RGB_ARRAY,
+    GameId.SMAC_MMM2: RenderMode.RGB_ARRAY,
+    # SMACv2 (procedural generation)
+    GameId.SMACV2_TERRAN: RenderMode.RGB_ARRAY,
+    GameId.SMACV2_PROTOSS: RenderMode.RGB_ARRAY,
+    GameId.SMACV2_ZERG: RenderMode.RGB_ARRAY,
+    # RWARE (Robotic Warehouse)
+    GameId.RWARE_TINY_2AG: RenderMode.RGB_ARRAY,
+    GameId.RWARE_TINY_4AG: RenderMode.RGB_ARRAY,
+    GameId.RWARE_SMALL_2AG: RenderMode.RGB_ARRAY,
+    GameId.RWARE_SMALL_4AG: RenderMode.RGB_ARRAY,
+    GameId.RWARE_MEDIUM_2AG: RenderMode.RGB_ARRAY,
+    GameId.RWARE_MEDIUM_4AG: RenderMode.RGB_ARRAY,
+    GameId.RWARE_MEDIUM_4AG_EASY: RenderMode.RGB_ARRAY,
+    GameId.RWARE_MEDIUM_4AG_HARD: RenderMode.RGB_ARRAY,
+    GameId.RWARE_LARGE_4AG: RenderMode.RGB_ARRAY,
+    GameId.RWARE_LARGE_4AG_HARD: RenderMode.RGB_ARRAY,
+    GameId.RWARE_LARGE_8AG: RenderMode.RGB_ARRAY,
+    GameId.RWARE_LARGE_8AG_HARD: RenderMode.RGB_ARRAY,
 }
 
 
@@ -2108,9 +2234,20 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
     GameId.AMERICAN_CHECKERS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     GameId.RUSSIAN_CHECKERS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
     GameId.INTERNATIONAL_DRAUGHTS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.HYBRID_TURN_BASED),
-    # gym-multigrid - Multi-agent environments (simultaneous stepping, multi-human gameplay)
+    # mosaic_multigrid - Multi-agent environments (simultaneous stepping, multi-human gameplay)
     GameId.MOSAIC_MULTIGRID_SOCCER: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
     GameId.MOSAIC_MULTIGRID_COLLECT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MOSAIC_MULTIGRID_COLLECT2VS2: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MOSAIC_MULTIGRID_COLLECT_1VS1: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_INDAGOBS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MOSAIC_MULTIGRID_SOCCER_1VS1_INDAGOBS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MOSAIC_MULTIGRID_COLLECT_INDAGOBS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MOSAIC_MULTIGRID_COLLECT2VS2_INDAGOBS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MOSAIC_MULTIGRID_COLLECT_1VS1_INDAGOBS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_TEAMOBS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MOSAIC_MULTIGRID_COLLECT2VS2_TEAMOBS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_INDAGOBS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_TEAMOBS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
     GameId.INI_MULTIGRID_BLOCKED_UNLOCK_PICKUP: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
     GameId.INI_MULTIGRID_EMPTY_5X5: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
     GameId.INI_MULTIGRID_EMPTY_RANDOM_5X5: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
@@ -2180,6 +2317,30 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
     GameId.OVERCOOKED_COORDINATION_RING: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
     GameId.OVERCOOKED_FORCED_COORDINATION: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
     GameId.OVERCOOKED_COUNTER_CIRCUIT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    # SMAC v1 - cooperative multi-agent micromanagement (no human control)
+    GameId.SMAC_3M: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.SMAC_8M: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.SMAC_2S3Z: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.SMAC_3S5Z: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.SMAC_5M_VS_6M: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.SMAC_MMM2: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    # SMACv2 - cooperative multi-agent with procedural generation
+    GameId.SMACV2_TERRAN: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.SMACV2_PROTOSS: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.SMACV2_ZERG: (ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    # RWARE (Robotic Warehouse) -- human play supported via keyboard
+    GameId.RWARE_TINY_2AG: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.RWARE_TINY_4AG: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.RWARE_SMALL_2AG: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.RWARE_SMALL_4AG: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.RWARE_MEDIUM_2AG: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.RWARE_MEDIUM_4AG: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.RWARE_MEDIUM_4AG_EASY: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.RWARE_MEDIUM_4AG_HARD: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.RWARE_LARGE_4AG: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.RWARE_LARGE_4AG_HARD: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.RWARE_LARGE_8AG: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.RWARE_LARGE_8AG_HARD: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
 }
 
 
@@ -2210,9 +2371,13 @@ DEFAULT_PARADIGM_BY_FAMILY: dict[EnvironmentFamily, SteppingParadigm] = {
     EnvironmentFamily.PETTINGZOO_CLASSIC: SteppingParadigm.SEQUENTIAL,  # Chess, Go, etc.
     EnvironmentFamily.PYBULLET_DRONES: SteppingParadigm.SINGLE_AGENT,  # Single/multi-agent quadcopter control
     EnvironmentFamily.OPEN_SPIEL: SteppingParadigm.SEQUENTIAL,  # Turn-based board games (Checkers, etc.)
-    EnvironmentFamily.MULTIGRID: SteppingParadigm.SIMULTANEOUS,  # Multi-agent grid envs (all agents act at once)
+    EnvironmentFamily.MOSAIC_MULTIGRID: SteppingParadigm.SIMULTANEOUS,  # MOSAIC MultiGrid (Soccer, Collect) - all agents act at once
+    EnvironmentFamily.INI_MULTIGRID: SteppingParadigm.SIMULTANEOUS,  # INI MultiGrid (Empty, BlockedUnlockPickup) - all agents act at once
     EnvironmentFamily.MELTINGPOT: SteppingParadigm.SIMULTANEOUS,  # Multi-agent social scenarios (parallel stepping)
     EnvironmentFamily.OVERCOOKED: SteppingParadigm.SIMULTANEOUS,  # 2-agent cooperative cooking (parallel stepping)
+    EnvironmentFamily.SMAC: SteppingParadigm.SIMULTANEOUS,  # SMAC v1: all units act in parallel each timestep
+    EnvironmentFamily.SMACV2: SteppingParadigm.SIMULTANEOUS,  # SMACv2: all units act in parallel (procedural gen)
+    EnvironmentFamily.RWARE: SteppingParadigm.SIMULTANEOUS,  # RWARE: all robots act in parallel each timestep
     EnvironmentFamily.OTHER: SteppingParadigm.SINGLE_AGENT,  # Fallback
 }
 

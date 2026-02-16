@@ -138,9 +138,9 @@ class ManagementTab(QtWidgets.QWidget):
         self._content_stack = QtWidgets.QStackedWidget(self)
 
         # Table (index 0)
-        self._table = QtWidgets.QTableWidget(0, 7, self)
+        self._table = QtWidgets.QTableWidget(0, 8, self)
         self._table.setHorizontalHeaderLabels(
-            ["Run ID", "Agent", "Status", "Outcome", "Created", "Failure", "Disk Size"]
+            ["Run ID", "Agent", "Status", "Outcome", "Created", "Failure", "Reason", "Disk Size"]
         )
         header_view = self._table.horizontalHeader()
         if header_view is not None:
@@ -224,6 +224,12 @@ class ManagementTab(QtWidgets.QWidget):
             # Format timestamp
             created_str = run.created_at.strftime("%Y-%m-%d %H:%M")
 
+            # Truncate reason for table display; full text in tooltip
+            reason_text = run.reason or ""
+            reason_display = reason_text.replace("\n", " ")
+            if len(reason_display) > 120:
+                reason_display = reason_display[:117] + "..."
+
             values = [
                 run.run_id[:12] + "...",
                 agent_type,
@@ -231,6 +237,7 @@ class ManagementTab(QtWidgets.QWidget):
                 run.outcome or "—",
                 created_str,
                 run.failure_reason or "—",
+                reason_display or "—",
                 self._format_size(disk_size),
             ]
 
@@ -251,8 +258,11 @@ class ManagementTab(QtWidgets.QWidget):
                             item.setForeground(QtGui.QColor("#f44336"))  # Red
                     elif run.status == RunStatus.READY:
                         item.setForeground(QtGui.QColor("#FF9800"))  # Orange
+                # Reason column: show full stderr in tooltip
+                if col == 6 and reason_text:
+                    item.setToolTip(reason_text)
                 # Right-align disk size
-                if col == 6:
+                if col == 7:
                     item.setTextAlignment(
                         QtCore.Qt.AlignmentFlag.AlignRight
                         | QtCore.Qt.AlignmentFlag.AlignVCenter

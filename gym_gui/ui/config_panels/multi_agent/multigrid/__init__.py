@@ -2,7 +2,7 @@
 
 from .config_panel import (
     MULTIGRID_GAME_IDS,
-    LEGACY_FIXED_AGENT_COUNTS,
+    MOSAIC_AGENT_COUNTS,
     INI_CONFIGURABLE_GAMES,
     ControlCallbacks,
     build_multigrid_controls,
@@ -10,7 +10,7 @@ from .config_panel import (
 
 __all__ = [
     "MULTIGRID_GAME_IDS",
-    "LEGACY_FIXED_AGENT_COUNTS",
+    "MOSAIC_AGENT_COUNTS",
     "INI_CONFIGURABLE_GAMES",
     "ControlCallbacks",
     "build_multigrid_controls",

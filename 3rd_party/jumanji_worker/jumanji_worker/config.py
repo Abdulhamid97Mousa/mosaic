@@ -36,7 +36,7 @@ PACKING_ENVIRONMENTS = frozenset({
 # Phase 3: Routing environments
 ROUTING_ENVIRONMENTS = frozenset({
     "Cleaner-v0",
-    "Connector-v2",
+    "Connector-v3",
     "CVRP-v1",
     "Maze-v0",
     "MMST-v0",
@@ -70,7 +70,7 @@ ALL_ENVIRONMENTS = frozenset({
     "Tetris-v0",
     # Routing
     "Cleaner-v0",
-    "Connector-v2",
+    "Connector-v3",
     "CVRP-v1",
     "Maze-v0",
     "MMST-v0",

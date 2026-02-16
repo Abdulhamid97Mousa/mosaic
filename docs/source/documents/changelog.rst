@@ -9,14 +9,13 @@ All notable changes to MOSAIC will be documented here.
 Added
 ^^^^^
 
-- Multi-paradigm orchestration (SINGLE_AGENT, SEQUENTIAL, SIMULTANEOUS, HIERARCHICAL)
+- Multi-paradigm orchestration (SINGLE_AGENT, SEQUENTIAL, SIMULTANEOUS)
 - PolicyMappingService for per-agent policy binding
 - Visual-first interface with PyQt6
-- Support for heterogeneous agents (Human, RL, BDI, LLM)
+- Support for heterogeneous agents (Human, RL, LLM)
 - CleanRL worker integration
 - XuanCe worker integration (planned)
 - RLlib worker integration (planned)
-- Jason BDI worker integration
 - PettingZoo environment support
 - Gymnasium environment support
 - ViZDoom environment support

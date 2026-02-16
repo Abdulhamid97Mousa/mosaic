@@ -567,7 +567,7 @@ class CleanRlPolicyForm(QtWidgets.QDialog, LogConstantMixin):
 
 
 # Late import to avoid cycles with the train form registrations.
-from gym_gui.ui.forms import get_worker_form_factory  # noqa: E402  # isort:skip
+from gym_gui.ui.forms.factory import get_worker_form_factory  # noqa: E402  # isort:skip
 
 _factory = get_worker_form_factory()
 if not _factory.has_policy_form("cleanrl_worker"):

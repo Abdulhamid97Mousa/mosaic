@@ -239,16 +239,19 @@ def run_curriculum_training(config: CurriculumTrainingConfig) -> Dict[str, Any]:
     _LOGGER.info("Creating curriculum environment...")
     _LOGGER.info(f"Schedule: {[s['env_id'] for s in config.curriculum_schedule]}")
 
-    # NOTE: apply_wrappers=False because sitecustomize.py already applies
-    # ImgObsWrapper + FlattenObservation when it patches gym.make().
-    # Setting True would cause double-wrapping and break the obs space.
+    # NOTE: apply_wrappers=True so BabyAI environments get ImgObsWrapper +
+    # FlattenObservation.  The trainer daemon spawns bash scripts as
+    # subprocesses, so Python loads the *system* sitecustomize -- not
+    # cleanrl_worker's custom one -- meaning gym.make() is unpatched.
+    # Without wrappers the obs space is a Dict (no .shape) and PPOAgent
+    # crashes with `assert obs_shape is not None`.
     envs = make_curriculum_env(
         config.curriculum_schedule,
         num_envs=config.num_envs,
         seed=config.seed,
         capture_video=config.capture_video,
         run_name=run_name,
-        apply_wrappers=False,
+        apply_wrappers=True,
     )
 
     # Initialize agent
@@ -260,7 +263,7 @@ def run_curriculum_training(config: CurriculumTrainingConfig) -> Dict[str, Any]:
     if config.tensorboard_dir:
         try:
             from torch.utils.tensorboard import SummaryWriter
-            tb_path = Path(config.tensorboard_dir) / run_name
+            tb_path = Path(config.tensorboard_dir)
             tb_path.mkdir(parents=True, exist_ok=True)
             writer = SummaryWriter(str(tb_path))
             _LOGGER.info(f"TensorBoard logging to: {tb_path}")

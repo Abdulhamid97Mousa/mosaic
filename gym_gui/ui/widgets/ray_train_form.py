@@ -1450,7 +1450,7 @@ class RayRLlibTrainForm(QtWidgets.QDialog):
 # Register form with factory at module load
 def _register_ray_train_form() -> None:
     """Register Ray RLlib train form with factory (deferred to avoid circular import)."""
-    from gym_gui.ui.forms import get_worker_form_factory
+    from gym_gui.ui.forms.factory import get_worker_form_factory
     factory = get_worker_form_factory()
     if not factory.has_train_form("ray_worker"):
         factory.register_train_form(

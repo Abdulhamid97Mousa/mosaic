@@ -35,7 +35,7 @@ except ImportError:
     pass  # MiniGrid not installed
 
 try:
-    import gym_multigrid  # Registers MultiGrid-* environments
+    import mosaic_multigrid  # Registers MultiGrid-* environments
 except ImportError:
     pass  # MultiGrid not installed
 

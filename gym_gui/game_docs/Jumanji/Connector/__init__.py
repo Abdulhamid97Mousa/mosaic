@@ -9,7 +9,7 @@ Repository: https://github.com/google-deepmind/jumanji
 from __future__ import annotations
 
 
-def get_connector_html(env_id: str = "Connector-v2") -> str:
+def get_connector_html(env_id: str = "Connector-v3") -> str:
     """Generate Connector HTML documentation."""
     return f"""
 <h2>Jumanji {env_id}</h2>
@@ -36,7 +36,14 @@ a grid without any paths crossing each other.
 </ul>
 
 <h4>Action Space</h4>
-<p><code>Discrete</code> - Select next cell to add to current path</p>
+<p><code>MultiDiscrete([5] * num_agents)</code> - Per-agent movement:</p>
+<ul>
+    <li><strong>0</strong>: No-op (stay)</li>
+    <li><strong>1</strong>: Up</li>
+    <li><strong>2</strong>: Right</li>
+    <li><strong>3</strong>: Down</li>
+    <li><strong>4</strong>: Left</li>
+</ul>
 
 <h4>Rewards</h4>
 <ul>

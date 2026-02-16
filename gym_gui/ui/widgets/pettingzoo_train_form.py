@@ -25,7 +25,7 @@ from gym_gui.core.pettingzoo_enums import (
     get_envs_by_family,
     is_aec_env,
 )
-from gym_gui.ui.forms import get_worker_form_factory
+from gym_gui.ui.forms.factory import get_worker_form_factory
 
 _LOGGER = logging.getLogger(__name__)
 

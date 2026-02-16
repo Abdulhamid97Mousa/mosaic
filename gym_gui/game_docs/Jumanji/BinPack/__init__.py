@@ -39,10 +39,11 @@ number of fixed-capacity bins.
 </ul>
 
 <h4>Action Space</h4>
-<p><code>Discrete</code> - Select which bin to place the current item:</p>
+<p><code>MultiDiscrete([obs_num_ems, max_num_items])</code> - Two-part placement decision:</p>
 <ul>
-    <li>Each action places the next item into a specific bin</li>
-    <li>Invalid actions (bin overflow) are masked</li>
+    <li><strong>Dimension 0</strong>: EMS (Empty Maximal Space) index — which bin slot to use (0 to obs_num_ems-1)</li>
+    <li><strong>Dimension 1</strong>: Item index — which item to place (0 to max_num_items-1)</li>
+    <li>Invalid placements (overflow or occupied) are masked via <code>action_mask</code></li>
 </ul>
 
 <h4>Rewards</h4>

@@ -108,6 +108,17 @@ class ScriptExperimentWidget(QtWidgets.QWidget):
         self._step_delay_spin.valueChanged.connect(self._on_step_delay_changed)
         settings_layout.addWidget(self._step_delay_spin, 1, 1)
 
+        # Environment mode (Fixed vs Procedural generation)
+        settings_layout.addWidget(QtWidgets.QLabel("Environment:"), 1, 2)
+        self._env_mode_combo = QtWidgets.QComboBox()
+        self._env_mode_combo.addItems(["Procedural", "Fixed"])
+        self._env_mode_combo.setCurrentIndex(0)  # Default: Procedural
+        self._env_mode_combo.setToolTip(
+            "Procedural: different layout each episode (generalization test)\n"
+            "Fixed: same layout every episode (isolate agent behavior)"
+        )
+        settings_layout.addWidget(self._env_mode_combo, 1, 3)
+
         layout.addWidget(self._settings_group)
 
         # Progress display
@@ -196,6 +207,10 @@ class ScriptExperimentWidget(QtWidgets.QWidget):
                 script_max_steps = self._operator_configs[0].max_steps
             self._max_steps_spin.setValue(script_max_steps or 500)
 
+            # Set environment mode from script
+            env_mode = self._execution_config.get("environment_mode", "procedural")
+            self._env_mode_combo.setCurrentIndex(1 if env_mode == "fixed" else 0)
+
             # Build info display
             num_operators = len(self._operator_configs)
             seeds = self._execution_config.get("seeds", range(1000, 1000 + num_episodes))
@@ -209,6 +224,9 @@ class ScriptExperimentWidget(QtWidgets.QWidget):
 
             if script_max_steps:
                 info_text += f"<br><b>Max Steps/Episode:</b> {script_max_steps}"
+
+            env_mode_display = self._env_mode_combo.currentText()
+            info_text += f"<br><b>Environment Mode:</b> {env_mode_display}"
 
             info_text += "<br><br><b>Operators:</b><br>"
             for config in self._operator_configs:
@@ -345,6 +363,9 @@ class ScriptExperimentWidget(QtWidgets.QWidget):
         # Apply UI overrides to execution config
         self._execution_config["step_delay_ms"] = self._step_delay_spin.value()
         self._execution_config["num_episodes"] = self._max_episodes_spin.value()
+        self._execution_config["environment_mode"] = (
+            "fixed" if self._env_mode_combo.currentIndex() == 1 else "procedural"
+        )
 
         # Apply max_steps override to all operator configs
         max_steps = self._max_steps_spin.value()
@@ -370,7 +391,12 @@ class ScriptExperimentWidget(QtWidgets.QWidget):
     def _on_progress_updated(self, episode_num: int, total_episodes: int, seed: int):
         """Handle progress update from execution manager."""
         self._progress_label.setText("<span style='font-size: 14pt; color: #4CAF50;'>Running...</span>")
-        self._episode_label.setText(f"<b>Episode:</b> {episode_num}/{total_episodes} &nbsp;&nbsp; <b>Seed:</b> {seed}")
+        env_mode = self._env_mode_combo.currentText()
+        self._episode_label.setText(
+            f"<b>Episode:</b> {episode_num}/{total_episodes} &nbsp;&nbsp; "
+            f"<b>Seed:</b> {seed} &nbsp;&nbsp; "
+            f"<b>Mode:</b> {env_mode}"
+        )
 
     def _on_experiment_completed(self, num_episodes: int):
         """Handle experiment completion from execution manager."""

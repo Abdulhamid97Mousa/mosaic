@@ -52,7 +52,6 @@ from .constants_telemetry import (
     DB_SINK_WRITER_QUEUE_SIZE,
     EPISODE_BUFFER_SIZE,
     ERROR_LOG_LEVEL,
-    HEALTH_MONITOR_HEARTBEAT_INTERVAL_S,
     INITIAL_CREDITS,
     LIVE_CONTROL_QUEUE_SIZE,
     LIVE_EPISODE_QUEUE_SIZE,
@@ -82,7 +81,6 @@ from .constants_telemetry_bus import (
 from .constants_telemetry_db import (
     DB_DEFAULTS,
     DatabaseDefaults,
-    HealthMonitorDefaults,
     RegistryDefaults,
     TelemetryDBSinkDefaults,
 )
@@ -173,7 +171,6 @@ __all__ = [
     "DB_SINK_WRITER_QUEUE_SIZE",
     "EPISODE_BUFFER_SIZE",
     "ERROR_LOG_LEVEL",
-    "HEALTH_MONITOR_HEARTBEAT_INTERVAL_S",
     "INITIAL_CREDITS",
     "LIVE_CONTROL_QUEUE_SIZE",
     "LIVE_EPISODE_QUEUE_SIZE",
@@ -201,7 +198,6 @@ __all__ = [
     # Telemetry DB
     "DB_DEFAULTS",
     "DatabaseDefaults",
-    "HealthMonitorDefaults",
     "RegistryDefaults",
     "TelemetryDBSinkDefaults",
     # Trainer

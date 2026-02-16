@@ -49,32 +49,43 @@ it disappears, and pieces above fall down.
 <code>Dict</code> with:
 </p>
 <ul>
-    <li><strong>board</strong>: 2D grid showing placed blocks</li>
-    <li><strong>current_piece</strong>: The falling tetromino</li>
-    <li><strong>next_piece</strong>: Preview of next tetromino</li>
-    <li><strong>position</strong>: Current piece position</li>
+    <li><strong>grid</strong>: <code>Box(shape=(num_rows, num_cols), dtype=int32)</code> - Binary grid of placed blocks (0=empty, 1=filled)</li>
+    <li><strong>tetromino</strong>: <code>Box(shape=(4, 4), dtype=int32)</code> - Current piece shape</li>
+    <li><strong>action_mask</strong>: <code>Box(shape=(4, num_cols), dtype=bool)</code> - Valid [rotation, column] placements</li>
+    <li><strong>step_count</strong>: Scalar step counter</li>
 </ul>
 
 <h4>Action Space</h4>
-<p><code>Discrete</code> - Control the falling piece:</p>
-<ul>
-    <li><strong>Left/Right</strong>: Move horizontally</li>
-    <li><strong>Rotate CW/CCW</strong>: Rotate piece</li>
-    <li><strong>Soft Drop</strong>: Move down faster</li>
-    <li><strong>Hard Drop</strong>: Instantly place piece</li>
-</ul>
+<p><code>MultiDiscrete([4, num_cols])</code> - Each action is a placement decision:</p>
+<table style="width:100%; border-collapse: collapse; margin: 10px 0;">
+    <tr style="background-color: #f0f0f0;">
+        <th style="border: 1px solid #ddd; padding: 8px;">Dimension</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Range</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Meaning</th>
+    </tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">0: Rotation</td><td style="border: 1px solid #ddd; padding: 8px;">0-3</td><td style="border: 1px solid #ddd; padding: 8px;">0=0deg, 1=90deg, 2=180deg, 3=270deg</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">1: Column</td><td style="border: 1px solid #ddd; padding: 8px;">0 to num_cols-1</td><td style="border: 1px solid #ddd; padding: 8px;">Horizontal position for piece placement</td></tr>
+</table>
+<p><em>Note: Unlike classic Tetris, Jumanji Tetris places pieces instantly
+rather than dropping them in real-time. You choose rotation + column,
+then the piece is placed immediately.</em></p>
 
 <h4>Scoring</h4>
-<ul>
-    <li><strong>Single</strong>: 1 line cleared</li>
-    <li><strong>Double</strong>: 2 lines cleared</li>
-    <li><strong>Triple</strong>: 3 lines cleared</li>
-    <li><strong>Tetris</strong>: 4 lines cleared (bonus!)</li>
-</ul>
+<table style="width:100%; border-collapse: collapse; margin: 10px 0;">
+    <tr style="background-color: #f0f0f0;">
+        <th style="border: 1px solid #ddd; padding: 8px;">Lines Cleared</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Points</th>
+    </tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">0</td><td style="border: 1px solid #ddd; padding: 8px;">0</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">1 (Single)</td><td style="border: 1px solid #ddd; padding: 8px;">40</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">2 (Double)</td><td style="border: 1px solid #ddd; padding: 8px;">100</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">3 (Triple)</td><td style="border: 1px solid #ddd; padding: 8px;">300</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">4 (Tetris)</td><td style="border: 1px solid #ddd; padding: 8px;">1200</td></tr>
+</table>
 
 <h4>Episode End Conditions</h4>
 <ul>
-    <li><strong>Termination</strong>: Blocks reach the top (game over)</li>
+    <li><strong>Termination</strong>: No valid placements remain (action_mask is all False)</li>
 </ul>
 
 <h4>Strategies</h4>
@@ -86,16 +97,33 @@ it disappears, and pieces above fall down.
 </ul>
 
 <h4>Controls</h4>
+<p>Use cursor keys to adjust rotation and column, then press Space to place:</p>
 <table style="width:100%; border-collapse: collapse; margin: 10px 0;">
     <tr style="background-color: #f0f0f0;">
         <th style="border: 1px solid #ddd; padding: 8px;">Key</th>
         <th style="border: 1px solid #ddd; padding: 8px;">Action</th>
     </tr>
-    <tr><td style="border: 1px solid #ddd; padding: 8px;">Left/Right Arrow</td><td style="border: 1px solid #ddd; padding: 8px;">Move piece</td></tr>
-    <tr><td style="border: 1px solid #ddd; padding: 8px;">Up Arrow / Z</td><td style="border: 1px solid #ddd; padding: 8px;">Rotate</td></tr>
-    <tr><td style="border: 1px solid #ddd; padding: 8px;">Down Arrow</td><td style="border: 1px solid #ddd; padding: 8px;">Soft drop</td></tr>
-    <tr><td style="border: 1px solid #ddd; padding: 8px;">Space</td><td style="border: 1px solid #ddd; padding: 8px;">Hard drop</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">A / Left Arrow</td><td style="border: 1px solid #ddd; padding: 8px;">Move cursor left (column - 1)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">D / Right Arrow</td><td style="border: 1px solid #ddd; padding: 8px;">Move cursor right (column + 1)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">W / Up Arrow</td><td style="border: 1px solid #ddd; padding: 8px;">Rotate clockwise (+90deg)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">S / Down Arrow</td><td style="border: 1px solid #ddd; padding: 8px;">Rotate counter-clockwise (-90deg)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Space / Enter</td><td style="border: 1px solid #ddd; padding: 8px;">Place piece at current rotation + column</td></tr>
 </table>
+<p><em>The status bar shows your current cursor position. After placing, the
+cursor resets to column center with 0-degree rotation.</em></p>
+
+<h4>Mouse Controls</h4>
+<table style="width:100%; border-collapse: collapse; margin: 10px 0;">
+    <tr style="background-color: #f0f0f0;">
+        <th style="border: 1px solid #ddd; padding: 8px;">Input</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Action</th>
+    </tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Left Click on column</td><td style="border: 1px solid #ddd; padding: 8px;">Place piece at that column (with current rotation)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Scroll Up</td><td style="border: 1px solid #ddd; padding: 8px;">Rotate piece clockwise (+90deg)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Scroll Down</td><td style="border: 1px solid #ddd; padding: 8px;">Rotate piece counter-clockwise (-90deg)</td></tr>
+</table>
+<p><em>Scroll to choose rotation, then click the target column. Both keyboard
+and mouse input work simultaneously.</em></p>
 
 <h4>References</h4>
 <ul>
