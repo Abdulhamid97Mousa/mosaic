@@ -3,103 +3,23 @@ What Is an Operator?
 
 Operators answer a single question: **given an observation, what action
 should the agent take?**  They are the decision-making layer of MOSAIC,
-sitting above the process-level Worker abstraction.
+sitting above the process-level :doc:`Worker <../workers/index>`
+abstraction.
 
-The Problem
------------
+The core interface is simple:
 
-MOSAIC supports many kinds of decision-makers: humans clicking keys,
-LLMs reasoning about board states, trained RL policies, and scripted
-baselines.  Without a unified abstraction, the GUI would need separate
-code paths for each:
+.. code-block:: text
 
-.. mermaid::
+   observation --> [Operator] --> action
 
-   graph LR
-       subgraph "Without Operators (Fragile)"
-           GUI["GUI"]
-           GUI -->|"if human"| KB["Keyboard Handler"]
-           GUI -->|"if RL"| RL["Policy Loader"]
-           GUI -->|"if LLM"| LLM["API Client"]
-           GUI -->|"if script"| SC["Script Runner"]
-       end
+Every decision-maker -- human, LLM, RL policy, or scripted
+baseline -- implements the same ``select_action(obs) -> action``
+protocol.  This makes all decision-makers **interchangeable**: the GUI,
+the experiment runner, and the telemetry system never need to know what
+kind of operator they are talking to.
 
-       style GUI fill:#ddd,stroke:#999
-
-The Solution: The Operator Protocol
-------------------------------------
-
-MOSAIC defines a ``Protocol`` (structural subtyping) that any
-decision-maker must satisfy:
-
-.. code-block:: python
-
-   from typing import Protocol, Any, Optional
-
-   class Operator(Protocol):
-       """Any entity that selects actions from observations."""
-
-       @property
-       def id(self) -> str: ...
-
-       @property
-       def name(self) -> str: ...
-
-       def select_action(
-           self,
-           observation: Any,
-           legal_actions: Optional[list] = None,
-       ) -> Any:
-           """Return an action given an observation."""
-           ...
-
-       def reset(self, seed: Optional[int] = None) -> None:
-           """Reset internal state for a new episode."""
-           ...
-
-       def on_step_result(
-           self,
-           observation: Any,
-           action: Any,
-           reward: float,
-           terminated: bool,
-           truncated: bool,
-       ) -> None:
-           """Receive feedback from the environment."""
-           ...
-
-Any Python object that implements these methods is a valid Operator --
-no inheritance required.  This enables maximum flexibility: a human
-operator returns ``None`` (the GUI injects keyboard input), an RL
-operator runs a forward pass through a neural network, and an LLM
-operator calls a language model API.
-
-.. mermaid::
-
-   graph TB
-       PROTO["Operator Protocol<br/>select_action(obs) -> action"]
-
-       HUMAN["HumanOperator<br/>returns None<br/>(GUI injects input)"]
-       LLM["LLM Operator<br/>calls vLLM / OpenRouter"]
-       RL["RL Operator<br/>PyTorch forward pass"]
-       BASE["Baseline Operator<br/>random / scripted"]
-
-       PROTO --> HUMAN
-       PROTO --> LLM
-       PROTO --> RL
-       PROTO --> BASE
-
-       style PROTO fill:#4a90d9,stroke:#2e5a87,color:#fff
-       style HUMAN fill:#9370db,stroke:#6a0dad,color:#fff
-       style LLM fill:#9370db,stroke:#6a0dad,color:#fff
-       style RL fill:#9370db,stroke:#6a0dad,color:#fff
-       style BASE fill:#9370db,stroke:#6a0dad,color:#fff
-
-Worker vs Operator
+Operator vs Worker
 ------------------
-
-These two concepts serve different purposes and operate at different
-levels of the architecture:
 
 .. list-table::
    :header-rows: 1
@@ -108,133 +28,75 @@ levels of the architecture:
    * - Concept
      - Definition
      - Examples
-   * - **Worker**
-     - A *process-level* wrapper that manages an RL library's lifecycle,
-       configuration, and telemetry.  Workers live in ``3rd_party/`` and
-       communicate via gRPC/JSONL.
-     - ``cleanrl_worker``, ``xuance_worker``, ``ray_worker``
    * - **Operator**
-     - An *agent-level* abstraction that selects actions step-by-step
-       via ``select_action(obs) -> action``.  Operators are the
-       decision-makers that run inside worker subprocesses.
-     - Human Operator, LLM Operator, RL Operator
+     - The *agent-level interface* -- wraps one or more Worker
+       subprocesses and presents ``select_action(obs) -> action``
+       to the GUI.
+     - LLM Operator, RL Operator, Human Operator,
+       Chess Operator (wraps 2 workers)
+   * - **Worker**
+     - A *process-level* execution unit inside an Operator.
+       Manages library lifecycle, API calls, or scripted behaviors.
+       Lives in ``3rd_party/`` and communicates via stdin/stdout JSON.
+     - ``balrog_worker``, ``cleanrl_worker``, ``xuance_worker``,
+       ``ray_worker``, ``operators_worker``
 
-A **Worker** *contains* one or more **Operators**.  For example:
+Two Modes of Operation
+----------------------
+
+MOSAIC supports two fundamentally different operator configurations:
 
 .. mermaid::
 
    graph LR
-       subgraph Worker["CleanRL Worker (Process)"]
-           TRAIN["Training Loop"]
-           CKPT["Checkpoint"]
+       subgraph "Homogeneous"
+           H1["RL"]
+           H2["RL"]
+           H3["RL"]
        end
 
-       subgraph Operator["RL Operator (Interface)"]
-           SA["select_action(obs)"]
-           RESET["reset(seed)"]
+       subgraph "Hybrid"
+           X1["RL"]
+           X2["LLM"]
+           X3["Human"]
        end
 
-       TRAIN -->|"produces"| CKPT
-       CKPT -->|"loads into"| Operator
+       style H1 fill:#9370db,stroke:#6a0dad,color:#fff
+       style H2 fill:#9370db,stroke:#6a0dad,color:#fff
+       style H3 fill:#9370db,stroke:#6a0dad,color:#fff
+       style X1 fill:#9370db,stroke:#6a0dad,color:#fff
+       style X2 fill:#4a90d9,stroke:#2e5a87,color:#fff
+       style X3 fill:#ff7f50,stroke:#cc5500,color:#fff
 
-       style Worker fill:#ff7f50,stroke:#cc5500,color:#fff
-       style Operator fill:#9370db,stroke:#6a0dad,color:#fff
-       style CKPT fill:#f0e68c,stroke:#bdb76b
+:doc:`Homogeneous Decision-Makers <homogenous_decision_makers/index>`
+   All agents use the same paradigm (all RL, all LLM, etc.).
+   Covers the Operator Protocol, the five categories (human, llm, rl,
+   baseline), the single-worker pattern, and GUI adaptation by
+   category.
 
-At **training time**, the Worker drives the loop.  At **evaluation
-time**, the trained policy is loaded into an Operator that the GUI
-controls step-by-step.
-
-Operator Categories
--------------------
-
-Every operator belongs to one of five categories.  The category
-determines which GUI controls are shown and how the subprocess is
-launched:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 15 30 30 25
-
-   * - Category
-     - Description
-     - Configuration
-     - Action Source
-   * - ``human``
-     - Manual keyboard input
-     - None (key bindings)
-     - GUI keyboard events
-   * - ``llm``
-     - Language model inference
-     - Provider, model, API key, base URL
-     - LLM API call
-   * - ``rl``
-     - Trained RL policy
-     - Policy path, algorithm
-     - Neural network forward pass
-   * - ``bdi``
-     - Belief-Desire-Intention agent
-     - Agent configuration
-     - BDI reasoning engine
-   * - ``baseline``
-     - Scripted or random agent
-     - Max steps, seed
-     - Random / heuristic
+:doc:`Hybrid Decision-Maker <hybrid_decision_maker/index>`
+   Agents use **different** paradigms in the same experiment (e.g., RL +
+   LLM as teammates).  Covers the research gap this addresses, the
+   WorkerAssignment system, experimental configurations, deterministic
+   cross-paradigm evaluation, and the research questions this enables.
 
 OperatorConfig
 --------------
 
-Each operator is configured via an ``OperatorConfig`` dataclass that
-captures everything needed to launch and control it:
+Each operator is configured via an ``OperatorConfig`` dataclass:
 
 .. code-block:: python
 
    @dataclass
    class OperatorConfig:
        operator_id: str
-       operator_type: str        # "llm", "rl", "human", "baseline"
-       worker_id: str            # Which worker subprocess to use
        display_name: str
-       env_name: str             # Environment family
-       task: str                 # Specific environment ID
-       settings: dict            # Type-specific settings
-       run_id: str = ""          # Assigned at launch time
-       max_steps: int = 0        # 0 = unlimited
-
-**Factory methods** simplify creation:
-
-.. code-block:: python
-
-   # Single-agent operator
-   config = OperatorConfig.single_agent(
-       operator_id="llm_1",
-       operator_type="llm",
-       worker_id="barlog_worker",
-       display_name="GPT-4o on BabyAI",
-       env_name="babyai",
-       task="BabyAI-GoToRedBall-v0",
-       settings={
-           "client_name": "vllm",
-           "model_id": "Qwen/Qwen2.5-1.5B-Instruct",
-           "base_url": "http://127.0.0.1:8000/v1",
-       },
-   )
-
-   # Multi-agent operator (e.g., Chess)
-   config = OperatorConfig.multi_agent(
-       operator_id="chess_match",
-       display_name="LLM Chess Match",
-       env_name="pettingzoo",
-       task="chess_v6",
-       worker_assignments={
-           "player_0": WorkerAssignment(
-               worker_id="chess_worker", worker_type="llm", ...
-           ),
-           "player_1": WorkerAssignment(
-               worker_id="chess_worker", worker_type="llm", ...
-           ),
-       },
-   )
+       env_name: str
+       task: str
+       workers: Dict[str, WorkerAssignment]
+       run_id: str | None = None
+       execution_mode: str = "aec"
+       max_steps: int | None = None
 
 OperatorService
 ---------------
@@ -245,39 +107,14 @@ operators:
 .. code-block:: python
 
    class OperatorService:
-       def register_operator(
-           self,
-           operator: Operator,
-           descriptor: OperatorDescriptor,
-       ) -> None: ...
-
+       def register_operator(self, operator, descriptor) -> None: ...
        def set_active_operator(self, operator_id: str) -> None: ...
-
        def select_action(self, observation: Any) -> Any: ...
-
        def seed(self, seed: int) -> None: ...
 
-At startup, MOSAIC registers built-in operators (Human, Worker) and
-any discovered via entry points.  The GUI's operator dropdown is
-populated from ``OperatorService.get_descriptors()``.
-
-MultiOperatorService
---------------------
-
-For side-by-side comparison, the ``MultiOperatorService`` manages
-N operators running in parallel:
-
-.. code-block:: python
-
-   class MultiOperatorService:
-       def add_operator(self, config: OperatorConfig) -> None: ...
-       def remove_operator(self, operator_id: str) -> None: ...
-       def get_active_operators(self) -> list[OperatorConfig]: ...
-       def start_all(self) -> None: ...
-       def stop_all(self) -> None: ...
-
-Each operator gets its own environment instance, render container,
-and subprocess -- but they share the same seed for reproducibility.
+At startup, MOSAIC registers built-in operators and any discovered via
+entry points.  The GUI's operator dropdown is populated from
+``OperatorService.get_descriptors()``.
 
 Directory Layout
 ----------------
@@ -287,12 +124,19 @@ Operator-related code lives in the MOSAIC core (not ``3rd_party/``):
 .. code-block:: text
 
    gym_gui/
-   ├── services/
-   │   ├── operator.py                          # Protocol + OperatorService
-   │   ├── operator_launcher.py                 # Subprocess spawning
-   │   └── operator_script_execution_manager.py # Script mode state machine
-   └── ui/widgets/
-       ├── operator_config_widget.py            # Configuration UI
-       ├── operator_render_container.py         # Per-operator render view
-       ├── multi_operator_render_view.py        # Grid of render containers
-       └── script_experiment_widget.py          # Script mode UI
+       services/
+           operator.py                          # Protocol + OperatorService
+           operator_launcher.py                 # Subprocess spawning
+           operator_script_execution_manager.py # Script mode state machine
+       ui/
+           widgets/
+               operators_tab.py                 # Manual + Script mode tabs
+               operator_config_widget.py        # Per-operator config rows
+               operator_render_container.py     # Per-operator render view
+               multi_operator_render_view.py    # Grid of render containers
+               script_experiment_widget.py      # Script mode UI
+           panels/
+               control_panel_container.py       # Service-to-UI bridge
+           config_panels/
+               single_agent/                    # Per-game environment configs
+               multi_agent/                     # Multi-agent environment configs

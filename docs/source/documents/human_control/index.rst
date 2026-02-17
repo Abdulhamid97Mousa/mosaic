@@ -1,75 +1,82 @@
 Human Control
 =============
 
-MOSAIC provides a comprehensive human control system that lets users play
-environments directly through the GUI.  Every supported environment has
-keyboard (and sometimes mouse) bindings that map physical keys to
-discrete or continuous actions.
+Human Control is the interactive play layer of MOSAIC -- keyboard input,
+mouse interaction, and the render view that displays environment state in
+real time.  Together these subsystems let a human player step into any
+supported environment and interact with it through the GUI.
 
-The system operates in two fundamentally different configurations:
+Signal Flow
+-----------
+
+.. mermaid::
+
+   graph LR
+       KB[Keyboard] --> HIC[HumanInputController]
+       HIC --> SC[SessionController]
+       SC --> ADAPT[Adapter]
+       ADAPT --> ENV[Environment]
+       ENV --> |obs| ADAPT
+       ADAPT --> |payload| REG[RendererRegistry]
+       REG --> STRAT[RendererStrategy]
+       STRAT --> RV[Render View]
+
+       style KB fill:#4a90d9,stroke:#2e5a87,color:#fff
+       style RV fill:#4a90d9,stroke:#2e5a87,color:#fff
+       style HIC fill:#50c878,stroke:#2e8b57,color:#fff
+       style SC fill:#50c878,stroke:#2e8b57,color:#fff
+       style REG fill:#ff7f50,stroke:#cc5500,color:#fff
+       style STRAT fill:#ff7f50,stroke:#cc5500,color:#fff
+       style ADAPT fill:#9370db,stroke:#6a0dad,color:#fff
+       style ENV fill:#9370db,stroke:#6a0dad,color:#fff
+
+| Blue = GUI widgets | Green = Controllers | Orange = Rendering | Purple = Environment / Adapter |
+
+Subsystems
+----------
+
+**Keyboard Input** --
+Two input modes (shortcut-based for turn-based games, state-based for
+real-time arcade games), per-environment key mappings covering all 26
+environment families, and multi-keyboard support for multi-agent play via
+Linux ``evdev``.  See :doc:`keyboard_input` for the full reference.
+
+**Render View** --
+A strategy-pattern rendering pipeline that converts environment
+observations into visual output.  Three built-in strategies cover grid
+tile maps, RGB pixel arrays, and interactive board games.  See
+:doc:`render_view` for the full reference.
+
+Control Modes
+-------------
+
+The ``ControlMode`` enum determines who provides actions for each agent.
+Human input is active in every mode except ``AGENT_ONLY``.
 
 .. list-table::
    :widths: 30 70
    :header-rows: 1
 
-   * - Mode
+   * - Control Mode
      - Description
-   * - **Single-Agent**
-     - One human controls one agent.  Standard keyboard input via Qt.
-   * - **Multi-Agent**
-     - Multiple humans each control a separate agent using dedicated USB
-       keyboards routed through Linux ``evdev``.
-
-.. mermaid::
-
-   graph TD
-       subgraph "Human Control System"
-           KC[Keyboard Events] --> HIC[HumanInputController]
-           HIC -->|Turn-based| SB[Shortcut-Based Mode]
-           HIC -->|Real-time| STB[State-Based Mode]
-           SB --> SA[SessionController.perform_human_action]
-           STB --> RES[KeyCombinationResolver]
-           RES --> SA
-       end
-
-       subgraph "Multi-Agent Extension"
-           USB1[USB Keyboard 1] --> EVDEV[evdev Monitor]
-           USB2[USB Keyboard 2] --> EVDEV
-           EVDEV --> ROUTE[Agent Router]
-           ROUTE --> A1[Agent 0 Keys]
-           ROUTE --> A2[Agent 1 Keys]
-       end
-
-       style KC fill:#4a90d9,stroke:#2e5a87,color:#fff
-       style HIC fill:#50c878,stroke:#2e8b57,color:#fff
-       style EVDEV fill:#ff7f50,stroke:#cc5500,color:#fff
-       style RES fill:#9370db,stroke:#6a0dad,color:#fff
-
-How It Works
-------------
-
-When a human presses a key in the MOSAIC GUI:
-
-1. **Qt captures the key event** (``keyPressEvent`` / ``keyReleaseEvent``)
-2. **HumanInputController** routes it through the configured input mode
-3. A **KeyCombinationResolver** (or QShortcut) maps the key(s) to an action index
-4. The action is forwarded to the environment via ``SessionController``
-
-The input mode is user-configurable in the **Game Configuration** panel:
-
-- **Shortcut-Based (Immediate)**: Each key press instantly fires one action.
-  Best for turn-based games (Chess, FrozenLake, MiniGrid).
-- **State-Based (Real-time)**: Tracks all currently pressed keys and computes
-  combined actions (e.g., Up+Right → diagonal).  Best for arcade games
-  (Procgen, Atari, ViZDoom).
-
-.. tip::
-
-   For multi-agent environments, MOSAIC automatically forces **state-based**
-   mode because shortcut-based mode conflicts with per-device keyboard routing.
+   * - ``HUMAN_ONLY``
+     - All actions come from the human keyboard.  No AI agent is involved.
+   * - ``AGENT_ONLY``
+     - All actions come from an AI agent.  The keyboard is disabled.
+   * - ``HYBRID_TURN_BASED``
+     - Human and agent alternate turns within the same environment.
+   * - ``HYBRID_HUMAN_AGENT``
+     - Human controls some agents while AI controls others simultaneously.
+   * - ``MULTI_AGENT_COOP``
+     - Multiple human players cooperate, each with a dedicated USB keyboard.
+   * - ``MULTI_AGENT_COMPETITIVE``
+     - Multiple human players compete against each other, each with a
+       dedicated USB keyboard.
 
 .. toctree::
    :maxdepth: 2
 
+   keyboard_input
+   render_view
+   multi_keyboard_evdev
    single_agent/index
-   multi_agent/index

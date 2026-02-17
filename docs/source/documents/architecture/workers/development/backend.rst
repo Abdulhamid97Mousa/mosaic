@@ -1,9 +1,10 @@
-Developing a Worker
-===================
+Backend: Worker Package
+=======================
 
-This guide walks through creating a new MOSAIC worker from scratch.
-By the end you will have a fully integrated worker that the GUI
-discovers automatically.
+This guide walks through creating the backend package for a new
+MOSAIC worker under ``3rd_party/``.  By the end you will have a
+fully functional worker that the Daemon can spawn and that emits
+standardized JSONL telemetry.
 
 Prerequisites
 -------------

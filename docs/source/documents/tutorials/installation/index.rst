@@ -759,7 +759,7 @@ Platform Guides
 
    ubuntu
    wsl
-   common_errors
+   common_errors/index
 
 Next Steps
 ----------

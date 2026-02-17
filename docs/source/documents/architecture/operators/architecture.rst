@@ -1,10 +1,12 @@
 IPC Architecture
 ================
 
-Operators communicate with the MOSAIC GUI through a lightweight
-**stdin/stdout JSON protocol**.  Unlike Workers (which use the
-three-tier gRPC pipeline), Operators use direct subprocess IPC
-for low-latency, step-by-step control.
+Operators are the agent-level interface of MOSAIC.  Each Operator wraps
+one or more Worker subprocesses and communicates with the MOSAIC GUI
+through a lightweight **stdin/stdout JSON protocol**.  Unlike the
+training pipeline (which uses the three-tier gRPC architecture),
+Operators use direct subprocess IPC for low-latency, step-by-step
+control.
 
 Two Communication Modes
 -----------------------
@@ -37,10 +39,12 @@ creating a synchronized step loop.
            HANDLE["OperatorProcessHandle"]
        end
 
-       subgraph WORKER["Operator Subprocess"]
-           RUNTIME["InteractiveRuntime"]
-           ENV["Environment"]
-           POLICY["Policy / LLM"]
+       subgraph OP["Operator (Agent-Level Interface)"]
+           subgraph WORKER["Worker Subprocess"]
+               RUNTIME["InteractiveRuntime"]
+               ENV["Environment"]
+               POLICY["Policy / LLM"]
+           end
        end
 
        LAUNCHER -->|"spawn"| WORKER
@@ -50,7 +54,8 @@ creating a synchronized step loop.
        RUNTIME --> POLICY
 
        style GUI fill:#4a90d9,stroke:#2e5a87,color:#fff
-       style WORKER fill:#9370db,stroke:#6a0dad,color:#fff
+       style OP fill:#9370db,stroke:#6a0dad,color:#fff
+       style WORKER fill:#ff7f50,stroke:#cc5500,color:#fff
 
 Interactive JSON Protocol
 -------------------------
@@ -171,16 +176,36 @@ The ``OperatorLauncher`` spawns operator subprocesses and returns
    graph TB
        LAUNCHER["OperatorLauncher"]
 
-       LAUNCHER -->|"_build_llm_command()"| LLM["barlog_worker<br/>chess_worker<br/>operators_worker"]
-       LAUNCHER -->|"_build_rl_command()"| RL["cleanrl_worker<br/>--interactive"]
-       LAUNCHER -->|"_build_baseline_command()"| BASE["operators_worker<br/>--random"]
-       LAUNCHER -->|"_build_human_command()"| HUMAN["keyboard input"]
+       subgraph OP_LLM["LLM Operator"]
+           LLM["balrog_worker / chess_worker / operators_worker"]
+       end
+
+       subgraph OP_RL["RL Operator"]
+           RL["cleanrl_worker --interactive"]
+       end
+
+       subgraph OP_BASE["Baseline Operator"]
+           BASE["operators_worker --random"]
+       end
+
+       subgraph OP_HUMAN["Human Operator"]
+           HUMAN["human_worker / keyboard input"]
+       end
+
+       LAUNCHER -->|"_build_llm_command()"| OP_LLM
+       LAUNCHER -->|"_build_rl_command()"| OP_RL
+       LAUNCHER -->|"_build_baseline_command()"| OP_BASE
+       LAUNCHER -->|"_build_human_command()"| OP_HUMAN
 
        style LAUNCHER fill:#50c878,stroke:#2e8b57,color:#fff
-       style LLM fill:#9370db,stroke:#6a0dad,color:#fff
-       style RL fill:#9370db,stroke:#6a0dad,color:#fff
-       style BASE fill:#9370db,stroke:#6a0dad,color:#fff
-       style HUMAN fill:#9370db,stroke:#6a0dad,color:#fff
+       style OP_LLM fill:#9370db,stroke:#6a0dad,color:#fff
+       style OP_RL fill:#9370db,stroke:#6a0dad,color:#fff
+       style OP_BASE fill:#9370db,stroke:#6a0dad,color:#fff
+       style OP_HUMAN fill:#9370db,stroke:#6a0dad,color:#fff
+       style LLM fill:#ff7f50,stroke:#cc5500,color:#fff
+       style RL fill:#ff7f50,stroke:#cc5500,color:#fff
+       style BASE fill:#ff7f50,stroke:#cc5500,color:#fff
+       style HUMAN fill:#ff7f50,stroke:#cc5500,color:#fff
 
 **Command dispatch** -- the launcher selects the correct worker
 subprocess based on operator type:
@@ -243,21 +268,26 @@ spawns one subprocess **per player**:
 
    graph TB
        LAUNCHER["OperatorLauncher"]
-       MULTI["MultiAgentOperatorHandle"]
 
-       subgraph "Player Subprocesses"
-           P0["Player 0<br/>chess_worker (GPT-4o)"]
-           P1["Player 1<br/>chess_worker (Claude)"]
+       subgraph OP["Chess Operator (Agent-Level Interface)"]
+           MULTI["MultiAgentOperatorHandle"]
+           subgraph W0["chess_worker (Player 0 -- GPT-4o)"]
+               P0_RT["InteractiveRuntime"]
+           end
+           subgraph W1["chess_worker (Player 1 -- Claude)"]
+               P1_RT["InteractiveRuntime"]
+           end
        end
 
-       LAUNCHER -->|"launch_multiagent_operator()"| MULTI
-       MULTI --> P0
-       MULTI --> P1
+       LAUNCHER -->|"launch_multiagent_operator()"| OP
+       MULTI --> W0
+       MULTI --> W1
 
        style LAUNCHER fill:#50c878,stroke:#2e8b57,color:#fff
+       style OP fill:#9370db,stroke:#6a0dad,color:#fff
        style MULTI fill:#4a90d9,stroke:#2e5a87,color:#fff
-       style P0 fill:#9370db,stroke:#6a0dad,color:#fff
-       style P1 fill:#9370db,stroke:#6a0dad,color:#fff
+       style W0 fill:#ff7f50,stroke:#cc5500,color:#fff
+       style W1 fill:#ff7f50,stroke:#cc5500,color:#fff
 
 .. code-block:: python
 

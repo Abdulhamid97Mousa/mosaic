@@ -142,12 +142,12 @@ installation instructions, environment lists, and academic citations.
 Supported Workers
 -----------------
 
-* **CleanRL** - Single-file RL implementations (PPO, DQN, SAC, TD3)
-* **XuanCe** - Multi-agent algorithms (MAPPO, QMIX, MADDPG)
-* **RLlib** - Distributed training with Ray
-* **MuJoCo MPC** - Model Predictive Control worker
-* **Godot** - 3D game engine integration
-* **LLM** - Language model agents (planned)
+* **CleanRL** -- Single-file RL implementations (PPO, DQN, SAC, TD3, DDPG, C51)
+* **XuanCe** -- Multi-agent algorithms (MAPPO, QMIX, MADDPG, VDN, COMA)
+* **RLlib** -- Distributed training with Ray (PPO, IMPALA, APPO)
+* **BALROG** -- Single-agent LLM benchmarking (MiniGrid, BabyAI, MiniHack, Crafter)
+* **MOSAIC LLM** -- Multi-agent LLM with coordination strategies and Theory of Mind (MultiGrid, BabyAI, MeltingPot, PettingZoo)
+* **Chess LLM** -- LLM chess play with multi-turn dialog (PettingZoo Chess)
 
 Quick Example
 -------------
@@ -239,9 +239,6 @@ MOSAIC is designed for:
    :caption: Getting Started
 
    documents/tutorials/installation/index
-   documents/tutorials/installation/ubuntu
-   documents/tutorials/installation/wsl
-   documents/tutorials/installation/common_errors
    documents/tutorials/quickstart
    documents/tutorials/basic_usage
 
@@ -262,6 +259,13 @@ MOSAIC is designed for:
    documents/architecture/policy_mapping
    documents/architecture/workers/index
    documents/architecture/operators/index
+
+.. toctree::
+   :hidden:
+   :maxdepth: 2
+   :caption: Human Control
+
+   documents/human_control/index
 
 .. toctree::
    :hidden:

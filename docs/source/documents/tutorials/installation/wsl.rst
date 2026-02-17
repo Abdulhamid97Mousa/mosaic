@@ -301,16 +301,84 @@ system info:
 
 .. code-block:: text
 
+   bash ./run.sh
+   Checking for existing trainer processes...
+   Starting trainer daemon...
+   Waiting for trainer daemon...
+   Trainer daemon ready.
+   Launching MOSAIC...
    [gym_gui] Loaded settings:
    {
+     "qt_api": "PyQt6",
+     "log_level": "DEBUG",
+     "default_control_mode": "human_only",
+     "default_seed": 1,
+     "allow_seed_reuse": false,
+     "ui": {
+       "chat_panel_collapsed": true
+     },
+     "vllm": {
+       "max_servers": 4,
+       "gpu_memory_utilization": 0.85
+     },
+     "system": {
+       "cpu_model": "x86_64",
+       "cpu_cores_physical": 8,
+       "cpu_cores_logical": 16,
+       "cpu_freq_max_mhz": 0,
+       "ram_total_gb": 15.5,
+       "ram_available_gb": 13.3,
+       "ram_used_gb": 2.2,
+       "ram_percent_used": 14.0
+     },
      "cuda": {
        "available": true,
-       "device_name": "NVIDIA GeForce RTX 4090 Laptop GPU",
-       ...
+       "device_count": 1,
+       "current_device": 0,
+       "device_name": "NVIDIA GeForce RTX 3060 Laptop GPU",
+       "memory_total_gb": 6.0,
+       "memory_free_gb": 5.9,
+       "memory_used_gb": 0.1
+     },
+     "display": {
+       "DISPLAY": ":0",
+       "WAYLAND_DISPLAY": "wayland-0",
+       "XDG_RUNTIME_DIR": "/run/user/1000/",
+       "QT_QPA_PLATFORM": "xcb",
+       "wslg_available": true,
+       "x11_socket_exists": true
+     },
+     "env": {
+       "MUJOCO_GL": "egl",
+       "QT_DEBUG_PLUGINS": "0",
+       "PLATFORM": "ubuntu",
+       "MPI4PY_RC_INITIALIZE": "0"
      },
      "optional_deps": {
        "chat": true,
        "minigrid": true,
-       ...
+       "babyai": true,
+       "mosaic_multigrid": true,
+       "multigrid_ini": true,
+       "pettingzoo": true,
+       "mujoco": false,
+       "atari": true,
+       "vizdoom": false,
+       "crafter": true,
+       "nethack": false,
+       "overcooked_ai": false,
+       "smac": false,
+       "smacv2": false,
+       "rware": false,
+       "ray_worker": true,
+       "cleanrl_worker": false,
+       "xuance_worker": false
+     },
+     "protobuf": {
+       "compiled": true,
+       "location": "gym_gui/services/trainer/proto",
+       "pb2_files_count": 1,
+       "grpc_files_count": 1
      }
    }
+   [gym_gui] Qt platform plugin: xcb

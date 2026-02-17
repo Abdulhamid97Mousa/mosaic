@@ -19,7 +19,8 @@ Some workers are designed to facilitate training reinforcement learning algorith
            W1["CleanRL Worker<br/>PPO · DQN · SAC"]
            W2["XuanCe Worker<br/>MAPPO · QMIX"]
            W3["RLlib Worker<br/>PPO · IMPALA"]
-           W4["BALROG Worker<br/>LLM agents"]
+           W4["BALROG Worker<br/>Single-Agent LLM"]
+           W5["MOSAIC LLM Worker<br/>Multi-Agent LLM"]
        end
 
        GUI -- "gRPC" --> Daemon
@@ -27,6 +28,7 @@ Some workers are designed to facilitate training reinforcement learning algorith
        Daemon -- "spawn + JSONL" --> W2
        Daemon -- "spawn + JSONL" --> W3
        Daemon -- "spawn + JSONL" --> W4
+       Daemon -- "spawn + JSONL" --> W5
 
        style GUI fill:#4a90d9,stroke:#2e5a87,color:#fff
        style Daemon fill:#50c878,stroke:#2e8b57,color:#fff
@@ -34,6 +36,7 @@ Some workers are designed to facilitate training reinforcement learning algorith
        style W2 fill:#ff7f50,stroke:#cc5500,color:#fff
        style W3 fill:#ff7f50,stroke:#cc5500,color:#fff
        style W4 fill:#ff7f50,stroke:#cc5500,color:#fff
+       style W5 fill:#ff7f50,stroke:#cc5500,color:#fff
 
 Key Principles
 --------------
@@ -85,13 +88,12 @@ Available Workers
      - Distributed training at scale
    * - **BALROG**
      - Evaluation
-     - GPT-4, Claude, Llama
-     - LLM agent benchmarking
-   * - **MOSAIC-LLM**
+     - GPT-4, Claude, Llama (single-agent)
+     - Single-agent LLM benchmarking (MiniGrid, BabyAI)
+   * - **MOSAIC LLM**
      - Evaluation
-     - Ad-hoc Multi-Agent as decision-makers via API
-     - Local deployment via vLLM
-     - LLM Multi-Agent benchmarking 
+     - GPT-4, Claude, Llama (multi-agent)
+     - Multi-agent LLM with coordination strategies and Theory of Mind
 
 .. tip::
 
@@ -101,11 +103,12 @@ Available Workers
 
 
 .. toctree::
+   :hidden:
    :maxdepth: 2
 
    concept
    architecture
    lifecycle
    integrated_workers/index
-   development
+   development/index
    examples
