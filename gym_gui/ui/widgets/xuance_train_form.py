@@ -23,6 +23,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from qtpy import QtCore, QtGui, QtWidgets
 
+from gym_gui.config.paths import VAR_TRAINER_DIR
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
     LOG_UI_TRAIN_FORM_TRACE,
@@ -1544,7 +1545,7 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
             "artifacts": {
                 "tensorboard": {
                     "enabled": track_tensorboard,
-                    "relative_path": f"var/trainer/runs/{run_id}/tensorboard" if track_tensorboard else None,
+                    "relative_path": f"var/trainer/{'evals' if state.test_mode else 'runs'}/{run_id}/tensorboard" if track_tensorboard else None,
                 },
                 "wandb": {
                     "enabled": track_wandb,
@@ -1574,7 +1575,12 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
 
         # TensorBoard environment
         if track_tensorboard:
-            environment["XUANCE_TENSORBOARD_DIR"] = f"var/trainer/runs/{run_id}/tensorboard"
+            environment["XUANCE_TENSORBOARD_DIR"] = f"var/trainer/{'evals' if state.test_mode else 'runs'}/{run_id}/tensorboard"
+
+        # MOSAIC_RUN_DIR: route eval runs to evals/, training to runs/
+        environment["MOSAIC_RUN_DIR"] = str(
+            (VAR_TRAINER_DIR / ("evals" if state.test_mode else "runs") / run_id).resolve()
+        )
 
         # WandB environment variables
         if track_wandb:

@@ -13,7 +13,7 @@ from jsonschema import Draft202012Validator, ValidationError
 from ulid import ULID
 
 from gym_gui.constants import TRAINER_DEFAULTS
-from gym_gui.config.paths import VAR_TENSORBOARD_DIR, VAR_WANDB_DIR
+from gym_gui.config.paths import VAR_EVALS_DIR, VAR_TENSORBOARD_DIR, VAR_WANDB_DIR
 from gym_gui.utils import json_serialization
 
 
@@ -264,8 +264,20 @@ def validate_train_run_config(raw: Mapping[str, Any]) -> TrainRunConfig:
         and not worker_meta.get("module")
     )
 
+    # Detect eval runs: CleanRL sets extras.mode=="policy_eval", XuanCe sets test_mode==True
+    is_eval_run = False
+    if isinstance(worker_config, MutableMapping):
+        wk_extras = worker_config.get("extras")
+        if isinstance(wk_extras, Mapping) and str(wk_extras.get("mode", "")) == "policy_eval":
+            is_eval_run = True
+        elif bool(worker_config.get("test_mode", False)):
+            is_eval_run = True
+
     if not is_custom_script:
-        # --- Standard training: compute and inject artifact paths ---
+        # --- Standard training/eval: compute and inject artifact paths ---
+        base_dir = VAR_EVALS_DIR if is_eval_run else VAR_TENSORBOARD_DIR
+        base_relative = "var/trainer/evals" if is_eval_run else "var/trainer/runs"
+
         worker_extras = {}
         if isinstance(worker_config, Mapping):
             worker_extras = worker_config.get("extras", {}) if isinstance(worker_config.get("extras"), Mapping) else {}
@@ -273,11 +285,11 @@ def validate_train_run_config(raw: Mapping[str, Any]) -> TrainRunConfig:
         if not isinstance(tensorboard_dirname, str) or not tensorboard_dirname.strip():
             tensorboard_dirname = "tensorboard"
         tensorboard_relative = tensorboard_dirname
-        tensorboard_absolute = (VAR_TENSORBOARD_DIR / run_id / tensorboard_dirname).resolve()
+        tensorboard_absolute = (base_dir / run_id / tensorboard_dirname).resolve()
 
         # WANDB manifest file path (worker will write run_path here after wandb.init())
-        wandb_manifest_file = (VAR_WANDB_DIR / run_id / "wandb.json").resolve()
-        wandb_relative = f"var/trainer/runs/{run_id}/wandb.json"
+        wandb_manifest_file = (base_dir / run_id / "wandb.json").resolve()
+        wandb_relative = f"{base_relative}/{run_id}/wandb.json"
 
         if isinstance(metadata_payload, MutableMapping):
             artifacts_meta = metadata_payload.get("artifacts")
@@ -317,11 +329,11 @@ def validate_train_run_config(raw: Mapping[str, Any]) -> TrainRunConfig:
         if "XUANCE_RUN_ID" in environment:
             environment["XUANCE_RUN_ID"] = run_id
         if "XUANCE_TENSORBOARD_DIR" in environment:
-            environment["XUANCE_TENSORBOARD_DIR"] = f"var/trainer/runs/{run_id}/tensorboard"
+            environment["XUANCE_TENSORBOARD_DIR"] = f"{base_relative}/{run_id}/tensorboard"
 
         if "MOSAIC_RUN_ID" in environment:
             environment["MOSAIC_RUN_ID"] = run_id
-        run_dir = VAR_TENSORBOARD_DIR / run_id
+        run_dir = base_dir / run_id
         if "MOSAIC_RUN_DIR" in environment:
             environment["MOSAIC_RUN_DIR"] = str(run_dir)
         if "MOSAIC_CHECKPOINT_DIR" in environment:

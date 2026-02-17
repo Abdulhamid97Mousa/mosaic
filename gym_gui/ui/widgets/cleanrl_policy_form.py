@@ -457,7 +457,7 @@ class CleanRlPolicyForm(QtWidgets.QDialog, LogConstantMixin):
             "eval_episodes": episodes_per_batch,
             "eval_batch_size": episodes_per_batch,
             "eval_repeat": repeat_eval,
-            "tensorboard_dir": "tensorboard_eval",
+            "tensorboard_dir": "tensorboard",
             "eval_gamma": float(self._gamma_spin.value()),
             "eval_max_episode_steps": int(self._max_steps_spin.value()) if self._max_steps_spin.value() > 0 else None,
             "eval_max_episode_seconds": float(self._max_seconds_spin.value()) if self._max_seconds_spin.value() > 0 else None,
@@ -506,8 +506,8 @@ class CleanRlPolicyForm(QtWidgets.QDialog, LogConstantMixin):
             },
         }
 
-        tensorboard_relpath = f"var/trainer/runs/{run_id}/{extras['tensorboard_dir']}"
-        tensorboard_abs = (VAR_TRAINER_DIR / "runs" / run_id / extras["tensorboard_dir"]).resolve()
+        tensorboard_relpath = f"var/trainer/evals/{run_id}/{extras['tensorboard_dir']}"
+        tensorboard_abs = (VAR_TRAINER_DIR / "evals" / run_id / extras["tensorboard_dir"]).resolve()
         metadata["artifacts"] = {
             "tensorboard": {
                 "enabled": True,
@@ -523,6 +523,7 @@ class CleanRlPolicyForm(QtWidgets.QDialog, LogConstantMixin):
         environment: Dict[str, Any] = {
             "CLEANRL_RUN_ID": run_id,
             "CLEANRL_AGENT_ID": agent_id,
+            "MOSAIC_RUN_DIR": str((VAR_TRAINER_DIR / "evals" / run_id).resolve()),
             "TRACK_TENSORBOARD": "0",
             "TRACK_WANDB": "0",
             "WANDB_MODE": "offline",

@@ -257,13 +257,22 @@ All run artifacts are organized under ``/var/gym_gui/``:
    │   ├── configs/
    │   │   ├── config-{run_id}.json        # Full trainer config
    │   │   └── worker-{run_id}.json        # Per-worker config
-   │   ├── runs/
+   │   ├── runs/                           # Training run artifacts
    │   │   └── {run_id}/
    │   │       ├── tensorboard/            # TensorBoard logs
+   │   │       ├── checkpoints/            # Model checkpoints
    │   │       ├── videos/                 # Recorded episodes
    │   │       ├── logs/
    │   │       │   ├── worker.stdout.log
    │   │       │   └── worker.stderr.log
+   │   │       └── analytics.json          # GUI manifest
+   │   ├── evals/                          # Evaluation run artifacts (separate from training)
+   │   │   └── {run_id}/
+   │   │       ├── tensorboard/            # Evaluation TensorBoard logs
+   │   │       ├── videos/                 # Evaluation video captures
+   │   │       ├── logs/
+   │   │       │   ├── cleanrl.stdout.log
+   │   │       │   └── cleanrl.stderr.log
    │   │       ├── analytics.json          # GUI manifest
    │   │       └── eval_summary.json       # Evaluation results
    │   ├── registry.db                     # SQLite state store
@@ -274,3 +283,9 @@ All run artifacts are organized under ``/var/gym_gui/``:
    └── logs/
        ├── gym_gui.log                     # Application log
        └── trainer_daemon.log              # Daemon log
+
+Training runs and evaluation runs are stored in separate directories.
+CleanRL policy evaluations (``extras.mode == "policy_eval"``) and XuanCe
+test-mode runs (``test_mode == True``) are routed to ``evals/``. All other
+runs go to ``runs/``. The run manager searches both directories for cleanup
+and disk usage reporting.

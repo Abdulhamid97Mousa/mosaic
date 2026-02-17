@@ -15,6 +15,7 @@
 # or install directly: pip install -r cleanrl/requirements/requirements.txt
 
 # Key CleanRL dependencies (subset for reference):
+setuptools<78  # tensorboard uses pkg_resources, removed in setuptools>=78
 torch>=2.0.0
 tensorboard>=2.11.0
 wandb>=0.22.3

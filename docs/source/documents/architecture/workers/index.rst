@@ -106,5 +106,6 @@ Available Workers
    concept
    architecture
    lifecycle
+   integrated_workers/index
    development
    examples

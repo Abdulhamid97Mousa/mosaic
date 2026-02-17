@@ -13,6 +13,7 @@ PyQt6-WebEngine==6.9.0
 qtpy==2.4.3
 qasync==0.27.0
 # Core dependencies
+setuptools<78  # setuptools>=78 removed pkg_resources; tensorboard still requires it
 packaging==25.0
 PyYAML>=6.0
 jsonschema==4.23.0
@@ -29,6 +30,13 @@ pytest==8.4.2
 pytest-qt>=4.5.0
 pydantic==2.12.0
 Pillow==10.4.0
+
+# PyTorch (required: app.py uses torch.cuda for GPU detection at startup)
+torch>=2.0.0
+
+# System monitoring (required: app.py uses psutil for CPU/RAM, nvidia-ml-py for GPU memory)
+psutil>=5.9.0
+nvidia-ml-py>=11.0.0
 
 # HDF5 for replay storage (frames, observations)
 h5py>=3.10.0

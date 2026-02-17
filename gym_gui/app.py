@@ -89,6 +89,19 @@ def _format_settings(settings: Settings) -> str:
             pass
     payload["cuda"] = cuda_info
 
+    # Display / Qt platform information
+    display_info: dict[str, Any] = {
+        "DISPLAY": os.getenv("DISPLAY", "not set"),
+        "WAYLAND_DISPLAY": os.getenv("WAYLAND_DISPLAY", "not set"),
+        "XDG_RUNTIME_DIR": os.getenv("XDG_RUNTIME_DIR", "not set"),
+        "QT_QPA_PLATFORM": os.getenv("QT_QPA_PLATFORM", "auto"),
+    }
+    # Detect WSLg
+    display_info["wslg_available"] = os.path.exists("/mnt/wslg/.X11-unix")
+    # Check X11 socket
+    display_info["x11_socket_exists"] = os.path.exists("/tmp/.X11-unix/X0")
+    payload["display"] = display_info
+
     # Environment variables (important ones)
     payload["env"] = {
         "MUJOCO_GL": os.getenv("MUJOCO_GL", "not set"),
@@ -173,6 +186,7 @@ def _detect_optional_dependencies() -> dict[str, bool]:
 
         # Environment families
         "minigrid": "minigrid",
+        "babyai": "minigrid.envs.babyai",  # BabyAI (bundled in minigrid>=2)
         "mosaic_multigrid": "mosaic_multigrid",  # Modern fork (Gymnasium API)
         "multigrid_ini": "multigrid",  # Original INI version (cooperative exploration)
         "pettingzoo": "pettingzoo",
@@ -306,8 +320,17 @@ def main() -> int:
         traceback.print_exc()
         return 0
 
+    # Share OpenGL contexts across QQuickWidget instances (must be set
+    # *before* QApplication is created).  On WSLg the default QRhiGles2
+    # backend may fail to create a context; QSG_RHI_BACKEND=software in
+    # .env sidesteps this, but the attribute is still required for any
+    # GL-based fallback to work.
+    from PyQt6.QtCore import Qt
+    QApplication.setAttribute(Qt.ApplicationAttribute.AA_ShareOpenGLContexts)
+
     app = QApplication(sys.argv)
     app.setApplicationName("Gym GUI")
+    print(f"[gym_gui] Qt platform plugin: {app.platformName()}")
 
     # Setup Qt-compatible asyncio event loop using qasync
     _setup_qasync_event_loop(app)

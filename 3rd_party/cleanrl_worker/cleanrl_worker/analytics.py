@@ -70,7 +70,7 @@ def build_manifest(
     All paths are stored as relative paths (relative to run_dir) for portability.
     The GUI resolves them at load time using the run_id.
     """
-    # Extract the relative tensorboard directory name (e.g., "tensorboard" or "tensorboard_eval")
+    # Extract the relative tensorboard directory name (always "tensorboard")
     tensorboard_dir = extras.get("tensorboard_dir")
     tensorboard_relative: Optional[str] = None
     if isinstance(tensorboard_dir, str) and tensorboard_dir.strip():

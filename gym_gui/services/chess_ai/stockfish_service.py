@@ -12,9 +12,8 @@ import shutil
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Optional
 
-from stockfish import Stockfish
-
 if TYPE_CHECKING:
+    from stockfish import Stockfish as StockfishType
     from gym_gui.core.adapters.chess_adapter import ChessState
 
 _LOG = logging.getLogger(__name__)
@@ -77,7 +76,7 @@ class StockfishService:
             config: Optional configuration. Uses defaults if not provided.
         """
         self._config = config or StockfishConfig()
-        self._engine: Optional[Stockfish] = None
+        self._engine: Optional["StockfishType"] = None
         self._stockfish_path: Optional[str] = None
 
     @staticmethod
@@ -123,6 +122,8 @@ class StockfishService:
             return False
 
         try:
+            from stockfish import Stockfish
+
             self._engine = Stockfish(
                 path=self._stockfish_path,
                 depth=self._config.depth,

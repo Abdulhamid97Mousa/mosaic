@@ -1,9 +1,12 @@
+import datetime
+
 from google.protobuf import timestamp_pb2 as _timestamp_pb2
 from google.protobuf.internal import containers as _containers
 from google.protobuf.internal import enum_type_wrapper as _enum_type_wrapper
 from google.protobuf import descriptor as _descriptor
 from google.protobuf import message as _message
-from typing import ClassVar as _ClassVar, Iterable as _Iterable, Mapping as _Mapping, Optional as _Optional, Union as _Union
+from collections.abc import Iterable as _Iterable, Mapping as _Mapping
+from typing import ClassVar as _ClassVar, Optional as _Optional, Union as _Union
 
 DESCRIPTOR: _descriptor.FileDescriptor
 
@@ -116,7 +119,7 @@ class RunRecord(_message.Message):
     failure_reason: str
     gpu_slots: _containers.RepeatedScalarFieldContainer[int]
     seq_id: int
-    def __init__(self, run_id: _Optional[str] = ..., status: _Optional[_Union[RunStatus, str]] = ..., digest: _Optional[str] = ..., created_at: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ..., last_heartbeat: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ..., gpu_slot: _Optional[int] = ..., failure_reason: _Optional[str] = ..., gpu_slots: _Optional[_Iterable[int]] = ..., seq_id: _Optional[int] = ...) -> None: ...
+    def __init__(self, run_id: _Optional[str] = ..., status: _Optional[_Union[RunStatus, str]] = ..., digest: _Optional[str] = ..., created_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., updated_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., last_heartbeat: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., gpu_slot: _Optional[int] = ..., failure_reason: _Optional[str] = ..., gpu_slots: _Optional[_Iterable[int]] = ..., seq_id: _Optional[int] = ...) -> None: ...
 
 class ListRunsRequest(_message.Message):
     __slots__ = ("status_filter",)
@@ -162,7 +165,7 @@ class HealthCheckResponse(_message.Message):
     started_at: _timestamp_pb2.Timestamp
     listen_address: str
     healthy: bool
-    def __init__(self, pid: _Optional[int] = ..., started_at: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ..., listen_address: _Optional[str] = ..., healthy: bool = ...) -> None: ...
+    def __init__(self, pid: _Optional[int] = ..., started_at: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., listen_address: _Optional[str] = ..., healthy: bool = ...) -> None: ...
 
 class StreamStepsRequest(_message.Message):
     __slots__ = ("run_id", "since_seq")
@@ -220,7 +223,7 @@ class RunStep(_message.Message):
     render_payload_json: str
     episode_seed: int
     worker_id: str
-    def __init__(self, run_id: _Optional[str] = ..., episode_index: _Optional[int] = ..., step_index: _Optional[int] = ..., action_json: _Optional[str] = ..., observation_json: _Optional[str] = ..., reward: _Optional[float] = ..., terminated: bool = ..., truncated: bool = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ..., policy_label: _Optional[str] = ..., backend: _Optional[str] = ..., seq_id: _Optional[int] = ..., agent_id: _Optional[str] = ..., render_hint_json: _Optional[str] = ..., frame_ref: _Optional[str] = ..., payload_version: _Optional[int] = ..., render_payload_json: _Optional[str] = ..., episode_seed: _Optional[int] = ..., worker_id: _Optional[str] = ...) -> None: ...
+    def __init__(self, run_id: _Optional[str] = ..., episode_index: _Optional[int] = ..., step_index: _Optional[int] = ..., action_json: _Optional[str] = ..., observation_json: _Optional[str] = ..., reward: _Optional[float] = ..., terminated: bool = ..., truncated: bool = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., policy_label: _Optional[str] = ..., backend: _Optional[str] = ..., seq_id: _Optional[int] = ..., agent_id: _Optional[str] = ..., render_hint_json: _Optional[str] = ..., frame_ref: _Optional[str] = ..., payload_version: _Optional[int] = ..., render_payload_json: _Optional[str] = ..., episode_seed: _Optional[int] = ..., worker_id: _Optional[str] = ...) -> None: ...
 
 class RunEpisode(_message.Message):
     __slots__ = ("run_id", "episode_index", "total_reward", "steps", "terminated", "truncated", "metadata_json", "timestamp", "seq_id", "agent_id", "worker_id")
@@ -246,7 +249,7 @@ class RunEpisode(_message.Message):
     seq_id: int
     agent_id: str
     worker_id: str
-    def __init__(self, run_id: _Optional[str] = ..., episode_index: _Optional[int] = ..., total_reward: _Optional[float] = ..., steps: _Optional[int] = ..., terminated: bool = ..., truncated: bool = ..., metadata_json: _Optional[str] = ..., timestamp: _Optional[_Union[_timestamp_pb2.Timestamp, _Mapping]] = ..., seq_id: _Optional[int] = ..., agent_id: _Optional[str] = ..., worker_id: _Optional[str] = ...) -> None: ...
+    def __init__(self, run_id: _Optional[str] = ..., episode_index: _Optional[int] = ..., total_reward: _Optional[float] = ..., steps: _Optional[int] = ..., terminated: bool = ..., truncated: bool = ..., metadata_json: _Optional[str] = ..., timestamp: _Optional[_Union[datetime.datetime, _timestamp_pb2.Timestamp, _Mapping]] = ..., seq_id: _Optional[int] = ..., agent_id: _Optional[str] = ..., worker_id: _Optional[str] = ...) -> None: ...
 
 class PublishTelemetryResponse(_message.Message):
     __slots__ = ("accepted", "dropped")

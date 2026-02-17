@@ -39,6 +39,7 @@ dependencies = [
 
     # Qt GUI framework
     "PyQt6>=6.7.0",
+    "PyQt6-WebEngine>=6.7.0",
     "qtpy>=2.4.0",
     "qasync>=0.27.0",
 
@@ -48,6 +49,13 @@ dependencies = [
     "pydantic>=2.0.0",
     "Pillow>=10.0.0",
     "numpy>=1.24.0",
+
+    # PyTorch (required: app.py uses torch.cuda for GPU detection at startup)
+    "torch>=2.0.0",
+
+    # System monitoring (required: app.py uses psutil for CPU/RAM info at startup)
+    "psutil>=5.9.0",
+    "nvidia-ml-py>=11.0.0",
 
     # gRPC for trainer communication
     "grpcio>=1.60.0",

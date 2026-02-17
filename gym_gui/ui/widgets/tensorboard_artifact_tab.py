@@ -95,12 +95,12 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
         if self._path_field is not None:
             self._path_field.setText(str(self._log_dir))
             self._path_field.setCursorPosition(0)
+        if self._command_field is not None:
+            self._command_field.setText(self._cli_command)
+            self._command_field.setCursorPosition(0)
         self._pending_launch = False
         self._data_seen = False
         self._last_status = None
-        self._refresh_status()
-
-    def refresh(self) -> None:
         self._refresh_status()
 
     # ------------------------------------------------------------------
@@ -371,18 +371,6 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
             )
 
     # ------------------------------------------------------------------
-    def set_log_dir(self, log_dir: Path | str) -> None:
-        self._log_dir = Path(log_dir)
-        self._cli_command = self._build_cli_command(self._log_dir)
-        if self._path_field is not None:
-            self._path_field.setText(str(self._log_dir))
-        if self._command_field is not None:
-            self._command_field.setText(self._cli_command)
-            self._command_field.setCursorPosition(0)
-        self._data_seen = False
-        self._last_status = None
-        self._refresh_status()
-
     @pyqtSlot(bool)
     def _toggle_details_section(self, checked: bool) -> None:
         if hasattr(self, "_details_container") and self._details_container is not None:
@@ -597,7 +585,7 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
             process = subprocess.Popen(
                 command,
                 stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
+                stderr=subprocess.PIPE,
                 text=True,
             )
         except FileNotFoundError:
@@ -643,15 +631,39 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
         if self._tensorboard_port is None:
             return
         if self._tensorboard_process and self._tensorboard_process.poll() is not None:
+            # Read stderr for diagnostics before cleaning up
+            stderr_output = ""
+            if self._tensorboard_process.stderr:
+                try:
+                    stderr_output = self._tensorboard_process.stderr.read() or ""
+                except Exception:
+                    pass
+            exit_code = self._tensorboard_process.returncode
             self.log_constant(
                 LOG_UI_RENDER_TABS_WARNING,
                 message="TensorBoard process exited unexpectedly",
-                extra={"run_id": self._run_id, "agent_id": self._agent_id, "port": self._tensorboard_port},
+                extra={
+                    "run_id": self._run_id,
+                    "agent_id": self._agent_id,
+                    "port": self._tensorboard_port,
+                    "exit_code": exit_code,
+                    "stderr": stderr_output[:500] if stderr_output else "",
+                },
             )
+            status_msg = f"TensorBoard process exited unexpectedly (code {exit_code})."
+            if stderr_output:
+                # Show last meaningful line of stderr
+                lines = [ln.strip() for ln in stderr_output.strip().splitlines() if ln.strip()]
+                if lines:
+                    status_msg += f"\n{lines[-1][:200]}"
             if self._status_label is not None:
-                self._status_label.setText("TensorBoard process exited unexpectedly.")
+                self._status_label.setText(status_msg)
             if self._server_probe_timer is not None:
                 self._server_probe_timer.stop()
+            self._tensorboard_process = None
+            if self._embedded_button is not None:
+                self._embedded_button.setEnabled(True)
+                self._embedded_button.setVisible(True)
             return
 
         url = self._tensorboard_url(self._tensorboard_port)
@@ -761,6 +773,9 @@ class TensorboardArtifactTab(QtWidgets.QWidget, LogConstantMixin):
                 )
         finally:
             self._tensorboard_process = None
+            if self._embedded_button is not None:
+                self._embedded_button.setEnabled(True)
+                self._embedded_button.setVisible(True)
             self.log_constant(
                 LOG_UI_RENDER_TABS_TRACE,
                 message="TensorBoard process stopped",

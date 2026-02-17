@@ -438,7 +438,9 @@ class CleanRLWorkerRuntime:
         if mosaic_run_dir:
             run_dir = Path(mosaic_run_dir).resolve()
         else:
-            run_dir = (VAR_TRAINER_DIR / "runs" / self._config.run_id).resolve()
+            mode = str(dict(self._config.extras).get("mode") or "train")
+            subdir = "evals" if mode == "policy_eval" else "runs"
+            run_dir = (VAR_TRAINER_DIR / subdir / self._config.run_id).resolve()
         run_dir.mkdir(parents=True, exist_ok=True)
         logs_dir = run_dir / "logs"
         logs_dir.mkdir(parents=True, exist_ok=True)
@@ -767,7 +769,7 @@ class CleanRLWorkerRuntime:
         stderr_path = logs_dir / "cleanrl.stderr.log"
         videos_dir = run_dir / "videos"
         videos_dir.mkdir(parents=True, exist_ok=True)
-        tensorboard_dirname = "tensorboard_eval"
+        tensorboard_dirname = "tensorboard"
         tensorboard_log_dir = run_dir / tensorboard_dirname
         # Create tensorboard directory early so TensorBoard tab can start watching it
         tensorboard_log_dir.mkdir(parents=True, exist_ok=True)

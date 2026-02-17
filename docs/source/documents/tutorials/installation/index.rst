@@ -85,8 +85,8 @@ Choose your installation based on your use case:
 
       .. code-block:: bash
 
-         # Quick install via pyproject.toml
-         pip install -e ".[cleanrl,box2d,atari]"
+         # cleanrl = worker (training backend), minigrid = environment family
+         pip install -e ".[cleanrl,minigrid]"
 
          # Or full isolation via requirements
          pip install -r requirements/cleanrl_worker.txt
@@ -195,11 +195,15 @@ all installable extras.  Each extra maps to a set of PyPI packages:
 
 .. tip::
 
-   Multiple extras can be combined in a single command:
+   You do not need to install every extra. Pick only what you need.
+   Note that **workers** (training backends like ``cleanrl``, ``xuance``) and
+   **environment families** (like ``minigrid``, ``pettingzoo``) are independent —
+   combine one worker with the environments you want:
 
    .. code-block:: bash
 
-      pip install -e ".[cleanrl,smac,mosaic_multigrid,box2d]"
+      # cleanrl = worker, minigrid = environment family
+      pip install -e ".[cleanrl,minigrid]"
 
 requirements/ Directory
 ^^^^^^^^^^^^^^^^^^^^^^^
@@ -703,10 +707,13 @@ If ``mpi4py`` fails to install:
    ``MPI_Init()`` from blocking when XuanCe is imported outside of ``mpirun``.
    Make sure your ``.env`` file includes this setting.
 
-Stockfish Issues (PettingZoo Chess)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Stockfish (Chess Engine)
+^^^^^^^^^^^^^^^^^^^^^^^^
 
-If Chess environments fail:
+`Stockfish <https://stockfishchess.org/>`_ is a standalone chess engine — it is
+**not** part of PettingZoo.  PettingZoo's Chess environment uses ``python-chess``
+for move validation and rendering, but can optionally use Stockfish as a
+built-in opponent.  If you want Stockfish-powered opponents:
 
 .. code-block:: bash
 
@@ -744,12 +751,22 @@ If you encounter conflicts between workers:
    source .venv-cleanrl/bin/activate
    pip install -r requirements/cleanrl_worker.txt
 
+Platform Guides
+---------------
+
+.. toctree::
+   :maxdepth: 1
+
+   ubuntu
+   wsl
+   common_errors
+
 Next Steps
 ----------
 
 After installation:
 
-1. **Quick Start**: See :doc:`quickstart` to run your first experiment
-2. **Basic Usage**: See :doc:`basic_usage` for GUI walkthrough
-3. **Environments**: See :doc:`../environments/index` for the full environment catalog
-4. **Architecture**: See :doc:`../architecture/overview` to understand MOSAIC's design
+1. **Quick Start**: See :doc:`../quickstart` to run your first experiment
+2. **Basic Usage**: See :doc:`../basic_usage` for GUI walkthrough
+3. **Environments**: See :doc:`../../environments/index` for the full environment catalog
+4. **Architecture**: See :doc:`../../architecture/overview` to understand MOSAIC's design

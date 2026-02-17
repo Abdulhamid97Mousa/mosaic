@@ -7,7 +7,7 @@ These tests cover the three main buttons in the gym_gui UI:
 
 Each flow has specific requirements for:
 - Configuration handling
-- TensorBoard directory management (tensorboard/ for training, tensorboard_eval/ for evaluation)
+- TensorBoard directory management (tensorboard/ for both; runs/ vs evals/ parent separates them)
 - Checkpoint file handling
 """
 
@@ -39,7 +39,6 @@ def tmp_run_dir(tmp_path: Path) -> Path:
     run_dir.mkdir(parents=True)
     (run_dir / "logs").mkdir()
     (run_dir / "tensorboard").mkdir()
-    (run_dir / "tensorboard_eval").mkdir()
     return run_dir
 
 
@@ -261,7 +260,7 @@ class TestEvaluatePolicyFlow:
 
     This flow:
     - Loads a trained checkpoint
-    - Uses tensorboard_eval/ directory for evaluation logs
+    - Uses tensorboard/ directory for evaluation logs (under evals/ parent)
     - Runs evaluation episodes and logs returns
     """
 
@@ -277,7 +276,7 @@ class TestEvaluatePolicyFlow:
             extras={
                 "mode": "policy_eval",
                 "policy_path": str(sample_checkpoint),
-                "tensorboard_dir": "tensorboard_eval",
+                "tensorboard_dir": "tensorboard",
                 "eval_episodes": 10,
                 "eval_gamma": 0.99,
                 "eval_capture_video": False,
@@ -286,7 +285,7 @@ class TestEvaluatePolicyFlow:
 
         assert config.extras["mode"] == "policy_eval"
         assert config.extras["policy_path"] == str(sample_checkpoint)
-        assert config.extras["tensorboard_dir"] == "tensorboard_eval"
+        assert config.extras["tensorboard_dir"] == "tensorboard"
         assert config.extras["eval_episodes"] == 10
 
     def test_eval_dry_run_returns_summary(self, sample_checkpoint: Path) -> None:
@@ -295,7 +294,7 @@ class TestEvaluatePolicyFlow:
             extras={
                 "mode": "policy_eval",
                 "policy_path": str(sample_checkpoint),
-                "tensorboard_dir": "tensorboard_eval",
+                "tensorboard_dir": "tensorboard",
             }
         )
         runtime = _make_runtime(config, dry_run=True)
@@ -305,19 +304,19 @@ class TestEvaluatePolicyFlow:
         assert summary["status"] == "dry-run"
         assert summary["extras"]["mode"] == "policy_eval"
 
-    def test_eval_tensorboard_dir_is_separate(self) -> None:
-        """Test that eval uses tensorboard_eval, not tensorboard."""
+    def test_eval_tensorboard_dir_uses_tensorboard(self) -> None:
+        """Test that eval uses tensorboard/ (separation is via evals/ parent dir)."""
         config = _make_config(
             extras={
                 "mode": "policy_eval",
                 "policy_path": "/path/to/model.cleanrl_model",
-                "tensorboard_dir": "tensorboard_eval",
+                "tensorboard_dir": "tensorboard",
             }
         )
 
-        # The tensorboard_dir should be tensorboard_eval for evaluation
-        assert config.extras["tensorboard_dir"] == "tensorboard_eval"
-        assert config.extras["tensorboard_dir"] != "tensorboard"
+        # Both training and eval use 'tensorboard' as the dirname;
+        # the evals/ vs runs/ parent directory provides separation.
+        assert config.extras["tensorboard_dir"] == "tensorboard"
 
     def test_eval_missing_checkpoint_raises_error(self, tmp_path: Path, monkeypatch) -> None:
         """Test that missing checkpoint file raises FileNotFoundError."""
@@ -357,7 +356,7 @@ class TestEvaluatePolicyFlow:
             "extras": {
                 "mode": "policy_eval",
                 "policy_path": str(sample_checkpoint),
-                "tensorboard_dir": "tensorboard_eval",
+                "tensorboard_dir": "tensorboard",
                 "eval_episodes": 5,
                 "eval_gamma": 0.99,
                 "eval_capture_video": True,
@@ -427,7 +426,7 @@ class TestResumeTrainingFlow:
         assert summary["config"]["algo"] == "ppo"
 
     def test_resume_tensorboard_dir_is_tensorboard(self) -> None:
-        """Test that resume uses tensorboard, not tensorboard_eval."""
+        """Test that resume uses tensorboard/."""
         config = _make_config(
             extras={
                 "mode": "resume_training",
@@ -436,9 +435,7 @@ class TestResumeTrainingFlow:
             }
         )
 
-        # Resume training should continue to tensorboard (not tensorboard_eval)
         assert config.extras["tensorboard_dir"] == "tensorboard"
-        assert config.extras["tensorboard_dir"] != "tensorboard_eval"
 
     def test_resume_env_variable_format(self, sample_checkpoint: Path) -> None:
         """Test that CLEANRL_RESUME_PATH is properly formatted."""
@@ -480,13 +477,12 @@ class TestResumeTrainingFlow:
 class TestTensorBoardDirectories:
     """Tests for TensorBoard directory management.
 
-    The system uses two separate directories:
-    - tensorboard/ - Training logs
-    - tensorboard_eval/ - Evaluation logs
+    Both training and evaluation use tensorboard/ as the subdirectory name.
+    Separation is achieved via the parent directory: runs/ vs evals/.
     """
 
-    def test_tensorboard_dirs_are_distinct(self) -> None:
-        """Test that training and eval use different tensorboard directories."""
+    def test_tensorboard_dirname_is_consistent(self) -> None:
+        """Test that training and eval both use 'tensorboard' as dirname."""
         train_config = _make_config(
             extras={
                 "mode": "train",
@@ -498,34 +494,23 @@ class TestTensorBoardDirectories:
             extras={
                 "mode": "policy_eval",
                 "policy_path": "/path/to/model.cleanrl_model",
-                "tensorboard_dir": "tensorboard_eval",
+                "tensorboard_dir": "tensorboard",
             }
         )
 
         assert train_config.extras["tensorboard_dir"] == "tensorboard"
-        assert eval_config.extras["tensorboard_dir"] == "tensorboard_eval"
-        assert train_config.extras["tensorboard_dir"] != eval_config.extras["tensorboard_dir"]
+        assert eval_config.extras["tensorboard_dir"] == "tensorboard"
 
-    def test_tensorboard_dir_naming_conventions(self) -> None:
-        """Test the naming conventions for tensorboard directories."""
-        # Training uses 'tensorboard'
-        train_dir = "tensorboard"
-        assert train_dir == "tensorboard"
+    def test_tensorboard_dir_naming_convention(self) -> None:
+        """Test the naming convention for tensorboard directory."""
+        # Both training and eval use 'tensorboard'
+        tb_dir = "tensorboard"
+        assert tb_dir == "tensorboard"
 
-        # Evaluation uses 'tensorboard_eval'
-        eval_dir = "tensorboard_eval"
-        assert eval_dir == "tensorboard_eval"
-        assert eval_dir.startswith("tensorboard")
-        assert "_eval" in eval_dir
-
-    def test_both_tensorboard_dirs_can_exist(self, tmp_run_dir: Path) -> None:
-        """Test that both tensorboard directories can coexist."""
+    def test_tensorboard_dir_exists_in_run(self, tmp_run_dir: Path) -> None:
+        """Test that tensorboard directory exists in run directory."""
         tb_dir = tmp_run_dir / "tensorboard"
-        tb_eval_dir = tmp_run_dir / "tensorboard_eval"
-
         assert tb_dir.exists()
-        assert tb_eval_dir.exists()
-        assert tb_dir != tb_eval_dir
 
 
 # =============================================================================
@@ -647,7 +632,7 @@ class TestIntegration:
             extras={
                 "mode": "policy_eval",
                 "policy_path": str(checkpoint_path),
-                "tensorboard_dir": "tensorboard_eval",
+                "tensorboard_dir": "tensorboard",
                 "eval_episodes": 5,
             }
         )
@@ -706,7 +691,7 @@ class TestIntegration:
                 extras={
                     "mode": "policy_eval",
                     "policy_path": str(checkpoint_path),
-                    "tensorboard_dir": "tensorboard_eval",
+                    "tensorboard_dir": "tensorboard",
                     "eval_episodes": eval_episodes,
                 }
             )

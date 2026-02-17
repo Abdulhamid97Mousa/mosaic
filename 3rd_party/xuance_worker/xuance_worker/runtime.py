@@ -410,7 +410,8 @@ class XuanCeWorkerRuntime:
             if mosaic_run_dir:
                 run_dir = Path(mosaic_run_dir).resolve()
             else:
-                run_dir = (VAR_TRAINER_DIR / "runs" / self._config.run_id).resolve()
+                subdir = "evals" if self._config.test_mode else "runs"
+                run_dir = (VAR_TRAINER_DIR / subdir / self._config.run_id).resolve()
             run_dir.mkdir(parents=True, exist_ok=True)
 
             # Create logs directory

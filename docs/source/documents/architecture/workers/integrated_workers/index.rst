@@ -15,7 +15,7 @@ translates between MOSAIC and the library.
      - Algorithms
      - Environments
      - Execution Model
-   * - :doc:`CleanRL <cleanrl>`
+   * - :doc:`CleanRL <CleanRL_Worker/index>`
      - Single-Agent
      - PPO, DQN, SAC, TD3, DDPG, C51
      - Gymnasium, Atari, MiniGrid, BabyAI, Procgen
@@ -107,6 +107,6 @@ Each worker has dedicated GUI form widgets for experiment configuration:
 .. toctree::
    :maxdepth: 2
 
-   cleanrl
+   CleanRL_Worker/index
    xuance
    ray_rllib

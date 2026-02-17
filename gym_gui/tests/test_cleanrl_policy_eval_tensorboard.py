@@ -18,7 +18,7 @@ MODEL_PATH = Path(
 ).resolve()
 
 LOG_DIR = Path(
-    "/home/hamid/Desktop/Projects/GUI_BDI_RL/var/trainer/runs/01KAWCW4PZP8R9BBQD8F595WST/tensorboard_eval"
+    "/home/hamid/Desktop/Projects/GUI_BDI_RL/var/trainer/evals/01KAWCW4PZP8R9BBQD8F595WST/tensorboard"
 ).resolve()
 
 RUN_DIR = LOG_DIR.parent

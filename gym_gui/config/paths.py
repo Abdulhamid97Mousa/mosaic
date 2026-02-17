@@ -20,6 +20,7 @@ VAR_TRAINER_DIR = VAR_ROOT / "trainer"
 VAR_TENSORBOARD_DIR = VAR_TRAINER_DIR / "runs"
 VAR_WANDB_DIR = VAR_TRAINER_DIR / "runs"  # WANDB manifests stored per-run like TensorBoard
 VAR_TRAINER_DB = VAR_TRAINER_DIR / "trainer.sqlite"
+VAR_EVALS_DIR = VAR_TRAINER_DIR / "evals"  # Evaluation run artifacts (separate from training runs)
 VAR_CUSTOM_SCRIPTS_DIR = VAR_TRAINER_DIR / "custom_scripts"  # Custom script phase configs and checkpoints
 VAR_DATA_DIR = VAR_ROOT / "data"
 VAR_MODELS_DIR = VAR_ROOT / "models"  # LLM models for vLLM serving
@@ -70,6 +71,7 @@ def ensure_var_directories() -> None:
         VAR_EVALUATOR_DIR,
         VAR_VLLM_DIR,
         VAR_BIN_DIR,
+        VAR_EVALS_DIR,
         VAR_CUSTOM_SCRIPTS_DIR,
         # VAR_SC2_ROOT is VAR_DATA_DIR (already created above); no extra mkdir needed.
         VAR_SMAC_REPLAYS_DIR,
@@ -104,6 +106,7 @@ __all__ = [
     "VAR_SMAC_MAPS_DIR",
     "VAR_SMACV2_MAPS_DIR",
     "VAR_SMAC_REPLAYS_DIR",
+    "VAR_EVALS_DIR",
     "VAR_CUSTOM_SCRIPTS_DIR",
     "CLEANRL_SCRIPTS_DIR",
     "XUANCE_SCRIPTS_DIR",

@@ -23,6 +23,35 @@ import numpy as np
 logger = logging.getLogger(__name__)
 
 
+class _DiscreteToBoxWrapper(gym.ObservationWrapper):
+    """Convert a Discrete observation space to a one-hot Box space.
+
+    Environments like FrozenLake-v1, Taxi-v3, and CliffWalking-v0 use
+    ``Discrete(n)`` observation spaces that return a single integer.
+    MLP-based agents (e.g. CleanRL's ``MLPAgent``) expect a fixed-size
+    float vector so they can compute ``obs_dim = prod(obs_space.shape)``.
+    For ``Discrete(n)`` the shape is ``()`` and ``prod(()) == 1``, which
+    causes a shape mismatch in the first linear layer.
+
+    This wrapper transparently converts the integer observation into a
+    one-hot float32 vector of length *n*, giving the agent a
+    ``Box(0, 1, (n,), float32)`` observation space.
+    """
+
+    def __init__(self, env: gym.Env):
+        super().__init__(env)
+        assert isinstance(env.observation_space, gym.spaces.Discrete)
+        self._n = int(env.observation_space.n)
+        self.observation_space = gym.spaces.Box(
+            low=0.0, high=1.0, shape=(self._n,), dtype=np.float32
+        )
+
+    def observation(self, obs):
+        one_hot = np.zeros(self._n, dtype=np.float32)
+        one_hot[int(obs)] = 1.0
+        return one_hot
+
+
 def _has_wrapper(env: gym.Env, wrapper_cls: type) -> bool:
     """Walk the wrapper chain and return True if *wrapper_cls* is present."""
     current = env
@@ -229,6 +258,9 @@ def make_env(
                 env = gym.wrappers.RecordVideo(env, f"videos/{run_name}")
             else:
                 env = gym.make(env_id, **kwargs)
+
+            if isinstance(env.observation_space, gym.spaces.Discrete):
+                env = _DiscreteToBoxWrapper(env)
 
             env = gym.wrappers.RecordEpisodeStatistics(env)
 

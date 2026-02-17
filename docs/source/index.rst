@@ -238,7 +238,10 @@ MOSAIC is designed for:
    :maxdepth: 2
    :caption: Getting Started
 
-   documents/tutorials/installation
+   documents/tutorials/installation/index
+   documents/tutorials/installation/ubuntu
+   documents/tutorials/installation/wsl
+   documents/tutorials/installation/common_errors
    documents/tutorials/quickstart
    documents/tutorials/basic_usage
 

@@ -101,7 +101,7 @@ def unified_evaluate(
 # Maps algorithm name to (agent_path, make_env_path, accepts_gamma)
 _ALGO_MODULES: Dict[str, tuple] = {
     # PPO family
-    "ppo": ("cleanrl_worker.algorithms.ppo_with_save.Agent", "cleanrl_worker.algorithms.ppo_with_save.make_env", True),
+    "ppo": ("cleanrl_worker.agents.MLPAgent", "cleanrl_worker.wrappers.minigrid.make_env", True),
     "ppo_continuous_action": ("cleanrl.ppo_continuous_action.Agent", "cleanrl.ppo_continuous_action.make_env", True),
     "ppo_atari": ("cleanrl.ppo_atari.Agent", "cleanrl.ppo_atari.make_env", False),
     "ppo_atari_lstm": ("cleanrl.ppo_atari_lstm.Agent", "cleanrl.ppo_atari_lstm.make_env", False),

@@ -122,13 +122,13 @@ def test_policy_form_builds_config(monkeypatch, qt_app):
     assert extras["eval_episodes"] == 75
     assert extras["eval_batch_size"] == 75
     assert extras["eval_repeat"] is True
-    assert extras["tensorboard_dir"] == "tensorboard_eval"
+    assert extras["tensorboard_dir"] == "tensorboard"
     assert extras["eval_gamma"] == 0.95
     assert extras["eval_max_episode_steps"] == 123
     assert extras["eval_max_episode_seconds"] == 12.5
     artifacts = config["metadata"].get("artifacts", {})
     tb_meta = artifacts.get("tensorboard")
-    assert tb_meta and tb_meta["relative_path"].endswith("tensorboard_eval")
+    assert tb_meta and tb_meta["relative_path"].endswith("tensorboard")
     ui_meta = config["metadata"].get("ui", {})
     assert ui_meta.get("eval_gamma") == 0.95
     assert ui_meta.get("eval_max_episode_steps") == 123

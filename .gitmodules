@@ -130,9 +130,22 @@
   path = 3rd_party/multigrid-ini
   url = https://github.com/ini/multigrid.git
 
-# https://github.com/openai/procgen.git 
+# https://github.com/openai/procgen.git
 
 [submodule "procgen"]
-  path = 3rd_party/procgen 
+  path = 3rd_party/procgen
   url = https://github.com/openai/procgen.git
 
+[submodule "Syllabus"]
+  path = 3rd_party/Syllabus
+  url = https://github.com/RyanNavillus/Syllabus.git
+
+[submodule "3rd_party/DI-engine"]
+	path = 3rd_party/DI-engine
+	url = https://github.com/opendilab/DI-engine.git
+[submodule "3rd_party/Syllabus"]
+	path = 3rd_party/Syllabus
+	url = https://github.com/RyanNavillus/Syllabus.git
+[submodule "3rd_party/multigrid-ini"]
+	path = 3rd_party/multigrid-ini
+	url = https://github.com/ini/multigrid.git

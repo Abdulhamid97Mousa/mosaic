@@ -122,16 +122,18 @@ class TrainingRunManager:
                 )
 
         # 3. Delete run directory (logs, tensorboard, checkpoints)
-        run_dir = VAR_TRAINER_DIR / "runs" / run_id
-        if run_dir.exists():
-            try:
-                shutil.rmtree(run_dir)
-                _LOGGER.debug("Deleted run directory", extra={"path": str(run_dir)})
-            except Exception as exc:
-                _LOGGER.warning(
-                    "Failed to delete run directory",
-                    extra={"path": str(run_dir), "error": str(exc)},
-                )
+        # Search both runs/ and evals/ since eval runs are stored separately
+        for subdir in ("runs", "evals"):
+            run_dir = VAR_TRAINER_DIR / subdir / run_id
+            if run_dir.exists():
+                try:
+                    shutil.rmtree(run_dir)
+                    _LOGGER.debug("Deleted run directory", extra={"path": str(run_dir)})
+                except Exception as exc:
+                    _LOGGER.warning(
+                        "Failed to delete run directory",
+                        extra={"path": str(run_dir), "error": str(exc)},
+                    )
 
         # 4. Delete configuration files
         configs_dir = VAR_TRAINER_DIR / "configs"
@@ -197,21 +199,21 @@ class TrainingRunManager:
         Returns:
             Total size in bytes, or 0 if the directory doesn't exist.
         """
-        run_dir = VAR_TRAINER_DIR / "runs" / run_id
-        if not run_dir.exists():
-            return 0
-
-        try:
-            total_size = sum(
-                f.stat().st_size for f in run_dir.rglob("*") if f.is_file()
-            )
-            return total_size
-        except Exception as exc:
-            _LOGGER.warning(
-                "Failed to calculate disk size for run",
-                extra={"run_id": run_id, "error": str(exc)},
-            )
-            return 0
+        total_size = 0
+        for subdir in ("runs", "evals"):
+            run_dir = VAR_TRAINER_DIR / subdir / run_id
+            if not run_dir.exists():
+                continue
+            try:
+                total_size += sum(
+                    f.stat().st_size for f in run_dir.rglob("*") if f.is_file()
+                )
+            except Exception as exc:
+                _LOGGER.warning(
+                    "Failed to calculate disk size for run",
+                    extra={"run_id": run_id, "error": str(exc)},
+                )
+        return total_size
 
     def get_run_config_json(self, run_id: str) -> Optional[str]:
         """Get the raw config JSON for a run.
