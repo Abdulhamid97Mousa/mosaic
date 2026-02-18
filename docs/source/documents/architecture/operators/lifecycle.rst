@@ -26,7 +26,7 @@ Execution Modes
 
 .. important::
 
-   Manual Mode and Script Mode are **fully decoupled** -- they use
+   Manual Mode and Script Mode are **fully decoupled**, they use
    separate signal paths and state machines.  Running a script does
    not interfere with manual controls, and vice versa.
 
@@ -214,10 +214,10 @@ rendered but never visually painted by the Qt compositor.
 
 The step delay is configurable via a UI spinbox:
 
-- **0 ms** -- fastest (may skip frames visually)
-- **50 ms** -- smooth frame-by-frame rendering (default)
-- **200 ms** -- slow-motion playback for analysis
-- **1000 ms** -- one step per second
+- **0 ms**: fastest (may skip frames visually)
+- **50 ms**: smooth frame-by-frame rendering (default)
+- **200 ms**: slow-motion playback for analysis
+- **1000 ms**: one step per second
 
 .. warning::
 
@@ -246,8 +246,8 @@ When an episode ends, the manager advances to the next seed:
 
 **Seed modes:**
 
-- **Procedural** -- different seed per episode (tests generalization)
-- **Fixed** -- same seed every episode (isolates agent behavior)
+- **Procedural**: different seed per episode (tests generalization)
+- **Fixed**: same seed every episode (isolates agent behavior)
 
 Script Format
 -------------

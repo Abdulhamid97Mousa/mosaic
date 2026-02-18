@@ -10,6 +10,7 @@ Three-Tier Process Model
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph TB
        subgraph Tier1["Tier 1 · Main Process"]
            GUI["Qt6 GUI"]
@@ -173,7 +174,7 @@ can ``print()`` can become a MOSAIC worker.
 
 .. mermaid::
 
-   graph LR
+   graph TB
        W["Worker<br/>print(json)"] -->|"stdout"| P["Telemetry Proxy<br/>(JsonlTailer)"]
        P -->|"parse + validate"| PB["Protobuf<br/>RunStep / RunEpisode"]
        PB -->|"gRPC stream"| D["Daemon"]
@@ -189,7 +190,7 @@ can ``print()`` can become a MOSAIC worker.
 JSONL Event Types
 ~~~~~~~~~~~~~~~~~
 
-**Step event** — emitted every environment step:
+**Step event**: emitted every environment step:
 
 .. code-block:: json
 
@@ -205,7 +206,7 @@ JSONL Event Types
      "truncated": false
    }
 
-**Episode event** — emitted when an episode ends:
+**Episode event**: emitted when an episode ends:
 
 .. code-block:: json
 
@@ -219,7 +220,7 @@ JSONL Event Types
      "truncated": false
    }
 
-**Lifecycle event** — emitted at run boundaries:
+**Lifecycle event**: emitted at run boundaries:
 
 .. code-block:: json
 
@@ -244,53 +245,9 @@ Daemon.
 
 This sidecar architecture provides two benefits:
 
-1. **Workers stay simple** — no gRPC client code, no protobuf imports
-2. **Fault isolation** — a malformed log line cannot crash the worker
+1. **Workers stay simple**: no gRPC client code, no protobuf imports
+2. **Fault isolation**: a malformed log line cannot crash the worker
 
-Protobuf Messages
-~~~~~~~~~~~~~~~~~
-
-The Proxy translates JSONL into typed protobuf messages:
-
-.. code-block:: protobuf
-
-   message RunStep {
-     string  run_id          = 1;
-     uint64  episode_index   = 2;
-     uint64  step_index      = 3;
-     string  action_json     = 4;
-     string  observation_json = 5;
-     double  reward          = 6;
-     bool    terminated      = 7;
-     bool    truncated       = 8;
-     string  agent_id        = 13;
-     string  render_payload_json = 17;
-     uint64  episode_seed    = 18;
-     string  worker_id       = 19;
-     uint64  seq_id          = 12;
-   }
-
-   message RunEpisode {
-     string  run_id          = 1;
-     uint64  episode_index   = 2;
-     double  total_reward    = 3;
-     uint64  steps           = 4;
-     bool    terminated      = 5;
-     bool    truncated       = 6;
-     string  metadata_json   = 7;
-     uint64  seq_id          = 9;
-     string  agent_id        = 10;
-     string  worker_id       = 11;
-   }
-
-Proto files are located at:
-
-.. code-block:: text
-
-   gym_gui/services/trainer/proto/
-   ├── trainer.proto           # Protocol definition
-   ├── trainer_pb2.py          # Generated Python code
-   └── trainer_pb2_grpc.py     # Generated gRPC stubs
 
 Reliability Mechanisms
 ----------------------
@@ -328,7 +285,7 @@ Reconnection
 
 The GUI tracks the last received ``seq_id`` for each run.  On
 reconnection, it requests ``StreamRunSteps(run_id, since_seq=last_seq)``
-to resume from where it left off — no data is lost.
+to resume from where it left off, ensuring no data is lost.
 
 Performance
 -----------

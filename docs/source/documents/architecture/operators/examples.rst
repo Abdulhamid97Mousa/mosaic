@@ -9,7 +9,7 @@ Human Operator
 
 **Category:** ``human``
 
-The simplest operator -- it returns ``None`` for every action,
+The simplest operator, it returns ``None`` for every action,
 signalling the GUI to inject keyboard input.
 
 .. code-block:: python
@@ -34,7 +34,7 @@ signalling the GUI to inject keyboard input.
            pass
 
 The Human Operator is always available and registered at startup.
-No subprocess is spawned -- actions come directly from Qt keyboard
+No subprocess is spawned, actions come directly from Qt keyboard
 events.
 
 **Best for:** Manual exploration, debugging, understanding environments.

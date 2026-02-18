@@ -60,11 +60,11 @@ communication channel is a simple, well-defined IPC protocol.
 
 This gives us:
 
-- **Fault containment** — a crashed worker cannot freeze the GUI or
+- **Fault containment**: a crashed worker cannot freeze the GUI or
   kill other workers
-- **Dependency freedom** — each worker can pin its own library versions
-- **GPU isolation** — ``CUDA_VISIBLE_DEVICES`` is set per-process
-- **Clean shutdown** — ``SIGTERM`` to the process group kills the
+- **Dependency freedom**: each worker can pin its own library versions
+- **GPU isolation**: ``CUDA_VISIBLE_DEVICES`` is set per-process
+- **Clean shutdown**: ``SIGTERM`` to the process group kills the
   entire worker tree
 
 Worker vs Operator
@@ -80,39 +80,47 @@ MOSAIC distinguishes two concepts that are easy to confuse:
      - Definition
      - Examples
    * - **Worker**
-     - A *process-level* wrapper that manages an RL library's lifecycle,
-       configuration, and telemetry.  Workers live in ``3rd_party/``.
-     - ``cleanrl_worker``, ``xuance_worker``, ``ray_worker``
+     - A *process-level* execution unit that handles **training**, API
+       calls, or bash script for custom workflows.  Workers live in ``3rd_party/``
+       and communicate via JSONL over stdout.  The Trainer Daemon
+       manages the worker process lifecycle, passing configuration
+       via JSON files and environment variables.
+     - ``cleanrl_worker``, ``xuance_worker``, ``ray_worker``,
+       ``balrog_worker``, ``mosaic_llm_worker``
    * - **Operator**
-     - An *agent-level* abstraction that selects actions from
-       observations via ``select_action(obs) → action``.  Operators
-       are the decision-makers.
+     - An *agent-level* interface used strictly for **evaluation**.
+       The operator assigns workers to agents, loads trained policies
+       (or connects to LLM endpoints), and exposes
+       ``select_action(obs) -> action`` to the GUI.  Operators support
+       two modes: **Manual** (side-by-side comparison) and **Script**
+       (automated long-running evaluation).
      - RL Operator, LLM Operator, Human Operator
 
-A **worker** *contains* one or more **operators**.  For example, the
-CleanRL worker wraps a PPO training script; at evaluation time, the
-trained policy is loaded into an RL Operator that exposes
-``select_action()``.
+Workers handle training **separately** from operators.  An RL worker
+trains a policy and saves a checkpoint; an LLM worker connects to a
+vLLM instance.  The :doc:`operator </documents/architecture/operators/index>`
+then takes the result (trained policy or LLM endpoint) and assigns it
+to an agent for evaluation via ``select_action()``.
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph LR
-       subgraph Worker["CleanRL Worker (Process)"]
-           SHIM["Shim Layer"]
-           ALGO["PPO Algorithm"]
-           EMIT["Telemetry Emitter"]
+       subgraph Training["Training Phase (Worker)"]
+           WORKER["CleanRL Worker"]
+           WORKER -->|"produces"| CKPT["Checkpoint"]
        end
 
-       subgraph Operator["RL Operator (Interface)"]
+       subgraph Eval["Evaluation Phase (Operator)"]
+           OP["RL Operator"]
            SA["select_action(obs)"]
-           OS["on_step(obs, act, rew)"]
+           OP --> SA
        end
 
-       Worker -->|"trains"| CKPT["Checkpoint"]
-       CKPT -->|"loads into"| Operator
+       CKPT -->|"loaded by"| OP
 
-       style Worker fill:#ff7f50,stroke:#cc5500,color:#fff
-       style Operator fill:#4a90d9,stroke:#2e5a87,color:#fff
+       style Training fill:#ff7f50,stroke:#cc5500,color:#fff
+       style Eval fill:#4a90d9,stroke:#2e5a87,color:#fff
        style CKPT fill:#f0e68c,stroke:#bdb76b
 
 The Shim Pattern
@@ -124,31 +132,24 @@ layer** sits between MOSAIC and the library, translating everything:
 .. mermaid::
 
    graph TB
-       subgraph Upstream["Upstream Library (Unmodified)"]
-           U1["ppo.py"]
-           U2["dqn.py"]
-           U3["sac.py"]
+       subgraph Core["MOSAIC Core"]
+           D["Trainer Daemon"] ~~~ G["Qt6 GUI"]
        end
 
        subgraph Shim["MOSAIC Shim Layer"]
-           S1["config.py — Translate MOSAIC JSON → CLI args"]
-           S2["runtime.py — Manage lifecycle & subprocess"]
-           S3["telemetry.py — Emit JSONL to stdout"]
-           S4["analytics.py — Generate manifests"]
-           S5["fastlane.py — Shared-memory rendering"]
+           S1["config.py<br/>Translate JSON → CLI"] ~~~ S2["runtime.py<br/>Manage lifecycle"] ~~~ S3["telemetry.py<br/>Emit JSONL"] ~~~ S4["analytics.py<br/>Generate manifests"] ~~~ S5["fastlane.py<br/>Shared-memory rendering"]
        end
 
-       subgraph Core["MOSAIC Core"]
-           D["Trainer Daemon"]
-           G["Qt6 GUI"]
+       subgraph Upstream["Upstream Library -- Unmodified"]
+           U1["ppo.py"] ~~~ U2["dqn.py"] ~~~ U3["sac.py"]
        end
 
-       Upstream <--> Shim
-       Shim <-->|"gRPC + JSONL"| Core
+       Core -->|"gRPC + JSONL"| Shim
+       Shim --> Upstream
 
-       style Upstream fill:#e8e8e8,stroke:#999
-       style Shim fill:#ff7f50,stroke:#cc5500,color:#fff
        style Core fill:#4a90d9,stroke:#2e5a87,color:#fff
+       style Shim fill:#ff7f50,stroke:#cc5500,color:#fff
+       style Upstream fill:#e8e8e8,stroke:#999
 
 **Benefits:**
 

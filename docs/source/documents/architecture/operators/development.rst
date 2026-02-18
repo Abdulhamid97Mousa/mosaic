@@ -3,7 +3,7 @@ Developing an Operator
 
 This guide walks through creating a new operator type for MOSAIC.
 Unlike Workers (which are standalone packages in ``3rd_party/``),
-Operators are lightweight -- they need an ``InteractiveRuntime`` inside
+Operators are lightweight, they need an ``InteractiveRuntime`` inside
 an existing worker subprocess plus a few GUI integration points.
 
 Prerequisites

@@ -74,7 +74,7 @@ Human input is active in every mode except ``AGENT_ONLY``.
        dedicated USB keyboard.
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    keyboard_input
    render_view

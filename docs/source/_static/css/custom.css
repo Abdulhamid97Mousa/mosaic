@@ -1,5 +1,20 @@
 /* MOSAIC Custom Styles */
 
+/* ── Sidebar logo: smaller, no title text ── */
+.sidebar-brand {
+    padding: 0.5rem;
+}
+
+.sidebar-logo {
+    max-width: 100px;
+    margin: 0 auto;
+    border-radius: 50%;
+}
+
+.sidebar-brand-text {
+    display: none;
+}
+
 /* Code block styling */
 .highlight {
     border-radius: 4px;
@@ -41,4 +56,31 @@ table {
 
 th {
     background-color: var(--color-background-secondary);
+}
+
+/* ── Collapsible sidebar sections ── */
+.sidebar-tree p.caption {
+    cursor: pointer;
+    user-select: none;
+}
+
+.sidebar-tree p.caption > .caption-text {
+    position: relative;
+    padding-right: 1.4em;
+}
+
+.sidebar-tree p.caption > .caption-text::after {
+    content: "\25BE"; /* ▾ */
+    position: absolute;
+    right: 0;
+    font-size: 0.75em;
+    transition: transform 0.2s ease;
+}
+
+.sidebar-tree p.caption.collapsed > .caption-text::after {
+    transform: rotate(-90deg); /* ▸ */
+}
+
+.sidebar-tree p.caption.collapsed + ul {
+    display: none;
 }

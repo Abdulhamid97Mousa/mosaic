@@ -102,15 +102,39 @@ Choose your installation based on your use case:
          # Or via requirements
          pip install -r requirements/xuance_worker.txt
 
-   .. tab:: SMAC (StarCraft)
+   .. tab:: Ray/RLlib
 
-      For cooperative micromanagement in StarCraft II:
+      For distributed RL training with Ray:
 
       .. code-block:: bash
 
-         pip install -e ".[smac]"
+         pip install -e ".[ray-rllib]"
 
-         # Also requires StarCraft II binary (see SMAC section below)
+         # Or via requirements
+         pip install -r requirements/ray_worker.txt
+
+   .. tab:: BALROG (LLM Eval)
+
+      For benchmarking LLM agents on BabyAI, MiniHack, and Crafter:
+
+      .. code-block:: bash
+
+         pip install -e ".[balrog]"
+
+         # For BabyAI tasks, also install BALROG's Minigrid fork
+         pip install -e ".[balrog,minigrid-balrog]"
+
+         # Or via requirements
+         pip install -r requirements/balrog_worker.txt
+
+   .. tab:: MOSAIC LLM
+
+      For multi-agent LLM reasoning with Theory of Mind:
+
+      .. code-block:: bash
+
+         pip install -r requirements/mosaic_llm_worker.txt
+         pip install -e 3rd_party/mosaic/llm_worker
 
    .. tab:: Full Development
 

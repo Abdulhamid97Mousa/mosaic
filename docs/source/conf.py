@@ -91,7 +91,7 @@ exclude_patterns = []
 # -- Options for HTML output -------------------------------------------------
 
 html_theme = "furo"
-html_title = f"<div style='text-align: center; font-size: 20px'><strong>{project}</strong></div>"
+html_title = "MOSAIC"
 html_short_title = "MOSAIC"
 html_scaled_image_link = False
 html_static_path = ['_static']
@@ -111,6 +111,10 @@ html_theme_options = {
 
 html_css_files = [
     'css/custom.css',
+]
+
+html_js_files = [
+    'js/sidebar-collapse.js',
 ]
 
 favicons = [

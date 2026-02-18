@@ -12,8 +12,8 @@ The core interface is simple:
 
    observation --> [Operator] --> action
 
-Every decision-maker -- human, LLM, RL policy, or scripted
-baseline -- implements the same ``select_action(obs) -> action``
+Every decision-maker whether it may be a human, LLM, RL policy, or Random
+policy,  implements the same ``select_action(obs) -> action``
 protocol.  This makes all decision-makers **interchangeable**: the GUI,
 the experiment runner, and the telemetry system never need to know what
 kind of operator they are talking to.
@@ -29,7 +29,7 @@ Operator vs Worker
      - Definition
      - Examples
    * - **Operator**
-     - The *agent-level interface* -- wraps one or more Worker
+     - The *agent-level interface*, wraps one or more Worker
        subprocesses and presents ``select_action(obs) -> action``
        to the GUI.
      - LLM Operator, RL Operator, Human Operator,

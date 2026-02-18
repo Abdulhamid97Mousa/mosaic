@@ -1,11 +1,11 @@
 Operators
 =========
 
-An **Operator** is the agent-level interface of MOSAIC -- the unified
+An **Operator** is the agent-level interface of MOSAIC, the unified
 abstraction that lets the GUI assign a worker to each individual agent
 or a group of agents.  While :doc:`Workers <../workers/index>` handle
 process-level concerns (training, telemetry, GPU isolation), Operators
-are strictly for **evaluation and interactive play**: the worker inside
+are strictly for **evaluation and interactive play**. Then, the worker inside
 an Operator loads a trained policy (or calls an LLM API, or reads
 keyboard input) and computes actions step-by-step.  The Operator wraps
 this and answers the question *"given this observation, what action

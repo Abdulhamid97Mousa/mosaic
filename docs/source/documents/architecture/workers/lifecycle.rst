@@ -227,23 +227,23 @@ stages before reaching the user's screen:
 
        W --> P --> G --> D --> B --> H --> UI
 
-       style W fill:#ff7f50,stroke:#cc5500,color:#fff
-       style P fill:#ffd700,stroke:#b8860b
-       style G fill:#a0d2db,stroke:#5f9ea0
-       style D fill:#50c878,stroke:#2e8b57,color:#fff
-       style B fill:#dda0dd,stroke:#8b008b
+       style W fill:#87ceeb,stroke:#4682b4
+       style P fill:#87ceeb,stroke:#4682b4
+       style G fill:#87ceeb,stroke:#4682b4
+       style D fill:#87ceeb,stroke:#4682b4
+       style B fill:#87ceeb,stroke:#4682b4
        style H fill:#87ceeb,stroke:#4682b4
-       style UI fill:#4a90d9,stroke:#2e5a87,color:#fff
+       style UI fill:#87ceeb,stroke:#4682b4
 
 Each stage adds value:
 
-1. **Worker** — produces raw training data
-2. **Proxy** — validates, parses, and converts to protobuf
-3. **gRPC** — typed, backpressure-aware transport
-4. **Daemon** — persists to SQLite (crash-safe, WAL mode)
-5. **Broadcaster** — per-client subscription queues with replay
-6. **Hub** — bridges async gRPC → Qt event loop
-7. **UI** — renders frames, updates charts, logs metrics
+1. **Worker**: produces raw training data
+2. **Proxy**: validates, parses, and converts to protobuf
+3. **gRPC**: typed, backpressure-aware transport
+4. **Daemon**: persists to SQLite (crash-safe, WAL mode)
+5. **Broadcaster**: per-client subscription queues with replay
+6. **Hub**: bridges async gRPC → Qt event loop
+7. **UI**: renders frames, updates charts, logs metrics
 
 Storage Layout
 --------------
