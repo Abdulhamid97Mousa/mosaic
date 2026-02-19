@@ -28,6 +28,7 @@ build tools. Install everything at once:
        libxcb-cursor0 \
        fontconfig fonts-dejavu-extra fonts-liberation fonts-noto \
        stockfish \
+       jq \
        xvfb
 
 .. list-table::
@@ -52,6 +53,8 @@ build tools. Install everything at once:
      - XuanCe worker (``mpi4py``)
    * - ``stockfish``
      - PettingZoo Chess environments
+   * - ``jq``
+     - CleanRL curriculum training scripts (JSON processing)
    * - ``xvfb``
      - Virtual display for headless servers (optional)
 

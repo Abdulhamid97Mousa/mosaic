@@ -67,9 +67,10 @@ def soccer_1vs1_config():
 
 
 @pytest.fixture
-@requires_mosaic
 def multigrid_env(soccer_1vs1_config):
     """Create a real MultiGrid_Env for 1vs1 soccer."""
+    if not _HAS_MOSAIC:
+        pytest.skip("mosaic_multigrid not installed")
     from xuance_worker.environments.mosaic_multigrid import MultiGrid_Env
     env = MultiGrid_Env(soccer_1vs1_config)
     yield env
@@ -77,7 +78,6 @@ def multigrid_env(soccer_1vs1_config):
 
 
 @pytest.fixture
-@requires_mosaic
 def env_after_reset(multigrid_env):
     """MultiGrid_Env after calling reset()."""
     obs, info = multigrid_env.reset()
@@ -441,9 +441,9 @@ class TestYamlConfig:
         """Agent must be MAPPO."""
         assert yaml_config["agent"] == "MAPPO"
 
-    def test_no_parameter_sharing(self, yaml_config):
-        """use_parameter_sharing must be False for separate per-agent policies."""
-        assert yaml_config["use_parameter_sharing"] is False
+    def test_parameter_sharing_enabled(self, yaml_config):
+        """use_parameter_sharing must be True for symmetric game (shared policy)."""
+        assert yaml_config["use_parameter_sharing"] is True
 
     def test_representation_is_mlp(self, yaml_config):
         """Basic_MLP requires flat observation space."""

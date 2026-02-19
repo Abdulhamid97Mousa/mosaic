@@ -264,8 +264,7 @@ Each file includes ``-r base.txt`` to pull in shared dependencies:
    ├── llm_worker.txt         # MOSAIC native LLM worker
    ├── mosaic_llm_worker.txt  # Full LLM worker stack
    ├── chat.txt               # Chat UI (OpenRouter + vLLM)
-   ├── mujoco_mpc_worker.txt  # MuJoCo MPC controller
-   └── godot_worker.txt       # Godot game engine
+   └── mujoco_mpc_worker.txt  # MuJoCo MPC controller
 
 Runtime Detection
 ^^^^^^^^^^^^^^^^^
@@ -330,7 +329,7 @@ Additionally, the ``gym_gui/constants/optional_deps.py`` module provides
    )
 
    # Lazy worker launchers (import on first use)
-   from gym_gui.constants import get_mjpc_launcher, get_godot_launcher
+   from gym_gui.constants import get_mjpc_launcher
 
 Environment Family Installation
 --------------------------------
@@ -542,19 +541,6 @@ Model Predictive Control with MuJoCo physics.
 
    # The MPC binary is pre-built in 3rd_party/mujoco_mpc_worker/bin/
    # Or build from source — see 3rd_party/mujoco_mpc_worker/README.md
-
-Godot Worker
-^^^^^^^^^^^^
-
-3D game environment training.
-
-.. code-block:: bash
-
-   # The Godot binary is included in 3rd_party/godot_worker/bin/
-   # No pip installation needed for basic usage
-
-   # For Python RL bridge (optional):
-   pip install godot-rl
 
 Special Setup: StarCraft II (SMAC / SMACv2)
 -------------------------------------------

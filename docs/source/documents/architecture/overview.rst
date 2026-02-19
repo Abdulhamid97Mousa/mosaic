@@ -4,36 +4,34 @@ Architecture Overview
 MOSAIC is built on a layered architecture that separates concerns
 and enables extensibility.
 
+.. figure:: /_static/figures/A_Full_Architecture.jpg
+   :alt: MOSAIC Full Architecture
+   :align: center
+   :width: 100%
+
+   Full architecture: Evaluation Phase (left), Training Phase (right),
+   Daemon Process (gRPC Server, RunRegistry, Dispatcher, Broadcasters),
+   and Worker Processes (CleanRL, XuanCe, Ray RLlib, BALROG, MOSAIC LLM).
+
 System Layers
 -------------
 
-.. grid:: 1
-   :gutter: 2
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
 
-   .. grid-item-card:: Visual Layer
-      :class-header: sd-bg-primary sd-text-white
-
-      PyQt6 GUI: MainWindow, ControlPanel, RenderTabs, AdvancedConfig
-
-   .. grid-item-card:: Service Layer
-      :class-header: sd-bg-success sd-text-white
-
-      PolicyMappingService, ActorService, TelemetryService, SeedManager
-
-   .. grid-item-card:: Controller Layer
-      :class-header: sd-bg-warning
-
-      SessionController, HumanInputController, EnvironmentManager
-
-   .. grid-item-card:: Adapter Layer
-      :class-header: sd-bg-info sd-text-white
-
-      ParadigmAdapter, EnvironmentAdapter, PettingZooAdapter, ViZDoomAdapter
-
-   .. grid-item-card:: Worker Layer (gRPC/IPC)
-      :class-header: sd-bg-secondary sd-text-white
-
-      CleanRL | XuanCe | RLlib | LLM
+   * - Layer
+     - Key Components
+   * - **Visual Layer**
+     - MainWindow, ControlPanel, RenderTabs, AdvancedConfigTab
+   * - **Service Layer**
+     - PolicyMappingService, ActorService, TelemetryService, OperatorService, SessionSeedManager, StorageRecorderService
+   * - **Controller Layer**
+     - SessionController, HumanInputController, InteractionController, LiveTelemetryController
+   * - **Adapter Layer**
+     - EnvironmentAdapter (base), PettingZooAdapter, ALEAdapter, MiniGridAdapter, ViZDoomAdapter, SMACAdapter, and 50+ environment-specific adapters
+   * - **Worker Layer (gRPC/IPC)**
+     - CleanRL, XuanCe, RLlib, BALROG, MOSAIC LLM, Chess LLM
 
 Visual Layer
 ------------
@@ -52,34 +50,46 @@ Services provide business logic independent of the UI:
 
 - **PolicyMappingService**: Per-agent policy binding with paradigm awareness
 - **ActorService**: Actor registration and action selection
-- **TelemetryService**: Metrics collection and export (TensorBoard, W&B)
-- **SeedManager**: Reproducibility management
+- **TelemetryService**: Aggregates telemetry events and forwards to storage backends
+- **OperatorService**: Multi-agent environment orchestration during evaluation
+- **SessionSeedManager**: Deterministic seeding across Python, NumPy, and Qt for reproducibility
+- **StorageRecorderService**: HDF5-based session recording and replay
+- **ServiceLocator**: Central registry for service discovery
 
 Controller Layer
 ----------------
 
-Controllers coordinate between services and handle state:
+Controllers coordinate between services and the UI via Qt signals:
 
-- **SessionController**: Manages the training/evaluation loop
-- **HumanInputController**: Captures keyboard/mouse input
-- **EnvironmentManager**: Environment lifecycle management
+- **SessionController**: Manages the adapter lifecycle and evaluation loop
+- **HumanInputController**: Captures keyboard and mouse input for human agents
+- **InteractionController**: Abstract base with environment-specific subclasses (Box2D, TurnBased, ALE, ViZDoom, SMAC, Procgen, Jumanji)
+- **LiveTelemetryController**: Real-time telemetry display and updates
 
 Adapter Layer
 -------------
 
-Adapters provide unified interfaces to different environment types:
+Adapters provide a unified ``EnvironmentAdapter`` interface to different environment types.
+MOSAIC uses an adapter factory pattern to instantiate the correct adapter at runtime:
 
-- **ParadigmAdapter**: Abstract base for stepping paradigms
-- **EnvironmentAdapter**: Gymnasium environments
-- **PettingZooAdapter**: PettingZoo multi-agent environments
-- **ViZDoomAdapter**: ViZDoom FPS environments
+- **EnvironmentAdapter**: Abstract base class defining the step/reset/render contract
+- **PettingZooAdapter**: PettingZoo multi-agent environments (AEC and Parallel)
+- **ALEAdapter**: Atari 2600 games via the Arcade Learning Environment
+- **MiniGridAdapter**: Procedural grid-world navigation (25+ variants)
+- **BabyAIAdapter**: Language-grounded instruction following (35+ variants)
+- **ViZDoomAdapter**: Doom-based first-person visual RL
+- **SMACAdapter / SMACv2Adapter**: StarCraft Multi-Agent Challenge
+- **JumanjiAdapter**: JAX-accelerated environments (20+ variants)
+- **And 50+ more** covering Gymnasium, Box2D, MuJoCo, Crafter, MiniHack, NetHack, TextWorld, Procgen, Overcooked, RWARE, Melting Pot, PyBullet Drones, and others
 
 Worker Layer
 ------------
 
-External training backends communicate via gRPC/IPC:
+External training and inference backends communicate via gRPC/IPC:
 
-- **CleanRL**: Single-agent RL (PPO, DQN, SAC, TD3)
-- **XuanCe**: Multi-agent RL (MAPPO, QMIX, MADDPG)
-- **RLlib**: Distributed RL with Ray
-
+- **CleanRL**: Single-agent RL (PPO, DQN, SAC, TD3, DDPG, C51, Rainbow)
+- **XuanCe**: Multi-agent RL (MAPPO, QMIX, MADDPG, VDN, COMA)
+- **RLlib**: Distributed RL with Ray (PPO, IMPALA, APPO)
+- **BALROG**: Single-agent LLM benchmarking (MiniGrid, BabyAI, MiniHack, Crafter)
+- **MOSAIC LLM**: Multi-agent LLM with coordination strategies and Theory of Mind
+- **Chess LLM**: LLM chess play with multi-turn dialog

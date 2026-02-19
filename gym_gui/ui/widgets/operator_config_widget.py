@@ -1517,8 +1517,14 @@ class OperatorConfigRow(QtWidgets.QWidget):
 
     def _update_configure_button_visibility(self) -> None:
         """Show/hide Configure button based on whether game supports configuration."""
-        from gym_gui.ui.widgets.operators_board_config_form import BoardConfigDialogFactory
-        from gym_gui.ui.widgets.operators_grid_config_form import GridConfigDialogFactory
+        try:
+            from gym_gui.ui.widgets.operators_board_config_form import BoardConfigDialogFactory
+        except ImportError:
+            BoardConfigDialogFactory = None
+        try:
+            from gym_gui.ui.widgets.operators_grid_config_form import GridConfigDialogFactory
+        except ImportError:
+            GridConfigDialogFactory = None
 
         env_family = self._env_combo.currentText()
         task = self._task_combo.currentText()
@@ -1526,8 +1532,8 @@ class OperatorConfigRow(QtWidgets.QWidget):
         # Show Configure button for:
         # 1. Turn-based board games (Chess, Go, Checkers) - via BoardConfigDialogFactory
         # 2. Grid environments (MiniGrid, BabyAI, MultiGrid, MeltingPot) - via GridConfigDialogFactory
-        is_board_game = BoardConfigDialogFactory.supports(task)
-        is_grid_env = GridConfigDialogFactory.supports(task)
+        is_board_game = BoardConfigDialogFactory.supports(task) if BoardConfigDialogFactory else False
+        is_grid_env = GridConfigDialogFactory.supports(task) if GridConfigDialogFactory else False
 
         is_configurable = is_board_game or is_grid_env
         self._configure_btn.setVisible(is_configurable)

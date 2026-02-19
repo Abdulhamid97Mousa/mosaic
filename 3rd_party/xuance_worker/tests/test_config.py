@@ -121,13 +121,10 @@ class TestXuanCeWorkerConfigBasic:
         assert full_config.worker_id == "worker-001"
         assert full_config.extras == {"learning_rate": 0.001, "batch_size": 64}
 
-    def test_config_is_frozen(self, minimal_config: XuanCeWorkerConfig) -> None:
-        """Test that config is immutable (frozen dataclass)."""
-        with pytest.raises(AttributeError):
-            minimal_config.run_id = "modified"  # type: ignore
-
-        with pytest.raises(AttributeError):
-            minimal_config.method = "dqn"  # type: ignore
+    def test_config_is_mutable_dataclass(self, minimal_config: XuanCeWorkerConfig) -> None:
+        """Test that config is a mutable dataclass (not frozen)."""
+        minimal_config.run_id = "modified"
+        assert minimal_config.run_id == "modified"
 
 
 # =============================================================================
@@ -359,14 +356,14 @@ class TestXuanCeWorkerConfigEdgeCases:
     """Tests for edge cases and boundary conditions."""
 
     def test_empty_run_id(self) -> None:
-        """Test handling of empty run_id."""
-        config = XuanCeWorkerConfig(
-            run_id="",
-            method="ppo",
-            env="classic_control",
-            env_id="CartPole-v1",
-        )
-        assert config.run_id == ""
+        """Test that empty run_id raises ValueError."""
+        with pytest.raises(ValueError, match="run_id is required"):
+            XuanCeWorkerConfig(
+                run_id="",
+                method="ppo",
+                env="classic_control",
+                env_id="CartPole-v1",
+            )
 
     def test_seed_zero_preserved(self) -> None:
         """Test that seed=0 is preserved (not treated as None)."""
@@ -438,11 +435,11 @@ class TestXuanCeWorkerConfigEdgeCases:
 
     def test_from_dict_missing_optional_fields(self) -> None:
         """Test from_dict with missing optional fields uses defaults."""
-        data: dict[str, Any] = {}  # Empty dict
+        data: dict[str, Any] = {"run_id": "defaults-test"}  # Only run_id provided
         config = XuanCeWorkerConfig.from_dict(data)
 
-        # Should use all defaults
-        assert config.run_id == ""
+        # Should use all defaults except run_id
+        assert config.run_id == "defaults-test"
         assert config.method == "dqn"
         assert config.env == "classic_control"
         assert config.env_id == "CartPole-v1"

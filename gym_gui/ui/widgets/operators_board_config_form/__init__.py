@@ -55,17 +55,45 @@ from .base import (
     GamePiece,
 )
 from .factory import BoardConfigDialogFactory
-from .chess_editor import ChessConfigDialog, ChessBoardState
-from .base_checkers_editor import (
-    CheckersBoardState,
-    EditableCheckersBoard,
-    CheckersPieceTray,
-    BaseCheckersConfigDialog,
-)
-from .checkers_editor import OpenSpielCheckersConfigDialog
-from .american_checkers_editor import AmericanCheckersConfigDialog
-from .russian_checkers_editor import RussianCheckersConfigDialog
-from .international_draughts_editor import InternationalDraughtsConfigDialog
+
+# Game-specific editors depend on optional libraries (e.g. python-chess).
+# Import them conditionally so the package loads even when those libs are absent.
+# The factory already handles lazy registration with try/except.
+
+try:
+    from .chess_editor import ChessConfigDialog, ChessBoardState
+except ImportError:
+    pass
+
+try:
+    from .base_checkers_editor import (
+        CheckersBoardState,
+        EditableCheckersBoard,
+        CheckersPieceTray,
+        BaseCheckersConfigDialog,
+    )
+except ImportError:
+    pass
+
+try:
+    from .checkers_editor import OpenSpielCheckersConfigDialog
+except ImportError:
+    pass
+
+try:
+    from .american_checkers_editor import AmericanCheckersConfigDialog
+except ImportError:
+    pass
+
+try:
+    from .russian_checkers_editor import RussianCheckersConfigDialog
+except ImportError:
+    pass
+
+try:
+    from .international_draughts_editor import InternationalDraughtsConfigDialog
+except ImportError:
+    pass
 
 __all__ = [
     # Base classes (for extending)
@@ -76,15 +104,15 @@ __all__ = [
     "GamePiece",
     # Factory (main entry point)
     "BoardConfigDialogFactory",
-    # Chess implementation
+    # Chess implementation (optional: requires python-chess)
     "ChessConfigDialog",
     "ChessBoardState",
-    # Checkers/Draughts base classes
+    # Checkers/Draughts base classes (optional)
     "CheckersBoardState",
     "EditableCheckersBoard",
     "CheckersPieceTray",
     "BaseCheckersConfigDialog",
-    # Checkers/Draughts variants
+    # Checkers/Draughts variants (optional)
     "OpenSpielCheckersConfigDialog",
     "AmericanCheckersConfigDialog",
     "RussianCheckersConfigDialog",

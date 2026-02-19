@@ -1,40 +1,28 @@
 #!/bin/bash
-# mappo_curriculum_collect_soccer_1v1_indagobs.sh
+# smoke_test_curriculum_swap.sh
 #
-# @description: MAPPO curriculum: collect_1vs1 (1M) -> soccer_1vs1 (4M)
+# @description: Smoke test: MAPPO curriculum collect_1vs1 (50k) -> soccer_1vs1 (50k)
 # @env_family: multigrid
 # @environments: collect_1vs1, soccer_1vs1
 # @method: MAPPO
 # @phases: 2
-# @total_timesteps: 5000000
+# @total_timesteps: 100000
 #
-# Single-Process 2-Phase Curriculum Transfer Learning:
-#   Phase 1: Train MAPPO on collect_1vs1 (ball collection) for 1M steps
-#            - Simpler task: collect 3 balls in 10x10 grid (+1 per ball)
-#            - Agents learn: movement, spatial awareness, object interaction
-#            - Natural termination when all balls collected (denser reward)
-#   Phase 2: Swap environment to soccer_1vs1 and continue training for 1M steps
-#            - Harder task: score goals in 16x11 FIFA-ratio grid
-#            - Policy weights, optimizer state, LR schedule ALL preserved
-#            - Agents only need to learn: carry to goal zone + drop
+# Quick verification that multi-agent curriculum environment swap works.
+# Uses small step counts (50k per phase) so it completes in ~3 minutes.
 #
-# Both environments share identical obs/action spaces:
-#   - 2 agents (1v1), IndAgObs (3,3,3)=27 obs, 7 discrete actions
-#   - Same network architecture: [64,64] MLP
-#   - Environment swap preserves everything in memory (no checkpoint transfer)
-#
-# Architecture note:
-#   Uses multi_agent_curriculum_training.py which creates ONE RunnerMARL,
-#   trains Phase 1, then hot-swaps environments for Phase 2. Unlike the
-#   2-process approach, this preserves Adam optimizer momentum, LR schedule
-#   position, and produces a single continuous TensorBoard timeline.
+# Verifies:
+#   - Phase 1 trains on collect_1vs1
+#   - Environment swap to soccer_1vs1 succeeds
+#   - Phase 2 trains on soccer_1vs1
+#   - Checkpoints saved for both phases
 #
 # Usage:
 #   # Launch via GUI (XuanCe Script Form) or manually:
 #   export MOSAIC_CONFIG_FILE="/path/to/config.json"
-#   export MOSAIC_RUN_ID="curriculum_collect_soccer_001"
+#   export MOSAIC_RUN_ID="smoke_test_001"
 #   export MOSAIC_CUSTOM_SCRIPTS_DIR="/path/to/output"
-#   bash mappo_curriculum_collect_soccer_1v1_indagobs.sh
+#   bash smoke_test_curriculum_swap.sh
 
 set -e  # Exit on error
 
@@ -47,11 +35,11 @@ RUN_ID="${MOSAIC_RUN_ID:?MOSAIC_RUN_ID not set}"
 SCRIPTS_DIR="${MOSAIC_CUSTOM_SCRIPTS_DIR:?MOSAIC_CUSTOM_SCRIPTS_DIR not set}"
 
 # ============================================================================
-# Training Parameters (configurable via environment variables)
+# Training Parameters -- small steps for smoke testing
 # ============================================================================
 
-PHASE1_STEPS="${PHASE1_STEPS:-1000000}"
-PHASE2_STEPS="${PHASE2_STEPS:-4000000}"
+PHASE1_STEPS="${PHASE1_STEPS:-50000}"
+PHASE2_STEPS="${PHASE2_STEPS:-50000}"
 NUM_ENVS="${XUANCE_NUM_ENVS:-4}"
 SEED="${XUANCE_SEED:-}"
 TRAINING_MODE="competitive"
@@ -85,8 +73,8 @@ mkdir -p "$RUN_DIR/config"
 # ============================================================================
 
 echo "============================================================"
-echo "  MAPPO Curriculum: collect_1vs1 -> soccer_1vs1"
-echo "  (Single Process - Zero Interruption)"
+echo "  Smoke Test: MAPPO Curriculum Swap"
+echo "  collect_1vs1 (50k) -> soccer_1vs1 (50k)"
 echo "============================================================"
 echo ""
 echo "Run Configuration:"
@@ -107,16 +95,9 @@ echo "  Transfer:         In-memory (optimizer + LR preserved)"
 echo ""
 echo "Shared Architecture:"
 echo "  Agents:           2 (1v1 competitive, parameter sharing)"
-echo "  Policy:           1 shared policy (symmetric game, no collapse)"
 echo "  Observations:     IndAgObs (3,3,3) = 27 flat"
 echo "  Actions:          7 discrete"
-echo "  Network:          MLP [64,64]"
 echo "  Parallel Envs:    $NUM_ENVS"
-echo "  Seed:             ${SEED:-random}"
-echo ""
-echo "FastLane:"
-echo "  Enabled:          $GYM_GUI_FASTLANE_ONLY"
-echo "  Video Mode:       $GYM_GUI_FASTLANE_VIDEO_MODE"
 echo ""
 echo "============================================================"
 
@@ -172,12 +153,12 @@ python -m xuance_worker.cli --config "$CURRICULUM_CONFIG"
 
 echo ""
 echo "============================================================"
-echo "  Curriculum Training Complete!"
+echo "  Smoke Test Complete!"
 echo "============================================================"
 echo ""
-echo "Phase 1 (collect_1vs1 - ball collection): $PHASE1_STEPS steps"
-echo "Phase 2 (soccer_1vs1 - goal scoring):     $PHASE2_STEPS steps"
-echo "Total:                                     $((PHASE1_STEPS + PHASE2_STEPS)) steps"
+echo "Phase 1 (collect_1vs1): $PHASE1_STEPS steps"
+echo "Phase 2 (soccer_1vs1): $PHASE2_STEPS steps"
+echo "Total:                  $((PHASE1_STEPS + PHASE2_STEPS)) steps"
 echo ""
 echo "Checkpoints: $RUN_DIR/checkpoints/"
 echo "TensorBoard: $RUN_DIR/tensorboard/"

@@ -250,4 +250,5 @@ Quick Reference: WSL System Dependencies
        libxcb-xfixes0 libxcb-xinerama0 libxcb-cursor0 \
        libnss3 libnspr4 libasound2 \
        libxcomposite1 libxdamage1 libxkbfile1 \
-       fontconfig fonts-dejavu-extra fonts-liberation fonts-noto
+       fontconfig fonts-dejavu-extra fonts-liberation fonts-noto \
+       jq

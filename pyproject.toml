@@ -337,6 +337,9 @@ ray-rllib = [
 ]
 
 # XuanCe worker for MARL training
+# NOTE: The xuance library (>= 1.4.0) must be installed separately from
+# the git submodule: pip install -e "3rd_party/xuance_worker/xuance[torch]"
+# The dependencies below are the Python packages required alongside xuance.
 xuance = [
     "torch>=2.0.0",
     "torchvision>=0.15.0",

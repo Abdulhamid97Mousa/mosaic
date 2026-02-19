@@ -80,7 +80,8 @@ Inside your WSL terminal:
        libxcomposite1 libxdamage1 libxkbfile1 \
        libxcb-cursor0 \
        fontconfig fonts-dejavu-extra fonts-liberation fonts-noto \
-       stockfish
+       stockfish \
+       jq
 
 .. tip::
 

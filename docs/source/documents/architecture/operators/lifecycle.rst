@@ -38,20 +38,25 @@ State Machine
 
 .. mermaid::
 
-   stateDiagram-v2
-       [*] --> IDLE : Operator configured
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
+   graph TD
+       START(( )) -->|Operator configured| IDLE
+       IDLE -->|Start All clicked| LAUNCHING
+       LAUNCHING -->|Subprocess spawned| RUNNING
+       RUNNING -->|Step All clicked| STEPPING
+       STEPPING -->|Response received| RUNNING
+       RUNNING -->|Reset All clicked| RESETTING
+       RESETTING -->|Ready response| RUNNING
+       RUNNING -->|Stop All clicked| STOPPED
+       STEPPING -->|Stop All clicked| STOPPED
+       STOPPED --> END(( ))
 
-       IDLE --> LAUNCHING : "Start All" clicked
-       LAUNCHING --> RUNNING : Subprocess spawned
-       RUNNING --> STEPPING : "Step All" clicked
-       STEPPING --> RUNNING : Response received
-       RUNNING --> RESETTING : "Reset All" clicked
-       RESETTING --> RUNNING : Ready response
-
-       RUNNING --> STOPPED : "Stop All" clicked
-       STEPPING --> STOPPED : "Stop All" clicked
-
-       STOPPED --> [*]
+       style IDLE fill:#6c757d,stroke:#495057,color:#fff
+       style LAUNCHING fill:#0d6efd,stroke:#0a58ca,color:#fff
+       style RUNNING fill:#198754,stroke:#146c43,color:#fff
+       style STEPPING fill:#ffc107,stroke:#cc9a06,color:#000
+       style RESETTING fill:#0dcaf0,stroke:#0aa2c0,color:#000
+       style STOPPED fill:#dc3545,stroke:#b02a37,color:#fff
 
 Signal Flow
 ~~~~~~~~~~~
@@ -103,24 +108,31 @@ State Machine
 
 .. mermaid::
 
-   stateDiagram-v2
-       [*] --> IDLE : Script loaded
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
+   graph TD
+       START(( )) -->|Script loaded| IDLE
+       IDLE -->|Run Experiment clicked| LAUNCHING
+       LAUNCHING -->|Subprocess spawned + reset sent| WAITING_READY
+       WAITING_READY -->|ready response| STEPPING
 
-       IDLE --> LAUNCHING : "Run Experiment" clicked
-       LAUNCHING --> WAITING_READY : Subprocess spawned + reset sent
-       WAITING_READY --> STEPPING : "ready" response received
+       subgraph LOOP ["Paced Step Loop"]
+           STEPPING -->|episode_end response| EPISODE_DONE
+       end
 
-       STEPPING --> STEPPING : "step" response (paced loop)
-       STEPPING --> EPISODE_DONE : "episode_end" response
+       EPISODE_DONE -->|All episodes finished| COMPLETED
+       EPISODE_DONE -->|Next episode: reset with next seed| WAITING_READY
 
-       EPISODE_DONE --> WAITING_READY : Next episode (reset with next seed)
-       EPISODE_DONE --> COMPLETED : All episodes finished
+       WAITING_READY -->|User clicks Stop| STOPPED
+       STEPPING -->|User clicks Stop| STOPPED
 
-       STEPPING --> STOPPED : User clicks "Stop"
-       WAITING_READY --> STOPPED : User clicks "Stop"
-
-       COMPLETED --> [*]
-       STOPPED --> [*]
+       style IDLE fill:#6c757d,stroke:#495057,color:#fff
+       style LAUNCHING fill:#0d6efd,stroke:#0a58ca,color:#fff
+       style WAITING_READY fill:#ffc107,stroke:#cc9a06,color:#000
+       style STEPPING fill:#198754,stroke:#146c43,color:#fff
+       style EPISODE_DONE fill:#0dcaf0,stroke:#0aa2c0,color:#000
+       style COMPLETED fill:#198754,stroke:#146c43,color:#fff
+       style STOPPED fill:#dc3545,stroke:#b02a37,color:#fff
+       style LOOP fill:none,stroke:#555,stroke-dasharray: 5 5
 
 OperatorScriptExecutionManager
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -145,7 +157,8 @@ The manager coordinates with ``MainWindow`` through signals:
 
 .. mermaid::
 
-   graph LR
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
+   graph TD
        SCRIPT["ScriptExperimentWidget<br/>(UI)"]
        MGR["OperatorScriptExecutionManager<br/>(State Machine)"]
        MW["MainWindow<br/>(Signal Router)"]

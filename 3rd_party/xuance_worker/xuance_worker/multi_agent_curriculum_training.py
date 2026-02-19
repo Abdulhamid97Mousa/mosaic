@@ -184,12 +184,11 @@ def _create_runner(config: XuanCeWorkerConfig, env_id: str):
     )
 
     runner = get_runner(
-        method=method_for_runner,
+        algo=method_for_runner,
         env=config.env,
         env_id=env_id,
         config_path=resolved_config_path,
         parser_args=parser_args,
-        is_test=False,
     )
 
     LOGGER.info("Created runner: %s", type(runner).__name__)
@@ -209,37 +208,7 @@ def _create_envs(runner_config, env_id: str):
     return make_envs(phase_config)
 
 
-# ---------------------------------------------------------------------------
-# tqdm suppression (prevents pipe buffer deadlock)
-# ---------------------------------------------------------------------------
-
-def _ensure_tqdm_disabled() -> None:
-    """Ensure tqdm is disabled to prevent pipe buffer deadlock.
-
-    XuanCe's on_policy_marl.py uses tqdm(range(n_steps)) which writes to
-    stderr on every iteration. When stderr is piped to the telemetry proxy,
-    the 1MB pipe buffer fills up and the training process deadlocks.
-
-    We set TQDM_DISABLE at module level, but if tqdm was imported before that
-    (e.g. by another dependency), this patches the XuanCe module directly.
-    """
-    import sys
-
-    tqdm_mod = sys.modules.get("tqdm")
-    if tqdm_mod is None:
-        return  # Not imported yet; module-level env var will handle it
-
-    # Patch the tqdm class in XuanCe's on-policy MARL module if already loaded
-    marl_mod = sys.modules.get("xuance.torch.agents.core.on_policy_marl")
-    if marl_mod is not None and hasattr(marl_mod, "tqdm"):
-        original_tqdm = marl_mod.tqdm
-
-        def _silent_tqdm(iterable=None, *args, **kwargs):
-            kwargs["disable"] = True
-            return original_tqdm(iterable, *args, **kwargs)
-
-        marl_mod.tqdm = _silent_tqdm
-        LOGGER.debug("Patched tqdm in on_policy_marl module")
+from ._patches import apply_xuance_patches
 
 
 # ---------------------------------------------------------------------------
@@ -282,13 +251,12 @@ def run_multi_agent_curriculum_training(
     except ImportError:
         pass
 
+    # Apply all XuanCe v1.4.0 shim-layer patches before creating runners
+    apply_xuance_patches()
+
     # Create runner for the first phase
     first_env_id = schedule[0]["env_id"]
     runner = _create_runner(worker_config, first_env_id)
-
-    # Belt-and-suspenders: if tqdm was already imported before our module-level
-    # TQDM_DISABLE took effect, patch the XuanCe module directly (now loaded).
-    _ensure_tqdm_disabled()
 
     phase_results = []
 
@@ -324,12 +292,23 @@ def run_multi_agent_curriculum_training(
             new_envs = _create_envs(runner.config, env_id)
             new_envs.reset()  # Populate buf_obs for agents.train()
 
+            # CRITICAL: XuanCe's training loop uses agent.train_envs (not
+            # agent.envs).  Setting the wrong attribute silently keeps
+            # training on the OLD environment -- the swap looks successful
+            # in logs but the agent never sees the new env.
             runner.envs = new_envs
-            runner.agents.envs = new_envs
+            runner.agent.train_envs = new_envs
+
+            # Sanity check: verify the agent will actually use the new envs
+            assert runner.agent.train_envs is new_envs, (
+                "Environment swap failed: runner.agent.train_envs does not "
+                "point to the new environments.  The training loop reads "
+                "from train_envs, so swapping any other attribute is a no-op."
+            )
 
             LOGGER.info(
                 "Environment swap complete: %s (step counter at %d)",
-                env_id, runner.agents.current_step,
+                env_id, runner.agent.current_step,
             )
 
         # Train this phase
@@ -339,11 +318,11 @@ def run_multi_agent_curriculum_training(
             n_train_steps, phase_steps, runner.n_envs,
         )
 
-        runner.agents.train(n_train_steps)
+        runner.agent.train(n_train_steps)
 
         # Save phase checkpoint
         model_name = f"phase{phase_idx + 1}_model.pth"
-        runner.agents.save_model(model_name)
+        runner.agent.save_model(model_name)
 
         phase_elapsed = time.time() - phase_start
         LOGGER.info(
@@ -359,8 +338,8 @@ def run_multi_agent_curriculum_training(
         })
 
     # Final save
-    runner.agents.save_model("final_train_model.pth")
-    runner.agents.finish()
+    runner.agent.save_model("final_train_model.pth")
+    runner.agent.finish()
     runner.envs.close()
 
     total_elapsed = time.time() - start_time

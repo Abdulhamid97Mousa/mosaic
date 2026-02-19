@@ -118,7 +118,9 @@ html_js_files = [
 ]
 
 favicons = [
-    {"href": "figures/favicon.png"},
+    {"rel": "icon", "type": "image/x-icon", "href": "figures/favicon.ico"},
+    {"rel": "icon", "type": "image/png", "sizes": "32x32", "href": "figures/favicon_32.png"},
+    {"rel": "icon", "type": "image/png", "sizes": "16x16", "href": "figures/favicon_16.png"},
 ]
 
 # -- Intersphinx configuration -----------------------------------------------

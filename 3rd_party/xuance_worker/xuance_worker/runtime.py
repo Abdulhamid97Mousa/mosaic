@@ -226,6 +226,19 @@ except ImportError:
 LOGGER = logging.getLogger(__name__)
 
 
+def _json_default(obj: Any) -> Any:
+    """Handle numpy types for json.dumps."""
+    import numpy as np
+
+    if isinstance(obj, (np.integer,)):
+        return int(obj)
+    if isinstance(obj, (np.floating,)):
+        return float(obj)
+    if isinstance(obj, np.ndarray):
+        return obj.tolist()
+    raise TypeError(f"Object of type {type(obj).__name__} is not JSON serializable")
+
+
 @dataclass(frozen=True)
 class XuanCeRuntimeSummary:
     """Summary returned from XuanCe training runs.
@@ -528,12 +541,11 @@ class XuanCeWorkerRuntime:
 
             try:
                 runner = get_runner(
-                    method=method_for_runner,
+                    algo=method_for_runner,
                     env=self._config.env,
                     env_id=self._config.env_id,
                     config_path=resolved_config_path,
                     parser_args=parser_args,
-                    is_test=self._config.test_mode,
                 )
                 LOGGER.info("DEBUG: get_runner() returned successfully")
                 LOGGER.info("DEBUG: runner type = %s", type(runner).__name__)
@@ -590,13 +602,17 @@ class XuanCeWorkerRuntime:
                     LOGGER.info(
                         "Loading pretrained weights from: %s", pretrained_path
                     )
-                    runner.agents.load_model(str(pretrained_path))
+                    runner.agent.load_model(str(pretrained_path))
                     LOGGER.info("Pretrained weights loaded successfully")
                 else:
                     LOGGER.warning(
                         "pretrained_model_dir does not exist: %s",
                         pretrained_path,
                     )
+            # Apply all XuanCe v1.4.0 shim-layer patches
+            from ._patches import apply_xuance_patches
+            apply_xuance_patches()
+
             # Execute training
             runner.run()
 
@@ -827,11 +843,10 @@ class InteractiveRuntime:
         # Create runner to get agent
         try:
             runner = get_runner(
-                method=self._method,
+                algo=self._method,
                 env=env_family,
                 env_id=self._env_id,
                 parser_args=parser_args,
-                is_test=True,  # Test mode
             )
 
             # Load the model weights
@@ -1042,7 +1057,7 @@ class InteractiveRuntime:
 
     def _emit(self, data: dict) -> None:
         """Emit JSON line to stdout."""
-        print(json.dumps(data), flush=True)
+        print(json.dumps(data, default=_json_default), flush=True)
 
     def run(self) -> None:
         """Main loop - read commands from stdin, execute, respond."""

@@ -6,7 +6,7 @@
 }
 
 .sidebar-logo {
-    max-width: 100px;
+    max-width: 128px;
     margin: 0 auto;
     border-radius: 50%;
 }
@@ -56,6 +56,83 @@ table {
 
 th {
     background-color: var(--color-background-secondary);
+}
+
+/* ── Sidebar collapse/expand toggle ── */
+
+/* Make brand area a flex row so button sits beside the logo */
+.sidebar-brand {
+    position: relative;
+}
+
+/* Collapse button: sits above the logo, top-right of brand area */
+.sidebar-collapse-btn {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 6px;
+    background: transparent;
+    color: var(--color-foreground-muted);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    opacity: 0.5;
+    transition: background 0.15s ease, color 0.15s ease, opacity 0.15s ease;
+}
+
+.sidebar-collapse-btn:hover {
+    opacity: 1;
+    background: var(--color-background-secondary);
+    color: var(--color-foreground-primary);
+}
+
+.sidebar-collapse-btn svg {
+    width: 16px;
+    height: 16px;
+}
+
+/* Expand button: visible icon top-left when sidebar is hidden */
+.sidebar-expand-btn {
+    position: fixed;
+    top: 16px;
+    left: 16px;
+    z-index: 200;
+    width: 36px;
+    height: 36px;
+    border: none;
+    border-radius: 8px;
+    background: transparent;
+    color: var(--color-foreground-muted);
+    cursor: pointer;
+    padding: 0;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sidebar-expand-btn:hover {
+    background: var(--color-background-secondary);
+    color: var(--color-foreground-primary);
+}
+
+.sidebar-expand-btn svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* When sidebar is hidden */
+body.sidebar-hidden .sidebar-drawer {
+    display: none;
+}
+
+body.sidebar-hidden .sidebar-expand-btn {
+    display: flex;
 }
 
 /* ── Collapsible sidebar sections ── */

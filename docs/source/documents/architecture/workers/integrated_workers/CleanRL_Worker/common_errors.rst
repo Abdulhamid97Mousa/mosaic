@@ -155,6 +155,25 @@ curriculum training mode and is vendored as a Git submodule.
    git submodule update --init 3rd_party/Syllabus
    pip install -e 3rd_party/Syllabus
 
+**``jq: command not found`` in curriculum scripts**
+
+.. code-block:: text
+
+   curriculum_babyai_goto.sh: line 78: jq: command not found
+
+**Cause:** The ``jq`` command-line JSON processor is not installed.
+Curriculum scripts use ``jq`` to build the schedule JSON from the base
+MOSAIC config.
+
+**Fix:**
+
+.. code-block:: bash
+
+   sudo apt-get update && sudo apt-get install -y jq
+
+See also :doc:`/documents/tutorials/installation/common_errors/workers/index`
+for the full write-up.
+
 **"Task space mismatch" or unexpected environment switching**
 
 **Cause:** The ``curriculum_schedule`` contains environment IDs that

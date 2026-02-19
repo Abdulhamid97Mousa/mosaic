@@ -8,7 +8,10 @@ version = "0.1.0"
 description = "XuanCe integration for MOSAIC BDI-RL framework"
 requires-python = ">=3.10"
 license = "MIT"
-# Dependencies are managed via the main project's requirements.txt
+# Dependencies are managed via the main project's requirements.txt.
+# The xuance library (>= 1.4.0) must be installed separately from the
+# git submodule at 3rd_party/xuance_worker/xuance/.
+# See docs: tutorials/installation/common_errors/workers/xuance_worker_errors/
 dependencies = []
 
 [project.optional-dependencies]

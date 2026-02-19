@@ -6,10 +6,11 @@ MOSAIC. Errors shared across platforms are listed below. For platform-specific
 issues, see the sub-pages:
 
 .. toctree::
-   :maxdepth: 1
+   :maxdepth: 2
 
    wsl
    ubuntu
+   workers/index
 
 -----
 
