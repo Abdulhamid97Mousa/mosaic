@@ -90,7 +90,7 @@ intercepts this and injects keyboard input from the user.
 
 .. mermaid::
 
-   graph LR
+   graph TB
        OBS["Observation<br/>(rendered frame)"] --> GUI["GUI<br/>Keyboard Capture"]
        GUI --> ACTION["Action<br/>(key mapping)"]
        ACTION --> ENV["Environment"]
@@ -121,7 +121,7 @@ to a language model API, and parses the response into an action.
 
 .. mermaid::
 
-   graph LR
+   graph TB
        OBS["Observation<br/>(grid / board)"] --> PROMPT["Text Prompt<br/>Generation"]
        PROMPT --> API["LLM API<br/>vLLM / OpenRouter / OpenAI"]
        API --> PARSE["Response<br/>Parsing"]
@@ -192,7 +192,7 @@ forward pass to select actions.
 
 .. mermaid::
 
-   graph LR
+   graph TB
        OBS["Observation<br/>(tensor)"] --> NET["Neural Network<br/>Forward Pass"]
        NET --> ACTION["Action<br/>(argmax / sample)"]
 
@@ -223,7 +223,7 @@ simple strategies like random action selection or fixed heuristics.
 
 .. mermaid::
 
-   graph LR
+   graph TB
        OBS["Observation<br/>(ignored)"] --> RNG["Random / Heuristic<br/>Action Selection"]
        RNG --> ACTION["Action"]
 

@@ -70,7 +70,8 @@ class RgbRendererStrategy(RendererStrategy):
         if frame is None:
             self.reset()
             return
-        self._view.render_frame(frame, tooltip_payload=payload)
+        square_size = context.square_size if context else None
+        self._view.render_frame(frame, tooltip_payload=payload, square_size=square_size)
 
     def supports(self, payload: Mapping[str, object]) -> bool:
         return "rgb" in payload or "frame" in payload
@@ -117,6 +118,7 @@ class _RgbView(QtWidgets.QWidget):
 
         self._current_pixmap: QtGui.QPixmap | None = None
         self._tooltip_text: str = ""
+        self._square_size: int | None = None  # Display tile size (from Square dropdown)
 
         # Mouse capture state
         self._mouse_capture_enabled = False
@@ -378,8 +380,22 @@ class _RgbView(QtWidgets.QWidget):
             return
         super().wheelEvent(event)
 
-    def render_frame(self, frame: object, *, tooltip_payload: Mapping[str, object] | None = None) -> None:
-        """Render an RGB frame array."""
+    def render_frame(
+        self,
+        frame: object,
+        *,
+        tooltip_payload: Mapping[str, object] | None = None,
+        square_size: int | None = None,
+    ) -> None:
+        """Render an RGB frame array.
+
+        Args:
+            frame: RGB numpy array or list.
+            tooltip_payload: Optional payload for tooltip text.
+            square_size: If set, controls display scaling so each native tile
+                pixel maps to (square_size / 32) display pixels.
+        """
+        self._square_size = square_size
         # IMPORTANT: Must specify dtype=np.uint8 because when frame comes from
         # JSON/list conversion (e.g., tolist() -> np.asarray()), numpy defaults
         # to int64 which corrupts the image data for QImage
@@ -450,13 +466,22 @@ class _RgbView(QtWidgets.QWidget):
         widget_height = widget_rect.height()
 
         if pixmap_width > 0 and pixmap_height > 0:
-            scale_x = widget_width / pixmap_width
-            scale_y = widget_height / pixmap_height
-            scale = min(scale_x, scale_y)  # Use smaller scale to fit entirely
-
-            # Calculate scaled dimensions
-            scaled_width = int(pixmap_width * scale)
-            scaled_height = int(pixmap_height * scale)
+            if self._square_size and self._square_size > 0:
+                # Fixed scale: each native tile (32px default) maps to square_size display px
+                scale = self._square_size / 32.0
+                scaled_width = int(pixmap_width * scale)
+                scaled_height = int(pixmap_height * scale)
+                # Clamp to widget bounds if the scaled image is too large
+                if scaled_width > widget_width or scaled_height > widget_height:
+                    fit = min(widget_width / scaled_width, widget_height / scaled_height)
+                    scaled_width = int(scaled_width * fit)
+                    scaled_height = int(scaled_height * fit)
+            else:
+                scale_x = widget_width / pixmap_width
+                scale_y = widget_height / pixmap_height
+                scale = min(scale_x, scale_y)  # Use smaller scale to fit entirely
+                scaled_width = int(pixmap_width * scale)
+                scaled_height = int(pixmap_height * scale)
 
             # Center the scaled pixmap in the widget
             x = (widget_width - scaled_width) // 2

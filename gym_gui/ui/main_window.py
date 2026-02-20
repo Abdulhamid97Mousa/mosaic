@@ -3089,7 +3089,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     )
                     return
 
-                env = gym.make(task, render_mode="rgb_array")
+                tile_size = config.settings.get("square_size") or 32
+                env = gym.make(task, render_mode="rgb_array", tile_size=tile_size)
                 env.reset(seed=seed)
 
                 # Apply custom initial state if configured
@@ -3414,7 +3415,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
                     env = gymnasium.make(task, render_mode='rgb_array')
                     env.reset(seed=seed)
-                    # Old deprecated envs support highlight=True, newer ones may not
+                    # mosaic_multigrid render() does not accept tile_size
                     try:
                         rgb_frame = env.render(highlight=True)
                     except TypeError:
@@ -3454,13 +3455,19 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                         INI_CONFIGURATIONS = {}
 
                     num_agents = len(config.workers) if config.workers else 1
+                    tile_size = config.settings.get("square_size") or 32
 
                     if task in INI_CONFIGURATIONS:
                         env_cls, config_kwargs = INI_CONFIGURATIONS[task]
-                        config_kwargs = {**config_kwargs, "agents": num_agents, "render_mode": "rgb_array"}
+                        config_kwargs = {
+                            **config_kwargs,
+                            "agents": num_agents,
+                            "render_mode": "rgb_array",
+                            "tile_size": tile_size,
+                        }
                         env = env_cls(**config_kwargs)
                     else:
-                        env = gymnasium.make(task, render_mode="rgb_array")
+                        env = gymnasium.make(task, render_mode="rgb_array", tile_size=tile_size)
 
                     env.reset(seed=seed)
                     rgb_frame = env.render()
@@ -3597,7 +3604,6 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     # Check if we need to scale image to target resolution
                     image_scale = config.settings.get("image_scale", 0)
                     if image_scale and image_scale > 0:
-                        # Scale image to target resolution (square)
                         from PIL import Image
                         pil_image = Image.fromarray(rgb_frame)
                         pil_image = pil_image.resize(

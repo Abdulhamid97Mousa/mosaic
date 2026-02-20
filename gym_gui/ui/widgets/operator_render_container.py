@@ -707,6 +707,17 @@ class OperatorRenderContainer(QtWidgets.QFrame):
                 # Render using the active strategy
                 if self._renderer_strategy and self._renderer_strategy.supports(render_payload):
                     context = RendererContext()
+                    # Pass square_size for grid environments (same as board game path)
+                    square_size = self._config.settings.get("square_size")
+                    if square_size:
+                        context.square_size = square_size
+                    _LOGGER.debug(
+                        "RGB render: square_size=%s, settings_keys=%s, strategy=%s",
+                        square_size,
+                        list(self._config.settings.keys()),
+                        type(self._renderer_strategy).__name__,
+                        extra=self._log_extra(),
+                    )
                     self._renderer_strategy.render(render_payload, context=context)
 
         except Exception as e:

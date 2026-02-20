@@ -40,6 +40,7 @@ LOGGER = logging.getLogger("gym_gui.app")
 _log = partial(log_constant, LOGGER)
 
 
+
 def _format_settings(settings: Settings) -> str:
     """Format settings for display, including system information."""
     import torch
@@ -330,6 +331,14 @@ def main() -> int:
 
     app = QApplication(sys.argv)
     app.setApplicationName("Gym GUI")
+
+    # Set the MOSAIC logo as the taskbar icon (read via _NET_WM_ICON on X11).
+    from PyQt6.QtGui import QIcon
+    from pathlib import Path
+    _logo = Path(__file__).parent / "assets" / "mosaic_logo.png"
+    if _logo.exists():
+        app.setWindowIcon(QIcon(str(_logo)))
+
     print(f"[gym_gui] Qt platform plugin: {app.platformName()}")
 
     # Setup Qt-compatible asyncio event loop using qasync

@@ -19,14 +19,14 @@ Installing everything would:
 
 **The Problem: Monolithic Installation**
 
-.. image:: /images/installation/monolithic_problem.png
+.. image:: /images/installation/monolithic_problem.jpg
    :alt: Monolithic installation causes dependency conflicts
    :align: center
    :width: 100%
 
 **The Solution: Modular Extras**
 
-.. image:: /images/installation/modular_solution.png
+.. image:: /images/installation/modular_solution.jpg
    :alt: Modular extras let you install only what you need
    :align: center
    :width: 100%

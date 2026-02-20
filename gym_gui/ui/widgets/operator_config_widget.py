@@ -1218,6 +1218,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
         )
         self._container_size_combo.addItem("Auto", 0)
         self._container_size_combo.addItem("300px", 300)
+        self._container_size_combo.addItem("350px", 350)
         self._container_size_combo.addItem("400px", 400)
         self._container_size_combo.addItem("512px", 512)
         self._container_size_combo.addItem("600px", 600)
@@ -1277,8 +1278,9 @@ class OperatorConfigRow(QtWidgets.QWidget):
 
         self._square_size_combo = QtWidgets.QComboBox(self)
         self._square_size_combo.setToolTip(
-            "Board square size (for Chess, Go, Connect Four, Checkers).\n"
-            "Controls the size of each square/cell on the board."
+            "Tile/square size in pixels.\n"
+            "For board games: size of each square on the board.\n"
+            "For multigrid: size of each grid cell (default 32px)."
         )
         self._square_size_combo.addItem("Small (30px)", 30)
         self._square_size_combo.addItem("Medium (50px)", 50)
@@ -1557,11 +1559,19 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._configure_btn.setVisible(is_configurable)
         self._map_label.setVisible(is_configurable)
 
-        # Show square size dropdown only for board games (Chess, Go, Connect Four, Checkers)
-        # Note: MiniGrid/BabyAI/MultiGrid use RGB rendering - tile size is fixed by environment
-        is_board_game_env = env_family in ("pettingzoo_classic", "open_spiel") or is_board_game
-        self._square_size_combo.setVisible(is_board_game_env)
-        self._square_size_label.setVisible(is_board_game_env)
+        # Show square size dropdown for board games and grid environments
+        # Board games: controls square size on the board
+        # Grid envs (minigrid, babyai, multigrid): controls tile_size (grid cell pixel size, default 32px)
+        is_square_size_env = (
+            env_family in (
+                "pettingzoo_classic", "open_spiel",
+                "babyai", "minigrid",
+                "mosaic_multigrid", "ini_multigrid",
+            )
+            or is_board_game
+        )
+        self._square_size_combo.setVisible(is_square_size_env)
+        self._square_size_label.setVisible(is_square_size_env)
 
         # Show game resolution dropdown only for Crafter (controls native render size)
         is_crafter = env_family == "crafter"
