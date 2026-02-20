@@ -308,8 +308,45 @@ Then re-run the proto generation:
 Startup Errors
 --------------
 
-Trainer daemon -- "Detected incompatible Protobuf Gencode/Runtime versions"
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Trainer daemon failed to start -- "VersionError: Detected incompatible Protobuf Gencode/Runtime versions"
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Error (when running ``./run.sh``):**
+
+.. code-block:: text
+
+   Checking for existing trainer processes...
+   Starting trainer daemon...
+   Waiting for trainer daemon...
+   ERROR: Trainer daemon failed to start. Check var/logs/trainer_daemon.log
+
+**Check the log** (``var/logs/trainer_daemon.log``):
+
+.. code-block:: text
+
+   File ".../google/protobuf/runtime_version.py", line 100, in ValidateProtobufRuntimeVersion
+     _ReportVersionError(
+   File ".../google/protobuf/runtime_version.py", line 50, in _ReportVersionError
+     raise VersionError(msg)
+   google.protobuf.runtime_version.VersionError: Detected incompatible Protobuf Gencode/Runtime versions when loading trainer.proto: gencode 6.31.1 runtime 5.29.6. Runtime version cannot be older than the linked gencode version.
+
+**Cause:** The generated Protobuf files (``trainer_pb2.py``) checked into the repository were compiled with a newer version of Protobuf (e.g., 6.31.1) than the one installed in your Python environment (e.g., 5.29.6). Protobuf requires that the runtime library be at least as new as the compiler used to generate the code.
+
+**Fix:** Regenerate the Protobuf files using your local environment's tools:
+
+.. code-block:: bash
+
+   source .venv/bin/activate
+   bash tools/generate_protos.sh
+
+Then restart the application:
+
+.. code-block:: bash
+
+   ./run.sh
+
+Trainer daemon failed to start -- "No module named 'dotenv'"
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error (when running ``./run.sh``):**
 

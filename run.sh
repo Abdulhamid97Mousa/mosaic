@@ -120,6 +120,11 @@ PY
     fi
     if [ "$attempt" -eq 10 ]; then
         echo "ERROR: Trainer daemon failed to start. Check var/logs/trainer_daemon.log" >&2
+        echo "" >&2
+        echo "Common fix: Regenerate protobuf stubs to match your environment:" >&2
+        echo "  source .venv/bin/activate" >&2
+        echo "  bash tools/generate_protos.sh" >&2
+        echo "  ./run.sh" >&2
         exit 1
     fi
     sleep 1

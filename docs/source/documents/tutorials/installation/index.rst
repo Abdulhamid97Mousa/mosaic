@@ -17,6 +17,20 @@ Installing everything would:
 - Waste **disk space** (10+ GB for all workers)
 - Slow down installation unnecessarily
 
+**The Problem: Monolithic Installation**
+
+.. image:: /images/installation/monolithic_problem.png
+   :alt: Monolithic installation causes dependency conflicts
+   :align: center
+   :width: 100%
+
+**The Solution: Modular Extras**
+
+.. image:: /images/installation/modular_solution.png
+   :alt: Modular extras let you install only what you need
+   :align: center
+   :width: 100%
+
 Our solution: **install only what you need**.
 
 System Requirements
@@ -102,7 +116,7 @@ Choose your installation based on your use case:
          # Or via requirements
          pip install -r requirements/xuance_worker.txt
 
-   .. tab:: Ray/RLlib
+   .. tab:: Ray RLlib
 
       For distributed RL training with Ray:
 
