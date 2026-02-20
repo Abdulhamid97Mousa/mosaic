@@ -372,3 +372,282 @@ Use this checklist to verify your operator is complete:
 - Worker appears in ``worker_catalog.py``
 - Subprocess protocol test passes (reset/step/stop cycle)
 - Episodes auto-reset after termination
+
+-----
+
+Adding an Environment Family
+=============================
+
+An **environment family** groups related environments under a single
+dropdown entry in the Operators tab. Adding a new family requires
+changes in two files:
+
+- ``gym_gui/ui/widgets/operator_config_widget.py`` -- family registry
+  and UI logic
+- ``gym_gui/ui/main_window.py`` -- environment creation and preview
+  rendering
+
+This section walks through each step. The ``mosaic_multigrid`` /
+``ini_multigrid`` split is used as a running example.
+
+Step 1: Add to ``ENV_FAMILIES``
+-------------------------------
+
+Open ``gym_gui/ui/widgets/operator_config_widget.py`` and add a new
+key to the ``ENV_FAMILIES`` dict:
+
+.. code-block:: python
+
+   ENV_FAMILIES: Dict[str, Tuple[str, ...]] = {
+       # ... existing families ...
+       "my_family": (
+           "MyEnv-TaskA-v0",
+           "MyEnv-TaskB-v0",
+           "MyEnv-TaskC-v0",
+       ),
+   }
+
+Each string is a gym-registered environment ID that appears in the
+**Task** dropdown when the family is selected.
+
+If your environments are registered dynamically (like ``babyai`` or
+``meltingpot``), use an empty tuple and populate it at runtime:
+
+.. code-block:: python
+
+   "my_family": (),  # Loaded dynamically
+
+.. tip::
+
+   Use the correct gym ID strings. If a package registers environments
+   via ``gym.register(id="MyEnv-TaskA-v0", ...)``, the ``ENV_FAMILIES``
+   tuple must use ``"MyEnv-TaskA-v0"`` exactly.
+
+Step 2: Update ``_auto_detect_agent_count``
+-------------------------------------------
+
+If your family is multi-agent, add detection logic so the GUI
+knows how many agents to display:
+
+.. code-block:: python
+
+   def _auto_detect_agent_count(env_family: str, env_id: str) -> int:
+       # ... existing checks ...
+
+       elif env_family == "my_family":
+           # Instantiate and query agent count
+           import gym
+           env = gym.make(env_id)
+           num_agents = getattr(env, 'num_agents', 1)
+           env.close()
+           return num_agents
+
+For single-agent families, this function can return ``0`` (the
+default) and no multi-agent panel will be shown.
+
+Step 3: Update ``_get_execution_mode``
+--------------------------------------
+
+Declare whether your family uses turn-based (AEC) or simultaneous
+(parallel) stepping:
+
+.. code-block:: python
+
+   def _get_execution_mode(env_family: str) -> str:
+       if env_family in ("pettingzoo", "pettingzoo_classic", "open_spiel"):
+           return "aec"
+       elif env_family in ("mosaic_multigrid", "ini_multigrid",
+                           "meltingpot", "overcooked", "my_family"):
+           return "parallel"
+       return "aec"
+
+Step 4: Update multi-agent guard tuples
+----------------------------------------
+
+Several functions use tuples to identify multi-agent or
+simultaneous-only families. Add your family name to each:
+
+1. ``_is_multiagent_env_selected()`` -- determines whether to show
+   the player assignment panel:
+
+   .. code-block:: python
+
+      return env_family in (
+          "pettingzoo", "pettingzoo_classic", "open_spiel",
+          "mosaic_multigrid", "ini_multigrid",
+          "meltingpot", "overcooked",
+          "my_family",  # <-- add here
+      )
+
+2. ``simultaneous_only_envs`` in ``_update_multiagent_panel()`` --
+   disables the AEC option for families that only support parallel
+   mode:
+
+   .. code-block:: python
+
+      simultaneous_only_envs = (
+          "overcooked", "mosaic_multigrid", "ini_multigrid",
+          "meltingpot",
+          "my_family",  # <-- if simultaneous-only
+      )
+
+3. Agent ID generation block -- generates ``agent_0``, ``agent_1``,
+   etc. for simultaneous families:
+
+   .. code-block:: python
+
+      elif env_family in ("mosaic_multigrid", "ini_multigrid",
+                          "meltingpot", "overcooked", "my_family"):
+          agent_ids = [f"agent_{i}" for i in range(num_agents)]
+
+4. ``_is_parallel_multiagent()`` in ``main_window.py`` -- identifies
+   parallel environments for the shared-environment execution path:
+
+   .. code-block:: python
+
+      if first_config.env_name in (
+          "mosaic_multigrid", "ini_multigrid",
+          "meltingpot", "overcooked",
+          "my_family",  # <-- add here
+      ):
+
+Step 5: Add environment creation
+---------------------------------
+
+In ``main_window.py``, add a branch to
+``_create_parallel_multiagent_env()`` so the runtime can instantiate
+your environments:
+
+.. code-block:: python
+
+   elif env_name == "my_family":
+       import gymnasium
+       import my_package.envs  # triggers gymnasium.register() calls
+       env = gymnasium.make(task)
+       env.render_mode = 'rgb_array'
+       return env
+
+.. important::
+
+   Use ``gymnasium.make(task)`` with the registered environment ID.
+   Do **not** hardcode specific class imports -- this ensures all
+   variants (current and future) are handled correctly. See
+   :doc:`/documents/tutorials/installation/common_errors/operators/index`
+   for the preview-hang bug caused by hardcoded class imports.
+
+   Both ``mosaic_multigrid`` and ``ini_multigrid`` use the modern
+   Gymnasium API (``import gymnasium``), not the deprecated OpenAI
+   Gym (``import gym``).
+
+Step 6: Add preview rendering
+------------------------------
+
+In the ``_on_initialize_operator()`` method of ``main_window.py``,
+add an ``elif`` branch so "Load Environment" shows a preview frame:
+
+.. code-block:: python
+
+   elif env_name == "my_family":
+       try:
+           import gymnasium
+           import my_package.envs  # noqa: F401
+
+           env = gymnasium.make(task)
+           env.render_mode = 'rgb_array'
+           env.reset()
+           rgb_frame = env.render()
+           env.close()
+       except ImportError as import_err:
+           self._status_bar.showMessage(
+               f"my_package not installed - cannot preview: {import_err}",
+               5000
+           )
+           return
+       except Exception as e:
+           self._status_bar.showMessage(
+               f"Cannot preview my_family {task}: {e}",
+               5000
+           )
+           return
+
+Step 7: Add settings panel (optional)
+--------------------------------------
+
+If your family needs family-specific UI controls (like the multigrid
+observation mode / coordination strategy panel), create a container
+widget in the ``_create_multiagent_controls()`` method and
+show/hide it based on the selected family:
+
+.. code-block:: python
+
+   if env_family in ("mosaic_multigrid", "ini_multigrid"):
+       self._multigrid_settings_container.show()
+   elif env_family == "my_family":
+       self._my_family_settings_container.show()
+   else:
+       self._multigrid_settings_container.hide()
+       self._my_family_settings_container.hide()
+
+Environment Family Checklist
+----------------------------
+
+Use this checklist when adding a new environment family:
+
+- [ ] ``ENV_FAMILIES`` dict has a key with all gym-registered IDs
+- [ ] ``_auto_detect_agent_count()`` handles the family (if multi-agent)
+- [ ] ``_get_execution_mode()`` returns ``"aec"`` or ``"parallel"``
+- [ ] ``_is_multiagent_env_selected()`` includes the family
+- [ ] ``simultaneous_only_envs`` tuple includes it (if parallel-only)
+- [ ] Agent ID generation block includes it
+- [ ] ``_is_parallel_multiagent()`` in ``main_window.py`` includes it
+- [ ] ``_create_parallel_multiagent_env()`` has a creation branch
+- [ ] ``_on_initialize_operator()`` has a preview rendering branch
+- [ ] All gym IDs use ``gym.make()`` -- no hardcoded class imports
+- [ ] Preview error messages name the family clearly
+- [ ] ``gym_gui/tests/`` has passing tests for the new family
+
+Example: ``mosaic_multigrid`` / ``ini_multigrid`` Split
+-------------------------------------------------------
+
+The original ``"multigrid"`` family mixed two distinct environment
+sets. It was split into two independent families:
+
+.. list-table::
+   :widths: 20 40 40
+   :header-rows: 1
+
+   * - Property
+     - ``mosaic_multigrid``
+     - ``ini_multigrid``
+   * - Source
+     - `PyPI: mosaic-multigrid <https://pypi.org/project/mosaic-multigrid/>`_
+     - `GitHub: ini/multigrid <https://github.com/ini/multigrid>`_
+   * - Type
+     - Competitive team sports
+     - Cooperative exploration
+   * - view_size
+     - 3
+     - 7
+   * - Env count
+     - 13 (Soccer, Collect, Basketball)
+     - 13 (Empty, RedBlueDoors, LockedHallway, etc.)
+   * - ID prefix
+     - ``MosaicMultiGrid-*``
+     - ``MultiGrid-*``
+   * - API
+     - Gymnasium (``import gymnasium``)
+     - Gymnasium (``import gymnasium``)
+   * - Install
+     - ``pip install ".[mosaic_multigrid]"``
+     - ``pip install ".[multigrid_ini]"``
+   * - Role assignment
+     - Yes (Soccer forward/defender)
+     - No
+
+**Key lesson:** Always use ``gymnasium.make(task)`` for environment
+creation rather than importing specific classes. The mosaic_multigrid package
+has 13 environments across 4 variant tiers (Original, IndAgObs,
+TeamObs, Basketball). Hardcoding class imports like
+``SoccerGame4HEnv10x15N2`` will silently break when the user selects a
+different variant (e.g., ``MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0``
+uses ``SoccerGame4HIndAgObsEnv16x11N2``).

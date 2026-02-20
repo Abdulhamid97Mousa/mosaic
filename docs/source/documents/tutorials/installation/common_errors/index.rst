@@ -11,6 +11,7 @@ issues, see the sub-pages:
    wsl
    ubuntu
    workers/index
+   operators/index
 
 -----
 

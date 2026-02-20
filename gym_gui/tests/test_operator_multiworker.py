@@ -898,17 +898,17 @@ class TestPettingZooGamesConstant:
                     f"{game_name}: {player_id} should have a label"
 
     def test_pettingzoo_in_env_families(self) -> None:
-        """Test that pettingzoo is included in ENV_FAMILIES."""
+        """Test that pettingzoo_classic is included in ENV_FAMILIES."""
         from gym_gui.ui.widgets.operator_config_widget import (
             ENV_FAMILIES,
             PETTINGZOO_GAMES,
         )
 
-        assert "pettingzoo" in ENV_FAMILIES, \
-            "pettingzoo should be in ENV_FAMILIES"
-        # ENV_FAMILIES["pettingzoo"] should contain all game names
-        assert set(ENV_FAMILIES["pettingzoo"]) == set(PETTINGZOO_GAMES.keys()), \
-            "ENV_FAMILIES['pettingzoo'] should match PETTINGZOO_GAMES keys"
+        assert "pettingzoo_classic" in ENV_FAMILIES, \
+            "pettingzoo_classic should be in ENV_FAMILIES"
+        # ENV_FAMILIES["pettingzoo_classic"] should contain all game names
+        assert set(ENV_FAMILIES["pettingzoo_classic"]) == set(PETTINGZOO_GAMES.keys()), \
+            "ENV_FAMILIES['pettingzoo_classic'] should match PETTINGZOO_GAMES keys"
 
 
 # =============================================================================

@@ -52,9 +52,9 @@ from gym_gui.logging_config.log_constants import (
 )
 
 try:  # pragma: no cover - import guard
-    import gym
+    import gymnasium
 except ImportError:  # pragma: no cover
-    gym = None  # type: ignore[assignment]
+    gymnasium = None  # type: ignore[assignment]
 
 # Try importing INI multigrid environments (local package)
 try:  # pragma: no cover - import guard
@@ -162,10 +162,10 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
 
     def load(self) -> None:
         """Instantiate the INI MultiGrid environment."""
-        if gym is None:
+        if gymnasium is None:
             raise RuntimeError(
-                "gym package not installed. "
-                "Install with: pip install gym"
+                "gymnasium package not installed. "
+                "Install with: pip install gymnasium"
             )
 
         try:
@@ -179,9 +179,9 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
                 config_kwargs = {**config_kwargs, "render_mode": "rgb_array"}
                 env = env_cls(**config_kwargs)
             else:
-                # Try to make via gym.make if registered
+                # Try to make via gymnasium.make if registered
                 try:
-                    env = gym.make(self._env_id)
+                    env = gymnasium.make(self._env_id)
                 except Exception as e:
                     available_envs = list(INI_CONFIGURATIONS.keys())
                     raise RuntimeError(

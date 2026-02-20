@@ -55,7 +55,7 @@ class OperatorsTab(QtWidgets.QWidget):
     step_all_requested = pyqtSignal(int)  # Emit with current seed
     reset_all_requested = pyqtSignal(int)  # Emit with current seed
     stop_operators_requested = pyqtSignal()
-    initialize_operator_requested = pyqtSignal(str, object, int)  # operator_id, config, seed
+    initialize_operator_requested = pyqtSignal(str, object, object)  # operator_id, config, seed (int or None)
     step_player_requested = pyqtSignal(str, int)  # player_id, seed
     human_step_completed = pyqtSignal(str)  # operator_id - emitted when human completes their step
     human_action_requested = pyqtSignal(str, int)  # operator_id, action_index - request to step human operator
@@ -196,6 +196,14 @@ class OperatorsTab(QtWidgets.QWidget):
         self._random_seed_button.setToolTip("Generate a new random seed")
         self._random_seed_button.clicked.connect(self._on_random_seed_clicked)
         seed_row.addWidget(self._random_seed_button)
+
+        self._use_shared_seed_checkbox = QtWidgets.QCheckBox("Use Shared Seed", exec_group)
+        self._use_shared_seed_checkbox.setChecked(True)
+        self._use_shared_seed_checkbox.setToolTip(
+            "When checked, all operators use the same seed for identical layouts.\n"
+            "When unchecked, each operator gets a random layout."
+        )
+        seed_row.addWidget(self._use_shared_seed_checkbox)
 
         exec_layout.addLayout(seed_row)
 
@@ -446,9 +454,13 @@ class OperatorsTab(QtWidgets.QWidget):
     def _on_initialize_requested(self, operator_id: str, config: OperatorConfig) -> None:
         """Handle initialize request from an operator row.
 
-        Passes the shared seed for controlled scientific comparison.
+        Passes the shared seed when "Use Shared Seed" is checked,
+        or None for random layout when unchecked.
         """
-        seed = self.get_current_seed()
+        if self._use_shared_seed_checkbox.isChecked():
+            seed = self.get_current_seed()
+        else:
+            seed = None
         self.initialize_operator_requested.emit(operator_id, config, seed)
 
     def _on_configure_requested(self, operator_id: str, config: OperatorConfig) -> None:

@@ -182,7 +182,10 @@ ENV_FAMILIES: Dict[str, Tuple[str, ...]] = {
         "Blackjack-v1",
     ),
     # PettingZoo Classic board games (Chess, Go, Connect Four, TicTacToe)
-    "pettingzoo_classic": ("chess_v6", "connect_four_v3", "go_v5", "tictactoe_v3"),
+    "pettingzoo_classic": (
+        "chess_v6", "connect_four_v3", "go_v5", "tictactoe_v3",
+        "backgammon_v3", "gin_rummy_v4", "texas_holdem_v4",
+    ),
     # OpenSpiel board games (Google DeepMind) + custom draughts variants
     # - open_spiel/* : Original OpenSpiel implementations via Shimmy
     # - draughts/*   : Custom implementations with proper rule variants
@@ -192,20 +195,35 @@ ENV_FAMILIES: Dict[str, Tuple[str, ...]] = {
         "draughts/russian_checkers",     # Custom: 8x8, men capture backward, flying kings
         "draughts/international_draughts",  # Custom: 10x10, backward captures, flying kings
     ),
-    # mosaic_multigrid multi-agent environments (simultaneous stepping)
-    # mosaic_multigrid (Soccer, Collect) + Modern INI multigrid
-    "multigrid": (
-        # Legacy environments
-        "MultiGrid-Soccer-v0",
-        "MultiGrid-Collect-v0",
-        # INI environments - Empty series
+    # mosaic_multigrid: competitive team sports (view_size=3, simultaneous stepping)
+    # PyPI: https://pypi.org/project/mosaic-multigrid/
+    "mosaic_multigrid": (
+        # Original (Deprecated)
+        "MosaicMultiGrid-Soccer-v0",
+        "MosaicMultiGrid-Collect-v0",
+        "MosaicMultiGrid-Collect-2vs2-v0",
+        "MosaicMultiGrid-Collect-1vs1-v0",
+        # IndAgObs v4.0.0 (Recommended for RL training)
+        "MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0",
+        "MosaicMultiGrid-Soccer-1vs1-IndAgObs-v0",
+        "MosaicMultiGrid-Collect-IndAgObs-v0",
+        "MosaicMultiGrid-Collect-2vs2-IndAgObs-v0",
+        "MosaicMultiGrid-Collect-1vs1-IndAgObs-v0",
+        "MosaicMultiGrid-Basketball-3vs3-IndAgObs-v0",
+        # TeamObs v4.0.0 (SMAC-style teammate awareness)
+        "MosaicMultiGrid-Soccer-2vs2-TeamObs-v0",
+        "MosaicMultiGrid-Collect-2vs2-TeamObs-v0",
+        "MosaicMultiGrid-Basketball-3vs3-TeamObs-v0",
+    ),
+    # ini_multigrid: cooperative exploration environments (view_size=7, simultaneous stepping)
+    # GitHub: https://github.com/ini/multigrid
+    "ini_multigrid": (
         "MultiGrid-Empty-5x5-v0",
         "MultiGrid-Empty-Random-5x5-v0",
         "MultiGrid-Empty-6x6-v0",
         "MultiGrid-Empty-Random-6x6-v0",
         "MultiGrid-Empty-8x8-v0",
         "MultiGrid-Empty-16x16-v0",
-        # INI environments - Puzzles
         "MultiGrid-RedBlueDoors-6x6-v0",
         "MultiGrid-RedBlueDoors-8x8-v0",
         "MultiGrid-LockedHallway-2Rooms-v0",
@@ -231,8 +249,8 @@ def _auto_detect_agent_count(env_family: str, env_id: str) -> int:
     """Auto-detect the number of agents in a multi-agent environment.
 
     Args:
-        env_family: Environment family (e.g., "pettingzoo", "multigrid")
-        env_id: Environment ID (e.g., "chess_v6", "MultiGrid-Soccer-v0")
+        env_family: Environment family (e.g., "pettingzoo", "mosaic_multigrid")
+        env_id: Environment ID (e.g., "chess_v6", "MosaicMultiGrid-Soccer-v0")
 
     Returns:
         Number of agents, or 0 if detection fails or single-agent
@@ -247,7 +265,7 @@ def _auto_detect_agent_count(env_family: str, env_id: str) -> int:
                 return 2
             return 0
 
-        elif env_family == "multigrid":
+        elif env_family in ("mosaic_multigrid", "ini_multigrid"):
             # MultiGrid: instantiate environment and query agent count
             from gym_gui.core.factories.adapters import create_adapter
             from gym_gui.core.enums import GameId
@@ -305,14 +323,14 @@ def _get_execution_mode(env_family: str) -> str:
     """Get the default execution mode for an environment family.
 
     Args:
-        env_family: Environment family (e.g., "pettingzoo", "multigrid")
+        env_family: Environment family (e.g., "pettingzoo", "mosaic_multigrid")
 
     Returns:
         "aec" for turn-based, "parallel" for simultaneous
     """
     if env_family in ("pettingzoo", "pettingzoo_classic", "open_spiel"):
         return "aec"  # Turn-based
-    elif env_family in ("multigrid", "meltingpot", "overcooked"):
+    elif env_family in ("mosaic_multigrid", "ini_multigrid", "meltingpot", "overcooked"):
         return "parallel"  # Simultaneous
     return "aec"  # Default
 
@@ -963,8 +981,8 @@ class PlayerAssignmentPanel(QtWidgets.QWidget):
         """Initialize the player assignment panel.
 
         Args:
-            env_family: Environment family ("pettingzoo", "multigrid", etc.)
-            env_id: Environment ID (e.g., "chess_v6", "MultiGrid-Soccer-v0")
+            env_family: Environment family ("pettingzoo", "mosaic_multigrid", etc.)
+            env_id: Environment ID (e.g., "chess_v6", "MosaicMultiGrid-Soccer-v0")
             num_agents: Number of agents in the environment
             agent_ids: Optional list of agent IDs (e.g., ["player_0", "player_1"])
                       If None, auto-generates ["agent_0", "agent_1", ...]
@@ -1561,12 +1579,13 @@ class OperatorConfigRow(QtWidgets.QWidget):
         - pettingzoo: Turn-based games (Chess, Go, Connect Four)
         - pettingzoo_classic: Classic board games (Chess, Go, Connect Four, TicTacToe)
         - open_spiel: OpenSpiel board games (Checkers, etc.)
-        - multigrid: Simultaneous grid world (Soccer, Collect)
+        - mosaic_multigrid: Competitive team sports (Soccer, Collect, Basketball)
+        - ini_multigrid: Cooperative exploration (Empty, LockedHallway, etc.)
         - meltingpot: DeepMind social scenarios
         - overcooked: Cooperative cooking
         """
         env_family = self._env_combo.currentText()
-        return env_family in ("pettingzoo", "pettingzoo_classic", "open_spiel", "multigrid", "meltingpot", "overcooked")
+        return env_family in ("pettingzoo", "pettingzoo_classic", "open_spiel", "mosaic_multigrid", "ini_multigrid", "meltingpot", "overcooked")
 
     def _update_multiagent_panel(self) -> None:
         """Update the multi-agent player assignment panel based on selected game."""
@@ -1603,7 +1622,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
 
         # Disable/enable AEC option based on environment capabilities
         # Some environments (overcooked, multigrid, meltingpot) only support parallel/simultaneous
-        simultaneous_only_envs = ("overcooked", "multigrid", "meltingpot")
+        simultaneous_only_envs = ("overcooked", "mosaic_multigrid", "ini_multigrid", "meltingpot")
 
         if env_family in simultaneous_only_envs:
             # Disable AEC option for simultaneous-only environments
@@ -1636,7 +1655,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._execution_mode_container.show()
 
         # Show MultiGrid settings if MultiGrid is selected
-        if env_family == "multigrid":
+        if env_family in ("mosaic_multigrid", "ini_multigrid"):
             self._multigrid_settings_container.show()
             # Update role selectors if Level 3 is selected
             if self._coordination_level_combo.currentData() == 3:
@@ -1656,7 +1675,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
             game_info = PETTINGZOO_GAMES[env_id]
             agent_ids = game_info.get("players", None)
             agent_labels = game_info.get("player_labels", None)
-        elif env_family in ("multigrid", "meltingpot", "overcooked"):
+        elif env_family in ("mosaic_multigrid", "ini_multigrid", "meltingpot", "overcooked"):
             # Simultaneous multi-agent: auto-generate agent_0, agent_1, etc.
             agent_ids = [f"agent_{i}" for i in range(num_agents)]
             agent_labels = {aid: f"Agent {i}" for i, aid in enumerate(agent_ids)}
@@ -1729,7 +1748,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
         env_id = self._task_combo.currentText()
 
         # Only create role selectors for MultiGrid Soccer
-        if env_family != "multigrid" or "Soccer" not in env_id:
+        if env_family != "mosaic_multigrid" or "Soccer" not in env_id:
             return
 
         # Get number of agents
@@ -1785,7 +1804,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
         For single-agent environments: Show single worker row (LLM, RL, or Human).
         For multi-agent environments: Hide single worker row, show player panel.
             - pettingzoo: Turn-based games (Chess, Go)
-            - multigrid, meltingpot, overcooked: Simultaneous multi-agent
+            - mosaic_multigrid, ini_multigrid, meltingpot, overcooked: Simultaneous multi-agent
         For Human type: Hide both LLM and RL containers (no configuration needed).
         """
         operator_type = self._type_combo.currentText().lower()
@@ -2156,7 +2175,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
                     player_workers[first_player].settings["game_resolution"] = game_resolution
 
                 # Add role assignments for Level 3 (Role-Based)
-                if env_name == "multigrid" and coordination_level == 3:
+                if env_name in ("mosaic_multigrid", "ini_multigrid") and coordination_level == 3:
                     for player_id, worker in player_workers.items():
                         if player_id in self._role_selectors:
                             role = self._role_selectors[player_id].currentData()

@@ -33,7 +33,7 @@ End-to-End Flow
 Control Modes
 -------------
 
-Three ``ControlMode`` values permit human input in single-agent
+One ``ControlMode`` value drives human input in single-agent
 environments:
 
 .. list-table::
@@ -45,12 +45,6 @@ environments:
    * - ``HUMAN_ONLY``
      - All actions come from the keyboard.  The environment waits for
        human input before advancing.
-   * - ``HYBRID_TURN_BASED``
-     - Human and AI agent alternate turns.  The GUI indicates whose turn
-       it is and blocks keyboard input during the agent's turn.
-   * - ``HYBRID_HUMAN_AGENT``
-     - Human controls some agents while AI controls others.  Both act
-       simultaneously each step.
 
 Example: Playing FrozenLake
 ---------------------------

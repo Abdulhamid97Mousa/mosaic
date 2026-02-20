@@ -11,7 +11,7 @@ Signal Flow
 
 .. mermaid::
 
-   graph LR
+   graph TB
        KB[Keyboard] --> HIC[HumanInputController]
        HIC --> SC[SessionController]
        SC --> ADAPT[Adapter]
@@ -63,10 +63,6 @@ Human input is active in every mode except ``AGENT_ONLY``.
      - All actions come from the human keyboard.  No AI agent is involved.
    * - ``AGENT_ONLY``
      - All actions come from an AI agent.  The keyboard is disabled.
-   * - ``HYBRID_TURN_BASED``
-     - Human and agent alternate turns within the same environment.
-   * - ``HYBRID_HUMAN_AGENT``
-     - Human controls some agents while AI controls others simultaneously.
    * - ``MULTI_AGENT_COOP``
      - Multiple human players cooperate, each with a dedicated USB keyboard.
    * - ``MULTI_AGENT_COMPETITIVE``

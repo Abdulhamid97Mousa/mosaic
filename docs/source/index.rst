@@ -171,7 +171,7 @@ installation instructions, environment lists, and academic citations.
           :width: 200px
    * - **Overcooked**
      - Cooperative cooking (2 agents)
-     - .. image:: images/envs/overcooked/overcooked.gif
+     - .. image:: images/envs/overcooked/overcooked_layouts.gif
           :width: 200px
    * - **SMAC**
      - StarCraft Multi-Agent Challenge (hand-designed maps)

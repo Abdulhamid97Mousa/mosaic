@@ -1066,7 +1066,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             return False, None
 
         # Check if this is a parallel multi-agent environment
-        if first_config.env_name in ("multigrid", "meltingpot", "overcooked"):
+        if first_config.env_name in ("mosaic_multigrid", "ini_multigrid", "meltingpot", "overcooked"):
             # Must have multiple workers (agents)
             if len(first_config.workers) > 1:
                 return True, first_config
@@ -2591,31 +2591,24 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         """Create a parallel multi-agent environment.
 
         Args:
-            env_name: Environment family (multigrid, meltingpot, overcooked).
-            task: Specific environment (e.g., MultiGrid-Soccer-v0).
+            env_name: Environment family (mosaic_multigrid, ini_multigrid, meltingpot, overcooked).
+            task: Specific environment (e.g., MosaicMultiGrid-Soccer-v0).
             seed: Random seed.
 
         Returns:
             The created gymnasium/PettingZoo Parallel environment.
         """
-        if env_name == "multigrid":
-            # Import and create MultiGrid environment
-            try:
-                from mosaic_multigrid.envs import CollectGame, Soccer  # type: ignore[import-not-found]
-            except ImportError:
-                import gymnasium as gym
-                # Fallback: try to create via gym.make
-                env = gym.make(task, render_mode="rgb_array")
-                return env
+        if env_name == "mosaic_multigrid":
+            # All mosaic envs registered via gymnasium.register() in mosaic_multigrid.envs
+            import gymnasium
+            import mosaic_multigrid.envs  # noqa: F401 - triggers gymnasium.register() calls
+            env = gymnasium.make(task, render_mode='rgb_array')
+            return env
 
-            # Create based on task
-            if "Soccer" in task:
-                env = Soccer(render_mode="rgb_array")
-            elif "Collect" in task:
-                env = CollectGame(render_mode="rgb_array")
-            else:
-                import gymnasium as gym
-                env = gym.make(task, render_mode="rgb_array")
+        elif env_name == "ini_multigrid":
+            # Import and create INI MultiGrid environment
+            import gymnasium as gym
+            env = gym.make(task, render_mode="rgb_array")
             return env
 
         elif env_name == "meltingpot":
@@ -3053,17 +3046,18 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._shared_pettingzoo_env = None
             self._pettingzoo_player_handles.clear()
 
-    def _on_initialize_operator(self, operator_id: str, config: OperatorConfig, seed: int) -> None:
-        """Initialize environment for operator preview with shared seed.
+    def _on_initialize_operator(self, operator_id: str, config: OperatorConfig, seed: int | None) -> None:
+        """Initialize environment for operator preview.
 
-        Creates the environment, resets it with the shared seed, and displays
-        the initial observation. Using the same seed for all operators ensures
-        identical environments for controlled scientific comparison.
+        Creates the environment and resets it. When seed is provided (shared
+        seed mode), all operators get identical initial layouts for controlled
+        scientific comparison. When seed is None, each operator gets a random
+        layout.
 
         Args:
             operator_id: The operator's unique ID
             config: Operator configuration with env_name and task
-            seed: Shared seed for reproducible environment initialization
+            seed: Shared seed for reproducible initialization, or None for random
         """
         env_name = config.env_name
         task = config.task
@@ -3411,61 +3405,19 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     )
                     return
 
-            elif env_name == "multigrid":
-                # mosaic_multigrid uses old gym API (not gymnasium)
-                # Supports both mosaic_multigrid (Soccer, Collect) and modern INI multigrid
+            elif env_name == "mosaic_multigrid":
+                # mosaic_multigrid: competitive team sports (Soccer, Collect, Basketball)
+                # All envs registered via gymnasium.register() in mosaic_multigrid.envs
                 try:
-                    import gym
-                    import sys
-                    import os
+                    import gymnasium
+                    import mosaic_multigrid.envs  # noqa: F401 - triggers gymnasium.register() calls
 
-                    # Add INI multigrid to path if available
-                    ini_multigrid_path = os.path.join(
-                        os.path.dirname(__file__), "..", "..", "3rd_party", "multigrid-ini"
-                    )
-                    if os.path.exists(ini_multigrid_path) and ini_multigrid_path not in sys.path:
-                        sys.path.insert(0, ini_multigrid_path)
-
-                    # Try importing INI configurations
+                    env = gymnasium.make(task, render_mode='rgb_array')
+                    env.reset(seed=seed)
+                    # Old deprecated envs support highlight=True, newer ones may not
                     try:
-                        from multigrid.envs import CONFIGURATIONS as INI_CONFIGURATIONS
-                    except ImportError:
-                        INI_CONFIGURATIONS = {}
-
-                    # Get agent count from operator configuration
-                    num_agents = len(config.workers) if config.workers else 1
-
-                    # Create environment based on task
-                    is_legacy_multigrid = False  # Track if mosaic_multigrid (supports highlight)
-
-                    if task == "MultiGrid-Soccer-v0":
-                        from mosaic_multigrid.envs import SoccerGame4HEnv10x15N2
-                        env = SoccerGame4HEnv10x15N2()
-                        # Set render_mode to avoid deprecation warning (MultiGrid doesn't support in constructor)
-                        env.render_mode = 'rgb_array'
-                        is_legacy_multigrid = True
-                    elif task == "MultiGrid-Collect-v0":
-                        from mosaic_multigrid.envs import CollectGame4HEnv10x10N2
-                        env = CollectGame4HEnv10x10N2()
-                        # Set render_mode to avoid deprecation warning (MultiGrid doesn't support in constructor)
-                        env.render_mode = 'rgb_array'
-                        is_legacy_multigrid = True
-                    elif task in INI_CONFIGURATIONS:
-                        # INI multigrid environment - instantiate directly from configurations
-                        env_cls, config_kwargs = INI_CONFIGURATIONS[task]
-                        # Pass configured agent count to INI environment
-                        config_kwargs = {**config_kwargs, "agents": num_agents}
-                        env = env_cls(**config_kwargs)
-                        env.render_mode = 'rgb_array'
-                    else:
-                        # Try gym.make as fallback (render_mode already set)
-                        env = gym.make(task, render_mode="rgb_array")
-
-                    env.reset()
-                    # Render - mosaic_multigrid supports highlight parameter, INI multigrid doesn't
-                    if is_legacy_multigrid:
                         rgb_frame = env.render(highlight=True)
-                    else:
+                    except TypeError:
                         rgb_frame = env.render()
                     env.close()
                 except ImportError as import_err:
@@ -3476,7 +3428,52 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     return
                 except Exception as e:
                     self._status_bar.showMessage(
-                        f"Cannot preview multigrid {task}: {e}",
+                        f"Cannot preview mosaic_multigrid {task}: {e}",
+                        5000
+                    )
+                    return
+
+            elif env_name == "ini_multigrid":
+                # ini_multigrid: cooperative exploration environments
+                # Uses INI multigrid from 3rd_party/multigrid-ini (gymnasium API)
+                try:
+                    import gymnasium
+                    import sys
+                    import os
+
+                    # Add INI multigrid to path if available
+                    ini_multigrid_path = os.path.join(
+                        os.path.dirname(__file__), "..", "..", "3rd_party", "multigrid-ini"
+                    )
+                    if os.path.exists(ini_multigrid_path) and ini_multigrid_path not in sys.path:
+                        sys.path.insert(0, ini_multigrid_path)
+
+                    try:
+                        from multigrid.envs import CONFIGURATIONS as INI_CONFIGURATIONS
+                    except ImportError:
+                        INI_CONFIGURATIONS = {}
+
+                    num_agents = len(config.workers) if config.workers else 1
+
+                    if task in INI_CONFIGURATIONS:
+                        env_cls, config_kwargs = INI_CONFIGURATIONS[task]
+                        config_kwargs = {**config_kwargs, "agents": num_agents, "render_mode": "rgb_array"}
+                        env = env_cls(**config_kwargs)
+                    else:
+                        env = gymnasium.make(task, render_mode="rgb_array")
+
+                    env.reset(seed=seed)
+                    rgb_frame = env.render()
+                    env.close()
+                except ImportError as import_err:
+                    self._status_bar.showMessage(
+                        f"ini_multigrid not available - cannot preview: {import_err}",
+                        5000
+                    )
+                    return
+                except Exception as e:
+                    self._status_bar.showMessage(
+                        f"Cannot preview ini_multigrid {task}: {e}",
                         5000
                     )
                     return

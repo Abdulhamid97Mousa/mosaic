@@ -75,13 +75,13 @@ import logging
 _log = logging.getLogger(__name__)
 
 try:  # pragma: no cover - import guard
-    import gym
+    import gymnasium
 except ImportError:  # pragma: no cover
-    gym = None  # type: ignore[assignment]
+    gymnasium = None  # type: ignore[assignment]
 
 try:  # pragma: no cover - import guard
-    # Import mosaic_multigrid environments - this triggers gymnasium registration
-    import mosaic_multigrid.envs  # noqa: F401 - needed for gym.register() side effect
+    # Import mosaic_multigrid environments - this triggers gymnasium.register() side effect
+    import mosaic_multigrid.envs  # noqa: F401 - needed for gymnasium.register() side effect
     from mosaic_multigrid.envs import (
         SoccerGame4HEnv10x15N2,
         SoccerGame2HIndAgObsEnv16x11N2,
@@ -237,10 +237,10 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
 
     def load(self) -> None:
         """Instantiate the MOSAIC MultiGrid environment."""
-        if gym is None:
+        if gymnasium is None:
             raise RuntimeError(
-                "gym package not installed. "
-                "Install with: pip install gym"
+                "gymnasium package not installed. "
+                "Install with: pip install gymnasium"
             )
 
         try:
@@ -326,9 +326,9 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
                     )
                 env = Basketball3vs3TeamObsEnv(render_mode='rgb_array')
             else:
-                # Try to make via gym.make if registered
+                # Try to make via gymnasium.make if registered
                 try:
-                    env = gym.make(self._env_id, render_mode='rgb_array')
+                    env = gymnasium.make(self._env_id, render_mode='rgb_array')
                 except Exception as e:
                     raise RuntimeError(
                         f"Unknown MOSAIC MultiGrid environment: {self._env_id}. "

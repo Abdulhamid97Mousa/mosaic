@@ -256,6 +256,65 @@ with shared seeds.
 same observation wrappers used during training (e.g., ``ImgObsWrapper``
 and ``FlattenObservation`` for MiniGrid).
 
+MOSAIC MultiGrid Operator (Multi-Agent)
+----------------------------------------
+
+**Category:** ``llm`` or ``rl``
+**Environments:** ``mosaic_multigrid`` family (Soccer, Collect, Basketball)
+
+The mosaic_multigrid family provides competitive team-based multi-agent
+games. Environments are registered via the ``mosaic-multigrid`` PyPI
+package and created using ``gym.make()``.
+
+**Configuration (2v2 Soccer with IndAgObs):**
+
+.. code-block:: python
+
+   config = OperatorConfig.multi_agent(
+       operator_id="soccer_2v2",
+       operator_type="rl",
+       worker_id="cleanrl_worker",
+       display_name="Soccer 2v2 IndAgObs",
+       env_name="mosaic_multigrid",
+       task="MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0",
+       workers={
+           "agent_0": WorkerConfig(worker_id="cleanrl_worker", settings={}),
+           "agent_1": WorkerConfig(worker_id="cleanrl_worker", settings={}),
+           "agent_2": WorkerConfig(worker_id="cleanrl_worker", settings={}),
+           "agent_3": WorkerConfig(worker_id="cleanrl_worker", settings={}),
+       },
+   )
+
+**Available environment tiers:**
+
+.. list-table::
+   :header-rows: 1
+   :widths: 35 15 50
+
+   * - Tier
+     - Envs
+     - Notes
+   * - Original (v1.0.2)
+     - 4
+     - Deprecated, backward compatible
+   * - IndAgObs (v4.0.0)
+     - 6
+     - Individual agent observations, recommended for RL training
+   * - TeamObs (v4.0.0)
+     - 3
+     - SMAC-style teammate awareness (2v2+ only)
+
+**Best for:** Multi-agent RL research, team coordination, competitive
+zero-sum games.
+
+.. note::
+
+   The ``mosaic_multigrid`` package (v4.4.0+) uses the modern
+   **Gymnasium** API. All environments are registered via
+   ``gymnasium.register()`` in ``mosaic_multigrid.envs``. The preview
+   and runtime use ``gymnasium.make(task)`` -- never hardcode class
+   imports.
+
 Random Baseline Operator
 -------------------------
 

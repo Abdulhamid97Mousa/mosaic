@@ -462,6 +462,10 @@ class XuanCeWorkerRuntime:
                     "XuanCe is not installed. Install with: pip install -e 3rd_party/xuance_worker"
                 ) from e
 
+            # Apply compatibility shims before get_runner (redirects dirs to var/, etc.)
+            from .xuance_shims import apply_shims
+            apply_shims()
+
             # Normalize method name for XuanCe config lookup
             # UI sends "PPO_Clip" but XuanCe expects "ppo" for config folder lookup
             normalized_method = _normalize_method_name(self._config.method)
@@ -609,10 +613,6 @@ class XuanCeWorkerRuntime:
                         "pretrained_model_dir does not exist: %s",
                         pretrained_path,
                     )
-            # Apply all XuanCe v1.4.0 shim-layer patches
-            from ._patches import apply_xuance_patches
-            apply_xuance_patches()
-
             # Execute training
             runner.run()
 
@@ -823,6 +823,10 @@ class InteractiveRuntime:
             raise RuntimeError(
                 "XuanCe is not installed. Install with: pip install xuance"
             ) from e
+
+        # Apply compatibility shims before get_runner (redirects dirs to var/)
+        from .xuance_shims import apply_shims
+        apply_shims()
 
         # Determine environment family from env_id
         env_family = self._config.env

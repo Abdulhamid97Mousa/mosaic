@@ -208,7 +208,7 @@ def _create_envs(runner_config, env_id: str):
     return make_envs(phase_config)
 
 
-from ._patches import apply_xuance_patches
+from .xuance_shims import apply_shims
 
 
 # ---------------------------------------------------------------------------
@@ -251,8 +251,8 @@ def run_multi_agent_curriculum_training(
     except ImportError:
         pass
 
-    # Apply all XuanCe v1.4.0 shim-layer patches before creating runners
-    apply_xuance_patches()
+    # Apply all XuanCe v1.4.0 compatibility shims before creating runners
+    apply_shims()
 
     # Create runner for the first phase
     first_env_id = schedule[0]["env_id"]

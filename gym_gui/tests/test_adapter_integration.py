@@ -140,7 +140,7 @@ class TestAdapterRenderPayloads:
         assert "grid" in payload
         assert "agent_position" in payload
         assert "game_id" in payload
-        assert payload.get("game_id") == "CliffWalking-v1"
+        assert payload.get("game_id") == "CliffWalking-v0"
         
         # Grid should be 4x12
         grid = payload.get("grid", [])
@@ -351,7 +351,7 @@ class TestRenderPayloadStructure:
     @pytest.mark.parametrize("game_id,adapter_class,config", [
         ("FrozenLake-v1", "FrozenLakeAdapter", "DEFAULT_FROZEN_LAKE_CONFIG"),
         ("FrozenLake-v2", "FrozenLakeV2Adapter", "DEFAULT_FROZEN_LAKE_V2_CONFIG"),
-        ("CliffWalking-v1", "CliffWalkingAdapter", "DEFAULT_CLIFF_WALKING_CONFIG"),
+        ("CliffWalking-v0", "CliffWalkingAdapter", "DEFAULT_CLIFF_WALKING_CONFIG"),
         ("Taxi-v3", "TaxiAdapter", "DEFAULT_TAXI_CONFIG"),
     ])
     def test_render_payload_structure(self, game_id, adapter_class, config):
