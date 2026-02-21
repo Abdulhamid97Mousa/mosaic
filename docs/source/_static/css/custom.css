@@ -96,39 +96,46 @@ th {
     height: 16px;
 }
 
-/* Expand button: visible icon top-left when sidebar is hidden */
+
+/* ── Sidebar hidden state ── */
+body.sidebar-hidden .sidebar-drawer {
+    display: none;
+}
+
+body.sidebar-hidden .content {
+    padding-left: 104px;
+}
+
+/* Expand button: small square top-left when sidebar is collapsed */
 .sidebar-expand-btn {
     position: fixed;
-    top: 16px;
-    left: 16px;
+    top: 8px;
+    left: 8px;
     z-index: 200;
-    width: 36px;
-    height: 36px;
-    border: none;
-    border-radius: 8px;
-    background: transparent;
+    width: 28px;
+    height: 28px;
+    border: 1px solid var(--color-background-border);
+    border-radius: 6px;
+    background: var(--color-background-secondary);
     color: var(--color-foreground-muted);
     cursor: pointer;
-    padding: 0;
     display: none;
     align-items: center;
     justify-content: center;
-    transition: background 0.15s ease, color 0.15s ease;
+    padding: 0;
+    opacity: 0.7;
+    transition: opacity 0.15s ease, background 0.15s ease;
 }
 
 .sidebar-expand-btn:hover {
-    background: var(--color-background-secondary);
+    opacity: 1;
+    background: var(--color-background-hover, var(--color-background-secondary));
     color: var(--color-foreground-primary);
 }
 
 .sidebar-expand-btn svg {
-    width: 20px;
-    height: 20px;
-}
-
-/* When sidebar is hidden */
-body.sidebar-hidden .sidebar-drawer {
-    display: none;
+    width: 16px;
+    height: 16px;
 }
 
 body.sidebar-hidden .sidebar-expand-btn {
@@ -141,23 +148,25 @@ body.sidebar-hidden .sidebar-expand-btn {
     user-select: none;
 }
 
-.sidebar-tree p.caption > .caption-text {
+.sidebar-tree p.caption>.caption-text {
     position: relative;
     padding-right: 1.4em;
 }
 
-.sidebar-tree p.caption > .caption-text::after {
-    content: "\25BE"; /* ▾ */
+.sidebar-tree p.caption>.caption-text::after {
+    content: "\25BE";
+    /* ▾ */
     position: absolute;
     right: 0;
     font-size: 0.75em;
     transition: transform 0.2s ease;
 }
 
-.sidebar-tree p.caption.collapsed > .caption-text::after {
-    transform: rotate(-90deg); /* ▸ */
+.sidebar-tree p.caption.collapsed>.caption-text::after {
+    transform: rotate(-90deg);
+    /* ▸ */
 }
 
-.sidebar-tree p.caption.collapsed + ul {
+.sidebar-tree p.caption.collapsed+ul {
     display: none;
 }

@@ -4,7 +4,7 @@ Architecture Overview
 MOSAIC is built on a layered architecture that separates concerns
 and enables extensibility.
 
-.. figure:: /_static/figures/A_Full_Architecture.jpg
+.. figure:: /_static/figures/A_Full_Architecture.png
    :alt: MOSAIC Full Architecture
    :align: center
    :width: 100%

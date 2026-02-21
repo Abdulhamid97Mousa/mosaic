@@ -110,7 +110,7 @@ def get_worker_catalog() -> Tuple[WorkerDefinition, ...]:
                 "PyTorch backend with TensorBoard/WandB logging."
             ),
             supports_training=True,
-            supports_policy_load=False,  # Phase 1: CLI only
+            supports_policy_load=True,  # InteractiveRuntime: init_agent + select_action IPC
             requires_live_telemetry=False,  # Phase 1: No FastLane yet
             provides_fast_analytics=False,
             supports_multi_agent=True,

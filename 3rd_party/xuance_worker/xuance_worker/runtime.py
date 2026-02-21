@@ -769,6 +769,10 @@ class InteractiveRuntime:
         self._episode_reward = 0.0
         self._episode_count = 0
 
+        # Action-selector mode state (set by init_agent, used by select_action)
+        self._player_id: Optional[str] = None
+        self._n_agents: int = 2  # default for soccer 1v1; used for MAPPO one-hot
+
         LOGGER.info(
             "InteractiveRuntime initialized | env=%s method=%s policy=%s",
             self._env_id,
@@ -776,8 +780,14 @@ class InteractiveRuntime:
             self._policy_path,
         )
 
-    def _load_policy(self) -> None:
-        """Load trained XuanCe policy from checkpoint."""
+    def _load_policy(self, action_selector: bool = False) -> None:
+        """Load trained XuanCe policy from checkpoint.
+
+        Args:
+            action_selector: When True, skip SyncVectorEnv creation.
+                The GUI owns the shared environment in action-selector mode,
+                so we only need to load the policy network — no own env needed.
+        """
         import gymnasium as gym
 
         if not self._policy_path:
@@ -787,34 +797,34 @@ class InteractiveRuntime:
         if not policy_file.exists():
             raise FileNotFoundError(f"Policy checkpoint not found: {policy_file}")
 
-        LOGGER.info("Loading XuanCe policy from %s", policy_file)
+        LOGGER.info("Loading XuanCe policy from %s (action_selector=%s)", policy_file, action_selector)
 
         # Auto-import environment packages to register their environments
-        if self._env_id.startswith("MiniGrid") or self._env_id.startswith("BabyAI"):
+        env_id = self._env_id
+        is_minigrid = env_id.startswith("MiniGrid") or env_id.startswith("BabyAI")
+        if is_minigrid:
             try:
                 import minigrid  # noqa: F401 - registers MiniGrid/BabyAI envs
                 LOGGER.debug("Imported minigrid to register environments")
             except ImportError:
                 LOGGER.warning("minigrid package not installed")
 
-        # Create vectorized environment with render mode
-        env_id = self._env_id
-        is_minigrid = env_id.startswith("MiniGrid") or env_id.startswith("BabyAI")
+        if not action_selector:
+            # Own-environment mode: create SyncVectorEnv for _handle_step
+            # Not used in action-selector mode — the GUI manages the shared env.
+            def make_env():
+                env = gym.make(env_id, render_mode="rgb_array")
+                if is_minigrid:
+                    try:
+                        from minigrid.wrappers import ImgObsWrapper
+                        env = ImgObsWrapper(env)
+                        env = gym.wrappers.FlattenObservation(env)
+                    except ImportError:
+                        pass
+                env = gym.wrappers.RecordEpisodeStatistics(env)
+                return env
 
-        def make_env():
-            env = gym.make(env_id, render_mode="rgb_array")
-            # Apply MiniGrid wrappers if needed
-            if is_minigrid:
-                try:
-                    from minigrid.wrappers import ImgObsWrapper
-                    env = ImgObsWrapper(env)
-                    env = gym.wrappers.FlattenObservation(env)
-                except ImportError:
-                    pass
-            env = gym.wrappers.RecordEpisodeStatistics(env)
-            return env
-
-        self._envs = gym.vector.SyncVectorEnv([make_env])
+            self._envs = gym.vector.SyncVectorEnv([make_env])
 
         # Load XuanCe agent
         try:
@@ -836,6 +846,19 @@ class InteractiveRuntime:
             env_family = "classic_control"
         elif "Pong" in env_id or "Breakout" in env_id:
             env_family = "atari"
+        elif "MosaicMultiGrid" in env_id:
+            env_family = "mosaic_multigrid"
+        elif "IniMultiGrid" in env_id:
+            env_family = "ini_multigrid"
+        elif "multigrid" in env_id.lower():
+            env_family = "multigrid"
+
+        # XuanCe's get_runner uses "multigrid" for all multigrid variants.
+        # Our internal names ("mosaic_multigrid", "ini_multigrid") identify the
+        # specific implementation, but YAML configs live under configs/{method}/multigrid/.
+        xuance_env = env_family
+        if env_family in ("mosaic_multigrid", "ini_multigrid"):
+            xuance_env = "multigrid"
 
         # Build parser args for XuanCe
         parser_args = SimpleNamespace()
@@ -844,79 +867,299 @@ class InteractiveRuntime:
         parser_args.parallels = 1
         parser_args.running_steps = 1  # Not training, just loading
 
-        # Create runner to get agent
-        try:
-            runner = get_runner(
-                algo=self._method,
-                env=env_family,
-                env_id=self._env_id,
-                parser_args=parser_args,
+        # Create runner to get agent — raises on failure (no silent fallback).
+        runner = get_runner(
+            algo=self._method,
+            env=xuance_env,
+            env_id=self._env_id,
+            parser_args=parser_args,
+        )
+
+        if not hasattr(runner, 'agent'):
+            raise RuntimeError(
+                f"XuanCe runner ({type(runner).__name__}) has no 'agent' attribute. "
+                "Cannot load policy."
             )
 
-            # Load the model weights
-            if hasattr(runner, 'agent'):
-                self._agent = runner.agent
-                if hasattr(self._agent, 'load_model'):
-                    self._agent.load_model(str(policy_file))
-                    LOGGER.info("XuanCe agent model loaded")
-                else:
-                    # Try loading directly via torch
-                    try:
-                        import torch
-                        state_dict = torch.load(str(policy_file), map_location=self._device)
-                        if hasattr(self._agent, 'policy'):
-                            self._agent.policy.load_state_dict(state_dict)
-                        LOGGER.info("Loaded model via torch.load")
-                    except Exception as e:
-                        LOGGER.warning("Could not load model weights: %s", e)
+        self._agent = runner.agent
+
+        # Update n_agents from the loaded agent (used for MAPPO one-hot sizing)
+        if hasattr(self._agent, 'n_agents'):
+            self._n_agents = self._agent.n_agents
+            LOGGER.info("n_agents set to %d from loaded agent", self._n_agents)
+
+        # Load the model weights
+        if hasattr(self._agent, 'load_model'):
+            self._agent.load_model(str(policy_file))
+            LOGGER.info("XuanCe agent model loaded from %s", policy_file)
+        else:
+            # Try loading directly via torch
+            import torch
+            state_dict = torch.load(str(policy_file), map_location=self._device)
+            if hasattr(self._agent, 'policy'):
+                self._agent.policy.load_state_dict(state_dict)
+                LOGGER.info("Loaded model weights via torch.load")
             else:
-                LOGGER.warning("Runner has no agent attribute")
+                raise RuntimeError(
+                    f"Cannot load model weights: agent {type(self._agent).__name__} "
+                    "has neither load_model() nor .policy attribute."
+                )
 
-        except Exception as e:
-            LOGGER.warning("XuanCe runner creation failed: %s, using fallback", e)
-            # Fallback: create a simple random agent for testing
-            self._agent = None
-
-        LOGGER.info("Policy loading completed")
+        LOGGER.info("Policy loading completed (action_selector=%s)", action_selector)
 
     def _get_action(self, obs) -> int:
-        """Get action from loaded policy."""
+        """Get action from loaded policy.
+
+        Used by _handle_step (own-environment mode) and indirectly by
+        _handle_select_action (action-selector mode, after obs preparation).
+
+        Raises:
+            RuntimeError: If agent is not loaded or action selection fails.
+                Callers must catch this and emit {"type": "error"}.
+                Never silently falls back to random — that hides real failures.
+        """
+        if self._agent is None:
+            raise RuntimeError("Agent not loaded. Send reset or init_agent first.")
+
+        if hasattr(self._agent, 'action'):
+            action = self._agent.action(obs)
+        elif hasattr(self._agent, 'act'):
+            action = self._agent.act(obs)
+        elif hasattr(self._agent, 'policy'):
+            import torch
+            with torch.no_grad():
+                obs_tensor = torch.FloatTensor(obs).to(self._device)
+                action = self._agent.policy(obs_tensor)
+                if hasattr(action, 'cpu'):
+                    action = action.cpu().numpy()
+        else:
+            raise RuntimeError(
+                f"Agent has no recognised action method. "
+                f"Type: {type(self._agent).__name__}"
+            )
+
+        # Extract scalar if needed
+        if hasattr(action, '__len__'):
+            if len(action) == 1:
+                action = action[0]
+            elif len(action) > 1 and hasattr(action[0], '__len__'):
+                action = action[0][0]
+
+        return int(action)
+
+    def _append_agent_onehot(self, obs: "np.ndarray", player_id: str) -> "np.ndarray":
+        """Append one-hot agent index to obs for MAPPO parameter-sharing mode.
+
+        MAPPO with use_parameter_sharing=True expects:
+            input_dim = obs_dim + n_agents
+        The one-hot tells the shared network which agent is requesting the action.
+
+        Args:
+            obs: Raw observation, shape (obs_dim,).
+            player_id: Agent identifier, e.g. "agent_0" or "agent_1".
+
+        Returns:
+            Concatenated observation, shape (obs_dim + n_agents,).
+
+        Raises:
+            RuntimeError: If player_id cannot be parsed or agent_idx is out of range.
+        """
+        import numpy as np
+        try:
+            agent_idx = int(player_id.split("_")[-1])  # "agent_0" → 0
+        except (ValueError, IndexError):
+            raise RuntimeError(
+                f"Cannot parse agent index from player_id='{player_id}'. "
+                f"Expected format: 'agent_N' (e.g. 'agent_0')."
+            )
+        if agent_idx >= self._n_agents:
+            raise RuntimeError(
+                f"agent_idx={agent_idx} >= n_agents={self._n_agents}. "
+                f"Policy was trained with {self._n_agents} agents "
+                f"but player_id='{player_id}' implies agent index {agent_idx}. "
+                f"Check that the checkpoint matches the game being played."
+            )
+        one_hot = np.zeros(self._n_agents, dtype=np.float32)
+        one_hot[agent_idx] = 1.0
+        return np.concatenate([obs, one_hot])
+
+    def _get_marl_action(self, obs: "np.ndarray", player_id: str) -> int:
+        """Get action from a MARL policy (IPPO or MAPPO) for a specific agent.
+
+        Calls the policy's forward pass directly with the correct observation
+        format, rather than going through the agent's high-level action() method
+        which expects full multi-env observation dicts.
+
+        For IPPO (use_parameter_sharing=False):
+            - Each agent has its own network keyed by agent_key (e.g. "agent_0").
+            - obs is passed as {agent_key: tensor}, no one-hot needed.
+
+        For MAPPO (use_parameter_sharing=True):
+            - One shared network; agent identity conveyed via agents_id one-hot.
+            - agents_id is built from agent_idx and passed to policy as a separate
+              argument — it is NOT concatenated to obs before the call.
+              (The policy concatenates it internally after the representation layer.)
+
+        Args:
+            obs: Raw observation array, shape (obs_dim,).
+            player_id: Agent identifier, e.g. "agent_0" or "agent_1".
+
+        Returns:
+            Integer action selected by the policy.
+
+        Raises:
+            RuntimeError: If agent is not loaded, player_id is invalid, or
+                the policy forward pass fails.
+        """
+        import torch
         import numpy as np
 
         if self._agent is None:
-            # Fallback: random action
-            return self._envs.single_action_space.sample()
+            raise RuntimeError("Agent not loaded. Send init_agent first.")
+
+        is_parameter_sharing = getattr(self._agent, 'use_parameter_sharing', False)
+        obs_tensor = torch.FloatTensor(obs).unsqueeze(0).to(self._device)  # (1, obs_dim)
+
+        if is_parameter_sharing:
+            # MAPPO: shared network, differentiated by agent_ids one-hot.
+            # The one-hot is passed as agents_id — the policy concatenates it
+            # with the representation output internally. Do NOT pre-concatenate.
+            agent_key = self._agent.model_keys[0]  # Single shared model key
+            try:
+                agent_idx = int(player_id.split("_")[-1])
+            except (ValueError, IndexError):
+                raise RuntimeError(
+                    f"Cannot parse agent index from player_id='{player_id}'. "
+                    f"Expected format: 'agent_N' (e.g. 'agent_0')."
+                )
+            if agent_idx >= self._n_agents:
+                raise RuntimeError(
+                    f"agent_idx={agent_idx} >= n_agents={self._n_agents}. "
+                    f"Checkpoint was trained with {self._n_agents} agents but "
+                    f"player_id='{player_id}' implies index {agent_idx}."
+                )
+            agents_id = torch.zeros(1, self._n_agents, dtype=torch.float32, device=self._device)
+            agents_id[0, agent_idx] = 1.0
+            obs_input = {agent_key: obs_tensor}
+            LOGGER.debug(
+                "MAPPO action: agent_key=%s agent_idx=%d agents_id=%s",
+                agent_key, agent_idx, agents_id.tolist()
+            )
+            with torch.no_grad():
+                _, pi_dists = self._agent.policy(
+                    observation=obs_input,
+                    agent_ids=agents_id,
+                    agent_key=agent_key,
+                )
+            action = pi_dists[agent_key].stochastic_sample()
+
+        else:
+            # IPPO: each agent has its own network keyed by agent_key.
+            # No one-hot needed — the correct network is selected by agent_key.
+            agent_key = player_id  # e.g. "agent_0", "agent_1"
+            agent_keys = getattr(self._agent, 'agent_keys', [])
+            if agent_key not in agent_keys:
+                raise RuntimeError(
+                    f"player_id='{player_id}' (agent_key='{agent_key}') not in "
+                    f"agent_keys={agent_keys}. "
+                    f"Check that player_id matches the environment's agent naming."
+                )
+            obs_input = {agent_key: obs_tensor}
+            LOGGER.debug("IPPO action: agent_key=%s", agent_key)
+            with torch.no_grad():
+                _, pi_dists = self._agent.policy(
+                    observation=obs_input,
+                    agent_ids=None,
+                    agent_key=agent_key,
+                )
+            action = pi_dists[agent_key].stochastic_sample()
+
+        return int(action.cpu().item())
+
+    def _handle_init_agent(self, cmd: dict) -> None:
+        """Initialize in action-selector mode (no env management).
+
+        The GUI owns the shared environment and will send individual agent
+        observations via select_action commands. This handler only needs to
+        load the policy network — it does not create its own environment.
+
+        Args:
+            cmd: Command dict with 'game_name' and 'player_id'.
+        """
+        game_name = cmd.get("game_name", "")
+        player_id = cmd.get("player_id", "")
+        self._player_id = player_id  # stored for use in _handle_select_action
 
         try:
-            # XuanCe agents typically have an action() method
-            if hasattr(self._agent, 'action'):
-                action = self._agent.action(obs)
-            elif hasattr(self._agent, 'act'):
-                action = self._agent.act(obs)
-            elif hasattr(self._agent, 'policy'):
-                # Direct policy access
-                import torch
-                with torch.no_grad():
-                    obs_tensor = torch.FloatTensor(obs).to(self._device)
-                    action = self._agent.policy(obs_tensor)
-                    if hasattr(action, 'cpu'):
-                        action = action.cpu().numpy()
-            else:
-                # Fallback
-                action = self._envs.single_action_space.sample()
-
-            # Extract scalar if needed
-            if hasattr(action, '__len__'):
-                if len(action) == 1:
-                    action = action[0]
-                elif len(action) > 1 and hasattr(action[0], '__len__'):
-                    action = action[0][0]
-
-            return int(action)
-
+            if self._agent is None:
+                self._load_policy(action_selector=True)
+            self._emit({
+                "type": "agent_initialized",
+                "game_name": game_name,
+                "player_id": player_id,
+            })
+            LOGGER.info("Agent initialized for %s as %s", game_name, player_id)
         except Exception as e:
-            LOGGER.warning("Action selection failed: %s, using random", e)
-            return self._envs.single_action_space.sample()
+            LOGGER.exception("init_agent failed for %s as %s", game_name, player_id)
+            self._emit({"type": "error", "message": f"init_agent failed: {e}"})
+
+    def _handle_select_action(self, cmd: dict) -> None:
+        """Select action given an external observation (action-selector mode).
+
+        The GUI manages the shared environment and sends the individual agent's
+        observation here. Policy inference runs and the action is returned.
+
+        For MARL policies (IPPO/MAPPO), _get_marl_action() is used to call the
+        policy's forward pass directly with the correct format:
+          - IPPO: obs dict keyed by agent_key, no one-hot (each agent has own net)
+          - MAPPO: obs dict keyed by shared model_key, agents_id one-hot passed
+                   as a separate argument (policy concatenates it internally)
+
+        On ANY failure, emits {"type": "error"} — never falls back to random.
+        The GUI's _query_worker_for_action raises RuntimeError on error responses,
+        which surfaces immediately rather than silently corrupting the episode.
+
+        Args:
+            cmd: Command dict with 'observation' (list) and 'player_id' (str).
+        """
+        import numpy as np
+
+        observation = cmd.get("observation")
+        player_id = cmd.get("player_id") or self._player_id or ""
+
+        if observation is None:
+            self._emit({"type": "error", "message": "select_action missing 'observation'"})
+            return
+
+        if self._agent is None:
+            try:
+                self._load_policy(action_selector=True)
+            except Exception as e:
+                self._emit({"type": "error", "message": f"Policy not loaded: {e}"})
+                return
+
+        try:
+            obs = np.array(observation, dtype=np.float32)
+
+            # Use MARL-aware action selection for multi-agent policies.
+            # _get_marl_action calls the policy's forward() directly, handling:
+            #   IPPO: selects the correct per-agent network via agent_key=player_id
+            #   MAPPO: builds agents_id one-hot; policy concatenates it internally
+            # _get_action is kept only for single-agent (DRL) policies.
+            is_marl = hasattr(self._agent, 'use_parameter_sharing')
+            if is_marl and player_id:
+                action = self._get_marl_action(obs, player_id)
+            else:
+                action = self._get_action(obs)
+
+            self._emit({
+                "type": "action_selected",
+                "player_id": player_id,
+                "action": int(action),
+            })
+        except Exception as e:
+            LOGGER.exception("select_action failed for player_id=%s", player_id)
+            self._emit({"type": "error", "message": f"select_action failed: {e}"})
 
     def _handle_reset(self, seed: Optional[int] = None) -> None:
         """Handle reset command - initialize environment with seed."""
@@ -1095,6 +1338,10 @@ class InteractiveRuntime:
                 self._handle_reset(cmd.get("seed"))
             elif cmd_type == "step":
                 self._handle_step()
+            elif cmd_type == "init_agent":
+                self._handle_init_agent(cmd)
+            elif cmd_type == "select_action":
+                self._handle_select_action(cmd)
             elif cmd_type == "stop":
                 self._emit({"type": "stopped"})
                 LOGGER.info("Stop command received, shutting down")

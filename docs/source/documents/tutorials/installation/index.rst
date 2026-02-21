@@ -791,6 +791,5 @@ Next Steps
 After installation:
 
 1. **Quick Start**: See :doc:`../quickstart` to run your first experiment
-2. **Basic Usage**: See :doc:`../basic_usage` for GUI walkthrough
-3. **Environments**: See :doc:`../../environments/index` for the full environment catalog
-4. **Architecture**: See :doc:`../../architecture/overview` to understand MOSAIC's design
+2. **Environments**: See :doc:`../../environments/index` for the full environment catalog
+3. **Architecture**: See :doc:`../../architecture/overview` to understand MOSAIC's design

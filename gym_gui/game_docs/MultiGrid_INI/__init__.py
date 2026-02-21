@@ -118,7 +118,7 @@ Uses <strong>Gymnasium</strong> API:
 </table>
 <p style="background-color: #ffecb3; padding: 8px; border-radius: 4px; margin-top: 10px;">
 <strong>Note:</strong> INI MultiGrid has no STILL action. When no key is pressed,
-<code>DONE (6)</code> is sent as idle. This differs from MOSAIC MultiGrid which uses <code>STILL (0)</code>.
+<code>DONE (6)</code> is sent as idle. This differs from MOSAIC MultiGrid which uses <code>NOOP (0)</code>.
 </p>
 
 <h4>Source</h4>

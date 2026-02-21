@@ -149,3 +149,6 @@
 [submodule "3rd_party/multigrid-ini"]
 	path = 3rd_party/multigrid-ini
 	url = https://github.com/ini/multigrid.git
+[submodule "3rd_party/mosaic_multigrid"]
+	path = 3rd_party/mosaic_multigrid
+	url = https://github.com/Abdulhamid97Mousa/mosaic_multigrid.git

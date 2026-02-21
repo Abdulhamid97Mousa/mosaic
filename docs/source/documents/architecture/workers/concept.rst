@@ -105,7 +105,7 @@ to an agent for evaluation via ``select_action()``.
 .. mermaid::
 
    %%{init: {"flowchart": {"curve": "linear"}} }%%
-   graph LR
+   graph TB
        subgraph Training["Training Phase (Worker)"]
            WORKER["CleanRL Worker"]
            WORKER -->|"produces"| CKPT["Checkpoint"]

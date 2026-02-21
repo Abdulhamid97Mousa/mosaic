@@ -238,6 +238,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._parallel_multiagent_step_state: Optional[MultiAgentStepState] = None
         self._parallel_action_panel: Optional[MultiAgentActionPanel] = None
         self._parallel_player_handles: Dict[str, Any] = {}  # agent_id -> handle
+        self._parallel_multiagent_obs: Dict[Any, Any] = {}  # agent_key -> obs array
+        self._multigrid_aec_mode: bool = False  # True when env is a PettingZoo AEC env
 
         # Track dynamic agent tabs by (run_id, agent_id)
         self._agent_tab_index: set[tuple[str, str]] = set()
@@ -1285,7 +1287,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             )
             return None
 
-    def _on_reset_all_operators(self, seed: int) -> None:
+    def _on_reset_all_operators(self, seed: int | None) -> None:
         """Reset all configured operators with shared seed.
 
         Scientific Execution Model (inspired by BALROG):
@@ -1831,7 +1833,11 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         # Check if we're in parallel multi-agent mode (MultiGrid, MeltingPot, Overcooked)
         if self._parallel_multiagent_mode and self._parallel_multiagent_env is not None:
-            self._on_step_parallel_multiagent()
+            # AEC sub-mode: each agent acts one at a time (true sequential stepping)
+            if self._multigrid_aec_mode:
+                self._on_step_multigrid_aec()
+            else:
+                self._on_step_parallel_multiagent()
             return
 
         # Standard single-agent flow: each worker owns its own environment
@@ -2527,17 +2533,31 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         # Create the shared environment
         try:
-            self._parallel_multiagent_env = self._create_parallel_multiagent_env(
-                env_name, task, seed
-            )
+            raw_env = self._create_parallel_multiagent_env(env_name, task, seed)
+
+            # Wrap in AEC env when execution_mode="aec".
+            # AEC: env.step([action_i, NOOP]) fires once per agent,
+            # so each subsequent agent observes the intermediate state S(t+0.5).
+            if config.execution_mode == "aec":
+                from gym_gui.services.aec_wrapper import GymnasiumMultiAgentAECWrapper
+                self._parallel_multiagent_env = GymnasiumMultiAgentAECWrapper(raw_env)
+                self._multigrid_aec_mode = True
+                _OP_LOGGER.info(
+                    "Wrapped %s/%s as AEC env (per-agent physics)",
+                    env_name, task,
+                )
+            else:
+                self._parallel_multiagent_env = raw_env
+                self._multigrid_aec_mode = False
+
             self._parallel_multiagent_mode = True
             self._parallel_multiagent_config = config
             self._parallel_player_handles.clear()
 
             self.log_constant(
                 LOG_OPERATOR_PARALLEL_RESET_STARTED,
-                message=f"Created shared parallel environment: {env_name}/{task}",
-                extra={"env_name": env_name, "task": task, "seed": seed},
+                message=f"Created shared parallel environment: {env_name}/{task} (mode={config.execution_mode})",
+                extra={"env_name": env_name, "task": task, "seed": seed, "execution_mode": config.execution_mode},
             )
         except Exception as e:
             self.log_constant(
@@ -2557,13 +2577,62 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             ai_agents, human_agents,
         )
 
-        # TODO: Launch AI workers for ai_agents
-        # For now, we just support all-human mode for testing
+        for agent_id in ai_agents:
+            assignment = config.workers.get(agent_id)
+            if assignment is None:
+                _OP_LOGGER.warning("No worker assignment for agent %s, skipping", agent_id)
+                continue
 
-        # Reset the environment
+            player_config = OperatorConfig.single_agent(
+                operator_id=f"{config.operator_id}_{agent_id}",
+                display_name=f"{config.display_name} - {agent_id}",
+                worker_id=assignment.worker_id,
+                worker_type=assignment.worker_type,
+                env_name=env_name,
+                task=task,
+                settings=assignment.settings,
+            )
+
+            try:
+                handle = self._operator_launcher.launch_operator(
+                    player_config,
+                    interactive=True,
+                )
+                handle.send_init_agent(game_name=task, player_id=agent_id)
+                init_resp = handle.read_response(timeout=10.0)
+                if init_resp and init_resp.get("type") == "agent_initialized":
+                    _OP_LOGGER.info("AI worker ready for agent %s", agent_id)
+                else:
+                    _OP_LOGGER.warning(
+                        "Unexpected init_agent response for %s: %s", agent_id, init_resp
+                    )
+                self._parallel_player_handles[agent_id] = handle
+            except OperatorLaunchError as e:
+                _OP_LOGGER.error("Failed to launch AI worker for %s: %s", agent_id, e)
+                self.log_constant(
+                    LOG_OPERATOR_ENV_PREVIEW_ERROR,
+                    message=f"Failed to launch AI worker for {agent_id}: {e}",
+                    extra={"agent_id": agent_id, "task": task},
+                )
+
+        # Reset the environment.
+        # PettingZoo AEC reset() returns None; initial obs are read via observe().
+        # Parallel envs return (obs, info) as usual.
         try:
-            obs, info = self._parallel_multiagent_env.reset(seed=seed)
-            _OP_LOGGER.debug("Environment reset, obs keys: %s", list(obs.keys()) if isinstance(obs, dict) else type(obs))
+            reset_result = self._parallel_multiagent_env.reset(seed=seed)
+            if reset_result is None:
+                # PettingZoo AEC env — populate obs by calling observe() per agent
+                env = self._parallel_multiagent_env
+                self._parallel_multiagent_obs = {
+                    a: env.observe(a) for a in env.agents
+                }
+            else:
+                obs, info = reset_result
+                self._parallel_multiagent_obs = obs if isinstance(obs, dict) else {}
+            _OP_LOGGER.debug(
+                "Environment reset, obs keys: %s",
+                list(self._parallel_multiagent_obs.keys()),
+            )
         except Exception as e:
             self.log_constant(
                 LOG_OPERATOR_ENV_PREVIEW_ERROR,
@@ -2612,7 +2681,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             return env
 
         elif env_name == "meltingpot":
-            # MeltingPot support (placeholder)
+            # MeltingPot support (not yet implemented).
+            # MeltingPot uses NOOP=0 (dm_env convention), so when implemented
+            # it will support both Parallel and AEC via GymnasiumMultiAgentAECWrapper.
             raise NotImplementedError("MeltingPot environment not yet supported")
 
         elif env_name == "overcooked":
@@ -2621,6 +2692,43 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         else:
             raise ValueError(f"Unknown parallel multi-agent environment: {env_name}")
+
+    def _get_parallel_agent_obs(self, agent_id: str) -> Optional[Any]:
+        """Get the stored observation for an agent, handling int/string key mismatch.
+
+        mosaic_multigrid uses integer agent keys (0, 1) in obs dicts but
+        OperatorConfig uses string agent IDs ("agent_0", "agent_1").
+
+        Args:
+            agent_id: String agent identifier, e.g. "agent_0".
+
+        Returns:
+            The obs array/dict for this agent, or None if not found.
+        """
+        obs_dict = self._parallel_multiagent_obs
+        if not obs_dict:
+            return None
+
+        # Direct string lookup first
+        if agent_id in obs_dict:
+            return obs_dict[agent_id]
+
+        # Extract trailing integer: "agent_0" -> 0, "player_1" -> 1
+        try:
+            idx = int(str(agent_id).split("_")[-1])
+            if idx in obs_dict:
+                return obs_dict[idx]
+        except (ValueError, AttributeError):
+            pass
+
+        # Last resort: direct int cast
+        try:
+            if int(agent_id) in obs_dict:
+                return obs_dict[int(agent_id)]
+        except (ValueError, TypeError):
+            pass
+
+        return None
 
     def _render_parallel_multiagent_frame(self) -> None:
         """Render the current state of the parallel multi-agent environment."""
@@ -2702,17 +2810,57 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             extra={"human_agents": human_agents, "ai_agents": ai_agents},
         )
 
-        # Collect AI actions first (blocking for now)
-        # TODO: Implement async action collection from AI workers
+        # Collect AI actions by calling each worker's select_action
         for agent_id in ai_agents:
-            # For now, use random action as placeholder
-            action_space = env.action_spaces.get(agent_id) if hasattr(env, "action_spaces") else env.action_space
-            if hasattr(action_space, "sample"):
-                action = action_space.sample()
+            handle = self._parallel_player_handles.get(agent_id)
+            action_space = (
+                env.action_spaces.get(agent_id)
+                if hasattr(env, "action_spaces")
+                else env.action_space
+            )
+
+            if handle is None or not handle.is_running:
+                _OP_LOGGER.warning(
+                    "No running worker for AI agent %s, using random fallback", agent_id
+                )
+                action = action_space.sample() if hasattr(action_space, "sample") else 0
+                step_state.add_action(agent_id, action)
+                continue
+
+            # Get and flatten the agent's observation.
+            # mosaic_multigrid IndAgObs: obs is a dict with 'image' (3,3,3 array).
+            # XuanCe IPPO/MAPPO was trained on the flattened image (27 floats).
+            agent_obs = self._get_parallel_agent_obs(agent_id)
+            if agent_obs is None:
+                _OP_LOGGER.warning(
+                    "No observation for AI agent %s, using random fallback", agent_id
+                )
+                action = action_space.sample() if hasattr(action_space, "sample") else 0
+                step_state.add_action(agent_id, action)
+                continue
+
+            if isinstance(agent_obs, dict):
+                image = agent_obs.get("image", next(iter(agent_obs.values())))
+                obs_flat = image.flatten().tolist() if hasattr(image, "flatten") else list(image)
+            elif hasattr(agent_obs, "flatten"):
+                obs_flat = agent_obs.flatten().tolist()
             else:
-                action = 0
+                obs_flat = list(agent_obs)
+
+            handle.send_select_action(obs_flat, agent_id)
+            response = handle.read_response(timeout=10.0)
+
+            if response and response.get("type") == "action_selected":
+                action = int(response["action"])
+                _OP_LOGGER.debug("AI agent %s selected action %d", agent_id, action)
+            else:
+                _OP_LOGGER.warning(
+                    "Bad response from AI agent %s: %s — using random fallback",
+                    agent_id, response,
+                )
+                action = action_space.sample() if hasattr(action_space, "sample") else 0
+
             step_state.add_action(agent_id, action)
-            _OP_LOGGER.debug(f"AI agent {agent_id} action: {action}")
 
         step_state.ai_actions_ready = True
 
@@ -2752,6 +2900,192 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             f"Select actions for {len(human_agents)} human agent(s)",
             10000
         )
+
+    def _on_step_multigrid_aec(self) -> None:
+        """Step one turn of the AEC environment (per-agent physics).
+
+        Supports: mosaic_multigrid (v5.0.0+) and MeltingPot (NOOP=0 required).
+
+        In AEC mode, only ONE agent acts per call:
+          - GymnasiumMultiAgentAECWrapper.step(action) calls
+            env.step([action_i, NOOP, ...]) internally, advancing physics
+            immediately for this agent only.
+          - The next agent observes the intermediate state S(t+0.5).
+          - agent_selection cycles "agent_0" → "agent_1" → ...
+          - If AI: query worker for action, then aec_env.step(action)
+          - If human: show one-agent action panel, wait for submission
+          - Render after each individual step (sequential visual feedback)
+
+        mosaic_multigrid v5 action space: noop=0  left=1  right=2  forward=3
+          pickup=4  drop=5  toggle=6  done=7  (8 actions, noop=0 required for AEC)
+        """
+        env = self._parallel_multiagent_env
+        config = self._parallel_multiagent_config
+        if env is None or config is None:
+            _OP_LOGGER.warning("_on_step_multigrid_aec: no env/config")
+            return
+
+        # agent_selection is already a PettingZoo string ID: "agent_0" or "agent_1"
+        current_agent = env.agent_selection
+        if current_agent is None or not env.agents:
+            _OP_LOGGER.info("AEC episode done — agent_selection is None")
+            self._status_bar.showMessage("Episode finished. Reset to play again.", 4000)
+            return
+
+        human_agents = config.get_human_agents()
+        ai_agents = config.get_ai_agents()
+
+        _OP_LOGGER.debug(
+            "AEC step: current_agent=%s, human=%s, ai=%s",
+            current_agent, human_agents, ai_agents,
+        )
+
+        if current_agent in ai_agents:
+            # ---------------------------------------------------------------
+            # AI agent's turn: query the worker for an action
+            # ---------------------------------------------------------------
+            handle = self._parallel_player_handles.get(current_agent)
+
+            # PettingZoo AEC exposes action_space as a method: env.action_space(agent)
+            try:
+                action_space = env.action_space(current_agent)
+            except (TypeError, KeyError):
+                action_space = None
+
+            if handle is None or not handle.is_running:
+                _OP_LOGGER.warning(
+                    "AEC: no running worker for AI agent %s — NOOP fallback",
+                    current_agent,
+                )
+                env.step(0)  # NOOP (action 0)
+            else:
+                # observe() uses the PettingZoo string agent ID
+                agent_obs = env.observe(current_agent)
+                if agent_obs is None:
+                    _OP_LOGGER.warning(
+                        "AEC: no observation for %s — NOOP fallback", current_agent
+                    )
+                    env.step(0)
+                else:
+                    # Flatten observation for XuanCe worker (IndAgObs: image 3×3×3)
+                    if isinstance(agent_obs, dict):
+                        image = agent_obs.get("image", next(iter(agent_obs.values())))
+                        obs_flat = (
+                            image.flatten().tolist()
+                            if hasattr(image, "flatten")
+                            else list(image)
+                        )
+                    elif hasattr(agent_obs, "flatten"):
+                        obs_flat = agent_obs.flatten().tolist()
+                    else:
+                        obs_flat = list(agent_obs)
+
+                    handle.send_select_action(obs_flat, current_agent)
+                    response = handle.read_response(timeout=10.0)
+
+                    if response and response.get("type") == "action_selected":
+                        action = int(response["action"])
+                        _OP_LOGGER.debug(
+                            "AEC: AI agent %s chose action %d", current_agent, action
+                        )
+                    else:
+                        _OP_LOGGER.warning(
+                            "AEC: bad response from %s: %s — fallback to NOOP",
+                            current_agent, response,
+                        )
+                        action = (
+                            action_space.sample()
+                            if action_space is not None and hasattr(action_space, "sample")
+                            else 0
+                        )
+
+                    env.step(action)
+
+            # Render after this agent's action
+            self._render_parallel_multiagent_frame()
+
+            # Check episode end
+            if not env.agents:
+                total_reward = sum(env.rewards.values())
+                self._status_bar.showMessage(
+                    f"Episode done! Total reward: {total_reward:.2f}", 5000
+                )
+                _OP_LOGGER.info(
+                    "AEC episode ended after %s acted, total_reward=%.2f",
+                    current_agent, total_reward,
+                )
+            else:
+                self._status_bar.showMessage(
+                    f"AEC: {current_agent} acted → now {env.agent_selection}'s turn",
+                    1500,
+                )
+
+        elif current_agent in human_agents:
+            # ---------------------------------------------------------------
+            # Human agent's turn: show one-agent action panel
+            # ---------------------------------------------------------------
+            try:
+                act_space = env.action_space(current_agent)
+                num_actions = act_space.n if hasattr(act_space, "n") else 8
+            except (TypeError, KeyError):
+                num_actions = 8
+
+            action_labels = [
+                "NOOP", "LEFT", "RIGHT", "FORWARD",
+                "PICKUP", "DROP", "TOGGLE", "DONE",
+            ][:num_actions]
+
+            if self._parallel_action_panel is not None:
+                self._parallel_action_panel.deleteLater()
+
+            self._parallel_action_panel = MultiAgentActionPanel(
+                human_agents=[current_agent],
+                action_labels=action_labels,
+                agent_labels={current_agent: current_agent},
+            )
+            self._parallel_action_panel.all_actions_submitted.connect(
+                self._on_aec_human_action_submitted
+            )
+            _OP_LOGGER.info("AEC: waiting for human %s to act", current_agent)
+            self._status_bar.showMessage(
+                f"AEC: select action for {current_agent}", 10000
+            )
+        else:
+            _OP_LOGGER.warning(
+                "AEC: agent %s not in human_agents or ai_agents — NOOP fallback",
+                current_agent,
+            )
+            env.step(0)
+            self._render_parallel_multiagent_frame()
+
+    def _on_aec_human_action_submitted(self, actions: Dict[str, int]) -> None:
+        """Handle submission of a single human agent's action in AEC mode.
+
+        Args:
+            actions: Dict with exactly one entry {agent_str: action_int}.
+        """
+        env = self._parallel_multiagent_env
+        if env is None:
+            return
+
+        if not actions:
+            _OP_LOGGER.warning("_on_aec_human_action_submitted: empty actions dict")
+            return
+
+        action_int = next(iter(actions.values()))
+        env.step(int(action_int))
+
+        self._render_parallel_multiagent_frame()
+
+        if not env.agents:
+            total_reward = sum(env.rewards.values())
+            self._status_bar.showMessage(
+                f"Episode done! Total reward: {total_reward:.2f}", 5000
+            )
+        else:
+            self._status_bar.showMessage(
+                f"AEC: human acted → now {env.agent_selection}'s turn", 2000
+            )
 
     def _on_parallel_human_actions_submitted(self, actions: Dict[str, int]) -> None:
         """Handle submission of all human actions.
@@ -2793,12 +3127,28 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         _OP_LOGGER.info(f"Executing parallel step with actions: {actions}")
 
         try:
-            # Convert to list if env expects list-based actions
+            # Build action list keyed by env's native agent indices.
+            # config.workers uses string keys ("agent_0", "agent_1") but
+            # mosaic_multigrid uses integer keys (0, 1). Map between them.
             if hasattr(env, "agents"):
-                action_list = [actions.get(agent, 0) for agent in env.agents]
+                int_actions: Dict[Any, int] = {}
+                for agent_id, action in actions.items():
+                    try:
+                        idx = int(str(agent_id).split("_")[-1])
+                    except (ValueError, AttributeError):
+                        try:
+                            idx = int(agent_id)
+                        except (ValueError, TypeError):
+                            continue
+                    int_actions[idx] = action
+                action_list = [int_actions.get(agent, 0) for agent in env.agents]
                 obs, rewards, terminateds, truncateds, infos = env.step(action_list)
             else:
                 obs, rewards, terminateds, truncateds, infos = env.step(actions)
+
+            # Store updated observations so next step's select_action gets fresh obs
+            if isinstance(obs, dict):
+                self._parallel_multiagent_obs = obs
 
             # Render updated frame
             self._render_parallel_multiagent_frame()

@@ -329,9 +329,11 @@ def _get_execution_mode(env_family: str) -> str:
         "aec" for turn-based, "parallel" for simultaneous
     """
     if env_family in ("pettingzoo", "pettingzoo_classic", "open_spiel"):
-        return "aec"  # Turn-based
-    elif env_family in ("mosaic_multigrid", "ini_multigrid", "meltingpot", "overcooked"):
-        return "parallel"  # Simultaneous
+        return "aec"  # Turn-based by default
+    elif env_family in ("mosaic_multigrid", "meltingpot"):
+        return "parallel"  # Simultaneous by default — but AEC is also supported
+    elif env_family in ("ini_multigrid", "overcooked"):
+        return "parallel"  # Simultaneous only (no NOOP action — AEC not available)
     return "aec"  # Default
 
 
@@ -752,6 +754,23 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         self._browse_btn.clicked.connect(self._on_browse_policy)
         rl_layout.addWidget(self._browse_btn)
 
+        # Algorithm dropdown (xuance_worker: ippo, mappo; others: ppo, dqn, etc.)
+        rl_layout.addWidget(QtWidgets.QLabel("Algorithm:", self._rl_row))
+        self._algorithm_combo = QtWidgets.QComboBox(self._rl_row)
+        self._algorithm_combo.setFixedWidth(90)
+        self._algorithm_combo.addItem("IPPO", "ippo")
+        self._algorithm_combo.addItem("MAPPO", "mappo")
+        self._algorithm_combo.addItem("PPO", "ppo")
+        self._algorithm_combo.addItem("QMIX", "qmix")
+        self._algorithm_combo.setToolTip(
+            "Algorithm that produced the checkpoint.\n"
+            "IPPO: per-agent networks, no one-hot, portable across team compositions.\n"
+            "MAPPO: shared network + agent one-hot, requires fixed n_agents.\n"
+            "Must match the --method used during training."
+        )
+        self._algorithm_combo.currentIndexChanged.connect(self._on_changed)
+        rl_layout.addWidget(self._algorithm_combo)
+
         rl_layout.addStretch()
         main_layout.addWidget(self._rl_row)
         self._rl_row.hide()  # Hidden by default (LLM is default type)
@@ -912,13 +931,16 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
             settings["player_name"] = self._player_label
             settings["player_id"] = self._player_id
         elif worker_type == "rl":
-            # RL worker settings: policy path
+            # RL worker settings: policy path and algorithm
             policy_path = self._policy_path_edit.text().strip()
             if policy_path:
                 settings["policy_path"] = policy_path
+            algorithm = self._algorithm_combo.currentData()
+            if algorithm:
+                settings["algorithm"] = algorithm
             # Default worker if none selected
             if not worker_id:
-                worker_id = "ray_worker"
+                worker_id = "xuance_worker"
         else:
             # LLM worker settings: client, model, API key
             client_name = self._client_combo.currentData() or "openrouter"
@@ -1382,12 +1404,21 @@ class OperatorConfigRow(QtWidgets.QWidget):
         exec_mode_layout.addWidget(exec_mode_label)
 
         self._execution_mode_combo = QtWidgets.QComboBox(self._execution_mode_container)
-        self._execution_mode_combo.addItem("AEC (Turn-Based)", "aec")
+        self._execution_mode_combo.addItem("AEC (True Sequential Physics)", "aec")
         self._execution_mode_combo.addItem("Parallel (Simultaneous)", "parallel")
         self._execution_mode_combo.setToolTip(
             "Execution paradigm for multi-agent environments:\n"
-            "- AEC (Agent Environment Cycle): Agents take turns one at a time\n"
-            "- Parallel: All agents act simultaneously each step"
+            "\n"
+            "Parallel: All agents observe S(t) simultaneously, act, then\n"
+            "env.step([A_0, A_1]) fires once. Neither agent sees what the\n"
+            "other did before deciding.\n"
+            "\n"
+            "AEC (True Sequential Physics): Each agent's action is applied\n"
+            "to the physics immediately via env.step([A_i, NOOP]). The next\n"
+            "agent observes the intermediate state S(t+0.5) — it sees the\n"
+            "result of the previous agent's action before deciding.\n"
+            "Requires NOOP=0 in the action space (mosaic_multigrid v5+,\n"
+            "MeltingPot). Not available for environments without NOOP."
         )
         self._execution_mode_combo.setMinimumWidth(200)
         self._execution_mode_combo.currentIndexChanged.connect(self._on_config_changed)
@@ -1630,26 +1661,39 @@ class OperatorConfigRow(QtWidgets.QWidget):
         # Set default execution mode based on environment family
         default_mode = _get_execution_mode(env_family)
 
-        # Disable/enable AEC option based on environment capabilities
-        # Some environments (overcooked, multigrid, meltingpot) only support parallel/simultaneous
-        simultaneous_only_envs = ("overcooked", "mosaic_multigrid", "ini_multigrid", "meltingpot")
+        # Disable/enable AEC option based on environment capabilities.
+        #
+        # AEC (GymnasiumMultiAgentAECWrapper) requires NOOP=0 in the
+        # action space so that non-acting agents do nothing while the current
+        # agent's physics step runs.
+        #
+        # AEC-capable (NOOP=0 available):
+        #   mosaic_multigrid  — action 0 = NOOP (v5.0.0+)
+        #   meltingpot        — action 0 = NOOP (dm_env convention)
+        #   pettingzoo / open_spiel — native AEC
+        #
+        # Simultaneous-only (no NOOP action — AEC not available):
+        #   ini_multigrid     — action 0 = LEFT (no NOOP)
+        #   overcooked        — no NOOP action
+        simultaneous_only_envs = ("overcooked", "ini_multigrid")
+
+        from PyQt6.QtGui import QStandardItemModel
+        model = self._execution_mode_combo.model()
 
         if env_family in simultaneous_only_envs:
-            # Disable AEC option for simultaneous-only environments
-            # Use QStandardItemModel for proper type checking
-            from PyQt6.QtGui import QStandardItemModel
-            model = self._execution_mode_combo.model()
+            # Disable AEC option — env has no NOOP action
             if isinstance(model, QStandardItemModel):
                 item = model.item(0)  # AEC is at index 0
                 if item is not None:
                     item.setEnabled(False)
-                    item.setToolTip("This environment only supports Parallel (Simultaneous) execution")
+                    item.setToolTip(
+                        "AEC not available: this environment has no NOOP action.\n"
+                        "Non-acting agents cannot stay idle during per-agent physics steps."
+                    )
             # Force selection to Parallel
             self._execution_mode_combo.setCurrentIndex(1)  # Parallel
         else:
-            # Enable AEC option for environments that support it
-            from PyQt6.QtGui import QStandardItemModel
-            model = self._execution_mode_combo.model()
+            # Enable AEC option — NOOP=0 is available, AEC works
             if isinstance(model, QStandardItemModel):
                 item = model.item(0)  # AEC is at index 0
                 if item is not None:

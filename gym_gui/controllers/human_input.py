@@ -157,29 +157,29 @@ class MiniGridKeyCombinationResolver(KeyCombinationResolver):
 
 
 class MultiGridKeyCombinationResolver(KeyCombinationResolver):
-    """Resolve key combinations for LEGACY mosaic_multigrid environments (Soccer, Collect).
+    """Resolve key combinations for mosaic_multigrid environments (Soccer, Collect, Basketball).
 
-    Legacy mosaic_multigrid action space (8 discrete actions):
-    0: STILL - Do nothing
-    1: LEFT - Turn left
-    2: RIGHT - Turn right
+    mosaic_multigrid v5.0.0 action space (8 discrete actions):
+    0: NOOP    - Do nothing (AEC compatibility — non-acting agents wait, inspired by MeltingPot)
+    1: LEFT    - Turn left
+    2: RIGHT   - Turn right
     3: FORWARD - Move forward
-    4: PICKUP - Pick up object
-    5: DROP - Drop object
-    6: TOGGLE - Toggle/activate object
-    7: DONE - Done action (not used by default)
+    4: PICKUP  - Pick up object / steal from opponent
+    5: DROP    - Drop object / score at goal / teleport pass
+    6: TOGGLE  - Toggle/activate object
+    7: DONE    - Done action
 
-    NOTE: This is for the mosaic_multigrid package (forked from ArnaudFickinger).
+    NOTE: This is for the mosaic_multigrid package (PyPI: mosaic-multigrid v5.0.0+).
     For INI multigrid environments, use INIMultiGridKeyCombinationResolver.
     """
 
     def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
-        """Map pressed keys to legacy MultiGrid actions.
+        """Map pressed keys to mosaic_multigrid v5 actions.
 
         Priority order:
         1. Action buttons (pickup, drop, toggle, done)
         2. Movement (forward, turn left/right)
-        3. No keys = None (caller should use STILL action)
+        3. No keys = None (caller should use NOOP action 0)
         """
         # Check direction keys
         left = bool(pressed_keys & _KEYS_LEFT)
@@ -204,7 +204,7 @@ class MultiGridKeyCombinationResolver(KeyCombinationResolver):
         if forward:
             return 3  # FORWARD (move forward)
 
-        return None  # No action - caller should use STILL (action 0)
+        return None  # No action - caller should use NOOP (action 0)
 
 
 class INIMultiGridKeyCombinationResolver(KeyCombinationResolver):
@@ -689,16 +689,13 @@ def get_key_combination_resolver(
     # Fallback: check by game ID prefix/name for games not in the mapping
     game_name = game_id.value if hasattr(game_id, 'value') else str(game_id)
 
-    # MOSAIC MultiGrid environments (7 actions - PyPI package mosaic-multigrid)
+    # MOSAIC MultiGrid environments (8 actions - PyPI package mosaic-multigrid v5.0.0+)
+    # noop=0, left=1, right=2, forward=3, pickup=4, drop=5, toggle=6, done=7
     if game_name.startswith("MosaicMultiGrid"):
-        return INIMultiGridKeyCombinationResolver()
+        return MultiGridKeyCombinationResolver()
 
-    # MultiGrid environments - check if legacy or INI
+    # INI MultiGrid environments (7 actions, no noop)
     if game_name.startswith("MultiGrid"):
-        # Legacy mosaic_multigrid: Soccer, Collect (8 actions with STILL at index 0)
-        if "Soccer" in game_name or "Collect" in game_name:
-            return MultiGridKeyCombinationResolver()
-        # INI multigrid: All other MultiGrid envs (7 actions, no STILL)
         return INIMultiGridKeyCombinationResolver()
 
     # MeltingPot environments (variable actions: 8-11 depending on substrate)
@@ -843,17 +840,18 @@ _STANDARD_MINIGRID_ACTIONS = (
     _mapping(("Key_Q",), 6),                # done / no-op
 )
 
-# Standard MultiGrid action mapping for LEGACY mosaic_multigrid (8 discrete actions)
-# Legacy MultiGrid action indices: 0=STILL, 1=LEFT, 2=RIGHT, 3=FORWARD, 4=PICKUP, 5=DROP, 6=TOGGLE, 7=DONE
-# Used by: Soccer, Collect (mosaic_multigrid)
-_LEGACY_MULTIGRID_ACTIONS = (
-    _mapping(("Key_Left", "Key_A"), 1),    # turn left (action 1, not 0!)
-    _mapping(("Key_Right", "Key_D"), 2),   # turn right (action 2, not 1!)
-    _mapping(("Key_Up", "Key_W"), 3),      # move forward (action 3, not 2!)
-    _mapping(("Key_G", "Key_Space"), 4),   # pick up (action 4, not 3!)
-    _mapping(("Key_H",), 5),                # drop (action 5, not 4!)
-    _mapping(("Key_E", "Key_Return"), 6),  # toggle / use (action 6, not 5!)
-    _mapping(("Key_Q",), 7),                # done / no-op (action 7, not 6!)
+# mosaic_multigrid v5.0.0 action mapping (8 discrete actions)
+# Action indices: 0=NOOP, 1=LEFT, 2=RIGHT, 3=FORWARD, 4=PICKUP, 5=DROP, 6=TOGGLE, 7=DONE
+# Used by: Soccer, Collect, Basketball (PyPI: mosaic-multigrid v5.0.0+)
+# No key pressed → NOOP (action 0) via _get_default_idle_action()
+_MOSAIC_MULTIGRID_ACTIONS = (
+    _mapping(("Key_Left", "Key_A"), 1),    # turn left
+    _mapping(("Key_Right", "Key_D"), 2),   # turn right
+    _mapping(("Key_Up", "Key_W"), 3),      # move forward
+    _mapping(("Key_G", "Key_Space"), 4),   # pick up
+    _mapping(("Key_H",), 5),               # drop
+    _mapping(("Key_E", "Key_Return"), 6),  # toggle / use
+    _mapping(("Key_Q",), 7),               # done
 )
 
 # INI MultiGrid action mapping (7 discrete actions - NO STILL)
@@ -1602,17 +1600,17 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
 
         Returns:
             Default idle action index:
-            - Legacy multigrid: 0 (STILL) - do nothing
+            - mosaic_multigrid v5: 0 (NOOP) - do nothing
             - MeltingPot: 0 (NOOP) - do nothing
             - INI multigrid: 6 (DONE) - no visible effect, agent stays still
         """
-        # INI MultiGrid has NO NOOP/STILL action - all actions cause movement/rotation
+        # INI MultiGrid has NO NOOP action - all actions cause movement/rotation
         # Use DONE (action 6) as the idle since it doesn't cause visible changes
         if isinstance(self._key_resolver, INIMultiGridKeyCombinationResolver):
             return 6  # DONE - no visible effect in INI multigrid
 
         # Other environments use action 0 as idle:
-        # - Legacy multigrid: 0 = STILL (do nothing)
+        # - mosaic_multigrid v5: 0 = NOOP (do nothing)
         # - MeltingPot: 0 = NOOP (do nothing)
         return 0
 

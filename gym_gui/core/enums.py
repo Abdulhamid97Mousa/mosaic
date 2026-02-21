@@ -429,8 +429,9 @@ class GameId(StrEnum):
     # Repository (old): https://github.com/ArnaudFickinger/gym-multigrid
     # Repository (new): https://github.com/ini/multigrid
     # ─────────────────────────────────────────────────────────────────────────
-    # MOSAIC MultiGrid (PyPI: mosaic-multigrid v2.0.0+)
+    # MOSAIC MultiGrid (PyPI: mosaic-multigrid v5.0.0+)
     # Competitive team-based multi-agent games with view_size=3
+    # Action space v5: noop=0, left=1, right=2, forward=3, pickup=4, drop=5, toggle=6, done=7
     # PyPI: https://pypi.org/project/mosaic-multigrid/
     # GitHub: https://github.com/Abdulhamid97Mousa/mosaic_multigrid
     # ─────────────────────────────────────────────────────────────────────────

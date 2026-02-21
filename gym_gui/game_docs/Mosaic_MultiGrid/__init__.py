@@ -1,27 +1,50 @@
 """MOSAIC MultiGrid game documentation module.
 
 MOSAIC MultiGrid is our custom multi-agent grid-world package built on
-Gymnasium.  It provides competitive team-based environments (Soccer, Collect)
-with simultaneous stepping, partial observability, and multi-keyboard support.
+Gymnasium.  It provides competitive team-based environments (Soccer, Collect,
+Basketball) with two execution modes, partial observability, and multi-keyboard
+support.
 
 Package location: 3rd_party/mosaic_multigrid/
-PyPI: mosaic-multigrid
+PyPI: mosaic-multigrid (v5.0.0+)
 API: Gymnasium (env.reset(seed=N), 5-tuple step returns)
+
+Action space (v5.0.0+):
+    Discrete(8): 0=NOOP, 1=LEFT, 2=RIGHT, 3=FORWARD, 4=PICKUP, 5=DROP, 6=TOGGLE, 7=DONE
+    NOOP (0) is a genuine no-op — the agent stays in place and does nothing.
+    This enables AEC (sequential physics) mode via GymnasiumMultiAgentAECWrapper.
+
+Execution modes:
+    Parallel (default):
+        Both agents observe S(t) and act simultaneously.
+        env.step([A_0, A_1]) fires once — one physics update per round.
+
+    AEC (sequential physics):
+        Agent_0 acts; physics fires immediately → S(t+0.5).
+        Agent_1 observes the intermediate state before deciding.
+        env.step([A_0, NOOP]) → S(t+0.5) → env.step([NOOP, A_1]) → S(t+1)
+        Requires GymnasiumMultiAgentAECWrapper (gym_gui/services/aec_wrapper.py).
+        Only available because NOOP=0 is a genuine no-op (v5.0.0+).
 
 Environments:
     Deprecated (v1.0.2):
         - MosaicMultiGrid-Soccer-v0: 2v2 soccer, 15x10 grid
         - MosaicMultiGrid-Collect-v0: 3-agent individual competition
         - MosaicMultiGrid-Collect-2vs2-v0: 2v2 team collection
+        - MosaicMultiGrid-Collect-1vs1-v0: 1v1 collection
 
-    IndAgObs (v3.0.0+) -- RECOMMENDED:
+    IndAgObs (v4.0.0+) -- RECOMMENDED:
         - MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0: 2v2 soccer, 16x11 FIFA grid
+        - MosaicMultiGrid-Soccer-1vs1-IndAgObs-v0: 1v1 soccer, same grid
         - MosaicMultiGrid-Collect-IndAgObs-v0: 3-agent with natural termination
         - MosaicMultiGrid-Collect-2vs2-IndAgObs-v0: 2v2 with natural termination
+        - MosaicMultiGrid-Collect-1vs1-IndAgObs-v0: 1v1 with natural termination
+        - MosaicMultiGrid-Basketball-3vs3-IndAgObs-v0: 3v3 basketball, court rendering
 
-    TeamObs (v3.0.0+) -- SMAC-style teammate awareness:
+    TeamObs (v4.0.0+) -- SMAC-style teammate awareness:
         - MosaicMultiGrid-Soccer-2vs2-TeamObs-v0: IndAgObs + teammate features
         - MosaicMultiGrid-Collect-2vs2-TeamObs-v0: IndAgObs + teammate features
+        - MosaicMultiGrid-Basketball-3vs3-TeamObs-v0: IndAgObs + teammate features
 """
 
 from __future__ import annotations
@@ -74,13 +97,14 @@ Agents pick up the ball, navigate to the opponent's goal, and DROP to score.
 
 
 def _get_soccer_enhanced_html() -> str:
-    """Soccer IndAgObs (recommended) documentation."""
+    """Soccer IndAgObs 2vs2 (recommended) documentation."""
     return """
 <h2>MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0</h2>
 
 <p style="background-color: #e8f5e9; padding: 8px; border-radius: 4px; margin-bottom: 10px;">
 <strong>RECOMMENDED</strong> for RL training and human play.
 Gymnasium API: <code>env.reset(seed=N)</code> returns <code>(obs, info)</code>.
+Supports <strong>Parallel</strong> (default) and <strong>AEC</strong> execution modes.
 </p>
 
 <p>
@@ -106,6 +130,7 @@ FIFA-ratio grid (16x11) with meaningful partial observability (3x3 view).
     <tr><td style="border: 1px solid #ddd; padding: 8px;">Win Condition</td><td style="border: 1px solid #ddd; padding: 8px;">First to 2 goals</td></tr>
     <tr><td style="border: 1px solid #ddd; padding: 8px;">Steal Cooldown</td><td style="border: 1px solid #ddd; padding: 8px;">10 steps (both stealer and victim)</td></tr>
     <tr><td style="border: 1px solid #ddd; padding: 8px;">Zero-Sum</td><td style="border: 1px solid #ddd; padding: 8px;">Yes (+1 scoring team, -1 opponents)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Execution Mode</td><td style="border: 1px solid #ddd; padding: 8px;">Parallel (default) or AEC</td></tr>
 </table>
 
 <h4>Observation Space</h4>
@@ -123,7 +148,7 @@ Each agent receives a partial observation:
         <th style="border: 1px solid #ddd; padding: 8px;">Action</th>
         <th style="border: 1px solid #ddd; padding: 8px;">Soccer Use</th>
     </tr>
-    <tr><td style="border: 1px solid #ddd; padding: 8px;">0</td><td style="border: 1px solid #ddd; padding: 8px;">STILL</td><td style="border: 1px solid #ddd; padding: 8px;">Idle (stand still)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">0</td><td style="border: 1px solid #ddd; padding: 8px;">NOOP</td><td style="border: 1px solid #ddd; padding: 8px;">Idle — AEC no-op (inspired by MeltingPot)</td></tr>
     <tr><td style="border: 1px solid #ddd; padding: 8px;">1</td><td style="border: 1px solid #ddd; padding: 8px;">LEFT</td><td style="border: 1px solid #ddd; padding: 8px;">Rotate counter-clockwise</td></tr>
     <tr><td style="border: 1px solid #ddd; padding: 8px;">2</td><td style="border: 1px solid #ddd; padding: 8px;">RIGHT</td><td style="border: 1px solid #ddd; padding: 8px;">Rotate clockwise</td></tr>
     <tr><td style="border: 1px solid #ddd; padding: 8px;">3</td><td style="border: 1px solid #ddd; padding: 8px;">FORWARD</td><td style="border: 1px solid #ddd; padding: 8px;">Move in facing direction</td></tr>
@@ -193,7 +218,7 @@ strategy space (pass beats solo-carry, marking beats pass, solo-carry beats mark
         <th style="border: 1px solid #ddd; padding: 8px;">ID</th>
         <th style="border: 1px solid #ddd; padding: 8px;">Soccer Use</th>
     </tr>
-    <tr><td style="border: 1px solid #ddd; padding: 8px;"><em>(no key)</em></td><td style="border: 1px solid #ddd; padding: 8px;">STILL</td><td style="border: 1px solid #ddd; padding: 8px;"><strong>0</strong></td><td style="border: 1px solid #ddd; padding: 8px;">Idle (stand still)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;"><em>(no key)</em></td><td style="border: 1px solid #ddd; padding: 8px;">NOOP</td><td style="border: 1px solid #ddd; padding: 8px;"><strong>0</strong></td><td style="border: 1px solid #ddd; padding: 8px;">Idle — AEC no-op</td></tr>
     <tr><td style="border: 1px solid #ddd; padding: 8px;">A or Left</td><td style="border: 1px solid #ddd; padding: 8px;">LEFT</td><td style="border: 1px solid #ddd; padding: 8px;"><strong>1</strong></td><td style="border: 1px solid #ddd; padding: 8px;">Rotate counter-clockwise</td></tr>
     <tr><td style="border: 1px solid #ddd; padding: 8px;">D or Right</td><td style="border: 1px solid #ddd; padding: 8px;">RIGHT</td><td style="border: 1px solid #ddd; padding: 8px;"><strong>2</strong></td><td style="border: 1px solid #ddd; padding: 8px;">Rotate clockwise</td></tr>
     <tr><td style="border: 1px solid #ddd; padding: 8px;">W or Up</td><td style="border: 1px solid #ddd; padding: 8px;">FORWARD</td><td style="border: 1px solid #ddd; padding: 8px;"><strong>3</strong></td><td style="border: 1px solid #ddd; padding: 8px;">Move in facing direction</td></tr>
@@ -203,8 +228,9 @@ strategy space (pass beats solo-carry, marking beats pass, solo-carry beats mark
     <tr><td style="border: 1px solid #ddd; padding: 8px;">Q</td><td style="border: 1px solid #ddd; padding: 8px;">DONE</td><td style="border: 1px solid #ddd; padding: 8px;"><strong>7</strong></td><td style="border: 1px solid #ddd; padding: 8px;">Signal completion</td></tr>
 </table>
 <p style="background-color: #ffecb3; padding: 8px; border-radius: 4px; margin-top: 10px;">
-<strong>Note:</strong> MOSAIC MultiGrid uses <code>STILL (0)</code> as the idle action when no key is pressed.
+<strong>Note:</strong> MOSAIC MultiGrid uses <code>NOOP (0)</code> as the idle action when no key is pressed.
 This is different from INI MultiGrid which uses <code>DONE (6)</code>.
+NOOP=0 is a genuine no-op (v5.0.0+) and enables AEC mode via <code>GymnasiumMultiAgentAECWrapper</code>.
 </p>
 
 <h4>Improvements over Deprecated Soccer-v0</h4>
@@ -221,6 +247,7 @@ This is different from INI MultiGrid which uses <code>DONE (6)</code>.
     <tr><td style="border: 1px solid #ddd; padding: 8px;">Steal cooldown</td><td style="border: 1px solid #ddd; padding: 8px;">None</td><td style="border: 1px solid #ddd; padding: 8px;">10 steps (dual)</td></tr>
     <tr><td style="border: 1px solid #ddd; padding: 8px;">Avg episode</td><td style="border: 1px solid #ddd; padding: 8px;">10,000 steps</td><td style="border: 1px solid #ddd; padding: 8px;">~200 steps</td></tr>
     <tr><td style="border: 1px solid #ddd; padding: 8px;">Training speed</td><td style="border: 1px solid #ddd; padding: 8px;">Baseline</td><td style="border: 1px solid #ddd; padding: 8px;">~50x faster</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Execution modes</td><td style="border: 1px solid #ddd; padding: 8px;">Parallel only</td><td style="border: 1px solid #ddd; padding: 8px;">Parallel + AEC</td></tr>
 </table>
 
 <h4>References</h4>
@@ -228,6 +255,61 @@ This is different from INI MultiGrid which uses <code>DONE (6)</code>.
     <li>Source: <code>3rd_party/mosaic_multigrid/</code></li>
     <li>Class: <code>SoccerGame4HIndAgObsEnv16x11N2</code></li>
     <li>See: <code>SOCCER_IMPROVEMENTS.md</code> for full technical details</li>
+</ul>
+"""
+
+
+def _get_soccer_1vs1_html() -> str:
+    """Soccer IndAgObs 1vs1 documentation."""
+    return """
+<h2>MosaicMultiGrid-Soccer-1vs1-IndAgObs-v0</h2>
+
+<p style="background-color: #e8f5e9; padding: 8px; border-radius: 4px; margin-bottom: 10px;">
+<strong>RECOMMENDED</strong> for RL training and hybrid RL+LLM experiments.
+Gymnasium API: <code>env.reset(seed=N)</code> returns <code>(obs, info)</code>.
+Supports <strong>Parallel</strong> (default) and <strong>AEC</strong> execution modes.
+</p>
+
+<p>
+1v1 soccer on the same 16x11 FIFA-ratio grid as the 2vs2 variant.
+Reduced to 2 agents — ideal for IPPO training and ablation between Parallel vs AEC modes.
+Each agent is the only member of their team; teleport pass has no effect (no teammate).
+</p>
+
+<h4>Environment Details</h4>
+<table style="width:100%; border-collapse: collapse; margin: 10px 0;">
+    <tr style="background-color: #f0f0f0;">
+        <th style="border: 1px solid #ddd; padding: 8px;">Property</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Value</th>
+    </tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Grid Size</td><td style="border: 1px solid #ddd; padding: 8px;">16 x 11 (14 x 9 playable, FIFA 1.54 ratio)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Agents</td><td style="border: 1px solid #ddd; padding: 8px;">2 (1 per team)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Team 1</td><td style="border: 1px solid #ddd; padding: 8px;">Agent 0</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Team 2</td><td style="border: 1px solid #ddd; padding: 8px;">Agent 1</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Ball</td><td style="border: 1px solid #ddd; padding: 8px;">1 wildcard ball (respawns after goal)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">View Size</td><td style="border: 1px solid #ddd; padding: 8px;">3 x 3</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Max Steps</td><td style="border: 1px solid #ddd; padding: 8px;">200</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Win Condition</td><td style="border: 1px solid #ddd; padding: 8px;">First to 2 goals</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Zero-Sum</td><td style="border: 1px solid #ddd; padding: 8px;">Yes (+1 scorer, -1 opponent)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Execution Mode</td><td style="border: 1px solid #ddd; padding: 8px;">Parallel (default) or AEC</td></tr>
+</table>
+
+<h4>Why 1vs1?</h4>
+<ul>
+    <li><strong>IPPO training baseline</strong>: Simplest competitive setting -- one policy per agent, no team coordination required</li>
+    <li><strong>AEC ablation</strong>: Only 2 agents means 1 intermediate state S(t+0.5) per round -- clearest setting to study AEC effect</li>
+    <li><strong>Hybrid RL+LLM</strong>: Freeze <code>pi_agent_0</code> (RL), pair with LLM-controlled <code>agent_1</code> -- no dimension mismatch from team size</li>
+    <li><strong>Curriculum start</strong>: Train here first before scaling to 2vs2</li>
+</ul>
+
+<h4>Action Space</h4>
+<p><code>Discrete(8)</code> -- same as 2vs2 Soccer (NOOP=0 enables AEC mode).</p>
+
+<h4>References</h4>
+<ul>
+    <li>Source: <code>3rd_party/mosaic_multigrid/</code></li>
+    <li>AEC wrapper: <code>gym_gui/services/aec_wrapper.py</code></li>
+    <li>See: <code>SOCCER_IMPROVEMENTS.md</code> for shared mechanics</li>
 </ul>
 """
 
@@ -282,6 +364,7 @@ def _get_collect_enhanced_html() -> str:
 <p style="background-color: #e8f5e9; padding: 8px; border-radius: 4px; margin-bottom: 10px;">
 <strong>RECOMMENDED</strong> for RL training.
 Gymnasium API: <code>env.reset(seed=N)</code> returns <code>(obs, info)</code>.
+Supports <strong>Parallel</strong> (default) and <strong>AEC</strong> execution modes.
 </p>
 
 <p>
@@ -302,6 +385,7 @@ when all balls are collected. 35x faster training than the deprecated variant.
     <tr><td style="border: 1px solid #ddd; padding: 8px;">Max Steps</td><td style="border: 1px solid #ddd; padding: 8px;">300</td></tr>
     <tr><td style="border: 1px solid #ddd; padding: 8px;">Termination</td><td style="border: 1px solid #ddd; padding: 8px;">When all 5 balls collected</td></tr>
     <tr><td style="border: 1px solid #ddd; padding: 8px;">Zero-Sum</td><td style="border: 1px solid #ddd; padding: 8px;">Yes (+1 collector, -1 others)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Execution Mode</td><td style="border: 1px solid #ddd; padding: 8px;">Parallel (default) or AEC</td></tr>
 </table>
 
 <h4>Game Mechanics</h4>
@@ -376,6 +460,7 @@ def _get_collect2vs2_enhanced_html() -> str:
 <p style="background-color: #e8f5e9; padding: 8px; border-radius: 4px; margin-bottom: 10px;">
 <strong>RECOMMENDED</strong> for RL training.
 Gymnasium API: <code>env.reset(seed=N)</code> returns <code>(obs, info)</code>.
+Supports <strong>Parallel</strong> (default) and <strong>AEC</strong> execution modes.
 </p>
 
 <p>
@@ -399,6 +484,7 @@ Green team (Agents 0, 1) vs Red team (Agents 2, 3) compete to collect
     <tr><td style="border: 1px solid #ddd; padding: 8px;">Max Steps</td><td style="border: 1px solid #ddd; padding: 8px;">400</td></tr>
     <tr><td style="border: 1px solid #ddd; padding: 8px;">Termination</td><td style="border: 1px solid #ddd; padding: 8px;">When all 7 balls collected</td></tr>
     <tr><td style="border: 1px solid #ddd; padding: 8px;">Zero-Sum</td><td style="border: 1px solid #ddd; padding: 8px;">Yes (+1 team, -1 opponents)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Execution Mode</td><td style="border: 1px solid #ddd; padding: 8px;">Parallel (default) or AEC</td></tr>
 </table>
 
 <h4>Game Mechanics</h4>
@@ -426,37 +512,84 @@ Green team (Agents 0, 1) vs Red team (Agents 2, 3) compete to collect
 
 
 # ---------------------------------------------------------------------------
-# Dispatch
+# Basketball
 # ---------------------------------------------------------------------------
 
-def get_mosaic_multigrid_html(env_id: str) -> str:
-    """Generate MOSAIC MultiGrid HTML documentation for a specific variant.
+def _get_basketball_html() -> str:
+    """Basketball IndAgObs 3vs3 documentation."""
+    return """
+<h2>MosaicMultiGrid-Basketball-3vs3-IndAgObs-v0</h2>
 
-    Args:
-        env_id: Environment identifier (e.g., "MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0")
+<p style="background-color: #e8f5e9; padding: 8px; border-radius: 4px; margin-bottom: 10px;">
+<strong>NEW</strong> in v4.0.0. 3v3 basketball with court rendering.
+Gymnasium API: <code>env.reset(seed=N)</code> returns <code>(obs, info)</code>.
+Supports <strong>Parallel</strong> (default) and <strong>AEC</strong> execution modes.
+</p>
 
-    Returns:
-        HTML string containing environment documentation.
-    """
-    _is_modern = ("IndAgObs" in env_id or "TeamObs" in env_id
-                   or "Enhanced" in env_id)
-    if "Soccer" in env_id:
-        if _is_modern:
-            return _get_soccer_enhanced_html()
-        return _get_soccer_base_html()
-    elif "Collect-2vs2" in env_id or "Collect2vs2" in env_id:
-        if _is_modern:
-            return _get_collect2vs2_enhanced_html()
-        return _get_collect2vs2_base_html()
-    elif "Collect-1vs1" in env_id:
-        return _get_collect2vs2_enhanced_html()  # 1vs1 shares collect team docs
-    elif "Collect" in env_id:
-        if _is_modern:
-            return _get_collect_enhanced_html()
-        return _get_collect_base_html()
-    else:
-        return _get_overview_html()
+<p>
+6-agent (3v3) basketball game on a court-rendered grid.
+Two teams compete to score baskets. Court rendering provides visual
+court markings (three-point line, key, half-court line).
+</p>
 
+<h4>Environment Details</h4>
+<table style="width:100%; border-collapse: collapse; margin: 10px 0;">
+    <tr style="background-color: #f0f0f0;">
+        <th style="border: 1px solid #ddd; padding: 8px;">Property</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Value</th>
+    </tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Agents</td><td style="border: 1px solid #ddd; padding: 8px;">6 (3 per team)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Team 1</td><td style="border: 1px solid #ddd; padding: 8px;">Agents 0, 1, 2</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Team 2</td><td style="border: 1px solid #ddd; padding: 8px;">Agents 3, 4, 5</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">View Size</td><td style="border: 1px solid #ddd; padding: 8px;">3 x 3</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Rendering</td><td style="border: 1px solid #ddd; padding: 8px;">Court markings (three-point line, key, half-court)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Execution Mode</td><td style="border: 1px solid #ddd; padding: 8px;">Parallel (default) or AEC</td></tr>
+</table>
+
+<h4>Action Space</h4>
+<p><code>Discrete(8)</code> -- same for all agents (NOOP=0 enables AEC mode):</p>
+<table style="width:100%; border-collapse: collapse; margin: 10px 0;">
+    <tr style="background-color: #f0f0f0;">
+        <th style="border: 1px solid #ddd; padding: 8px;">ID</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Action</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Basketball Use</th>
+    </tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">0</td><td style="border: 1px solid #ddd; padding: 8px;">NOOP</td><td style="border: 1px solid #ddd; padding: 8px;">Idle — AEC no-op</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">1</td><td style="border: 1px solid #ddd; padding: 8px;">LEFT</td><td style="border: 1px solid #ddd; padding: 8px;">Rotate counter-clockwise</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">2</td><td style="border: 1px solid #ddd; padding: 8px;">RIGHT</td><td style="border: 1px solid #ddd; padding: 8px;">Rotate clockwise</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">3</td><td style="border: 1px solid #ddd; padding: 8px;">FORWARD</td><td style="border: 1px solid #ddd; padding: 8px;">Move in facing direction / dribble</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">4</td><td style="border: 1px solid #ddd; padding: 8px;">PICKUP</td><td style="border: 1px solid #ddd; padding: 8px;">Grab ball / steal from opponent</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">5</td><td style="border: 1px solid #ddd; padding: 8px;">DROP</td><td style="border: 1px solid #ddd; padding: 8px;">Shoot / pass to teammate</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">6</td><td style="border: 1px solid #ddd; padding: 8px;">TOGGLE</td><td style="border: 1px solid #ddd; padding: 8px;">Toggle object</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">7</td><td style="border: 1px solid #ddd; padding: 8px;">DONE</td><td style="border: 1px solid #ddd; padding: 8px;">Signal completion</td></tr>
+</table>
+
+<h4>AEC Mode Note</h4>
+<p style="background-color: #e3f2fd; padding: 8px; border-radius: 4px;">
+With 6 agents in AEC mode, each round requires 6 <code>env.step()</code> calls.
+Agent ordering: 0 → 1 → 2 → 3 → 4 → 5 → repeat.
+Each agent observes the intermediate state produced by all preceding agents
+in the current round before choosing its action.
+</p>
+
+<h4>TeamObs Variant</h4>
+<p>
+<code>MosaicMultiGrid-Basketball-3vs3-TeamObs-v0</code> extends IndAgObs
+with SMAC-style teammate awareness: each agent's observation includes
+relative positions and states of all teammates.
+</p>
+
+<h4>References</h4>
+<ul>
+    <li>Source: <code>3rd_party/mosaic_multigrid/</code></li>
+    <li>AEC wrapper: <code>gym_gui/services/aec_wrapper.py</code></li>
+</ul>
+"""
+
+
+# ---------------------------------------------------------------------------
+# Overview
+# ---------------------------------------------------------------------------
 
 def _get_overview_html() -> str:
     """Return overview HTML for MOSAIC MultiGrid family."""
@@ -465,8 +598,35 @@ def _get_overview_html() -> str:
 
 <p>
 <strong>MOSAIC MultiGrid</strong> is a competitive multi-agent grid-world package
-built on Gymnasium. It provides team-based environments (Soccer, Collect) with
-simultaneous stepping, partial observability (3x3 view), and multi-keyboard support.
+built on Gymnasium. It provides team-based environments (Soccer, Collect, Basketball)
+with partial observability (3x3 view) and multi-keyboard support.
+</p>
+
+<h4>Execution Modes</h4>
+<table style="width:100%; border-collapse: collapse; margin: 10px 0;">
+    <tr style="background-color: #f0f0f0;">
+        <th style="border: 1px solid #ddd; padding: 8px;">Mode</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">How it works</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Game model</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Implementation</th>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;"><strong>Parallel</strong> (default)</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">All agents observe S(t) and act simultaneously.<br><code>env.step([A_0, A_1, ...])</code> fires once per round.</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">Normal-form (Markov Game)</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">Direct Gymnasium API</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;"><strong>AEC</strong></td>
+        <td style="border: 1px solid #ddd; padding: 8px;">Agent_0 acts → physics fires → S(t+0.5).<br>Agent_1 observes intermediate state before deciding.<br><code>env.step([A_i, NOOP, ...])</code> × N per round.</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">Extensive-form (sequential)</td>
+        <td style="border: 1px solid #ddd; padding: 8px;"><code>GymnasiumMultiAgentAECWrapper</code><br>(gym_gui/services/aec_wrapper.py)</td>
+    </tr>
+</table>
+<p style="background-color: #ffecb3; padding: 8px; border-radius: 4px;">
+<strong>AEC requires NOOP=0</strong> (mosaic_multigrid v5.0.0+). Non-acting agents receive NOOP
+so only the active agent's action affects the physics. AEC is <em>not available</em> for
+<code>ini_multigrid</code> (action 0 = LEFT) or <code>overcooked</code> (no NOOP).
 </p>
 
 <h4>Available Environments</h4>
@@ -484,6 +644,12 @@ simultaneous stepping, partial observability (3x3 view), and multi-keyboard supp
         <td style="border: 1px solid #ddd; padding: 8px;">Recommended</td>
     </tr>
     <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;"><code>MosaicMultiGrid-Soccer-1vs1-IndAgObs-v0</code></td>
+        <td style="border: 1px solid #ddd; padding: 8px;">2 (1v1)</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">Zero-sum soccer</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">Recommended</td>
+    </tr>
+    <tr>
         <td style="border: 1px solid #ddd; padding: 8px;"><code>MosaicMultiGrid-Collect-IndAgObs-v0</code></td>
         <td style="border: 1px solid #ddd; padding: 8px;">3</td>
         <td style="border: 1px solid #ddd; padding: 8px;">Individual competition</td>
@@ -496,16 +662,34 @@ simultaneous stepping, partial observability (3x3 view), and multi-keyboard supp
         <td style="border: 1px solid #ddd; padding: 8px;">Recommended</td>
     </tr>
     <tr>
-        <td style="border: 1px solid #ddd; padding: 8px;"><code>MosaicMultiGrid-Soccer-1vs1-IndAgObs-v0</code></td>
-        <td style="border: 1px solid #ddd; padding: 8px;">2 (1v1)</td>
-        <td style="border: 1px solid #ddd; padding: 8px;">Zero-sum soccer</td>
-        <td style="border: 1px solid #ddd; padding: 8px;">Recommended</td>
-    </tr>
-    <tr>
         <td style="border: 1px solid #ddd; padding: 8px;"><code>MosaicMultiGrid-Collect-1vs1-IndAgObs-v0</code></td>
         <td style="border: 1px solid #ddd; padding: 8px;">2 (1v1)</td>
         <td style="border: 1px solid #ddd; padding: 8px;">Team collection</td>
         <td style="border: 1px solid #ddd; padding: 8px;">Recommended</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;"><code>MosaicMultiGrid-Basketball-3vs3-IndAgObs-v0</code></td>
+        <td style="border: 1px solid #ddd; padding: 8px;">6 (3v3)</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">Basketball (court rendering)</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">Recommended</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;"><code>MosaicMultiGrid-Soccer-2vs2-TeamObs-v0</code></td>
+        <td style="border: 1px solid #ddd; padding: 8px;">4 (2v2)</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">Soccer + teammate obs</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">SMAC-style</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;"><code>MosaicMultiGrid-Collect-2vs2-TeamObs-v0</code></td>
+        <td style="border: 1px solid #ddd; padding: 8px;">4 (2v2)</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">Collection + teammate obs</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">SMAC-style</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;"><code>MosaicMultiGrid-Basketball-3vs3-TeamObs-v0</code></td>
+        <td style="border: 1px solid #ddd; padding: 8px;">6 (3v3)</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">Basketball + teammate obs</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">SMAC-style</td>
     </tr>
 </table>
 
@@ -514,27 +698,71 @@ simultaneous stepping, partial observability (3x3 view), and multi-keyboard supp
 Uses <strong>Gymnasium</strong> API:
 <code>env.reset(seed=42)</code> returns <code>(obs, info)</code>.
 <code>env.step(actions)</code> returns <code>(obs, rewards, terminated, truncated, info)</code>.
+Action space v5.0.0+: <code>Discrete(8)</code> — 0=NOOP, 1=LEFT, 2=RIGHT, 3=FORWARD, 4=PICKUP, 5=DROP, 6=TOGGLE, 7=DONE.
 </p>
 
 <h4>Source</h4>
-<p><code>3rd_party/mosaic_multigrid/</code></p>
+<p><code>3rd_party/mosaic_multigrid/</code> &nbsp;|&nbsp; PyPI: <code>mosaic-multigrid</code></p>
 """
+
+
+# ---------------------------------------------------------------------------
+# Dispatch
+# ---------------------------------------------------------------------------
+
+def get_mosaic_multigrid_html(env_id: str) -> str:
+    """Generate MOSAIC MultiGrid HTML documentation for a specific variant.
+
+    Args:
+        env_id: Environment identifier (e.g., "MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0")
+
+    Returns:
+        HTML string containing environment documentation.
+    """
+    _is_modern = ("IndAgObs" in env_id or "TeamObs" in env_id
+                   or "Enhanced" in env_id)
+    if "Basketball" in env_id:
+        return _get_basketball_html()
+    elif "Soccer" in env_id:
+        if "1vs1" in env_id:
+            return _get_soccer_1vs1_html()
+        if _is_modern:
+            return _get_soccer_enhanced_html()
+        return _get_soccer_base_html()
+    elif "Collect-2vs2" in env_id or "Collect2vs2" in env_id:
+        if _is_modern:
+            return _get_collect2vs2_enhanced_html()
+        return _get_collect2vs2_base_html()
+    elif "Collect-1vs1" in env_id:
+        return _get_collect2vs2_enhanced_html()  # 1vs1 shares collect team docs
+    elif "Collect" in env_id:
+        if _is_modern:
+            return _get_collect_enhanced_html()
+        return _get_collect_base_html()
+    else:
+        return _get_overview_html()
 
 
 # Pre-generated HTML constants for convenience
 MOSAIC_SOCCER_HTML = _get_soccer_enhanced_html()
 MOSAIC_SOCCER_BASE_HTML = _get_soccer_base_html()
+MOSAIC_SOCCER_1VS1_HTML = _get_soccer_1vs1_html()
 MOSAIC_COLLECT_HTML = _get_collect_enhanced_html()
 MOSAIC_COLLECT_BASE_HTML = _get_collect_base_html()
 MOSAIC_COLLECT2VS2_HTML = _get_collect2vs2_enhanced_html()
 MOSAIC_COLLECT2VS2_BASE_HTML = _get_collect2vs2_base_html()
+MOSAIC_BASKETBALL_HTML = _get_basketball_html()
+MOSAIC_OVERVIEW_HTML = _get_overview_html()
 
 __all__ = [
     "get_mosaic_multigrid_html",
     "MOSAIC_SOCCER_HTML",
     "MOSAIC_SOCCER_BASE_HTML",
+    "MOSAIC_SOCCER_1VS1_HTML",
     "MOSAIC_COLLECT_HTML",
     "MOSAIC_COLLECT_BASE_HTML",
     "MOSAIC_COLLECT2VS2_HTML",
     "MOSAIC_COLLECT2VS2_BASE_HTML",
+    "MOSAIC_BASKETBALL_HTML",
+    "MOSAIC_OVERVIEW_HTML",
 ]

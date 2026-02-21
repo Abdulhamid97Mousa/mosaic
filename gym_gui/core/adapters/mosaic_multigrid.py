@@ -1,6 +1,6 @@
 """MOSAIC MultiGrid adapter - Competitive team-based multi-agent environments.
 
-PyPI Package: mosaic-multigrid v4.4.0
+PyPI Package: mosaic-multigrid v5.0.0
 GitHub: https://github.com/Abdulhamid97Mousa/mosaic_multigrid
 PyPI: https://pypi.org/project/mosaic-multigrid/
 
@@ -25,17 +25,17 @@ TeamObs Environments (SMAC-style teammate awareness):
 
 Features:
 - Gymnasium 1.0+ API (5-tuple dict-keyed observations)
-- 7 actions (LEFT, RIGHT, FORWARD, PICKUP, DROP, TOGGLE, DONE - no STILL)
+- 8 actions (NOOP, LEFT, RIGHT, FORWARD, PICKUP, DROP, TOGGLE, DONE — noop=0 for AEC)
 - view_size=3 (partial observability - competitive challenge)
 - Team rewards (positive-only shared), ball passing, teleport passing, stealing mechanics
 - Event tracking: goal_scored_by, passes_completed, steals_completed (v4.3.0)
-- Agent position and carrying status in info dict per step (v4.4.0)
+- Agent position and carrying status in info dict per step (v5.0.0)
 - Factored one-hot encoding with ball-carrying bit (OneHotObsWrapper)
 - PettingZoo AEC + Parallel API support
 - FIFA-style rendering for Soccer, court rendering for Basketball
 
 Installation:
-    pip install mosaic-multigrid>=4.4.0
+    pip install mosaic-multigrid>=5.0.0
 
 Usage:
     from gym_gui.core.adapters.mosaic_multigrid import MultiGridSoccerIndAgObsAdapter
@@ -80,51 +80,76 @@ except ImportError:  # pragma: no cover
     gymnasium = None  # type: ignore[assignment]
 
 try:  # pragma: no cover - import guard
-    # Import mosaic_multigrid environments - this triggers gymnasium.register() side effect
-    import mosaic_multigrid.envs  # noqa: F401 - needed for gymnasium.register() side effect
-    from mosaic_multigrid.envs import (
-        SoccerGame4HEnv10x15N2,
-        SoccerGame2HIndAgObsEnv16x11N2,
-        CollectGame4HEnv10x10N2,
-        CollectGame2HEnv10x10N2,
-        SoccerGame4HIndAgObsEnv16x11N2,
-        CollectGame3HIndAgObsEnv10x10N3,
-        CollectGame4HIndAgObsEnv10x10N2,
-        CollectGame2HIndAgObsEnv10x10N2,
-        SoccerTeamObsEnv,
-        Collect2vs2TeamObsEnv,
-        BasketballGame6HIndAgObsEnv19x11N3,
-        Basketball3vs3TeamObsEnv,
-    )
+    # Import mosaic_multigrid.envs module — triggers gymnasium.register() side effect.
+    # Each class is fetched with getattr so that a missing class in a given install
+    # only nullifies that specific class instead of setting ALL classes to None.
+    import mosaic_multigrid.envs as _mmg_envs  # noqa: F401
+    _mmg = _mmg_envs
+    SoccerGame4HEnv10x15N2          = getattr(_mmg, "SoccerGame4HEnv10x15N2",          None)  # type: ignore[assignment]
+    SoccerGame2HIndAgObsEnv16x11N2  = getattr(_mmg, "SoccerGame2HIndAgObsEnv16x11N2",  None)  # type: ignore[assignment]
+    CollectGame4HEnv10x10N2         = getattr(_mmg, "CollectGame4HEnv10x10N2",          None)  # type: ignore[assignment]
+    CollectGame2HEnv10x10N2         = getattr(_mmg, "CollectGame2HEnv10x10N2",          None)  # type: ignore[assignment]
+    SoccerGame4HIndAgObsEnv16x11N2  = getattr(_mmg, "SoccerGame4HIndAgObsEnv16x11N2",  None)  # type: ignore[assignment]
+    CollectGame3HIndAgObsEnv10x10N3 = getattr(_mmg, "CollectGame3HIndAgObsEnv10x10N3", None)  # type: ignore[assignment]
+    CollectGame4HIndAgObsEnv10x10N2 = getattr(_mmg, "CollectGame4HIndAgObsEnv10x10N2", None)  # type: ignore[assignment]
+    CollectGame2HIndAgObsEnv10x10N2 = getattr(_mmg, "CollectGame2HIndAgObsEnv10x10N2", None)  # type: ignore[assignment]
+    SoccerTeamObsEnv                = getattr(_mmg, "SoccerTeamObsEnv",                None)  # type: ignore[assignment]
+    Collect2vs2TeamObsEnv           = getattr(_mmg, "Collect2vs2TeamObsEnv",           None)  # type: ignore[assignment]
+    BasketballGame6HIndAgObsEnv19x11N3 = getattr(_mmg, "BasketballGame6HIndAgObsEnv19x11N3", None)  # type: ignore[assignment]
+    Basketball3vs3TeamObsEnv        = getattr(_mmg, "Basketball3vs3TeamObsEnv",        None)  # type: ignore[assignment]
+    # Log any classes that came back None (class name not in this install)
+    _missing = [
+        name for name, obj in [
+            ("SoccerGame4HEnv10x15N2",          SoccerGame4HEnv10x15N2),
+            ("SoccerGame2HIndAgObsEnv16x11N2",  SoccerGame2HIndAgObsEnv16x11N2),
+            ("CollectGame4HEnv10x10N2",         CollectGame4HEnv10x10N2),
+            ("CollectGame2HEnv10x10N2",         CollectGame2HEnv10x10N2),
+            ("SoccerGame4HIndAgObsEnv16x11N2",  SoccerGame4HIndAgObsEnv16x11N2),
+            ("CollectGame3HIndAgObsEnv10x10N3", CollectGame3HIndAgObsEnv10x10N3),
+            ("CollectGame4HIndAgObsEnv10x10N2", CollectGame4HIndAgObsEnv10x10N2),
+            ("CollectGame2HIndAgObsEnv10x10N2", CollectGame2HIndAgObsEnv10x10N2),
+            ("SoccerTeamObsEnv",                SoccerTeamObsEnv),
+            ("Collect2vs2TeamObsEnv",           Collect2vs2TeamObsEnv),
+            ("BasketballGame6HIndAgObsEnv19x11N3", BasketballGame6HIndAgObsEnv19x11N3),
+            ("Basketball3vs3TeamObsEnv",        Basketball3vs3TeamObsEnv),
+        ] if obj is None
+    ]
+    if _missing:
+        _log.warning(
+            "mosaic_multigrid installed but missing env classes (install may be outdated): %s",
+            ", ".join(_missing),
+        )
 except ImportError as _import_err:  # pragma: no cover
     _log.warning(
-        "mosaic_multigrid import failed (env classes unavailable): %s",
+        "mosaic_multigrid import failed (package not installed): %s",
         _import_err,
     )
-    SoccerGame4HEnv10x15N2 = None  # type: ignore[assignment, misc]
-    SoccerGame2HIndAgObsEnv16x11N2 = None  # type: ignore[assignment, misc]
-    CollectGame4HEnv10x10N2 = None  # type: ignore[assignment, misc]
-    CollectGame2HEnv10x10N2 = None  # type: ignore[assignment, misc]
-    SoccerGame4HIndAgObsEnv16x11N2 = None  # type: ignore[assignment, misc]
+    SoccerGame4HEnv10x15N2          = None  # type: ignore[assignment, misc]
+    SoccerGame2HIndAgObsEnv16x11N2  = None  # type: ignore[assignment, misc]
+    CollectGame4HEnv10x10N2         = None  # type: ignore[assignment, misc]
+    CollectGame2HEnv10x10N2         = None  # type: ignore[assignment, misc]
+    SoccerGame4HIndAgObsEnv16x11N2  = None  # type: ignore[assignment, misc]
     CollectGame3HIndAgObsEnv10x10N3 = None  # type: ignore[assignment, misc]
     CollectGame4HIndAgObsEnv10x10N2 = None  # type: ignore[assignment, misc]
     CollectGame2HIndAgObsEnv10x10N2 = None  # type: ignore[assignment, misc]
-    SoccerTeamObsEnv = None  # type: ignore[assignment, misc]
-    Collect2vs2TeamObsEnv = None  # type: ignore[assignment, misc]
+    SoccerTeamObsEnv                = None  # type: ignore[assignment, misc]
+    Collect2vs2TeamObsEnv           = None  # type: ignore[assignment, misc]
     BasketballGame6HIndAgObsEnv19x11N3 = None  # type: ignore[assignment, misc]
-    Basketball3vs3TeamObsEnv = None  # type: ignore[assignment, misc]
+    Basketball3vs3TeamObsEnv        = None  # type: ignore[assignment, misc]
 
 
-# MOSAIC multigrid action names (7 actions - no STILL)
-# Used by: Soccer, Collect (PyPI: mosaic-multigrid v2.0.0+)
+# MOSAIC multigrid action names (8 actions — noop=0 for AEC compatibility)
+# Used by: Soccer, Collect, Basketball (PyPI: mosaic-multigrid v5.0.0+)
+# Inspired by MeltingPot NOOP=0 convention (Google DeepMind)
 MOSAIC_MULTIGRID_ACTIONS: List[str] = [
-    "LEFT",     # 0 - Turn left
-    "RIGHT",    # 1 - Turn right
-    "FORWARD",  # 2 - Move forward
-    "PICKUP",   # 3 - Pick up object
-    "DROP",     # 4 - Drop object
-    "TOGGLE",   # 5 - Toggle/activate object
-    "DONE",     # 6 - Done
+    "NOOP",     # 0 - No operation (AEC: non-acting agents wait)
+    "LEFT",     # 1 - Turn left
+    "RIGHT",    # 2 - Turn right
+    "FORWARD",  # 3 - Move forward
+    "PICKUP",   # 4 - Pick up object / steal from opponent
+    "DROP",     # 5 - Drop object / score at goal / teleport pass
+    "TOGGLE",   # 6 - Toggle/activate object
+    "DONE",     # 7 - Done
 ]
 
 # Observation encoding constants (3-channel: TYPE, COLOR, STATE)
@@ -146,11 +171,11 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
     - Team-based competitive gameplay (Soccer: 2v2, Collect: 3 players)
     - Gymnasium 1.0+ API (5-tuple dict-keyed observations)
     - view_size=3 for partial observability (competitive challenge)
-    - 7 actions (no STILL action)
+    - 8 actions (noop=0, left=1 … done=7 — noop for AEC compatibility)
 
     The environment provides:
     - Observations: Dict of encoded grid views per agent
-    - Actions: Dict of discrete actions (0-6) per agent
+    - Actions: Dict of discrete actions (0-7) per agent
     - Rewards: Dict of float rewards per agent
     - Terminated/Truncated: Dict per agent + __all__ flag
     """
@@ -249,80 +274,94 @@ class MultiGridAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
             if self._env_id == "soccer" or self._env_id == "MosaicMultiGrid-Soccer-v0":
                 if SoccerGame4HEnv10x15N2 is None:
                     raise RuntimeError(
-                        "mosaic_multigrid not installed. "
-                        "Install with: pip install mosaic-multigrid>=2.0.0"
+                        "mosaic_multigrid v5.0.0 not installed. "
+                        "Install with: pip install -e 3rd_party/mosaic_multigrid/"
                     )
                 env = SoccerGame4HEnv10x15N2(render_mode='rgb_array')
             elif self._env_id == "collect" or self._env_id == "MosaicMultiGrid-Collect-v0":
                 if CollectGame4HEnv10x10N2 is None:
                     raise RuntimeError(
-                        "mosaic_multigrid not installed. "
-                        "Install with: pip install mosaic-multigrid>=2.0.0"
+                        "mosaic_multigrid v5.0.0 not installed. "
+                        "Install with: pip install -e 3rd_party/mosaic_multigrid/"
                     )
                 env = CollectGame4HEnv10x10N2(render_mode='rgb_array')
+            elif self._env_id == "MosaicMultiGrid-Collect-2vs2-v0":
+                if CollectGame4HEnv10x10N2 is None:
+                    raise RuntimeError(
+                        "mosaic_multigrid v5.0.0 not installed. "
+                        "Install with: pip install -e 3rd_party/mosaic_multigrid/"
+                    )
+                env = CollectGame4HEnv10x10N2(render_mode='rgb_array')
+            elif self._env_id == "MosaicMultiGrid-Collect-1vs1-v0":
+                if CollectGame2HEnv10x10N2 is None:
+                    raise RuntimeError(
+                        "mosaic_multigrid v5.0.0 not installed. "
+                        "Install with: pip install -e 3rd_party/mosaic_multigrid/"
+                    )
+                env = CollectGame2HEnv10x10N2(render_mode='rgb_array')
             # IndAgObs environments (v4.0.0 - Individual Agent Observations)
             elif self._env_id == "soccer_indagobs" or self._env_id == "MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0":
                 if SoccerGame4HIndAgObsEnv16x11N2 is None:
                     raise RuntimeError(
-                        "mosaic_multigrid v4.0.0+ not installed. "
-                        "Install with: pip install mosaic-multigrid>=4.0.0"
+                        "mosaic_multigrid v5.0.0 not installed. "
+                        "Install with: pip install -e 3rd_party/mosaic_multigrid/"
                     )
                 env = SoccerGame4HIndAgObsEnv16x11N2(render_mode='rgb_array')
             elif self._env_id == "collect_indagobs" or self._env_id == "MosaicMultiGrid-Collect-IndAgObs-v0":
                 if CollectGame3HIndAgObsEnv10x10N3 is None:
                     raise RuntimeError(
-                        "mosaic_multigrid v4.0.0+ not installed. "
-                        "Install with: pip install mosaic-multigrid>=4.0.0"
+                        "mosaic_multigrid v5.0.0 not installed. "
+                        "Install with: pip install -e 3rd_party/mosaic_multigrid/"
                     )
                 env = CollectGame3HIndAgObsEnv10x10N3(render_mode='rgb_array')
             elif self._env_id == "collect2vs2_indagobs" or self._env_id == "MosaicMultiGrid-Collect-2vs2-IndAgObs-v0":
                 if CollectGame4HIndAgObsEnv10x10N2 is None:
                     raise RuntimeError(
-                        "mosaic_multigrid v4.0.0+ not installed. "
-                        "Install with: pip install mosaic-multigrid>=4.0.0"
+                        "mosaic_multigrid v5.0.0 not installed. "
+                        "Install with: pip install -e 3rd_party/mosaic_multigrid/"
                     )
                 env = CollectGame4HIndAgObsEnv10x10N2(render_mode='rgb_array')
             elif self._env_id == "collect_1vs1_indagobs" or self._env_id == "MosaicMultiGrid-Collect-1vs1-IndAgObs-v0":
                 if CollectGame2HIndAgObsEnv10x10N2 is None:
                     raise RuntimeError(
-                        "mosaic_multigrid v4.1.0+ not installed. "
-                        "Install with: pip install mosaic-multigrid>=4.1.0"
+                        "mosaic_multigrid v5.0.0 not installed. "
+                        "Install with: pip install -e 3rd_party/mosaic_multigrid/"
                     )
                 env = CollectGame2HIndAgObsEnv10x10N2(render_mode='rgb_array')
             elif self._env_id == "soccer_1vs1_indagobs" or self._env_id == "MosaicMultiGrid-Soccer-1vs1-IndAgObs-v0":
                 if SoccerGame2HIndAgObsEnv16x11N2 is None:
                     raise RuntimeError(
-                        "mosaic_multigrid v4.1.0+ not installed. "
-                        "Install with: pip install mosaic-multigrid>=4.1.0"
+                        "mosaic_multigrid v5.0.0 not installed. "
+                        "Install with: pip install -e 3rd_party/mosaic_multigrid/"
                     )
                 env = SoccerGame2HIndAgObsEnv16x11N2(render_mode='rgb_array')
             elif self._env_id == "basketball_indagobs" or self._env_id == "MosaicMultiGrid-Basketball-3vs3-IndAgObs-v0":
                 if BasketballGame6HIndAgObsEnv19x11N3 is None:
                     raise RuntimeError(
-                        "mosaic_multigrid v4.0.0+ not installed. "
-                        "Install with: pip install mosaic-multigrid>=4.0.0"
+                        "mosaic_multigrid v5.0.0 not installed. "
+                        "Install with: pip install -e 3rd_party/mosaic_multigrid/"
                     )
                 env = BasketballGame6HIndAgObsEnv19x11N3(render_mode='rgb_array')
             # TeamObs environments (v4.0.0 - SMAC-style teammate awareness)
             elif self._env_id == "soccer_teamobs" or self._env_id == "MosaicMultiGrid-Soccer-2vs2-TeamObs-v0":
                 if SoccerTeamObsEnv is None:
                     raise RuntimeError(
-                        "mosaic_multigrid v4.0.0+ not installed. "
-                        "Install with: pip install mosaic-multigrid>=4.0.0"
+                        "mosaic_multigrid v5.0.0 not installed. "
+                        "Install with: pip install -e 3rd_party/mosaic_multigrid/"
                     )
                 env = SoccerTeamObsEnv(render_mode='rgb_array')
             elif self._env_id == "collect2vs2_teamobs" or self._env_id == "MosaicMultiGrid-Collect-2vs2-TeamObs-v0":
                 if Collect2vs2TeamObsEnv is None:
                     raise RuntimeError(
-                        "mosaic_multigrid v4.0.0+ not installed. "
-                        "Install with: pip install mosaic-multigrid>=4.0.0"
+                        "mosaic_multigrid v5.0.0 not installed. "
+                        "Install with: pip install -e 3rd_party/mosaic_multigrid/"
                     )
                 env = Collect2vs2TeamObsEnv(render_mode='rgb_array')
             elif self._env_id == "basketball_teamobs" or self._env_id == "MosaicMultiGrid-Basketball-3vs3-TeamObs-v0":
                 if Basketball3vs3TeamObsEnv is None:
                     raise RuntimeError(
-                        "mosaic_multigrid v4.0.0+ not installed. "
-                        "Install with: pip install mosaic-multigrid>=4.0.0"
+                        "mosaic_multigrid v5.0.0 not installed. "
+                        "Install with: pip install -e 3rd_party/mosaic_multigrid/"
                     )
                 env = Basketball3vs3TeamObsEnv(render_mode='rgb_array')
             else:
@@ -901,6 +940,24 @@ class MultiGridCollect4HAdapter(MultiGridAdapter):
         super().__init__(context, config=config)
 
 
+class MultiGridCollect1vs1Adapter(MultiGridAdapter):
+    """Adapter for MOSAIC MultiGrid Collect-1vs1 deprecated environment (2 agents, 1v1).
+
+    Maps to CollectGame2HEnv10x10N2 environment class.
+    Use MultiGridCollect1vs1IndAgObsAdapter for training (natural termination, 3 balls).
+    """
+
+    def __init__(
+        self,
+        context: AdapterContext | None = None,
+        *,
+        config: MultiGridConfig | None = None,
+    ) -> None:
+        if config is None:
+            config = MultiGridConfig(env_id="MosaicMultiGrid-Collect-1vs1-v0")
+        super().__init__(context, config=config)
+
+
 # IndAgObs adapter classes (v4.0.0 - Individual Agent Observations)
 class MultiGridSoccerIndAgObsAdapter(MultiGridAdapter):
     """Adapter for MOSAIC MultiGrid Soccer IndAgObs environment (4 players, 2v2).
@@ -1067,7 +1124,7 @@ MOSAIC_MULTIGRID_ADAPTERS: Dict[GameId, type[MultiGridAdapter]] = {
     GameId.MOSAIC_MULTIGRID_SOCCER: MultiGridSoccerAdapter,
     GameId.MOSAIC_MULTIGRID_COLLECT: MultiGridCollect3HAdapter,
     GameId.MOSAIC_MULTIGRID_COLLECT2VS2: MultiGridCollect4HAdapter,
-    GameId.MOSAIC_MULTIGRID_COLLECT_1VS1: MultiGridCollect4HAdapter,  # base 1vs1 uses same adapter pattern
+    GameId.MOSAIC_MULTIGRID_COLLECT_1VS1: MultiGridCollect1vs1Adapter,
     # IndAgObs environments (v4.0.0 - Individual Agent Observations)
     GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_INDAGOBS: MultiGridSoccerIndAgObsAdapter,
     GameId.MOSAIC_MULTIGRID_SOCCER_1VS1_INDAGOBS: MultiGridSoccer1vs1IndAgObsAdapter,
@@ -1086,6 +1143,7 @@ __all__ = [
     "MultiGridSoccerAdapter",
     "MultiGridCollect3HAdapter",
     "MultiGridCollect4HAdapter",
+    "MultiGridCollect1vs1Adapter",
     "MultiGridSoccerIndAgObsAdapter",
     "MultiGridSoccer1vs1IndAgObsAdapter",
     "MultiGridCollectIndAgObsAdapter",

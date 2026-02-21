@@ -31,26 +31,17 @@ Heterogeneous Multi-Agent RL, LLM, and Human Decision-Makers**
 
 MOSAIC is a visual-first platform that enables researchers to configure, run, and
 compare experiments across RL, LLM, VLM, and human decision-makers in the same
-multi-agent environment.  Different paradigms -- like tiles in a mosaic -- come
+multi-agent environment.  Different paradigms like tiles in a mosaic come
 together to form a complete picture of agent performance.
 
 
-.. image:: images/Platform_Main_View.png
-   :alt: 
+.. figure:: _static/figures/A_Full_Architecture.png
+   :alt: MOSAIC Platform Overview
    :align: center
    :width: 100%
 
-.. raw:: html
-
-   <br>
-
-.. figure:: _static/figures/A_Full_Architecture.jpg
-   :alt: MOSAIC Full Architecture
-   :align: center
-   :width: 100%
-
-   The architecture is showing the Evaluation Phase
-   (operators, that contain workers), Training Phase (TrainerClient, TrainerService, Workers),
+   The architecture shows the Evaluation Phase (operators containing workers),
+   Training Phase (TrainerClient, TrainerService, Workers),
    Daemon Process (gRPC Server, RunRegistry, Dispatcher, Broadcasters),
    and Worker Processes (CleanRL, XuanCe, Ray RLlib, BALROG, MOSAIC LLM).
 
@@ -89,7 +80,7 @@ under a unified, visual-first interface.
 
 - **Unified Framework Bridge**: Connect RL, LLM, and Robotics in a single platform
 - **Visual-First Design**: Configure experiments through an intuitive PyQt6 interface, **Almost no code required**.
-- **Heterogeneous Agent Mixing**: Run Human + RL + LLM agents in the same environment
+- **Heterogeneous Agent Mixing**: Deploy Human(Agent),  RL, and LLM agents in the same environment
 - **Resource Management & Quotas**: GPU allocation, queue limits, credit-based backpressure, health monitoring.
 - **Per-Agent Policy Binding**: Route each agent to different workers via ``PolicyMappingService``.
 - **Worker Lifecycle Orchestration**: Subprocess management with heartbeat monitoring and graceful termination.
@@ -159,11 +150,11 @@ installation instructions, environment lists, and academic citations.
           :width: 200px
    * - **MOSAIC MultiGrid**
      - Competitive team sports (view_size=3)
-     - .. image:: images/envs/multigrid/multigrid.gif
+     - .. image:: images/envs/mosaic_multigrid/mosaic_multigrid.gif
           :width: 200px
    * - **INI MultiGrid**
      - Cooperative exploration (view_size=7)
-     - .. image:: images/envs/multigrid/multigrid.gif
+     - .. image:: images/envs/multigrid_ini/multigrid_ini.gif
           :width: 200px
    * - **Melting Pot**
      - Social multi-agent scenarios (up to 16 agents)

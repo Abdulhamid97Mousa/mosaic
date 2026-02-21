@@ -110,5 +110,6 @@ Available Workers
    architecture
    lifecycle
    integrated_workers/index
+   development
    development/index
    examples

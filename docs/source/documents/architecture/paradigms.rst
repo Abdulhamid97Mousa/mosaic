@@ -19,7 +19,16 @@ SteppingParadigm Enum
 SINGLE_AGENT
 ------------
 
-Standard Gymnasium interface with one agent.
+Standard `Gymnasium <https://gymnasium.farama.org/>`_ interface with one agent.
+One observation, one action, one reward per step.
+
+.. figure:: /_static/figures/paradigm_single_agent.png
+   :alt: Gymnasium agent-environment loop
+   :align: center
+   :width: 70%
+
+   The standard agent-environment loop.
+   *(Source: Gymnasium documentation)*
 
 .. code-block:: python
 
@@ -37,7 +46,17 @@ Standard Gymnasium interface with one agent.
 SEQUENTIAL (AEC)
 ----------------
 
-Agents take turns, one at a time. Based on PettingZoo's AEC API.
+Agents take turns one at a time, following
+`PettingZoo's AEC (Agent Environment Cycle) API <https://pettingzoo.farama.org/api/aec/>`_.
+Each agent observes and acts before the next agent is called.
+
+.. figure:: /_static/figures/paradigm_aec.png
+   :alt: PettingZoo AEC cycle diagram
+   :align: center
+   :width: 80%
+
+   The AEC cycle: agents act sequentially.
+   *(Source: PettingZoo documentation)*
 
 .. code-block:: python
 
@@ -56,7 +75,22 @@ Agents take turns, one at a time. Based on PettingZoo's AEC API.
 SIMULTANEOUS (POSG)
 -------------------
 
-All agents act at the same time. Based on PettingZoo's Parallel API.
+All agents act at the same time, following
+`PettingZoo's Parallel API <https://pettingzoo.farama.org/api/parallel/>`_.
+This corresponds to a
+`Partially Observable Stochastic Game (POSG) <https://www.marl-book.com/>`_:
+each agent receives only a local observation of the shared state and submits
+its action without seeing what other agents will do. The environment resolves
+all actions together in one transition.
+
+.. figure:: /_static/figures/paradigm_simultaneous.svg
+   :alt: Simultaneous multi-agent stepping diagram
+   :align: center
+   :width: 85%
+
+   All agents submit actions in the same step; the environment advances once
+   all are collected.
+   *(Source: Ray RLlib documentation)*
 
 .. code-block:: python
 

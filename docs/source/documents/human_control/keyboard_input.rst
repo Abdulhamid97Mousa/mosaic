@@ -23,7 +23,7 @@ an ``InputMode`` enum value.
      - Best For
    * - ``InputMode.SHORTCUT_BASED``
      - Qt ``QShortcut`` objects.  Each key press immediately fires a single
-       action.  No key-state tracking -- pressing two keys at once fires
+       action.  No key-state tracking, pressing two keys at once fires
        whichever arrives first.
      - Turn-based games: FrozenLake, MiniGrid, Chess, MiniHack, Jumanji
        puzzles.
@@ -76,8 +76,8 @@ Each resolver targets a specific environment family.
      - MiniGrid (7 actions)
      - Left / Right / Forward / Pickup / Drop / Toggle / Done
    * - ``MultiGridKeyCombinationResolver``
-     - Legacy mosaic_multigrid (8 actions)
-     - Still / Left / Right / Forward / Pickup / Drop / Toggle / Done
+     - mosaic_multigrid (8 actions)
+     - Noop / Left / Right / Forward / Pickup / Drop / Toggle / Done
    * - ``INIMultiGridKeyCombinationResolver``
      - INI multigrid (7 actions)
      - Left / Right / Forward / Pickup / Drop / Toggle / Done
@@ -85,7 +85,7 @@ Each resolver targets a specific environment family.
      - RWARE warehouse (5 actions)
      - Noop / Forward / Left / Right / Toggle
    * - ``MeltingPotKeyCombinationResolver``
-     - MeltingPot (8--11 actions)
+     - MeltingPot (8 to 11 actions)
      - Noop / Forward / Backward / Strafe / Turn / Interact / Fire
    * - ``ProcgenKeyCombinationResolver``
      - Procgen (15 actions)
@@ -120,18 +120,18 @@ an action index and a human-readable label.  The helper function
 
 Each environment family defines its own mapping dictionary:
 
-- ``_TOY_TEXT_MAPPINGS`` -- FrozenLake, Taxi, CliffWalking, Blackjack
-- ``_MINIG_GRID_MAPPINGS`` -- MiniGrid family
-- ``_MULTIGRID_MAPPINGS`` -- MOSAIC MultiGrid and INI MultiGrid
-- ``_BOX_2D_MAPPINGS`` -- LunarLander, CarRacing, BipedalWalker
-- ``_VIZDOOM_MAPPINGS`` -- ViZDoom scenarios
-- ``_MINIHACK_MAPPINGS`` -- MiniHack dungeon crawling
-- ``_NETHACK_MAPPINGS`` -- NetHack challenge
-- ``_CRAFTER_MAPPINGS`` -- Crafter survival
-- ``_BABAISAI_MAPPINGS`` -- BabaIsAI puzzles
-- ``_PROCGEN_MAPPINGS`` -- Procgen games
-- ``_ALE_MAPPINGS`` -- Atari / ALE
-- ``_JUMANJI_MAPPINGS`` -- Jumanji logic games
+- ``_TOY_TEXT_MAPPINGS`` : FrozenLake, Taxi, CliffWalking, Blackjack
+- ``_MINIG_GRID_MAPPINGS`` : MiniGrid family
+- ``_MULTIGRID_MAPPINGS`` : MOSAIC MultiGrid and INI MultiGrid
+- ``_BOX_2D_MAPPINGS`` : LunarLander, CarRacing, BipedalWalker
+- ``_VIZDOOM_MAPPINGS`` : ViZDoom scenarios
+- ``_MINIHACK_MAPPINGS`` : MiniHack dungeon crawling
+- ``_NETHACK_MAPPINGS`` : NetHack challenge
+- ``_CRAFTER_MAPPINGS`` : Crafter survival
+- ``_BABAISAI_MAPPINGS`` : BabaIsAI puzzles
+- ``_PROCGEN_MAPPINGS`` : Procgen games
+- ``_ALE_MAPPINGS`` : Atari / ALE
+- ``_JUMANJI_MAPPINGS`` : Jumanji logic games
 
 Common Key Reference
 ^^^^^^^^^^^^^^^^^^^^

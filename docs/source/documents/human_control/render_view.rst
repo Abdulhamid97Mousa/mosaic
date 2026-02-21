@@ -16,21 +16,21 @@ RendererStrategy Protocol
 Every renderer implements the ``RendererStrategy`` protocol defined in
 ``gym_gui.rendering.interfaces``:
 
-- ``mode`` -- the ``RenderMode`` this strategy handles.
-- ``widget`` -- the Qt widget that displays the rendered output.
-- ``render(payload, context)`` -- draw a single frame from the given
+- ``mode``: the ``RenderMode`` this strategy handles.
+- ``widget``: the Qt widget that displays the rendered output.
+- ``render(payload, context)``: draw a single frame from the given
   observation payload.
-- ``supports(payload)`` -- return ``True`` if this strategy can handle
+- ``supports(payload)``: return ``True`` if this strategy can handle
   the payload.
-- ``reset()`` -- clear state between episodes.
+- ``reset()``: clear state between episodes.
 
 RendererContext
 ^^^^^^^^^^^^^^
 
 A ``RendererContext`` dataclass carries metadata needed by strategies:
 
-- ``game_id`` -- the ``GameId`` enum identifying the current environment.
-- ``square_size`` -- pixel size per grid tile (used by the grid renderer).
+- ``game_id``:  is  ``GameId`` enum identifying the current environment.
+- ``square_size``:  pixel size per grid tile (used by the grid renderer).
 
 RendererRegistry
 ^^^^^^^^^^^^^^^^
@@ -38,10 +38,10 @@ RendererRegistry
 ``RendererRegistry`` maps ``RenderMode`` values to strategy factory
 functions:
 
-- ``register(mode, factory)`` -- add a new mode-to-strategy binding.
-- ``create(mode, parent)`` -- instantiate the strategy for the given mode.
-- ``is_registered(mode)`` -- check whether a mode has a registered factory.
-- ``supported_modes()`` -- list all registered modes.
+- ``register(mode, factory)``: add a new mode-to-strategy binding.
+- ``create(mode, parent)``: instantiate the strategy for the given mode.
+- ``is_registered(mode)``: check whether a mode has a registered factory.
+- ``supported_modes()``: list all registered modes.
 
 The convenience function ``create_default_renderer_registry()``
 pre-populates the registry with the ``GRID`` and ``RGB_ARRAY``
@@ -110,18 +110,15 @@ Mouse Interaction Modes
 The RGB renderer supports three optional mouse interaction modes for
 environments that need pointer input:
 
-**FPS Mouse Capture (ViZDoom)** --
-``set_mouse_capture_enabled()`` locks the cursor to the render widget.
+**FPS Mouse Capture (ViZDoom):** ``set_mouse_capture_enabled()`` locks the cursor to the render widget.
 Mouse deltas are forwarded via ``set_mouse_delta_callback()`` for
 first-person look control.  Press **Esc** to release the capture.
 
-**Grid Click (Jumanji Tetris / Minesweeper)** --
-``set_grid_click_callback(rows, cols, grid_rect)`` overlays a logical
+**Grid Click (Jumanji Tetris / Minesweeper):** ``set_grid_click_callback(rows, cols, grid_rect)`` overlays a logical
 grid on the rendered image.  Clicks are translated to ``(row, col)``
 coordinates and forwarded to the environment as discrete actions.
 
-**Scroll Wheel (Tetris Rotation)** --
-``set_scroll_callback()`` forwards mouse wheel events, typically used
+**Scroll Wheel (Tetris Rotation):** ``set_scroll_callback()`` forwards mouse wheel events, typically used
 for piece rotation in puzzle games.
 
 Grid Renderer
@@ -137,9 +134,9 @@ Asset System
 Each toy-text environment has a dedicated asset class that maps
 observation states to tile pixmaps:
 
-- ``FrozenLakeAssets`` -- ice, hole, start, goal, and elf sprites.
-- ``TaxiAssets`` -- road grid, passenger, destination, taxi sprites.
-- ``CliffWalkingAssets`` -- safe tiles, cliff tiles, agent sprite.
+- ``FrozenLakeAssets``: ice, hole, start, goal, and elf sprites.
+- ``TaxiAssets``: road grid, passenger, destination, taxi sprites.
+- ``CliffWalkingAssets``: safe tiles, cliff tiles, agent sprite.
 
 All asset classes use the ``AssetManager`` singleton, which provides
 pixmap caching and lazy loading to avoid reloading sprites on every
@@ -150,8 +147,8 @@ Tile Layers
 
 The grid renderer uses a two-layer system:
 
-1. **Base layer** -- static background tiles (ice, road, cliff edge).
-2. **Overlay layer** -- dynamic elements (agent position, items).
+1. **Base layer**: static background tiles (ice, road, cliff edge).
+2. **Overlay layer**: dynamic elements (agent position, items).
 
 This allows the agent sprite to move over the background without
 re-rendering static tiles.

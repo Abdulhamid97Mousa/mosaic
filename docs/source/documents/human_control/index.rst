@@ -1,7 +1,7 @@
 Human Control
 =============
 
-Human Control is the interactive play layer of MOSAIC -- keyboard input,
+Human Control is the interactive play layer of MOSAIC's keyboard input,
 mouse interaction, and the render view that displays environment state in
 real time.  Together these subsystems let a human player step into any
 supported environment and interact with it through the GUI.
@@ -35,14 +35,12 @@ Signal Flow
 Subsystems
 ----------
 
-**Keyboard Input** --
-Two input modes (shortcut-based for turn-based games, state-based for
+**Keyboard Input:** Two input modes (shortcut-based for turn-based games, state-based for
 real-time arcade games), per-environment key mappings covering all 26
 environment families, and multi-keyboard support for multi-agent play via
 Linux ``evdev``.  See :doc:`keyboard_input` for the full reference.
 
-**Render View** --
-A strategy-pattern rendering pipeline that converts environment
+**Render View:** A strategy-pattern rendering pipeline that converts environment
 observations into visual output.  Three built-in strategies cover grid
 tile maps, RGB pixel arrays, and interactive board games.  See
 :doc:`render_view` for the full reference.

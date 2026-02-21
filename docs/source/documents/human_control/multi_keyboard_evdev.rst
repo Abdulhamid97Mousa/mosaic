@@ -12,13 +12,13 @@ Why Multiple Keyboards?
 
 Multi-agent environments such as MultiGrid-Soccer (2 v 2, 4 agents),
 Overcooked (2 cooperating chefs), MeltingPot (up to 16 agents), or
-RWARE (2--8 warehouse robots) are designed for simultaneous human play.
+RWARE (2 to 8 warehouse robots) are designed for simultaneous human play.
 Each player needs a **dedicated keyboard** so that their key presses
 only move their own agent.
 
 A USB hub with at least 4 ports is recommended because:
 
-- Most laptops expose only 1--3 USB ports, which are already occupied by
+- Most laptops expose only 1 to 3 USB ports, which are already occupied by
   mouse, headset, or other peripherals.
 - A 4-port hub lets you connect 4 inexpensive USB keyboards (one per
   agent) to a single host USB port.
@@ -53,7 +53,7 @@ Tested hardware combinations:
      - Hub port 4
 
 All four keyboards share the **same key bindings** (WASD for movement,
-Space for interact, etc.) -- the evdev layer distinguishes them by which
+Space for interact, etc.), the evdev layer distinguishes them by which
 physical USB port they are plugged into, not by which keys are pressed.
 
 The X11 Problem
@@ -88,10 +88,10 @@ Three approaches were evaluated:
 
 Evidence is preserved in the test suite:
 
-- ``test_qt_keyboard_device_id.py`` -- all keyboards show ``systemId=3``
-- ``test_xinput2_multi_keyboard.py`` -- mouse events work, keyboard
+- ``test_qt_keyboard_device_id.py``: all keyboards show ``systemId=3``
+- ``test_xinput2_multi_keyboard.py``: mouse events work, keyboard
   events do not
-- ``test_usb_hub_keyboards.py`` -- evdev correctly identifies per-device
+- ``test_usb_hub_keyboards.py``: evdev correctly identifies per-device
   key presses
 
 Architecture
@@ -159,7 +159,7 @@ The complete path of a single key press from hardware to game action:
    (e.g., ``agent_1``).
 7. ``linux_keycode_to_qt_key(17)`` converts Linux keycode 17 to
    ``Qt.Key.Key_W``, then ``int()`` converts the enum to an integer
-   (critical -- the pressed-keys set stores plain integers for
+   (**critical**: the pressed-keys set stores plain integers for
    compatibility with the ``KeyCombinationResolver``).
 8. The key is added to ``_agent_pressed_keys["agent_1"]``.
 9. The ``KeyCombinationResolver`` for this environment inspects
@@ -199,18 +199,18 @@ A ``QObject`` that runs on a dedicated ``QThread``.  Located at
 
 **Key methods:**
 
-- ``discover_keyboards()`` -- scans ``/dev/input/by-path/*kbd`` and
+- ``discover_keyboards()`` : scans ``/dev/input/by-path/*kbd`` and
   ``/dev/input/by-id/*kbd``, deduplicates by real path, reads device
   names from ``/proc/bus/input/devices``.
-- ``add_device(device)`` -- opens the event file with
+- ``add_device(device)`` : opens the event file with
   ``O_RDONLY | O_NONBLOCK``.  On ``PermissionError``, emits an error
   with instructions to run ``sudo usermod -a -G input $USER``.
-- ``start_monitoring()`` -- moves itself to a ``QThread`` and enters the
+- ``start_monitoring()`` : moves itself to a ``QThread`` and enters the
   ``_monitor_loop()``.
-- ``_monitor_loop()`` -- calls ``select()`` with a 0.5 s timeout across
+- ``_monitor_loop()`` : calls ``select()`` with a 0.5 s timeout across
   all open file descriptors; dispatches to ``_process_device_events()``
   for each readable fd.
-- ``_process_device_events(fd)`` -- reads 24-byte packets, unpacks with
+- ``_process_device_events(fd)`` : reads 24-byte packets, unpacks with
   ``struct.unpack('llHHi', data)``, emits ``key_pressed`` or
   ``key_released`` on ``EV_KEY`` events.
 
@@ -218,7 +218,7 @@ Device Path Strategy
 ^^^^^^^^^^^^^^^^^^^^
 
 MOSAIC uses ``/dev/input/by-path/*-event-kbd`` paths because they are
-**stable across reboots** -- the path encodes the USB topology (PCI bus,
+**stable across reboots**, the path encodes the USB topology (PCI bus,
 hub port number), not a volatile event number.
 
 Example paths for 4 keyboards on one hub::
@@ -264,15 +264,15 @@ KeyboardAssignmentWidget
 A Qt widget (``gym_gui/ui/widgets/keyboard_assignment_widget.py``) that
 provides the user interface for mapping keyboards to agents:
 
-- **Auto-detection** -- discovers all connected USB keyboards via the
+- **Auto-detection:** discovers all connected USB keyboards via the
   evdev monitor.
-- **Auto-assign** -- maps the first *N* discovered keyboards to agents
+- **Auto-assign:** maps the first *N* discovered keyboards to agents
   0..*N*-1 in the order they appear on the USB bus.
-- **Manual override** -- drag-and-drop or drop-down selection to
+- **Manual override:** drag-and-drop or drop-down selection to
   reassign any keyboard to any agent.
-- **Test mode** -- press any key and the widget highlights which agent
+- **Test mode:** press any key and the widget highlights which agent
   the keyboard controls.
-- **Persistence** -- assignments are saved to
+- **Persistence:** assignments are saved to
   ``config/keyboard_assignments.yaml`` and restored on next launch.
 
 Why State-Based Mode Is Required
@@ -320,7 +320,7 @@ System Requirements
 Platform
 ^^^^^^^^
 
-- **Linux only** -- evdev is a Linux kernel interface.
+- **Linux only:** evdev is a Linux kernel interface.
 - Tested on **Ubuntu 22.04** with X11.
 - Kernel 2.6 or later (evdev has been stable since 2003).
 
@@ -346,7 +346,7 @@ Hardware
 ^^^^^^^^
 
 - A USB hub (4+ ports recommended).
-- One USB keyboard per agent.  Any brand works -- keyboards do not need
+- One USB keyboard per agent.  Any brand works, keyboards do not need
   to match.
 
 User Workflow
@@ -369,7 +369,7 @@ In-Game Usage
 3. Set the number of agents (e.g., 4).
 4. Click **Load Environment**.
 5. The **Keyboard Assignment Widget** appears automatically.
-6. Click **Auto-Assign** -- keyboards are mapped to agents in USB-port
+6. Click **Auto-Assign**, keyboards are mapped to agents in USB-port
    order.
 7. Click **Apply Assignments**.
 8. Start the game.  Each keyboard controls only its assigned agent.
@@ -423,7 +423,7 @@ Keyboard-to-agent assignments are saved to
        product_id: "c34b"
 
 Because paths are based on USB topology, the same physical port always
-maps to the same agent -- even after a reboot.
+maps to the same agent, even after a reboot.
 
 Performance
 -----------
@@ -502,9 +502,9 @@ Qt shortcuts which fire globally.
 Known Limitations
 -----------------
 
-- **Linux only** -- evdev is not available on Windows or macOS.
-- **USB required** -- Bluetooth keyboards may have unreliable device
+- **Linux only:** evdev is not available on Windows or macOS.
+- **USB required:** Bluetooth keyboards may have unreliable device
   paths.
-- **Same key layout** -- all keyboards share the same key bindings
+- **Same key layout:** all keyboards share the same key bindings
   (WASD, etc.).  Per-keyboard remapping is not yet supported.
-- **GUI required** -- headless/CLI mode does not support multi-keyboard.
+- **GUI required:** headless/CLI mode does not support multi-keyboard.

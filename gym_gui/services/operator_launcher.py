@@ -979,29 +979,46 @@ class OperatorLauncher:
                 message="RL operator requires 'task' (environment ID)",
             )
 
-        # Build cleanrl-worker command
-        cmd = [
-            self._python_executable,
-            "-m", "cleanrl_worker.cli",
-            "--interactive",  # Always use interactive mode for operators
-            "--run-id", run_id,
-            "--algo", algorithm,
-            "--env-id", env_id,
-            "--policy-path", str(policy_path),
-        ]
+        # Dispatch based on worker_id
+        if config.worker_id == "xuance_worker":
+            # XuanCe MARL worker (IPPO, MAPPO, etc.)
+            # InteractiveRuntime reads commands from stdin/stdout.
+            cmd = [
+                self._python_executable,
+                "-m", "xuance_worker.cli",
+                "--interactive",
+                "--env-id", env_id,
+                "--method", algorithm,
+                "--policy-path", str(policy_path),
+            ]
 
-        # Add seed if provided
-        seed = settings.get("seed")
-        if seed is not None:
-            cmd.extend(["--seed", str(seed)])
+            seed = settings.get("seed")
+            if seed is not None:
+                cmd.extend(["--seed", str(seed)])
 
-        # Add verbose flag for debugging
-        if settings.get("verbose"):
-            cmd.append("--verbose")
+        else:
+            # Default: CleanRL worker
+            cmd = [
+                self._python_executable,
+                "-m", "cleanrl_worker.cli",
+                "--interactive",  # Always use interactive mode for operators
+                "--run-id", run_id,
+                "--algo", algorithm,
+                "--env-id", env_id,
+                "--policy-path", str(policy_path),
+            ]
+
+            seed = settings.get("seed")
+            if seed is not None:
+                cmd.extend(["--seed", str(seed)])
+
+            if settings.get("verbose"):
+                cmd.append("--verbose")
 
         LOGGER.info(
-            "Built RL command for operator %s | algo=%s env=%s policy=%s",
+            "Built RL command for operator %s | worker=%s algo=%s env=%s policy=%s",
             config.operator_id,
+            config.worker_id,
             algorithm,
             env_id,
             policy_path,

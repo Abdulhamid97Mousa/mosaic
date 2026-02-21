@@ -53,7 +53,7 @@ class OperatorsTab(QtWidgets.QWidget):
     # Signals
     operators_changed = pyqtSignal(list)  # List[OperatorConfig]
     step_all_requested = pyqtSignal(int)  # Emit with current seed
-    reset_all_requested = pyqtSignal(int)  # Emit with current seed
+    reset_all_requested = pyqtSignal(object)  # Emit with current seed (int or None)
     stop_operators_requested = pyqtSignal()
     initialize_operator_requested = pyqtSignal(str, object, object)  # operator_id, config, seed (int or None)
     step_player_requested = pyqtSignal(str, int)  # player_id, seed
@@ -401,10 +401,14 @@ class OperatorsTab(QtWidgets.QWidget):
 
     def _on_reset_all_clicked(self) -> None:
         """Handle Reset All button click."""
-        seed = self._seed_spin.value()
+        if self._use_shared_seed_checkbox.isChecked():
+            seed = self._seed_spin.value()
+        else:
+            seed = None
         self._step_count = 0
         self._step_count_label.setText("Steps: 0")
-        self._status_label.setText(f"Resetting with seed {seed}...")
+        seed_display = str(seed) if seed is not None else "random"
+        self._status_label.setText(f"Resetting with seed {seed_display}...")
         self._is_running = True
         self._human_step_completed = False  # Reset human step state
         self.reset_all_requested.emit(seed)
