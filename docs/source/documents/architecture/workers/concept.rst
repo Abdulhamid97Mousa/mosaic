@@ -129,27 +129,10 @@ The Shim Pattern
 Workers never modify the upstream library.  Instead, a thin **shim
 layer** sits between MOSAIC and the library, translating everything:
 
-.. mermaid::
-
-   graph TB
-       subgraph Core["MOSAIC Core"]
-           D["Trainer Daemon"] ~~~ G["Qt6 GUI"]
-       end
-
-       subgraph Shim["MOSAIC Shim Layer"]
-           S1["config.py<br/>Translate JSON → CLI"] ~~~ S2["runtime.py<br/>Manage lifecycle"] ~~~ S3["telemetry.py<br/>Emit JSONL"] ~~~ S4["analytics.py<br/>Generate manifests"] ~~~ S5["fastlane.py<br/>Shared-memory rendering"]
-       end
-
-       subgraph Upstream["Upstream Library -- Unmodified"]
-           U1["ppo.py"] ~~~ U2["dqn.py"] ~~~ U3["sac.py"]
-       end
-
-       Core -->|"gRPC + JSONL"| Shim
-       Shim --> Upstream
-
-       style Core fill:#4a90d9,stroke:#2e5a87,color:#fff
-       style Shim fill:#ff7f50,stroke:#cc5500,color:#fff
-       style Upstream fill:#e8e8e8,stroke:#999
+.. figure:: /images/workers/concepts/shim_pattern.jpg
+   :alt: The Shim Pattern — MOSAIC Core → Shim Layer → Upstream Library
+   :align: center
+   :width: 90%
 
 **Benefits:**
 

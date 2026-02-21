@@ -114,7 +114,7 @@ Common Errors
 -------------
 
 If you encounter build failures or dependency conflicts during installation,
-see the :doc:`common_errors` page for solutions to all known issues, including:
+see the :doc:`common_errors/index` page for solutions to all known issues, including:
 
 - ``swig`` not found (Box2D)
 - ``nle`` build failure (NetHack)

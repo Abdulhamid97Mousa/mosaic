@@ -8,44 +8,10 @@ Workers communicate with the MOSAIC core through a layered IPC
 Three-Tier Process Model
 ------------------------
 
-.. mermaid::
-
-   %%{init: {"flowchart": {"curve": "linear"}} }%%
-   graph TB
-       subgraph Tier1["Tier 1 · Main Process"]
-           GUI["Qt6 GUI"]
-           TC["TrainerClient<br/>(gRPC async client)"]
-           GUI --> TC
-       end
-
-       subgraph Tier2["Tier 2 · Daemon Process"]
-           TS["TrainerService<br/>(gRPC server @ 127.0.0.1:50055)"]
-           DISP["TrainerDispatcher<br/>(subprocess manager)"]
-           REG["RunRegistry<br/>(SQLite state store)"]
-           REB["RunEventBroadcaster<br/>(fan-out queues)"]
-           RTB["RunTelemetryBroadcaster<br/>(step/episode fan-out)"]
-           TS --> DISP
-           TS --> REG
-           TS --> REB
-           TS --> RTB
-           DISP --> REG
-       end
-
-       subgraph Tier3["Tier 3 · Worker Processes"]
-           PROXY["Telemetry Proxy<br/>(sidecar)"]
-           WORKER["Worker Process<br/>(e.g. cleanrl_worker)"]
-           PROXY -->|"tail stdout"| WORKER
-       end
-
-       TC -- "gRPC over HTTP/2" --> TS
-       DISP -- "spawn" --> PROXY
-       PROXY -- "spawn" --> WORKER
-       PROXY -- "PublishRunSteps<br/>PublishRunEpisodes" --> TS
-       RTB -- "StreamRunSteps" --> TC
-
-       style Tier1 fill:#e3f2fd,stroke:#1565c0
-       style Tier2 fill:#e8f5e9,stroke:#2e7d32
-       style Tier3 fill:#fff3e0,stroke:#e65100
+.. image:: ../../../images/workers/architecture/ipc_architecture.jpg
+   :alt: Three-tier process model — Tier 1 Main Process, Tier 2 Daemon Process, Tier 3 Worker Processes
+   :align: center
+   :width: 100%
 
 Process Hierarchy
 ~~~~~~~~~~~~~~~~~

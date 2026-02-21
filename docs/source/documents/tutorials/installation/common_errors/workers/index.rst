@@ -27,7 +27,7 @@ library.
 
 .. code-block:: text
 
-   /home/zahra/.../scripts/curriculum_babyai_goto.sh: line 78: jq: command not found
+   /path/to/mosaic/scripts/curriculum_babyai_goto.sh: line 78: jq: command not found
 
 **Cause:** The ``jq`` command-line JSON processor is not installed on the
 system.  CleanRL curriculum training scripts (e.g.

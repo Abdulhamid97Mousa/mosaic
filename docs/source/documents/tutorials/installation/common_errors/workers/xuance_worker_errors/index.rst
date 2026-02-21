@@ -38,7 +38,7 @@ but not ``xuance``, so the ``from xuance import get_runner`` call fails.
 
 .. code-block:: bash
 
-   cd /home/zahra/projects_hamid/GUI_BDI_RL
+   cd /path/to/mosaic
    source .venv/bin/activate
 
    # 1. Initialise the XuanCe submodule
@@ -134,7 +134,7 @@ Version Compatibility
 
    .. code-block:: bash
 
-      cd /home/zahra/projects_hamid/GUI_BDI_RL
+      cd /path/to/mosaic
       source .venv/bin/activate
       cd 3rd_party/xuance_worker/xuance
       git pull origin main
@@ -240,36 +240,43 @@ Curriculum environment swap does not switch the environment
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Symptom:** After Phase 1 completes, the logs say the environment was
-swapped to the new env_id (e.g. ``soccer_1vs1``), but the FastLane
+swapped to the new ``env_id`` (e.g. ``soccer_1vs1``), but the FastLane
 visualization and training behaviour remain on the Phase 1 environment
 (e.g. ``collect_1vs1``).  Rewards and episode lengths do not change.
+The process eventually crashes because the agent is stepping a closed
+environment handle.
 
-**Cause:** XuanCe's ``MARLAgents`` stores training environments in
-``self.train_envs``, and the on-policy training loop
-(``on_policy_marl.py``) reads exclusively from ``self.train_envs``:
-
-.. code-block:: python
-
-   # XuanCe's on_policy_marl.py training loop
-   obs_dict = self.train_envs.buf_obs          # line 413
-   next_obs_dict, ... = self.train_envs.step(actions_dict)  # line 420
-
-A previous bug in the MOSAIC harness set ``runner.agent.envs`` (a
-non-existent attribute) instead of ``runner.agent.train_envs``.  The
-assignment silently created a new attribute on the agent object, but the
-training loop never read it -- so the agent kept stepping through the
-Phase 1 environments for the entire run.
-
-**Fix:** The swap code now correctly sets ``runner.agent.train_envs``,
-with a runtime assertion to prevent future regressions:
+**Root cause:** XuanCe's on-policy training loop (``on_policy_marl.py``)
+reads exclusively from ``self.envs``:
 
 .. code-block:: python
 
-   runner.agent.train_envs = new_envs
-   assert runner.agent.train_envs is new_envs
+   # XuanCe on_policy_marl.py -- the attribute that actually matters
+   obs_dict = self.envs.buf_obs
+   next_obs_dict, ... = self.envs.step(actions_dict)
 
-A regression test in ``tests/test_env_swap.py`` verifies the swap code
-targets the correct attribute by inspecting the source.
+The MOSAIC harness was setting ``runner.agents.train_envs = new_envs``.
+The attribute ``train_envs`` does **not exist** on XuanCe's
+``MARLAgents``.  Python silently creates a new attribute on the object,
+the training loop never sees it, and the agent continues stepping the
+already-closed Phase 1 environment handles until the process crashes.
+
+**Fix:** The swap in ``multi_agent_curriculum_training.py`` now sets
+``runner.agents.envs``, the attribute XuanCe actually reads, with a
+runtime assertion to catch any future regression:
+
+.. code-block:: python
+
+   # Before (bug): train_envs does not exist in XuanCe
+   runner.agents.train_envs = new_envs   # silently ignored
+
+   # After (fix): envs is what on_policy_marl.py reads
+   runner.agents.envs = new_envs
+   assert runner.agents.envs is new_envs
+
+A regression test in ``tests/test_env_swap.py`` confirms that the swap
+code targets ``runner.agents.envs`` and that the attribute is identical
+to the newly created environment after the swap.
 
 -----
 

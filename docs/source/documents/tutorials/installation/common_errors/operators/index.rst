@@ -146,7 +146,7 @@ environment.
 .. code-block:: bash
 
    source .venv/bin/activate
-   cd /home/zahra/projects_hamid/GUI_BDI_RL
+   cd /path/to/mosaic
    pip install ".[mosaic_multigrid]"
 
 This installs ``mosaic-multigrid==4.4.0`` plus all base dependencies
@@ -211,7 +211,7 @@ the Python path or the submodule was not initialized.
 .. code-block:: bash
 
    source .venv/bin/activate
-   cd /home/zahra/projects_hamid/GUI_BDI_RL
+   cd /path/to/mosaic
    pip install ".[multigrid_ini]"
 
 **Fix -- Option B: Install from local directory:**

@@ -4,7 +4,7 @@ XuanCe Worker
 The XuanCe worker is MOSAIC's **multi-agent and comprehensive RL** integration.
 It wraps the `XuanCe <https://github.com/agi-brain/xuance>`_ library — a
 unified deep RL library with 46+ algorithms across single-agent, multi-agent,
-and offline RL — behind the standard :doc:`shim pattern <../concept>`, adding
+and offline RL — behind the standard :doc:`shim pattern <../../concept>`, adding
 subprocess isolation, FastLane telemetry, curriculum learning, and GUI
 configuration.
 
@@ -291,28 +291,10 @@ advertising support for up to 100 agents, discrete and continuous action
 spaces, and the ``multigrid``, ``smac``, ``mpe``, and ``pettingzoo``
 environment families.
 
-File Layout
------------
 
-.. code-block:: text
 
-   3rd_party/xuance_worker/xuance_worker/
-   +-- __init__.py                       # Lazy exports, get_worker_metadata()
-   +-- cli.py                            # CLI entry point (--config, --dry-run)
-   +-- config.py                         # XuanCeWorkerConfig dataclass
-   +-- runtime.py                        # XuanCeWorkerRuntime, InteractiveRuntime
-   +-- fastlane.py                       # FastLane telemetry integration
-   +-- sitecustomize.py                  # Import-time patches (mpi4py, paths)
-   +-- xuance_shims.py                   # Redirect XuanCe output to var/
-   +-- algorithm_registry.py            # Backend / Paradigm / AlgorithmInfo index
-   +-- analytics.py                      # Run summary manifest
-   +-- multi_agent_curriculum_training.py  # In-memory env-swap curriculum
-   +-- single_agent_curriculum_training.py # Single-agent curriculum variant
-   +-- _compat.py                        # Backwards-compatibility helpers
-   +-- _patches.py                       # XuanCe monkey-patches
-   +-- wrappers/
-   |   +-- curriculum.py                # Curriculum env wrappers
-   +-- environments/
-   |   +-- mosaic_multigrid.py          # MultiGrid env registration
-   +-- scripts/                         # Pre-built training shell scripts
-   +-- configs/                         # Default XuanCe YAML config overrides
+.. toctree::
+   :maxdepth: 1
+
+   installation
+   common_errors

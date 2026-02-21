@@ -35,7 +35,7 @@ cannot find the mapped package directories and the build fails.
 .. code-block:: bash
 
    # 1. Initialise the CleanRL submodule
-   cd /home/zahra/projects_hamid/GUI_BDI_RL
+   cd /path/to/mosaic
    git submodule update --init 3rd_party/cleanrl_worker/cleanrl
 
    # If the above fails with "did not match any file(s) known to git",

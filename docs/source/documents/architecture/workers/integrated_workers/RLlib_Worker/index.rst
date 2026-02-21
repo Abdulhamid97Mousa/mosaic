@@ -4,7 +4,7 @@ Ray RLlib Worker
 The Ray RLlib worker is MOSAIC's **distributed multi-agent RL** integration.
 It wraps `Ray RLlib <https://docs.ray.io/en/latest/rllib/index.html>`_ —
 Ray's scalable reinforcement learning library — behind the standard
-:doc:`shim pattern <../concept>`, providing distributed training across
+:doc:`shim pattern <../../concept>`, providing distributed training across
 multiple CPUs or GPUs, PettingZoo multi-agent environment support, and
 flexible policy configurations including self-play and independent learning.
 
@@ -266,20 +266,9 @@ advertising support for self-play, population-based training, pause/resume,
 and up to 100 agents across the ``sisl``, ``classic``, ``butterfly``, and
 ``mpe`` environment families.
 
-File Layout
------------
 
-.. code-block:: text
+.. toctree::
+   :maxdepth: 1
 
-   3rd_party/ray_worker/ray_worker/
-   +-- __init__.py            # Exports, get_worker_metadata()
-   +-- cli.py                 # CLI entry point (--config, --dry-run)
-   +-- config.py              # RayWorkerConfig and sub-config dataclasses
-   +-- runtime.py             # RayWorkerRuntime, EnvironmentFactory
-   +-- fastlane.py            # FastLane telemetry hooks
-   +-- sitecustomize.py       # Import-time patches
-   +-- algo_params.py         # Schema-based algorithm hyperparameter registry
-   +-- policy_actor.py        # RayPolicyActor, RayPolicyController (inference)
-   +-- policy_evaluator.py    # PolicyEvaluator, run_evaluation()
-   +-- evaluation_results.py  # EpisodeMetrics, EvaluationResults dataclasses
-   +-- analytics.py           # Run manifest
+   installation
+   common_errors

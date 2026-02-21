@@ -18,7 +18,7 @@ dependency; install only the ones you need.
 
    Environment families and workers are independent -- install any
    combination you need.  See the
-   :doc:`Installation Guide </documents/tutorials/installation>` for details.
+   :doc:`Installation Guide </documents/tutorials/installation/index>` for details.
 
 .. toctree::
    :maxdepth: 2

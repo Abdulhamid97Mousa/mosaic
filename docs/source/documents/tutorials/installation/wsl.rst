@@ -277,7 +277,7 @@ Common Build Errors
 -------------------
 
 Build failures and dependency conflicts are shared across Ubuntu and WSL.
-See the :doc:`common_errors` page for all known issues and fixes, including:
+See the :doc:`common_errors/index` page for all known issues and fixes, including:
 
 - ``swig`` not found (Box2D)
 - ``nle`` build failure (NetHack)

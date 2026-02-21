@@ -275,7 +275,7 @@ and produces:
 .. code-block:: text
 
    (.venv) $ bash ./tools/generate_protos.sh
-   [protos] Root: /home/zahra/projects_hamid/GUI_BDI_RL
+   [protos] Root: /path/to/mosaic
    [protos] grpcio-tools not installed. Run: pip install grpcio-tools
 
 **Cause:** The proto generation script requires ``grpcio-tools`` to compile
@@ -294,7 +294,7 @@ Then re-run the proto generation:
 .. code-block:: bash
 
    (.venv) $ bash ./tools/generate_protos.sh
-   [protos] Root: /home/zahra/projects_hamid/GUI_BDI_RL
+   [protos] Root: /path/to/mosaic
    [protos] Generating trainer stubs
    [protos] Done
 

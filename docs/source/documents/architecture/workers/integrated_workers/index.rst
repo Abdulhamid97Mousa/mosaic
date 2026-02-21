@@ -1,10 +1,11 @@
 Integrated Workers
 ==================
 
-MOSAIC ships with three production-ready workers that wrap major RL
-frameworks.  Each worker follows the :doc:`shim pattern <../concept>`:
-upstream libraries are **never modified**; a thin integration layer
-translates between MOSAIC and the library.
+MOSAIC ships with four production-ready workers that wrap major RL
+frameworks and LLM evaluation suites.  Each worker follows the
+:doc:`shim pattern <../concept>`: upstream libraries are **never
+modified**; a thin integration layer translates between MOSAIC and
+the library.
 
 .. list-table::
    :header-rows: 1
@@ -12,7 +13,7 @@ translates between MOSAIC and the library.
 
    * - Worker
      - Paradigm
-     - Algorithms
+     - Algorithms / Models
      - Environments
      - Execution Model
    * - :doc:`CleanRL <CleanRL_Worker/index>`
@@ -20,16 +21,21 @@ translates between MOSAIC and the library.
      - PPO, DQN, SAC, TD3, DDPG, C51
      - Gymnasium, Atari, MiniGrid, BabyAI, Procgen
      - Subprocess
-   * - :doc:`XuanCe <xuance>`
+   * - :doc:`XuanCe <XuanCe_Worker/index>`
      - Multi-Agent
      - MAPPO, QMIX, MADDPG, VDN, COMA + 40 more
      - PettingZoo, SMAC, MultiGrid, MPE
      - In-process
-   * - :doc:`Ray RLlib <ray_rllib>`
+   * - :doc:`Ray RLlib <RLlib_Worker/index>`
      - Both
      - PPO, IMPALA, APPO, DQN, A2C
      - PettingZoo (SISL, Classic, Butterfly, MPE)
      - Ray cluster
+   * - :doc:`BALROG <BALROG_Worker/index>`
+     - LLM/VLM Evaluation
+     - GPT-4o, Claude 3, Gemini, vLLM (local)
+     - NetHack, MiniHack, BabyAI, Crafter, TextWorld
+     - Subprocess (parallel)
 
 Each worker provides:
 
@@ -105,8 +111,9 @@ Each worker has dedicated GUI form widgets for experiment configuration:
      - Distributed training setup
 
 .. toctree::
-   :maxdepth: 2
+   :maxdepth: 1
 
    CleanRL_Worker/index
-   xuance
-   ray_rllib
+   XuanCe_Worker/index
+   RLlib_Worker/index
+   BALROG_Worker/index

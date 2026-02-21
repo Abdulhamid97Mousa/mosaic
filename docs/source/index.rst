@@ -39,11 +39,17 @@ together to form a complete picture of agent performance.
    :alt: MOSAIC Platform Overview
    :align: center
    :width: 100%
+   :target: documents/architecture/workers/architecture.html
 
-   The architecture shows the Evaluation Phase (operators containing workers),
-   Training Phase (TrainerClient, TrainerService, Workers),
+   The architecture shows the
+   :doc:`Evaluation Phase <documents/architecture/operators/index>` (operators containing workers),
+   :doc:`Training Phase <documents/architecture/workers/architecture>` (TrainerClient, TrainerService, Workers),
    Daemon Process (gRPC Server, RunRegistry, Dispatcher, Broadcasters),
-   and Worker Processes (CleanRL, XuanCe, Ray RLlib, BALROG, MOSAIC LLM).
+   and :doc:`Worker Processes <documents/architecture/workers/integrated_workers/index>`
+   (:doc:`CleanRL <documents/architecture/workers/integrated_workers/CleanRL_Worker/index>`,
+   :doc:`XuanCe <documents/architecture/workers/integrated_workers/XuanCe_Worker/index>`,
+   :doc:`Ray RLlib <documents/architecture/workers/integrated_workers/RLlib_Worker/index>`,
+   :doc:`BALROG <documents/architecture/workers/integrated_workers/BALROG_Worker/index>`).
 
 .. raw:: html
 
@@ -71,7 +77,10 @@ configurable step pacing for visual inspection or headless batch execution.
 Why MOSAIC?
 -----------
 
-Today's AI landscape offers powerful but **fragmented** tools: RL frameworks (CleanRL, RLlib, XuanCe),
+Today's AI landscape offers powerful but **fragmented** tools: RL frameworks
+(`CleanRL <https://github.com/vwxyzjn/cleanrl>`_,
+`RLlib <https://docs.ray.io/en/latest/rllib/index.html>`_,
+`XuanCe <https://github.com/agi-brain/xuance>`_),
 language models (GPT, Claude), and robotics simulators (MuJoCo).
 Each excels in isolation, but **no platform bridges them together**
 under a unified, visual-first interface.
@@ -184,51 +193,13 @@ installation instructions, environment lists, and academic citations.
 Supported Workers
 -----------------
 
-* **CleanRL:**  Single-file RL implementations (PPO, DQN, SAC, TD3, DDPG, C51)
-* **XuanCe:**  Multi-agent algorithms (MAPPO, QMIX, MADDPG, VDN, COMA)
-* **RLlib:**  Distributed training with Ray (PPO, IMPALA, APPO)
-* **BALROG:**  Single-agent LLM benchmarking (MiniGrid, BabyAI, MiniHack, Crafter)
-* **MOSAIC LLM:**  Multi-agent LLM with coordination strategies and Theory of Mind (MultiGrid, BabyAI, MeltingPot, PettingZoo)
-* **Chess LLM:**  LLM chess play with multi-turn dialog (PettingZoo Chess)
-
-Quick Example
--------------
-
-.. code-block:: python
-
-   from gym_gui.services import PolicyMappingService
-   from gym_gui.core.enums import SteppingParadigm
-
-   # Configure heterogeneous agents for a Chess game
-   policy_service = PolicyMappingService()
-   policy_service.set_paradigm(SteppingParadigm.SEQUENTIAL)
-
-   # Player 0: Human control
-   policy_service.bind_agent_policy("player_0", "human_keyboard")
-
-   # Player 1: Trained RL policy
-   policy_service.bind_agent_policy("player_1", "cleanrl_ppo")
-
-Core Features
--------------
-
-**Multi-Paradigm Support**
-   Seamlessly switch between single-agent, multi-agent (AEC/Parallel), and hybrid environments
-   without changing your agent code.
-
-**Agent Integration**
-   Human, RL (CleanRL, Ray), and future LLM agents in the same framework.
-
-**Policy Mapping**
-   Assign different policies to different agents with flexible configuration through the
-   PolicyMappingService.
-
-**Robotics Support**
-   MuJoCo MPC for robotics control tasks.
-
-**Real-time Visualization**
-   Interactive render view with the MOSAIC space animation, live telemetry, and episode replay.
-
+* :doc:`CleanRL <documents/architecture/workers/integrated_workers/CleanRL_Worker/index>`: Single-file RL implementations (PPO, DQN, SAC, TD3, DDPG, C51)
+* :doc:`XuanCe <documents/architecture/workers/integrated_workers/XuanCe_Worker/index>`: Modular RL framework with flexible algorithm composition and custom environments.
+  Multi-agent algorithms (MAPPO, QMIX, MADDPG, VDN, COMA)
+* :doc:`Ray RLlib <documents/architecture/workers/integrated_workers/RLlib_Worker/index>`: RL with distributed training and large-batch optimization (PPO, IMPALA, APPO)
+* :doc:`BALROG <documents/architecture/workers/integrated_workers/BALROG_Worker/index>`: LLM/VLM agentic evaluation (GPT-4o, Claude 3, Gemini · NetHack, BabyAI, Crafter)
+* **MOSAIC LLM:** Multi-agent LLM with coordination strategies and Theory of Mind (MultiGrid, BabyAI, MeltingPot, PettingZoo)
+* **Chess LLM:** LLM chess play with multi-turn dialog (PettingZoo Chess)
 
 .. raw:: html
 
@@ -251,7 +222,7 @@ Core Features
 
 .. toctree::
    :hidden:
-   :maxdepth: 2
+   :maxdepth: 4
    :caption: Architecture
 
    documents/architecture/overview
