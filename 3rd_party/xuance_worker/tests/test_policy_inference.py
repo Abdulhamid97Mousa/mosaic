@@ -182,9 +182,9 @@ class TestIPPOPolicyInference:
         assert len(all_a) > 0 and len(all_b) > 0
 
     def test_invalid_player_id_raises(self):
-        """Querying with an invalid player_id should raise RuntimeError."""
+        """Querying with an invalid player_id should raise KeyError."""
         obs = np.random.rand(27).astype(np.float32)
-        with pytest.raises(RuntimeError, match="not in"):
+        with pytest.raises(KeyError):
             _get_action(self.agent, self.device, obs, "agent_99")
 
 
@@ -312,9 +312,9 @@ class TestFreshIPPOInference:
             env.close()
 
     def test_invalid_agent_key_raises(self):
-        """Invalid agent key raises RuntimeError."""
+        """Invalid agent key raises KeyError."""
         obs = np.random.rand(27).astype(np.float32)
-        with pytest.raises(RuntimeError):
+        with pytest.raises(KeyError):
             _get_action(self.agent, self.device, obs, "agent_99")
 
 
