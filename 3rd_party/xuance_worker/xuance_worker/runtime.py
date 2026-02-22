@@ -953,8 +953,16 @@ class InteractiveRuntime:
 
         # Load the model weights
         if hasattr(self._agent, 'load_model'):
-            self._agent.load_model(str(policy_file))
-            LOGGER.info("XuanCe agent model loaded from %s", policy_file)
+            # XuanCe's load_model() expects the env-level directory
+            # (e.g. .../collect_1vs1/). It auto-discovers seed_*/ subdirs
+            # and picks the latest .pth inside. If the user selected a
+            # specific .pth file, walk up to the env-level directory.
+            load_path = Path(policy_file)
+            if load_path.is_file():
+                # .pth → seed_dir → env_dir
+                load_path = load_path.parent.parent
+            self._agent.load_model(str(load_path))
+            LOGGER.info("XuanCe agent model loaded from %s", load_path)
         else:
             # Try loading directly via torch
             import torch

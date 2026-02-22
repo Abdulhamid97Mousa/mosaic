@@ -239,6 +239,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._parallel_action_panel: Optional[MultiAgentActionPanel] = None
         self._parallel_player_handles: Dict[str, Any] = {}  # agent_id -> handle
         self._parallel_multiagent_obs: Dict[Any, Any] = {}  # agent_key -> obs array
+        self._parallel_episode_reward: float = 0.0  # accumulated reward for current episode
+        self._parallel_step_index: int = 0  # step counter within current episode
+        self._parallel_episode_index: int = 0  # episode counter
         self._multigrid_aec_mode: bool = False  # True when env is a PettingZoo AEC env
 
         # Track dynamic agent tabs by (run_id, agent_id)
@@ -2620,6 +2623,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # Parallel envs return (obs, info) as usual.
         try:
             reset_result = self._parallel_multiagent_env.reset(seed=seed)
+            self._parallel_episode_reward = 0.0
+            self._parallel_step_index = 0
             if reset_result is None:
                 # PettingZoo AEC env — populate obs by calling observe() per agent
                 env = self._parallel_multiagent_env
@@ -2763,10 +2768,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             # Display in render container
             wrapped_payload = {
                 "render_payload": render_payload,
-                "episode_index": 0,
-                "step_index": 0,
+                "episode_index": self._parallel_episode_index,
+                "step_index": self._parallel_step_index,
                 "reward": 0.0,
-                "episode_reward": 0.0,
+                "episode_reward": self._parallel_episode_reward,
                 "terminated": False,
                 "truncated": False,
             }
@@ -2813,31 +2818,31 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # Collect AI actions by calling each worker's select_action
         for agent_id in ai_agents:
             handle = self._parallel_player_handles.get(agent_id)
-            action_space = (
-                env.action_spaces.get(agent_id)
-                if hasattr(env, "action_spaces")
-                else env.action_space
-            )
+
+            # Get per-agent action space (not the multi-agent Dict space)
+            agent_idx = int(str(agent_id).split("_")[-1]) if "_" in str(agent_id) else 0
+            if hasattr(env, "action_spaces") and agent_id in env.action_spaces:
+                action_space = env.action_spaces[agent_id]
+            elif hasattr(env.action_space, "spaces"):
+                action_space = env.action_space.spaces.get(agent_idx, env.action_space)
+            else:
+                action_space = env.action_space
 
             if handle is None or not handle.is_running:
-                _OP_LOGGER.warning(
-                    "No running worker for AI agent %s, using random fallback", agent_id
+                raise RuntimeError(
+                    f"No running worker for AI agent {agent_id}. "
+                    f"Start the worker before stepping."
                 )
-                action = action_space.sample() if hasattr(action_space, "sample") else 0
-                step_state.add_action(agent_id, action)
-                continue
 
             # Get and flatten the agent's observation.
             # mosaic_multigrid IndAgObs: obs is a dict with 'image' (3,3,3 array).
             # XuanCe IPPO/MAPPO was trained on the flattened image (27 floats).
             agent_obs = self._get_parallel_agent_obs(agent_id)
             if agent_obs is None:
-                _OP_LOGGER.warning(
-                    "No observation for AI agent %s, using random fallback", agent_id
+                raise RuntimeError(
+                    f"No observation for AI agent {agent_id}. "
+                    f"Reset the environment before stepping."
                 )
-                action = action_space.sample() if hasattr(action_space, "sample") else 0
-                step_state.add_action(agent_id, action)
-                continue
 
             if isinstance(agent_obs, dict):
                 image = agent_obs.get("image", next(iter(agent_obs.values())))
@@ -2858,7 +2863,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     "Bad response from AI agent %s: %s — using random fallback",
                     agent_id, response,
                 )
-                action = action_space.sample() if hasattr(action_space, "sample") else 0
+                action = int(action_space.sample()) if hasattr(action_space, "sample") else 0
 
             step_state.add_action(agent_id, action)
 
@@ -3127,24 +3132,31 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         _OP_LOGGER.info(f"Executing parallel step with actions: {actions}")
 
         try:
-            # Build action list keyed by env's native agent indices.
+            # Build action dict with integer keys.
             # config.workers uses string keys ("agent_0", "agent_1") but
-            # mosaic_multigrid uses integer keys (0, 1). Map between them.
-            if hasattr(env, "agents"):
-                int_actions: Dict[Any, int] = {}
-                for agent_id, action in actions.items():
+            # mosaic_multigrid uses integer keys (0, 1). Always convert.
+            int_actions: Dict[Any, int] = {}
+            for agent_id, action in actions.items():
+                try:
+                    idx = int(str(agent_id).split("_")[-1])
+                except (ValueError, AttributeError):
                     try:
-                        idx = int(str(agent_id).split("_")[-1])
-                    except (ValueError, AttributeError):
-                        try:
-                            idx = int(agent_id)
-                        except (ValueError, TypeError):
-                            continue
-                    int_actions[idx] = action
-                action_list = [int_actions.get(agent, 0) for agent in env.agents]
-                obs, rewards, terminateds, truncateds, infos = env.step(action_list)
+                        idx = int(agent_id)
+                    except (ValueError, TypeError):
+                        continue
+                int_actions[idx] = action
+
+            if hasattr(env, "agents"):
+                action_input = [int_actions.get(agent, 0) for agent in env.agents]
             else:
-                obs, rewards, terminateds, truncateds, infos = env.step(actions)
+                action_input = int_actions
+
+            obs, rewards, terminateds, truncateds, infos = env.step(action_input)
+
+            # Track step and accumulate reward
+            self._parallel_step_index += 1
+            step_reward = sum(rewards.values()) if isinstance(rewards, dict) else sum(rewards)
+            self._parallel_episode_reward += step_reward
 
             # Store updated observations so next step's select_action gets fresh obs
             if isinstance(obs, dict):
@@ -3158,16 +3170,29 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             all_truncated = all(truncateds.values()) if isinstance(truncateds, dict) else all(truncateds)
 
             if all_done or all_truncated:
-                total_reward = sum(rewards.values()) if isinstance(rewards, dict) else sum(rewards)
                 self._status_bar.showMessage(
-                    f"Episode done! Total reward: {total_reward:.2f}",
+                    f"Episode {self._parallel_episode_index} done at step {self._parallel_step_index}! "
+                    f"Total reward: {self._parallel_episode_reward:.2f}",
                     5000
                 )
-                _OP_LOGGER.info(f"Episode ended with total reward: {total_reward}")
+                _OP_LOGGER.info(
+                    "Episode %d ended at step %d with total reward: %.2f",
+                    self._parallel_episode_index, self._parallel_step_index,
+                    self._parallel_episode_reward,
+                )
+                # Auto-reset for next episode
+                self._parallel_episode_index += 1
+                self._parallel_episode_reward = 0.0
+                self._parallel_step_index = 0
+                reset_result = env.reset()
+                if reset_result is not None:
+                    obs, _info = reset_result
+                    if isinstance(obs, dict):
+                        self._parallel_multiagent_obs = obs
             else:
-                step_reward = sum(rewards.values()) if isinstance(rewards, dict) else sum(rewards)
                 self._status_bar.showMessage(
-                    f"Step completed. Reward: {step_reward:.2f}",
+                    f"Step {self._parallel_step_index}. Reward: {step_reward:.2f} "
+                    f"(episode total: {self._parallel_episode_reward:.2f})",
                     2000
                 )
 

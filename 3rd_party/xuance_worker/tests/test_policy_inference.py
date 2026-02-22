@@ -59,7 +59,10 @@ def _load_ippo_agent(env_id: str = "collect_1vs1", checkpoint: str = CHECKPOINT_
         config_path=config_path, is_test=True,
     )
     agent = runner.agent
-    agent.load_model(checkpoint)
+    # load_model() expects the env_id-level dir (e.g. .../collect_1vs1/)
+    # It auto-discovers seed_*/ subdirs and picks the latest .pth inside.
+    checkpoint_dir = str(Path(checkpoint).parent.parent)
+    agent.load_model(checkpoint_dir)
     device = next(iter(agent.policy.parameters())).device
     return agent, device
 
@@ -142,22 +145,35 @@ class TestIPPOPolicyInference:
     def test_policy_not_uniform(self):
         """Trained policy should NOT produce uniform random actions.
 
-        Run 100 queries on the same observation — a trained policy should
-        favour certain actions, unlike a uniform random policy.
+        Run 100 queries on an actual environment observation — a trained policy
+        should favour certain actions more than a uniform random policy.
         """
-        # Create a non-trivial observation (not all zeros)
-        obs = np.random.RandomState(0).rand(27).astype(np.float32)
+        from types import SimpleNamespace
+        from xuance_worker.environments.mosaic_multigrid import MultiGrid_Env
+
+        cfg = SimpleNamespace(
+            env_name="multigrid", env_id="collect_1vs1",
+            env_seed=42, training_mode="competitive",
+        )
+        env = MultiGrid_Env(cfg)
+        try:
+            obs, _ = env.reset()
+            test_obs = obs["agent_0"]
+        finally:
+            env.close()
+
         actions = [
-            _get_action(self.agent, self.device, obs, "agent_0")
-            for _ in range(100)
+            _get_action(self.agent, self.device, test_obs, "agent_0")
+            for _ in range(200)
         ]
-        unique = len(set(actions))
-        # A uniform policy over 8 actions would almost certainly hit 7-8 unique
-        # values in 100 samples. A trained policy should concentrate on fewer.
-        # We use a generous threshold: if ≤ 6 unique actions, it's non-uniform.
-        assert unique <= 7, (
-            f"Policy produced {unique} unique actions out of 100 — "
-            f"looks uniform/random. Expected trained concentration."
+        from collections import Counter
+        counts = Counter(actions)
+        most_common_freq = counts.most_common(1)[0][1]
+        # A uniform policy over 8 actions with 200 samples → ~25 each.
+        # A trained policy should have its top action appear > 40 times.
+        assert most_common_freq > 40, (
+            f"Policy's most common action appeared {most_common_freq}/200 times — "
+            f"looks uniform/random. Distribution: {dict(counts)}"
         )
 
     def test_different_obs_different_actions(self):
