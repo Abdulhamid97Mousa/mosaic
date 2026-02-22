@@ -8,8 +8,8 @@ The ParadigmAdapter bridges between the GUI/orchestrator and paradigm-specific
 environments (Gymnasium, PettingZoo AEC, PettingZoo Parallel, Jason/BDI).
 
 See Also:
-    - docs/1.0_DAY_41/TASK_1/00_multi_paradigm_orchestrator_plan.md
-    - docs/1.0_DAY_41/TASK_1/01_paradigm_comparison.md
+    - :doc:`/documents/architecture/paradigms` for stepping paradigm details
+    - :doc:`/documents/architecture/operators/concept` for operator architecture
 """
 
 from __future__ import annotations
@@ -82,7 +82,7 @@ class ParadigmAdapter(ABC):
         ...     result = adapter.step(actions)
 
     See Also:
-        - docs/1.0_DAY_41/TASK_1/01_paradigm_comparison.md for paradigm details
+        - :doc:`/documents/architecture/paradigms` for paradigm details
     """
 
     @property
@@ -628,7 +628,7 @@ class HierarchicalParadigmAdapter(ParadigmAdapter):
     the Jason/AgentSpeak bridge which is separate from RL stepping.
 
     See Also:
-        - docs/1.0_DAY_41/TASK_1/00_multi_paradigm_orchestrator_plan.md
+        - :doc:`/documents/architecture/paradigms` for multi-paradigm orchestration
     """
 
     def __init__(self, env: Any) -> None:

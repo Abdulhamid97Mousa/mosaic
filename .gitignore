@@ -247,8 +247,8 @@ _vizdoom.ini
 # Development Progress (internal documentation - not for public release)
 # =============================================================================
 
-# Paper drafts and research documents (private)
-docs/my_paper/
+# Paper drafts — related_papers/RLlib excluded
+docs/my_paper/related_papers/RLlib_Abstractions_for_Distributed_Reinforcement_Learning/
 
 
 #  

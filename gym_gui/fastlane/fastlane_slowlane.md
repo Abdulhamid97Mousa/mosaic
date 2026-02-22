@@ -53,7 +53,7 @@ Preconditions: these components do not exist yet, so the fast-lane GUI must be a
 
 1. **Create Qt Quick renderer shim (`gym_gui/ui/renderers/fastlane_item.py`)**
 
-  Implement a custom `QtQuick.QQuickPaintedItem` (or `QtQuick.QQuickItem` with a texture node) and expose it to QML via the Qt Qml registration APIs. Import `PySide6.QtQml` / `PySide6.QtQuick`, and either decorate the class with `@QtQml.QmlElement()` or invoke `QtQml.qmlRegisterType` to publish it under a namespace (for example `GymGui 1.0`), matching the module packaging notes in `docs/1.0_DAY_24/TASK_3/QtQml`. Store the latest `QImage` plus metrics, expose `@QtCore.Slot(QtGui.QImage, float, float, float)` invokables that update state, and call `update()` to trigger repainting.
+  Implement a custom `QtQuick.QQuickPaintedItem` (or `QtQuick.QQuickItem` with a texture node) and expose it to QML via the Qt Qml registration APIs. Import `PySide6.QtQml` / `PySide6.QtQuick`, and either decorate the class with `@QtQml.QmlElement()` or invoke `QtQml.qmlRegisterType` to publish it under a namespace (for example `GymGui 1.0`), matching the PySide6 QML registration conventions. Store the latest `QImage` plus metrics, expose `@QtCore.Slot(QtGui.QImage, float, float, float)` invokables that update state, and call `update()` to trigger repainting.
 
 1. **Author the QML shell (`gym_gui/ui/resources/qml/FastLaneView.qml`)**
 
@@ -78,8 +78,8 @@ Preconditions: these components do not exist yet, so the fast-lane GUI must be a
 ### Qt QML and Qt Quick integration notes
 
 - Leverage the Qt Qml engine APIs to publish custom types: either decorate classes with `@QtQml.QmlElement()` or call `QtQml.qmlRegisterType`, ensuring the namespace and version match the `import GymGui 1.0` statement used in QML.
-- Import `PySide6.QtQuick` to access the canonical visual types (`QQuickItem`, `QQuickPaintedItem`) and keep the QML scene focused on the Qt Quick “standard library” primitives outlined in `docs/1.0_DAY_24/TASK_3/QtQuick.md`.
-- When embedding the QML into widgets, keep a reference to the underlying `QQmlEngine` so disk cache or JavaScript-engine tweaks (see `docs/1.0_DAY_24/TASK_3/QtQml`) can be set centrally if performance tuning becomes necessary.
+- Import `PySide6.QtQuick` to access the canonical visual types (`QQuickItem`, `QQuickPaintedItem`) and keep the QML scene focused on the Qt Quick “standard library” primitives from the PySide6 documentation.
+- When embedding the QML into widgets, keep a reference to the underlying `QQmlEngine` so disk cache or JavaScript-engine tweaks (see PySide6 QtQml documentation) can be set centrally if performance tuning becomes necessary.
 
 ### Grounding references
 
@@ -87,7 +87,7 @@ Preconditions: these components do not exist yet, so the fast-lane GUI must be a
 - Telemetry plumbing: `gym_gui/controllers/live_telemetry_controllers.py`, `gym_gui/ui/widgets/live_telemetry_tab.py`, `gym_gui/ui/widgets/render_tabs.py`.
 - Presenter integration: `gym_gui/ui/presenters/workers/cleanrl_worker_presenter.py`, `gym_gui/ui/presenters/workers/registry.py`.
 - UI resource layout: keep new assets under `gym_gui/ui/...` to match existing module organization.
-- Qt QML / Qt Quick references: `docs/1.0_DAY_24/TASK_3/QtQml`, `docs/1.0_DAY_24/TASK_3/QtQuick.md`.
+- Qt QML / Qt Quick references: PySide6 official documentation for `QtQml` and `QtQuick` modules.
 
 ## Data Flow Overview
 

@@ -32,6 +32,8 @@ System Layers
      - EnvironmentAdapter (base), PettingZooAdapter, ALEAdapter, MiniGridAdapter, ViZDoomAdapter, SMACAdapter, and 50+ environment-specific adapters
    * - **Worker Layer (gRPC/IPC)**
      - CleanRL, XuanCe, RLlib, BALROG, MOSAIC LLM, Chess LLM
+   * - **Fast Lane (Shared Memory)**
+     - FastLaneWriter, FastLaneReader, FastLaneConsumer, SPSC ring buffer for real-time frame delivery
 
 Visual Layer
 ------------
@@ -93,3 +95,17 @@ External training and inference backends communicate via gRPC/IPC:
 - **BALROG**: Single-agent LLM benchmarking (MiniGrid, BabyAI, MiniHack, Crafter)
 - **MOSAIC LLM**: Multi-agent LLM with coordination strategies and Theory of Mind
 - **Chess LLM**: LLM chess play with multi-turn dialog
+
+Fast Lane
+---------
+
+The :doc:`/documents/rendering_tabs/fastlane` provides real-time frame delivery from workers to the GUI
+via a shared-memory SPSC ring buffer, bypassing the gRPC/SQLite slow lane
+for rendering. Key components:
+
+- **FastLaneWriter / FastLaneReader**: Shared-memory ring buffer with seqlock semantics
+- **FastLaneConsumer**: Qt-side poller that converts shared-memory frames to ``QImage``
+- **tile_frames()**: Composites vectorized environment frames into a single image
+- **worker_helpers**: Injects fast-lane environment variables into worker subprocess launch
+
+See the :doc:`/documents/rendering_tabs/index` section for the full rendering architecture.

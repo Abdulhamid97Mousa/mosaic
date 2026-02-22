@@ -15,8 +15,8 @@ For single-agent environments, it delegates to ActorService.
 For multi-agent, it maintains agent_id → policy_id mapping.
 
 See Also:
-    - docs/1.0_DAY_41/TASK_1/03_policy_mapping_service_plan.md
-    - docs/1.0_DAY_41/TASK_1/00_multi_paradigm_orchestrator_plan.md
+    - :doc:`/documents/architecture/policy_mapping` for policy mapping details
+    - :doc:`/documents/architecture/paradigms` for stepping paradigm architecture
 """
 
 from __future__ import annotations
@@ -75,7 +75,7 @@ class PolicyMappingService(LogConstantMixin):
         >>> mapping.bind_agent_policy("player_1", "cleanrl_worker")
 
     See Also:
-        - docs/1.0_DAY_41/TASK_1/03_policy_mapping_service_plan.md
+        - :doc:`/documents/architecture/policy_mapping` for policy mapping details
     """
 
     def __init__(self, actor_service: ActorService) -> None:

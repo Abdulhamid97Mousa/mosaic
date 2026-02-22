@@ -120,6 +120,36 @@ def _get_competition_num_groups(env: str, env_id: str) -> int | None:
 # Directory containing custom YAML configs shipped with xuance_worker
 _WORKER_CONFIGS_DIR = Path(__file__).resolve().parent / "configs"
 
+# Gymnasium ID → XuanCe short env_id mapping.
+# The GUI uses full gymnasium IDs; XuanCe configs/environments use short names.
+# Covers all MosaicMultiGrid and IniMultiGrid registered environments.
+_GYMNASIUM_TO_XUANCE: dict[str, str] = {
+    # MosaicMultiGrid — legacy (no IndAgObs)
+    "MosaicMultiGrid-Soccer-v0": "soccer",
+    "MosaicMultiGrid-Collect-v0": "collect",
+    "MosaicMultiGrid-Collect-2vs2-v0": "collect_2vs2",
+    "MosaicMultiGrid-Collect-1vs1-v0": "collect_1vs1",
+    # MosaicMultiGrid — IndAgObs
+    "MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0": "soccer_2vs2_indagobs",
+    "MosaicMultiGrid-Soccer-1vs1-IndAgObs-v0": "soccer_1vs1",
+    "MosaicMultiGrid-Collect-IndAgObs-v0": "collect_indagobs",
+    "MosaicMultiGrid-Collect-2vs2-IndAgObs-v0": "collect_2vs2_indagobs",
+    "MosaicMultiGrid-Collect-1vs1-IndAgObs-v0": "collect_1vs1",
+    "MosaicMultiGrid-Basketball-3vs3-IndAgObs-v0": "basketball_3vs3_indagobs",
+    # MosaicMultiGrid — TeamObs
+    "MosaicMultiGrid-Soccer-2vs2-TeamObs-v0": "soccer_2vs2_teamobs",
+    "MosaicMultiGrid-Collect-2vs2-TeamObs-v0": "collect_2vs2_teamobs",
+    "MosaicMultiGrid-Basketball-3vs3-TeamObs-v0": "basketball_3vs3_teamobs",
+}
+
+
+def _gymnasium_to_xuance_env_id(gym_id: str) -> str | None:
+    """Convert a gymnasium environment ID to the XuanCe short env_id.
+
+    Returns None if no mapping exists (non-multigrid environments).
+    """
+    return _GYMNASIUM_TO_XUANCE.get(gym_id)
+
 
 def _resolve_custom_config_path(
     method: str,
@@ -146,7 +176,20 @@ def _resolve_custom_config_path(
 
     yaml_path = _WORKER_CONFIGS_DIR / method / env / f"{env_id}.yaml"
     if not yaml_path.exists():
-        return None  # Fall back to XuanCe's built-in config lookup
+        # Fallback: convert gymnasium ID to XuanCe short env_id.
+        # The GUI passes full gymnasium IDs (e.g. "MosaicMultiGrid-Collect-1vs1-v0")
+        # but YAML config files use XuanCe's short names (e.g. "collect_1vs1").
+        short_id = _gymnasium_to_xuance_env_id(env_id)
+        if short_id:
+            yaml_path = _WORKER_CONFIGS_DIR / method / env / f"{short_id}.yaml"
+            if yaml_path.exists():
+                _logger = logging.getLogger(__name__)
+                _logger.info(
+                    "Mapped gymnasium ID '%s' -> xuance env_id '%s' -> config '%s'",
+                    env_id, short_id, yaml_path.name,
+                )
+        if not yaml_path.exists():
+            return None  # Fall back to XuanCe's built-in config lookup
 
     resolved = str(yaml_path)
     _logger = logging.getLogger(__name__)
@@ -867,11 +910,31 @@ class InteractiveRuntime:
         parser_args.parallels = 1
         parser_args.running_steps = 1  # Not training, just loading
 
+        # Resolve config YAML from the worker's own configs directory.
+        # XuanCe's get_runner() looks in its vendored package configs/ by default,
+        # which doesn't contain our multigrid configs.
+        # Also convert gymnasium ID to XuanCe short env_id for config lookup
+        # and runner creation (XuanCe's env factory expects short names).
+        xuance_env_id = _gymnasium_to_xuance_env_id(self._env_id) or self._env_id
+        if xuance_env_id != self._env_id:
+            LOGGER.info("Mapped gymnasium ID '%s' -> xuance env_id '%s'", self._env_id, xuance_env_id)
+
+        config_path = _resolve_custom_config_path(
+            method=self._method,
+            env=xuance_env,
+            env_id=xuance_env_id,
+            num_groups=None,
+            config_path=None,
+        )
+        if config_path:
+            LOGGER.info("Using worker config: %s", config_path)
+
         # Create runner to get agent — raises on failure (no silent fallback).
         runner = get_runner(
             algo=self._method,
             env=xuance_env,
-            env_id=self._env_id,
+            env_id=xuance_env_id,
+            config_path=config_path,
             parser_args=parser_args,
         )
 

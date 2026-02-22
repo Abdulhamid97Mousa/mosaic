@@ -246,6 +246,33 @@ def _get_env_class(env_id: str) -> Optional[Type]:
             from mosaic_multigrid.envs import CollectGame2HIndAgObsEnv10x10N2
             env_cls = CollectGame2HIndAgObsEnv10x10N2
 
+        # --- 2vs2 IndAgObs variants ---
+        elif env_id.lower() in ("soccer_2vs2_indagobs", "soccergame4hindagobsenv16x11n2"):
+            from mosaic_multigrid.envs import SoccerGame4HIndAgObsEnv16x11N2
+            env_cls = SoccerGame4HIndAgObsEnv16x11N2
+
+        elif env_id.lower() in ("collect_2vs2_indagobs", "collectgame4hindagobsenv10x10n2"):
+            from mosaic_multigrid.envs import CollectGame4HIndAgObsEnv10x10N2
+            env_cls = CollectGame4HIndAgObsEnv10x10N2
+
+        # --- 3vs3 IndAgObs variants ---
+        elif env_id.lower() in ("basketball_3vs3_indagobs", "basketballgame6hindagobsenv19x11n3"):
+            from mosaic_multigrid.envs import BasketballGame6HIndAgObsEnv19x11N3
+            env_cls = BasketballGame6HIndAgObsEnv19x11N3
+
+        # --- TeamObs variants (IndAgObs + teammate features) ---
+        elif env_id.lower() in ("soccer_2vs2_teamobs", "soccerteamobsenv"):
+            from mosaic_multigrid.envs import SoccerTeamObsEnv
+            env_cls = SoccerTeamObsEnv
+
+        elif env_id.lower() in ("collect_2vs2_teamobs", "collect2vs2teamobsenv"):
+            from mosaic_multigrid.envs import Collect2vs2TeamObsEnv
+            env_cls = Collect2vs2TeamObsEnv
+
+        elif env_id.lower() in ("basketball_3vs3_teamobs", "basketball3vs3teamobsenv"):
+            from mosaic_multigrid.envs import Basketball3vs3TeamObsEnv
+            env_cls = Basketball3vs3TeamObsEnv
+
     except ImportError as e:
         _logger.warning(f"Could not import mosaic_multigrid environment '{env_id}': {e}")
 
@@ -256,7 +283,15 @@ def _get_env_class(env_id: str) -> Optional[Type]:
 def get_available_environments() -> List[str]:
     """Return list of available MultiGrid environment IDs."""
     available = []
-    for env_id in ["soccer", "soccer_1vs1", "collect", "collect_1vs1"]:
+    for env_id in [
+        "soccer", 
+        "soccer_1vs1", 
+        "collect", "collect_1vs1",
+        "soccer_2vs2_indagobs", "collect_2vs2_indagobs",
+        "basketball_3vs3_indagobs",
+        "soccer_2vs2_teamobs", "collect_2vs2_teamobs",
+        "basketball_3vs3_teamobs",
+    ]:
         if _get_env_class(env_id) is not None:
             available.append(env_id)
     return available
@@ -299,6 +334,66 @@ MULTIGRID_ENV_INFO = {
         "team_names": ["green", "red"],
         "recommended_mode": TrainingMode.COMPETITIVE,
         "zero_sum": True,
+    },
+    # --- 2vs2 IndAgObs variants ---
+    "soccer_2vs2_indagobs": {
+        "full_name": "SoccerGame4HIndAgObsEnv16x11N2",
+        "description": "2v2 Soccer - IndAgObs, 16x11 FIFA grid, ball respawn",
+        "num_agents": 4,
+        "default_teams": [[0, 1], [2, 3]],
+        "team_names": ["green", "blue"],
+        "recommended_mode": TrainingMode.COMPETITIVE,
+        "zero_sum": True,
+    },
+    "collect_2vs2_indagobs": {
+        "full_name": "CollectGame4HIndAgObsEnv10x10N2",
+        "description": "2v2 ball collection - IndAgObs, 10x10, 7 balls",
+        "num_agents": 4,
+        "default_teams": [[0, 1], [2, 3]],
+        "team_names": ["green", "red"],
+        "recommended_mode": TrainingMode.COMPETITIVE,
+        "zero_sum": True,
+    },
+    # --- 3vs3 IndAgObs variants ---
+    "basketball_3vs3_indagobs": {
+        "full_name": "BasketballGame6HIndAgObsEnv19x11N3",
+        "description": "3v3 Basketball - IndAgObs, 19x11 court, score in opponent hoop",
+        "num_agents": 6,
+        "default_teams": [[0, 1, 2], [3, 4, 5]],
+        "team_names": ["green", "blue"],
+        "recommended_mode": TrainingMode.COMPETITIVE,
+        "zero_sum": True,
+    },
+    # --- TeamObs variants (IndAgObs + teammate features) ---
+    "soccer_2vs2_teamobs": {
+        "full_name": "SoccerTeamObsEnv",
+        "description": "2v2 Soccer - TeamObs (image + teammate positions/directions/ball)",
+        "num_agents": 4,
+        "default_teams": [[0, 1], [2, 3]],
+        "team_names": ["green", "blue"],
+        "recommended_mode": TrainingMode.COMPETITIVE,
+        "zero_sum": True,
+        "obs_type": "teamobs",
+    },
+    "collect_2vs2_teamobs": {
+        "full_name": "Collect2vs2TeamObsEnv",
+        "description": "2v2 Collect - TeamObs (image + teammate positions/directions/ball)",
+        "num_agents": 4,
+        "default_teams": [[0, 1], [2, 3]],
+        "team_names": ["green", "red"],
+        "recommended_mode": TrainingMode.COMPETITIVE,
+        "zero_sum": True,
+        "obs_type": "teamobs",
+    },
+    "basketball_3vs3_teamobs": {
+        "full_name": "Basketball3vs3TeamObsEnv",
+        "description": "3v3 Basketball - TeamObs (image + teammate positions/directions/ball)",
+        "num_agents": 6,
+        "default_teams": [[0, 1, 2], [3, 4, 5]],
+        "team_names": ["green", "blue"],
+        "recommended_mode": TrainingMode.COMPETITIVE,
+        "zero_sum": True,
+        "obs_type": "teamobs",
     },
 }
 
@@ -403,9 +498,11 @@ class MultiGrid_Env(RawMultiAgentEnv):
         # =====================================================================
         # IMPORTANT: Store env metadata BEFORE wrapping with FastLane
         # FastLane wrapper doesn't forward all attributes (agents, max_steps, etc.)
+        # TeamObs envs are gymnasium.Wrappers — look through to unwrapped env.
         # =====================================================================
-        self._base_env_agents = self.env.agents  # mosaic_multigrid agent objects
-        self._base_max_steps = getattr(self.env, 'max_steps', 10000)
+        _base = getattr(self.env, 'unwrapped', self.env)
+        self._base_env_agents = _base.agents  # mosaic_multigrid agent objects
+        self._base_max_steps = getattr(_base, 'max_steps', getattr(self.env, 'max_steps', 10000))
 
         # Store scenario name for reference
         self.scenario_name = f"{env_name}.{env_id}"
@@ -440,10 +537,21 @@ class MultiGrid_Env(RawMultiAgentEnv):
         obs_space_0 = self.env.observation_space[0]  # Dict space for agent 0
         img_space = obs_space_0['image']  # Box space for image
 
-        # Flatten observation for MLP representations: (3,3,3) -> (27,)
+        # Detect TeamObs: teammate_* keys present alongside image
+        self._is_teamobs = 'teammate_positions' in obs_space_0.spaces
+
+        # Flatten observation for MLP representations.
+        # IndAgObs: image only → (3,3,3) = 27
+        # TeamObs:  image + teammate_directions + teammate_has_ball + teammate_positions
+        #   2vs2 (1 teammate):  27 + 1 + 1 + 2 = 31    (excl. direction)
+        #   3vs3 (2 teammates): 27 + 2 + 2 + 4 = 35    (excl. direction)
         # XuanCe Basic_MLP reads obs_shape[0] as input dimension, so a flat
         # shape ensures the first Linear layer has the correct in_features.
         self._obs_flat_dim = int(np.prod(img_space.shape))
+        if self._is_teamobs:
+            for key in ('teammate_directions', 'teammate_has_ball', 'teammate_positions'):
+                if key in obs_space_0.spaces:
+                    self._obs_flat_dim += int(np.prod(obs_space_0[key].shape))
 
         self.observation_space = {
             agent: spaces.Box(
@@ -464,11 +572,10 @@ class MultiGrid_Env(RawMultiAgentEnv):
         }
 
         # State space (global state) - concatenated agent observations
-        single_obs_dim = int(np.prod(img_space.shape))
         self.state_space = spaces.Box(
-            low=0,
-            high=255,
-            shape=(self.num_agents * single_obs_dim,),
+            low=-np.inf,
+            high=np.inf,
+            shape=(self.num_agents * self._obs_flat_dim,),
             dtype=np.float32
         )
 
@@ -533,6 +640,19 @@ class MultiGrid_Env(RawMultiAgentEnv):
         """Render the environment."""
         return self.env.render(*args, **kwargs)
 
+    def _flatten_agent_obs(self, agent_obs: dict) -> np.ndarray:
+        """Flatten a single agent's observation dict to a 1-D float32 array.
+
+        IndAgObs: image only → (27,)
+        TeamObs:  image + teammate_directions + teammate_has_ball + teammate_positions
+        """
+        parts = [np.asarray(agent_obs['image']).flatten()]
+        if self._is_teamobs:
+            for key in ('teammate_directions', 'teammate_has_ball', 'teammate_positions'):
+                if key in agent_obs:
+                    parts.append(np.asarray(agent_obs[key]).flatten())
+        return np.concatenate(parts).astype(np.float32)
+
     def reset(self, **kwargs: Any) -> Tuple[Dict[str, np.ndarray], Dict[str, Any]]:
         """Reset the environment to initial state.
 
@@ -551,10 +671,10 @@ class MultiGrid_Env(RawMultiAgentEnv):
         else:
             obs_dict = result
 
-        # mosaic_multigrid returns dict {0: {image, direction, mission}, 1: ...}
-        # Extract image arrays and flatten for MLP: (3,3,3) -> (27,)
+        # mosaic_multigrid returns dict {0: {image, direction, mission, ...}, 1: ...}
+        # Flatten observations (handles both IndAgObs and TeamObs)
         observations = {
-            f"agent_{i}": obs_dict[i]['image'].flatten().astype(np.float32)
+            f"agent_{i}": self._flatten_agent_obs(obs_dict[i])
             for i in range(self.num_agents)
         }
 
@@ -590,9 +710,9 @@ class MultiGrid_Env(RawMultiAgentEnv):
         # mosaic_multigrid uses Gymnasium API (5-tuple dict-keyed return)
         obs_dict, rewards_dict, terminated_dict, truncated_dict, info = self.env.step(actions_dict)
 
-        # Extract image arrays and flatten for MLP: (3,3,3) -> (27,)
+        # Flatten observations (handles both IndAgObs and TeamObs)
         observations = {
-            f"agent_{i}": obs_dict[i]['image'].flatten().astype(np.float32)
+            f"agent_{i}": self._flatten_agent_obs(obs_dict[i])
             for i in range(self.num_agents)
         }
 
@@ -631,11 +751,10 @@ class MultiGrid_Env(RawMultiAgentEnv):
         if self._last_obs is None:
             return np.zeros(self.state_space.shape, dtype=np.float32)
 
-        # _last_obs is now dict {0: {image, direction, mission}, 1: ...}
-        # Extract and concatenate image arrays
-        images = [self._last_obs[i]['image'].flatten() for i in range(self.num_agents)]
-        state = np.concatenate(images)
-        return state.astype(np.float32)
+        # _last_obs is dict {0: {image, direction, mission, ...}, 1: ...}
+        # Flatten and concatenate all agent observations
+        parts = [self._flatten_agent_obs(self._last_obs[i]) for i in range(self.num_agents)]
+        return np.concatenate(parts).astype(np.float32)
 
     def agent_mask(self) -> Dict[str, bool]:
         """Returns boolean mask indicating which agents are alive."""

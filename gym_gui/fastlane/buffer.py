@@ -1,11 +1,11 @@
 """Shared-memory ring buffer for fast lane frame delivery.
 
-The fast lane mirrors the architecture described in
-``docs/1.0_DAY_24/TASK_3/proposing_improvement.md`` and
-``docs/1.0_DAY_25/TASK_1/Rendering_Telemetry_pipeline.md``:
-trainers/workers publish the freshest RGB frame + HUD scalars into shared memory
+Trainers/workers publish the freshest RGB frame + HUD scalars into shared memory
 so the GUI can render immediately, while the existing telemetry pipeline
 continues to provide durable storage.
+
+See Also:
+    - :doc:`/documents/architecture/fastlane` for the Fast Lane architecture overview
 """
 from __future__ import annotations
 

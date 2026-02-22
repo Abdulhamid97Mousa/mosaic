@@ -233,6 +233,20 @@ Supported Workers
 
 .. toctree::
    :hidden:
+   :maxdepth: 3
+   :caption: Rendering
+
+   documents/rendering_tabs/index
+
+.. toctree::
+   :hidden:
+   :maxdepth: 3
+   :caption: Runtime Logging
+
+   documents/runtime_logging/index
+
+.. toctree::
+   :hidden:
    :maxdepth: 2
    :caption: Human Control
 

@@ -793,8 +793,8 @@ class SteppingParadigm(StrEnum):
     by gym_gui/services/mujoco_mpc_controller/.
 
     See Also:
-        - docs/1.0_DAY_41/TASK_1/01_paradigm_comparison.md for POSG vs AEC details
-        - docs/1.0_DAY_41/TASK_1/00_multi_paradigm_orchestrator_plan.md for architecture
+        - :doc:`/documents/architecture/paradigms` for POSG vs AEC details
+        - :doc:`/documents/architecture/operators/concept` for operator architecture
     """
 
     SINGLE_AGENT = "single_agent"

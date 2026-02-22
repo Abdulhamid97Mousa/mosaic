@@ -33,7 +33,7 @@ DDPG_HTML = (
     "<li><strong>tau</strong>: 0.005 smoothing; <strong>policy_frequency</strong>: 2 for delayed actor updates.</li>"
     "</ul>"
     "<p>The CleanRL script uses 2×256 ReLU layers for actor and critic; the documentation at "
-    "`docs/1.0_DAY_22/TASK_3/ALGORITHM_DOCUMENTATION.md` stresses this MLP size and reward-rescaling experiments "
+    "the CleanRL documentation stresses this MLP size and reward-rescaling experiments "
     "(see the Reward Scale section). Layer norm can change the effective scale, so adjust `exploration_noise` "
     "and reward clipping accordingly.</p>"
     "<h4>Stability Tips</h4>"

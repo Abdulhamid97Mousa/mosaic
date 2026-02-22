@@ -1,0 +1,79 @@
+# IPPO configuration for mosaic_multigrid 3v3 Basketball (TeamObs)
+# Environment: Basketball3vs3TeamObsEnv
+# Gymnasium ID: MosaicMultiGrid-Basketball-3vs3-TeamObs-v0
+# Teams: Green (agent_0..2) vs Blue (agent_3..5) — 3 agents per team
+#
+# TeamObs = IndAgObs + teammate features (2 teammates per agent):
+#   image(3,3,3)=27 + teammate_directions(2)=2 + teammate_has_ball(2)=2
+#   + teammate_positions(2,2)=4  →  flat dim = 35
+# 8 discrete actions, max_steps=200, zero_sum=True
+# Richest observation space — teammate awareness for coordination
+
+agent: "IPPO"
+env_name: "multigrid"
+env_id: "basketball_3vs3_teamobs"
+env_seed: 1
+continuous_action: False
+learner: "IPPO_Learner"
+policy: "Categorical_MAAC_Policy"
+representation: "Basic_MLP"
+vectorize: "DummyVecMultiAgentEnv"
+runner: "MARL"
+
+use_rnn: False
+rnn: "GRU"
+fc_hidden_sizes: [64, 64]
+recurrent_hidden_size: 64
+N_recurrent_layers: 1
+dropout: 0
+normalize: "LayerNorm"
+initialize: "orthogonal"
+gain: 0.01
+
+# Network architecture — TeamObs: 27 (image) + 8 (teammate) = 35 features
+# Wider hidden layers for richer obs + more agents
+representation_hidden_size: [128, 64]
+actor_hidden_size: [128, 64]
+critic_hidden_size: [128, 64]
+activation: "relu"
+activation_action: "softmax"
+
+# 6 agents, 2 teams — separate policy per agent
+use_parameter_sharing: False
+use_actions_mask: False
+
+seed: 1
+parallels: 4
+buffer_size: 200
+n_epochs: 4
+n_minibatch: 4
+learning_rate: 0.0007
+weight_decay: 0
+
+vf_coef: 0.5
+ent_coef: 0.05
+target_kl: 0.25
+clip_range: 0.2
+clip_type: 1
+gamma: 0.99
+
+use_linear_lr_decay: True
+end_factor_lr_decay: 0.1
+use_global_state: False
+use_value_clip: True
+value_clip_range: 0.2
+use_value_norm: True
+use_huber_loss: True
+huber_delta: 10.0
+use_advnorm: True
+use_gae: True
+gae_lambda: 0.95
+use_grad_clip: True
+grad_clip_norm: 10.0
+
+running_steps: 5000000
+eval_interval: 100000
+test_episode: 5
+
+log_dir: "./logs/ippo/"
+model_dir: "./models/ippo/"
