@@ -33,6 +33,7 @@ creating a synchronized step loop.
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph LR
        subgraph GUI["MOSAIC GUI (Main Process)"]
            LAUNCHER["OperatorLauncher"]
@@ -173,6 +174,7 @@ The ``OperatorLauncher`` spawns operator subprocesses and returns
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph TB
        LAUNCHER["OperatorLauncher"]
 
@@ -266,6 +268,7 @@ spawns one subprocess **per player**:
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph TB
        LAUNCHER["OperatorLauncher"]
 

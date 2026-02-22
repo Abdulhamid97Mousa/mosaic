@@ -3,6 +3,34 @@ Services API
 
 Service classes providing business logic.
 
+OperatorConfig
+--------------
+
+.. autoclass:: gym_gui.services.operator.OperatorConfig
+   :members:
+   :undoc-members:
+
+WorkerAssignment
+----------------
+
+.. autoclass:: gym_gui.services.operator.WorkerAssignment
+   :members:
+   :undoc-members:
+
+OperatorLauncher
+----------------
+
+.. autoclass:: gym_gui.services.operator_launcher.OperatorLauncher
+   :members:
+   :undoc-members:
+
+OperatorScriptExecutionManager
+------------------------------
+
+.. autoclass:: gym_gui.services.operator_script_execution_manager.OperatorScriptExecutionManager
+   :members:
+   :undoc-members:
+
 PolicyMappingService
 --------------------
 

@@ -57,6 +57,7 @@ Operator Protocol fills this gap:
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph LR
        subgraph "Gymnasium (Environments)"
            E1["CartPole"]
@@ -146,6 +147,7 @@ This creates four agent slots, each backed by a different subprocess:
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph TB
        ENV["MultiGrid Soccer 2v2<br/>(PettingZoo AEC)"]
 
@@ -310,6 +312,7 @@ paradigms -- the first time this has been possible.
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph LR
        SEEDS["Seed Schedule<br/>[42, 43, 44, ..., 141]"]
 
@@ -400,6 +403,7 @@ debugging and observing agent behavior:
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph LR
        USER["User"]
        OT["OperatorsTab<br/>Manual Mode"]
@@ -421,6 +425,7 @@ across M seed values without user interaction.  Managed by
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph LR
        SCRIPT["ScriptExperimentWidget<br/>define seed range + episodes"]
        MGR["ScriptExecutionManager<br/>state machine"]

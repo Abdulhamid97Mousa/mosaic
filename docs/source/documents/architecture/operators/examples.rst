@@ -52,6 +52,7 @@ style to evaluate LLMs as agents in grid-world environments.
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph LR
        GUI["GUI"] -->|"stdin"| BW["barlog_worker<br/>InteractiveRuntime"]
        BW --> AGENT["BALROG Agent<br/>(naive/cot/robust)"]
@@ -133,6 +134,7 @@ prompting style for multi-turn chess play.
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph TB
        subgraph "Chess Worker"
            RT["ChessWorkerRuntime"]
@@ -224,6 +226,7 @@ with shared seeds.
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph LR
        GUI["GUI"] -->|"stdin"| CW["cleanrl_worker<br/>InteractiveRuntime"]
        CW --> POLICY["Trained Policy<br/>(PPO / DQN)"]
@@ -345,6 +348,7 @@ different decision-making strategies on the same environment:
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph TB
        subgraph "Shared Environment Configuration"
            SEED["Shared Seed: 42"]

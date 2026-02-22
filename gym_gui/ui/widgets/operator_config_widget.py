@@ -671,7 +671,7 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         row1.addWidget(QtWidgets.QLabel("Type:", self))
         self._type_combo = QtWidgets.QComboBox(self)
         self._type_combo.setFixedWidth(70)
-        self._type_combo.addItems(["LLM", "RL", "Human"])
+        self._type_combo.addItems(["LLM", "RL", "Human", "Random"])
         row1.addWidget(self._type_combo)
 
         # Worker dropdown
@@ -824,9 +824,11 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
             workers = _get_rl_evaluation_workers()
             for worker in workers:
                 self._worker_combo.addItem(worker.display_name, worker.worker_id)
-        else:
-            # Human: single worker option
+        elif worker_type == "human":
             self._worker_combo.addItem("MOSAIC Human Worker", "human_worker")
+        else:
+            # Random: no real worker needed
+            self._worker_combo.addItem("Random Agent", "random_agent")
 
         # Restore selection if possible
         if current_worker:
@@ -842,6 +844,7 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         is_llm = worker_type == "llm"
         is_rl = worker_type == "rl"
         is_human = worker_type == "human"
+        is_random = worker_type == "random"
 
         # LLM row visibility
         self._llm_row.setVisible(is_llm)
@@ -849,8 +852,8 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         self._client_combo.setVisible(is_llm)
         # RL row visibility
         self._rl_row.setVisible(is_rl)
-        # Worker dropdown: hide for Human (only one option)
-        self._worker_combo.setVisible(not is_human)
+        # Worker dropdown: hide for Human and Random (single option each)
+        self._worker_combo.setVisible(not is_human and not is_random)
 
     def _on_browse_policy(self) -> None:
         """Open file dialog to browse for policy file."""
@@ -930,6 +933,11 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
             worker_id = "human_worker"
             settings["player_name"] = self._player_label
             settings["player_id"] = self._player_id
+        elif worker_type == "random":
+            # Random baseline: uses operators_worker with random behavior
+            worker_id = "operators_worker"
+            worker_type = "baseline"
+            settings["behavior"] = "random"
         elif worker_type == "rl":
             # RL worker settings: policy path and algorithm
             policy_path = self._policy_path_edit.text().strip()
@@ -1073,6 +1081,13 @@ class PlayerAssignmentPanel(QtWidgets.QWidget):
     def env_family(self) -> str:
         """Return environment family."""
         return self._env_family
+
+    def has_llm_agent(self) -> bool:
+        """Return True if any agent row has type LLM."""
+        return any(
+            row._type_combo.currentText().lower() == "llm"
+            for row in self._rows.values()
+        )
 
 
 class OperatorConfigRow(QtWidgets.QWidget):
@@ -1455,13 +1470,18 @@ class OperatorConfigRow(QtWidgets.QWidget):
         obs_mode_row.addStretch()
         multigrid_layout.addLayout(obs_mode_row)
 
-        # Coordination Level Selector
+        # Coordination Level Selector (only visible when an LLM agent is present)
+        self._coordination_container = QtWidgets.QWidget(self._multigrid_settings_container)
+        coord_container_layout = QtWidgets.QVBoxLayout(self._coordination_container)
+        coord_container_layout.setContentsMargins(0, 0, 0, 0)
+        coord_container_layout.setSpacing(4)
+
         coord_level_row = QtWidgets.QHBoxLayout()
-        coord_level_label = QtWidgets.QLabel("Coordination Strategy:", self._multigrid_settings_container)
+        coord_level_label = QtWidgets.QLabel("Coordination Strategy (LLM only):", self._coordination_container)
         coord_level_label.setStyleSheet("font-weight: bold; color: #555;")
         coord_level_row.addWidget(coord_level_label)
 
-        self._coordination_level_combo = QtWidgets.QComboBox(self._multigrid_settings_container)
+        self._coordination_level_combo = QtWidgets.QComboBox(self._coordination_container)
         self._coordination_level_combo.addItem("Level 1: Emergent (Minimal)", 1)
         self._coordination_level_combo.addItem("Level 2: Basic Hints", 2)
         self._coordination_level_combo.addItem("Level 3: Role-Based", 3)
@@ -1476,10 +1496,10 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._coordination_level_combo.currentIndexChanged.connect(self._on_coordination_level_changed)
         coord_level_row.addWidget(self._coordination_level_combo)
         coord_level_row.addStretch()
-        multigrid_layout.addLayout(coord_level_row)
+        coord_container_layout.addLayout(coord_level_row)
 
         # Role Assignment Panel (shown only for Level 3)
-        self._role_assignment_container = QtWidgets.QWidget(self._multigrid_settings_container)
+        self._role_assignment_container = QtWidgets.QWidget(self._coordination_container)
         role_layout = QtWidgets.QVBoxLayout(self._role_assignment_container)
         role_layout.setContentsMargins(20, 4, 0, 4)
         role_layout.setSpacing(4)
@@ -1494,7 +1514,10 @@ class OperatorConfigRow(QtWidgets.QWidget):
         role_layout.addLayout(self._role_selectors_layout)
 
         self._role_assignment_container.hide()  # Hidden by default
-        multigrid_layout.addWidget(self._role_assignment_container)
+        coord_container_layout.addWidget(self._role_assignment_container)
+
+        self._coordination_container.hide()  # Hidden until an LLM agent is present
+        multigrid_layout.addWidget(self._coordination_container)
 
         self._multigrid_settings_container.hide()  # Hidden until MultiGrid selected
         main_layout.addWidget(self._multigrid_settings_container)
@@ -1708,8 +1731,8 @@ class OperatorConfigRow(QtWidgets.QWidget):
         # Show execution mode selector
         self._execution_mode_container.show()
 
-        # Show MultiGrid settings if MultiGrid is selected
-        if env_family in ("mosaic_multigrid", "ini_multigrid"):
+        # Show MultiGrid/MeltingPot settings (observation mode, coordination strategy)
+        if env_family in ("mosaic_multigrid", "ini_multigrid", "meltingpot"):
             self._multigrid_settings_container.show()
             # Update role selectors if Level 3 is selected
             if self._coordination_level_combo.currentData() == 3:
@@ -1763,8 +1786,16 @@ class OperatorConfigRow(QtWidgets.QWidget):
         """Emit config_changed signal with current configuration."""
         if self._updating:
             return
+        self._update_coordination_visibility()
         config = self.get_config()
         self.config_changed.emit(self._operator_id, config)
+
+    def _update_coordination_visibility(self) -> None:
+        """Show coordination strategy only when at least one agent is LLM."""
+        if self._player_panel is not None and self._player_panel.has_llm_agent():
+            self._coordination_container.show()
+        else:
+            self._coordination_container.hide()
 
     def _on_coordination_level_changed(self) -> None:
         """Handle coordination level change - show/hide role assignment panel."""
@@ -2302,6 +2333,12 @@ class OperatorConfigRow(QtWidgets.QWidget):
             # Human operators: no subprocess worker, environment lives in GUI
             # No special settings needed - action selection happens via UI
             worker_id = "human_worker"  # Special marker for human operators
+
+        elif operator_type == "random":
+            # Random baseline: uses operators_worker with random behavior
+            operator_type = "baseline"
+            worker_id = "operators_worker"
+            settings["behavior"] = "random"
 
         # Common settings - container size, image scale, and square size
         container_size = self._container_size_combo.currentData()

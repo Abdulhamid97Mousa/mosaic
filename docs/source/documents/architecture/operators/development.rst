@@ -21,6 +21,7 @@ Adding a new operator requires changes in three areas:
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph LR
        A["1. InteractiveRuntime<br/>(Worker subprocess)"] --> B["2. OperatorLauncher<br/>(Command dispatch)"]
        B --> C["3. GUI Integration<br/>(Config widget)"]

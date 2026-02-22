@@ -13,6 +13,7 @@ should I take?"*
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph TB
        GUI["Qt6 GUI<br/>(Main Process)"]
        LAUNCHER["OperatorLauncher<br/>(Subprocess Manager)"]

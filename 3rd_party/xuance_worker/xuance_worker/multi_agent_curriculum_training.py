@@ -292,23 +292,23 @@ def run_multi_agent_curriculum_training(
             new_envs = _create_envs(runner.config, env_id)
             new_envs.reset()  # Populate buf_obs for agents.train()
 
-            # CRITICAL: XuanCe's training loop uses agent.train_envs (not
-            # agent.envs).  Setting the wrong attribute silently keeps
-            # training on the OLD environment -- the swap looks successful
-            # in logs but the agent never sees the new env.
+            # CRITICAL: XuanCe's on_policy_marl.train() reads from
+            # self.envs (buf_obs, step(), buf_state, etc.).  We must
+            # update runner.envs AND runner.agents.envs so the training
+            # loop actually sees the new environment.
             runner.envs = new_envs
-            runner.agent.train_envs = new_envs
+            runner.agents.envs = new_envs
 
             # Sanity check: verify the agent will actually use the new envs
-            assert runner.agent.train_envs is new_envs, (
-                "Environment swap failed: runner.agent.train_envs does not "
+            assert runner.agents.envs is new_envs, (
+                "Environment swap failed: runner.agents.envs does not "
                 "point to the new environments.  The training loop reads "
-                "from train_envs, so swapping any other attribute is a no-op."
+                "from self.envs, so swapping any other attribute is a no-op."
             )
 
             LOGGER.info(
                 "Environment swap complete: %s (step counter at %d)",
-                env_id, runner.agent.current_step,
+                env_id, runner.agents.current_step,
             )
 
         # Train this phase
@@ -318,11 +318,11 @@ def run_multi_agent_curriculum_training(
             n_train_steps, phase_steps, runner.n_envs,
         )
 
-        runner.agent.train(n_train_steps)
+        runner.agents.train(n_train_steps)
 
         # Save phase checkpoint
         model_name = f"phase{phase_idx + 1}_model.pth"
-        runner.agent.save_model(model_name)
+        runner.agents.save_model(model_name)
 
         phase_elapsed = time.time() - phase_start
         LOGGER.info(
@@ -338,8 +338,8 @@ def run_multi_agent_curriculum_training(
         })
 
     # Final save
-    runner.agent.save_model("final_train_model.pth")
-    runner.agent.finish()
+    runner.agents.save_model("final_train_model.pth")
+    runner.agents.finish()
     runner.envs.close()
 
     total_elapsed = time.time() - start_time

@@ -221,12 +221,12 @@ class WorkerAssignment:
 
     Attributes:
         worker_id: References WorkerDefinition (e.g., "balrog_worker", "cleanrl_worker").
-        worker_type: Type of worker - "llm", "vlm", "rl", or "human".
+        worker_type: Type of worker - "llm", "vlm", "rl", "human", or "baseline".
         settings: Worker-specific settings (client_name, model_id, api_key, etc.).
     """
 
     worker_id: str  # References WorkerDefinition in worker catalog
-    worker_type: str  # "llm", "vlm", "rl", "human"
+    worker_type: str  # "llm", "vlm", "rl", "human", "baseline"
     settings: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:

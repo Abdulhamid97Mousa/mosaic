@@ -7,6 +7,7 @@ baseline.  This is the simplest and most common configuration in MOSAIC.
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph LR
        ENV["Environment"]
 
@@ -90,6 +91,7 @@ intercepts this and injects keyboard input from the user.
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph TB
        OBS["Observation<br/>(rendered frame)"] --> GUI["GUI<br/>Keyboard Capture"]
        GUI --> ACTION["Action<br/>(key mapping)"]
@@ -121,6 +123,7 @@ to a language model API, and parses the response into an action.
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph TB
        OBS["Observation<br/>(grid / board)"] --> PROMPT["Text Prompt<br/>Generation"]
        PROMPT --> API["LLM API<br/>vLLM / OpenRouter / OpenAI"]
@@ -192,6 +195,7 @@ forward pass to select actions.
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph TB
        OBS["Observation<br/>(tensor)"] --> NET["Neural Network<br/>Forward Pass"]
        NET --> ACTION["Action<br/>(argmax / sample)"]
@@ -223,6 +227,7 @@ simple strategies like random action selection or fixed heuristics.
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph TB
        OBS["Observation<br/>(ignored)"] --> RNG["Random / Heuristic<br/>Action Selection"]
        RNG --> ACTION["Action"]
@@ -250,6 +255,7 @@ is the most common pattern:
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph LR
        OBS["observation"] --> OP
        subgraph OP["Operator"]
@@ -323,6 +329,7 @@ is useful for comparing algorithms, hyperparameters, or models:
 
 .. mermaid::
 
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph TB
        ENV1["MiniGrid-DoorKey-6x6-v0<br/>seed=42"]
        ENV2["MiniGrid-DoorKey-6x6-v0<br/>seed=42"]
