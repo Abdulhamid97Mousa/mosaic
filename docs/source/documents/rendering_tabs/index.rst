@@ -2,11 +2,13 @@ Rendering Tabs
 ==============
 
 MOSAIC's rendering subsystem delivers environment frames to the screen through
-two independent data paths — a :doc:`fastlane` for real-time display and a
-:doc:`slow_lane` for durable telemetry — plus a pluggable
+two independent data paths: a :doc:`fastlane` for real-time display and a
+:doc:`slow_lane` for durable telemetry, plus a pluggable
 :doc:`strategies` layer that adapts pixel, grid, and board-game payloads to
-Qt widgets.  All rendering surfaces converge inside :doc:`render_tabs`, the
-central ``QTabWidget`` that hosts every visual tab.
+Qt widgets.  All rendering surfaces converge inside :doc:`render_tabs` (the
+central ``QTabWidget``) through individual :doc:`views` (``FastLaneTab``,
+``LiveTelemetryTab``, ``OperatorRenderContainer``,
+``MultiOperatorRenderView``).
 
 .. mermaid::
 
@@ -80,7 +82,7 @@ Why Two Lanes?
    * - :doc:`Fast <fastlane>`
      - SPSC shared-memory ring buffer (magic ``FLAN``, seqlock semantics).
        ``FastLaneConsumer`` polls every **16 ms** (~60 Hz).
-     - Live training frames — zero serialisation, lossy by design.
+     - Live training frames: zero serialisation, lossy by design.
        Only :doc:`/documents/architecture/workers/integrated_workers/CleanRL_Worker/index`,
        XuanCe, and Ray RLlib workers produce fast-lane frames.
    * - :doc:`Slow <slow_lane>`
@@ -88,23 +90,23 @@ Why Two Lanes?
        ``CreditManager`` (200 credits/stream) →
        ``RenderingSpeedRegulator`` (100 ms drain).
      - Durable step/episode telemetry, replay, W&B / TensorBoard integration.
-       All worker types — including :doc:`BALROG </documents/architecture/workers/integrated_workers/BALROG_Worker/index>` — publish here.
+       All worker types, including :doc:`BALROG </documents/architecture/workers/integrated_workers/BALROG_Worker/index>`, publish here.
 
 Both lanes converge in :doc:`render_tabs`: ``FastLaneTab`` for the fast lane,
 ``LiveTelemetryTab`` for the slow lane, and ``OperatorRenderContainer`` for
 multi-operator evaluation.  The :doc:`strategies` layer (``RendererRegistry``)
-decides *how* each frame is painted — pixel, grid, or board game.
+decides *how* each frame is painted: pixel, grid, or board game.
 
 Relationship to Other Sections
 ------------------------------
 
-- :doc:`/documents/architecture/overview` — system-level layer diagram that
+- :doc:`/documents/architecture/overview`: system-level layer diagram that
   positions rendering within the broader MOSAIC stack.
-- :doc:`/documents/runtime_logging/index` — the
+- :doc:`/documents/runtime_logging/index`: the
   :doc:`/documents/runtime_logging/log_constants` file defines ``LOG_*``
   codes emitted by rendering components (``LOG1001``–``LOG1015`` for operator UI,
   ``LOG700+`` for workers).
-- :doc:`/documents/runtime_logging/constants` — ``RenderDefaults``
+- :doc:`/documents/runtime_logging/constants`: ``RenderDefaults``
   (``min_delay_ms=10``, ``default_delay_ms=100``, ``queue_size=32``),
   ``BufferDefaults``, and telemetry queue sizes all live in
   ``gym_gui/constants/constants_ui.py`` and ``constants_telemetry.py``.
@@ -116,3 +118,4 @@ Relationship to Other Sections
    slow_lane
    strategies
    render_tabs
+   views

@@ -1,18 +1,21 @@
-Runtime Logging & Observability
-================================
+Runtime Logs
+============
 
 MOSAIC uses a **structured logging** system built on Python's ``logging``
 module.  Every log event carries a numeric code, component tag, and optional
 correlation IDs so that logs from multi-agent, multi-worker experiments can
 be filtered, traced, and aggregated.  This section covers:
 
-- :doc:`log_constants` — the ``LogConstant`` dataclass, 500+ code definitions,
-  ``LogConstantMixin``, filters, formatters, and the logging pipeline.
-- :doc:`constants` — the ``gym_gui/constants/`` package that centralises every
+- :doc:`log_constants`: the ``LogConstant`` dataclass, 500+ code definitions,
+  and lookup helpers.
+- :doc:`structured_logging`: ``LogConstantMixin``, filters, formatters, and
+  the full logging pipeline.
+- :doc:`constants`: the ``gym_gui/constants/`` package that centralises every
   tuning knob, default value, and magic number (160 exports).
-- :doc:`validation` — Pydantic models for telemetry payloads,
+- :doc:`validation`: Pydantic models for telemetry payloads,
   ``ValidationService`` for runtime checking, and Qt UI validators for form
   fields.
+- :doc:`observability/index`: TensorBoard and Weights and Biases integration.
 
 .. mermaid::
 
@@ -59,5 +62,7 @@ on telemetry payloads before they enter the
    :maxdepth: 2
 
    log_constants
+   structured_logging
    constants
    validation
+   observability/index

@@ -2,9 +2,9 @@ Application Constants
 =====================
 
 MOSAIC centralises all tuning knobs, default values, and magic numbers into
-a single ``gym_gui/constants/`` package.  Every subsystem — from the
+a single ``gym_gui/constants/`` package.  Every subsystem: from the
 :doc:`/documents/rendering_tabs/slow_lane` queue sizes to the
-:doc:`/documents/rendering_tabs/strategies` FPS caps — imports its defaults
+:doc:`/documents/rendering_tabs/strategies` FPS caps: imports its defaults
 from here rather than scattering literals across the codebase.
 
 Architecture
@@ -83,10 +83,10 @@ Constant Domains
      - ``require_torch()``, ``is_pettingzoo_available()``,
        and 12+ optional-dependency gates
    * - ``mosaic_welcome.py``
-     - —
+     - n/a
      - Welcome widget strings
    * - ``loader.py``
-     - —
+     - n/a
      - Dynamic constant discovery
 
 Rendering Defaults
@@ -316,9 +316,9 @@ Directory Layout
 See Also
 --------
 
-- :doc:`log_constants` — ``LogConstant`` codes reference specific constant
+- :doc:`log_constants`: ``LogConstant`` codes reference specific constant
   values (e.g., ``LOG_TELEMETRY_QUEUE_OVERFLOW`` uses ``RUNBUS_DEFAULT_QUEUE_SIZE``).
-- :doc:`validation` — Pydantic models validate payloads whose schema
+- :doc:`validation`: Pydantic models validate payloads whose schema
   constraints come from these constants.
-- :doc:`/documents/rendering_tabs/slow_lane` — the telemetry pipeline whose
+- :doc:`/documents/rendering_tabs/slow_lane`: the telemetry pipeline whose
   queue sizes, batch sizes, and credit thresholds are all defined here.

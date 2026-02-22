@@ -77,7 +77,7 @@ Seqlock Mechanism
 
 The writer and reader coordinate without locks using a **seqlock** protocol:
 
-1. **Write path** — ``FastLaneWriter.publish(frame, *, metrics, metadata) → int``:
+1. **Write path**: ``FastLaneWriter.publish(frame, *, metrics, metadata) → int``:
 
    - Computes ``slot = head % capacity``.
    - Writes ``seq = head * 2`` into the slot header (*odd* = in-flight).
@@ -85,7 +85,7 @@ The writer and reader coordinate without locks using a **seqlock** protocol:
    - Writes ``seq = head * 2 + 2`` (*even* = committed).
    - Atomically advances ``head`` in the shared header.
 
-2. **Read path** — ``FastLaneReader.latest_frame() → FastLaneFrame | None``:
+2. **Read path**: ``FastLaneReader.latest_frame() → FastLaneFrame | None``:
 
    - Reads ``seq1`` from the slot header.
    - If ``seq1 % 2 == 1`` → write in progress, skip.
@@ -93,7 +93,7 @@ The writer and reader coordinate without locks using a **seqlock** protocol:
    - Reads ``seq2`` and verifies ``seq1 == seq2`` → data is consistent.
    - On mismatch → retry or return ``None``.
 
-3. **Metrics path** — ``FastLaneReader.metrics() → FastLaneMetrics``:
+3. **Metrics path**: ``FastLaneReader.metrics() → FastLaneMetrics``:
    reads ``last_reward``, ``rolling_return``, ``step_rate_hz`` directly from
    the header doubles.
 
@@ -116,12 +116,12 @@ Factory Methods
 Design Rules
 ^^^^^^^^^^^^
 
-1. **SPSC only** — one writer, one reader, no mutexes.
-2. **Lossy** — the consumer always jumps to the latest sequence; old frames are
+1. **SPSC only**: one writer, one reader, no mutexes.
+2. **Lossy**: the consumer always jumps to the latest sequence; old frames are
    silently overwritten.
-3. **Batch-friendly** — no frame debt; the reader skips ahead.
-4. **Simple payload** — tight-packed RGB(A) bytes; HUD scalars in the header.
-5. **Invalidation** — ``FLAG_INVALIDATED`` tells the reader that the writer
+3. **Batch-friendly**: no frame debt; the reader skips ahead.
+4. **Simple payload**: tight-packed RGB(A) bytes; HUD scalars in the header.
+5. **Invalidation**: ``FLAG_INVALIDATED`` tells the reader that the writer
    has exited and the buffer should be re-attached.
 
 Frame Tiling
@@ -146,7 +146,7 @@ a worker's subprocess launch dict:
    * - Environment Variable
      - Description
    * - ``MOSAIC_FASTLANE_ONLY``
-     - ``"1"`` or ``"0"`` — skip :doc:`slow_lane` telemetry
+     - ``"1"`` or ``"0"``: skip :doc:`slow_lane` telemetry
    * - ``MOSAIC_FASTLANE_SLOT``
      - Which vectorized-env index feeds the writer
    * - ``MOSAIC_FASTLANE_VIDEO_MODE``
@@ -171,7 +171,7 @@ FastLaneConsumer
 ``FastLaneConsumer`` (``gym_gui/ui/fastlane_consumer.py``) is a ``QObject``
 that bridges shared memory to Qt signals.
 
-**Polling loop** — a ``QTimer`` fires every **16 ms**:
+**Polling loop**: a ``QTimer`` fires every **16 ms**:
 
 1. If not connected → attempt ``FastLaneReader.attach(run_id)``.
 2. Check ``FLAG_INVALIDATED`` → trigger reconnection.
@@ -183,8 +183,8 @@ that bridges shared memory to Qt signals.
 
 **Signals:**
 
-- ``frame_ready(FastLaneFrameEvent)`` — image + HUD text + optional metadata.
-- ``status_changed(str)`` — ``"connected"`` | ``"reconnecting"`` |
+- ``frame_ready(FastLaneFrameEvent)``: image + HUD text + optional metadata.
+- ``status_changed(str)``: ``"connected"`` | ``"reconnecting"`` |
   ``"fastlane-unavailable"``.
 
 FastLaneTab
@@ -207,8 +207,8 @@ See :doc:`render_tabs` for how it plugs into the central tab widget.
 
 **Modes:**
 
-- ``"train"`` (default) — live frames + reward / step-rate HUD.
-- ``"policy_eval"`` — adds an evaluation summary overlay that reloads
+- ``"train"`` (default): live frames + reward / step-rate HUD.
+- ``"policy_eval"``: adds an evaluation summary overlay that reloads
   ``eval_summary.json`` every 1 s (batch count, episodes, avg/min/max return).
 
 Directory Layout
@@ -230,13 +230,13 @@ Directory Layout
 See Also
 --------
 
-- :doc:`slow_lane` — the durable gRPC/SQLite telemetry path that complements
+- :doc:`slow_lane`: the durable gRPC/SQLite telemetry path that complements
   the fast lane.
-- :doc:`render_tabs` — ``FastLaneTab`` is dynamically added to ``RenderTabs``
+- :doc:`render_tabs`: ``FastLaneTab`` is dynamically added to ``RenderTabs``
   by worker presenters.
-- :doc:`/documents/architecture/workers/index` — the worker subprocess layer
+- :doc:`/documents/architecture/workers/index`: the worker subprocess layer
   that produces fast-lane frames.
 - :doc:`/documents/architecture/workers/integrated_workers/CleanRL_Worker/index`
-  — CleanRL's ``FastLaneTelemetryWrapper`` integration.
-- :doc:`/documents/runtime_logging/constants` — ``RenderDefaults`` and
+ : CleanRL's ``FastLaneTelemetryWrapper`` integration.
+- :doc:`/documents/runtime_logging/constants`: ``RenderDefaults`` and
   ``BufferDefaults`` for queue-size tuning.

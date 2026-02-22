@@ -122,7 +122,7 @@ Discrete turn actions
 
 Grid-click mode
    ``set_grid_click_callback(callback, rows, cols, grid_rect)`` normalises
-   click coordinates to ``(row, col)`` within a defined rectangle — used
+   click coordinates to ``(row, col)`` within a defined rectangle: used
    for Tetris, Minesweeper, and similar tile-action environments.
 
 Scroll-wheel support
@@ -157,7 +157,7 @@ auto-detects the game type from ``RendererContext.game_id`` or the payload's
      - Mountain background, cliff / stool / cookie overlays with layered
        compositing and directional actor sprites.
 
-**Asset management** — ``AssetManager`` singleton
+**Asset management**: ``AssetManager`` singleton
 (``gym_gui/rendering/assets.py``) caches ``QPixmap`` objects from
 ``gym_gui/assets/toy_text_images/``.  Per-game asset classes
 (``FrozenLakeAssets``, ``TaxiAssets``, ``CliffWalkingAssets``) enumerate
@@ -209,7 +209,7 @@ renderers.
      - ``checkers``
      - ``checkers_cell_clicked(row, col)``
 
-**Internal renderers** — ``_ChessBoardRenderer``, ``_ConnectFourBoardRenderer``,
+**Internal renderers**: ``_ChessBoardRenderer``, ``_ConnectFourBoardRenderer``,
 ``_GoBoardRenderer``, ``_TicTacToeBoardRenderer``, ``_SudokuBoardRenderer``,
 ``_CheckersBoardRenderer``.  Each paints its own ``QWidget`` and emits
 game-specific signals that are forwarded through :doc:`render_tabs` so
@@ -236,9 +236,9 @@ Directory Layout
 See Also
 --------
 
-- :doc:`render_tabs` — ``RenderTabs`` hosts the strategy widgets and forwards
+- :doc:`render_tabs`: ``RenderTabs`` hosts the strategy widgets and forwards
   all board-game signals to controllers.
-- :doc:`fastlane` — the fast lane bypasses strategies entirely and renders
+- :doc:`fastlane`: the fast lane bypasses strategies entirely and renders
   raw RGB via Qt Quick / QML.
-- :doc:`/documents/runtime_logging/constants` — ``RenderDefaults``
+- :doc:`/documents/runtime_logging/constants`: ``RenderDefaults``
   (queue sizes, FPS caps) and ``SliderDefaults`` for render-delay sliders.

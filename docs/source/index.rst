@@ -26,8 +26,7 @@ MOSAIC
 
    <br><br>
 
-**A Unified Platform for Cross-Paradigm Comparison and Evaluation of Homogeneous and
-Heterogeneous Multi-Agent RL, LLM, and Human Decision-Makers**
+**A Unified Platform for Cross-Paradigm Comparison and Evaluation of Homogeneous and Heterogeneous Multi-Agent RL, LLM, VLM, and Human Decision-Makers**
 
 MOSAIC is a visual-first platform that enables researchers to configure, run, and
 compare experiments across RL, LLM, VLM, and human decision-makers in the same
@@ -87,7 +86,6 @@ under a unified, visual-first interface.
 
 **MOSAIC provides:**
 
-- **Unified Framework Bridge**: Connect RL, LLM, and Robotics in a single platform
 - **Visual-First Design**: Configure experiments through an intuitive PyQt6 interface, **Almost no code required**.
 - **Heterogeneous Agent Mixing**: Deploy Human(Agent),  RL, and LLM agents in the same environment
 - **Resource Management & Quotas**: GPU allocation, queue limits, credit-based backpressure, health monitoring.
@@ -241,7 +239,7 @@ Supported Workers
 .. toctree::
    :hidden:
    :maxdepth: 3
-   :caption: Runtime Logging
+   :caption: Runtime Logs
 
    documents/runtime_logging/index
 

@@ -129,13 +129,13 @@ wraps Pydantic validation with :doc:`log_constants` structured logging:
    * - ``get_step_schema(key)``
      - ``Dict | None``
    * - ``clear_errors()`` / ``clear_warnings()``
-     - —
+     - ``None``
 
 **Modes:**
 
-- ``strict_mode=True`` — raises ``ValidationError`` on any failure.
+- ``strict_mode=True``: raises ``ValidationError`` on any failure.
   Suitable for CI/test environments.
-- ``strict_mode=False`` (default) — logs a warning via ``log_constant()``
+- ``strict_mode=False`` (default): logs a warning via ``log_constant()``
   and returns ``None``.  Suitable for production where partial data should
   not crash the pipeline.
 
@@ -261,9 +261,9 @@ Directory Layout
 See Also
 --------
 
-- :doc:`log_constants` — ``LOG_SERVICE_VALIDATION_*`` codes emitted by
+- :doc:`log_constants`: ``LOG_SERVICE_VALIDATION_*`` codes emitted by
   ``ValidationService``.
-- :doc:`constants` — numeric bounds used by ``AgentTrainFormInputs``
+- :doc:`constants`: numeric bounds used by ``AgentTrainFormInputs``
   (e.g., ``MAX_COUNTER_VALUE`` from ``constants_core.py``).
-- :doc:`/documents/rendering_tabs/slow_lane` — the telemetry pipeline that
+- :doc:`/documents/rendering_tabs/slow_lane`: the telemetry pipeline that
   passes through ``ValidationService`` before reaching the UI.

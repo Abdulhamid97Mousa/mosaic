@@ -3,7 +3,7 @@ Slow Lane
 
 The slow lane is MOSAIC's **durable** rendering and telemetry path.  It carries
 every step and episode event from workers through gRPC, a publish-subscribe bus,
-and into SQLite — feeding both the live UI and persistent storage for replay and
+and into SQLite: feeding both the live UI and persistent storage for replay and
 analytics.  Where the :doc:`fastlane` optimises for latency, the slow lane
 optimises for **completeness**: every event is persisted.
 
@@ -33,7 +33,7 @@ Pipeline Overview
        style DB fill:#e3f2fd,stroke:#1565c0,color:#333
 
 All queue sizes above are governed by
-:doc:`/documents/runtime_logging/constants` — see
+:doc:`/documents/runtime_logging/constants`: see
 ``constants_telemetry.py`` and ``constants_telemetry_bus.py``.
 
 Components
@@ -46,7 +46,7 @@ Lives in ``gym_gui/services/trainer/trainer_telemetry_proxy.py``.  Tails the
 worker's JSONL stdout stream and translates each line into a gRPC
 ``PublishRunSteps`` / ``PublishRunEpisodes`` call on the daemon.  When
 :doc:`fastlane` mode is active, the proxy also extracts RGB frames and writes
-them to a ``FastLaneWriter`` — bridging the two lanes.
+them to a ``FastLaneWriter``: bridging the two lanes.
 
 RunBus
 ^^^^^^
@@ -54,9 +54,9 @@ RunBus
 An in-process publish-subscribe event bus (``gym_gui/telemetry/run_bus.py``)
 that fans telemetry events to all subscribers.  Key topics:
 
-- ``STEP_APPENDED`` — a new step arrived.
-- ``EPISODE_FINALIZED`` — an episode completed.
-- ``CONTROL`` — pause / resume / stop commands.
+- ``STEP_APPENDED``: a new step arrived.
+- ``EPISODE_FINALIZED``: an episode completed.
+- ``CONTROL``: pause / resume / stop commands.
 
 Default queue size: ``RUNBUS_DEFAULT_QUEUE_SIZE = 2048``
 (``RUNBUS_UI_PATH_QUEUE_SIZE = 512``, ``RUNBUS_DB_PATH_QUEUE_SIZE = 1024``).
@@ -82,7 +82,7 @@ on the main thread.
    * - ``telemetry_stats_updated(run_id, stats)``
      - Aggregate stats changed (steps, episodes, mean reward).
    * - ``run_completed(run_id)``
-     - Training run finished — clean up resources.
+     - Training run finished: clean up resources.
 
 **Subscription lifecycle:**
 
@@ -125,7 +125,7 @@ the bus from overwhelming the UI thread.
    * - ``grant_credits(run_id, agent_id, amount)``
      - Grants credits up to ``initial × 2`` cap.
 
-When credits reach zero the producer pauses the UI rendering path — the
+When credits reach zero the producer pauses the UI rendering path: the
 :doc:`/documents/runtime_logging/constants` ``CreditDefaults``
 (``initial_credits=200``, ``starvation_threshold=10``) control the thresholds.
 Database writes via ``TelemetryDBSink`` are **never** throttled.
@@ -139,7 +139,7 @@ decouples visual frame rendering from table/telemetry updates.
 - Maintains a bounded ``deque`` of render payloads (default max
   ``RENDER_QUEUE_SIZE = 32``).
 - Drains at a configurable interval (default ``100 ms`` → ~10 FPS).
-- Auto-drops oldest payloads when the queue is full — the GUI always shows
+- Auto-drops oldest payloads when the queue is full: the GUI always shows
   the freshest available frame.
 - Emits ``payload_ready(dict)`` when a frame should be painted.
 - Buffers early payloads submitted before ``start()`` is called;
@@ -199,19 +199,19 @@ Design Principles
   lane efficient under high-frequency telemetry.
 - **Hot vs cold storage**: ``LiveTelemetryTab`` shows hot data from ``RunBus``;
   SQLite provides cold storage for replay and post-hoc analysis.
-- **The GUI never blocks** — all writes are asynchronous.  Credit-based
+- **The GUI never blocks**: all writes are asynchronous.  Credit-based
   backpressure ensures the UI thread stays responsive.
-- **Complementary to the fast lane** — the :doc:`fastlane` gives real-time
+- **Complementary to the fast lane**: the :doc:`fastlane` gives real-time
   visuals while the slow lane guarantees every event is persisted for
   :doc:`/documents/architecture/overview` analytics (W&B, TensorBoard).
 
 See Also
 --------
 
-- :doc:`fastlane` — the zero-serialisation rendering path for live training.
-- :doc:`render_tabs` — ``LiveTelemetryTab`` is the slow-lane widget that
+- :doc:`fastlane`: the zero-serialisation rendering path for live training.
+- :doc:`render_tabs`: ``LiveTelemetryTab`` is the slow-lane widget that
   receives regulated payloads.
-- :doc:`strategies` — the ``RendererRegistry`` decides how each slow-lane
+- :doc:`strategies`: the ``RendererRegistry`` decides how each slow-lane
   frame is painted.
-- :doc:`/documents/runtime_logging/constants` — all queue sizes, batch sizes,
+- :doc:`/documents/runtime_logging/constants`: all queue sizes, batch sizes,
   and credit thresholds live in the constants package.
