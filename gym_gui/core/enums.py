@@ -429,9 +429,9 @@ class GameId(StrEnum):
     # Repository (old): https://github.com/ArnaudFickinger/gym-multigrid
     # Repository (new): https://github.com/ini/multigrid
     # ─────────────────────────────────────────────────────────────────────────
-    # MOSAIC MultiGrid (PyPI: mosaic-multigrid v5.0.0+)
+    # MOSAIC MultiGrid (PyPI: mosaic-multigrid v6.0.0)
     # Competitive team-based multi-agent games with view_size=3
-    # Action space v5: noop=0, left=1, right=2, forward=3, pickup=4, drop=5, toggle=6, done=7
+    # Action space v6: noop=0, left=1, right=2, forward=3, pickup=4, drop=5, toggle=6, done=7
     # PyPI: https://pypi.org/project/mosaic-multigrid/
     # GitHub: https://github.com/Abdulhamid97Mousa/mosaic_multigrid
     # ─────────────────────────────────────────────────────────────────────────
@@ -452,6 +452,12 @@ class GameId(StrEnum):
     MOSAIC_MULTIGRID_SOCCER_2VS2_TEAMOBS = "MosaicMultiGrid-Soccer-2vs2-TeamObs-v0"  # IndAgObs + teammate features
     MOSAIC_MULTIGRID_COLLECT2VS2_TEAMOBS = "MosaicMultiGrid-Collect-2vs2-TeamObs-v0"  # IndAgObs + teammate features
     MOSAIC_MULTIGRID_BASKETBALL_TEAMOBS = "MosaicMultiGrid-Basketball-3vs3-TeamObs-v0"  # IndAgObs + teammate features
+
+    # Solo variants (v6.0.0) - Single-agent, no opponent, for curriculum pre-training
+    MOSAIC_MULTIGRID_SOCCER_SOLO_GREEN = "MosaicMultiGrid-Soccer-Solo-Green-IndAgObs-v0"  # 1 agent (Green), scores right
+    MOSAIC_MULTIGRID_SOCCER_SOLO_BLUE = "MosaicMultiGrid-Soccer-Solo-Blue-IndAgObs-v0"  # 1 agent (Blue), scores left
+    MOSAIC_MULTIGRID_BASKETBALL_SOLO_GREEN = "MosaicMultiGrid-Basketball-Solo-Green-IndAgObs-v0"  # 1 agent (Green), scores right
+    MOSAIC_MULTIGRID_BASKETBALL_SOLO_BLUE = "MosaicMultiGrid-Basketball-Solo-Blue-IndAgObs-v0"  # 1 agent (Blue), scores left
 
     # ─────────────────────────────────────────────────────────────────────────
     # INI MultiGrid (Local: 3rd_party/multigrid-ini/)
@@ -1155,6 +1161,11 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     # TeamObs variants (v4.0.0)
     GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_TEAMOBS: EnvironmentFamily.MOSAIC_MULTIGRID,
     GameId.MOSAIC_MULTIGRID_COLLECT2VS2_TEAMOBS: EnvironmentFamily.MOSAIC_MULTIGRID,
+    # Solo variants (v6.0.0)
+    GameId.MOSAIC_MULTIGRID_SOCCER_SOLO_GREEN: EnvironmentFamily.MOSAIC_MULTIGRID,
+    GameId.MOSAIC_MULTIGRID_SOCCER_SOLO_BLUE: EnvironmentFamily.MOSAIC_MULTIGRID,
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_SOLO_GREEN: EnvironmentFamily.MOSAIC_MULTIGRID,
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_SOLO_BLUE: EnvironmentFamily.MOSAIC_MULTIGRID,
     # INI MultiGrid (Local: cooperative exploration)
     GameId.INI_MULTIGRID_BLOCKED_UNLOCK_PICKUP: EnvironmentFamily.INI_MULTIGRID,
     GameId.INI_MULTIGRID_EMPTY_5X5: EnvironmentFamily.INI_MULTIGRID,
@@ -1479,6 +1490,11 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.MOSAIC_MULTIGRID_COLLECT2VS2_TEAMOBS: RenderMode.RGB_ARRAY,
     GameId.MOSAIC_MULTIGRID_BASKETBALL_INDAGOBS: RenderMode.RGB_ARRAY,
     GameId.MOSAIC_MULTIGRID_BASKETBALL_TEAMOBS: RenderMode.RGB_ARRAY,
+    # Solo variants (v6.0.0)
+    GameId.MOSAIC_MULTIGRID_SOCCER_SOLO_GREEN: RenderMode.RGB_ARRAY,
+    GameId.MOSAIC_MULTIGRID_SOCCER_SOLO_BLUE: RenderMode.RGB_ARRAY,
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_SOLO_GREEN: RenderMode.RGB_ARRAY,
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_SOLO_BLUE: RenderMode.RGB_ARRAY,
     GameId.INI_MULTIGRID_BLOCKED_UNLOCK_PICKUP: RenderMode.RGB_ARRAY,
     GameId.INI_MULTIGRID_EMPTY_5X5: RenderMode.RGB_ARRAY,
     GameId.INI_MULTIGRID_EMPTY_RANDOM_5X5: RenderMode.RGB_ARRAY,
@@ -2249,6 +2265,11 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
     GameId.MOSAIC_MULTIGRID_COLLECT2VS2_TEAMOBS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
     GameId.MOSAIC_MULTIGRID_BASKETBALL_INDAGOBS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
     GameId.MOSAIC_MULTIGRID_BASKETBALL_TEAMOBS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP, ControlMode.MULTI_AGENT_COMPETITIVE),
+    # Solo variants (v6.0.0) - single-agent, human or agent control only
+    GameId.MOSAIC_MULTIGRID_SOCCER_SOLO_GREEN: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.MOSAIC_MULTIGRID_SOCCER_SOLO_BLUE: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_SOLO_GREEN: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_SOLO_BLUE: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
     GameId.INI_MULTIGRID_BLOCKED_UNLOCK_PICKUP: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
     GameId.INI_MULTIGRID_EMPTY_5X5: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
     GameId.INI_MULTIGRID_EMPTY_RANDOM_5X5: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),

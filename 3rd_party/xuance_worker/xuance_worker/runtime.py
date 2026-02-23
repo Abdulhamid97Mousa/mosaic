@@ -140,6 +140,11 @@ _GYMNASIUM_TO_XUANCE: dict[str, str] = {
     "MosaicMultiGrid-Soccer-2vs2-TeamObs-v0": "soccer_2vs2_teamobs",
     "MosaicMultiGrid-Collect-2vs2-TeamObs-v0": "collect_2vs2_teamobs",
     "MosaicMultiGrid-Basketball-3vs3-TeamObs-v0": "basketball_3vs3_teamobs",
+    # MosaicMultiGrid — Solo (v6.0.0, single-agent, no opponent)
+    "MosaicMultiGrid-Soccer-Solo-Green-IndAgObs-v0": "soccer_solo_green",
+    "MosaicMultiGrid-Soccer-Solo-Blue-IndAgObs-v0": "soccer_solo_blue",
+    "MosaicMultiGrid-Basketball-Solo-Green-IndAgObs-v0": "basketball_solo_green",
+    "MosaicMultiGrid-Basketball-Solo-Blue-IndAgObs-v0": "basketball_solo_blue",
 }
 
 
@@ -656,8 +661,9 @@ class XuanCeWorkerRuntime:
                         "pretrained_model_dir does not exist: %s",
                         pretrained_path,
                     )
-            # Execute training
-            runner.run()
+            # Execute training (xuance >= 1.3 requires explicit mode argument)
+            run_mode = "test" if self._config.test_mode else "train"
+            runner.run(mode=run_mode)
 
             LOGGER.info(
                 "XuanCe training completed | method=%s runner=%s",
@@ -766,6 +772,7 @@ class InteractiveConfig:
     device: str = "cpu"
     dl_toolbox: str = "torch"
     env: str = "classic_control"
+    deterministic: bool = True
 
 
 class InteractiveRuntime:
@@ -803,6 +810,7 @@ class InteractiveRuntime:
         self._method = config.method
         self._device = config.device
         self._dl_toolbox = config.dl_toolbox
+        self._deterministic = config.deterministic
 
         # State (initialized on reset)
         self._envs = None  # Vector env for model compatibility
@@ -951,30 +959,40 @@ class InteractiveRuntime:
             self._n_agents = self._agent.n_agents
             LOGGER.info("n_agents set to %d from loaded agent", self._n_agents)
 
-        # Load the model weights
-        if hasattr(self._agent, 'load_model'):
-            # XuanCe's load_model() expects the env-level directory
-            # (e.g. .../collect_1vs1/). It auto-discovers seed_*/ subdirs
-            # and picks the latest .pth inside. If the user selected a
-            # specific .pth file, walk up to the env-level directory.
-            load_path = Path(policy_file)
-            if load_path.is_file():
-                # .pth → seed_dir → env_dir
-                load_path = load_path.parent.parent
-            self._agent.load_model(str(load_path))
-            LOGGER.info("XuanCe agent model loaded from %s", load_path)
-        else:
-            # Try loading directly via torch
-            import torch
-            state_dict = torch.load(str(policy_file), map_location=self._device)
+        # Load the model weights.
+        # We load the EXACT file the user selected, bypassing XuanCe's
+        # auto-discovery (which sorts .pth files alphabetically and picks
+        # the last one — "phase2_model.pth" > "final_train_model.pth").
+        import torch
+        load_path = Path(policy_file)
+        if load_path.is_file():
+            # Direct .pth file: load state_dict and apply to policy.
+            state_dict = torch.load(str(load_path), map_location=self._device)
+            # XuanCe saves raw OrderedDict state_dicts (not checkpoint dicts).
             if hasattr(self._agent, 'policy'):
                 self._agent.policy.load_state_dict(state_dict)
-                LOGGER.info("Loaded model weights via torch.load")
+                LOGGER.info("Loaded exact checkpoint: %s (%d tensors)",
+                            load_path.name, len(state_dict))
             else:
                 raise RuntimeError(
                     f"Cannot load model weights: agent {type(self._agent).__name__} "
-                    "has neither load_model() nor .policy attribute."
+                    "has no .policy attribute."
                 )
+        elif hasattr(self._agent, 'load_model'):
+            # Directory path: fall back to XuanCe's auto-discovery.
+            self._agent.load_model(str(load_path))
+            LOGGER.info("XuanCe agent model loaded from directory %s", load_path)
+        else:
+            raise RuntimeError(
+                f"Policy path is not a file and agent has no load_model(): {load_path}"
+            )
+
+        # Switch to evaluation mode: disables Dropout, freezes BatchNorm stats.
+        # XuanCe's own test runner doesn't call .eval(), but we do it here
+        # for correctness — inference should not use training-mode stochasticity.
+        if hasattr(self._agent, 'policy'):
+            self._agent.policy.eval()
+            LOGGER.info("Policy set to eval mode (dropout off, batchnorm frozen)")
 
         LOGGER.info("Policy loading completed (action_selector=%s)", action_selector)
 
@@ -1122,7 +1140,6 @@ class InteractiveRuntime:
                     agent_ids=agents_id,
                     agent_key=agent_key,
                 )
-            action = pi_dists[agent_key].stochastic_sample()
 
         else:
             # IPPO: each agent has its own network keyed by agent_key.
@@ -1143,7 +1160,30 @@ class InteractiveRuntime:
                     agent_ids=None,
                     agent_key=agent_key,
                 )
-            action = pi_dists[agent_key].stochastic_sample()
+
+        # Sample action: deterministic (argmax) for evaluation, stochastic for exploration.
+        dist = pi_dists[agent_key]
+        if self._deterministic:
+            action = dist.deterministic_sample()
+        else:
+            action = dist.stochastic_sample()
+
+        # Diagnostic logging: log action probabilities so we can verify the
+        # policy is producing peaked distributions (well-trained) vs uniform
+        # (untrained/broken). This is essential for debugging "policy used but
+        # wrong output" issues.
+        if LOGGER.isEnabledFor(logging.DEBUG):
+            probs = dist.distribution.probs[0].cpu().numpy()
+            LOGGER.debug(
+                "Action selected for %s: action=%d, mode=%s, probs=%s "
+                "(max_prob=%.3f, entropy=%.3f)",
+                player_id,
+                int(action.cpu().item()),
+                "deterministic" if self._deterministic else "stochastic",
+                [f"{p:.3f}" for p in probs],
+                float(probs.max()),
+                float(-np.sum(probs * np.log(probs + 1e-8))),
+            )
 
         return int(action.cpu().item())
 
@@ -1211,6 +1251,10 @@ class InteractiveRuntime:
 
         try:
             obs = np.array(observation, dtype=np.float32)
+            LOGGER.debug(
+                "select_action: player_id=%s obs_shape=%s obs_range=[%.1f, %.1f]",
+                player_id, obs.shape, float(obs.min()), float(obs.max()),
+            )
 
             # Use MARL-aware action selection for multi-agent policies.
             # _get_marl_action calls the policy's forward() directly, handling:

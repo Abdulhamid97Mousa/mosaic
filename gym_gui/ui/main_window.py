@@ -881,6 +881,16 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # Keyboard assignment widget signals (multi-human gameplay)
         self._control_panel._keyboard_widget.assignment_changed.connect(self._on_keyboard_assignment_changed)
 
+        # Keyboard assignment from Operators tab (multi-human operators with evdev)
+        self._control_panel.operators_tab.keyboard_assignment_changed.connect(
+            self._on_operator_keyboard_assignment_changed
+        )
+
+        # Human Step in parallel multi-agent mode → trigger step cycle
+        self._control_panel.operators_tab.human_step_parallel_requested.connect(
+            self._on_step_parallel_multiagent
+        )
+
         self._session.seed_applied.connect(self._on_seed_applied)
 
         # Log filters (delegated)
@@ -1929,6 +1939,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         which owns the gymnasium environment. The response includes the updated
         render payload which is displayed in the render container.
 
+        In parallel multi-agent mode (GUI owns env), this routes the action
+        to the parallel step state instead of a subprocess.
+
         Args:
             operator_id: The human operator's ID.
             action: The action index selected by the human.
@@ -1937,6 +1950,11 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             "Human action submitted: operator=%s, action=%d",
             operator_id, action,
         )
+
+        # ── Parallel multi-agent mode: route to step state, not subprocess ──
+        if self._parallel_multiagent_mode and self._parallel_multiagent_env is not None:
+            self._on_human_action_parallel_multiagent(operator_id, action)
+            return
 
         # Get the human operator's configuration
         config = self._multi_operator_service.get_operator(operator_id)
@@ -2029,6 +2047,113 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         # Hide the "Your Turn" indicator
         self._render_tabs.set_human_turn(operator_id, False)
+
+    def _on_human_action_parallel_multiagent(
+        self, operator_id: str, action: int
+    ) -> None:
+        """Route a human action in parallel multi-agent mode.
+
+        Handles two sub-modes:
+        - **AEC**: ``env.agent_selection`` determines the current agent.
+          The action is applied directly and the frame is re-rendered.
+        - **Parallel**: Actions are accumulated in ``MultiAgentStepState``.
+          Arrow key / button presses are assigned round-robin to pending
+          human agents. When all humans have acted the environment steps.
+
+        Args:
+            operator_id: The human operator's ID (from button / keyboard).
+            action: The action index selected by the human.
+        """
+        env = self._parallel_multiagent_env
+        config = self._parallel_multiagent_config
+        if env is None or config is None:
+            _OP_LOGGER.warning(
+                "_on_human_action_parallel_multiagent: no env/config"
+            )
+            return
+
+        # ── AEC sub-mode ──────────────────────────────────────────────
+        if self._multigrid_aec_mode:
+            current_agent = getattr(env, "agent_selection", None)
+            if current_agent is None or not env.agents:
+                _OP_LOGGER.info("AEC episode done — ignoring human action")
+                return
+
+            human_agents = config.get_human_agents()
+            if current_agent not in human_agents:
+                _OP_LOGGER.debug(
+                    "AEC: current agent %s is not human, ignoring action",
+                    current_agent,
+                )
+                return
+
+            _OP_LOGGER.info(
+                "AEC human action: %s → action %d", current_agent, action
+            )
+            env.step(int(action))
+            self._render_parallel_multiagent_frame()
+
+            # Clean up panel
+            self._clear_parallel_action_panel()
+
+            if not env.agents:
+                total_reward = sum(env.rewards.values())
+                self._status_bar.showMessage(
+                    f"Episode done! Total reward: {total_reward:.2f}", 5000
+                )
+            else:
+                self._status_bar.showMessage(
+                    f"AEC: {current_agent} acted → now {env.agent_selection}'s turn",
+                    2000,
+                )
+            return
+
+        # ── Parallel sub-mode ─────────────────────────────────────────
+        step_state = self._parallel_multiagent_step_state
+        if step_state is None:
+            # No step cycle active yet — trigger one (collects AI actions,
+            # creates the panel, etc.).
+            self._on_step_parallel_multiagent()
+            step_state = self._parallel_multiagent_step_state
+            if step_state is None:
+                _OP_LOGGER.error(
+                    "Failed to initialise step state for parallel mode"
+                )
+                return
+
+        # Assign action to the first pending human agent (round-robin)
+        pending = step_state.pending_human_agents()
+        if not pending:
+            _OP_LOGGER.debug(
+                "All human agents already acted — ignoring extra action"
+            )
+            return
+
+        target_agent = pending[0]
+        step_state.add_action(target_agent, action)
+        _OP_LOGGER.info(
+            "Parallel human action: %s → action %d (%d/%d humans done)",
+            target_agent,
+            action,
+            len(step_state.human_agents) - len(step_state.pending_human_agents()),
+            len(step_state.human_agents),
+        )
+
+        # Programmatically update the MultiAgentActionPanel row to stay in sync
+        if self._parallel_action_panel is not None:
+            row = self._parallel_action_panel._agent_rows.get(target_agent)
+            if row is not None:
+                row.set_action(action)
+
+        # All humans done? Execute the step.
+        if step_state.is_complete():
+            _OP_LOGGER.info("All actions collected — executing parallel step")
+            self._execute_parallel_multiagent_step(step_state.get_all_actions())
+        else:
+            still_pending = step_state.pending_human_agents()
+            self._status_bar.showMessage(
+                f"Waiting for: {', '.join(still_pending)}", 10000
+            )
 
     def _on_human_board_game_move(self, operator_id: str, from_sq: str, to_sq: str) -> None:
         """Handle board game move submitted by a human operator.
@@ -2536,7 +2661,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         # Create the shared environment
         try:
-            raw_env = self._create_parallel_multiagent_env(env_name, task, seed)
+            raw_env = self._create_parallel_multiagent_env(env_name, task, seed, config)
 
             # Wrap in AEC env when execution_mode="aec".
             # AEC: env.step([action_i, NOOP]) fires once per agent,
@@ -2601,9 +2726,18 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     player_config,
                     interactive=True,
                 )
+                # Drain the auto-emitted {"type":"init"} startup message
+                # before sending init_agent, so we don't confuse it with the
+                # actual init_agent response.
+                startup_msg = handle.read_response(timeout=5.0)
+                if startup_msg and startup_msg.get("type") == "init":
+                    _OP_LOGGER.debug("Drained startup init from %s", agent_id)
+                elif startup_msg:
+                    _OP_LOGGER.debug("First message from %s: %s", agent_id, startup_msg.get("type"))
+
                 handle.send_init_agent(game_name=task, player_id=agent_id)
                 init_resp = handle.read_response(timeout=10.0)
-                if init_resp and init_resp.get("type") == "agent_initialized":
+                if init_resp and init_resp.get("type") == "agent_ready":
                     _OP_LOGGER.info("AI worker ready for agent %s", agent_id)
                 else:
                     _OP_LOGGER.warning(
@@ -2655,19 +2789,26 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._multi_operator_service.set_operator_state(operator_id, "running")
         self._render_tabs.set_operator_status(operator_id, "running")
 
+        # Enable parallel mode on the Operators tab so Step All / Human Step
+        # behave correctly for GUI-owned environments.
+        self._control_panel.operators_tab.set_parallel_mode(True)
+
         # Show status
         self._status_bar.showMessage(
             f"Parallel multi-agent {task} ready: {len(human_agents)} human, {len(ai_agents)} AI agents (seed={seed})",
             3000
         )
 
-    def _create_parallel_multiagent_env(self, env_name: str, task: str, seed: int) -> Any:
+    def _create_parallel_multiagent_env(
+        self, env_name: str, task: str, seed: int, config: "OperatorConfig | None" = None,
+    ) -> Any:
         """Create a parallel multi-agent environment.
 
         Args:
             env_name: Environment family (mosaic_multigrid, ini_multigrid, meltingpot, overcooked).
             task: Specific environment (e.g., MosaicMultiGrid-Soccer-v0).
             seed: Random seed.
+            config: Optional operator config (used to extract view_size, etc.).
 
         Returns:
             The created gymnasium/PettingZoo Parallel environment.
@@ -2676,13 +2817,20 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             # All mosaic envs registered via gymnasium.register() in mosaic_multigrid.envs
             import gymnasium
             import mosaic_multigrid.envs  # noqa: F401 - triggers gymnasium.register() calls
-            env = gymnasium.make(task, render_mode='rgb_array')
+            extra_kwargs: dict[str, Any] = {}
+            if config is not None and config.view_size is not None:
+                extra_kwargs["view_size"] = config.view_size
+                _OP_LOGGER.info(
+                    "Operator view_size=%d applied to %s",
+                    config.view_size, task,
+                )
+            env = gymnasium.make(task, render_mode='rgb_array', disable_env_checker=True, **extra_kwargs)
             return env
 
         elif env_name == "ini_multigrid":
             # Import and create INI MultiGrid environment
             import gymnasium as gym
-            env = gym.make(task, render_mode="rgb_array")
+            env = gym.make(task, render_mode="rgb_array", disable_env_checker=True)
             return env
 
         elif env_name == "meltingpot":
@@ -2734,6 +2882,37 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             pass
 
         return None
+
+    def _embed_parallel_action_panel(self, panel: QtWidgets.QWidget) -> None:
+        """Embed a MultiAgentActionPanel inside the operator's render container.
+
+        Places the panel right below the environment render so the human can
+        see the game and the action buttons at the same time.
+        """
+        config = self._parallel_multiagent_config
+        if config is None:
+            return
+        container = self._render_tabs.multi_operator_view.get_container(
+            config.operator_id
+        )
+        if container is not None:
+            container.set_parallel_action_panel(panel)
+        else:
+            _OP_LOGGER.warning(
+                "No render container for operator %s — cannot embed action panel",
+                config.operator_id,
+            )
+
+    def _clear_parallel_action_panel(self) -> None:
+        """Remove the embedded parallel action panel from the render container."""
+        config = self._parallel_multiagent_config
+        if config is None:
+            return
+        container = self._render_tabs.multi_operator_view.get_container(
+            config.operator_id
+        )
+        if container is not None:
+            container.clear_parallel_action_panel()
 
     def _render_parallel_multiagent_frame(self) -> None:
         """Render the current state of the parallel multi-agent environment."""
@@ -2819,15 +2998,6 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         for agent_id in ai_agents:
             handle = self._parallel_player_handles.get(agent_id)
 
-            # Get per-agent action space (not the multi-agent Dict space)
-            agent_idx = int(str(agent_id).split("_")[-1]) if "_" in str(agent_id) else 0
-            if hasattr(env, "action_spaces") and agent_id in env.action_spaces:
-                action_space = env.action_spaces[agent_id]
-            elif hasattr(env.action_space, "spaces"):
-                action_space = env.action_space.spaces.get(agent_idx, env.action_space)
-            else:
-                action_space = env.action_space
-
             if handle is None or not handle.is_running:
                 raise RuntimeError(
                     f"No running worker for AI agent {agent_id}. "
@@ -2852,18 +3022,68 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             else:
                 obs_flat = list(agent_obs)
 
-            handle.send_select_action(obs_flat, agent_id)
-            response = handle.read_response(timeout=10.0)
-
-            if response and response.get("type") == "action_selected":
-                action = int(response["action"])
-                _OP_LOGGER.debug("AI agent %s selected action %d", agent_id, action)
-            else:
-                _OP_LOGGER.warning(
-                    "Bad response from AI agent %s: %s — using random fallback",
-                    agent_id, response,
+            # Drain any pending non-action messages (e.g., agent_ready) before
+            # sending the select_action request to avoid reading stale responses.
+            for _ in range(10):
+                pending = handle.try_read_response(timeout=0.0)
+                if pending is None:
+                    break
+                _OP_LOGGER.debug(
+                    "Drained pending message from %s: %s", agent_id, pending.get("type")
                 )
-                action = int(action_space.sample()) if hasattr(action_space, "sample") else 0
+
+            handle.send_select_action(obs_flat, agent_id)
+
+            # Read response, retrying if we get non-action messages (e.g.,
+            # a late agent_ready arriving after we drained).
+            action: int | None = None
+            response: dict | None = None
+            max_retries = 5
+            for attempt in range(max_retries):
+                response = handle.read_response(timeout=10.0)
+
+                if response is None:
+                    _OP_LOGGER.warning(
+                        "Timeout reading action from AI agent %s (attempt %d/%d)",
+                        agent_id, attempt + 1, max_retries,
+                    )
+                    continue
+
+                if response.get("type") == "action_selected":
+                    action_val = response.get("action", "")
+                    if action_val == "" or action_val is None:
+                        _OP_LOGGER.warning(
+                            "AI agent %s returned empty action, using NOOP (0)", agent_id
+                        )
+                        action = 0
+                    else:
+                        action = int(action_val)
+                    _OP_LOGGER.debug("AI agent %s selected action %d", agent_id, action)
+                    break
+
+                if response.get("type") == "agent_ready":
+                    _OP_LOGGER.debug(
+                        "AI agent %s sent agent_ready, waiting for action_selected "
+                        "(attempt %d/%d)", agent_id, attempt + 1, max_retries,
+                    )
+                    continue
+
+                # Unknown response type — log and retry
+                _OP_LOGGER.warning(
+                    "AI agent %s sent unexpected response type '%s', retrying "
+                    "(attempt %d/%d)", agent_id, response.get("type"), attempt + 1, max_retries,
+                )
+
+            if action is None:
+                _OP_LOGGER.error(
+                    "Failed to get action from AI agent %s after %d attempts. "
+                    "Last response: %s", agent_id, max_retries, response,
+                )
+                raise RuntimeError(
+                    f"Worker for agent {agent_id} returned no valid action after "
+                    f"{max_retries} attempts. Last response: {response}. "
+                    f"Check operator_agent logs for details."
+                )
 
             step_state.add_action(agent_id, action)
 
@@ -2896,13 +3116,33 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._on_parallel_human_actions_submitted
         )
 
-        # TODO: Display action panel in the UI (e.g., as a dialog or embedded widget)
-        # For now, just log that we're waiting
+        # Bridge evdev keyboard input to parallel step state
+        # When evdev is active, physical key presses on assigned keyboards
+        # directly submit actions for the corresponding human agent.
+        if self._human_input._use_evdev:
+            # Disconnect previous connection if any (avoid duplicates)
+            try:
+                self._human_input.agent_action_selected.disconnect(
+                    self._on_evdev_agent_action
+                )
+            except (TypeError, RuntimeError):
+                pass
+            self._human_input.agent_action_selected.connect(
+                self._on_evdev_agent_action
+            )
+            _OP_LOGGER.info(
+                "Evdev bridge active: keyboard input will submit actions for %s",
+                human_agents,
+            )
+
+        # Embed the action panel in the render container (right below the environment)
+        self._embed_parallel_action_panel(self._parallel_action_panel)
         _OP_LOGGER.info(
             f"Waiting for human actions from {len(human_agents)} agents"
         )
+        input_method = "keyboard + buttons" if self._human_input._use_evdev else "action buttons"
         self._status_bar.showMessage(
-            f"Select actions for {len(human_agents)} human agent(s)",
+            f"Select actions for {len(human_agents)} human agent(s) ({input_method})",
             10000
         )
 
@@ -2949,13 +3189,13 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             # ---------------------------------------------------------------
             # AI agent's turn: query the worker for an action
             # ---------------------------------------------------------------
-            handle = self._parallel_player_handles.get(current_agent)
-
             # PettingZoo AEC exposes action_space as a method: env.action_space(agent)
             try:
                 action_space = env.action_space(current_agent)
             except (TypeError, KeyError):
                 action_space = None
+
+            handle = self._parallel_player_handles.get(current_agent)
 
             if handle is None or not handle.is_running:
                 _OP_LOGGER.warning(
@@ -3051,9 +3291,29 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._parallel_action_panel.all_actions_submitted.connect(
                 self._on_aec_human_action_submitted
             )
+
+            # Embed panel in the render container (right below the environment)
+            self._embed_parallel_action_panel(self._parallel_action_panel)
+
+            # Bridge evdev keyboard input for AEC human turns
+            if self._human_input._use_evdev:
+                try:
+                    self._human_input.agent_action_selected.disconnect(
+                        self._on_evdev_aec_agent_action
+                    )
+                except (TypeError, RuntimeError):
+                    pass
+                self._human_input.agent_action_selected.connect(
+                    self._on_evdev_aec_agent_action
+                )
+                _OP_LOGGER.info(
+                    "AEC evdev bridge active for %s", current_agent
+                )
+
             _OP_LOGGER.info("AEC: waiting for human %s to act", current_agent)
+            input_method = "keyboard + buttons" if self._human_input._use_evdev else "buttons"
             self._status_bar.showMessage(
-                f"AEC: select action for {current_agent}", 10000
+                f"AEC: select action for {current_agent} ({input_method})", 10000
             )
         else:
             _OP_LOGGER.warning(
@@ -3082,6 +3342,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         self._render_parallel_multiagent_frame()
 
+        # Clean up embedded action panel
+        self._clear_parallel_action_panel()
+
         if not env.agents:
             total_reward = sum(env.rewards.values())
             self._status_bar.showMessage(
@@ -3090,6 +3353,63 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         else:
             self._status_bar.showMessage(
                 f"AEC: human acted → now {env.agent_selection}'s turn", 2000
+            )
+
+    def _on_evdev_aec_agent_action(self, agent_id: str, action: int) -> None:
+        """Handle evdev keyboard action during AEC human turn.
+
+        In AEC mode, only the current agent can act. If the evdev action
+        comes from the current agent, submit it as if the human clicked
+        the action button.
+
+        Args:
+            agent_id: The agent ID whose keyboard was pressed.
+            action: The resolved action index.
+        """
+        env = self._parallel_multiagent_env
+        if env is None:
+            return
+
+        current_agent = getattr(env, "agent_selection", None)
+        if current_agent is None:
+            return
+
+        # Only accept input from the agent whose turn it is
+        if agent_id != current_agent:
+            _OP_LOGGER.debug(
+                "AEC evdev: ignoring action from %s (current turn: %s)",
+                agent_id, current_agent,
+            )
+            return
+
+        _OP_LOGGER.info(
+            "AEC evdev action: %s → action %d", agent_id, action
+        )
+
+        # Disconnect evdev bridge before stepping (prevents duplicate handling)
+        try:
+            self._human_input.agent_action_selected.disconnect(
+                self._on_evdev_aec_agent_action
+            )
+        except (TypeError, RuntimeError):
+            pass
+
+        # Step the AEC environment with this action
+        env.step(int(action))
+        self._render_parallel_multiagent_frame()
+
+        # Clean up embedded action panel
+        self._clear_parallel_action_panel()
+
+        if not env.agents:
+            total_reward = sum(env.rewards.values())
+            self._status_bar.showMessage(
+                f"Episode done! Total reward: {total_reward:.2f}", 5000
+            )
+        else:
+            self._status_bar.showMessage(
+                f"AEC: {agent_id} acted via keyboard → now {env.agent_selection}'s turn",
+                2000,
             )
 
     def _on_parallel_human_actions_submitted(self, actions: Dict[str, int]) -> None:
@@ -3118,12 +3438,75 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 f"{len(step_state.human_agents) + len(step_state.ai_agents)}"
             )
 
+    def _on_evdev_agent_action(self, agent_id: str, action: int) -> None:
+        """Handle a per-agent action from evdev keyboard input.
+
+        Called when a physical keyboard assigned to an agent presses a key
+        combination that resolves to an action. Adds the action to the current
+        parallel multi-agent step state and executes the step when all human
+        agents have acted.
+
+        Args:
+            agent_id: The agent ID (e.g., "agent_0") whose keyboard was pressed.
+            action: The resolved action index.
+        """
+        step_state = self._parallel_multiagent_step_state
+        if step_state is None:
+            _OP_LOGGER.debug(
+                "Evdev agent action ignored (no active step state): agent=%s action=%d",
+                agent_id, action,
+            )
+            return
+
+        # Only accept actions from human agents in this step
+        if agent_id not in step_state.human_agents:
+            _OP_LOGGER.debug(
+                "Evdev action from non-human agent %s ignored", agent_id
+            )
+            return
+
+        # Skip if this agent already acted in this step
+        if agent_id in step_state.pending_actions:
+            _OP_LOGGER.debug(
+                "Evdev action from %s ignored (already acted this step)", agent_id
+            )
+            return
+
+        step_state.add_action(agent_id, action)
+        _OP_LOGGER.info(
+            "Evdev agent action: %s → action %d (%d/%d human actions collected)",
+            agent_id, action,
+            len([a for a in step_state.human_agents if a in step_state.pending_actions]),
+            len(step_state.human_agents),
+        )
+
+        # Update status bar with progress
+        pending = step_state.pending_human_agents()
+        if pending:
+            self._status_bar.showMessage(
+                f"Waiting for keyboard input from: {', '.join(pending)}",
+                10000,
+            )
+
+        # Execute step if all actions collected
+        if step_state.is_complete():
+            _OP_LOGGER.info("All actions collected via evdev + AI — executing step")
+            self._execute_parallel_multiagent_step(step_state.get_all_actions())
+
     def _execute_parallel_multiagent_step(self, actions: Dict[str, int]) -> None:
         """Execute a step on the parallel multi-agent environment.
 
         Args:
             actions: Dict mapping agent_id to action index.
         """
+        # Disconnect evdev bridge to prevent stale signals between steps
+        try:
+            self._human_input.agent_action_selected.disconnect(
+                self._on_evdev_agent_action
+            )
+        except (TypeError, RuntimeError):
+            pass
+
         env = self._parallel_multiagent_env
         config = self._parallel_multiagent_config
         if env is None or config is None:
@@ -3196,8 +3579,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     2000
                 )
 
-            # Clear step state
+            # Clear step state and embedded action panel
             self._parallel_multiagent_step_state = None
+            self._clear_parallel_action_panel()
 
             self.log_constant(
                 LOG_OPERATOR_PARALLEL_STEP_COMPLETED,
@@ -3374,6 +3758,14 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._multi_operator_service.set_operator_state(operator_id, "stopped")
             self._render_tabs.set_operator_status(operator_id, "stopped")
 
+        elif response_type == "init":
+            # Worker startup message — logged for diagnostics but no UI action needed
+            self.log_constant(
+                LOG_UI_MAINWINDOW_TRACE,
+                message=f"Operator init received",
+                extra={"operator_id": operator_id, "run_id": response.get("run_id")},
+            )
+
         else:
             self.log_constant(
                 LOG_UI_MAINWINDOW_WARNING,
@@ -3420,6 +3812,20 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._control_panel.set_turn_indicator("", visible=False)
             self._shared_pettingzoo_env = None
             self._pettingzoo_player_handles.clear()
+
+        # Disable parallel multi-agent mode if it was active
+        if self._parallel_multiagent_mode:
+            self._control_panel.operators_tab.set_parallel_mode(False)
+            self._clear_parallel_action_panel()
+            self._parallel_multiagent_mode = False
+            self._parallel_multiagent_step_state = None
+            if self._parallel_multiagent_env is not None:
+                try:
+                    self._parallel_multiagent_env.close()
+                except Exception:
+                    pass
+                self._parallel_multiagent_env = None
+            self._parallel_player_handles.clear()
 
     def _on_initialize_operator(self, operator_id: str, config: OperatorConfig, seed: int | None) -> None:
         """Initialize environment for operator preview.
@@ -3788,7 +4194,14 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     import gymnasium
                     import mosaic_multigrid.envs  # noqa: F401 - triggers gymnasium.register() calls
 
-                    env = gymnasium.make(task, render_mode='rgb_array')
+                    extra_kwargs: Dict[str, Any] = {}
+                    if config.view_size is not None:
+                        extra_kwargs["view_size"] = config.view_size
+                        _OP_LOGGER.info(
+                            "Preview: view_size=%d applied to %s",
+                            config.view_size, task,
+                        )
+                    env = gymnasium.make(task, render_mode='rgb_array', **extra_kwargs)
                     env.reset(seed=seed)
                     # mosaic_multigrid render() does not accept tile_size
                     try:
@@ -4459,6 +4872,58 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self.log_constant(
             LOG_UI_MAINWINDOW_TRACE,
             message=f"Keyboard {device_name} assigned to {agent_str}",
+            extra={"device_path": device_path, "agent_id": agent_str},
+        )
+
+    def _on_operator_keyboard_assignment_changed(self, device_path: str, agent_id: object) -> None:
+        """Handle keyboard assignment changes from the Operators tab evdev widget.
+
+        When human operators are configured in the Operators tab and the user assigns
+        physical USB keyboards to agents, this sets up evdev monitoring so each
+        keyboard controls only its assigned agent.
+        """
+        assignments = self._control_panel.operators_tab.keyboard_assignment_widget.get_assignments()
+        if not assignments:
+            _LOGGER.warning("No keyboard assignments to apply from Operators tab")
+            return
+
+        # Determine unique agents and configure HumanInputController
+        unique_agents = sorted(set(assignments.values()))
+        self._human_input.set_num_agents(len(unique_agents))
+        self._human_input.set_agent_names(unique_agents)
+
+        from gym_gui.logging_config.log_constants import (
+            LOG_KEYBOARD_EVDEV_SETUP_START,
+            LOG_KEYBOARD_EVDEV_SETUP_SUCCESS,
+            LOG_KEYBOARD_EVDEV_SETUP_FAILED,
+        )
+
+        self.log_constant(
+            LOG_KEYBOARD_EVDEV_SETUP_START,
+            message=f"Setting up evdev for {len(assignments)} keyboards (from Operators tab)",
+            extra={"num_keyboards": len(assignments), "assignments": assignments},
+        )
+
+        success = self._human_input.setup_evdev_keyboards(assignments)
+
+        if success:
+            self.log_constant(
+                LOG_KEYBOARD_EVDEV_SETUP_SUCCESS,
+                message=f"Evdev monitoring started for {len(assignments)} keyboards (Operators tab)",
+                extra={"num_keyboards": len(assignments), "agents": unique_agents},
+            )
+        else:
+            self.log_constant(
+                LOG_KEYBOARD_EVDEV_SETUP_FAILED,
+                message="Evdev setup failed from Operators tab - check permissions",
+                extra={"assignments": assignments},
+            )
+
+        agent_str = agent_id if agent_id else "unassigned"
+        device_name = device_path.split("/")[-1] if "/" in device_path else device_path
+        self.log_constant(
+            LOG_UI_MAINWINDOW_TRACE,
+            message=f"Operator keyboard {device_name} assigned to {agent_str}",
             extra={"device_path": device_path, "agent_id": agent_str},
         )
 

@@ -273,10 +273,10 @@ class TestObsActionShapes:
             assert obs[agent].dtype == np.float32
 
     @requires_mosaic
-    def test_action_space_discrete_7(self, multigrid_env):
-        """1vs1 soccer has 7 discrete actions per agent."""
+    def test_action_space_discrete_8(self, multigrid_env):
+        """1vs1 soccer has 8 discrete actions per agent (including toggle/done)."""
         for agent in multigrid_env.agents:
-            assert multigrid_env.action_space[agent].n == 7
+            assert multigrid_env.action_space[agent].n == 8
 
     @requires_mosaic
     def test_num_agents_is_2(self, multigrid_env):

@@ -1,5 +1,5 @@
-Rendering Tabs
-==============
+Overview
+========
 
 MOSAIC's rendering subsystem delivers environment frames to the screen through
 two independent data paths: a :doc:`fastlane` for real-time display and a

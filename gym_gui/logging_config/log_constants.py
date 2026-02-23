@@ -657,6 +657,15 @@ LOG_MOSAIC_MULTIGRID_VISIBILITY = _constant(
     tags=_tags("mosaic", "multigrid", "visibility", "observation"),
 )
 
+LOG_MOSAIC_MULTIGRID_OBSERVATION = _constant(
+    "LOG529",
+    "DEBUG",
+    "MOSAIC MultiGrid agent observation grid",
+    component="Adapter",
+    subcomponent="MosaicMultiGrid",
+    tags=_tags("mosaic", "multigrid", "observation", "grid"),
+)
+
 
 # ---------------------------------------------------------------------------
 # Crafter adapter specific constants (LOG530–LOG534)
@@ -2137,6 +2146,15 @@ LOG_UI_POLICY_FORM_ERROR = _constant(
     component="UI",
     subcomponent="PolicyForm",
     tags=_tags("ui", "policy_form", "error"),
+)
+
+LOG_OPERATOR_VIEW_SIZE_CONFIGURED = _constant(
+    "LOG739",
+    "INFO",
+    "Operator view_size configured for MOSAIC environment",
+    component="UI",
+    subcomponent="OperatorConfig",
+    tags=_tags("operator", "mosaic", "multigrid", "view_size", "config"),
 )
 
 LOG_UI_WORKER_TABS_TRACE = _constant(
@@ -4470,6 +4488,48 @@ LOG_WORKER_LLM_DEBUG = _constant(
     tags=_tags("llm", "worker", "debug"),
 )
 
+# Auto-reset and action-defaulting events (LOG1059–LOG1062)
+LOG_WORKER_BALROG_EPISODE_AUTO_RESET = _constant(
+    "LOG1059",
+    "INFO",
+    "BALROG episode auto-reset with seed",
+    component="Worker",
+    subcomponent="BarlogRuntime",
+    tags=_tags("balrog", "worker", "episode", "auto-reset", "seed"),
+)
+LOG_WORKER_BALROG_ACTION_DEFAULTED = _constant(
+    "LOG1060",
+    "WARNING",
+    "BALROG LLM action defaulted due to error",
+    component="Worker",
+    subcomponent="BarlogRuntime",
+    tags=_tags("balrog", "worker", "llm", "action", "default"),
+)
+LOG_WORKER_MOSAIC_LLM_EPISODE_AUTO_RESET = _constant(
+    "LOG1061",
+    "INFO",
+    "MOSAIC LLM episode auto-reset with seed",
+    component="Worker",
+    subcomponent="LLMRuntime",
+    tags=_tags("mosaic", "llm", "worker", "episode", "auto-reset", "seed"),
+)
+LOG_WORKER_MOSAIC_LLM_ACTION_DEFAULTED = _constant(
+    "LOG1062",
+    "WARNING",
+    "MOSAIC LLM action defaulted due to error",
+    component="Worker",
+    subcomponent="LLMRuntime",
+    tags=_tags("mosaic", "llm", "worker", "action", "default"),
+)
+LOG_WORKER_CLEANRL_EPISODE_AUTO_RESET = _constant(
+    "LOG1063",
+    "INFO",
+    "CleanRL episode auto-reset with seed",
+    component="Worker",
+    subcomponent="CleanRLRuntime",
+    tags=_tags("cleanrl", "worker", "episode", "auto-reset", "seed"),
+)
+
 
 # =========================================================================
 # Helper Functions for Runtime Discovery & Validation
@@ -4632,6 +4692,7 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_MOSAIC_MULTIGRID_PASS_COMPLETED,
     LOG_MOSAIC_MULTIGRID_STEAL_COMPLETED,
     LOG_MOSAIC_MULTIGRID_VISIBILITY,
+    LOG_MOSAIC_MULTIGRID_OBSERVATION,
     LOG_ENV_CRAFTER_BOOT,
     LOG_ENV_CRAFTER_STEP,
     LOG_ENV_CRAFTER_ERROR,
@@ -4734,6 +4795,7 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_OPERATOR_PARALLEL_RESET_STARTED,
     LOG_OPERATOR_PARALLEL_STEP_STARTED,
     LOG_OPERATOR_PARALLEL_STEP_COMPLETED,
+    LOG_OPERATOR_VIEW_SIZE_CONFIGURED,
     LOG_VLLM_SERVER_COUNT_CHANGED,
     LOG_VLLM_SERVER_STARTING,
     LOG_VLLM_SERVER_RUNNING,
@@ -4928,6 +4990,12 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_WORKER_LLM_ENV_CREATED,
     LOG_WORKER_LLM_AGENT_CREATED,
     LOG_WORKER_LLM_DEBUG,
+    # Auto-reset and action-defaulting events
+    LOG_WORKER_BALROG_EPISODE_AUTO_RESET,
+    LOG_WORKER_BALROG_ACTION_DEFAULTED,
+    LOG_WORKER_MOSAIC_LLM_EPISODE_AUTO_RESET,
+    LOG_WORKER_MOSAIC_LLM_ACTION_DEFAULTED,
+    LOG_WORKER_CLEANRL_EPISODE_AUTO_RESET,
 )
 
 
@@ -5002,6 +5070,7 @@ __all__ = (
     "LOG_MOSAIC_MULTIGRID_PASS_COMPLETED",
     "LOG_MOSAIC_MULTIGRID_STEAL_COMPLETED",
     "LOG_MOSAIC_MULTIGRID_VISIBILITY",
+    "LOG_MOSAIC_MULTIGRID_OBSERVATION",
     "LOG_ENV_CRAFTER_BOOT",
     "LOG_ENV_CRAFTER_STEP",
     "LOG_ENV_CRAFTER_ERROR",
@@ -5100,6 +5169,7 @@ __all__ = (
     "LOG_OPERATOR_PARALLEL_RESET_STARTED",
     "LOG_OPERATOR_PARALLEL_STEP_STARTED",
     "LOG_OPERATOR_PARALLEL_STEP_COMPLETED",
+    "LOG_OPERATOR_VIEW_SIZE_CONFIGURED",
     "LOG_VLLM_SERVER_COUNT_CHANGED",
     "LOG_VLLM_SERVER_STARTING",
     "LOG_VLLM_SERVER_RUNNING",
@@ -5341,6 +5411,12 @@ __all__ = (
     "LOG_WORKER_LLM_ENV_CREATED",
     "LOG_WORKER_LLM_AGENT_CREATED",
     "LOG_WORKER_LLM_DEBUG",
+    # Auto-reset and action-defaulting events
+    "LOG_WORKER_BALROG_EPISODE_AUTO_RESET",
+    "LOG_WORKER_BALROG_ACTION_DEFAULTED",
+    "LOG_WORKER_MOSAIC_LLM_EPISODE_AUTO_RESET",
+    "LOG_WORKER_MOSAIC_LLM_ACTION_DEFAULTED",
+    "LOG_WORKER_CLEANRL_EPISODE_AUTO_RESET",
     # Worker Availability Messages
     "GODOT_NOT_INSTALLED_TITLE",
     "GODOT_NOT_INSTALLED_MSG",

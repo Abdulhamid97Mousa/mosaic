@@ -315,6 +315,14 @@ class OperatorRenderContainer(QtWidgets.QFrame):
 
         layout.addWidget(self._header)
 
+        # Agent legend strip (multi-agent only)
+        self._agent_legend = QtWidgets.QWidget(self)
+        legend_layout = QtWidgets.QHBoxLayout(self._agent_legend)
+        legend_layout.setContentsMargins(4, 1, 4, 1)
+        legend_layout.setSpacing(6)
+        self._build_agent_legend(legend_layout)
+        layout.addWidget(self._agent_legend)
+
         # Render area - should expand to fill available space
         self._render_container = QtWidgets.QWidget(self)
         self._render_container.setMinimumSize(350, 280)  # Larger minimum for better display
@@ -394,6 +402,15 @@ class OperatorRenderContainer(QtWidgets.QFrame):
 
         layout.addWidget(self._stats_bar)
 
+        # Parallel multi-agent action panel container (hidden by default).
+        # When parallel mode is active, the MultiAgentActionPanel is embedded here
+        # so the human sees action rows right below the environment render.
+        self._parallel_action_container = QtWidgets.QWidget(self)
+        self._parallel_action_container_layout = QtWidgets.QVBoxLayout(self._parallel_action_container)
+        self._parallel_action_container_layout.setContentsMargins(0, 0, 0, 0)
+        self._parallel_action_container.setVisible(False)
+        layout.addWidget(self._parallel_action_container)
+
         # Action panel for human operators (click-to-select actions)
         # Uses FlowLayout so buttons wrap to multiple lines
         self._action_panel = QtWidgets.QWidget(self)
@@ -449,6 +466,51 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         # Track current chess state
         self._chess_legal_moves: list[str] = []
         self._chess_current_player: str = ""
+
+    def _build_agent_legend(self, legend_layout: QtWidgets.QHBoxLayout) -> None:
+        """Build agent identification labels dynamically from operator config."""
+        if not self._config.is_multiagent:
+            self._agent_legend.hide()
+            return
+
+        player_ids = self._config.player_ids
+        if not player_ids:
+            self._agent_legend.hide()
+            return
+
+        for player_id in player_ids:
+            worker = self._config.get_worker_for_player(player_id)
+            if worker is None:
+                continue
+
+            # Extract agent index from player_id (e.g., "agent_2" → 2)
+            try:
+                agent_idx = int(player_id.split("_")[-1])
+            except (ValueError, IndexError):
+                agent_idx = 0
+
+            type_color = self.TYPE_COLORS.get(worker.worker_type, "#666")
+            worker_type_short = worker.worker_type.upper()
+
+            chip = QtWidgets.QLabel(self._agent_legend)
+            chip.setText(
+                f'<b>A{agent_idx}</b>'
+                f' <span style="background:{type_color}; color:white;'
+                f' padding:1px 4px; border-radius:2px; font-size:8px;">'
+                f'{worker_type_short}</span>'
+            )
+            chip.setToolTip(
+                f"{player_id}\n"
+                f"Type: {worker.worker_type}\n"
+                f"Worker: {worker.worker_id}"
+            )
+            chip.setStyleSheet("font-size: 10px; padding: 0 2px;")
+            legend_layout.addWidget(chip)
+
+        legend_layout.addStretch()
+        self._agent_legend.setStyleSheet(
+            "background-color: #f5f5f5; border-radius: 3px;"
+        )
 
     def _update_header(self) -> None:
         """Update header with current config."""
@@ -878,8 +940,8 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         step_reward = payload.get("reward", 0.0)
 
         try:
-            new_episode = int(episode_index) + 1
-            new_step = int(step_index) + 1
+            new_episode = int(episode_index) + 1  # episode_index is 0-based from worker
+            new_step = int(step_index)  # step_index is already 1-based from worker
 
             # Reset episode reward and conversation when episode changes
             if new_episode != self._current_episode:
@@ -1553,6 +1615,36 @@ class OperatorRenderContainer(QtWidgets.QFrame):
     def is_interactive(self) -> bool:
         """Check if this container is interactive (human operator)."""
         return self._is_interactive
+
+    # --- Parallel Multi-Agent Action Panel ---
+
+    def set_parallel_action_panel(self, panel: QtWidgets.QWidget) -> None:
+        """Embed a MultiAgentActionPanel right below the environment render.
+
+        Hides the single-agent ``_action_panel`` and shows the multi-agent
+        panel instead.
+
+        Args:
+            panel: The MultiAgentActionPanel widget to embed.
+        """
+        self.clear_parallel_action_panel()
+        self._action_panel.setVisible(False)
+        self._parallel_action_container_layout.addWidget(panel)
+        self._parallel_action_container.setVisible(True)
+        _LOGGER.debug(
+            "Parallel action panel embedded in render container for %s",
+            self._config.operator_id,
+        )
+
+    def clear_parallel_action_panel(self) -> None:
+        """Remove the embedded parallel action panel and hide the container."""
+        while self._parallel_action_container_layout.count():
+            item = self._parallel_action_container_layout.takeAt(0)
+            if item is not None:
+                widget = item.widget()
+                if widget is not None:
+                    widget.setParent(None)  # type: ignore[call-overload]
+        self._parallel_action_container.setVisible(False)
 
     def cleanup(self) -> None:
         """Clean up resources."""

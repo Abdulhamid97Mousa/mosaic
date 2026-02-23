@@ -351,6 +351,7 @@ class OperatorConfig:
     # MultiGrid-specific settings (for LLM workers in multi-agent environments)
     observation_mode: str = "visible_teammates"  # "egocentric" or "visible_teammates"
     coordination_level: int = 1  # 1=Emergent, 2=Basic Hints, 3=Role-Based
+    view_size: int | None = None  # Agent view size for MOSAIC (None = env default of 3)
 
     def __post_init__(self) -> None:
         """Validate configuration and ensure workers dict is populated."""
@@ -523,6 +524,7 @@ class OperatorConfig:
         observation_mode: str = "visible_teammates",
         coordination_level: int = 1,
         max_steps: int | None = None,
+        view_size: int | None = None,
     ) -> "OperatorConfig":
         """Create a multi-agent operator config.
 
@@ -536,6 +538,7 @@ class OperatorConfig:
             observation_mode: Observation mode for MultiGrid - "egocentric" or "visible_teammates".
             coordination_level: Coordination strategy level (1=Emergent, 2=Basic Hints, 3=Role-Based).
             max_steps: Maximum steps per episode before truncation.
+            view_size: Agent view size for MOSAIC (None = env default of 3).
 
         Returns:
             OperatorConfig with multiple workers for multi-agent env.
@@ -550,6 +553,7 @@ class OperatorConfig:
             execution_mode=execution_mode,
             observation_mode=observation_mode,
             coordination_level=coordination_level,
+            view_size=view_size,
         )
 
     def with_run_id(self, run_id: str) -> "OperatorConfig":

@@ -86,21 +86,28 @@ on the main thread.
 
 **Subscription lifecycle:**
 
-.. code-block:: python
+.. mermaid::
 
-   # 1. Controller subscribes to a run
-   controller.subscribe_to_run(run_id)
-     → subscribe_to_runbus(run_id)
-     → credit_manager.initialize_stream(run_id, "default")
+   sequenceDiagram
+       autonumber
+       participant C as LiveTelemetryController
+       participant RB as RunBus
+       participant CM as CreditManager
+       participant TAB as LiveTelemetryTab
 
-   # 2. First step event triggers tab creation
-   controller._process_step_queue()
-     → detects first event → emits run_tab_requested
+       note over C: Phase 1: Subscribe to a run
+       C->>RB: subscribe_to_runbus(run_id)
+       C->>CM: initialize_stream(run_id, "default")
 
-   # 3. Tab registers itself
-   controller.register_tab(run_id, agent_id, tab)
-     → grant_credits(run_id, agent_id, 200)
-     → flush buffered steps/episodes
+       note over C: Phase 2: First step triggers tab creation
+       RB-->>C: STEP_APPENDED event
+       C->>C: _process_step_queue()
+       C-->>TAB: emit run_tab_requested(run_id, agent_id, tab_name)
+
+       note over TAB: Phase 3: Tab registers itself
+       TAB->>C: register_tab(run_id, agent_id, tab)
+       C->>CM: grant_credits(run_id, agent_id, 200)
+       C->>TAB: flush buffered steps/episodes
 
 Queue sizes: ``LIVE_STEP_QUEUE_SIZE = 64``,
 ``LIVE_EPISODE_QUEUE_SIZE = 64``, ``LIVE_CONTROL_QUEUE_SIZE = 32``.

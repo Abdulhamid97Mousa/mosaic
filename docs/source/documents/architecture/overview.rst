@@ -38,12 +38,67 @@ System Layers
 Visual Layer
 ------------
 
-The visual layer provides the user interface built with PyQt6:
+The visual layer provides the user interface built with PyQt6.  The screenshot
+below shows the four main regions of the MOSAIC Qt Shell, each highlighted with
+a distinct colour:
 
-- **MainWindow**: Application shell with tab management
+.. figure:: /images/architecture/visual_layer.png
+   :alt: MOSAIC Visual Layer, annotated screenshot
+   :align: center
+   :width: 100%
+
+   Annotated screenshot of the MOSAIC Qt Shell showing all four visual regions.
+
+.. list-table::
+   :widths: 8 20 72
+   :header-rows: 1
+
+   * - Colour
+     - Region
+     - Description
+   * - .. raw:: html
+
+          <span style="color:#c0392b; font-weight:bold;">&#9679;</span>
+     - **Main Window** 
+     - The top-level application shell (``MainWindow``).  Hosts the menu bar
+       (*Settings, Control Panel, Render View, Game Info, Runtime Log, Chat*),
+       the three content panes below, and the global Dark Mode toggle.
+   * - .. raw:: html
+
+          <span style="color:#e67e22; font-weight:bold;">&#9679;</span>
+     - **Control Panel** 
+     - Left sidebar (``ControlPanel``).  Contains environment selection
+       (*Family, Environment, Seed*), game configuration (*Input Mode, Display
+       Resolution, Control Mode*), the game-flow buttons (*Start / Pause /
+       Continue / Terminate / Agent Step / Reset*), and keyboard assignment
+       for multi-human play via ``evdev``.
+   * - .. raw:: html
+
+          <span style="color:#2980b9; font-weight:bold;">&#9679;</span>
+     - **Render Tabs** 
+     - Centre area (``RenderTabs``, a ``QTabWidget``).  Displays the live
+       environment frame through switchable tabs: *Grid, Raw, Video,
+       Human Replay, Multi-Operator, Management, Tensorboard*.  Dynamic
+       per-run tabs (e.g. ``FastLaneTab``, ``LiveTelemetryTab``) are added
+       automatically when training starts.
+       See :doc:`/documents/rendering_tabs/index` for the full rendering
+       architecture.
+   * - .. raw:: html
+
+          <span style="color:#27ae60; font-weight:bold;">&#9679;</span>
+     - **Runtime Logs** 
+     - Right panel (``RuntimeLogPanel``).  Streams structured log messages
+       with *Component* and *Severity* filters.  Every log line carries a
+       ``LOG###`` code (see :doc:`/documents/runtime_logging/log_constants`)
+       for fast searching.
+
+**Component summary:**
+
+- **MainWindow**: Application shell with tab management and menu bar
 - **ControlPanel**: Environment selection and actor configuration
 - **RenderTabs**: Display environment renders (RGB, ASCII, etc.)
-- **AdvancedConfigTab**: Fine-grained experiment configuration
+- **RuntimeLogPanel**: Filterable structured log viewer
+- **AdvancedConfigTab**: Fine-grained experiment configuration (accessible via the *Settings* menu)
 
 Service Layer
 -------------

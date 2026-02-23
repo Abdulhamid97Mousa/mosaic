@@ -1,6 +1,18 @@
 Hybrid Decision-Maker
 =====================
 
+.. raw:: html
+
+   <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
+     <source src="../../../../_static/videos/heterogeneous_agents_adversarial.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+   <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
+     <strong>Heterogeneous Multi-Agent Ad-Hoc Teamwork:</strong> Different decision-making paradigms (RL, LLM, Human, Random) competing head-to-head in the same multi-agent environment.
+     See <a href="../../../human_control/multi_keyboard_evdev.html">Multi-Keyboard Support</a>
+     and <a href="../../../architecture/operators/architecture.html">IPC Architecture</a>.
+   </p>
+
 A **hybrid** setup is one where agents in the same experiment use
 **different decision-making paradigms** -- for example, an RL-trained
 policy and an LLM playing side-by-side as teammates, or an RL agent
@@ -390,6 +402,16 @@ These questions span four possible outcomes:
   teams -- the most publishable result
 - **Hypothesis D (Interference)**: hybrid underperforms both
   homogeneous teams -- still publishable as a negative result
+
+.. raw:: html
+
+   <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
+     <source src="../../../../_static/videos/heterogeneous_agents_adversarial.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+   <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
+     <strong>Heterogeneous Multi-Agent Ad-Hoc Teamwork in Adversarial Settings:</strong> Different decision-making paradigms (RL, LLM, Random) competing head-to-head in the same multi-agent environment.
+   </p>
 
 GUI Integration
 ---------------

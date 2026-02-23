@@ -55,11 +55,22 @@ def register_mosaic_environments() -> None:
         from xuance.environment.multi_agent_env import REGISTRY_MULTI_AGENT_ENV
         from xuance_worker.environments.mosaic_multigrid import MultiGrid_Env
 
-        # Register MultiGrid
+        # Register MultiGrid (multi-agent)
         if "multigrid" not in REGISTRY_MULTI_AGENT_ENV:
             REGISTRY_MULTI_AGENT_ENV["multigrid"] = MultiGrid_Env
             REGISTRY_MULTI_AGENT_ENV["MultiGrid"] = MultiGrid_Env
             _logger.info("Registered MultiGrid_Env with XuanCe registry")
+
+        # Register Solo MultiGrid (single-agent PPO)
+        try:
+            from xuance.environment.single_agent_env import REGISTRY_ENV
+            from xuance_worker.environments.mosaic_multigrid import SoloMultiGrid_Env
+
+            if "mosaic_multigrid" not in REGISTRY_ENV:
+                REGISTRY_ENV["mosaic_multigrid"] = SoloMultiGrid_Env
+                _logger.info("Registered SoloMultiGrid_Env with XuanCe single-agent registry")
+        except ImportError as e:
+            _logger.warning(f"Could not register SoloMultiGrid_Env: {e}")
 
         _REGISTERED = True
         _logger.info("MOSAIC environments registered with XuanCe successfully")

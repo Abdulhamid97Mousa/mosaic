@@ -21,15 +21,24 @@ from gym_gui.core.enums import GameId
 
 # All MultiGrid game IDs
 MULTIGRID_GAME_IDS: tuple[GameId, ...] = (
-    # MOSAIC multigrid (fixed agent counts)
+    # MOSAIC multigrid 
     GameId.MOSAIC_MULTIGRID_SOCCER,      # 4 agents (2v2) - Deprecated
     GameId.MOSAIC_MULTIGRID_COLLECT,     # 3 agents - Deprecated
     GameId.MOSAIC_MULTIGRID_COLLECT2VS2,  # 4 agents (2v2) - Deprecated
     GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_INDAGOBS,      # 4 agents (2v2) - IndAgObs
+    GameId.MOSAIC_MULTIGRID_SOCCER_1VS1_INDAGOBS,      # 2 agents (1v1) - IndAgObs
     GameId.MOSAIC_MULTIGRID_COLLECT_INDAGOBS,     # 3 agents - IndAgObs
     GameId.MOSAIC_MULTIGRID_COLLECT2VS2_INDAGOBS,  # 4 agents (2v2) - IndAgObs
+    GameId.MOSAIC_MULTIGRID_COLLECT_1VS1_INDAGOBS, # 2 agents (1v1) - IndAgObs
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_INDAGOBS,   # 6 agents (3v3) - IndAgObs
     GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_TEAMOBS,       # 4 agents (2v2) - TeamObs
     GameId.MOSAIC_MULTIGRID_COLLECT2VS2_TEAMOBS,   # 4 agents (2v2) - TeamObs
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_TEAMOBS,    # 6 agents (3v3) - TeamObs
+    # Solo variants (v6.0.0) - single-agent, no opponent
+    GameId.MOSAIC_MULTIGRID_SOCCER_SOLO_GREEN,     # 1 agent (Green)
+    GameId.MOSAIC_MULTIGRID_SOCCER_SOLO_BLUE,      # 1 agent (Blue)
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_SOLO_GREEN,  # 1 agent (Green)
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_SOLO_BLUE,   # 1 agent (Blue)
     # INI multigrid (configurable agent count, default 2)
     GameId.INI_MULTIGRID_BLOCKED_UNLOCK_PICKUP,
     GameId.INI_MULTIGRID_EMPTY_5X5,
@@ -46,16 +55,25 @@ MULTIGRID_GAME_IDS: tuple[GameId, ...] = (
     GameId.INI_MULTIGRID_RED_BLUE_DOORS_8X8,
 )
 
-# MOSAIC environments with  agent counts (cannot be changed)
+# MOSAIC environments with agent counts 
 MOSAIC_AGENT_COUNTS: dict[GameId, int] = {
     GameId.MOSAIC_MULTIGRID_SOCCER: 4,   # 2v2 teams
     GameId.MOSAIC_MULTIGRID_COLLECT: 3,  # 3 collectors
     GameId.MOSAIC_MULTIGRID_COLLECT2VS2: 4,  # 2v2 teams
     GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_INDAGOBS: 4,   # 2v2 teams
+    GameId.MOSAIC_MULTIGRID_SOCCER_1VS1_INDAGOBS: 2,   # 1v1
     GameId.MOSAIC_MULTIGRID_COLLECT_INDAGOBS: 3,  # 3 collectors
     GameId.MOSAIC_MULTIGRID_COLLECT2VS2_INDAGOBS: 4,  # 2v2 teams
+    GameId.MOSAIC_MULTIGRID_COLLECT_1VS1_INDAGOBS: 2,  # 1v1
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_INDAGOBS: 6,  # 3v3
     GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_TEAMOBS: 4,   # 2v2 teams
     GameId.MOSAIC_MULTIGRID_COLLECT2VS2_TEAMOBS: 4,  # 2v2 teams
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_TEAMOBS: 6,  # 3v3
+    # Solo variants (v6.0.0) - single agent
+    GameId.MOSAIC_MULTIGRID_SOCCER_SOLO_GREEN: 1,
+    GameId.MOSAIC_MULTIGRID_SOCCER_SOLO_BLUE: 1,
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_SOLO_GREEN: 1,
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_SOLO_BLUE: 1,
 }
 
 # INI environments that support configurable agent count
@@ -133,6 +151,35 @@ def build_multigrid_controls(
         # Set initial value in overrides if not already set
         if "num_agents" not in overrides:
             overrides["num_agents"] = current_agents
+
+    # -------- View Size (MOSAIC only) --------
+    if is_mosaic:
+        view_spin = QtWidgets.QSpinBox(parent)
+        view_spin.setRange(3, 15)
+        view_spin.setSingleStep(2)  # Odd values preferred (3, 5, 7, 9, ...)
+        view_spin.setSpecialValueText("3 (default)")
+
+        current_view = overrides.get("view_size", cfg.view_size)
+        if current_view is None or current_view == 3:
+            view_spin.setValue(3)  # Shows "3 (default)"
+        else:
+            view_spin.setValue(int(current_view))
+
+        def on_view_changed(value: int) -> None:
+            # Only emit override if different from default (3)
+            emit("view_size", value if value != 3 else None)
+
+        view_spin.valueChanged.connect(on_view_changed)
+        view_spin.setToolTip(
+            "Agent view size (NxN partial observation window).\n"
+            "Default: 3 (9 cells visible, 7.1% of 16x11 grid).\n"
+            "Larger values give agents more information:\n"
+            "  5 = 25 cells (19.8%)\n"
+            "  7 = 49 cells (38.9%)\n"
+            "  9 = 81 cells (64.3%)\n"
+            "Must be odd for symmetric view. Even values are rounded up."
+        )
+        layout.addRow("View Size", view_spin)
 
     # -------- Seed (optional) --------
     seed_spin = QtWidgets.QSpinBox(parent)

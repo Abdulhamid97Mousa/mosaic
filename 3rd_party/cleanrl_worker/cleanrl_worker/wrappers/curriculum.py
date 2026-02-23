@@ -32,6 +32,7 @@ import os
 from typing import Any, Callable, Dict, List, Optional, Tuple
 
 import gymnasium as gym
+from .minigrid import is_minigrid_env
 
 # Register BabyAI/MiniGrid environments before gym.make()
 try:
@@ -126,15 +127,18 @@ class BabyAITaskWrapper(ReinitTaskWrapper):
         env = gym.make(env_id)
 
         if self.apply_wrappers:
-            # Apply standard MiniGrid observation wrappers
-            try:
-                from minigrid.wrappers import ImgObsWrapper
-                env = ImgObsWrapper(env)
-            except ImportError:
-                pass
+            _is_mg = is_minigrid_env(env_id)
 
-            # Flatten observation for neural network input
-            env = gym.wrappers.FlattenObservation(env)
+            # Apply standard MiniGrid observation wrappers
+            if _is_mg:
+                try:
+                    from minigrid.wrappers import ImgObsWrapper
+                    env = ImgObsWrapper(env)
+                except ImportError:
+                    pass
+                # NOTE: Do NOT flatten — MinigridAgent (CNN) expects raw (7,7,3) images
+            else:
+                env = gym.wrappers.FlattenObservation(env)
 
         return env
 
@@ -252,6 +256,7 @@ def make_curriculum_env(
     capture_video: bool = False,
     run_name: str = "curriculum_run",
     apply_wrappers: bool = True,
+    max_episode_steps: int = 256,
 ) -> gym.vector.VectorEnv:
     """
     Create a vectorized environment with curriculum learning support.
@@ -299,6 +304,9 @@ def make_curriculum_env(
     # This works for both single-process and multi-process training
     mp_curriculum = make_multiprocessing_curriculum(base_curriculum, start=True)
 
+    # Detect whether the curriculum targets MiniGrid/BabyAI environments
+    _is_mg = is_minigrid_env(curriculum_schedule[0]["env_id"])
+
     def make_env_fn(env_id: str, idx: int) -> gym.Env:
         """Create a single environment with wrappers."""
         if capture_video and idx == 0:
@@ -307,17 +315,22 @@ def make_curriculum_env(
         else:
             env = gym.make(env_id)
 
-        env = gym.wrappers.RecordEpisodeStatistics(env)
-
         if apply_wrappers:
-            # Apply standard MiniGrid observation wrappers
-            try:
-                from minigrid.wrappers import ImgObsWrapper
-                env = ImgObsWrapper(env)
-            except ImportError:
-                pass
+            if _is_mg:
+                # MiniGrid/BabyAI: ImgObsWrapper converts Dict→image Box.
+                # Do NOT flatten — MinigridAgent (CNN) expects raw (7,7,3).
+                try:
+                    from minigrid.wrappers import ImgObsWrapper
+                    env = ImgObsWrapper(env)
+                except ImportError:
+                    pass
+            else:
+                env = gym.wrappers.FlattenObservation(env)
 
-            env = gym.wrappers.FlattenObservation(env)
+        # TimeLimit BEFORE RecordEpisodeStatistics so truncation
+        # triggers the "episode" info dict correctly.
+        env = gym.wrappers.TimeLimit(env, max_episode_steps=max_episode_steps)
+        env = gym.wrappers.RecordEpisodeStatistics(env)
 
         return env
 

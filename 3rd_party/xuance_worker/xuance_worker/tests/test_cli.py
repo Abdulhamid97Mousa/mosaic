@@ -12,6 +12,33 @@ import pytest
 from xuance_worker.cli import main, parse_args
 
 
+def _extract_last_json(text: str) -> dict:
+    """Extract the last JSON object from stdout that may contain lifecycle events.
+
+    The lifecycle emitter writes single-line JSON events before the pretty-printed
+    config JSON.  We try parsing from the end of stdout backwards until we find
+    a valid JSON object.
+    """
+    # Try parsing the entire output first (works if only one JSON object)
+    text = text.strip()
+    try:
+        return json.loads(text)
+    except json.JSONDecodeError:
+        pass
+
+    # Multiple JSON objects: split by lines, find the last valid one.
+    # The config is pretty-printed (multi-line), so collect lines from end.
+    lines = text.splitlines()
+    for i in range(len(lines) - 1, -1, -1):
+        candidate = "\n".join(lines[i:])
+        try:
+            return json.loads(candidate)
+        except json.JSONDecodeError:
+            continue
+
+    raise ValueError(f"No valid JSON found in output:\n{text[:500]}")
+
+
 class TestParseArgs:
     """Test suite for CLI argument parsing."""
 
@@ -29,7 +56,6 @@ class TestParseArgs:
         assert args.device == "cpu"
         assert args.parallels == 8
         assert args.test is False
-        assert args.benchmark is False
         assert args.dry_run is False
         assert args.run_id is None
         assert args.config_path is None
@@ -88,11 +114,6 @@ class TestParseArgs:
         """Test --test flag."""
         args = parse_args(["--test"])
         assert args.test is True
-
-    def test_benchmark_flag(self) -> None:
-        """Test --benchmark flag."""
-        args = parse_args(["--benchmark"])
-        assert args.benchmark is True
 
     def test_dry_run_flag(self) -> None:
         """Test --dry-run flag."""
@@ -162,7 +183,9 @@ class TestMainFunction:
         assert exit_code == 0
 
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        # Lifecycle emitter may write JSON events before the config line;
+        # the config is the last valid JSON object on stdout.
+        output = _extract_last_json(captured.out)
 
         assert output["method"] == "ppo"
         assert output["env"] == "classic_control"
@@ -179,7 +202,7 @@ class TestMainFunction:
         assert exit_code == 0
 
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _extract_last_json(captured.out)
 
         assert output["method"] == "dqn"
         assert output["seed"] == 42
@@ -214,7 +237,7 @@ class TestMainFunction:
             assert exit_code == 0
 
             captured = capsys.readouterr()
-            output = json.loads(captured.out)
+            output = _extract_last_json(captured.out)
 
             assert output["run_id"] == "file_config_test"
             assert output["method"] == "td3"
@@ -257,24 +280,6 @@ class TestMainFunction:
         mock_runtime.run.assert_called_once()
 
     @patch("xuance_worker.cli.XuanCeWorkerRuntime")
-    def test_benchmark_mode(self, mock_runtime_class: MagicMock) -> None:
-        """Test benchmark mode."""
-        mock_runtime = MagicMock()
-        mock_runtime.benchmark.return_value = MagicMock(
-            status="completed",
-            runner_type="RunnerDRL",
-        )
-        mock_runtime_class.return_value = mock_runtime
-
-        exit_code = main([
-            "--method", "ppo",
-            "--benchmark",
-        ])
-
-        assert exit_code == 0
-        mock_runtime.benchmark.assert_called_once()
-
-    @patch("xuance_worker.cli.XuanCeWorkerRuntime")
     def test_runtime_error(self, mock_runtime_class: MagicMock) -> None:
         """Test handling of RuntimeError from runtime."""
         mock_runtime = MagicMock()
@@ -309,7 +314,7 @@ class TestMainFunctionRunId:
         assert exit_code == 0
 
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _extract_last_json(captured.out)
 
         # Auto-generated run_id should be 8 characters (UUID prefix)
         assert len(output["run_id"]) == 8
@@ -324,6 +329,6 @@ class TestMainFunctionRunId:
         assert exit_code == 0
 
         captured = capsys.readouterr()
-        output = json.loads(captured.out)
+        output = _extract_last_json(captured.out)
 
         assert output["run_id"] == "my_custom_run"

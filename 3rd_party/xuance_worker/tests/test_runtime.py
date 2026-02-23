@@ -296,12 +296,16 @@ class TestXuanCeWorkerRuntimeRun:
 
     def test_run_xuance_not_installed_raises_error(self) -> None:
         """Test that run() raises RuntimeError if XuanCe is not installed."""
+        import sys
+        from unittest.mock import patch
+
         config = _make_config()
         runtime = XuanCeWorkerRuntime(config, dry_run=False)
 
-        # This should raise RuntimeError because xuance is likely not installed
-        with pytest.raises(RuntimeError, match="XuanCe is not installed"):
-            runtime.run()
+        # Mock xuance as unavailable to test the import error path
+        with patch.dict(sys.modules, {"xuance": None}):
+            with pytest.raises(RuntimeError, match="XuanCe is not installed"):
+                runtime.run()
 
 
 # =============================================================================

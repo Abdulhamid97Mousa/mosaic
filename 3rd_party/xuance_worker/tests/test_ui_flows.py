@@ -598,11 +598,16 @@ class TestErrorHandling:
 
     def test_runtime_error_for_missing_xuance(self) -> None:
         """Test that RuntimeError is raised when XuanCe is not installed."""
+        import sys
+        from unittest.mock import patch
+
         config = _make_config()
         runtime = XuanCeWorkerRuntime(config, dry_run=False)
 
-        with pytest.raises(RuntimeError, match="XuanCe is not installed"):
-            runtime.run()
+        # Mock xuance as unavailable to test the import error path
+        with patch.dict(sys.modules, {"xuance": None}):
+            with pytest.raises(RuntimeError, match="XuanCe is not installed"):
+                runtime.run()
 
     def test_config_file_not_found(self, tmp_path: Path) -> None:
         """Test error when config file doesn't exist."""

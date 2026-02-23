@@ -24,6 +24,44 @@ cloud-hosted experiment comparison.
      - Cloud / local
      - Experiment comparison, artefact versioning, team sharing
 
+.. mermaid::
+
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
+   graph LR
+       subgraph Workers["MOSAIC Workers"]
+           CRL["CleanRL Worker"]
+           XU["XuanCe Worker"]
+           RLL["RLlib Worker"]
+       end
+
+       subgraph Metrics["Logged Metrics"]
+           M1["episodic_return"]
+           M2["policy_loss / value_loss"]
+           M3["entropy / learning_rate"]
+           M4["SPS (steps/sec)"]
+       end
+
+       subgraph TB["TensorBoard (Local)"]
+           TBD["Dashboard :6006<br/>var/trainer/runs/&lt;run_id&gt;/tensorboard/"]
+       end
+
+       subgraph WB["Weights & Biases (Cloud)"]
+           WBD["Project Dashboard<br/>run_name = MOSAIC ULID<br/>artefacts + system stats"]
+       end
+
+       CRL & XU & RLL --> M1 & M2 & M3 & M4
+       M1 & M2 & M3 & M4 --> TBD
+       M1 & M2 & M3 & M4 --> WBD
+
+       style Workers fill:#e8f5e9,stroke:#2e7d32,color:#333
+       style Metrics fill:#fff3e0,stroke:#e65100,color:#333
+       style TB fill:#e3f2fd,stroke:#1565c0,color:#333
+       style WB fill:#fce4ec,stroke:#c62828,color:#333
+
+Both backends receive the same metrics from worker training loops.
+TensorBoard writes summaries to local disk; W&B streams them to a cloud
+dashboard (or logs offline for later sync).
+
 -----
 
 TensorBoard

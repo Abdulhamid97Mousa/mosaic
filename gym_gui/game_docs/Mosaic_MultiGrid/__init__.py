@@ -6,10 +6,10 @@ Basketball) with two execution modes, partial observability, and multi-keyboard
 support.
 
 Package location: 3rd_party/mosaic_multigrid/
-PyPI: mosaic-multigrid (v5.0.0+)
+PyPI: mosaic-multigrid (v6.0.0)
 API: Gymnasium (env.reset(seed=N), 5-tuple step returns)
 
-Action space (v5.0.0+):
+Action space (v6.0.0):
     Discrete(8): 0=NOOP, 1=LEFT, 2=RIGHT, 3=FORWARD, 4=PICKUP, 5=DROP, 6=TOGGLE, 7=DONE
     NOOP (0) is a genuine no-op — the agent stays in place and does nothing.
     This enables AEC (sequential physics) mode via GymnasiumMultiAgentAECWrapper.
@@ -45,6 +45,12 @@ Environments:
         - MosaicMultiGrid-Soccer-2vs2-TeamObs-v0: IndAgObs + teammate features
         - MosaicMultiGrid-Collect-2vs2-TeamObs-v0: IndAgObs + teammate features
         - MosaicMultiGrid-Basketball-3vs3-TeamObs-v0: IndAgObs + teammate features
+
+    Solo (v6.0.0) -- Single-agent, no opponent, for curriculum pre-training:
+        - MosaicMultiGrid-Soccer-Solo-Green-IndAgObs-v0: 1 Green agent, scores right
+        - MosaicMultiGrid-Soccer-Solo-Blue-IndAgObs-v0: 1 Blue agent, scores left
+        - MosaicMultiGrid-Basketball-Solo-Green-IndAgObs-v0: 1 Green agent, scores right
+        - MosaicMultiGrid-Basketball-Solo-Blue-IndAgObs-v0: 1 Blue agent, scores left
 """
 
 from __future__ import annotations
@@ -230,7 +236,7 @@ strategy space (pass beats solo-carry, marking beats pass, solo-carry beats mark
 <p style="background-color: #ffecb3; padding: 8px; border-radius: 4px; margin-top: 10px;">
 <strong>Note:</strong> MOSAIC MultiGrid uses <code>NOOP (0)</code> as the idle action when no key is pressed.
 This is different from INI MultiGrid which uses <code>DONE (6)</code>.
-NOOP=0 is a genuine no-op (v5.0.0+) and enables AEC mode via <code>GymnasiumMultiAgentAECWrapper</code>.
+NOOP=0 is a genuine no-op (v5.0.0+, current v6.0.0) and enables AEC mode via <code>GymnasiumMultiAgentAECWrapper</code>.
 </p>
 
 <h4>Improvements over Deprecated Soccer-v0</h4>
@@ -588,6 +594,79 @@ relative positions and states of all teammates.
 
 
 # ---------------------------------------------------------------------------
+# Solo
+# ---------------------------------------------------------------------------
+
+def _get_solo_html(env_id: str) -> str:
+    """Solo environment (v6.0.0) documentation."""
+    if "Soccer" in env_id:
+        sport = "Soccer"
+        grid = "16 x 11 (14 x 9 playable, FIFA 1.54 ratio)"
+    else:
+        sport = "Basketball"
+        grid = "19 x 11 (17 x 9 playable)"
+
+    if "Green" in env_id:
+        color = "Green"
+        team = "1"
+        direction = "right"
+    else:
+        color = "Blue"
+        team = "2"
+        direction = "left"
+
+    return f"""
+<h2>{env_id}</h2>
+
+<p style="background-color: #e8f5e9; padding: 8px; border-radius: 4px; margin-bottom: 10px;">
+<strong>NEW</strong> in v6.0.0. Single-agent solo training -- no opponent on the field.
+Gymnasium API: <code>env.reset(seed=N)</code> returns <code>(obs, info)</code>.
+</p>
+
+<p>
+A single <strong>{color}</strong> agent (team {team}) on an empty {sport.lower()} field.
+The agent must learn to pick up the ball, navigate to the goal, and score
+without any opponent interference. Designed for <strong>curriculum pre-training</strong>
+before transferring to competitive multi-agent environments.
+</p>
+
+<h4>Environment Details</h4>
+<table style="width:100%; border-collapse: collapse; margin: 10px 0;">
+    <tr style="background-color: #f0f0f0;">
+        <th style="border: 1px solid #ddd; padding: 8px;">Property</th>
+        <th style="border: 1px solid #ddd; padding: 8px;">Value</th>
+    </tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Grid Size</td><td style="border: 1px solid #ddd; padding: 8px;">{grid}</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Agents</td><td style="border: 1px solid #ddd; padding: 8px;">1 ({color}, team {team})</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Opponent</td><td style="border: 1px solid #ddd; padding: 8px;">None</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Ball</td><td style="border: 1px solid #ddd; padding: 8px;">1 wildcard ball (respawns after goal)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Scoring Direction</td><td style="border: 1px solid #ddd; padding: 8px;">Scores {direction}</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">View Size</td><td style="border: 1px solid #ddd; padding: 8px;">3 x 3 (default, override with view_size=7)</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Max Steps</td><td style="border: 1px solid #ddd; padding: 8px;">200</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Win Condition</td><td style="border: 1px solid #ddd; padding: 8px;">First to 2 goals</td></tr>
+    <tr><td style="border: 1px solid #ddd; padding: 8px;">Reward</td><td style="border: 1px solid #ddd; padding: 8px;">+1 per goal scored</td></tr>
+</table>
+
+<h4>Why Solo?</h4>
+<ul>
+    <li><strong>Curriculum pre-training</strong>: Learn ball pickup + scoring without opponent interference</li>
+    <li><strong>Solves sparse reward</strong>: Random agents score 0 goals in 100 episodes with opponents; solo removes opponent blocking</li>
+    <li><strong>Team-specific checkpoints</strong>: Green scores right, Blue scores left -- each learns its own goal direction</li>
+    <li><strong>Transfer to 1v1/2v2</strong>: Pre-trained solo checkpoint initializes competitive training</li>
+</ul>
+
+<h4>Action Space</h4>
+<p><code>Discrete(8)</code> -- same as all MOSAIC MultiGrid environments (NOOP=0).</p>
+
+<h4>References</h4>
+<ul>
+    <li>Source: <code>3rd_party/mosaic_multigrid/</code></li>
+    <li>See: <code>SOCCER_IMPROVEMENTS.md</code> for curriculum strategy</li>
+</ul>
+"""
+
+
+# ---------------------------------------------------------------------------
 # Overview
 # ---------------------------------------------------------------------------
 
@@ -624,7 +703,7 @@ with partial observability (3x3 view) and multi-keyboard support.
     </tr>
 </table>
 <p style="background-color: #ffecb3; padding: 8px; border-radius: 4px;">
-<strong>AEC requires NOOP=0</strong> (mosaic_multigrid v5.0.0+). Non-acting agents receive NOOP
+<strong>AEC requires NOOP=0</strong> (mosaic_multigrid v5.0.0+, current v6.0.0). Non-acting agents receive NOOP
 so only the active agent's action affects the physics. AEC is <em>not available</em> for
 <code>ini_multigrid</code> (action 0 = LEFT) or <code>overcooked</code> (no NOOP).
 </p>
@@ -691,6 +770,30 @@ so only the active agent's action affects the physics. AEC is <em>not available<
         <td style="border: 1px solid #ddd; padding: 8px;">Basketball + teammate obs</td>
         <td style="border: 1px solid #ddd; padding: 8px;">SMAC-style</td>
     </tr>
+    <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;"><code>MosaicMultiGrid-Soccer-Solo-Green-IndAgObs-v0</code></td>
+        <td style="border: 1px solid #ddd; padding: 8px;">1</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">Solo soccer (Green, scores right)</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">v6.0.0</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;"><code>MosaicMultiGrid-Soccer-Solo-Blue-IndAgObs-v0</code></td>
+        <td style="border: 1px solid #ddd; padding: 8px;">1</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">Solo soccer (Blue, scores left)</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">v6.0.0</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;"><code>MosaicMultiGrid-Basketball-Solo-Green-IndAgObs-v0</code></td>
+        <td style="border: 1px solid #ddd; padding: 8px;">1</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">Solo basketball (Green, scores right)</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">v6.0.0</td>
+    </tr>
+    <tr>
+        <td style="border: 1px solid #ddd; padding: 8px;"><code>MosaicMultiGrid-Basketball-Solo-Blue-IndAgObs-v0</code></td>
+        <td style="border: 1px solid #ddd; padding: 8px;">1</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">Solo basketball (Blue, scores left)</td>
+        <td style="border: 1px solid #ddd; padding: 8px;">v6.0.0</td>
+    </tr>
 </table>
 
 <h4>API</h4>
@@ -698,7 +801,7 @@ so only the active agent's action affects the physics. AEC is <em>not available<
 Uses <strong>Gymnasium</strong> API:
 <code>env.reset(seed=42)</code> returns <code>(obs, info)</code>.
 <code>env.step(actions)</code> returns <code>(obs, rewards, terminated, truncated, info)</code>.
-Action space v5.0.0+: <code>Discrete(8)</code> — 0=NOOP, 1=LEFT, 2=RIGHT, 3=FORWARD, 4=PICKUP, 5=DROP, 6=TOGGLE, 7=DONE.
+Action space v6.0.0: <code>Discrete(8)</code> — 0=NOOP, 1=LEFT, 2=RIGHT, 3=FORWARD, 4=PICKUP, 5=DROP, 6=TOGGLE, 7=DONE.
 </p>
 
 <h4>Source</h4>
@@ -721,7 +824,9 @@ def get_mosaic_multigrid_html(env_id: str) -> str:
     """
     _is_modern = ("IndAgObs" in env_id or "TeamObs" in env_id
                    or "Enhanced" in env_id)
-    if "Basketball" in env_id:
+    if "Solo" in env_id:
+        return _get_solo_html(env_id)
+    elif "Basketball" in env_id:
         return _get_basketball_html()
     elif "Soccer" in env_id:
         if "1vs1" in env_id:
@@ -753,6 +858,10 @@ MOSAIC_COLLECT2VS2_HTML = _get_collect2vs2_enhanced_html()
 MOSAIC_COLLECT2VS2_BASE_HTML = _get_collect2vs2_base_html()
 MOSAIC_BASKETBALL_HTML = _get_basketball_html()
 MOSAIC_OVERVIEW_HTML = _get_overview_html()
+MOSAIC_SOLO_SOCCER_GREEN_HTML = _get_solo_html("MosaicMultiGrid-Soccer-Solo-Green-IndAgObs-v0")
+MOSAIC_SOLO_SOCCER_BLUE_HTML = _get_solo_html("MosaicMultiGrid-Soccer-Solo-Blue-IndAgObs-v0")
+MOSAIC_SOLO_BASKETBALL_GREEN_HTML = _get_solo_html("MosaicMultiGrid-Basketball-Solo-Green-IndAgObs-v0")
+MOSAIC_SOLO_BASKETBALL_BLUE_HTML = _get_solo_html("MosaicMultiGrid-Basketball-Solo-Blue-IndAgObs-v0")
 
 __all__ = [
     "get_mosaic_multigrid_html",
@@ -765,4 +874,8 @@ __all__ = [
     "MOSAIC_COLLECT2VS2_BASE_HTML",
     "MOSAIC_BASKETBALL_HTML",
     "MOSAIC_OVERVIEW_HTML",
+    "MOSAIC_SOLO_SOCCER_GREEN_HTML",
+    "MOSAIC_SOLO_SOCCER_BLUE_HTML",
+    "MOSAIC_SOLO_BASKETBALL_GREEN_HTML",
+    "MOSAIC_SOLO_BASKETBALL_BLUE_HTML",
 ]

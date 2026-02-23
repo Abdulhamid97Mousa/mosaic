@@ -317,11 +317,23 @@ class GameConfigBuilder:
                 except (TypeError, ValueError):
                     seed = None
 
+            # View size override (default None = use environment default)
+            view_size_raw = overrides.get("view_size")
+            view_size: int | None = None
+            if view_size_raw is not None:
+                try:
+                    view_size = int(view_size_raw)
+                    if view_size < 1:
+                        view_size = None
+                except (TypeError, ValueError):
+                    view_size = None
+
             return MultiGridConfig(
                 env_id=env_id,
                 num_agents=num_agents,
                 seed=seed,
                 highlight=highlight,
+                view_size=view_size,
             )
 
         # SMAC v1 environments (hand-designed cooperative micromanagement maps)

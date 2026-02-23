@@ -43,6 +43,8 @@ try:
         LOG_WORKER_BALROG_DEBUG,
         LOG_WORKER_MOSAIC_RUNTIME_INTEGRATION,
         LOG_WORKER_MOSAIC_ACTION_PARSED,
+        LOG_WORKER_BALROG_EPISODE_AUTO_RESET,
+        LOG_WORKER_BALROG_ACTION_DEFAULTED,
     )
     _HAS_GYM_GUI = True
 except ImportError:
@@ -604,6 +606,7 @@ class InteractiveRuntime:
         self._llm_calls = 0
         self._total_input_tokens = 0
         self._total_output_tokens = 0
+        self._reset_seed = None
 
     def _create_agent(self) -> Any:
         """Create BALROG agent based on config."""
@@ -648,6 +651,7 @@ class InteractiveRuntime:
             # Reset with seed
             effective_seed = seed if seed is not None else self.config.seed
             self._obs, info = self._env.reset(seed=effective_seed)
+            self._reset_seed = effective_seed  # Store for deterministic auto-reset
 
             # Set instruction prompt with valid actions (critical for LLM to know valid actions)
             instructions = None
@@ -732,6 +736,12 @@ class InteractiveRuntime:
             except Exception as e:
                 logger.warning(f"Agent act failed at step {self._step_idx}: {e}")
                 action_str = ""
+                if _HAS_GYM_GUI and log_constant:
+                    log_constant(logger, LOG_WORKER_BALROG_ACTION_DEFAULTED, extra={
+                        "step_index": self._step_idx,
+                        "error": str(e),
+                        "default_action": "go forward",
+                    })
 
             # Validate and execute action
             if self.config.env_name == "multigrid":
@@ -831,7 +841,17 @@ class InteractiveRuntime:
                 self._emit_episode_done(terminated, truncated, info)
                 # Auto-reset for next episode
                 self._episode_idx += 1
-                self._obs, _ = self._env.reset()
+                # Re-seed for MiniGrid/BabyAI to preserve deterministic layout
+                if self.config.env_name in ("babyai", "minigrid") and self._reset_seed is not None:
+                    self._obs, _ = self._env.reset(seed=self._reset_seed)
+                    if _HAS_GYM_GUI and log_constant:
+                        log_constant(logger, LOG_WORKER_BALROG_EPISODE_AUTO_RESET, extra={
+                            "episode_index": self._episode_idx,
+                            "seed": self._reset_seed,
+                            "env_name": self.config.env_name,
+                        })
+                else:
+                    self._obs, _ = self._env.reset()
                 self._step_idx = 0
                 self._total_reward = 0.0
                 self._prev_action = None

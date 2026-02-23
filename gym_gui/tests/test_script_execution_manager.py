@@ -33,7 +33,7 @@ def test_start_experiment_new_operators(execution_manager):
         OperatorConfig.single_agent(
             operator_id="random_minigrid",
             display_name="Random MiniGrid",
-            worker_id="operators_worker",
+            worker_id="random_worker",
             worker_type="baseline",
             env_name="minigrid",
             task="MiniGrid-Empty-8x8-v0",
@@ -72,7 +72,7 @@ def test_on_ready_triggers_stepping(execution_manager):
         OperatorConfig.single_agent(
             operator_id="op1",
             display_name="Op 1",
-            worker_id="operators_worker",
+            worker_id="random_worker",
             worker_type="baseline",
             env_name="minigrid",
             task="MiniGrid-Empty-8x8-v0",
@@ -108,7 +108,7 @@ def test_on_step_triggers_next_step(execution_manager, qtbot):
         OperatorConfig.single_agent(
             operator_id="op1",
             display_name="Op 1",
-            worker_id="operators_worker",
+            worker_id="random_worker",
             worker_type="baseline",
             env_name="minigrid",
             task="MiniGrid-Empty-8x8-v0",
@@ -135,7 +135,7 @@ def test_on_episode_ended_advances_to_next(execution_manager):
         OperatorConfig.single_agent(
             operator_id="op1",
             display_name="Op 1",
-            worker_id="operators_worker",
+            worker_id="random_worker",
             worker_type="baseline",
             env_name="minigrid",
             task="MiniGrid-Empty-8x8-v0",
@@ -176,7 +176,7 @@ def test_experiment_completes_after_all_episodes(execution_manager):
         OperatorConfig.single_agent(
             operator_id="op1",
             display_name="Op 1",
-            worker_id="operators_worker",
+            worker_id="random_worker",
             worker_type="baseline",
             env_name="minigrid",
             task="MiniGrid-Empty-8x8-v0",
@@ -212,7 +212,7 @@ def test_stop_experiment(execution_manager):
         OperatorConfig.single_agent(
             operator_id="op1",
             display_name="Op 1",
-            worker_id="operators_worker",
+            worker_id="random_worker",
             worker_type="baseline",
             env_name="minigrid",
             task="MiniGrid-Empty-8x8-v0",
@@ -251,7 +251,7 @@ def test_fixed_mode_uses_same_seed(execution_manager):
         OperatorConfig.single_agent(
             operator_id="op1",
             display_name="Op 1",
-            worker_id="operators_worker",
+            worker_id="random_worker",
             worker_type="baseline",
             env_name="minigrid",
             task="MiniGrid-Empty-8x8-v0",
@@ -295,7 +295,7 @@ def test_procedural_mode_uses_different_seeds(execution_manager):
         OperatorConfig.single_agent(
             operator_id="op1",
             display_name="Op 1",
-            worker_id="operators_worker",
+            worker_id="random_worker",
             worker_type="baseline",
             env_name="minigrid",
             task="MiniGrid-Empty-8x8-v0",

@@ -10,6 +10,14 @@ the Linux **evdev** subsystem.
 Why Multiple Keyboards?
 -----------------------
 
+.. raw:: html
+
+   <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
+     <source src="../../_static/videos/human_vs_human.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+   <br/><br/>
+
 Multi-agent environments such as MultiGrid-Soccer (2 v 2, 4 agents),
 Overcooked (2 cooperating chefs), MeltingPot (up to 16 agents), or
 RWARE (2 to 8 warehouse robots) are designed for simultaneous human play.
@@ -75,16 +83,23 @@ Three approaches were evaluated:
      - Details
      - Result
    * - Qt ``QInputDevice.systemId()``
-     - All keyboards return the same system ID because X11 merges them.
-     - Failed
+     - Under X11, the display server merges all physical keyboards into a
+       single virtual core device.  As a result, ``systemId()`` returns an
+       identical value for every keyboard, making per-device discrimination
+       impossible at the Qt abstraction layer.
+     - Rejected
    * - XInput2 native event filter
-     - XInput2 can distinguish mice but Qt intercepts keyboard events
-       before the native filter sees them.
-     - Failed
+     - The XInput2 extension can report distinct device identifiers for
+       pointing devices; however, Qt consumes keyboard events at the
+       toolkit level before they reach the application's native event
+       filter, preventing per-device attribution for key presses.
+     - Rejected
    * - **evdev** (direct ``/dev/input``)
-     - Read raw kernel events from each ``/dev/input/eventX`` file
-       descriptor independently.  Bypasses X11 entirely.
-     - **Works**
+     - Opens each ``/dev/input/eventX`` file descriptor independently and
+       reads raw ``struct input_event`` data directly from the Linux kernel
+       input subsystem.  This approach bypasses the X11 device-merging
+       layer entirely, providing reliable per-keyboard identification.
+     - **Adopted**
 
 Evidence is preserved in the test suite:
 

@@ -28,6 +28,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_BASELINE_AUTO_EXECUTION_COMPLETED,
 )
 from gym_gui.services.operator import OperatorConfig
+from gym_gui.ui.widgets.keyboard_assignment_widget import KeyboardAssignmentWidget
 from gym_gui.ui.widgets.operator_config_widget import OperatorConfigWidget, VLLMServerInfo
 from gym_gui.ui.widgets.script_experiment_widget import ScriptExperimentWidget
 from gym_gui.ui.widgets.vllm_server_widget import VLLMServerWidget
@@ -59,6 +60,8 @@ class OperatorsTab(QtWidgets.QWidget):
     step_player_requested = pyqtSignal(str, int)  # player_id, seed
     human_step_completed = pyqtSignal(str)  # operator_id - emitted when human completes their step
     human_action_requested = pyqtSignal(str, int)  # operator_id, action_index - request to step human operator
+    human_step_parallel_requested = pyqtSignal()  # Request a parallel multi-agent step cycle (Human Step in parallel mode)
+    keyboard_assignment_changed = pyqtSignal(str, object)  # (device_path, agent_id) - relayed from embedded KeyboardAssignmentWidget
 
     def __init__(self, parent: Optional[QtWidgets.QWidget] = None) -> None:
         super().__init__(parent)
@@ -83,6 +86,9 @@ class OperatorsTab(QtWidgets.QWidget):
         self._operator_types: dict[str, str] = {}  # operator_id -> "human", "llm", "rl", etc.
         self._operator_states: dict[str, str] = {}  # operator_id -> "stopped", "running"
         self._current_agent_index: int = 0  # Which agent's turn it is (0-based)
+
+        # Parallel multi-agent mode flag (MultiGrid, MeltingPot, Overcooked)
+        self._parallel_mode = False
 
         # Script-based execution is now handled by OperatorScriptExecutionManager
         # (no state needed in OperatorsTab)
@@ -165,6 +171,19 @@ class OperatorsTab(QtWidgets.QWidget):
 
         # Add with stretch=1 so config_group expands to fill available vertical space
         layout.addWidget(config_group, 1)
+
+        # Keyboard Assignment for multi-human operators (hidden by default).
+        # Shown when 2+ human operators are configured, allowing each USB keyboard
+        # to be assigned to a different human agent via the Linux evdev subsystem.
+        self._keyboard_assignment_widget = KeyboardAssignmentWidget(
+            available_agents=[],
+            parent=self,
+        )
+        self._keyboard_assignment_widget.setVisible(False)
+        self._keyboard_assignment_widget.assignment_changed.connect(
+            self.keyboard_assignment_changed.emit
+        )
+        layout.addWidget(self._keyboard_assignment_widget)
 
         # Scientific Execution Controls (inspired by BALROG methodology)
         exec_group = QtWidgets.QGroupBox("Execution Controls (Scientific Comparison)", self)
@@ -381,6 +400,19 @@ class OperatorsTab(QtWidgets.QWidget):
         # Show/hide Human Step button based on whether there are human operators
         self._human_step_button.setVisible(self._has_human_operator)
 
+        # Show keyboard assignment widget when 2+ human agents are configured.
+        # Single human agent doesn't need multi-keyboard — just use action buttons.
+        # Note: _human_operator_ids are operator-level IDs, but for multi-agent envs
+        # we need the per-agent human IDs (e.g., agent_0, agent_1) from within each config.
+        human_agent_ids: list[str] = []
+        for cfg in configs:
+            human_agent_ids.extend(cfg.get_human_agents())
+        if len(human_agent_ids) >= 2:
+            self._keyboard_assignment_widget.set_available_agents(human_agent_ids)
+            self._keyboard_assignment_widget.setVisible(True)
+        else:
+            self._keyboard_assignment_widget.setVisible(False)
+
         # Step All only enabled after Reset All is done
         if not has_operators:
             self._step_all_button.setEnabled(False)
@@ -394,21 +426,27 @@ class OperatorsTab(QtWidgets.QWidget):
         """Get the script execution manager for MainWindow to wire up signals."""
         return self._script_experiment_widget.execution_manager
 
+    @property
+    def keyboard_assignment_widget(self) -> KeyboardAssignmentWidget:
+        """Access the keyboard assignment widget for evdev integration."""
+        return self._keyboard_assignment_widget
+
     def _on_random_seed_clicked(self) -> None:
         """Generate a random seed."""
         new_seed = random.randint(0, 2147483647)
         self._seed_spin.setValue(new_seed)
 
     def _on_reset_all_clicked(self) -> None:
-        """Handle Reset All button click."""
-        if self._use_shared_seed_checkbox.isChecked():
-            seed = self._seed_spin.value()
-        else:
-            seed = None
+        """Handle Reset All button click.
+
+        Always sends the spinbox seed so that workers produce the same layout
+        shown by "Load Environment" preview.  The "Use Shared Seed" checkbox
+        is a UI hint for the user; the actual seed is always deterministic.
+        """
+        seed = self._seed_spin.value()
         self._step_count = 0
         self._step_count_label.setText("Steps: 0")
-        seed_display = str(seed) if seed is not None else "random"
-        self._status_label.setText(f"Resetting with seed {seed_display}...")
+        self._status_label.setText(f"Resetting with seed {seed}...")
         self._is_running = True
         self._human_step_completed = False  # Reset human step state
         self.reset_all_requested.emit(seed)
@@ -416,13 +454,15 @@ class OperatorsTab(QtWidgets.QWidget):
         # Enable stop button
         self._stop_operators_button.setEnabled(True)
 
-        # Step All: enabled only if no human operators, or after human steps
-        if self._has_human_operator:
-            self._step_all_button.setEnabled(False)
-            self._status_label.setText(f"Waiting for Human... (seed={seed})")
-        else:
+        # Step All: enabled only if no human operators, or after human steps.
+        # In parallel mode, Step All is always enabled (it collects AI actions
+        # and shows the human action panel for the remaining human agents).
+        if self._parallel_mode or not self._has_human_operator:
             self._step_all_button.setEnabled(True)
             self._status_label.setText(f"Running (seed={seed})")
+        else:
+            self._step_all_button.setEnabled(False)
+            self._status_label.setText(f"Waiting for Human... (seed={seed})")
 
     def _on_step_all_clicked(self) -> None:
         """Handle Step All button click.
@@ -437,8 +477,10 @@ class OperatorsTab(QtWidgets.QWidget):
         self._step_count_label.setText(f"Steps: {self._step_count}")
         self.step_all_requested.emit(seed)
 
-        # If there are human operators, disable Step All until human steps again
-        if self._has_human_operator:
+        # If there are human operators, disable Step All until human steps again.
+        # In parallel mode, Step All stays enabled — the step cycle handles
+        # collecting human actions via the embedded MultiAgentActionPanel.
+        if self._has_human_operator and not self._parallel_mode:
             self._human_step_completed = False
             self._step_all_button.setEnabled(False)
             self._status_label.setText(f"Waiting for Human... (step {self._step_count})")
@@ -458,13 +500,10 @@ class OperatorsTab(QtWidgets.QWidget):
     def _on_initialize_requested(self, operator_id: str, config: OperatorConfig) -> None:
         """Handle initialize request from an operator row.
 
-        Passes the shared seed when "Use Shared Seed" is checked,
-        or None for random layout when unchecked.
+        Always uses the spinbox seed so the preview matches the layout
+        that the worker subprocess will produce on Reset All.
         """
-        if self._use_shared_seed_checkbox.isChecked():
-            seed = self.get_current_seed()
-        else:
-            seed = None
+        seed = self.get_current_seed()
         self.initialize_operator_requested.emit(operator_id, config, seed)
 
     def _on_configure_requested(self, operator_id: str, config: OperatorConfig) -> None:
@@ -820,15 +859,19 @@ class OperatorsTab(QtWidgets.QWidget):
     def _on_human_step_button_clicked(self) -> None:
         """Handle Human Step button click.
 
-        This button is used in multi-operator sequential execution:
-        - When it's a Human operator's turn in the sequence
-        - Step All is disabled
-        - Human Step enables keyboard/mouse controller
-        - Human makes ONE action
-        - Step All re-enables to continue to next operator
+        In parallel multi-agent mode, this triggers a full step cycle
+        (collect AI actions → show human action panel → step env).
+
+        In subprocess mode, this shows the single-agent action panel
+        so the human can act via keyboard/buttons.
         """
         if not self._human_operator_ids:
             _LOGGER.warning("Human Step clicked but no human operators configured")
+            return
+
+        if self._parallel_mode:
+            _LOGGER.info("Human Step (parallel mode) — emitting human_step_parallel_requested")
+            self.human_step_parallel_requested.emit()
             return
 
         _LOGGER.info("Human Step button clicked - activating controller for human operator")
@@ -837,7 +880,7 @@ class OperatorsTab(QtWidgets.QWidget):
         self.show_human_actions_panel(show=True)
 
         # Update status
-        self._status_label.setText(f"Human's Turn - Use keyboard/mouse or click action button")
+        self._status_label.setText("Human's Turn - Use keyboard/mouse or click action button")
 
     def show_human_actions_panel(self, show: bool = True) -> None:
         """Show or hide the human actions panel.
@@ -854,5 +897,20 @@ class OperatorsTab(QtWidgets.QWidget):
         """Hide the human actions panel after action is taken."""
         self._human_actions_group.setVisible(False)
 
+    # --- Parallel Multi-Agent Mode Panel Methods ---
+
+    def set_parallel_mode(self, enabled: bool) -> None:
+        """Enable or disable parallel multi-agent mode.
+
+        When enabled:
+        - Step All stays enabled even with human operators
+        - Human Step emits human_step_parallel_requested instead of showing
+          the single-agent action panel
+
+        Args:
+            enabled: True for parallel mode, False for subprocess mode.
+        """
+        self._parallel_mode = enabled
+        _LOGGER.debug("set_parallel_mode: enabled=%s", enabled)
 
 __all__ = ["OperatorsTab"]

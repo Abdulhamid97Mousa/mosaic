@@ -1,8 +1,9 @@
 Integrated Workers
 ==================
 
-MOSAIC ships with four production-ready workers that wrap major RL
-frameworks and LLM evaluation suites.  Each worker follows the
+MOSAIC ships with seven production-ready workers that wrap major RL
+frameworks, LLM evaluation suites, multi-agent LLM coordination,
+human-in-the-loop control, and baseline agents.  Each worker follows the
 :doc:`shim pattern <../concept>`: upstream libraries are **never
 modified**; a thin integration layer translates between MOSAIC and
 the library.
@@ -16,6 +17,11 @@ the library.
      - Algorithms / Models
      - Environments
      - Execution Model
+   * - :doc:`MOSAIC LLM <MOSAIC_LLM_Worker/index>`
+     - Multi-Agent LLM
+     - OpenRouter, GPT-4o, Claude 3, Gemini, vLLM
+     - MultiGrid Soccer/Collect, BabyAI, PettingZoo
+     - Subprocess (interactive)
    * - :doc:`CleanRL <CleanRL_Worker/index>`
      - Single-Agent
      - PPO, DQN, SAC, TD3, DDPG, C51
@@ -36,6 +42,16 @@ the library.
      - GPT-4o, Claude 3, Gemini, vLLM (local)
      - NetHack, MiniHack, BabyAI, Crafter, TextWorld
      - Subprocess (parallel)
+   * - :doc:`MOSAIC Human <MOSAIC_Human_Worker/index>`
+     - Human-in-the-Loop
+     - Human action selection via GUI
+     - MiniGrid, Crafter, PettingZoo, Classic Control
+     - Subprocess (interactive)
+   * - :doc:`MOSAIC Random <MOSAIC_Random_Worker/index>`
+     - Baseline Agent
+     - random, noop, cycling (no training)
+     - All Gymnasium-compatible environments
+     - Subprocess
 
 Each worker provides:
 
@@ -113,6 +129,9 @@ Each worker has dedicated GUI form widgets for experiment configuration:
 .. toctree::
    :maxdepth: 1
 
+   MOSAIC_LLM_Worker/index
+   MOSAIC_Human_Worker/index
+   MOSAIC_Random_Worker/index
    CleanRL_Worker/index
    XuanCe_Worker/index
    RLlib_Worker/index

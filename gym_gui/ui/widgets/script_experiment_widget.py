@@ -303,7 +303,7 @@ class ScriptExperimentWidget(QtWidgets.QWidget):
                         return {"success": False, "error": f"Operator {i}, agent {agent_id}: missing 'type'"}
 
                     worker_id_map = {
-                        "baseline": "operators_worker",
+                        "baseline": "random_worker",
                         "rl": "cleanrl_worker",
                         "llm": "balrog_worker",
                         "vlm": "balrog_worker",

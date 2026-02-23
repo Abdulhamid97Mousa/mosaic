@@ -109,23 +109,6 @@ class TestXuanCeWorkerRuntimeDryRun:
         assert summary.runner_type == "unknown"
         assert summary.config["running_steps"] == 50000
 
-    def test_benchmark_dry_run(self) -> None:
-        """Test benchmark() in dry-run mode."""
-        config = XuanCeWorkerConfig(
-            run_id="bench_dry",
-            method="td3",
-            env="box2d",
-            env_id="LunarLander-v2",
-        )
-
-        runtime = XuanCeWorkerRuntime(config, dry_run=True)
-        summary = runtime.benchmark()
-
-        assert summary.status == "dry-run"
-        assert summary.method == "td3"
-        assert summary.env_id == "LunarLander-v2"
-
-
 class TestXuanCeWorkerRuntimeBuildParserArgs:
     """Test _build_parser_args method."""
 
@@ -238,16 +221,17 @@ class TestXuanCeWorkerRuntimeRun:
 
         runtime = XuanCeWorkerRuntime(config, dry_run=False)
 
-        # Patch sys.modules to provide fake xuance
+        # Patch sys.modules to provide fake xuance.
+        # Assertions must be inside the `with` block because after exit,
+        # sys.modules["xuance"] is restored and mock_xuance.get_runner
+        # may resolve to the real function instead of the MagicMock child.
         with patch.dict(sys.modules, {"xuance": mock_xuance}):
             summary = runtime.run()
-
-        assert summary.status == "completed"
-        assert summary.method == "ppo"
-        assert summary.env_id == "CartPole-v1"
-        assert summary.runner_type == "RunnerDRL"  # From mock.__class__.__name__
-        mock_xuance.get_runner.assert_called_once()
-        mock_runner.run.assert_called_once()
+            assert summary.status == "completed"
+            assert summary.method == "ppo"
+            assert summary.env_id == "CartPole-v1"
+            assert summary.runner_type == "RunnerDRL"
+            mock_runner.run.assert_called_once()
 
     def test_run_xuance_not_installed(self) -> None:
         """Test run() raises RuntimeError when XuanCe not installed."""
@@ -263,28 +247,6 @@ class TestXuanCeWorkerRuntimeRun:
         # This test will actually fail if XuanCe IS installed
         # We test the error path by checking the exception handling
         # In CI without XuanCe, this should raise RuntimeError
-
-
-class TestXuanCeWorkerRuntimeBenchmark:
-    """Test benchmark() method."""
-
-    def test_benchmark_dry_run_returns_summary(self) -> None:
-        """Test benchmark dry-run returns proper summary."""
-        config = XuanCeWorkerConfig(
-            run_id="bench_test",
-            method="mappo",
-            env="mpe",
-            env_id="simple_spread_v3",
-            running_steps=200000,
-        )
-
-        runtime = XuanCeWorkerRuntime(config, dry_run=True)
-        summary = runtime.benchmark()
-
-        assert isinstance(summary, XuanCeRuntimeSummary)
-        assert summary.status == "dry-run"
-        assert summary.method == "mappo"
-        assert summary.env_id == "simple_spread_v3"
 
 
 class TestXuanCeWorkerRuntimeConfig:
@@ -335,7 +297,3 @@ class TestXuanCeWorkerRuntimeIntegration:
         summary = runtime.run()
         assert summary.status == "dry-run"
         assert summary.config["seed"] == 42
-
-        # Benchmark and verify summary
-        summary = runtime.benchmark()
-        assert summary.status == "dry-run"

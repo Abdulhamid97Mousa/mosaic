@@ -58,10 +58,11 @@ except ImportError:
     pass
 import torch.nn as nn
 import torch.optim as optim
-from torch.distributions.categorical import Categorical
 
+from .agents import MinigridAgent, MLPAgent
 from .config import CleanRLWorkerConfig
-from .wrappers.curriculum import make_curriculum_env, make_babyai_curriculum
+from .wrappers.curriculum import make_curriculum_env
+from .wrappers.minigrid import is_minigrid_env
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -84,6 +85,7 @@ class CurriculumTrainingConfig:
     vf_coef: float = 0.5
     max_grad_norm: float = 0.5
     num_steps: int = 128  # Steps per rollout
+    max_episode_steps: int = 256  # Maximum steps per episode
     anneal_lr: bool = True
     seed: Optional[int] = None
     capture_video: bool = False
@@ -126,6 +128,7 @@ class CurriculumTrainingConfig:
             vf_coef=algo_params.get("vf_coef", 0.5),
             max_grad_norm=algo_params.get("max_grad_norm", 0.5),
             num_steps=algo_params.get("num_steps", 128),
+            max_episode_steps=algo_params.get("max_episode_steps", extras.get("max_episode_steps", 256)),
             anneal_lr=algo_params.get("anneal_lr", True),
             seed=config.seed,
             capture_video=extras.get("capture_video", False),
@@ -139,53 +142,6 @@ class CurriculumTrainingConfig:
             fastlane_video_mode=extras.get("fastlane_video_mode", "grid"),
             fastlane_grid_limit=extras.get("fastlane_grid_limit"),  # None = use num_envs
         )
-
-
-def layer_init(layer: nn.Module, std: float = np.sqrt(2), bias_const: float = 0.0) -> nn.Module:
-    """Initialize layer weights using orthogonal initialization."""
-    torch.nn.init.orthogonal_(layer.weight, std)
-    torch.nn.init.constant_(layer.bias, bias_const)
-    return layer
-
-
-class PPOAgent(nn.Module):
-    """PPO Agent network for MiniGrid/BabyAI environments."""
-
-    def __init__(self, envs: gym.vector.VectorEnv):
-        super().__init__()
-        obs_shape = envs.single_observation_space.shape
-        assert obs_shape is not None
-
-        # For flattened MiniGrid observations
-        obs_dim = int(np.prod(obs_shape))
-        action_dim = envs.single_action_space.n
-
-        self.critic = nn.Sequential(
-            layer_init(nn.Linear(obs_dim, 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, 1), std=1.0),
-        )
-        self.actor = nn.Sequential(
-            layer_init(nn.Linear(obs_dim, 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, 64)),
-            nn.Tanh(),
-            layer_init(nn.Linear(64, action_dim), std=0.01),
-        )
-
-    def get_value(self, x: torch.Tensor) -> torch.Tensor:
-        return self.critic(x)
-
-    def get_action_and_value(
-        self, x: torch.Tensor, action: Optional[torch.Tensor] = None
-    ) -> tuple[torch.Tensor, torch.Tensor, torch.Tensor, torch.Tensor]:
-        logits = self.actor(x)
-        probs = Categorical(logits=logits)
-        if action is None:
-            action = probs.sample()
-        return action, probs.log_prob(action), probs.entropy(), self.critic(x)
 
 
 def run_curriculum_training(config: CurriculumTrainingConfig) -> Dict[str, Any]:
@@ -239,12 +195,10 @@ def run_curriculum_training(config: CurriculumTrainingConfig) -> Dict[str, Any]:
     _LOGGER.info("Creating curriculum environment...")
     _LOGGER.info(f"Schedule: {[s['env_id'] for s in config.curriculum_schedule]}")
 
-    # NOTE: apply_wrappers=True so BabyAI environments get ImgObsWrapper +
-    # FlattenObservation.  The trainer daemon spawns bash scripts as
-    # subprocesses, so Python loads the *system* sitecustomize -- not
-    # cleanrl_worker's custom one -- meaning gym.make() is unpatched.
-    # Without wrappers the obs space is a Dict (no .shape) and PPOAgent
-    # crashes with `assert obs_shape is not None`.
+    # NOTE: apply_wrappers=True so BabyAI/MiniGrid environments get
+    # ImgObsWrapper (Dict obs → image Box).  FlattenObservation is only
+    # applied for non-MiniGrid envs — MiniGrid uses a CNN that needs
+    # raw (7,7,3) images.
     envs = make_curriculum_env(
         config.curriculum_schedule,
         num_envs=config.num_envs,
@@ -252,10 +206,19 @@ def run_curriculum_training(config: CurriculumTrainingConfig) -> Dict[str, Any]:
         capture_video=config.capture_video,
         run_name=run_name,
         apply_wrappers=True,
+        max_episode_steps=config.max_episode_steps,
     )
 
-    # Initialize agent
-    agent = PPOAgent(envs).to(device)
+    # Select agent architecture based on env type — must mirror
+    # algorithms/ppo.py so checkpoints are compatible with the
+    # interactive runtime.
+    starting_env_id = config.curriculum_schedule[0]["env_id"]
+    if is_minigrid_env(starting_env_id):
+        _LOGGER.info("Using MinigridAgent (CNN) for MiniGrid curriculum")
+        agent = MinigridAgent(envs).to(device)
+    else:
+        _LOGGER.info("Using MLPAgent (MLP) for curriculum")
+        agent = MLPAgent(envs).to(device)
     optimizer = optim.Adam(agent.parameters(), lr=config.learning_rate, eps=1e-5)
 
     # Set up TensorBoard logging if configured
@@ -327,11 +290,14 @@ def run_curriculum_training(config: CurriculumTrainingConfig) -> Dict[str, Any]:
             next_done = torch.Tensor(done).to(device)
 
             # Track episode statistics
-            if "final_info" in infos:
-                for info in infos["final_info"]:
-                    if info is not None and "episode" in info:
-                        ep_return = info["episode"]["r"]
-                        ep_length = info["episode"]["l"]
+            # Gymnasium SyncVectorEnv uses "episode" key with "_episode" boolean mask
+            # (the old "final_info" pattern is from pre-Gymnasium versions)
+            if "episode" in infos:
+                episode_mask = infos.get("_episode", np.ones(config.num_envs, dtype=bool))
+                for env_idx in range(config.num_envs):
+                    if episode_mask[env_idx]:
+                        ep_return = float(infos["episode"]["r"][env_idx])
+                        ep_length = int(infos["episode"]["l"][env_idx])
                         episode_rewards.append(ep_return)
                         episode_lengths.append(ep_length)
 

@@ -159,7 +159,7 @@ class MiniGridKeyCombinationResolver(KeyCombinationResolver):
 class MultiGridKeyCombinationResolver(KeyCombinationResolver):
     """Resolve key combinations for mosaic_multigrid environments (Soccer, Collect, Basketball).
 
-    mosaic_multigrid v5.0.0 action space (8 discrete actions):
+    mosaic_multigrid v6.0.0 action space (8 discrete actions):
     0: NOOP    - Do nothing (AEC compatibility — non-acting agents wait, inspired by MeltingPot)
     1: LEFT    - Turn left
     2: RIGHT   - Turn right
@@ -169,12 +169,12 @@ class MultiGridKeyCombinationResolver(KeyCombinationResolver):
     6: TOGGLE  - Toggle/activate object
     7: DONE    - Done action
 
-    NOTE: This is for the mosaic_multigrid package (PyPI: mosaic-multigrid v5.0.0+).
+    NOTE: This is for the mosaic_multigrid package (PyPI: mosaic-multigrid v6.0.0).
     For INI multigrid environments, use INIMultiGridKeyCombinationResolver.
     """
 
     def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
-        """Map pressed keys to mosaic_multigrid v5 actions.
+        """Map pressed keys to mosaic_multigrid v6 actions.
 
         Priority order:
         1. Action buttons (pickup, drop, toggle, done)
@@ -689,7 +689,7 @@ def get_key_combination_resolver(
     # Fallback: check by game ID prefix/name for games not in the mapping
     game_name = game_id.value if hasattr(game_id, 'value') else str(game_id)
 
-    # MOSAIC MultiGrid environments (8 actions - PyPI package mosaic-multigrid v5.0.0+)
+    # MOSAIC MultiGrid environments (8 actions - PyPI package mosaic-multigrid v6.0.0)
     # noop=0, left=1, right=2, forward=3, pickup=4, drop=5, toggle=6, done=7
     if game_name.startswith("MosaicMultiGrid"):
         return MultiGridKeyCombinationResolver()
@@ -840,9 +840,9 @@ _STANDARD_MINIGRID_ACTIONS = (
     _mapping(("Key_Q",), 6),                # done / no-op
 )
 
-# mosaic_multigrid v5.0.0 action mapping (8 discrete actions)
+# mosaic_multigrid v6.0.0 action mapping (8 discrete actions)
 # Action indices: 0=NOOP, 1=LEFT, 2=RIGHT, 3=FORWARD, 4=PICKUP, 5=DROP, 6=TOGGLE, 7=DONE
-# Used by: Soccer, Collect, Basketball (PyPI: mosaic-multigrid v5.0.0+)
+# Used by: Soccer, Collect, Basketball, Solo variants (PyPI: mosaic-multigrid v6.0.0)
 # No key pressed → NOOP (action 0) via _get_default_idle_action()
 _MOSAIC_MULTIGRID_ACTIONS = (
     _mapping(("Key_Left", "Key_A"), 1),    # turn left
@@ -1468,6 +1468,11 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
     # The session controller listens to this to apply actions during idle ticks
     key_action_available = QtCore.Signal(int)  # action index
 
+    # Signal emitted when an individual agent's action is resolved from evdev input.
+    # Used by the Operators tab to route per-agent keyboard actions to the
+    # parallel multi-agent step system.  (agent_id: str, action_index: int)
+    agent_action_selected = QtCore.Signal(str, int)
+
     def __init__(self, widget: QtWidgets.QWidget, session: SessionController) -> None:
         super().__init__(widget)
         self._logger = _LOGGER
@@ -1600,7 +1605,7 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
 
         Returns:
             Default idle action index:
-            - mosaic_multigrid v5: 0 (NOOP) - do nothing
+            - mosaic_multigrid v6: 0 (NOOP) - do nothing
             - MeltingPot: 0 (NOOP) - do nothing
             - INI multigrid: 6 (DONE) - no visible effect, agent stays still
         """
@@ -1610,7 +1615,7 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
             return 6  # DONE - no visible effect in INI multigrid
 
         # Other environments use action 0 as idle:
-        # - mosaic_multigrid v5: 0 = NOOP (do nothing)
+        # - mosaic_multigrid v6: 0 = NOOP (do nothing)
         # - MeltingPot: 0 = NOOP (do nothing)
         return 0
 
@@ -1923,6 +1928,14 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
             )
 
             self._emit_multi_agent_action()
+
+            # Emit per-agent action signal for the Operators tab integration.
+            # Resolves the action for just this agent based on their pressed keys.
+            if self._key_resolver is not None:
+                pressed = self._agent_pressed_keys.get(agent_id, set())
+                resolved = self._key_resolver.resolve(pressed)
+                if resolved is not None:
+                    self.agent_action_selected.emit(agent_id, resolved)
 
     def _on_evdev_key_released(self, device_path: str, keycode: int, timestamp: int) -> None:
         """Handle key release from evdev monitor.

@@ -1,6 +1,14 @@
 Overcooked
 ==========
 
+.. raw:: html
+
+   <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
+     <source src="../../../_static/videos/overcooked.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+   <br><br>
+
 Cooperative cooking game for studying human-AI coordination.
 
 :Install: ``pip install -e 3rd_party/overcooked_ai/``

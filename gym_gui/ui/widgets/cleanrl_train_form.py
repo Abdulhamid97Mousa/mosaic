@@ -989,8 +989,9 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
         # Save model based on checkbox
         algo_params["save_model"] = self._save_model_checkbox.isChecked()
 
-        # Procedural generation based on checkbox
-        algo_params["procedural_generation"] = self._procedural_generation_checkbox.isChecked()
+        # NOTE: procedural_generation is communicated via the
+        # CLEANRL_PROCEDURAL_GENERATION env-var (see _build_environment()),
+        # NOT as an algo_param — tyro would reject the unknown flag.
 
         capture_video_widget = getattr(self, "_capture_video_checkbox", None)
         capture_video_enabled = (
@@ -1088,7 +1089,7 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 "fastlane_grid_limit": int(state.fastlane_grid_limit),
             },
             "worker": {
-                "worker_id": state.worker_id or "cleanrl_worker",
+                "worker_id": "cleanrl_worker",
                 "module": "cleanrl_worker.cli",
                 "use_grpc": True,
                 "grpc_target": "127.0.0.1:50055",

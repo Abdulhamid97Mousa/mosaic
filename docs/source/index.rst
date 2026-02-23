@@ -57,10 +57,35 @@ together to form a complete picture of agent performance.
 
 MOSAIC provides two evaluation modes designed for reproducibility:
 
-- **Manual Mode** -- side-by-side comparison where multiple operators step through
+.. raw:: html
+
+   <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
+     <source src="_static/videos/demo_shared_seed.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+   <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
+     <strong>Manual Mode</strong> Side-by-side lock-step evaluation with shared seeds.
+     See <a href="documents/architecture/operators/index.html">Operators &amp; Evaluation Modes</a>
+     and <a href="documents/rendering_tabs/slow_lane.html">Slow Lane (Render View)</a>.
+   </p>
+
+- **Manual Mode:** side-by-side comparison where multiple operators step through
   the same environment with shared seeds, letting researchers visually inspect
   decision-making differences between paradigms in real time.
-- **Script Mode** -- automated, long-running evaluation driven by Python scripts
+
+.. raw:: html
+
+   <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
+     <source src="_static/videos/script_based_experiments.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+   <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
+     <strong>Script Mode:</strong> Automated batch evaluation with deterministic seed sequences.
+     See <a href="documents/architecture/operators/architecture.html">IPC Architecture</a>
+     and <a href="documents/runtime_logging/index.html">Runtime Logging</a>.
+   </p>
+
+- **Script Mode:** automated, long-running evaluation driven by Python scripts
   that define operator configurations, worker assignments, seed sequences, and
   episode counts.  Scripts execute deterministically with no manual intervention,
   producing reproducible telemetry logs (JSONL) for every step and episode.
@@ -91,6 +116,52 @@ under a unified, visual-first interface.
 - **Resource Management & Quotas**: GPU allocation, queue limits, credit-based backpressure, health monitoring.
 - **Per-Agent Policy Binding**: Route each agent to different workers via ``PolicyMappingService``.
 - **Worker Lifecycle Orchestration**: Subprocess management with heartbeat monitoring and graceful termination.
+
+.. raw:: html
+
+   <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
+     <source src="_static/videos/human_vs_human.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+   <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
+     <strong>Human vs Human:</strong> Two human players competing via dedicated USB keyboards.
+     See <a href="documents/human_control/index.html">Human Control</a>
+     and <a href="documents/human_control/multi_keyboard_evdev.html">Multi-Keyboard Support (Evdev)</a>.
+   </p>
+
+.. raw:: html
+
+   <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
+     <source src="_static/videos/random_worker.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+   <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
+     <strong>Random Agents:</strong> Baseline agents across 26 environment families.
+     See <a href="documents/architecture/workers/integrated_workers/MOSAIC_Random_Worker/index.html">MOSAIC Random Worker</a>
+     and <a href="documents/environments/index.html">Supported Environments</a>.
+   </p>
+
+.. raw:: html
+
+   <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
+     <source src="_static/videos/heterogeneous_agents_adversarial.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+   <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
+     <strong>Heterogeneous Multi-Agent Ad-Hoc Teamwork in Adversarial Settings:</strong> Different decision-making paradigms (RL, LLM, Random) competing head-to-head in the same multi-agent environment.
+     See <a href="documents/architecture/operators/hybrid_decision_maker/index.html">Hybrid Decision-Maker</a>.
+   </p>
+
+.. raw:: html
+
+   <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
+     <source src="_static/videos/random_team_vs_llm_team.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+   <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
+     <strong>Homogeneous Teams: Random vs LLM:</strong> Two homogeneous teams (all-Random vs all-LLM) competing in the same multi-agent environment.
+     See <a href="documents/architecture/operators/homogenous_decision_makers/index.html">Homogeneous Decision-Makers</a>.
+   </p>
 
 Supported Environment Families
 ------------------------------
@@ -188,16 +259,47 @@ installation instructions, environment lists, and academic citations.
      - .. image:: images/envs/mujoco/ant.gif
           :width: 200px
 
-Supported Workers
------------------
+Supported Workers (8)
+---------------------
 
 * :doc:`CleanRL <documents/architecture/workers/integrated_workers/CleanRL_Worker/index>`: Single-file RL implementations (PPO, DQN, SAC, TD3, DDPG, C51)
 * :doc:`XuanCe <documents/architecture/workers/integrated_workers/XuanCe_Worker/index>`: Modular RL framework with flexible algorithm composition and custom environments.
   Multi-agent algorithms (MAPPO, QMIX, MADDPG, VDN, COMA)
 * :doc:`Ray RLlib <documents/architecture/workers/integrated_workers/RLlib_Worker/index>`: RL with distributed training and large-batch optimization (PPO, IMPALA, APPO)
 * :doc:`BALROG <documents/architecture/workers/integrated_workers/BALROG_Worker/index>`: LLM/VLM agentic evaluation (GPT-4o, Claude 3, Gemini · NetHack, BabyAI, Crafter)
-* **MOSAIC LLM:** Multi-agent LLM with coordination strategies and Theory of Mind (MultiGrid, BabyAI, MeltingPot, PettingZoo)
+* :doc:`MOSAIC LLM <documents/architecture/workers/integrated_workers/MOSAIC_LLM_Worker/index>`: Multi-agent LLM with coordination strategies and Theory of Mind (MultiGrid, BabyAI, MeltingPot, PettingZoo)
 * **Chess LLM:** LLM chess play with multi-turn dialog (PettingZoo Chess)
+* :doc:`MOSAIC Human Worker <documents/architecture/workers/integrated_workers/MOSAIC_Human_Worker/index>`: Human-in-the-loop play via keyboard for any Gymnasium-compatible environment (MiniGrid, Crafter, Chess, NetHack)
+* :doc:`MOSAIC Random Worker <documents/architecture/workers/integrated_workers/MOSAIC_Random_Worker/index>`: Baseline agents with random, no-op, and cycling action behaviours across all 26 environment families
+
+Citing MOSAIC
+-------------
+
+If you use MOSAIC in your research, please cite the following paper:
+
+.. code-block:: bibtex
+
+   @article{mousa2026mosaic,
+     title   = {{MOSAIC}: A Unified Platform for Cross-Paradigm Comparison
+                and Evaluation of Homogeneous and Heterogeneous Multi-Agent
+                {RL}, {LLM}, {VLM}, and Human Decision-Makers},
+     author  = {Mousa, Abdulhamid M. and Daoui, Zahra and Khajiev, Rakhmonberdi
+                and Azzabi, Jalaledin M. and Mousa, Abdulkarim M. and Liu, Ming},
+     year    = {2026},
+     url     = {https://github.com/Abdulhamid97Mousa/MOSAIC},
+     note    = {Available at \url{https://github.com/Abdulhamid97Mousa/MOSAIC}}
+   }
+
+.. list-table::
+   :widths: 20 80
+
+   * - **Authors**
+     - Abdulhamid M. Mousa, Zahra Daoui, Rakhmonberdi Khajiev,
+       Jalaledin M. Azzabi, Abdulkarim M. Mousa, Liu Ming
+   * - **Repository**
+     - `github.com/Abdulhamid97Mousa/MOSAIC <https://github.com/Abdulhamid97Mousa/MOSAIC>`_
+   * - **License**
+     - MIT
 
 .. raw:: html
 

@@ -43,6 +43,8 @@ try:
         LOG_WORKER_BALROG_DEBUG,
         LOG_WORKER_MOSAIC_RUNTIME_INTEGRATION,
         LOG_WORKER_MOSAIC_ACTION_PARSED,
+        LOG_WORKER_MOSAIC_LLM_EPISODE_AUTO_RESET,
+        LOG_WORKER_MOSAIC_LLM_ACTION_DEFAULTED,
     )
     _HAS_GYM_GUI = True
 except ImportError:
@@ -501,7 +503,7 @@ class LLMWorkerRuntime:
             return obs
 
         # MOSAIC MultiGrid extension
-        if self.config.env_name == "multigrid" and hasattr(obs, "shape"):
+        if self.config.env_name in ("multigrid", "mosaic_multigrid") and hasattr(obs, "shape"):
             from llm_worker.environments import generate_multigrid_description
             import numpy as np
 
@@ -606,6 +608,7 @@ class InteractiveLLMRuntime:
         self._llm_calls = 0
         self._total_input_tokens = 0
         self._total_output_tokens = 0
+        self._reset_seed = None
 
     def _create_agent(self) -> Any:
         """Create BALROG agent based on config."""
@@ -650,6 +653,7 @@ class InteractiveLLMRuntime:
             # Reset with seed
             effective_seed = seed if seed is not None else self.config.seed
             self._obs, info = self._env.reset(seed=effective_seed)
+            self._reset_seed = effective_seed  # Store for deterministic auto-reset
 
             # Set instruction prompt with valid actions (critical for LLM to know valid actions)
             instructions = None
@@ -660,7 +664,7 @@ class InteractiveLLMRuntime:
                 self._agent.prompt_builder.update_instruction_prompt(
                     self._env.get_instruction_prompt(instructions=instructions)
                 )
-            elif self.config.env_name == "multigrid":
+            elif self.config.env_name in ("multigrid", "mosaic_multigrid"):
                 # MOSAIC MultiGrid extension
                 from llm_worker.environments import get_multigrid_instruction_prompt
 
@@ -766,10 +770,16 @@ class InteractiveLLMRuntime:
                 self._total_output_tokens += output_tokens
             except Exception as e:
                 logger.warning(f"Agent act failed at step {self._step_idx}: {e}")
-                action_str = ""
+                action_str = "go forward"  # Default to safe action on LLM failure
+                if _HAS_GYM_GUI and log_constant:
+                    log_constant(logger, LOG_WORKER_MOSAIC_LLM_ACTION_DEFAULTED, extra={
+                        "step_index": self._step_idx,
+                        "error": str(e),
+                        "default_action": action_str,
+                    })
 
             # Validate and execute action
-            if self.config.env_name == "multigrid":
+            if self.config.env_name in ("multigrid", "mosaic_multigrid"):
                 # MOSAIC MultiGrid extension - parse action from LLM text
                 from mosaic_extension.multigrid import parse_action
                 action = parse_action(action_str)
@@ -786,7 +796,23 @@ class InteractiveLLMRuntime:
                 else:
                     logger.debug(f"MOSAIC: Parsed action {action} from LLM: {action_str[:50]}")
             else:
-                action = self._env.check_action_validity(action_str)
+                try:
+                    action = self._env.check_action_validity(action_str)
+                except ValueError:
+                    # LLM returned invalid action text — default to "go forward"
+                    bad_action = action_str
+                    action_str = "go forward"
+                    action = self._env.check_action_validity(action_str)
+                    logger.warning(
+                        f"Invalid LLM action '{bad_action}' at step {self._step_idx}, "
+                        f"defaulting to '{action_str}'"
+                    )
+                    if _HAS_GYM_GUI and log_constant:
+                        log_constant(logger, LOG_WORKER_MOSAIC_LLM_ACTION_DEFAULTED, extra={
+                            "step_index": self._step_idx,
+                            "error": f"Invalid LLM output: '{bad_action}'",
+                            "default_action": action_str,
+                        })
 
             obs_new, reward, terminated, truncated, info = self._env.step(action)
 
@@ -866,7 +892,17 @@ class InteractiveLLMRuntime:
                 self._emit_episode_done(terminated, truncated, info)
                 # Auto-reset for next episode
                 self._episode_idx += 1
-                self._obs, _ = self._env.reset()
+                # Re-seed for MiniGrid/BabyAI to preserve deterministic layout
+                if self.config.env_name in ("babyai", "minigrid") and self._reset_seed is not None:
+                    self._obs, _ = self._env.reset(seed=self._reset_seed)
+                    if _HAS_GYM_GUI and log_constant:
+                        log_constant(logger, LOG_WORKER_MOSAIC_LLM_EPISODE_AUTO_RESET, extra={
+                            "episode_index": self._episode_idx,
+                            "seed": self._reset_seed,
+                            "env_name": self.config.env_name,
+                        })
+                else:
+                    self._obs, _ = self._env.reset()
                 self._step_idx = 0
                 self._total_reward = 0.0
                 self._prev_action = None
@@ -1056,6 +1092,11 @@ class InteractiveLLMRuntime:
                 if legal_moves:
                     import random
                     action_str = str(random.choice(legal_moves))
+                else:
+                    # No legal_moves available — fall back to NOOP (action 0)
+                    # to avoid sending an empty action string to the GUI.
+                    action_str = "0"
+                    logger.warning("No legal_moves available, falling back to NOOP (0)")
 
             # Convert action string to action index if action_mask provided
             action_index = None
@@ -1071,12 +1112,37 @@ class InteractiveLLMRuntime:
                 except Exception:
                     pass
 
+            # Ensure action is a valid integer for environments that expect
+            # numeric actions (e.g., MultiGrid, MeltingPot).  If the LLM
+            # returned non-numeric text, try to extract a digit; otherwise
+            # fall back to NOOP (0).
+            if action_index is None and action_str:
+                # Try to parse as int directly
+                try:
+                    action_index = int(action_str)
+                except ValueError:
+                    # Try to extract first digit from the response
+                    import re
+                    digits = re.findall(r'\d+', action_str)
+                    if digits:
+                        action_index = int(digits[0])
+                        logger.debug(
+                            "Extracted action %d from LLM response: %r",
+                            action_index, action_str,
+                        )
+                    else:
+                        logger.warning(
+                            "Could not parse action from LLM response: %r, "
+                            "falling back to NOOP (0)", action_str,
+                        )
+                        action_index = 0
+
             # Emit action selection result
             self._emit({
                 "type": "action_selected",
                 "run_id": self.config.run_id,
                 "player_id": player_id,
-                "action": action_index if action_index is not None else action_str,
+                "action": action_index if action_index is not None else 0,
                 "action_str": action_str,
                 "reasoning": reasoning,
                 "input_tokens": input_tokens,

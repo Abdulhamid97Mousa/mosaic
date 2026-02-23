@@ -41,6 +41,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_WORKER_CLEANRL_SUBPROCESS_STARTED,
     LOG_WORKER_CLEANRL_SUBPROCESS_FAILED,
     LOG_WORKER_CLEANRL_ANALYTICS_MANIFEST_CREATED,
+    LOG_WORKER_CLEANRL_EPISODE_AUTO_RESET,
 )
 
 from .analytics import build_manifest
@@ -306,9 +307,15 @@ class CleanRLWorkerRuntime:
         if isinstance(cuda_flag, bool) and cuda_flag:
             args.append("--cuda")
 
+        # Keys that appear in algo_params but must NOT be forwarded as CLI
+        # flags (they are handled via environment variables or other means).
+        _ALGO_PARAMS_SKIP = frozenset({"procedural_generation"})
+
         algo_params = extras.get("algo_params")
         if isinstance(algo_params, Mapping):
             for key, value in algo_params.items():
+                if key in _ALGO_PARAMS_SKIP:
+                    continue
                 flag = f"--{key.replace('_', '-')}"
                 if isinstance(value, bool):
                     if value:
@@ -1315,6 +1322,7 @@ class InteractiveRuntime:
         self._episode_reward = 0.0
         self._episode_count = 0
         self._device = "cpu"
+        self._reset_seed = None
 
         LOGGER.info(
             "InteractiveRuntime initialized | env=%s algo=%s policy=%s",
@@ -1349,21 +1357,30 @@ class InteractiveRuntime:
         # Create environment
         self._env = gym.make(self._env_id)
 
-        # Apply MiniGrid observation wrappers if needed (flatten Dict to Box)
+        # Apply MiniGrid observation wrappers if needed (Dict → image Box)
+        # NOTE: do NOT apply FlattenObservation here — the MinigridAgent CNN
+        # expects raw (7, 7, 3) image observations, not a flattened vector.
         if self._env_id.startswith("MiniGrid") or self._env_id.startswith("BabyAI"):
             try:
                 from minigrid.wrappers import ImgObsWrapper
                 self._env = ImgObsWrapper(self._env)
-                self._env = gym.wrappers.FlattenObservation(self._env)
-                LOGGER.debug("Applied MiniGrid observation wrappers")
+                LOGGER.debug("Applied MiniGrid ImgObsWrapper")
             except ImportError:
                 pass
 
         self._env = gym.wrappers.RecordEpisodeStatistics(self._env)
 
+        # Detect architecture from checkpoint BEFORE creating the vector env,
+        # because the MLP agent needs FlattenObservation while CNN does not.
+        import torch as _torch
+        _ckpt = _torch.load(str(policy_file), map_location="cpu", weights_only=True)
+        _state = _ckpt.get("model_state_dict", _ckpt) if isinstance(_ckpt, dict) else _ckpt
+        _has_cnn = any(k.startswith("cnn.") for k in _state.keys()) if hasattr(_state, "keys") else False
+
         # Wrap in vector env for compatibility with CleanRL models
         env_id = self._env_id
         is_minigrid = env_id.startswith("MiniGrid") or env_id.startswith("BabyAI")
+        needs_flatten = is_minigrid and not _has_cnn
 
         def make_env():
             env = gym.make(env_id, render_mode="rgb_array")  # Enable RGB rendering
@@ -1372,9 +1389,11 @@ class InteractiveRuntime:
                 try:
                     from minigrid.wrappers import ImgObsWrapper
                     env = ImgObsWrapper(env)
-                    env = gym.wrappers.FlattenObservation(env)
                 except ImportError:
                     pass
+                # MLP-based checkpoints were trained on flattened (7,7,3) → 147-dim
+                if needs_flatten:
+                    env = gym.wrappers.FlattenObservation(env)
             env = gym.wrappers.RecordEpisodeStatistics(env)
             return env
 
@@ -1390,12 +1409,21 @@ class InteractiveRuntime:
         if adapter is None:
             raise ValueError(f"No unified adapter for algorithm: {self._algo}")
 
+        # Select agent class matching the checkpoint architecture
+        agent_cls = eval_entry.agent_cls
+        if is_minigrid and _has_cnn:
+            from .agents.minigrid import MinigridAgent
+            agent_cls = MinigridAgent
+            LOGGER.info("Detected CNN-based MinigridAgent checkpoint")
+        elif is_minigrid:
+            LOGGER.info("Detected MLP-based checkpoint for MiniGrid env (flattened obs)")
+
         # Load the model using adapter
         adapter.load(
             str(policy_file),
             self._envs,
             self._device,
-            agent_cls=eval_entry.agent_cls,
+            agent_cls=agent_cls,
         )
         self._selector = adapter
 
@@ -1410,6 +1438,7 @@ class InteractiveRuntime:
 
             # Reset environment
             self._obs, info = self._envs.reset(seed=seed)
+            self._reset_seed = seed  # Store for deterministic auto-reset
             self._step_idx = 0
             self._episode_reward = 0.0
 
@@ -1492,42 +1521,14 @@ class InteractiveRuntime:
             self._episode_reward += reward_scalar
             self._step_idx += 1
 
-            # Get RGB frame for rendering if available
-            render_payload = None
-            try:
-                frame = self._envs.call("render")
-                if frame is not None and len(frame) > 0:
-                    rgb_frame = frame[0]
-                    if rgb_frame is not None and hasattr(rgb_frame, 'shape'):
-                        # Build render_payload in the format expected by GUI
-                        render_payload = {
-                            "mode": "rgb_array",
-                            "rgb": rgb_frame.tolist() if hasattr(rgb_frame, 'tolist') else rgb_frame,
-                            "width": int(rgb_frame.shape[1]),
-                            "height": int(rgb_frame.shape[0]),
-                        }
-            except Exception:
-                pass  # Rendering not available
+            # Save telemetry values BEFORE episode-end handling modifies them
+            tel_step = self._step_idx
+            tel_episode = self._episode_count
+            tel_reward = self._episode_reward
 
-            # Emit step telemetry
-            step_data = {
-                "type": "step",
-                "step_index": self._step_idx,
-                "episode_index": self._episode_count,  # Current episode number
-                "action": action_scalar,
-                "reward": reward_scalar,
-                "terminated": term,
-                "truncated": trunc,
-                "episode_reward": self._episode_reward,
-            }
-
-            # Include render_payload if available (for GUI rendering)
-            if render_payload is not None:
-                step_data["render_payload"] = render_payload
-
-            self._emit(step_data)
-
-            # Check for episode end
+            # Handle episode end BEFORE render capture so the seeded re-reset
+            # is reflected in the render frame (SyncVectorEnv auto-resets
+            # without a seed, which randomises MiniGrid layouts).
             if done:
                 self._episode_count += 1
                 self._emit({
@@ -1542,9 +1543,61 @@ class InteractiveRuntime:
                     self._episode_reward,
                     self._step_idx,
                 )
-                # Reset counters for next episode (SyncVectorEnv auto-resets the env)
+                # SyncVectorEnv auto-resets without a seed.  For MiniGrid/BabyAI
+                # envs the seed determines the grid layout, so we must re-reset
+                # with the original seed to preserve deterministic layouts.
+                is_minigrid = (
+                    self._env_id.startswith("MiniGrid")
+                    or self._env_id.startswith("BabyAI")
+                )
+                if is_minigrid and self._reset_seed is not None and self._envs is not None:
+                    obs_new, _ = self._envs.reset(seed=self._reset_seed)
+                    log_constant(
+                        LOGGER,
+                        LOG_WORKER_CLEANRL_EPISODE_AUTO_RESET,
+                        extra={
+                            "episode_index": self._episode_count,
+                            "seed": self._reset_seed,
+                            "env_id": self._env_id,
+                        },
+                    )
+                # Reset counters for next episode
                 self._step_idx = 0
                 self._episode_reward = 0.0
+
+            # Capture render AFTER potential seeded re-reset so the frame
+            # shows the correctly-seeded layout (not the random auto-reset).
+            render_payload = None
+            try:
+                frame = self._envs.call("render") if self._envs is not None else None
+                if frame is not None and len(frame) > 0:
+                    rgb_frame = frame[0]
+                    if rgb_frame is not None and hasattr(rgb_frame, 'shape'):
+                        render_payload = {
+                            "mode": "rgb_array",
+                            "rgb": rgb_frame.tolist() if hasattr(rgb_frame, 'tolist') else rgb_frame,
+                            "width": int(rgb_frame.shape[1]),
+                            "height": int(rgb_frame.shape[0]),
+                        }
+            except Exception:
+                pass  # Rendering not available
+
+            # Emit step telemetry using saved values (pre-reset counters)
+            step_data = {
+                "type": "step",
+                "step_index": tel_step,
+                "episode_index": tel_episode,
+                "action": action_scalar,
+                "reward": reward_scalar,
+                "terminated": term,
+                "truncated": trunc,
+                "episode_reward": tel_reward,
+            }
+
+            if render_payload is not None:
+                step_data["render_payload"] = render_payload
+
+            self._emit(step_data)
 
             self._obs = obs_new
 

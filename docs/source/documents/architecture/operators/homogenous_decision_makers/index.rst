@@ -1,6 +1,18 @@
 Homogeneous Decision-Makers
 ===========================
 
+.. raw:: html
+
+   <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
+     <source src="../../../../_static/videos/random_team_vs_llm_team.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+   <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
+     <strong>Homogeneous Teams: Random vs LLM:</strong> Two homogeneous teams (all-Random vs all-LLM) competing in the same multi-agent environment.
+     See <a href="../../../architecture/workers/integrated_workers/MOSAIC_Random_Worker/index.html">MOSAIC Random Worker</a>
+     and <a href="../../../architecture/workers/integrated_workers/MOSAIC_LLM_Worker/index.html">MOSAIC LLM Worker</a>.
+   </p>
+
 A **homogeneous** setup is one where every agent in an experiment uses
 the same decision-making paradigm -- all RL, all LLM, all human, or all
 baseline.  This is the simplest and most common configuration in MOSAIC.

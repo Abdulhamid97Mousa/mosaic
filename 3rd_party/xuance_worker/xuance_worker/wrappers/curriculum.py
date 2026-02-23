@@ -44,15 +44,33 @@ try:
 except ImportError:
     pass
 
-from syllabus.core import ReinitTaskWrapper
-from syllabus.core import GymnasiumSyncWrapper, make_multiprocessing_curriculum
-from syllabus.curricula import SequentialCurriculum, Constant
-from syllabus.task_space import DiscreteTaskSpace
+try:
+    from syllabus.core import ReinitTaskWrapper
+    from syllabus.core import GymnasiumSyncWrapper, make_multiprocessing_curriculum
+    from syllabus.curricula import SequentialCurriculum, Constant
+    from syllabus.task_space import DiscreteTaskSpace
+    _SYLLABUS_AVAILABLE = True
+except ImportError:
+    _SYLLABUS_AVAILABLE = False
 
 _LOGGER = logging.getLogger(__name__)
 
 
-class BabyAITaskWrapper(ReinitTaskWrapper):
+def _require_syllabus():
+    """Raise a clear error if syllabus-rl is not installed."""
+    if not _SYLLABUS_AVAILABLE:
+        raise ImportError(
+            "syllabus-rl is required for curriculum learning features. "
+            "Install with: pip install syllabus-rl"
+        )
+
+
+# BabyAITaskWrapper requires syllabus — define a stub base if unavailable
+# so the module is still importable (other code may import make_curriculum_env).
+_BaseWrapper = ReinitTaskWrapper if _SYLLABUS_AVAILABLE else gym.Wrapper
+
+
+class BabyAITaskWrapper(_BaseWrapper):
     """
     Task wrapper for BabyAI environments that switches between different env_ids.
 
@@ -175,8 +193,8 @@ class BabyAITaskWrapper(ReinitTaskWrapper):
 
 def make_babyai_curriculum(
     curriculum_schedule: List[Dict[str, Any]],
-    task_space: Optional[DiscreteTaskSpace] = None,
-) -> SequentialCurriculum:
+    task_space: Optional["DiscreteTaskSpace"] = None,
+) -> "SequentialCurriculum":
     """
     Create a SequentialCurriculum for BabyAI environments.
 
@@ -199,6 +217,7 @@ def make_babyai_curriculum(
             {"env_id": "BabyAI-GoToLocal-v0"},  # Final stage, no stopping condition
         ]
     """
+    _require_syllabus()
     env_ids = [stage["env_id"] for stage in curriculum_schedule]
 
     if task_space is None:
@@ -289,6 +308,7 @@ def make_curriculum_env(
         # Now use with ANY XuanCe algorithm!
         # The curriculum switching happens automatically during training.
     """
+    _require_syllabus()
     env_ids = [stage["env_id"] for stage in curriculum_schedule]
     task_space = DiscreteTaskSpace(len(env_ids), env_ids)
 

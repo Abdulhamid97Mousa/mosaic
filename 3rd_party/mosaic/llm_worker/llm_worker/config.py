@@ -16,7 +16,7 @@ from typing import Any, Dict, Literal, Optional
 # Note: "multigrid" is multi-agent extension of MiniGrid with simultaneous stepping
 # Note: "pettingzoo" is used for multi-agent games (chess, go, connect-four, etc.)
 #       In pettingzoo mode, the worker acts as action-selector (doesn't own env)
-ENV_NAMES = ("babyai", "minigrid", "multigrid", "minihack", "crafter", "nle", "textworld", "pettingzoo")
+ENV_NAMES = ("babyai", "minigrid", "multigrid", "mosaic_multigrid", "minihack", "crafter", "nle", "textworld", "pettingzoo")
 
 # Valid LLM client names
 # OpenRouter provides unified access to all major model providers
@@ -52,7 +52,7 @@ class LLMWorkerConfig:
     """
 
     run_id: str
-    env_name: Literal["babyai", "minigrid", "multigrid", "minihack", "crafter", "nle", "textworld"] = "babyai"
+    env_name: Literal["babyai", "minigrid", "multigrid", "mosaic_multigrid", "minihack", "crafter", "nle", "textworld", "pettingzoo"] = "babyai"
     task: str = "BabyAI-GoToRedBall-v0"
     client_name: Literal["openrouter", "openai", "anthropic", "google", "vllm"] = "openrouter"
     model_id: str = "openai/gpt-4o-mini"  # OpenRouter format: provider/model

@@ -8,6 +8,23 @@ training pipeline (which uses the three-tier gRPC architecture),
 Operators use direct subprocess IPC for low-latency, step-by-step
 control.
 
+MOSAIC provides two evaluation modes that share this IPC architecture:
+
+- **Manual Mode:** Side-by-side visual comparison of up to *N* concurrent
+  operators through lock-step execution.  "Step All" advances every operator
+  by one environment step simultaneously and "Reset All" synchronizes all
+  operators to identical initial conditions via shared seeds, across
+  single-agent, sequential (AEC), and simultaneous (POSG) stepping paradigms.
+
+- **Script Mode:** Automated, long-running evaluation driven by Python scripts
+  that define operator configurations, worker assignments, seed sequences, and
+  episode counts.  Scripts execute deterministically with no manual
+  intervention, producing reproducible JSONL telemetry for every step and
+  episode.  Scripts support *procedural seeds* (different seed per episode to
+  test generalization) and *fixed seeds* (same seed every episode to isolate
+  agent behaviour), with configurable step pacing for visual inspection or
+  headless batch execution.
+
 Two Communication Modes
 -----------------------
 

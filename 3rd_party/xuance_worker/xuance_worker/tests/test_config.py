@@ -69,8 +69,8 @@ class TestXuanCeWorkerConfig:
         assert config.worker_id == "worker_1"
         assert config.extras == {"learning_rate": 0.001}
 
-    def test_frozen_dataclass(self) -> None:
-        """Test that config is immutable (frozen)."""
+    def test_mutable_dataclass(self) -> None:
+        """Test that config is a mutable dataclass (not frozen)."""
         config = XuanCeWorkerConfig(
             run_id="test",
             method="ppo",
@@ -78,8 +78,9 @@ class TestXuanCeWorkerConfig:
             env_id="CartPole-v1",
         )
 
-        with pytest.raises(AttributeError):
-            config.method = "dqn"  # type: ignore[misc]
+        # Config is intentionally mutable for runtime adjustments
+        config.method = "dqn"
+        assert config.method == "dqn"
 
     def test_to_dict(self) -> None:
         """Test conversion to dictionary."""
@@ -273,15 +274,14 @@ class TestXuanCeWorkerConfigEdgeCases:
     """Edge case tests for XuanCeWorkerConfig."""
 
     def test_empty_run_id(self) -> None:
-        """Test handling of empty run_id."""
-        config = XuanCeWorkerConfig(
-            run_id="",
-            method="ppo",
-            env="classic_control",
-            env_id="CartPole-v1",
-        )
-
-        assert config.run_id == ""
+        """Test that empty run_id raises ValueError (__post_init__ validation)."""
+        with pytest.raises(ValueError, match="run_id is required"):
+            XuanCeWorkerConfig(
+                run_id="",
+                method="ppo",
+                env="classic_control",
+                env_id="CartPole-v1",
+            )
 
     def test_seed_zero(self) -> None:
         """Test that seed=0 is preserved (not treated as None)."""

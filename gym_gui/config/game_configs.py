@@ -690,6 +690,11 @@ class MultiGridConfig:
     highlight: bool = True
     """Whether to highlight agent view cones in render."""
 
+    view_size: int | None = None
+    """Agent view size override. MOSAIC default is 3, INI default is 7.
+    When None, uses the environment's built-in default.
+    Passed as view_size kwarg to the environment constructor."""
+
     env_kwargs: Dict[str, Any] | None = None
     """Additional environment-specific kwargs."""
 
@@ -708,20 +713,25 @@ class MultiGridConfig:
 
     def to_dict(self) -> Dict[str, Any]:
         """Convert config to dictionary."""
-        return {
+        result: Dict[str, Any] = {
             "env_id": self.env_id,
             "seed": self.seed,
             "highlight": self.highlight,
             "env_kwargs": self.env_kwargs or {},
         }
+        if self.view_size is not None:
+            result["view_size"] = self.view_size
+        return result
 
     @classmethod
     def from_dict(cls, data: Dict[str, Any]) -> "MultiGridConfig":
         """Create config from dictionary."""
+        view_size = data.get("view_size")
         return cls(
             env_id=data.get("env_id", "soccer"),
             seed=data.get("seed"),
             highlight=data.get("highlight", True),
+            view_size=int(view_size) if view_size is not None else None,
             env_kwargs=data.get("env_kwargs"),
         )
 

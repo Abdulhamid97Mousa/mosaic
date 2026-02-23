@@ -16,6 +16,8 @@ from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 from qtpy import QtCore, QtWidgets
 
 from gym_gui.config.paths import VAR_MODELS_HF_CACHE
+from gym_gui.logging_config.helpers import log_constant
+from gym_gui.logging_config.log_constants import LOG_OPERATOR_VIEW_SIZE_CONFIGURED
 from gym_gui.services.operator import OperatorConfig, WorkerAssignment
 from gym_gui.ui.worker_catalog.catalog import get_worker_catalog, WorkerDefinition
 from gym_gui.constants.constants_operator import (
@@ -545,6 +547,20 @@ LLM_CLIENT_MODELS: Dict[str, List[Tuple[str, str]]] = {
         ("google/gemma-2-27b-it", "Gemma 2 27B"),
         ("google/gemma-2-9b-it", "Gemma 2 9B"),
         ("google/gemma-2-9b-it:free", "Gemma 2 9B (Free)"),
+        # Paid models (reliable, no rate-limit issues with credits)
+        ("google/gemini-2.0-flash-001", "Gemini 2.0 Flash ($0.10/M)"),
+        ("mistralai/mistral-small-24b-instruct-2501", "Mistral Small 24B ($0.05/M)"),
+        # NVIDIA text-only models (verified: text-only modality)
+        # Nemotron 3 Nano (30B MoE, 3B active — designed for agentic AI, ~1.6s)
+        ("nvidia/nemotron-3-nano-30b-a3b:free", "Nemotron 3 Nano 30B (Free)"),
+        # Arcee AI text-only models (verified: text-only modality)
+        # Trinity Large (400B MoE, 13B active — reasoning, ~2.4s)
+        ("arcee-ai/trinity-large-preview:free", "Arcee Trinity Large 400B (Free)"),
+        # Trinity Mini (fast lightweight reasoning, ~2.7s)
+        ("arcee-ai/trinity-mini:free", "Arcee Trinity Mini (Free)"),
+        # Upstage text-only models (verified: text-only modality)
+        # Solar Pro 3 (multilingual reasoning, ~4s)
+        ("upstage/solar-pro-3:free", "Solar Pro 3 (Free)"),
     ],
     "vllm": [],  # vLLM servers are dynamically scanned
     "openai": [
@@ -663,14 +679,14 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         # Player label with ID
         label_text = f"{self._player_label} ({self._player_id})"
         player_label = QtWidgets.QLabel(label_text, self)
-        player_label.setFixedWidth(120)
+        player_label.setMinimumWidth(160)
         player_label.setStyleSheet("font-weight: bold;")
         row1.addWidget(player_label)
 
         # Type selector (LLM / RL / Human)
         row1.addWidget(QtWidgets.QLabel("Type:", self))
         self._type_combo = QtWidgets.QComboBox(self)
-        self._type_combo.setFixedWidth(70)
+        self._type_combo.setFixedWidth(80)
         self._type_combo.addItems(["LLM", "RL", "Human", "Random"])
         row1.addWidget(self._type_combo)
 
@@ -701,7 +717,7 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
 
         # Spacer to align with row1 (same width as player label)
         spacer = QtWidgets.QWidget(self._llm_row)
-        spacer.setFixedWidth(120)
+        spacer.setFixedWidth(160)
         llm_layout.addWidget(spacer)
 
         # Model dropdown
@@ -934,8 +950,8 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
             settings["player_name"] = self._player_label
             settings["player_id"] = self._player_id
         elif worker_type == "random":
-            # Random baseline: uses operators_worker with random behavior
-            worker_id = "operators_worker"
+            # Random baseline: uses random_worker subprocess
+            worker_id = "random_worker"
             worker_type = "baseline"
             settings["behavior"] = "random"
         elif worker_type == "rl":
@@ -1259,6 +1275,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._container_size_combo.addItem("400px", 400)
         self._container_size_combo.addItem("512px", 512)
         self._container_size_combo.addItem("600px", 600)
+        self._container_size_combo.addItem("700px", 700)
         self._container_size_combo.addItem("768px", 768)
         self._container_size_combo.addItem("800px", 800)
         self._container_size_combo.addItem("1024px", 1024)
@@ -1266,7 +1283,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._container_size_combo.addItem("1440px", 1440)
         self._container_size_combo.addItem("1600px", 1600)
         self._container_size_combo.addItem("1920px", 1920)
-        self._container_size_combo.setCurrentIndex(6)  # Default to 800px
+        self._container_size_combo.setCurrentIndex(7)  # Default to 800px
         self._container_size_combo.setFixedWidth(100)
         right_col.addRow("Container:", self._container_size_combo)
 
@@ -1469,6 +1486,32 @@ class OperatorConfigRow(QtWidgets.QWidget):
         obs_mode_row.addWidget(self._observation_mode_combo)
         obs_mode_row.addStretch()
         multigrid_layout.addLayout(obs_mode_row)
+
+        # View Size Selector (MOSAIC only — controls agent NxN partial observation window)
+        view_size_row = QtWidgets.QHBoxLayout()
+        view_size_label = QtWidgets.QLabel("View Size:", self._multigrid_settings_container)
+        view_size_label.setStyleSheet("font-weight: bold; color: #555;")
+        view_size_row.addWidget(view_size_label)
+
+        self._view_size_spin = QtWidgets.QSpinBox(self._multigrid_settings_container)
+        self._view_size_spin.setRange(3, 15)
+        self._view_size_spin.setSingleStep(2)  # Odd values preferred (3, 5, 7, 9, ...)
+        self._view_size_spin.setSpecialValueText("3 (default)")
+        self._view_size_spin.setValue(3)
+        self._view_size_spin.setToolTip(
+            "Agent view size (NxN partial observation window).\n"
+            "Default: 3 (9 cells visible, 7.1% of 16x11 grid).\n"
+            "Larger values give agents more information:\n"
+            "  5 = 25 cells (19.8%)\n"
+            "  7 = 49 cells (38.9%)\n"
+            "  9 = 81 cells (64.3%)\n"
+            "Must be odd for symmetric view. Even values are rounded up."
+        )
+        self._view_size_spin.setMinimumWidth(100)
+        self._view_size_spin.valueChanged.connect(self._on_config_changed)
+        view_size_row.addWidget(self._view_size_spin)
+        view_size_row.addStretch()
+        multigrid_layout.addLayout(view_size_row)
 
         # Coordination Level Selector (only visible when an LLM agent is present)
         self._coordination_container = QtWidgets.QWidget(self._multigrid_settings_container)
@@ -2270,6 +2313,22 @@ class OperatorConfigRow(QtWidgets.QWidget):
                 if self._initial_state:
                     player_workers[first_player].settings["initial_state"] = self._initial_state
 
+            # Get view_size (MOSAIC only, None = default of 3)
+            view_size_val = self._view_size_spin.value()
+            view_size = view_size_val if view_size_val != 3 else None
+            if view_size is not None:
+                _logger = logging.getLogger(__name__)
+                log_constant(
+                    _logger,
+                    LOG_OPERATOR_VIEW_SIZE_CONFIGURED,
+                    extra={
+                        "operator_id": self._operator_id,
+                        "view_size": view_size,
+                        "env_name": env_name,
+                        "task": task,
+                    },
+                )
+
             return OperatorConfig.multi_agent(
                 operator_id=self._operator_id,
                 display_name=display_name,
@@ -2279,6 +2338,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
                 execution_mode=execution_mode,
                 observation_mode=observation_mode,
                 coordination_level=coordination_level,
+                view_size=view_size,
             )
 
         # Single-agent mode: standard LLM/VLM/RL/Human configuration
@@ -2335,9 +2395,9 @@ class OperatorConfigRow(QtWidgets.QWidget):
             worker_id = "human_worker"  # Special marker for human operators
 
         elif operator_type == "random":
-            # Random baseline: uses operators_worker with random behavior
+            # Random baseline: uses random_worker subprocess
             operator_type = "baseline"
-            worker_id = "operators_worker"
+            worker_id = "random_worker"
             settings["behavior"] = "random"
 
         # Common settings - container size, image scale, and square size

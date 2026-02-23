@@ -19,9 +19,9 @@ _LOGGER = logging.getLogger(__name__)
 
 # Agent colors for visual distinction
 AGENT_COLORS = {
-    "agent_0": ("#e53935", "#ffcdd2"),  # Red (primary, background)
+    "agent_0": ("#43a047", "#c8e6c9"),  # Green (primary, background)
     "agent_1": ("#1e88e5", "#bbdefb"),  # Blue
-    "agent_2": ("#43a047", "#c8e6c9"),  # Green
+    "agent_2": ("#e53935", "#ffcdd2"),  # Red
     "agent_3": ("#fdd835", "#fff9c4"),  # Yellow
     "agent_4": ("#8e24aa", "#e1bee7"),  # Purple
     "agent_5": ("#00897b", "#b2dfdb"),  # Teal
@@ -181,6 +181,18 @@ class AgentActionRow(QtWidgets.QWidget):
         """Get selected action index, or None if not selected."""
         return self._selected_action
 
+    def set_action(self, action_index: int) -> None:
+        """Programmatically select an action (e.g., from arrow key input).
+
+        Updates the button highlight and selection label exactly like a click,
+        then emits :pyqtSignal:`action_selected`.
+
+        Args:
+            action_index: The action index to select.
+        """
+        if 0 <= action_index < len(self._action_buttons):
+            self._on_action_clicked(action_index)
+
     def clear_selection(self) -> None:
         """Clear the current selection."""
         self._selected_action = None
@@ -322,9 +334,9 @@ class MultiAgentActionPanel(QtWidgets.QWidget):
     def _get_color_name(self, agent_id: str) -> Optional[str]:
         """Get color name for an agent."""
         color_names = {
-            "agent_0": "Red",
+            "agent_0": "Green",
             "agent_1": "Blue",
-            "agent_2": "Green",
+            "agent_2": "Red",
             "agent_3": "Yellow",
             "agent_4": "Purple",
             "agent_5": "Teal",

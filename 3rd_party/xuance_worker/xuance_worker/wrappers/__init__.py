@@ -1,7 +1,7 @@
 """XuanCe Worker Wrappers.
 
 This module provides environment wrappers for XuanCe training,
-including curriculum learning support via Syllabus-RL.
+including curriculum learning support via Syllabus-RL (optional dependency).
 """
 
 from .curriculum import (

@@ -10,9 +10,9 @@ Procedurally generated grid-world environments for navigation and reasoning.
 
 .. raw:: html
 
-   <video width="100%" controls poster="../../../videos/MiniGrid/MINIGRID.gif">
+   <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
      <source src="../../../_static/videos/MiniGrid/MINIGRID_1.mp4" type="video/mp4">
-     <img src="../../../videos/MiniGrid/MINIGRID.gif" alt="MiniGrid Demo" style="width:100%">
+     Your browser does not support the video tag.
    </video>
    <br><br>
 

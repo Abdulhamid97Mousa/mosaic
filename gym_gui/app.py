@@ -103,6 +103,18 @@ def _format_settings(settings: Settings) -> str:
     display_info["x11_socket_exists"] = os.path.exists("/tmp/.X11-unix/X0")
     payload["display"] = display_info
 
+    # LLM API configuration
+    def _mask_key(key: str | None) -> str:
+        if not key:
+            return "not set"
+        return f"{key[:12]}...{key[-4:]}" if len(key) > 20 else "***"
+
+    payload["llm_apis"] = {
+        "openrouter_api_key": _mask_key(os.getenv("OPENROUTER_API_KEY")),
+        "vllm_base_url": os.getenv("VLLM_BASE_URL", "not set"),
+        "hf_token": _mask_key(os.getenv("HF_TOKEN")),
+    }
+
     # Environment variables (important ones)
     payload["env"] = {
         "MUJOCO_GL": os.getenv("MUJOCO_GL", "not set"),

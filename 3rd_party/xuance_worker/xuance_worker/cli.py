@@ -160,6 +160,11 @@ def parse_args(args: list[str] | None = None) -> argparse.Namespace:
         default=None,
         help="Path to trained policy checkpoint (required for interactive mode)",
     )
+    parser.add_argument(
+        "--stochastic",
+        action="store_true",
+        help="Use stochastic action sampling in interactive mode (default: deterministic/argmax)",
+    )
 
     # MOSAIC integration arguments (passed by trainer dispatcher)
     parser.add_argument(
@@ -304,6 +309,7 @@ def main(args: list[str] | None = None) -> int:
             method=config.method,
             policy_path=parsed.policy_path,
             device=config.device,
+            deterministic=not getattr(parsed, 'stochastic', False),
         )
         runtime = InteractiveRuntime(interactive_config)
         runtime.run()

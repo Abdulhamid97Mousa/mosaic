@@ -273,6 +273,23 @@ def _get_env_class(env_id: str) -> Optional[Type]:
             from mosaic_multigrid.envs import Basketball3vs3TeamObsEnv
             env_cls = Basketball3vs3TeamObsEnv
 
+        # --- Solo variants (v6.0.0, single-agent, no opponent) ---
+        elif env_id.lower() in ("soccer_solo_green", "soccersologreenindagobsenv16x11"):
+            from mosaic_multigrid.envs import SoccerSoloGreenIndAgObsEnv16x11
+            env_cls = SoccerSoloGreenIndAgObsEnv16x11
+
+        elif env_id.lower() in ("soccer_solo_blue", "soccersoloblueindagobsenv16x11"):
+            from mosaic_multigrid.envs import SoccerSoloBlueIndAgObsEnv16x11
+            env_cls = SoccerSoloBlueIndAgObsEnv16x11
+
+        elif env_id.lower() in ("basketball_solo_green", "basketballsologreenindagobsenv19x11"):
+            from mosaic_multigrid.envs import BasketballSoloGreenIndAgObsEnv19x11
+            env_cls = BasketballSoloGreenIndAgObsEnv19x11
+
+        elif env_id.lower() in ("basketball_solo_blue", "basketballsoloblueindagobsenv19x11"):
+            from mosaic_multigrid.envs import BasketballSoloBlueIndAgObsEnv19x11
+            env_cls = BasketballSoloBlueIndAgObsEnv19x11
+
     except ImportError as e:
         _logger.warning(f"Could not import mosaic_multigrid environment '{env_id}': {e}")
 
@@ -291,6 +308,9 @@ def get_available_environments() -> List[str]:
         "basketball_3vs3_indagobs",
         "soccer_2vs2_teamobs", "collect_2vs2_teamobs",
         "basketball_3vs3_teamobs",
+        # Solo (v6.0.0)
+        "soccer_solo_green", "soccer_solo_blue",
+        "basketball_solo_green", "basketball_solo_blue",
     ]:
         if _get_env_class(env_id) is not None:
             available.append(env_id)
@@ -395,11 +415,174 @@ MULTIGRID_ENV_INFO = {
         "zero_sum": True,
         "obs_type": "teamobs",
     },
+    # --- Solo variants (v6.0.0, single-agent, no opponent) ---
+    "soccer_solo_green": {
+        "full_name": "SoccerSoloGreenIndAgObsEnv16x11",
+        "description": "Solo Soccer (Green) - score in blue goal, no opponent",
+        "num_agents": 1,
+        "default_teams": [[0]],
+        "team_names": ["green"],
+        "recommended_mode": TrainingMode.INDEPENDENT,
+        "zero_sum": False,
+        "solo": True,
+    },
+    "soccer_solo_blue": {
+        "full_name": "SoccerSoloBlueIndAgObsEnv16x11",
+        "description": "Solo Soccer (Blue) - score in green goal, no opponent",
+        "num_agents": 1,
+        "default_teams": [[0]],
+        "team_names": ["blue"],
+        "recommended_mode": TrainingMode.INDEPENDENT,
+        "zero_sum": False,
+        "solo": True,
+    },
+    "basketball_solo_green": {
+        "full_name": "BasketballSoloGreenIndAgObsEnv19x11",
+        "description": "Solo Basketball (Green) - score in blue hoop, no opponent",
+        "num_agents": 1,
+        "default_teams": [[0]],
+        "team_names": ["green"],
+        "recommended_mode": TrainingMode.INDEPENDENT,
+        "zero_sum": False,
+        "solo": True,
+    },
+    "basketball_solo_blue": {
+        "full_name": "BasketballSoloBlueIndAgObsEnv19x11",
+        "description": "Solo Basketball (Blue) - score in green hoop, no opponent",
+        "num_agents": 1,
+        "default_teams": [[0]],
+        "team_names": ["blue"],
+        "recommended_mode": TrainingMode.INDEPENDENT,
+        "zero_sum": False,
+        "solo": True,
+    },
 }
 
 
 # =============================================================================
-# Main Environment Wrapper
+# Solo Environment Wrapper (single-agent PPO)
+# =============================================================================
+
+class SoloMultiGrid_Env(_gymnasium.Env if _HAS_GYMNASIUM else object):
+    """Standard Gymnasium wrapper for solo mosaic_multigrid environments.
+
+    Solo environments (v6.0.0) have 1 agent with no opponent. They use the
+    multi-agent API internally ({0: obs}, {0: reward}, etc.) but this wrapper
+    converts them to standard single-agent Gymnasium API for use with XuanCe's
+    PPO/DRL runner.
+
+    Observation: 3x3x3 IndAgObs image → flattened to (27,) float32
+    Action: Discrete(8) — left, right, forward, pickup, drop, toggle, done, still
+
+    Example:
+        config = SimpleNamespace(env_id="soccer_solo_green")
+        env = SoloMultiGrid_Env(config)
+        obs, info = env.reset()  # obs: np.ndarray shape (27,)
+        obs, reward, terminated, truncated, info = env.step(3)
+    """
+
+    metadata = {"render_modes": ["human", "rgb_array"]}
+
+    def __init__(self, config: Any) -> None:
+        env_id = getattr(config, 'env_id', 'soccer_solo_green')
+        env_seed = getattr(config, 'env_seed', None)
+        self.render_mode = getattr(config, 'render_mode', None)
+
+        env_cls = _get_env_class(env_id)
+        if env_cls is None:
+            raise ValueError(
+                f"Unknown solo MultiGrid environment: '{env_id}'. "
+                f"Available solo envs: soccer_solo_green, soccer_solo_blue, "
+                f"basketball_solo_green, basketball_solo_blue."
+            )
+
+        # FastLane render mode
+        fastlane_active = maybe_wrap_env is not None and is_fastlane_enabled()
+        render_mode = "rgb_array" if fastlane_active else None
+        self._inner = env_cls(render_mode=render_mode)
+
+        self._seed = env_seed
+        self._base = getattr(self._inner, 'unwrapped', self._inner)
+
+        # Single-agent: extract obs/action spaces from agent 0
+        inner_obs_space = self._inner.observation_space[0]
+        img_space = inner_obs_space['image']
+        self._obs_flat_dim = int(np.prod(img_space.shape))
+
+        self.observation_space = spaces.Box(
+            low=0, high=255,
+            shape=(self._obs_flat_dim,),
+            dtype=np.float32,
+        )
+        self.action_space = spaces.Discrete(self._inner.action_space[0].n)
+
+        # Wrap with FastLane if enabled
+        if maybe_wrap_env is not None and fastlane_active:
+            self._inner = GymToGymnasiumWrapper(self._inner)
+            self._inner = maybe_wrap_env(self._inner)
+            _logger.info("Applied FastLane wrapper for solo training visualization")
+
+        self.max_episode_steps = getattr(self._base, 'max_steps', 200)
+        self._episode_step = 0
+        self.env_id = env_id
+
+        _logger.info(
+            "SoloMultiGrid_Env initialized: env=%s, obs_dim=%d, actions=%d",
+            env_id, self._obs_flat_dim, self.action_space.n,
+        )
+
+    def _flatten_obs(self, multi_obs: dict) -> np.ndarray:
+        """Convert {0: {'image': (3,3,3), ...}} → flat (27,) float32."""
+        agent_obs = multi_obs[0]
+        img = agent_obs['image']
+        return img.flatten().astype(np.float32)
+
+    def reset(self, seed=None, options=None):
+        kwargs = {}
+        if seed is not None:
+            kwargs['seed'] = seed
+        elif self._seed is not None:
+            kwargs['seed'] = self._seed
+
+        result = self._inner.reset(**kwargs)
+        if isinstance(result, tuple):
+            obs, info = result
+        else:
+            obs, info = result, {}
+
+        self._episode_step = 0
+        return self._flatten_obs(obs), info
+
+    def step(self, action):
+        # Solo env expects list of actions: [action_for_agent_0]
+        result = self._inner.step([int(action)])
+        obs, rewards, terminated, truncated, info = result
+
+        self._episode_step += 1
+
+        # Extract scalar values from agent-0 dicts
+        flat_obs = self._flatten_obs(obs)
+        reward = rewards[0] if isinstance(rewards, dict) else float(rewards)
+        done = terminated[0] if isinstance(terminated, dict) else bool(terminated)
+        trunc = truncated[0] if isinstance(truncated, dict) else bool(truncated)
+        step_info = info.get(0, info) if isinstance(info, dict) else info
+
+        return flat_obs, float(reward), bool(done), bool(trunc), step_info
+
+    def render(self):
+        return self._inner.render()
+
+    def close(self):
+        if hasattr(self._inner, 'close'):
+            self._inner.close()
+
+    @property
+    def unwrapped(self):
+        return self._base
+
+
+# =============================================================================
+# Main Environment Wrapper (multi-agent)
 # =============================================================================
 
 class MultiGrid_Env(RawMultiAgentEnv):

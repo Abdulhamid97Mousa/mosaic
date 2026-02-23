@@ -967,16 +967,14 @@ class OperatorLauncher:
         # Validate required settings
         if not policy_path:
             raise OperatorLaunchError(
-                operator_id=config.operator_id,
-                message="RL operator requires 'policy_path' in settings",
+                f"RL operator {config.operator_id} requires 'policy_path' in settings"
             )
 
         # Determine environment ID (task field contains the full env ID)
         env_id = config.task
         if not env_id:
             raise OperatorLaunchError(
-                operator_id=config.operator_id,
-                message="RL operator requires 'task' (environment ID)",
+                f"RL operator {config.operator_id} requires 'task' (environment ID)"
             )
 
         # Dispatch based on worker_id
@@ -1110,7 +1108,7 @@ class OperatorLauncher:
     ) -> list[str]:
         """Build command line for baseline operator.
 
-        Uses operators_worker for simple baseline behaviors (random, noop, cycling).
+        Uses random_worker for simple baseline behaviors (random, noop, cycling).
         Baseline operators are used for ablation studies and credit assignment research.
 
         Args:
@@ -1141,8 +1139,7 @@ class OperatorLauncher:
         env_id = config.task
         if not env_id:
             raise OperatorLaunchError(
-                operator_id=config.operator_id,
-                message="Baseline operator requires 'task' (environment ID)",
+                f"Baseline operator {config.operator_id} requires 'task' (environment ID)"
             )
 
         # Determine environment name
@@ -1151,7 +1148,7 @@ class OperatorLauncher:
         # Build operators-worker command
         cmd = [
             self._python_executable,
-            "-m", "operators_worker",
+            "-m", "random_worker",
             "--run-id", run_id,
             "--behavior", behavior,
             "--env-name", env_name,

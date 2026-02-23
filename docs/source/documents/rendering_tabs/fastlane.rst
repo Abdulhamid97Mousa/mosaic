@@ -47,30 +47,6 @@ Data Classes
 
 All three are frozen dataclasses.
 
-Binary Layout
-^^^^^^^^^^^^^
-
-.. code-block:: text
-
-   ┌──────────────────── Header (72 bytes) ──────────────────┐
-   │ MAGIC(4s) VERSION(I) WIDTH(I) HEIGHT(I) CHANNELS(I)     │
-   │ PIXEL_FMT(I) CAPACITY(I) SLOT_SIZE(I) META_SIZE(I)      │
-   │ FLAGS(I) HEAD(Q) TAIL(Q)                                 │
-   │ LAST_REWARD(d) ROLLING_RETURN(d) STEP_RATE_HZ(d)        │
-   └──────────────────────────────────────────────────────────┘
-   ┌── Slot 0 ──┐  ┌── Slot 1 ──┐  ...  ┌── Slot N-1 ──┐
-   │ seq(Q)      │  │ seq(Q)      │       │ seq(Q)        │
-   │ payload_len │  │ payload_len │       │ payload_len   │
-   │ reserved    │  │ reserved    │       │ reserved      │
-   │ [RGB bytes] │  │ [RGB bytes] │       │ [RGB bytes]   │
-   └─────────────┘  └─────────────┘       └───────────────┘
-
-Key constants:
-
-- ``MAGIC = b"FLAN"``  ·  ``VERSION = 1``
-- ``_HEADER_SIZE = 72``  (struct ``< 4sIIIIIIIIIQQddd``)
-- ``_SLOT_META_SIZE = 16``  (struct ``< QII``)
-- ``FLAG_INVALIDATED = 0x1``
 
 Seqlock Mechanism
 ^^^^^^^^^^^^^^^^^

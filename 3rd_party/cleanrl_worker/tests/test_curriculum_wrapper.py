@@ -91,11 +91,13 @@ class TestBabyAITaskWrapper:
 
     @staticmethod
     def _make_minigrid_env(env_id: str) -> gym.Env:
-        """Create a MiniGrid env with proper observation wrappers."""
+        """Create a MiniGrid env with proper observation wrappers.
+
+        NOTE: No FlattenObservation — MinigridAgent (CNN) expects raw (7,7,3) images.
+        """
         from minigrid.wrappers import ImgObsWrapper
         env = gym.make(env_id)
-        env = ImgObsWrapper(env)  # Convert Dict obs to image
-        env = gym.wrappers.FlattenObservation(env)
+        env = ImgObsWrapper(env)  # Convert Dict obs to image (7,7,3)
         return env
 
     def test_initializes_with_env_ids(self):

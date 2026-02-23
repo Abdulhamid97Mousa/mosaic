@@ -228,11 +228,12 @@ class MeltingPotAdapter(EnvironmentAdapter[Dict[str, np.ndarray], Dict[str, int]
         # The actual per-agent observations are stored in _agent_observations
         return self._package_step(self._agent_observations, 0.0, False, False, step_info)
 
-    def step(self, action: Dict[str, int] | int) -> AdapterStep[Dict[str, np.ndarray]]:
+    def step(self, action: Dict[str, int] | int | list[int]) -> AdapterStep[Dict[str, np.ndarray]]:
         """Execute actions for all agents simultaneously.
 
         Args:
-            action: Dict of actions per agent or single action (broadcast to all)
+            action: Dict of actions per agent, single action (broadcast to all),
+                    or list of actions (one per agent by index, from HumanInputController)
 
         Returns:
             Step result with dict of observations, sum of rewards, and info
@@ -242,6 +243,13 @@ class MeltingPotAdapter(EnvironmentAdapter[Dict[str, np.ndarray], Dict[str, int]
         # Handle single action (broadcast to all agents)
         if isinstance(action, int):
             actions = {agent: action for agent in self._agent_names}
+        elif isinstance(action, (list, tuple)):
+            # List of actions from HumanInputController (one per agent by index)
+            if len(action) != self._num_agents:
+                raise ValueError(
+                    f"Expected {self._num_agents} actions, got {len(action)}"
+                )
+            actions = {agent: act for agent, act in zip(self._agent_names, action)}
         else:
             actions = dict(action)
             if len(actions) != self._num_agents:
