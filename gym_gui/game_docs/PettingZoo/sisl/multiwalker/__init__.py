@@ -1,0 +1,60 @@
+"""Documentation for PettingZoo SISL Multiwalker environment."""
+from __future__ import annotations
+
+
+def get_multiwalker_html(env_id: str = "multiwalker_v9") -> str:
+    """Generate Multiwalker environment HTML documentation."""
+    return (
+        "<h3>PettingZoo SISL: Multiwalker (multiwalker_v9)</h3>"
+        "<p>Bipedal robots work together to carry a package across terrain. Robots are "
+        "penalized for dropping the package or falling down.</p>"
+        "<h4>Environment Details</h4>"
+        "<ul>"
+        "<li><strong>Import:</strong> <code>from pettingzoo.sisl import multiwalker_v9</code></li>"
+        "<li><strong>Actions:</strong> Continuous</li>"
+        "<li><strong>Parallel API:</strong> Yes</li>"
+        "<li><strong>Agents:</strong> ['walker_0', 'walker_1', 'walker_2'] (default 3)</li>"
+        "<li><strong>Action Shape:</strong> (4,) - torques for each motor</li>"
+        "<li><strong>Observation Shape:</strong> (31,)</li>"
+        "</ul>"
+        "<h4>Observation Space</h4>"
+        "<p>31-dimensional vector containing:</p>"
+        "<ul>"
+        "<li>Hull angle and angular velocity</li>"
+        "<li>Horizontal and vertical speed</li>"
+        "<li>Joint positions and velocities</li>"
+        "<li>Leg contact with ground</li>"
+        "<li>LIDAR readings</li>"
+        "<li>Package position and angle</li>"
+        "</ul>"
+        "<h4>Rewards</h4>"
+        "<ul>"
+        "<li><strong>Forward reward:</strong> Package movement × forward_reward</li>"
+        "<li><strong>Fall penalty:</strong> -100 if robot falls</li>"
+        "<li><strong>Package drop:</strong> Large negative reward if dropped</li>"
+        "</ul>"
+        "<h4>Key Arguments</h4>"
+        "<pre><code>multiwalker_v9.env(\n"
+        "    n_walkers=3,           # Number of bipedal robots\n"
+        "    position_noise=1e-3,   # Noise in starting position\n"
+        "    angle_noise=1e-3,      # Noise in starting angle\n"
+        "    forward_reward=1.0,    # Reward per unit forward movement\n"
+        "    terminate_reward=-100, # Penalty for termination\n"
+        "    fall_reward=-10,       # Penalty for falling\n"
+        "    max_cycles=500         # Steps per episode\n"
+        ")</code></pre>"
+        "<h4>Usage</h4>"
+        "<pre><code>from pettingzoo.sisl import multiwalker_v9\n\n"
+        "env = multiwalker_v9.env(render_mode='human')\n"
+        "env.reset(seed=42)\n\n"
+        "for agent in env.agent_iter():\n"
+        "    obs, reward, term, trunc, info = env.last()\n"
+        "    action = None if term or trunc else env.action_space(agent).sample()\n"
+        "    env.step(action)\n"
+        "env.close()</code></pre>"
+    )
+
+
+MULTIWALKER_HTML = get_multiwalker_html()
+
+__all__ = ["MULTIWALKER_HTML", "get_multiwalker_html"]

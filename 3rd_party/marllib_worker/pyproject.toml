@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mosaic-marllib"
+version = "0.1.0"
+description = "MARLlib (Multi-Agent RL Library) integration for MOSAIC BDI-RL framework"
+requires-python = ">=3.8"
+license = {text = "MIT"}
+
+# Dependencies are managed externally.
+# MARLlib requires ray==1.8.0, torch>=1.9.0, pettingzoo==1.12.0
+# which may conflict with other MOSAIC workers.
+# Install MARLlib separately: pip install -e 3rd_party/MARLlib/
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+marllib-worker = "marllib_worker.cli:main"
+
+[project.entry-points."mosaic.workers"]
+marllib = "marllib_worker:get_worker_metadata"
+
+[tool.setuptools]
+packages = ["marllib_worker"]

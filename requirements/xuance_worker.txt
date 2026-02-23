@@ -1,0 +1,39 @@
+# XuanCe Worker Dependencies
+# This bundle contains dependencies required exclusively by the xuance_worker.
+# Install this when launching XuanCe-based MARL training runs.
+
+# Include base requirements
+-r base.txt
+
+# XuanCe core dependencies (from xuance setup.py)
+scipy>=1.5.0
+pygame>=2.1.0
+tqdm>=4.66.0
+pyglet==1.5.15
+tensorboard>=2.11.0
+wandb>=0.15.3
+moviepy==1.0.3
+imageio>=2.9.0
+opencv-python>=4.5.0
+mpi4py>=3.1.0
+
+# Deep learning backend (PyTorch is most common)
+torch>=2.0.0
+torchvision>=0.15.0
+
+# Gymnasium for single-agent environments
+gymnasium>=0.29.0
+
+# PettingZoo for multi-agent environments (required by XuanCe MARL)
+pettingzoo>=1.24.0
+
+# Optional XuanCe extras:
+# - For hyperparameter tuning: optuna>=4.1.0, optuna-dashboard>=0.17.0, plotly>=5.24.1
+# - For Atari: gymnasium[atari], ale-py==0.10.1
+# - For MuJoCo: gymnasium[mujoco]
+# - For Box2D: swig==4.3.0, gymnasium[box2d]
+# - For MiniGrid: minigrid==3.0.0
+# - For vision transformers: einops==0.8.1
+
+# For full XuanCe installation:
+# pip install xuance[torch]

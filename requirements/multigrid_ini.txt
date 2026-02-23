@@ -1,0 +1,48 @@
+# =============================================================================
+# INI MultiGrid (Cooperative Multi-Agent Grid Environments)
+# =============================================================================
+# Original cooperative multi-agent grid world environments from INI.
+# Different from mosaic_multigrid - focuses on cooperative exploration tasks.
+#
+# Local Package: 3rd_party/multigrid-ini/
+# GitHub: https://github.com/ini/multigrid
+#
+# USAGE:
+#   pip install -e 3rd_party/multigrid-ini/
+#
+# FEATURES:
+#   - Gymnasium 1.0+ API (5-tuple dict-keyed observations)
+#   - 7 actions (LEFT, RIGHT, FORWARD, PICKUP, DROP, TOGGLE, DONE - no STILL)
+#   - view_size=7 (larger field of view for exploration)
+#   - Cooperative rewards, puzzle-solving mechanics
+#   - Sequential door-opening puzzles
+#   - Multi-room navigation with keys
+#
+# ENVIRONMENTS:
+#   - MultiGrid-Empty-* (6 variants): Training grounds with configurable sizes
+#   - MultiGrid-RedBlueDoors-* (2 variants): Sequential door-opening puzzle
+#   - MultiGrid-LockedHallway-* (3 variants): Multi-room navigation with keys
+#   - MultiGrid-BlockedUnlockPickup-v0: Complex pickup with obstacles
+#   - MultiGrid-Playground-v0: Diverse object interactions
+#
+# COMPARISON with MOSAIC MultiGrid:
+#   - INI MultiGrid: Cooperative exploration, puzzle-solving
+#   - MOSAIC MultiGrid: Competitive/cooperative sports (soccer, ball collection)
+#
+# NOTE: This is separate from mosaic_multigrid and serves different use cases.
+# =============================================================================
+
+# Include core GUI + shared dependencies
+-r base.txt
+
+# =============================================================================
+# INI MultiGrid Installation (Local Package)
+# =============================================================================
+
+# Install from local 3rd_party directory:
+#   pip install -e 3rd_party/multigrid-ini/
+#
+# Required dependencies (installed automatically):
+gymnasium>=1.1.0
+numpy>=1.24.0
+pygame>=2.5.0

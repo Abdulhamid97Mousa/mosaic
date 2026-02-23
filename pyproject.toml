@@ -1,0 +1,467 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mosaic"
+version = "0.1.0"
+description = "MOSAIC: Multi-Agent Orchestration System with Adaptive Intelligent Control for Heterogeneous Agent Workloads"
+readme = "README.md"
+requires-python = ">=3.10,<3.13"
+license = {text = "MIT"}
+authors = [
+    {name = "Dr. Abdulhamid Mousa", email = "mousa.abdulhamid@bit.edu.cn"}
+]
+keywords = [
+    "reinforcement-learning",
+    "multi-agent",
+    "gymnasium",
+    "pettingzoo",
+    "meltingpot",
+    "pyqt6",
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+# Core dependencies - ONLY what's needed to launch the GUI
+# No gymnasium environments here - those are optional
+dependencies = [
+    # Environment configuration
+    "python-dotenv>=1.0.0",
+    "PyYAML>=6.0",
+
+    # Qt GUI framework
+    "PyQt6>=6.7.0",
+    "PyQt6-WebEngine>=6.7.0",
+    "qtpy>=2.4.0",
+    "qasync>=0.27.0",
+
+    # Core utilities
+    "packaging>=24.0",
+    "jsonschema>=4.20.0",
+    "pydantic>=2.0.0",
+    "Pillow>=10.0.0",
+    "numpy>=1.24.0",
+
+    # PyTorch (required: app.py uses torch.cuda for GPU detection at startup)
+    "torch>=2.0.0",
+
+    # System monitoring (required: app.py uses psutil for CPU/RAM info at startup)
+    "psutil>=5.9.0",
+    "nvidia-ml-py>=11.0.0",
+
+    # gRPC for trainer communication
+    "grpcio>=1.60.0",
+    "grpcio-tools>=1.60.0",
+    "protobuf>=4.25.0",
+
+    # Run ID generation
+    "python-ulid>=2.0.0",
+
+    # HDF5 for replay storage (frames, observations)
+    "h5py>=3.10.0",
+]
+
+[project.optional-dependencies]
+# =============================================================================
+# Environment Families (additive - install what you need)
+# =============================================================================
+
+# Gymnasium core (needed for most environment families)
+gymnasium = ["gymnasium>=1.1.0"]
+
+# Box2D environments (LunarLander, BipedalWalker, CarRacing)
+box2d = [
+    "gymnasium[box2d]>=1.1.0",
+]
+
+# MuJoCo environments (Ant, HalfCheetah, Humanoid, etc.)
+mujoco = [
+    "gymnasium[mujoco]>=1.1.0",
+]
+
+# Atari environments (Breakout, Pong, SpaceInvaders, etc.)
+atari = [
+    "gymnasium[atari]>=1.1.0",
+    "ale-py==0.10.1",  # Pin to 0.10.1 for gymnasium 1.0.0 compatibility (0.11+ needs >=1.1.0)
+    "autorom[accept-rom-license]>=0.6.0",
+]
+
+# MiniGrid environments (grid-world navigation)
+minigrid = [
+    "gymnasium>=1.1.0",
+    "minigrid>=2.0.0,<3.0.0",
+]
+
+# MiniGrid with BALROG/GLAM BabyAI tasks (BartekCupial's fork)
+# Required for: BabyAI-MixedTrainLocal-v0, BabyAI-MixedTestLocal-v0
+# These environments are used by BALROG benchmark and GLAM paper
+# Source: https://github.com/BartekCupial/Minigrid
+# Local path: 3rd_party/Minigrid/
+# NOTE: This REPLACES standard minigrid - don't install both!
+minigrid-balrog = [
+    "gymnasium>=1.1.0",
+    "minigrid @ git+https://github.com/BartekCupial/Minigrid.git",
+]
+
+# PettingZoo multi-agent environments (Chess, Go, MPE, etc.)
+pettingzoo = [
+    "pettingzoo[classic,butterfly,mpe,sisl]>=1.24.0",
+    "supersuit>=3.9.0",
+    "stockfish>=3.28.0",
+    # pymunk 7.x removed add_collision_handler() API used by waterworld
+    "pymunk>=6.0.0,<7.0.0",
+]
+
+# ViZDoom FPS environments
+vizdoom = [
+    "vizdoom>=1.2.0,<2.0.0",
+]
+
+# NetHack Learning Environment (NLE) + MiniHack
+# Requires system dependencies: build-essential, cmake, flex, bison
+nethack = [
+    "nle>=0.9.0",
+    "minihack>=0.1.5",
+]
+
+# Crafter open-world survival benchmark (Hafner 2022, ICLR)
+# Paper: "Benchmarking the Spectrum of Agent Capabilities"
+crafter = [
+    "crafter>=1.8.0",
+]
+
+# Procgen procedurally generated benchmark (Cobbe et al. 2019)
+# Paper: "Leveraging Procedural Generation to Benchmark RL"
+# 16 environments for testing generalization: coinrun, starpilot, etc.
+# NOTE: Official procgen only has wheels for Python 3.7-3.10.
+# For Python 3.11+, we use procgen-mirror which provides community wheels.
+procgen = [
+    "procgen>=0.10.7; python_version < '3.11'",
+    "procgen-mirror>=0.10.7; python_version >= '3.11'",
+]
+
+# TextWorld text-based game environment (Microsoft Research)
+# Paper: Cote et al. (2018). "TextWorld: A Learning Environment for Text-based Games"
+# Repository: https://github.com/microsoft/TextWorld
+# NOTE: Linux/macOS only (Windows not supported), Python 3.9-3.12
+textworld = [
+    "textworld>=1.6.0",
+]
+
+# BabaIsAI rule manipulation puzzle benchmark (ICML 2024 Workshop)
+# Paper: Cloos et al. (2024). "Baba Is AI: Break the Rules to Beat the Benchmark"
+# Repository: https://github.com/nacloos/baba-is-ai
+# Tests LLM reasoning and compositional generalization
+babaisai = [
+    "baba-is-ai @ git+https://github.com/nacloos/baba-is-ai",
+]
+
+# mosaic_multigrid - Modernized multi-agent sports environments (REPLACES gym-multigrid)
+# PyPI: https://pypi.org/project/mosaic-multigrid/
+# Includes: Soccer 2v2/1v1, Collect 3-agent/2v2/1v1, Basketball 3v3 (IndAgObs + TeamObs variants)
+# v6.0.0: Solo training environments (no opponent) for curriculum pre-training
+# v5.0.0: noop=0 added for AEC compatibility (inspired by MeltingPot NOOP=0)
+#         Action space: noop=0, left=1, right=2, forward=3, pickup=4, drop=5, toggle=6, done=7
+#         Step telemetry: infos[agent]["position"] and infos[agent]["carrying"] every step
+# Features: Gymnasium 1.0+ API, competitive/cooperative, ball passing/stealing, wrappers, PettingZoo API
+# NOTE: Now installs from local dev: pip install -e 3rd_party/mosaic_multigrid/
+mosaic_multigrid = [
+    "mosaic-multigrid==6.0.0",
+]
+
+# multigrid_ini - INI cooperative exploration multi-agent environments
+# Local: 3rd_party/multigrid-ini/
+# GitHub: https://github.com/ini/multigrid
+# Includes: MultiGrid-Empty, MultiGrid-RedBlueDoors, MultiGrid-LockedHallway, etc.
+# Features: Gymnasium 1.0+ API, cooperative puzzle-solving, door-opening, multi-room navigation
+# NOTE: Different from mosaic_multigrid - focuses on exploration, not sports
+# Installation: pip install -e 3rd_party/multigrid-ini/
+multigrid_ini = [
+    "gymnasium>=1.1.0",
+    "numpy>=1.24.0",
+    "pygame>=2.5.0",
+]
+
+# SMAC v1: StarCraft Multi-Agent Challenge (Oxford / WhiRL)
+# Paper: Samvelyan et al. (2019). "The StarCraft Multi-Agent Challenge"
+# Repository: https://github.com/oxwhirl/smac
+# Includes: 30+ hand-designed cooperative micromanagement maps (3m, 8m, 2s3z, 3s5z, 5m_vs_6m, MMM2, etc.)
+# Features: CTDE paradigm, action masking, global state for centralised critics, PyGame renderer
+# SYSTEM REQUIREMENT: StarCraft II binary (set SC2PATH env var)
+# Download: https://github.com/Blizzard/s2client-proto#linux-packages
+smac = [
+    "smac @ git+https://github.com/oxwhirl/smac.git",
+    "pygame>=2.1.0",
+]
+
+# SMACv2: StarCraft Multi-Agent Challenge v2 (Oxford / WhiRL)
+# Paper: Ellis et al. (2023). "SMACv2: An Improved Benchmark for Cooperative MARL"
+# Repository: https://github.com/oxwhirl/smacv2
+# Extends SMAC v1 with procedural unit generation: team compositions vary per episode
+# Maps: 10gen_terran, 10gen_protoss, 10gen_zerg (procedural instead of hand-designed)
+# SYSTEM REQUIREMENT: StarCraft II binary (set SC2PATH env var)
+smacv2 = [
+    "smacv2 @ git+https://github.com/oxwhirl/smacv2.git",
+    "pygame>=2.1.0",
+]
+
+# Robotic Warehouse (RWARE) multi-agent cooperative environment (University of Edinburgh)
+# Paper: Papoudakis et al. (2021). "Benchmarking Multi-Agent Deep RL Algorithms in Cooperative Tasks"
+# Repository: https://github.com/uoe-agents/robotic-warehouse
+# Local: 3rd_party/robotic-warehouse/
+# Includes: tiny/small/medium/large warehouses with 2-19 agents, 3 reward types, 4 observation types
+# Features: Cooperative shelf delivery, collision resolution, communication channels
+# Installation: pip install -e 3rd_party/robotic-warehouse/
+rware = [
+    "gymnasium>=1.1.0",
+    "pyglet<2.0.0",
+    "networkx>=2.8.0",
+]
+
+# Jumanji JAX-based RL environments (Google DeepMind)
+# Paper: Bonnet et al. (2024). "Jumanji: Industry-Driven Hardware-Accelerated RL Environments"
+# Repository: https://github.com/google-deepmind/jumanji
+# Includes: Game2048, Minesweeper, RubiksCube, SlidingPuzzle, Sudoku, GraphColoring
+# NOTE: Requires JAX with compatible hardware backend (CPU/GPU/TPU)
+jumanji = [
+    "jax>=0.4.20",
+    "jaxlib>=0.4.20",
+    "chex>=0.1.82",
+    "flax>=0.7.0",
+]
+
+# PyBullet Drones quadcopter environments (University of Toronto)
+# Paper: Panerati et al. (2021). "Learning to Fly - a Gym Environment with PyBullet Physics
+#        for Reinforcement Learning of Multi-agent Quadcopter Control"
+# Repository: https://github.com/utiasDSL/gym-pybullet-drones
+# Includes: HoverAviary, MultiHoverAviary, CtrlAviary, VelocityAviary
+# Features: Realistic physics, aerodynamic effects (drag, ground effect, downwash), multi-agent
+pybullet-drones = [
+    "gymnasium>=1.1.0",
+    "pybullet>=3.2.5",
+    "numpy>=2.0.0",
+    "scipy>=1.10.0",
+    "matplotlib>=3.7.0",
+]
+
+# OpenSpiel board games (Google DeepMind) via Shimmy PettingZoo wrapper
+# Repository: https://github.com/google-deepmind/open_spiel
+# Shimmy: https://shimmy.farama.org/environments/open_spiel/
+# Currently supported in MOSAIC: Checkers
+# NOTE: OpenSpiel provides 70+ games; we expose only Checkers for now
+openspiel = [
+    "open-spiel>=1.4.0",
+    "shimmy[openspiel]>=1.3.0",
+]
+
+# Melting Pot multi-agent social scenarios (Google DeepMind) via Shimmy PettingZoo wrapper
+# Paper: "Melting Pot: an evaluation suite for multi-agent reinforcement learning"
+# Repository: https://github.com/google-deepmind/meltingpot
+# Shimmy: https://shimmy.farama.org/environments/meltingpot/
+# Includes: 50+ substrates (collaborative_cooking, prisoners_dilemma, territory, clean_up, etc.)
+# Features: Up to 16 agents, social interactions (cooperation, competition, deception, trust)
+# NOTE: Linux/macOS only (Windows NOT supported)
+meltingpot = [
+    "shimmy[meltingpot]>=1.3.0",
+    "dm-tree>=0.1.8",
+    "immutabledict>=2.2.0",
+]
+
+# Overcooked-AI cooperative cooking (UC Berkeley CHAI)
+# Paper: Carroll et al. (2019). "On the Utility of Learning about Humans for Human-AI Coordination"
+# Repository: https://github.com/HumanCompatibleAI/overcooked_ai
+# Location: 3rd_party/overcooked_ai/
+# Includes: 50+ layouts (cramped_room, asymmetric_advantages, coordination_ring, etc.)
+# Features: 2-agent cooperative, simultaneous stepping, sparse rewards, zero-shot coordination
+# NOTE: Install from local path: pip install -e 3rd_party/overcooked_ai/
+# WARNING: Python 3.10 ONLY (requires >=3.10,<3.11) - incompatible with Python 3.11+
+overcooked = [
+    "dill",
+    "gymnasium>=1.1.0",
+    "ipywidgets",
+    "numpy<2.0.0",
+    "opencv-python",
+    "pygame",
+    "scipy",
+    "setuptools>=77.0.3",
+    "tqdm",
+]
+
+# =============================================================================
+# Workers (training backends)
+# =============================================================================
+
+# CleanRL worker for RL training
+cleanrl = [
+    "torch>=2.0.0",
+    "tensorboard>=2.11.0",
+    "wandb>=0.22.3",
+    "tyro>=0.5.0",
+    "tenacity>=8.0.0",
+    "moviepy>=1.0.3",
+]
+
+# MuJoCo MPC worker (also requires building C++ binary)
+mujoco-mpc = [
+    "mujoco>=3.0.0",
+]
+
+# Godot worker (binary included in 3rd_party/godot_worker/bin/)
+godot = [
+    # Optional: godot-rl for Python RL bridge
+    # "godot-rl>=0.6.0",
+]
+
+# LLM Chat UI (OpenRouter cloud + vLLM local)
+# Enables the Chat panel in the GUI for interacting with LLMs
+# vLLM is the standard for local GPU inference (like BALROG)
+# HuggingFace Hub for model download and authentication
+chat = [
+    "requests>=2.31.0",
+    "huggingface_hub>=0.20.0",
+    "vllm>=0.6.0",
+]
+
+# Ray/RLlib worker for distributed RL training
+ray-rllib = [
+    "ray[rllib]>=2.9.0",
+    "ray[tune]>=2.9.0",
+    "torch>=2.0.0",
+    "tensorboard>=2.11.0",
+    "dm-tree>=0.1.8",
+]
+
+# XuanCe worker for MARL training
+# NOTE: The xuance library (>= 1.4.0) must be installed separately from
+# the git submodule: pip install -e "3rd_party/xuance_worker/xuance[torch]"
+# The dependencies below are the Python packages required alongside xuance.
+xuance = [
+    "torch>=2.0.0",
+    "torchvision>=0.15.0",
+    "scipy>=1.5.0",
+    "pygame>=2.1.0",
+    "tqdm>=4.66.0",
+    "tensorboard>=2.11.0",
+    "wandb>=0.15.3",
+    "moviepy==1.0.3",
+    "imageio>=2.9.0",
+    "opencv-python>=4.5.0",
+    "mpi4py>=3.1.0",
+]
+
+# BALROG worker for LLM-based agents on BALROG benchmarks
+# Supports BabyAI, MiniHack, Crafter environments with OpenAI/Claude/Gemini
+# NOTE: For BabyAI tasks, also install minigrid-balrog extra:
+#       pip install -e ".[balrog,minigrid-balrog]"
+balrog = [
+    "omegaconf>=2.3.0",
+    "openai>=1.0.0",
+    "anthropic>=0.18.0",
+    "google-generativeai>=0.3.0",
+]
+
+# MCTX worker for GPU-accelerated MCTS training (AlphaZero/MuZero)
+# Uses Pgx for GPU game environments and mctx for MCTS algorithms
+# Paper: "Monte-Carlo Tree Search as Regularized Policy Optimization" (DeepMind)
+# Repository: https://github.com/google-deepmind/mctx
+# Supports: Chess, Go, Shogi, Connect Four, Othello, Backgammon, etc.
+mctx = [
+    "jax>=0.4.20",
+    "jaxlib>=0.4.20",
+    "flax>=0.7.0",
+    "optax>=0.1.7",
+    "chex>=0.1.82",
+    "pgx>=2.0.0",
+    "mctx>=0.0.5",
+    "tensorboard>=2.11.0",
+]
+
+# =============================================================================
+# Development & Testing
+# =============================================================================
+
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "pytest-qt>=4.5.0",
+    "pyright>=1.1.0",
+]
+
+# =============================================================================
+# Convenience Bundles
+# =============================================================================
+
+# All Gymnasium single-agent environments
+all-gymnasium = [
+    "mosaic[box2d,mujoco,atari,minigrid]",
+]
+
+# All environment families (single + multi-agent)
+all-envs = [
+    "mosaic[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom,nethack,crafter,procgen,textworld,babaisai,mosaic_multigrid,multigrid_ini,jumanji,pybullet-drones,openspiel,meltingpot,overcooked,smac,smacv2,rware]",
+]
+
+# Full development setup
+full = [
+    "mosaic[all-envs,cleanrl,dev]",
+]
+
+[tool.setuptools.packages.find]
+where = [
+    ".",
+    "3rd_party/jumanji_worker",
+    "3rd_party/balrog_worker",
+    "3rd_party/cleanrl_worker",
+    "3rd_party/ray_worker",
+    "3rd_party/xuance_worker",
+    "3rd_party/chess_worker",
+    "3rd_party/mctx_worker",
+    "3rd_party/marllib_worker",
+    # MOSAIC native workers
+    "3rd_party/mosaic/human_worker",
+    "3rd_party/mosaic/llm_worker",
+]
+include = [
+    "gym_gui*",
+    "jumanji_worker*",
+    "balrog_worker*",
+    "cleanrl_worker*",
+    "ray_worker*",
+    "xuance_worker*",
+    "chess_worker*",
+    "mctx_worker*",
+    "marllib_worker*",
+    # MOSAIC native workers (under 3rd_party/mosaic/)
+    "human_worker*",
+    "llm_worker*",
+]
+
+[project.entry-points."mosaic.workers"]
+jumanji = "jumanji_worker:get_worker_metadata"
+balrog = "balrog_worker:get_worker_metadata"
+cleanrl = "cleanrl_worker:get_worker_metadata"
+ray = "ray_worker:get_worker_metadata"
+xuance = "xuance_worker:get_worker_metadata"
+chess = "chess_worker:get_worker_metadata"
+mctx = "mctx_worker:get_worker_metadata"
+# MOSAIC native workers (under 3rd_party/mosaic/)
+human = "human_worker:get_worker_metadata"
+llm = "llm_worker:get_worker_metadata"
+marllib = "marllib_worker:get_worker_metadata"
+
+[project.urls]
+Homepage = "https://github.com/Abdulhamid97Mousa/MOSAIC"
+Repository = "https://github.com/Abdulhamid97Mousa/MOSAIC"
+Documentation = "https://mosaic-multi-agent-orchestration-system.readthedocs.io/"
+
+[tool.pyright]
+pythonVersion = "3.11"
+typeCheckingMode = "basic"

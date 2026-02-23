@@ -1,0 +1,73 @@
+# MAPPO configuration for SMAC 5m_vs_6m (5 Marines vs 6 Marines)
+# Difficulty: Hard -- asymmetric (outnumbered), requires focus-fire micro.
+#
+# Map: 5m_vs_6m -- 5 allied Marines vs 6 enemy Marines
+# Agents: 5 (parameter sharing)
+# Obs shape: 55 (per-agent local observation)
+# Actions: 12 discrete (noop, stop, move[4], attack[6])
+# Episode limit: 70 steps
+# Expected win rate: ~70-80% after 5M steps
+# Key challenge: Must learn to focus-fire to overcome numerical disadvantage
+
+agent: "MAPPO"
+env_name: "StarCraft2"
+env_id: "5m_vs_6m"
+env_seed: 1
+fps: 15
+learner: "MAPPO_Clip_Learner"
+policy: "Categorical_MAAC_Policy"
+representation: "Basic_RNN"
+vectorize: "Subproc_StarCraft2"
+runner: "RunnerStarCraft2"
+
+use_rnn: True
+rnn: "GRU"
+N_recurrent_layers: 1
+fc_hidden_sizes: [64, 64, 64]
+recurrent_hidden_size: 64
+dropout: 0
+normalize: "LayerNorm"
+initialize: "orthogonal"
+gain: 0.01
+
+actor_hidden_size: []
+critic_hidden_size: []
+activation: "relu"
+use_parameter_sharing: True
+use_actions_mask: True
+
+seed: 1
+parallels: 4
+buffer_size: 128
+n_epochs: 15
+n_minibatch: 1
+learning_rate: 0.0005
+weight_decay: 0
+
+vf_coef: 1.0
+ent_coef: 0.01
+target_kl: 0.25
+clip_range: 0.2
+clip_type: 1
+gamma: 0.99
+
+use_linear_lr_decay: True
+end_factor_lr_decay: 0.1
+use_global_state: False
+use_value_clip: True
+value_clip_range: 0.2
+use_value_norm: True
+use_huber_loss: True
+huber_delta: 10.0
+use_advnorm: True
+use_gae: True
+gae_lambda: 0.95
+use_grad_clip: True
+grad_clip_norm: 10.0
+
+running_steps: 5000000
+eval_interval: 50000
+test_episode: 32
+
+log_dir: "./logs/mappo/"
+model_dir: "./models/mappo/"

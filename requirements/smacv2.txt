@@ -1,0 +1,47 @@
+# =============================================================================
+# SMACv2 (StarCraft Multi-Agent Challenge v2) Dependencies
+# =============================================================================
+# SMACv2 extends SMAC v1 with procedural unit generation: team compositions
+# vary per episode, forcing agents to generalise rather than memorise fixed
+# strategies. Uses StarCraftCapabilityEnvWrapper instead of raw StarCraft2Env.
+#
+# USAGE:
+#   pip install -r requirements/smacv2.txt
+#
+# SYSTEM REQUIREMENTS:
+#   StarCraft II binary must be installed separately:
+#   Linux:   Download from https://github.com/Blizzard/s2client-proto#linux-packages
+#            Extract to ~/StarCraftII/ (default path) or set SC2PATH env var
+#   macOS:   Install via Battle.net client, then:
+#            export SC2PATH="/Applications/StarCraft II"
+#   Windows: Install via Battle.net client (auto-detected)
+#
+# SMAC MAPS:
+#   The pip package does NOT include .SC2Map files. Install maps via:
+#     git clone --depth 1 --sparse https://github.com/oxwhirl/smac.git /tmp/smac_repo
+#     cd /tmp/smac_repo && git sparse-checkout set smac/env/starcraft2/maps/SMAC_Maps
+#     cp -r smac/env/starcraft2/maps/SMAC_Maps var/data/StarCraftII/Maps/
+#
+# PROTOBUF COMPATIBILITY:
+#   s2clientprotocol ships protobuf 3.x pb2 files; our gRPC/TF stack needs 5.x.
+#   Set in .env: PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+#
+# PROCEDURAL MAPS:
+#   10gen_terran  - Random Terran composition (Marines, Marauders, Medivacs)
+#   10gen_protoss - Random Protoss composition (Stalkers, Zealots, Colossi)
+#   10gen_zerg    - Random Zerg composition (Zerglings, Hydralisks, Banelings)
+#
+# REFERENCES:
+#   Paper: Ellis et al. (2023). "SMACv2: An Improved Benchmark for Cooperative MARL"
+#   Repository: https://github.com/oxwhirl/smacv2
+# =============================================================================
+
+# Include core GUI + shared dependencies
+-r base.txt
+
+# SMACv2 - StarCraft Multi-Agent Challenge v2 (includes SMAC v1 compat)
+# WARNING: Install from GitHub, not PyPI.
+smacv2 @ git+https://github.com/oxwhirl/smacv2.git
+
+# PyGame for the built-in 2D renderer
+pygame>=2.1.0

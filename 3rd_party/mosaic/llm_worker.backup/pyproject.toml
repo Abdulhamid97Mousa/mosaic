@@ -1,0 +1,62 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm-worker"
+version = "0.1.0"
+description = "MOSAIC LLM Worker - Multi-agent LLM coordination with Theory of Mind"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "MOSAIC Team"}
+]
+keywords = ["llm", "multi-agent", "pettingzoo", "reinforcement-learning", "theory-of-mind"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "httpx>=0.27.0",
+]
+
+[project.optional-dependencies]
+openai = ["openai>=1.0.0"]
+anthropic = ["anthropic>=0.18.0"]
+vllm = ["vllm>=0.6.0"]
+all = [
+    "openai>=1.0.0",
+    "anthropic>=0.18.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.scripts]
+llm-worker = "llm_worker.cli:main"
+
+[project.entry-points."mosaic.workers"]
+llm = "llm_worker:get_worker_metadata"
+
+[project.urls]
+Homepage = "https://github.com/MOSAIC-RL/GUI_BDI_RL"
+Repository = "https://github.com/MOSAIC-RL/GUI_BDI_RL"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["llm_worker*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"

@@ -1,0 +1,60 @@
+# =============================================================================
+# Overcooked-AI Multi-Agent Cooperative Environment Dependencies
+# =============================================================================
+# Overcooked-AI is a 2-agent cooperative cooking environment developed by
+# UC Berkeley CHAI (Human Compatible AI) for studying human-AI coordination.
+#
+# USAGE:
+#   pip install -r requirements/overcooked.txt
+#
+# FEATURES:
+#   - 2-agent cooperative cooking task
+#   - 50+ layout variations
+#   - Simultaneous stepping paradigm (both agents act at once)
+#   - Sparse rewards based on soup delivery
+#   - Joint action space (6 discrete actions per agent)
+#   - Custom API (not Gymnasium/PettingZoo compatible out of box)
+#
+# KEY RESEARCH LAYOUTS:
+#   - cramped_room: Tight coordination required
+#   - asymmetric_advantages: Role specialization
+#   - coordination_ring: Communication-free coordination
+#   - forced_coordination: Counter-based cooperation
+#   - counter_circuit: Sequential task dependencies
+#
+# RESEARCH PAPER:
+#   Carroll et al. (2019). "On the Utility of Learning about Humans for
+#   Human-AI Coordination". NeurIPS 2019.
+#   https://arxiv.org/abs/1910.05789
+#
+# REPOSITORY:
+#   https://github.com/HumanCompatibleAI/overcooked_ai
+#
+# LOCAL INSTALLATION (from 3rd_party):
+#   pip install -e 3rd_party/overcooked_ai/
+#
+# IMPORTANT NOTES:
+#   - **Python 3.10 ONLY** - overcooked_ai requires Python >=3.10,<3.11
+#   - If using Python 3.11+, installation will fail
+#   - Create a Python 3.10 virtual environment for testing:
+#       python3.10 -m venv .venv-overcooked
+#       source .venv-overcooked/bin/activate
+#       pip install -r requirements/overcooked.txt
+# =============================================================================
+
+# Include core GUI + shared dependencies
+-r base.txt
+
+# Overcooked-AI requires installation from local 3rd_party directory:
+#   pip install -e 3rd_party/overcooked_ai/
+#
+# Core Dependencies (installed automatically):
+dill
+gymnasium>=1.1.0
+ipywidgets
+numpy<2.0.0
+opencv-python
+pygame
+scipy
+setuptools>=77.0.3
+tqdm

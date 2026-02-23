@@ -1,0 +1,32 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mosaic-godot"
+version = "0.1.0"
+description = "Godot game engine integration for MOSAIC BDI-RL framework"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+# Dependencies are managed via the main project's requirements.txt
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+godot-worker = "godot_worker.cli:main"
+
+[tool.setuptools]
+packages = [
+    "godot_worker",
+]
+
+[tool.setuptools.package-dir]
+"godot_worker" = "godot_worker"
+
+# Note: The Godot binary is included in bin/ directory.
+# It is NOT a Python package, just an executable.
+# To use: get_launcher().launch() or run godot-worker CLI

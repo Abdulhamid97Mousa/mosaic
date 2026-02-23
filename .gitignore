@@ -1,0 +1,274 @@
+# =============================================================================
+# Python Packaging Artifacts (pyproject.toml / setuptools / pip)
+# =============================================================================
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+**/__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+# PyInstaller
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# =============================================================================
+# Virtual Environments
+# =============================================================================
+
+.venv/
+venv/
+ENV/
+env/
+.env
+
+# =============================================================================
+# IDE / Editor
+# =============================================================================
+
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.cursor/
+.codacy/
+.codex/
+
+# =============================================================================
+# Testing
+# =============================================================================
+
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# =============================================================================
+# Type Checking
+# =============================================================================
+
+.mypy_cache/
+.dmypy.json
+dmypy.json
+.pytype/
+pyrightconfig.json
+
+# =============================================================================
+# Project Runtime Artifacts
+# =============================================================================
+
+# Runtime directories
+var/records/*
+var/telemetry/*
+var/cache/*
+var/tmp/*
+var/logs/*
+var/config/*
+var/policies/*
+var/trainer/
+var/data/*
+var/trainer.sqlite
+var/trainer.pid
+var/trainer.lock
+
+# Keep README files in var subdirectories
+!var/*/README.md
+
+# Legacy gym_gui/var paths
+gym_gui/var/replay/*
+gym_gui/var/telemetry/*
+gym_gui/var/cache/*
+gym_gui/var/tmp/*
+gym_gui/var/logs/*
+gym_gui/var/config/*
+!gym_gui/var/*/README.md
+
+# Runtime logs
+gym_gui/runtime/log_output/
+gym_gui/doc.qt.io/
+
+# =============================================================================
+# Protocol Buffers (generated files)
+# =============================================================================
+
+*_pb2.py
+*_pb2.pyi
+*_pb2_grpc.py
+
+# =============================================================================
+# Large Binary Files (GitHub 100MB limit)
+# =============================================================================
+
+3rd_party/godot_worker/bin/
+3rd_party/*/bin/
+*.bin
+ml-agents/
+
+# =============================================================================
+# 3rd Party Workers - Build Artifacts
+# =============================================================================
+
+# Egg-info directories (all workers)
+3rd_party/*/*.egg-info/
+3rd_party/*/*/*.egg-info/
+
+# CleanRL worker
+3rd_party/cleanrl_worker/cleanrl_worker.egg-info/
+3rd_party/cleanrl_worker/mosaic_cleanrl.egg-info/
+
+# MuJoCo MPC worker
+3rd_party/mujoco_mpc_worker/mosaic_mujoco_mpc.egg-info/
+3rd_party/mujoco_mpc_worker/mujoco_mpc/build/
+
+# Jason worker (Java/Gradle) — removed from repo
+3rd_party/jason_worker/
+3rd_party/gui_jason_grpc_cleanrl/.venv/
+3rd_party/gui_jason_grpc_cleanrl/var/
+3rd_party/gui_jason_grpc_cleanrl/.pytest_cache/
+3rd_party/gui_jason_grpc_cleanrl/jason_worker/.gradle/
+3rd_party/gui_jason_grpc_cleanrl/jason_worker/.jar/
+3rd_party/gui_jason_grpc_cleanrl/jason_worker/
+3rd_party/gui_jason_grpc_cleanrl/jason_worker/dist/
+3rd_party/gui_jason_grpc_cleanrl/jason_worker/gradlew
+
+# PettingZoo worker (submodule content)
+3rd_party/pettingzoo_worker/PettingZoo/
+
+# MARLIB worker )
+3rd_party/marllib_worker/marllib_worker/__pycache__
+3rd_party/marllib_worker/**/__pycache__/
+
+# MARLIB worker )
+3rd_party/marllib_worker/marllib_worker/__pycache__
+3rd_party/marllib_worker/**/__pycache__/
+
+# ViZDoom worker (submodule content)
+3rd_party/vizdoom_worker/ViZDoom/
+
+# Legacy paths
+3rd_party/JASON_GRPC_BRIDGE_PYTHON/
+3rd/JASON_java_project/examples/
+3rd/JASON_java_project/demos/
+3rd/JASON_java_project/doc/
+3rd/JASON_java_project/jason-interpreter/build/tmp/
+3rd_party/godot_worker/bin/godot
+# =============================================================================
+# Java / Gradle (for Jason worker)
+# =============================================================================
+
+*.class
+*.jar
+*.war
+*.ear
+target/
+*.gradle
+.gradle/
+
+# =============================================================================
+# Deprecated / Legacy Directories
+# =============================================================================
+
+spadeBDI_RL/
+cleanrl/
+chatbdi/
+coach/
+ray/
+SuperSuit/
+Vesna_RL/
+.fake/
+# =============================================================================
+# GitHub / CI
+# =============================================================================
+
+.github/
+
+# =============================================================================
+# ViZDoom Config (generated at runtime)
+# =============================================================================
+
+_vizdoom.ini
+
+# =============================================================================
+# Allow specific files that would otherwise be ignored
+# =============================================================================
+
+# Keep metadata directories
+!metadata/
+
+# =============================================================================
+# pip-tools (if using lock files)
+# =============================================================================
+
+# Uncomment if you want to ignore generated lock files:
+# requirements/*.txt
+# !requirements/README.md
+
+
+# Ignore cursor AI rules
+.cursor/rules/codacy.mdc
+
+# =============================================================================
+# Development Progress (internal documentation - not for public release)
+# =============================================================================
+
+# Paper drafts — related_papers/RLlib excluded
+docs/my_paper/related_papers/RLlib_Abstractions_for_Distributed_Reinforcement_Learning/
+
+# Internal development docs (not for public release)
+docs/Development_Progress/
+docs/plans/
+docs/reports/
+docs/workers/
+docs/my_paper/
+
+# Deprecated/internal workers (not for public release)
+3rd_party/dragon_worker/
+3rd_party/test_worker/
+
+
+# Experiment operator configs are tracked
+# experiments/*
+
+# 
+3rd_party/mosaic/llm_worker.backup/llm_worker/environments/nle/tiles.pkl
+3rd_party/mosaic/llm_worker.backup/llm_worker/environments/nle/Hack-Regular.ttf
+
+
+#
+_vizdoom.ini
+
+#
+.claude

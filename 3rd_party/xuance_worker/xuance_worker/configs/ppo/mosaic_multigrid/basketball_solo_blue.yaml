@@ -1,0 +1,77 @@
+# PPO configuration for mosaic_multigrid Solo Basketball (Blue)
+# Environment: BasketballSoloBlueIndAgObsEnv19x11
+# Gymnasium ID: MosaicMultiGrid-Basketball-Solo-Blue-IndAgObs-v0
+#
+# Solo variant (v6.0.0): Single agent, no opponent.
+# Blue agent must carry the ball and score in the green hoop.
+# Used for curriculum pre-training before adversarial 3v3.
+#
+# Standard PPO (single-agent) — not IPPO/MAPPO.
+# Uses RunnerDRL (not RunnerMARL) since there is only 1 agent.
+#
+# Observation: IndAgObs 3x3 egocentric view → (3,3,3) = 27 flattened
+# Actions: 8 discrete — left, right, forward, pickup, drop, toggle, done, still
+
+agent: "PPO_Clip"
+env_name: "mosaic_multigrid"
+env_id: "basketball_solo_blue"
+env_seed: 1
+continuous_action: False
+learner: "PPOCLIP_Learner"
+policy: "Categorical_AC"
+representation: "Basic_MLP"
+vectorize: "DummyVecEnv"
+runner: "DRL"
+
+# Network architecture
+representation_hidden_size: [64, 64]
+actor_hidden_size: [64, 64]
+critic_hidden_size: [64, 64]
+activation: "relu"
+activation_action: "softmax"
+normalize: "LayerNorm"
+initialize: "orthogonal"
+gain: 0.01
+
+# Training hyperparameters
+seed: 1
+parallels: 8
+horizon_size: 200
+n_epochs: 4
+n_minibatch: 4
+learning_rate: 0.0007
+weight_decay: 0
+
+# PPO-specific
+vf_coef: 0.5
+ent_coef: 0.05
+target_kl: 0.25
+clip_range: 0.2
+clip_type: 1
+gamma: 0.99
+
+# Training tricks
+use_linear_lr_decay: True
+end_factor_lr_decay: 0.1
+use_value_clip: True
+value_clip_range: 0.2
+use_value_norm: True
+use_huber_loss: True
+huber_delta: 10.0
+use_advnorm: True
+use_gae: True
+gae_lambda: 0.95
+use_grad_clip: True
+grad_clip_norm: 10.0
+use_obsnorm: False
+use_rewnorm: False
+
+# Training duration
+running_steps: 1000000
+eval_interval: 50000
+test_episode: 5
+test_steps: 10000
+
+# Logging (overridden by runtime)
+log_dir: "./logs/ppo/"
+model_dir: "./models/ppo/"

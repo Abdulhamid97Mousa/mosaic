@@ -1,0 +1,36 @@
+# =============================================================================
+# Crafter Environment Dependencies
+# =============================================================================
+# Crafter is an open-world survival game benchmark for RL research that
+# evaluates a wide spectrum of agent capabilities within a single environment.
+#
+# USAGE:
+#   pip install -r requirements/crafter.txt
+#
+# FEATURES:
+#   - 22 achievement-based evaluation metrics
+#   - Procedurally generated 64x64 worlds
+#   - 17 discrete actions (movement, interaction, crafting)
+#   - 64x64 RGB observations
+#   - Technology tree requiring planning and exploration
+#
+# PAPER:
+#   Hafner, D. (2022). "Benchmarking the Spectrum of Agent Capabilities"
+#   ICLR 2022. https://openreview.net/forum?id=1W0z96MFEoH
+#
+# DOCUMENTATION:
+#   Repository: https://github.com/danijar/crafter
+#   Website: https://danijar.com/crafter
+#
+# BENCHMARK SCORES (1M steps):
+#   Human Experts: 50.5%
+#   DreamerV2: 10.0%
+#   PPO: 4.6%
+#   Random: 1.6%
+# =============================================================================
+
+# Include core GUI + shared dependencies
+-r base.txt
+
+# Crafter open-world survival benchmark
+crafter>=1.8.0

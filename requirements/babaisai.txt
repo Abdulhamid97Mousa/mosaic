@@ -1,0 +1,19 @@
+# BabaIsAI - Rule Manipulation Puzzle Benchmark
+# Paper: Cloos et al. (2024). "Baba Is AI: Break the Rules to Beat the Benchmark"
+#        ICML 2024 Workshop on LLMs and Cognition
+# Repository: https://github.com/nacloos/baba-is-ai
+#
+# Installation:
+#   pip install -r requirements/babaisai.txt
+#
+# Or install via pip directly:
+#   pip install git+https://github.com/nacloos/baba-is-ai
+
+# Core BabaIsAI package (from GitHub - not on PyPI)
+baba-is-ai @ git+https://github.com/nacloos/baba-is-ai
+
+# BabaIsAI dependencies (usually installed automatically)
+gymnasium>=0.26.0
+numpy>=1.21.0
+pygame>=2.1.0
+Pillow>=9.0.0

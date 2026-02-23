@@ -1,0 +1,43 @@
+# =============================================================================
+# SMAC v1 (StarCraft Multi-Agent Challenge) Dependencies
+# =============================================================================
+# SMAC v1 provides 30+ hand-designed cooperative micromanagement maps for
+# multi-agent reinforcement learning research (3m, 8m, 2s3z, 3s5z, etc.).
+# Each map has a fixed team composition testing different coordination skills.
+#
+# USAGE:
+#   pip install -r requirements/smac.txt
+#
+# SYSTEM REQUIREMENTS:
+#   StarCraft II binary must be installed separately:
+#   Linux:   Download from https://github.com/Blizzard/s2client-proto#linux-packages
+#            Extract to ~/StarCraftII/ (default path) or set SC2PATH env var
+#   macOS:   Install via Battle.net client, then:
+#            export SC2PATH="/Applications/StarCraft II"
+#   Windows: Install via Battle.net client (auto-detected)
+#
+# SMAC MAPS:
+#   The pip package does NOT include .SC2Map files. Install maps via:
+#     git clone --depth 1 --sparse https://github.com/oxwhirl/smac.git /tmp/smac_repo
+#     cd /tmp/smac_repo && git sparse-checkout set smac/env/starcraft2/maps/SMAC_Maps
+#     cp -r smac/env/starcraft2/maps/SMAC_Maps var/data/StarCraftII/Maps/
+#
+# PROTOBUF COMPATIBILITY:
+#   s2clientprotocol ships protobuf 3.x pb2 files; our gRPC/TF stack needs 5.x.
+#   Set in .env: PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python
+#
+# REFERENCES:
+#   Paper: Samvelyan et al. (2019). "The StarCraft Multi-Agent Challenge"
+#   Repository: https://github.com/oxwhirl/smac
+# =============================================================================
+
+# Include core GUI + shared dependencies
+-r base.txt
+
+# SMAC v1 - StarCraft Multi-Agent Challenge
+# WARNING: PyPI 'smac' is the WRONG package (Bayesian optimization).
+# The real SMAC (StarCraft MARL) must be installed from GitHub:
+smac @ git+https://github.com/oxwhirl/smac.git
+
+# PyGame for the built-in 2D renderer
+pygame>=2.1.0

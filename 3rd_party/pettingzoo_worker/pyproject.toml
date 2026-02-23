@@ -1,0 +1,71 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "pettingzoo-worker"
+version = "0.1.0"
+description = "PettingZoo multi-agent environment wrapper for Mosaic"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Mosaic Team"}
+]
+keywords = ["multi-agent", "reinforcement-learning", "pettingzoo", "gymnasium"]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+
+dependencies = [
+    "pettingzoo>=1.24.0",
+    "gymnasium>=0.29.0",
+    "numpy>=1.21.0",
+]
+
+[project.optional-dependencies]
+all = [
+    "pettingzoo[all]>=1.24.0",
+]
+classic = [
+    "pettingzoo[classic]>=1.24.0",
+]
+butterfly = [
+    "pettingzoo[butterfly]>=1.24.0",
+]
+mpe = [
+    "pettingzoo[mpe]>=1.24.0",
+]
+sisl = [
+    "pettingzoo[sisl]>=1.24.0",
+]
+atari = [
+    "pettingzoo[atari]>=1.24.0",
+]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.urls]
+Homepage = "https://github.com/Farama-Foundation/PettingZoo"
+Documentation = "https://pettingzoo.farama.org/"
+
+[tool.setuptools]
+package-dir = {"" = "."}
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["pettingzoo_worker*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+addopts = "-v --tb=short"

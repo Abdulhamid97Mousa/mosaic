@@ -1,0 +1,444 @@
+{
+  "xuance_version": "1.4.0",
+  "schema_version": "0.1.0",
+  "algorithms": {
+    "PPO_Clip": {
+      "paradigm": "single_agent",
+      "category": "Policy Optimization",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0001, "help": "Learning rate for optimizer"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "horizon_size", "type": "int", "default": 256, "help": "Horizon size for rollout"},
+        {"name": "n_epochs", "type": "int", "default": 8, "help": "Number of epochs per update"},
+        {"name": "n_minibatch", "type": "int", "default": 8, "help": "Number of minibatches"},
+        {"name": "clip_range", "type": "float", "default": 0.2, "help": "Clip range for PPO ratio"},
+        {"name": "vf_coef", "type": "float", "default": 0.25, "help": "Value function coefficient"},
+        {"name": "ent_coef", "type": "float", "default": 0.01, "help": "Entropy coefficient"},
+        {"name": "use_gae", "type": "bool", "default": true, "help": "Use Generalized Advantage Estimation"},
+        {"name": "gae_lambda", "type": "float", "default": 0.95, "help": "GAE lambda parameter"},
+        {"name": "use_advnorm", "type": "bool", "default": true, "help": "Normalize advantages"},
+        {"name": "use_obsnorm", "type": "bool", "default": true, "help": "Normalize observations"},
+        {"name": "use_rewnorm", "type": "bool", "default": true, "help": "Normalize rewards"},
+        {"name": "use_grad_clip", "type": "bool", "default": true, "help": "Use gradient clipping"},
+        {"name": "grad_clip_norm", "type": "float", "default": 0.5, "help": "Gradient clip norm"}
+      ]
+    },
+    "PPO_KL": {
+      "paradigm": "single_agent",
+      "category": "Policy Optimization",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0001, "help": "Learning rate for optimizer"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "horizon_size", "type": "int", "default": 256, "help": "Horizon size for rollout"},
+        {"name": "n_epochs", "type": "int", "default": 8, "help": "Number of epochs per update"},
+        {"name": "n_minibatch", "type": "int", "default": 8, "help": "Number of minibatches"},
+        {"name": "target_kl", "type": "float", "default": 0.01, "help": "Target KL divergence"},
+        {"name": "kl_coef", "type": "float", "default": 1.0, "help": "KL penalty coefficient"},
+        {"name": "vf_coef", "type": "float", "default": 0.25, "help": "Value function coefficient"},
+        {"name": "ent_coef", "type": "float", "default": 0.01, "help": "Entropy coefficient"},
+        {"name": "use_gae", "type": "bool", "default": true, "help": "Use Generalized Advantage Estimation"},
+        {"name": "gae_lambda", "type": "float", "default": 0.95, "help": "GAE lambda parameter"},
+        {"name": "use_advnorm", "type": "bool", "default": true, "help": "Normalize advantages"},
+        {"name": "use_obsnorm", "type": "bool", "default": true, "help": "Normalize observations"},
+        {"name": "use_rewnorm", "type": "bool", "default": true, "help": "Normalize rewards"}
+      ]
+    },
+    "A2C": {
+      "paradigm": "single_agent",
+      "category": "Policy Optimization",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0007, "help": "Learning rate for optimizer"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "n_steps", "type": "int", "default": 5, "help": "Number of steps for n-step returns"},
+        {"name": "vf_coef", "type": "float", "default": 0.5, "help": "Value function coefficient"},
+        {"name": "ent_coef", "type": "float", "default": 0.01, "help": "Entropy coefficient"},
+        {"name": "use_gae", "type": "bool", "default": true, "help": "Use Generalized Advantage Estimation"},
+        {"name": "gae_lambda", "type": "float", "default": 0.95, "help": "GAE lambda parameter"},
+        {"name": "use_grad_clip", "type": "bool", "default": true, "help": "Use gradient clipping"},
+        {"name": "grad_clip_norm", "type": "float", "default": 0.5, "help": "Gradient clip norm"}
+      ]
+    },
+    "PG": {
+      "paradigm": "single_agent",
+      "category": "Policy Optimization",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.001, "help": "Learning rate for optimizer"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "ent_coef", "type": "float", "default": 0.01, "help": "Entropy coefficient"},
+        {"name": "use_obsnorm", "type": "bool", "default": false, "help": "Normalize observations"},
+        {"name": "use_rewnorm", "type": "bool", "default": false, "help": "Normalize rewards"}
+      ]
+    },
+    "PPG": {
+      "paradigm": "single_agent",
+      "category": "Policy Optimization",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0005, "help": "Learning rate for optimizer"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "horizon_size", "type": "int", "default": 256, "help": "Horizon size for rollout"},
+        {"name": "n_epochs", "type": "int", "default": 4, "help": "Number of policy epochs"},
+        {"name": "n_aux_epochs", "type": "int", "default": 6, "help": "Number of auxiliary epochs"},
+        {"name": "n_minibatch", "type": "int", "default": 8, "help": "Number of minibatches"},
+        {"name": "clip_range", "type": "float", "default": 0.2, "help": "Clip range for PPO ratio"},
+        {"name": "vf_coef", "type": "float", "default": 0.5, "help": "Value function coefficient"},
+        {"name": "ent_coef", "type": "float", "default": 0.01, "help": "Entropy coefficient"},
+        {"name": "beta_clone", "type": "float", "default": 1.0, "help": "Clone loss coefficient"},
+        {"name": "use_gae", "type": "bool", "default": true, "help": "Use Generalized Advantage Estimation"},
+        {"name": "gae_lambda", "type": "float", "default": 0.95, "help": "GAE lambda parameter"}
+      ]
+    },
+    "DQN": {
+      "paradigm": "single_agent",
+      "category": "Value-based",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0001, "help": "Learning rate for optimizer"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 500000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 64, "help": "Training batch size"},
+        {"name": "start_greedy", "type": "float", "default": 0.5, "help": "Initial exploration rate"},
+        {"name": "end_greedy", "type": "float", "default": 0.05, "help": "Final exploration rate"},
+        {"name": "sync_frequency", "type": "int", "default": 100, "help": "Target network sync frequency"},
+        {"name": "training_frequency", "type": "int", "default": 1, "help": "Training frequency (steps)"},
+        {"name": "start_training", "type": "int", "default": 1000, "help": "Steps before training starts"},
+        {"name": "use_obsnorm", "type": "bool", "default": false, "help": "Normalize observations"},
+        {"name": "use_rewnorm", "type": "bool", "default": false, "help": "Normalize rewards"}
+      ]
+    },
+    "DDQN": {
+      "paradigm": "single_agent",
+      "category": "Value-based",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0001, "help": "Learning rate for optimizer"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 500000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 64, "help": "Training batch size"},
+        {"name": "start_greedy", "type": "float", "default": 0.5, "help": "Initial exploration rate"},
+        {"name": "end_greedy", "type": "float", "default": 0.05, "help": "Final exploration rate"},
+        {"name": "sync_frequency", "type": "int", "default": 100, "help": "Target network sync frequency"},
+        {"name": "training_frequency", "type": "int", "default": 1, "help": "Training frequency (steps)"},
+        {"name": "start_training", "type": "int", "default": 1000, "help": "Steps before training starts"}
+      ]
+    },
+    "DuelingDQN": {
+      "paradigm": "single_agent",
+      "category": "Value-based",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0001, "help": "Learning rate for optimizer"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 500000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 64, "help": "Training batch size"},
+        {"name": "start_greedy", "type": "float", "default": 0.5, "help": "Initial exploration rate"},
+        {"name": "end_greedy", "type": "float", "default": 0.05, "help": "Final exploration rate"},
+        {"name": "sync_frequency", "type": "int", "default": 100, "help": "Target network sync frequency"},
+        {"name": "training_frequency", "type": "int", "default": 1, "help": "Training frequency (steps)"}
+      ]
+    },
+    "C51": {
+      "paradigm": "single_agent",
+      "category": "Value-based",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0001, "help": "Learning rate for optimizer"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 500000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 64, "help": "Training batch size"},
+        {"name": "n_atoms", "type": "int", "default": 51, "help": "Number of atoms for distribution"},
+        {"name": "v_min", "type": "float", "default": -10.0, "help": "Minimum value support"},
+        {"name": "v_max", "type": "float", "default": 10.0, "help": "Maximum value support"},
+        {"name": "start_greedy", "type": "float", "default": 0.5, "help": "Initial exploration rate"},
+        {"name": "end_greedy", "type": "float", "default": 0.05, "help": "Final exploration rate"},
+        {"name": "sync_frequency", "type": "int", "default": 100, "help": "Target network sync frequency"}
+      ]
+    },
+    "QRDQN": {
+      "paradigm": "single_agent",
+      "category": "Value-based",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0001, "help": "Learning rate for optimizer"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 500000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 64, "help": "Training batch size"},
+        {"name": "n_quantiles", "type": "int", "default": 200, "help": "Number of quantiles"},
+        {"name": "start_greedy", "type": "float", "default": 0.5, "help": "Initial exploration rate"},
+        {"name": "end_greedy", "type": "float", "default": 0.05, "help": "Final exploration rate"},
+        {"name": "sync_frequency", "type": "int", "default": 100, "help": "Target network sync frequency"}
+      ]
+    },
+    "SAC": {
+      "paradigm": "single_agent",
+      "category": "Actor-Critic",
+      "fields": [
+        {"name": "learning_rate_actor", "type": "float", "default": 0.001, "help": "Actor learning rate"},
+        {"name": "learning_rate_critic", "type": "float", "default": 0.001, "help": "Critic learning rate"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 200000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 256, "help": "Training batch size"},
+        {"name": "alpha", "type": "float", "default": 0.2, "help": "Entropy coefficient"},
+        {"name": "tau", "type": "float", "default": 0.005, "help": "Soft update coefficient"},
+        {"name": "use_automatic_entropy_tuning", "type": "bool", "default": true, "help": "Auto-tune entropy"},
+        {"name": "training_frequency", "type": "int", "default": 1, "help": "Training frequency (steps)"},
+        {"name": "start_training", "type": "int", "default": 1000, "help": "Steps before training starts"}
+      ]
+    },
+    "SAC_Discrete": {
+      "paradigm": "single_agent",
+      "category": "Actor-Critic",
+      "fields": [
+        {"name": "learning_rate_actor", "type": "float", "default": 0.001, "help": "Actor learning rate"},
+        {"name": "learning_rate_critic", "type": "float", "default": 0.001, "help": "Critic learning rate"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 200000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 256, "help": "Training batch size"},
+        {"name": "alpha", "type": "float", "default": 0.2, "help": "Entropy coefficient"},
+        {"name": "tau", "type": "float", "default": 0.005, "help": "Soft update coefficient"},
+        {"name": "use_automatic_entropy_tuning", "type": "bool", "default": true, "help": "Auto-tune entropy"}
+      ]
+    },
+    "DDPG": {
+      "paradigm": "single_agent",
+      "category": "Actor-Critic",
+      "fields": [
+        {"name": "learning_rate_actor", "type": "float", "default": 0.001, "help": "Actor learning rate"},
+        {"name": "learning_rate_critic", "type": "float", "default": 0.001, "help": "Critic learning rate"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 200000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 256, "help": "Training batch size"},
+        {"name": "tau", "type": "float", "default": 0.005, "help": "Soft update coefficient"},
+        {"name": "noise_stddev", "type": "float", "default": 0.1, "help": "Action noise std deviation"},
+        {"name": "training_frequency", "type": "int", "default": 1, "help": "Training frequency (steps)"},
+        {"name": "start_training", "type": "int", "default": 1000, "help": "Steps before training starts"}
+      ]
+    },
+    "TD3": {
+      "paradigm": "single_agent",
+      "category": "Actor-Critic",
+      "fields": [
+        {"name": "learning_rate_actor", "type": "float", "default": 0.001, "help": "Actor learning rate"},
+        {"name": "learning_rate_critic", "type": "float", "default": 0.001, "help": "Critic learning rate"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 200000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 256, "help": "Training batch size"},
+        {"name": "tau", "type": "float", "default": 0.005, "help": "Soft update coefficient"},
+        {"name": "noise_stddev", "type": "float", "default": 0.1, "help": "Action noise std deviation"},
+        {"name": "noise_clip", "type": "float", "default": 0.5, "help": "Target policy noise clip"},
+        {"name": "policy_delay", "type": "int", "default": 2, "help": "Policy update delay"},
+        {"name": "training_frequency", "type": "int", "default": 1, "help": "Training frequency (steps)"},
+        {"name": "start_training", "type": "int", "default": 1000, "help": "Steps before training starts"}
+      ]
+    },
+    "MAPPO": {
+      "paradigm": "multi_agent",
+      "category": "Centralized",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0007, "help": "Learning rate for optimizer"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 32, "help": "Rollout buffer size"},
+        {"name": "n_epochs", "type": "int", "default": 10, "help": "Number of epochs per update"},
+        {"name": "n_minibatch", "type": "int", "default": 1, "help": "Number of minibatches"},
+        {"name": "clip_range", "type": "float", "default": 0.2, "help": "Clip range for PPO ratio"},
+        {"name": "vf_coef", "type": "float", "default": 0.5, "help": "Value function coefficient"},
+        {"name": "ent_coef", "type": "float", "default": 0.01, "help": "Entropy coefficient"},
+        {"name": "use_gae", "type": "bool", "default": true, "help": "Use Generalized Advantage Estimation"},
+        {"name": "gae_lambda", "type": "float", "default": 0.95, "help": "GAE lambda parameter"},
+        {"name": "use_global_state", "type": "bool", "default": false, "help": "Use global state for critic"},
+        {"name": "use_value_clip", "type": "bool", "default": true, "help": "Clip value function"},
+        {"name": "use_value_norm", "type": "bool", "default": true, "help": "Normalize value targets"},
+        {"name": "use_adv_norm", "type": "bool", "default": true, "help": "Normalize advantages"},
+        {"name": "use_parameter_sharing", "type": "bool", "default": true, "help": "Share parameters across agents"},
+        {"name": "use_grad_clip", "type": "bool", "default": true, "help": "Use gradient clipping"},
+        {"name": "grad_clip_norm", "type": "float", "default": 10.0, "help": "Gradient clip norm"}
+      ]
+    },
+    "MADDPG": {
+      "paradigm": "multi_agent",
+      "category": "Centralized",
+      "fields": [
+        {"name": "learning_rate_actor", "type": "float", "default": 0.001, "help": "Actor learning rate"},
+        {"name": "learning_rate_critic", "type": "float", "default": 0.001, "help": "Critic learning rate"},
+        {"name": "gamma", "type": "float", "default": 0.95, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 100000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 256, "help": "Training batch size"},
+        {"name": "tau", "type": "float", "default": 0.01, "help": "Soft update coefficient"},
+        {"name": "start_training", "type": "int", "default": 1000, "help": "Steps before training starts"},
+        {"name": "training_frequency", "type": "int", "default": 100, "help": "Training frequency (steps)"}
+      ]
+    },
+    "MATD3": {
+      "paradigm": "multi_agent",
+      "category": "Centralized",
+      "fields": [
+        {"name": "learning_rate_actor", "type": "float", "default": 0.001, "help": "Actor learning rate"},
+        {"name": "learning_rate_critic", "type": "float", "default": 0.001, "help": "Critic learning rate"},
+        {"name": "gamma", "type": "float", "default": 0.95, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 100000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 256, "help": "Training batch size"},
+        {"name": "tau", "type": "float", "default": 0.01, "help": "Soft update coefficient"},
+        {"name": "policy_delay", "type": "int", "default": 2, "help": "Policy update delay"},
+        {"name": "noise_stddev", "type": "float", "default": 0.1, "help": "Action noise std deviation"}
+      ]
+    },
+    "MASAC": {
+      "paradigm": "multi_agent",
+      "category": "Centralized",
+      "fields": [
+        {"name": "learning_rate_actor", "type": "float", "default": 0.001, "help": "Actor learning rate"},
+        {"name": "learning_rate_critic", "type": "float", "default": 0.001, "help": "Critic learning rate"},
+        {"name": "gamma", "type": "float", "default": 0.95, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 100000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 256, "help": "Training batch size"},
+        {"name": "alpha", "type": "float", "default": 0.2, "help": "Entropy coefficient"},
+        {"name": "tau", "type": "float", "default": 0.01, "help": "Soft update coefficient"},
+        {"name": "use_automatic_entropy_tuning", "type": "bool", "default": true, "help": "Auto-tune entropy"}
+      ]
+    },
+    "COMA": {
+      "paradigm": "multi_agent",
+      "category": "Centralized",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0007, "help": "Learning rate"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "td_lambda", "type": "float", "default": 0.8, "help": "TD-lambda parameter"},
+        {"name": "vf_coef", "type": "float", "default": 0.5, "help": "Value function coefficient"},
+        {"name": "ent_coef", "type": "float", "default": 0.01, "help": "Entropy coefficient"},
+        {"name": "use_grad_clip", "type": "bool", "default": true, "help": "Use gradient clipping"},
+        {"name": "grad_clip_norm", "type": "float", "default": 10.0, "help": "Gradient clip norm"}
+      ]
+    },
+    "IPPO": {
+      "paradigm": "multi_agent",
+      "category": "Independent",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0007, "help": "Learning rate for optimizer"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 32, "help": "Rollout buffer size"},
+        {"name": "n_epochs", "type": "int", "default": 10, "help": "Number of epochs per update"},
+        {"name": "n_minibatch", "type": "int", "default": 1, "help": "Number of minibatches"},
+        {"name": "clip_range", "type": "float", "default": 0.2, "help": "Clip range for PPO ratio"},
+        {"name": "vf_coef", "type": "float", "default": 0.5, "help": "Value function coefficient"},
+        {"name": "ent_coef", "type": "float", "default": 0.01, "help": "Entropy coefficient"},
+        {"name": "use_gae", "type": "bool", "default": true, "help": "Use Generalized Advantage Estimation"},
+        {"name": "gae_lambda", "type": "float", "default": 0.95, "help": "GAE lambda parameter"},
+        {"name": "use_parameter_sharing", "type": "bool", "default": true, "help": "Share parameters across agents"}
+      ]
+    },
+    "IAC": {
+      "paradigm": "multi_agent",
+      "category": "Independent",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0007, "help": "Learning rate"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "n_steps", "type": "int", "default": 5, "help": "N-step returns"},
+        {"name": "vf_coef", "type": "float", "default": 0.5, "help": "Value function coefficient"},
+        {"name": "ent_coef", "type": "float", "default": 0.01, "help": "Entropy coefficient"},
+        {"name": "use_parameter_sharing", "type": "bool", "default": true, "help": "Share parameters across agents"}
+      ]
+    },
+    "IQL": {
+      "paradigm": "multi_agent",
+      "category": "Independent",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0001, "help": "Learning rate"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 500000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 32, "help": "Training batch size"},
+        {"name": "start_greedy", "type": "float", "default": 1.0, "help": "Initial exploration rate"},
+        {"name": "end_greedy", "type": "float", "default": 0.05, "help": "Final exploration rate"},
+        {"name": "sync_frequency", "type": "int", "default": 200, "help": "Target network sync frequency"},
+        {"name": "use_parameter_sharing", "type": "bool", "default": true, "help": "Share parameters across agents"}
+      ]
+    },
+    "VDN": {
+      "paradigm": "multi_agent",
+      "category": "Value Decomposition",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0005, "help": "Learning rate"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 5000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 32, "help": "Training batch size"},
+        {"name": "start_greedy", "type": "float", "default": 1.0, "help": "Initial exploration rate"},
+        {"name": "end_greedy", "type": "float", "default": 0.05, "help": "Final exploration rate"},
+        {"name": "sync_frequency", "type": "int", "default": 200, "help": "Target network sync frequency"}
+      ]
+    },
+    "QMIX": {
+      "paradigm": "multi_agent",
+      "category": "Value Decomposition",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0005, "help": "Learning rate"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 5000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 32, "help": "Training batch size"},
+        {"name": "start_greedy", "type": "float", "default": 1.0, "help": "Initial exploration rate"},
+        {"name": "end_greedy", "type": "float", "default": 0.05, "help": "Final exploration rate"},
+        {"name": "sync_frequency", "type": "int", "default": 200, "help": "Target network sync frequency"},
+        {"name": "hidden_dim_mixing", "type": "int", "default": 32, "help": "Hidden dimension for mixing network"},
+        {"name": "hidden_dim_hyper", "type": "int", "default": 64, "help": "Hidden dimension for hyper network"}
+      ]
+    },
+    "WQMIX": {
+      "paradigm": "multi_agent",
+      "category": "Value Decomposition",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0005, "help": "Learning rate"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 5000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 32, "help": "Training batch size"},
+        {"name": "start_greedy", "type": "float", "default": 1.0, "help": "Initial exploration rate"},
+        {"name": "end_greedy", "type": "float", "default": 0.05, "help": "Final exploration rate"},
+        {"name": "sync_frequency", "type": "int", "default": 200, "help": "Target network sync frequency"},
+        {"name": "alpha", "type": "float", "default": 0.1, "help": "Weighting factor"}
+      ]
+    },
+    "QTRAN": {
+      "paradigm": "multi_agent",
+      "category": "Value Decomposition",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0005, "help": "Learning rate"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 5000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 32, "help": "Training batch size"},
+        {"name": "start_greedy", "type": "float", "default": 1.0, "help": "Initial exploration rate"},
+        {"name": "end_greedy", "type": "float", "default": 0.05, "help": "Final exploration rate"},
+        {"name": "sync_frequency", "type": "int", "default": 200, "help": "Target network sync frequency"},
+        {"name": "lambda_opt", "type": "float", "default": 1.0, "help": "Opt loss coefficient"},
+        {"name": "lambda_nopt", "type": "float", "default": 1.0, "help": "Nopt loss coefficient"}
+      ]
+    },
+    "DCG": {
+      "paradigm": "multi_agent",
+      "category": "Value Decomposition",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.0005, "help": "Learning rate"},
+        {"name": "gamma", "type": "float", "default": 0.99, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 5000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 32, "help": "Training batch size"},
+        {"name": "start_greedy", "type": "float", "default": 1.0, "help": "Initial exploration rate"},
+        {"name": "end_greedy", "type": "float", "default": 0.05, "help": "Final exploration rate"},
+        {"name": "sync_frequency", "type": "int", "default": 200, "help": "Target network sync frequency"}
+      ]
+    },
+    "MFQ": {
+      "paradigm": "multi_agent",
+      "category": "Mean-Field",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.001, "help": "Learning rate"},
+        {"name": "gamma", "type": "float", "default": 0.95, "help": "Discount factor"},
+        {"name": "buffer_size", "type": "int", "default": 500000, "help": "Replay buffer size"},
+        {"name": "batch_size", "type": "int", "default": 256, "help": "Training batch size"},
+        {"name": "start_greedy", "type": "float", "default": 1.0, "help": "Initial exploration rate"},
+        {"name": "end_greedy", "type": "float", "default": 0.05, "help": "Final exploration rate"},
+        {"name": "sync_frequency", "type": "int", "default": 50, "help": "Target network sync frequency"}
+      ]
+    },
+    "MFAC": {
+      "paradigm": "multi_agent",
+      "category": "Mean-Field",
+      "fields": [
+        {"name": "learning_rate", "type": "float", "default": 0.001, "help": "Learning rate"},
+        {"name": "gamma", "type": "float", "default": 0.95, "help": "Discount factor"},
+        {"name": "n_steps", "type": "int", "default": 128, "help": "N-step returns"},
+        {"name": "vf_coef", "type": "float", "default": 0.5, "help": "Value function coefficient"},
+        {"name": "ent_coef", "type": "float", "default": 0.01, "help": "Entropy coefficient"}
+      ]
+    }
+  }
+}

@@ -1,0 +1,40 @@
+# PettingZoo Multi-Agent Environments
+# Install with: pip install -r requirements/pettingzoo.txt
+#
+# This file contains dependencies for multi-agent reinforcement learning
+# environments using PettingZoo (Farama Foundation).
+
+# Include base requirements
+-r base.txt
+
+# Core PettingZoo library
+pettingzoo>=1.24.0
+
+# Environment families
+# ────────────────────
+# Butterfly: Cooperative visual environments (Knights Archers Zombies, Pistonball)
+pettingzoo[butterfly]>=1.24.0
+
+# Classic: Turn-based games (Chess, Go, Poker, Hanabi, Connect Four)
+pettingzoo[classic]>=1.24.0
+
+# MPE: Multi-Particle Environments (Simple Spread, Tag, Adversary)
+pettingzoo[mpe]>=1.24.0
+
+# SISL: Cooperative continuous control (Multiwalker, Waterworld, Pursuit)
+pettingzoo[sisl]>=1.24.0
+# Pymunk constraint: PettingZoo waterworld uses add_collision_handler() API
+# which was removed in pymunk 7.x (replaced with on_collision)
+pymunk>=6.0.0,<7.0.0
+
+# Optional: Atari multi-agent games (Pong, Boxing, Tennis)
+# Requires ROM license acceptance - uncomment if needed:
+# pettingzoo[atari]>=1.24.0
+
+# SuperSuit: Environment wrappers for preprocessing
+# (frame stacking, resizing, normalization, etc.)
+supersuit>=3.9.0
+
+# Chess AI engine integration (for Human vs Agent mode)
+# Note: Also requires Stockfish binary: sudo apt install stockfish
+stockfish>=3.28.0

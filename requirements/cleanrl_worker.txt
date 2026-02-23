@@ -1,0 +1,32 @@
+# CleanRL Worker Dependencies
+# This bundle contains dependencies required exclusively by the cleanrl_worker.
+# Install this when launching CleanRL-based training runs.
+
+# Include base requirements
+-r base.txt
+
+# Reference CleanRL's own requirements structure
+# CleanRL maintains its dependencies in cleanrl/requirements/
+# We include the core requirements plus optional extras as needed
+
+# Core CleanRL requirements (mirrors cleanrl/requirements/requirements.txt)
+# Note: The actual CleanRL requirements file is auto-generated and extensive.
+# For production use, reference the cleanrl_worker copy: ../cleanrl/requirements/requirements.txt
+# or install directly: pip install -r cleanrl/requirements/requirements.txt
+
+# Key CleanRL dependencies (subset for reference):
+setuptools<78  # tensorboard uses pkg_resources, removed in setuptools>=78
+torch>=2.0.0
+tensorboard>=2.11.0
+wandb>=0.22.3
+tyro>=0.5.0
+tenacity>=8.0.0
+moviepy>=1.0.3
+
+# Optional extras can be included via separate files:
+# -r cleanrl_extras_atari.txt  (for Atari environments)
+# -r cleanrl_extras_jax.txt    (for JAX-accelerated algorithms)
+# -r cleanrl_extras_optuna.txt (for hyperparameter tuning)
+
+# For full compatibility, use CleanRL's maintained requirements:
+# pip install -r ../cleanrl/requirements/requirements.txt

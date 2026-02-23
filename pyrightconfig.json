@@ -1,0 +1,22 @@
+{
+  // Make Pylance/Pyright aware of the vendored worker packages.
+  "extraPaths": [
+    "3rd_party/mujoco_mpc_worker",
+    "3rd_party/xuance_worker",
+    "3rd_party/barlog_worker"
+  ],
+  // Keep analysis focused on the project sources.
+  "include": [
+    "gym_gui",
+    "3rd_party/mujoco_mpc_worker",
+    "3rd_party/xuance_worker",
+    "3rd_party/barlog_worker"
+  ],
+  // Match the repo's virtual environment so stubs resolve correctly.
+  "venv": ".venv",
+  "venvPath": ".",
+  "exclude": [
+    "**/*.md",
+    "**/docs/**",
+  ]
+}
