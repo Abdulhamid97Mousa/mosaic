@@ -153,11 +153,8 @@ ml-agents/
 3rd_party/mujoco_mpc_worker/mosaic_mujoco_mpc.egg-info/
 3rd_party/mujoco_mpc_worker/mujoco_mpc/build/
 
-# Jason worker (Java/Gradle)
-3rd_party/jason_worker/.gradle/
+# Jason worker (Java/Gradle) — removed from repo
 3rd_party/jason_worker/
-3rd_party/jason_worker/dist/
-3rd_party/jason_worker/*.jar
 3rd_party/gui_jason_grpc_cleanrl/.venv/
 3rd_party/gui_jason_grpc_cleanrl/var/
 3rd_party/gui_jason_grpc_cleanrl/.pytest_cache/
@@ -255,6 +252,11 @@ docs/Development_Progress/
 docs/plans/
 docs/reports/
 docs/workers/
+docs/my_paper/
+
+# Deprecated/internal workers (not for public release)
+3rd_party/dragon_worker/
+3rd_party/test_worker/
 
 
 # Experiment operator configs are tracked
