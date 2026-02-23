@@ -250,6 +250,9 @@ _vizdoom.ini
 # Paper drafts — related_papers/RLlib excluded
 docs/my_paper/related_papers/RLlib_Abstractions_for_Distributed_Reinforcement_Learning/
 
+# Internal development reports (not for public release)
+docs/Development_Progress/reports/
+
 
 # Experiment operator configs are tracked
 # experiments/*
