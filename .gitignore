@@ -251,8 +251,8 @@ _vizdoom.ini
 docs/my_paper/related_papers/RLlib_Abstractions_for_Distributed_Reinforcement_Learning/
 
 
-#  
-experiments/*
+# Experiment operator configs are tracked
+# experiments/*
 
 # 
 3rd_party/mosaic/llm_worker.backup/llm_worker/environments/nle/tiles.pkl
