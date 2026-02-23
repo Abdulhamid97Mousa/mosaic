@@ -8,7 +8,7 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-%3E%3D2.0.0-red)](https://pytorch.org/get-started/locally/)
 [![Gymnasium](https://img.shields.io/badge/gymnasium-%3E%3D0.28.1-blue)](https://gymnasium.farama.org/)
 [![PettingZoo](https://img.shields.io/badge/PettingZoo-%3E%3D1.24.0-blue)](https://pettingzoo.farama.org/)
-[![GitHub license](https://img.shields.io/github/license/Abdulhamid97Mousa/MOSAIC)](https://github.com/Abdulhamid97Mousa/MOSAIC/blob/main/LICENSE)
+[![GitHub license](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/Abdulhamid97Mousa/mosaic/blob/dev-hamid/LICENSE)
 
 # MOSAIC
 
@@ -135,7 +135,7 @@ If you use MOSAIC in your research, please cite:
 
 ## License
 
-MOSAIC is released under the MIT License — see the [LICENSE](LICENSE) file for details.
+MOSAIC is released under the [MIT License](https://github.com/Abdulhamid97Mousa/mosaic/blob/dev-hamid/LICENSE).
 
 ## Acknowledgments
 
