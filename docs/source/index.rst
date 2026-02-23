@@ -6,7 +6,7 @@ MOSAIC
    <a href="https://github.com/Abdulhamid97Mousa/MOSAIC">
         <img alt="GitHub" src="https://img.shields.io/github/stars/Abdulhamid97Mousa/MOSAIC?style=social">
    </a>
-   <a href="https://github.com/Abdulhamid97Mousa/mosaic/blob/dev-hamid/LICENSE">
+   <a href="https://github.com/Abdulhamid97Mousa/mosaic/blob/main/LICENSE">
         <img alt="License" src="https://img.shields.io/badge/license-MIT-green.svg">
    </a>
    <a href="https://www.python.org/downloads/">
