@@ -133,12 +133,6 @@ If you use MOSAIC in your research, please cite:
 }
 ```
 
-| | |
-|---|---|
-| **Authors** | Abdulhamid M. Mousa, Zahra Daoui, Rakhmonberdi Khajiev, Jalaledin M. Azzabi, Abdulkarim M. Mousa, Liu Ming |
-| **Repository** | [github.com/Abdulhamid97Mousa/MOSAIC](https://github.com/Abdulhamid97Mousa/MOSAIC) |
-| **License** | MIT |
-
 ## License
 
 MOSAIC is released under the MIT License — see the [LICENSE](LICENSE) file for details.

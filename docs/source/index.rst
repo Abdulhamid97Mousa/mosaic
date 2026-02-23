@@ -290,17 +290,6 @@ If you use MOSAIC in your research, please cite the following paper:
      note    = {Available at \url{https://github.com/Abdulhamid97Mousa/MOSAIC}}
    }
 
-.. list-table::
-   :widths: 20 80
-
-   * - **Authors**
-     - Abdulhamid M. Mousa, Zahra Daoui, Rakhmonberdi Khajiev,
-       Jalaledin M. Azzabi, Abdulkarim M. Mousa, Liu Ming
-   * - **Repository**
-     - `github.com/Abdulhamid97Mousa/MOSAIC <https://github.com/Abdulhamid97Mousa/MOSAIC>`_
-   * - **License**
-     - MIT
-
 .. raw:: html
 
    <br><hr>
