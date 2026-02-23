@@ -1,0 +1,53 @@
+# =============================================================================
+# Melting Pot Multi-Agent Environment Dependencies
+# =============================================================================
+# Melting Pot is a suite of multi-agent test scenarios developed by DeepMind
+# for evaluating generalization in social multi-agent reinforcement learning.
+#
+# USAGE:
+#   pip install -r requirements/meltingpot.txt
+#
+# FEATURES:
+#   - 50+ multi-agent substrates (game scenarios)
+#   - 256+ unique test scenarios
+#   - Up to 16 simultaneous agents
+#   - Social interaction scenarios: cooperation, competition, deception, trust
+#   - Parallel stepping paradigm (all agents act simultaneously)
+#   - Compatible with PettingZoo API through Shimmy wrapper
+#
+# KEY SUBSTRATES:
+#   - collaborative_cooking: Cooperative cooking task
+#   - prisoners_dilemma: Classic game theory scenario
+#   - territory__rooms: Territory control game
+#   - clean_up: Public goods game
+#   - fruit_market: Trading and resource management
+#
+# REPOSITORY:
+#   https://github.com/google-deepmind/meltingpot
+#
+# DOCUMENTATION:
+#   https://shimmy.farama.org/environments/meltingpot/
+#
+# NOTES:
+#   - Melting Pot does NOT support Windows
+#   - Requires Linux or macOS
+#   - Uses Shimmy wrapper to convert dm_env to PettingZoo API
+#   - Environments are nondeterministic (seeding has limited effect)
+# =============================================================================
+
+# Include core GUI + shared dependencies
+-r base.txt
+
+# PettingZoo is required (Melting Pot uses PettingZoo API through Shimmy)
+-r pettingzoo.txt
+
+# Shimmy with Melting Pot support
+# This installs: shimmy, dm-env, meltingpot, dmlab2d
+shimmy[meltingpot]>=1.3.0
+
+# Additional dependencies for Melting Pot
+# dm-tree for nested data structures
+dm-tree>=0.1.8
+
+# Immutabledict for substrate configuration
+immutabledict>=2.2.0

@@ -1,0 +1,68 @@
+# =============================================================================
+# MOSAIC MultiGrid (Competitive/Cooperative Multi-Agent Sports)
+# =============================================================================
+# Your modernized multi-agent extension of MiniGrid for competitive sports.
+# REPLACES: gym-multigrid (deprecated old Gym API version)
+# =============================================================================
+# MOSAIC MultiGrid is a modernized multi-agent extension of MiniGrid for
+# training cooperative and competitive multi-agent RL policies.
+# All agents act simultaneously with modern Gymnasium 1.0+ API.
+#
+# PyPI: https://pypi.org/project/mosaic-multigrid/
+# GitHub: https://github.com/Abdulhamid97Mousa/mosaic_multigrid
+#
+# USAGE:
+#   pip install -r requirements/mosaic_multigrid.txt
+#
+# FEATURES:
+#   - Gymnasium 1.0+ API (5-tuple dict-keyed observations)
+#   - Team-based multi-agent environments (2-6 agents)
+#   - Simultaneous stepping paradigm (parallel action execution)
+#   - Positive-only shared team rewards (v4.3.0), cooperative reward structures
+#   - Ball passing, stealing, and scoring mechanics
+#   - Event tracking: goal_scored_by, passes_completed, steals_completed (v4.3.0)
+#   - Observation wrappers (FullyObs, ImgObs, OneHot, SingleAgent, TeamObs)
+#   - Factored one-hot encoding with ball-carrying bit
+#   - PettingZoo AEC + Parallel API support
+#   - Numba JIT-accelerated observation generation
+#
+# INCLUDED ENVIRONMENTS (Original - Deprecated):
+#   - MosaicMultiGrid-Soccer-v0: 4 agents, 2v2 soccer (zero-sum)
+#   - MosaicMultiGrid-Collect-v0: 3 agents, ball collection (competitive)
+#   - MosaicMultiGrid-Collect-2vs2-v0: 4 agents (2v2), ball collection
+#   - MosaicMultiGrid-Collect-1vs1-v0: 2 agents (1v1), ball collection
+#
+# INDAGOBS ENVIRONMENTS (v4.0.0+ - Individual Agent Observations):
+#   - MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0: Ball respawn, first-to-2-goals, FIFA-style rendering
+#   - MosaicMultiGrid-Soccer-1vs1-IndAgObs-v0: 1v1 soccer, same FIFA grid (v4.1.0)
+#   - MosaicMultiGrid-Collect-IndAgObs-v0: Natural termination, 35x faster training
+#   - MosaicMultiGrid-Collect-2vs2-IndAgObs-v0: Natural termination, 7 balls (no draws)
+#   - MosaicMultiGrid-Collect-1vs1-IndAgObs-v0: Natural termination, 3 balls (v4.1.0)
+#   - MosaicMultiGrid-Basketball-3vs3-IndAgObs-v0: 6 agents, 3v3 basketball, court rendering
+#
+# TEAMOBS ENVIRONMENTS (v4.0.0 - SMAC-style teammate awareness):
+#   - MosaicMultiGrid-Soccer-2vs2-TeamObs-v0: IndAgObs + teammate positions/directions/has_ball
+#   - MosaicMultiGrid-Collect-2vs2-TeamObs-v0: IndAgObs + teammate features
+#   - MosaicMultiGrid-Basketball-3vs3-TeamObs-v0: IndAgObs + teammate features
+#
+# REPLACES:
+#   - Legacy gym-multigrid (ArnaudFickinger) - old gym API
+#   - INI multigrid is still supported separately
+# =============================================================================
+
+# Include core GUI + shared dependencies
+-r base.txt
+
+# =============================================================================
+# MOSAIC MultiGrid from PyPI (v6.0.0)
+# =============================================================================
+# v6.0.0: Solo training environments (no opponent) for curriculum pre-training
+#         Soccer Solo Green/Blue, Basketball Solo Green/Blue
+# v5.0.0: noop=0 added for AEC compatibility (inspired by MeltingPot NOOP=0)
+#         Action space: noop=0, left=1, right=2, forward=3, pickup=4, drop=5, toggle=6, done=7
+#         Step telemetry: infos[agent]["position"] and infos[agent]["carrying"] every step
+
+mosaic-multigrid==6.0.0
+
+# Note: For local development, use editable install instead:
+#   pip install -e 3rd_party/mosaic_multigrid/

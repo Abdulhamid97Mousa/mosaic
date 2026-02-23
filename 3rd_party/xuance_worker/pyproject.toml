@@ -1,0 +1,37 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mosaic-xuance-worker"
+version = "0.1.0"
+description = "XuanCe integration for MOSAIC BDI-RL framework"
+requires-python = ">=3.10"
+license = "MIT"
+# Dependencies are managed via the main project's requirements.txt.
+# The xuance library (>= 1.4.0) must be installed separately from the
+# git submodule at 3rd_party/xuance_worker/xuance/.
+# See docs: tutorials/installation/common_errors/workers/xuance_worker_errors/
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+xuance-worker = "xuance_worker.cli:main"
+
+[project.entry-points."mosaic.workers"]
+xuance = "xuance_worker:get_worker_metadata"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["xuance_worker*"]
+
+[tool.setuptools.package-dir]
+# Our harness is directly in xuance_worker/
+"xuance_worker" = "xuance_worker"
+
+[tool.setuptools.package-data]
+xuance_worker = ["py.typed"]

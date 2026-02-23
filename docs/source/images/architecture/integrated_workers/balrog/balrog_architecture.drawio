@@ -1,0 +1,318 @@
+<mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+  <root>
+    <mxCell id="0" />
+    <mxCell id="1" parent="0" />
+
+    <!-- ═══════════════════════════════════════════════════════════
+         MOSAIC CORE  (dark blue)
+         ═══════════════════════════════════════════════════════════ -->
+    <mxCell id="10"
+            value="&lt;b style='font-size:13px;color:#fff;'&gt;MOSAIC Core&lt;/b&gt;"
+            style="rounded=1;whiteSpace=wrap;html=1;
+                   fillColor=#4472C4;strokeColor=#2F528F;strokeWidth=2;
+                   fontSize=13;verticalAlign=top;align=left;
+                   spacingTop=8;spacingLeft=10;fontColor=#ffffff;"
+            vertex="1" parent="1">
+      <mxGeometry x="20" y="20" width="350" height="130" as="geometry" />
+    </mxCell>
+
+    <!-- Trainer Daemon -->
+    <mxCell id="11"
+            value="&lt;b&gt;Trainer Daemon&lt;/b&gt;"
+            style="rounded=1;whiteSpace=wrap;html=1;
+                   fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=1.5;
+                   fontSize=12;"
+            vertex="1" parent="10">
+      <mxGeometry x="35" y="52" width="130" height="45" as="geometry" />
+    </mxCell>
+
+    <!-- Qt6 GUI -->
+    <mxCell id="12"
+            value="&lt;b&gt;Qt6 GUI&lt;/b&gt;"
+            style="rounded=1;whiteSpace=wrap;html=1;
+                   fillColor=#dae8fc;strokeColor=#6c8ebf;strokeWidth=1.5;
+                   fontSize=12;"
+            vertex="1" parent="10">
+      <mxGeometry x="185" y="52" width="130" height="45" as="geometry" />
+    </mxCell>
+
+    <!-- Trainer Daemon --- Qt6 GUI  (undirected, within Core) -->
+    <mxCell id="50"
+            style="html=1;endArrow=none;startArrow=none;strokeColor=#2F528F;strokeWidth=1.5;"
+            edge="1" source="11" target="12" parent="10">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         BALROG SHIM LAYER  (orange)
+         ═══════════════════════════════════════════════════════════ -->
+    <mxCell id="20"
+            value="&lt;b style='font-size:13px;color:#fff;'&gt;BALROG Shim Layer &lt;/b&gt;&lt;span style='font-size:11px;color:#ffe0c0;'&gt;(balrog_worker/)&lt;/span&gt;"
+            style="rounded=1;whiteSpace=wrap;html=1;
+                   fillColor=#E07B2A;strokeColor=#B85D0D;strokeWidth=2;
+                   fontSize=13;verticalAlign=top;align=left;
+                   spacingTop=8;spacingLeft=10;fontColor=#ffffff;"
+            vertex="1" parent="1">
+      <mxGeometry x="20" y="200" width="350" height="265" as="geometry" />
+    </mxCell>
+
+    <!-- config.py -->
+    <mxCell id="21"
+            value="&lt;b&gt;config.py&lt;/b&gt;&lt;br/&gt;&lt;span style='font-size:11px;color:#555;'&gt;JSON &amp;rarr; BALROG config&lt;/span&gt;"
+            style="rounded=1;whiteSpace=wrap;html=1;
+                   fillColor=#ffffff;strokeColor=#B85D0D;strokeWidth=1.5;
+                   fontSize=12;"
+            vertex="1" parent="20">
+      <mxGeometry x="30" y="45" width="140" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- runtime.py -->
+    <mxCell id="22"
+            value="&lt;b&gt;runtime.py&lt;/b&gt;&lt;br/&gt;&lt;span style='font-size:11px;color:#555;'&gt;Evaluation lifecycle&lt;/span&gt;"
+            style="rounded=1;whiteSpace=wrap;html=1;
+                   fillColor=#ffffff;strokeColor=#B85D0D;strokeWidth=1.5;
+                   fontSize=12;"
+            vertex="1" parent="20">
+      <mxGeometry x="30" y="125" width="140" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- telemetry.py -->
+    <mxCell id="23"
+            value="&lt;b&gt;telemetry.py&lt;/b&gt;&lt;br/&gt;&lt;span style='font-size:11px;color:#555;'&gt;Emit JSONL metrics&lt;/span&gt;"
+            style="rounded=1;whiteSpace=wrap;html=1;
+                   fillColor=#ffffff;strokeColor=#B85D0D;strokeWidth=1.5;
+                   fontSize=12;"
+            vertex="1" parent="20">
+      <mxGeometry x="30" y="200" width="140" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- client/ -->
+    <mxCell id="24"
+            value="&lt;b&gt;client/&lt;/b&gt;&lt;br/&gt;&lt;span style='font-size:11px;color:#555;'&gt;LLM/VLM API wrappers&lt;/span&gt;"
+            style="rounded=1;whiteSpace=wrap;html=1;
+                   fillColor=#ffffff;strokeColor=#B85D0D;strokeWidth=1.5;
+                   fontSize=12;"
+            vertex="1" parent="20">
+      <mxGeometry x="185" y="125" width="140" height="50" as="geometry" />
+    </mxCell>
+
+    <!-- config.py -> runtime.py  (within Shim) -->
+    <mxCell id="51"
+            style="edgeStyle=orthogonalEdgeStyle;html=1;
+                   exitX=0.5;exitY=1;exitDx=0;exitDy=0;
+                   entryX=0.5;entryY=0;entryDx=0;entryDy=0;
+                   strokeColor=#B85D0D;strokeWidth=1.5;"
+            edge="1" source="21" target="22" parent="20">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- runtime.py -> telemetry.py  (within Shim) -->
+    <mxCell id="52"
+            style="edgeStyle=orthogonalEdgeStyle;html=1;
+                   exitX=0.5;exitY=1;exitDx=0;exitDy=0;
+                   entryX=0.5;entryY=0;entryDx=0;entryDy=0;
+                   strokeColor=#B85D0D;strokeWidth=1.5;"
+            edge="1" source="22" target="23" parent="20">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- runtime.py -> client/  (within Shim) -->
+    <mxCell id="53"
+            style="edgeStyle=orthogonalEdgeStyle;html=1;
+                   exitX=1;exitY=0.5;exitDx=0;exitDy=0;
+                   entryX=0;entryY=0.5;entryDx=0;entryDy=0;
+                   strokeColor=#B85D0D;strokeWidth=1.5;"
+            edge="1" source="22" target="24" parent="20">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         LLM / VLM BACKENDS  (light green)
+         ═══════════════════════════════════════════════════════════ -->
+    <mxCell id="30"
+            value="&lt;b style='font-size:13px;'&gt;LLM / VLM Backends&lt;/b&gt;"
+            style="rounded=1;whiteSpace=wrap;html=1;
+                   fillColor=#e8f5e9;strokeColor=#2e7d32;strokeWidth=2;
+                   fontSize=13;verticalAlign=top;align=left;
+                   spacingTop=8;spacingLeft=10;"
+            vertex="1" parent="1">
+      <mxGeometry x="440" y="20" width="270" height="245" as="geometry" />
+    </mxCell>
+
+    <!-- OpenAI API -->
+    <mxCell id="31"
+            value="&lt;b&gt;OpenAI API&lt;/b&gt;&lt;br/&gt;&lt;span style='font-size:11px;color:#555;'&gt;GPT-4o, GPT-4-turbo&lt;/span&gt;"
+            style="rounded=1;whiteSpace=wrap;html=1;
+                   fillColor=#ffffff;strokeColor=#2e7d32;strokeWidth=1.5;
+                   fontSize=12;"
+            vertex="1" parent="30">
+      <mxGeometry x="25" y="40" width="220" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- Anthropic API -->
+    <mxCell id="32"
+            value="&lt;b&gt;Anthropic API&lt;/b&gt;&lt;br/&gt;&lt;span style='font-size:11px;color:#555;'&gt;Claude 3 Opus/Sonnet&lt;/span&gt;"
+            style="rounded=1;whiteSpace=wrap;html=1;
+                   fillColor=#ffffff;strokeColor=#2e7d32;strokeWidth=1.5;
+                   fontSize=12;"
+            vertex="1" parent="30">
+      <mxGeometry x="25" y="95" width="220" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- Google Gemini -->
+    <mxCell id="33"
+            value="&lt;b&gt;Google Gemini&lt;/b&gt;&lt;br/&gt;&lt;span style='font-size:11px;color:#555;'&gt;Gemini 1.5 Pro/Flash&lt;/span&gt;"
+            style="rounded=1;whiteSpace=wrap;html=1;
+                   fillColor=#ffffff;strokeColor=#2e7d32;strokeWidth=1.5;
+                   fontSize=12;"
+            vertex="1" parent="30">
+      <mxGeometry x="25" y="150" width="220" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- vLLM (local) -->
+    <mxCell id="34"
+            value="&lt;b&gt;vLLM (local)&lt;/b&gt;&lt;br/&gt;&lt;span style='font-size:11px;color:#555;'&gt;Any HuggingFace model&lt;/span&gt;"
+            style="rounded=1;whiteSpace=wrap;html=1;
+                   fillColor=#ffffff;strokeColor=#2e7d32;strokeWidth=1.5;
+                   fontSize=12;"
+            vertex="1" parent="30">
+      <mxGeometry x="25" y="205" width="220" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         BALROG ENVIRONMENTS  (light gray)
+         ═══════════════════════════════════════════════════════════ -->
+    <mxCell id="40"
+            value="&lt;b style='font-size:13px;'&gt;BALROG Environments&lt;/b&gt;&lt;br/&gt;&lt;span style='font-size:11px;color:#666;'&gt;Unmodified Upstream&lt;/span&gt;"
+            style="rounded=1;whiteSpace=wrap;html=1;
+                   fillColor=#F2F2F2;strokeColor=#AAAAAA;strokeWidth=2;
+                   fontSize=13;verticalAlign=top;align=left;
+                   spacingTop=8;spacingLeft=10;"
+            vertex="1" parent="1">
+      <mxGeometry x="440" y="320" width="270" height="145" as="geometry" />
+    </mxCell>
+
+    <!-- NetHack / MiniHack -->
+    <mxCell id="41"
+            value="NetHack /&lt;br/&gt;MiniHack"
+            style="rounded=1;whiteSpace=wrap;html=1;
+                   fillColor=#ffffff;strokeColor=#AAAAAA;strokeWidth=1.5;
+                   fontSize=11;"
+            vertex="1" parent="40">
+      <mxGeometry x="15" y="48" width="108" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- BabyAI / MiniGrid -->
+    <mxCell id="42"
+            value="BabyAI /&lt;br/&gt;MiniGrid"
+            style="rounded=1;whiteSpace=wrap;html=1;
+                   fillColor=#ffffff;strokeColor=#AAAAAA;strokeWidth=1.5;
+                   fontSize=11;"
+            vertex="1" parent="40">
+      <mxGeometry x="147" y="48" width="108" height="40" as="geometry" />
+    </mxCell>
+
+    <!-- Crafter -->
+    <mxCell id="43"
+            value="Crafter"
+            style="rounded=1;whiteSpace=wrap;html=1;
+                   fillColor=#ffffff;strokeColor=#AAAAAA;strokeWidth=1.5;
+                   fontSize=11;"
+            vertex="1" parent="40">
+      <mxGeometry x="15" y="98" width="108" height="35" as="geometry" />
+    </mxCell>
+
+    <!-- TextWorld -->
+    <mxCell id="44"
+            value="TextWorld"
+            style="rounded=1;whiteSpace=wrap;html=1;
+                   fillColor=#ffffff;strokeColor=#AAAAAA;strokeWidth=1.5;
+                   fontSize=11;"
+            vertex="1" parent="40">
+      <mxGeometry x="147" y="98" width="108" height="35" as="geometry" />
+    </mxCell>
+
+    <!-- ═══════════════════════════════════════════════════════════
+         CROSS-CONTAINER EDGES  (parent="1")
+         ═══════════════════════════════════════════════════════════ -->
+
+    <!-- Core -> Shim: "spawn + JSON config" -->
+    <mxCell id="54"
+            value="&lt;b&gt;spawn + JSON config&lt;/b&gt;"
+            style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=11;
+                   exitX=0.5;exitY=1;exitDx=0;exitDy=0;
+                   entryX=0.5;entryY=0;entryDx=0;entryDy=0;
+                   strokeColor=#2F528F;strokeWidth=1.5;"
+            edge="1" source="10" target="20" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- client/ -> OpenAI API -->
+    <mxCell id="55"
+            style="edgeStyle=orthogonalEdgeStyle;html=1;
+                   strokeColor=#2e7d32;strokeWidth=1.5;
+                   exitX=1;exitY=0.3;exitDx=0;exitDy=0;
+                   entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+            edge="1" source="24" target="31" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- client/ -> Anthropic API -->
+    <mxCell id="56"
+            style="edgeStyle=orthogonalEdgeStyle;html=1;
+                   strokeColor=#2e7d32;strokeWidth=1.5;
+                   exitX=1;exitY=0.5;exitDx=0;exitDy=0;
+                   entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+            edge="1" source="24" target="32" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- client/ -> Google Gemini -->
+    <mxCell id="57"
+            style="edgeStyle=orthogonalEdgeStyle;html=1;
+                   strokeColor=#2e7d32;strokeWidth=1.5;
+                   exitX=1;exitY=0.7;exitDx=0;exitDy=0;
+                   entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+            edge="1" source="24" target="33" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- client/ -> vLLM (local) -->
+    <mxCell id="58"
+            style="edgeStyle=orthogonalEdgeStyle;html=1;
+                   strokeColor=#2e7d32;strokeWidth=1.5;
+                   exitX=1;exitY=0.9;exitDx=0;exitDy=0;
+                   entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+            edge="1" source="24" target="34" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- runtime.py -> BALROG Environments: "drives agent" -->
+    <mxCell id="59"
+            value="&lt;i&gt;drives agent&lt;/i&gt;"
+            style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=11;
+                   strokeColor=#AAAAAA;strokeWidth=1.5;
+                   exitX=1;exitY=1;exitDx=0;exitDy=0;
+                   entryX=0;entryY=0.5;entryDx=0;entryDy=0;"
+            edge="1" source="22" target="40" parent="1">
+      <mxGeometry relative="1" as="geometry" />
+    </mxCell>
+
+    <!-- telemetry.py -> Trainer Daemon: "JSONL stdout" -->
+    <mxCell id="60"
+            value="&lt;i&gt;JSONL stdout&lt;/i&gt;"
+            style="edgeStyle=orthogonalEdgeStyle;html=1;fontSize=11;
+                   strokeColor=#4472C4;strokeWidth=1.5;dashed=1;
+                   exitX=0;exitY=0.5;exitDx=0;exitDy=0;
+                   entryX=0;entryY=1;entryDx=0;entryDy=0;"
+            edge="1" source="23" target="11" parent="1">
+      <mxGeometry relative="1" as="geometry">
+        <Array as="points">
+          <mxPoint x="10" y="420" />
+          <mxPoint x="10" y="175" />
+        </Array>
+      </mxGeometry>
+    </mxCell>
+
+  </root>
+</mxGraphModel>

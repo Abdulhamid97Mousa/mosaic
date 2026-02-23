@@ -1,0 +1,36 @@
+# =============================================================================
+# NetHack Learning Environment (NLE) Dependencies
+# =============================================================================
+# NLE provides the NetHack game as a Gymnasium environment for RL research.
+# MiniHack builds on NLE to provide sandbox environments for focused learning.
+#
+# USAGE:
+#   pip install -r requirements/nethack.txt
+#
+# SYSTEM REQUIREMENTS (Ubuntu/Debian):
+#   sudo apt-get install -y build-essential autoconf libtool pkg-config \
+#       python3-dev python3-pip python3-numpy libncurses5-dev libbz2-dev \
+#       flex bison
+#
+# SYSTEM REQUIREMENTS (macOS):
+#   brew install cmake flex bison libtool autoconf automake
+#
+# NOTES:
+#   - NLE requires building native code (CMake + compiler toolchain)
+#   - First install may take several minutes to compile NetHack
+#   - MiniHack depends on NLE and adds simplified RL environments
+#   - Both use vi-keys (hjklyubn) for 8-directional movement
+#
+# DOCUMENTATION:
+#   NLE: https://github.com/facebookresearch/nle
+#   MiniHack: https://minihack.readthedocs.io/
+# =============================================================================
+
+# Include core GUI + shared dependencies
+-r base.txt
+
+# NetHack Learning Environment (NLE) - core dependency
+nle>=0.9.0
+
+# MiniHack - sandbox environments built on NLE
+minihack>=0.1.5

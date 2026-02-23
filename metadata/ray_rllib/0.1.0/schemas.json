@@ -1,0 +1,379 @@
+{
+  "version": "0.1.0",
+  "framework": "ray_rllib",
+  "description": "Algorithm parameter schemas for Ray RLlib multi-agent training",
+  "algorithms": {
+    "PPO": {
+      "display_name": "Proximal Policy Optimization",
+      "description": "On-policy algorithm with clipped surrogate objective. Stable and general purpose.",
+      "action_space": ["discrete", "continuous"],
+      "fields": [
+        {
+          "name": "lr",
+          "type": "float",
+          "default": 0.0003,
+          "min": 0.000001,
+          "max": 0.1,
+          "help": "Learning rate for the optimizer",
+          "category": "optimization"
+        },
+        {
+          "name": "gamma",
+          "type": "float",
+          "default": 0.99,
+          "min": 0.0,
+          "max": 1.0,
+          "help": "Discount factor for future rewards",
+          "category": "rl"
+        },
+        {
+          "name": "lambda_",
+          "type": "float",
+          "default": 0.95,
+          "min": 0.0,
+          "max": 1.0,
+          "help": "GAE (Generalized Advantage Estimation) lambda parameter",
+          "category": "rl"
+        },
+        {
+          "name": "clip_param",
+          "type": "float",
+          "default": 0.3,
+          "min": 0.01,
+          "max": 1.0,
+          "help": "PPO clipping parameter for the surrogate objective",
+          "category": "ppo"
+        },
+        {
+          "name": "vf_loss_coeff",
+          "type": "float",
+          "default": 0.5,
+          "min": 0.0,
+          "max": 10.0,
+          "help": "Coefficient for the value function loss",
+          "category": "loss"
+        },
+        {
+          "name": "entropy_coeff",
+          "type": "float",
+          "default": 0.01,
+          "min": 0.0,
+          "max": 1.0,
+          "help": "Coefficient for entropy regularization (encourages exploration)",
+          "category": "loss"
+        },
+        {
+          "name": "train_batch_size",
+          "type": "int",
+          "default": 4000,
+          "min": 128,
+          "max": 65536,
+          "help": "Total batch size for training per learner",
+          "category": "training"
+        },
+        {
+          "name": "sgd_minibatch_size",
+          "type": "int",
+          "default": 128,
+          "min": 16,
+          "max": 8192,
+          "help": "Minibatch size for SGD updates",
+          "category": "training"
+        },
+        {
+          "name": "num_sgd_iter",
+          "type": "int",
+          "default": 30,
+          "min": 1,
+          "max": 100,
+          "help": "Number of SGD epochs per training iteration",
+          "category": "training"
+        }
+      ]
+    },
+    "APPO": {
+      "display_name": "Asynchronous PPO",
+      "description": "Async variant of PPO with V-trace for off-policy correction. Higher throughput than PPO.",
+      "action_space": ["discrete", "continuous"],
+      "fields": [
+        {
+          "name": "lr",
+          "type": "float",
+          "default": 0.0005,
+          "min": 0.000001,
+          "max": 0.1,
+          "help": "Learning rate for the optimizer",
+          "category": "optimization"
+        },
+        {
+          "name": "gamma",
+          "type": "float",
+          "default": 0.99,
+          "min": 0.0,
+          "max": 1.0,
+          "help": "Discount factor for future rewards",
+          "category": "rl"
+        },
+        {
+          "name": "clip_param",
+          "type": "float",
+          "default": 0.4,
+          "min": 0.01,
+          "max": 1.0,
+          "help": "PPO clipping parameter for policy updates",
+          "category": "appo"
+        },
+        {
+          "name": "vf_loss_coeff",
+          "type": "float",
+          "default": 0.5,
+          "min": 0.0,
+          "max": 10.0,
+          "help": "Coefficient for the value function loss",
+          "category": "loss"
+        },
+        {
+          "name": "entropy_coeff",
+          "type": "float",
+          "default": 0.01,
+          "min": 0.0,
+          "max": 1.0,
+          "help": "Coefficient for entropy regularization",
+          "category": "loss"
+        },
+        {
+          "name": "train_batch_size",
+          "type": "int",
+          "default": 4000,
+          "min": 128,
+          "max": 65536,
+          "help": "Total batch size for training per learner",
+          "category": "training"
+        },
+        {
+          "name": "vtrace",
+          "type": "bool",
+          "default": true,
+          "help": "Use V-trace for importance sampling correction (replaces GAE)",
+          "category": "appo"
+        },
+        {
+          "name": "use_kl_loss",
+          "type": "bool",
+          "default": false,
+          "help": "Use KL divergence loss term",
+          "category": "appo"
+        }
+      ]
+    },
+    "IMPALA": {
+      "display_name": "IMPALA",
+      "description": "Importance Weighted Actor-Learner Architecture. Distributed, high throughput training.",
+      "action_space": ["discrete", "continuous"],
+      "fields": [
+        {
+          "name": "lr",
+          "type": "float",
+          "default": 0.0005,
+          "min": 0.000001,
+          "max": 0.1,
+          "help": "Learning rate for the optimizer",
+          "category": "optimization"
+        },
+        {
+          "name": "gamma",
+          "type": "float",
+          "default": 0.99,
+          "min": 0.0,
+          "max": 1.0,
+          "help": "Discount factor for future rewards",
+          "category": "rl"
+        },
+        {
+          "name": "vf_loss_coeff",
+          "type": "float",
+          "default": 0.5,
+          "min": 0.0,
+          "max": 10.0,
+          "help": "Coefficient for the value function loss",
+          "category": "loss"
+        },
+        {
+          "name": "entropy_coeff",
+          "type": "float",
+          "default": 0.01,
+          "min": 0.0,
+          "max": 1.0,
+          "help": "Coefficient for entropy regularization",
+          "category": "loss"
+        },
+        {
+          "name": "train_batch_size",
+          "type": "int",
+          "default": 4000,
+          "min": 128,
+          "max": 65536,
+          "help": "Total batch size for training per learner",
+          "category": "training"
+        },
+        {
+          "name": "vtrace",
+          "type": "bool",
+          "default": true,
+          "help": "Use V-trace for importance sampling correction",
+          "category": "impala"
+        }
+      ]
+    },
+    "DQN": {
+      "display_name": "Deep Q-Network",
+      "description": "Off-policy Q-learning with experience replay. Discrete actions only.",
+      "action_space": ["discrete"],
+      "fields": [
+        {
+          "name": "lr",
+          "type": "float",
+          "default": 0.0005,
+          "min": 0.000001,
+          "max": 0.1,
+          "help": "Learning rate for the optimizer",
+          "category": "optimization"
+        },
+        {
+          "name": "gamma",
+          "type": "float",
+          "default": 0.99,
+          "min": 0.0,
+          "max": 1.0,
+          "help": "Discount factor for future rewards",
+          "category": "rl"
+        },
+        {
+          "name": "train_batch_size",
+          "type": "int",
+          "default": 4000,
+          "min": 128,
+          "max": 65536,
+          "help": "Total batch size for training per learner",
+          "category": "training"
+        },
+        {
+          "name": "n_step",
+          "type": "int",
+          "default": 3,
+          "min": 1,
+          "max": 10,
+          "help": "N-step returns for TD learning",
+          "category": "dqn"
+        },
+        {
+          "name": "target_network_update_freq",
+          "type": "int",
+          "default": 500,
+          "min": 1,
+          "max": 10000,
+          "help": "Frequency of target network updates (in training steps)",
+          "category": "dqn"
+        },
+        {
+          "name": "double_q",
+          "type": "bool",
+          "default": true,
+          "help": "Use Double DQN (reduces overestimation)",
+          "category": "dqn"
+        },
+        {
+          "name": "dueling",
+          "type": "bool",
+          "default": true,
+          "help": "Use Dueling DQN architecture",
+          "category": "dqn"
+        }
+      ]
+    },
+    "SAC": {
+      "display_name": "Soft Actor-Critic",
+      "description": "Off-policy algorithm for continuous actions with entropy regularization.",
+      "action_space": ["continuous"],
+      "fields": [
+        {
+          "name": "lr",
+          "type": "float",
+          "default": 0.0003,
+          "min": 0.000001,
+          "max": 0.1,
+          "help": "Learning rate for the optimizer",
+          "category": "optimization"
+        },
+        {
+          "name": "gamma",
+          "type": "float",
+          "default": 0.99,
+          "min": 0.0,
+          "max": 1.0,
+          "help": "Discount factor for future rewards",
+          "category": "rl"
+        },
+        {
+          "name": "train_batch_size",
+          "type": "int",
+          "default": 4000,
+          "min": 128,
+          "max": 65536,
+          "help": "Total batch size for training per learner",
+          "category": "training"
+        },
+        {
+          "name": "tau",
+          "type": "float",
+          "default": 0.005,
+          "min": 0.001,
+          "max": 1.0,
+          "help": "Soft update coefficient for target networks",
+          "category": "sac"
+        },
+        {
+          "name": "initial_alpha",
+          "type": "float",
+          "default": 1.0,
+          "min": 0.01,
+          "max": 10.0,
+          "help": "Initial entropy coefficient (alpha)",
+          "category": "sac"
+        }
+      ]
+    }
+  },
+  "common_fields": {
+    "description": "Fields available to all algorithms",
+    "fields": [
+      {
+        "name": "total_timesteps",
+        "type": "int",
+        "default": 1000000,
+        "min": 1000,
+        "max": 100000000,
+        "help": "Total environment steps for training",
+        "category": "training"
+      },
+      {
+        "name": "num_workers",
+        "type": "int",
+        "default": 2,
+        "min": 0,
+        "max": 64,
+        "help": "Number of rollout workers",
+        "category": "resources"
+      },
+      {
+        "name": "num_gpus",
+        "type": "int",
+        "default": 0,
+        "min": 0,
+        "max": 8,
+        "help": "Number of GPUs for training",
+        "category": "resources"
+      }
+    ]
+  }
+}

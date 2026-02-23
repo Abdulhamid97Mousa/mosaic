@@ -1,0 +1,56 @@
+# Base requirements for gym_gui application (GUI + shared infrastructure)
+# This file contains dependencies required for the GUI to run, plus shared
+# libraries used by both the GUI and workers (e.g., grpcio, gymnasium core).
+
+# Environment configuration
+python-dotenv==1.1.1
+dotenv==0.9.9
+# Qt GUI framework
+PyQt6==6.9.1
+PyQt6-Qt6==6.9.2
+PyQt6-sip==13.10.2
+PyQt6-WebEngine==6.9.0
+qtpy==2.4.3
+qasync==0.27.0
+# Core dependencies
+setuptools<78  # setuptools>=78 removed pkg_resources; tensorboard still requires it
+packaging==25.0
+PyYAML>=6.0
+jsonschema==4.23.0
+
+# gRPC for trainer communication
+grpcio==1.67.1
+grpcio-tools==1.67.1
+protobuf==5.28.3
+
+# Run ID generation
+python-ulid==2.7.0
+numpy==2.3.4
+pytest==8.4.2
+pytest-qt>=4.5.0
+pydantic==2.12.0
+Pillow==10.4.0
+
+# PyTorch (required: app.py uses torch.cuda for GPU detection at startup)
+torch>=2.0.0
+
+# System monitoring (required: app.py uses psutil for CPU/RAM, nvidia-ml-py for GPU memory)
+psutil>=5.9.0
+nvidia-ml-py>=11.0.0
+
+# HDF5 for replay storage (frames, observations)
+h5py>=3.10.0
+
+# Gymnasium core + environment families used across GUI and workers
+
+gymnasium[box2d]
+gymnasium[mujoco]
+gymnasium[atari]
+gymnasium
+minigrid>=2,<3.0.0
+
+autorom[accept-rom-license]==0.6.1
+
+# Curriculum Learning (algorithm-agnostic, works with CleanRL, XuanCe, RLlib, etc.)
+# Syllabus-RL provides TaskWrapper for switching environments during training
+-e ./3rd_party/Syllabus

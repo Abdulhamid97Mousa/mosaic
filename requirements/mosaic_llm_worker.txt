@@ -1,0 +1,93 @@
+# MOSAIC LLM Worker Dependencies
+# Install with: pip install -r requirements/mosaic_llm_worker.txt
+#
+# This file contains dependencies for the MOSAIC native LLM worker,
+# which provides multi-agent LLM coordination with Theory of Mind.
+# Inspired by BALROG but independent and multi-agent focused.
+#
+# Key features:
+# - 3 coordination levels (emergent, hints, role-based)
+# - Theory of Mind observation modes
+# - Multiple LLM provider support (OpenRouter, OpenAI, Anthropic)
+#
+# See: 3rd_party/mosaic/llm_worker/
+
+# Include base requirements
+-r base.txt
+
+# ═══════════════════════════════════════════════════════════════
+# Core Dependencies (required)
+# ═══════════════════════════════════════════════════════════════
+
+# HTTP client for OpenRouter API
+httpx>=0.27.0
+
+# NumPy for observation processing
+numpy>=1.24.0
+
+# ═══════════════════════════════════════════════════════════════
+# LLM Client Libraries (install based on which provider you use)
+# ═══════════════════════════════════════════════════════════════
+
+# OpenAI client (GPT-4o, GPT-4o-mini, etc.)
+# Also used for vLLM local inference (OpenAI-compatible API)
+openai>=1.0.0
+
+# Anthropic client (Claude 3.5 Sonnet, Claude 3 Opus, etc.)
+anthropic>=0.18.0
+
+# ═══════════════════════════════════════════════════════════════
+# Environment Dependencies (install based on which envs you use)
+# ═══════════════════════════════════════════════════════════════
+
+# MultiGrid (multi-agent grid world, Soccer, Collect)
+# pip install multigrid
+# Or: pip install -r requirements/multigrid.txt
+
+# PettingZoo (general multi-agent environments)
+# pip install pettingzoo>=1.24.0
+# Or: pip install -r requirements/pettingzoo.txt
+
+# ═══════════════════════════════════════════════════════════════
+# API Key Setup
+# ═══════════════════════════════════════════════════════════════
+#
+# Set in .env file:
+#
+# For OpenRouter (recommended - access to multiple models):
+#   OPENROUTER_API_KEY=sk-or-v1-...
+#
+# For direct OpenAI:
+#   OPENAI_API_KEY=sk-...
+#
+# For direct Anthropic:
+#   ANTHROPIC_API_KEY=sk-ant-...
+#
+# For vLLM local server:
+#   VLLM_BASE_URL=http://localhost:8000/v1
+#
+# ═══════════════════════════════════════════════════════════════
+# Usage Examples
+# ═══════════════════════════════════════════════════════════════
+#
+# 1. Install the worker:
+#    pip install -e 3rd_party/mosaic/llm_worker
+#
+# 2. Run with OpenRouter (default):
+#    mosaic-llm-worker --task MultiGrid-Soccer-v0 \
+#      --model anthropic/claude-3.5-sonnet \
+#      --coordination-level 2
+#
+# 3. Run with direct Anthropic:
+#    mosaic-llm-worker --task MultiGrid-Soccer-v0 \
+#      --client anthropic \
+#      --model claude-3-5-sonnet-20241022
+#
+# 4. Run with Theory of Mind observations:
+#    mosaic-llm-worker --task MultiGrid-Soccer-v0 \
+#      --observation-mode visible_teammates \
+#      --coordination-level 3
+#
+# 5. Interactive mode for GUI:
+#    mosaic-llm-worker --interactive --task MultiGrid-Soccer-v0
+#

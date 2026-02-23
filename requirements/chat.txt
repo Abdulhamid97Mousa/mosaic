@@ -1,0 +1,71 @@
+# LLM Chat UI Dependencies (OpenRouter + vLLM)
+# Install with: pip install -r requirements/chat.txt
+#
+# This file contains dependencies for the Chat panel in the GUI,
+# which supports OpenRouter (cloud) and vLLM (local) providers.
+#
+# Alternative: pip install -e ".[chat]"
+
+# Include base requirements
+-r base.txt
+
+# ═══════════════════════════════════════════════════════════════
+# HTTP Client for LLM API Requests
+# ═══════════════════════════════════════════════════════════════
+
+# HTTP client for OpenRouter and vLLM API calls
+# Both providers use OpenAI-compatible chat completions API
+# See: https://openrouter.ai/docs/quickstart
+# See: https://docs.vllm.ai/en/latest/serving/openai_compatible_server.html
+requests>=2.31.0
+
+# ═══════════════════════════════════════════════════════════════
+# HuggingFace Hub (for local model download)
+# ═══════════════════════════════════════════════════════════════
+
+# HuggingFace Hub for model authentication and download
+# Required for downloading gated models (Llama, etc.)
+# See: https://huggingface.co/docs/huggingface_hub/en/quick-start
+huggingface_hub>=0.20.0
+
+# ═══════════════════════════════════════════════════════════════
+# vLLM (Local Model Serving)
+# ═══════════════════════════════════════════════════════════════
+
+# vLLM for local GPU inference
+# See: https://docs.vllm.ai/en/latest/
+# Note: Requires NVIDIA GPU with CUDA support
+vllm>=0.6.0
+
+# ═══════════════════════════════════════════════════════════════
+# Supported Providers
+# ═══════════════════════════════════════════════════════════════
+#
+# OpenRouter (Cloud):
+#   - Base URL: https://openrouter.ai/api/v1
+#   - API Key: Get from https://openrouter.ai/keys
+#   - Models: GPT-4, Claude, Llama, Mistral, etc.
+#
+# vLLM (Local GPU):
+#   - Base URL: http://localhost:8000/v1
+#   - Start server: vllm serve <model> --api-key token-abc123
+#   - Models: Any HuggingFace model
+#   - Requires: NVIDIA GPU with CUDA support
+#   - Install: pip install vllm
+#
+# ═══════════════════════════════════════════════════════════════
+# Configuration
+# ═══════════════════════════════════════════════════════════════
+#
+# OpenRouter API Key:
+#   Set in .env or enter directly in the Chat panel UI:
+#   OPENROUTER_API_KEY=sk-or-v1-your_api_key_here
+#
+# HuggingFace Token (for gated models like Llama):
+#   1. Create account at https://huggingface.co
+#   2. Get token at https://huggingface.co/settings/tokens
+#   3. Accept model license (e.g., https://huggingface.co/meta-llama)
+#   4. Enter token in Chat panel or set HF_TOKEN env variable
+#
+# vLLM Server:
+#   VLLM_BASE_URL=http://localhost:8000/v1

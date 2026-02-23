@@ -1,0 +1,3931 @@
+{
+  "algorithms": {
+    "c51": {
+      "fields": [
+        {
+          "default": "c51",
+          "help": "",
+          "name": "exp_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "seed",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "torch_deterministic",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "cuda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "track",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "cleanRL",
+          "help": "",
+          "name": "wandb_project_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "wandb_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": "CartPole-v1",
+          "help": "",
+          "name": "env_id",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 500000,
+          "help": "",
+          "name": "total_timesteps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.00025,
+          "help": "",
+          "name": "learning_rate",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "num_envs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 101,
+          "help": "",
+          "name": "n_atoms",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": -100,
+          "help": "",
+          "name": "v_min",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 100,
+          "help": "",
+          "name": "v_max",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 10000,
+          "help": "",
+          "name": "buffer_size",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.99,
+          "help": "",
+          "name": "gamma",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 500,
+          "help": "",
+          "name": "target_network_frequency",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 128,
+          "help": "",
+          "name": "batch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "start_e",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.05,
+          "help": "",
+          "name": "end_e",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.5,
+          "help": "",
+          "name": "exploration_fraction",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 10000,
+          "help": "",
+          "name": "learning_starts",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 10,
+          "help": "",
+          "name": "train_frequency",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        }
+      ],
+      "module": "cleanrl.c51"
+    },
+    "c51_atari": {
+      "fields": [
+        {
+          "default": "c51_atari",
+          "help": "",
+          "name": "exp_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "seed",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "torch_deterministic",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "cuda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "track",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "cleanRL",
+          "help": "",
+          "name": "wandb_project_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "wandb_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": "BreakoutNoFrameskip-v4",
+          "help": "",
+          "name": "env_id",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 10000000,
+          "help": "",
+          "name": "total_timesteps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.00025,
+          "help": "",
+          "name": "learning_rate",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "num_envs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 51,
+          "help": "",
+          "name": "n_atoms",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": -10,
+          "help": "",
+          "name": "v_min",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 10,
+          "help": "",
+          "name": "v_max",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 1000000,
+          "help": "",
+          "name": "buffer_size",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.99,
+          "help": "",
+          "name": "gamma",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 10000,
+          "help": "",
+          "name": "target_network_frequency",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 32,
+          "help": "",
+          "name": "batch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "start_e",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.01,
+          "help": "",
+          "name": "end_e",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.1,
+          "help": "",
+          "name": "exploration_fraction",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 80000,
+          "help": "",
+          "name": "learning_starts",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 4,
+          "help": "",
+          "name": "train_frequency",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        }
+      ],
+      "module": "cleanrl.c51_atari"
+    },
+    "ddpg_continuous_action": {
+      "fields": [
+        {
+          "default": "ddpg_continuous_action",
+          "help": "",
+          "name": "exp_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "seed",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "torch_deterministic",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "cuda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "track",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "cleanRL",
+          "help": "",
+          "name": "wandb_project_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "wandb_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": "Hopper-v4",
+          "help": "",
+          "name": "env_id",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1000000,
+          "help": "",
+          "name": "total_timesteps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.0003,
+          "help": "",
+          "name": "learning_rate",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 1000000,
+          "help": "",
+          "name": "buffer_size",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.99,
+          "help": "",
+          "name": "gamma",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.005,
+          "help": "",
+          "name": "tau",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 256,
+          "help": "",
+          "name": "batch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 0.1,
+          "help": "",
+          "name": "exploration_noise",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 25000.0,
+          "help": "",
+          "name": "learning_starts",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 2,
+          "help": "",
+          "name": "policy_frequency",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        }
+      ],
+      "module": "cleanrl.ddpg_continuous_action"
+    },
+    "dqn": {
+      "fields": [
+        {
+          "default": "dqn",
+          "help": "",
+          "name": "exp_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "seed",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "torch_deterministic",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "cuda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "track",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "cleanRL",
+          "help": "",
+          "name": "wandb_project_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "wandb_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": "CartPole-v1",
+          "help": "",
+          "name": "env_id",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 500000,
+          "help": "",
+          "name": "total_timesteps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.00025,
+          "help": "",
+          "name": "learning_rate",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "num_envs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 10000,
+          "help": "",
+          "name": "buffer_size",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.99,
+          "help": "",
+          "name": "gamma",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 1.0,
+          "help": "",
+          "name": "tau",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 500,
+          "help": "",
+          "name": "target_network_frequency",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 128,
+          "help": "",
+          "name": "batch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "start_e",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.05,
+          "help": "",
+          "name": "end_e",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.5,
+          "help": "",
+          "name": "exploration_fraction",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 10000,
+          "help": "",
+          "name": "learning_starts",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 10,
+          "help": "",
+          "name": "train_frequency",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        }
+      ],
+      "module": "cleanrl.dqn"
+    },
+    "dqn_atari": {
+      "fields": [
+        {
+          "default": "dqn_atari",
+          "help": "",
+          "name": "exp_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "seed",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "torch_deterministic",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "cuda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "track",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "cleanRL",
+          "help": "",
+          "name": "wandb_project_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "wandb_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": "BreakoutNoFrameskip-v4",
+          "help": "",
+          "name": "env_id",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 10000000,
+          "help": "",
+          "name": "total_timesteps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.0001,
+          "help": "",
+          "name": "learning_rate",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "num_envs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 1000000,
+          "help": "",
+          "name": "buffer_size",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.99,
+          "help": "",
+          "name": "gamma",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 1.0,
+          "help": "",
+          "name": "tau",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 1000,
+          "help": "",
+          "name": "target_network_frequency",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 32,
+          "help": "",
+          "name": "batch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "start_e",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.01,
+          "help": "",
+          "name": "end_e",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.1,
+          "help": "",
+          "name": "exploration_fraction",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 80000,
+          "help": "",
+          "name": "learning_starts",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 4,
+          "help": "",
+          "name": "train_frequency",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        }
+      ],
+      "module": "cleanrl.dqn_atari"
+    },
+    "ppo": {
+      "fields": [
+        {
+          "default": "ppo",
+          "help": "",
+          "name": "exp_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "seed",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "torch_deterministic",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "cuda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "track",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "cleanRL",
+          "help": "",
+          "name": "wandb_project_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "wandb_entity",
+          "optional": true,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": "CartPole-v1",
+          "help": "",
+          "name": "env_id",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 500000,
+          "help": "",
+          "name": "total_timesteps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.00025,
+          "help": "",
+          "name": "learning_rate",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 4,
+          "help": "",
+          "name": "num_envs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 128,
+          "help": "",
+          "name": "num_steps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "anneal_lr",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.99,
+          "help": "",
+          "name": "gamma",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.95,
+          "help": "",
+          "name": "gae_lambda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 4,
+          "help": "",
+          "name": "num_minibatches",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 4,
+          "help": "",
+          "name": "update_epochs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "norm_adv",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.2,
+          "help": "",
+          "name": "clip_coef",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "clip_vloss",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.01,
+          "help": "",
+          "name": "ent_coef",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.5,
+          "help": "",
+          "name": "vf_coef",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.5,
+          "help": "",
+          "name": "max_grad_norm",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "target_kl",
+          "optional": true,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "batch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "minibatch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "num_iterations",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        }
+      ],
+      "module": "cleanrl_worker.algorithms.ppo_with_save"
+    },
+    "ppo_atari": {
+      "fields": [
+        {
+          "default": "ppo_atari",
+          "help": "",
+          "name": "exp_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "seed",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "torch_deterministic",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "cuda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "track",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "cleanRL",
+          "help": "",
+          "name": "wandb_project_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "wandb_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "BreakoutNoFrameskip-v4",
+          "help": "",
+          "name": "env_id",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 10000000,
+          "help": "",
+          "name": "total_timesteps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.00025,
+          "help": "",
+          "name": "learning_rate",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 8,
+          "help": "",
+          "name": "num_envs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 128,
+          "help": "",
+          "name": "num_steps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "anneal_lr",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.99,
+          "help": "",
+          "name": "gamma",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.95,
+          "help": "",
+          "name": "gae_lambda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 4,
+          "help": "",
+          "name": "num_minibatches",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 4,
+          "help": "",
+          "name": "update_epochs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "norm_adv",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.1,
+          "help": "",
+          "name": "clip_coef",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "clip_vloss",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.01,
+          "help": "",
+          "name": "ent_coef",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.5,
+          "help": "",
+          "name": "vf_coef",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.5,
+          "help": "",
+          "name": "max_grad_norm",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "target_kl",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "batch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "minibatch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "num_iterations",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        }
+      ],
+      "module": "cleanrl.ppo_atari"
+    },
+    "ppo_atari_lstm": {
+      "fields": [
+        {
+          "default": "ppo_atari_lstm",
+          "help": "",
+          "name": "exp_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "seed",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "torch_deterministic",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "cuda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "track",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "cleanRL",
+          "help": "",
+          "name": "wandb_project_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "wandb_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "BreakoutNoFrameskip-v4",
+          "help": "",
+          "name": "env_id",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 10000000,
+          "help": "",
+          "name": "total_timesteps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.00025,
+          "help": "",
+          "name": "learning_rate",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 8,
+          "help": "",
+          "name": "num_envs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 128,
+          "help": "",
+          "name": "num_steps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "anneal_lr",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.99,
+          "help": "",
+          "name": "gamma",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.95,
+          "help": "",
+          "name": "gae_lambda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 4,
+          "help": "",
+          "name": "num_minibatches",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 4,
+          "help": "",
+          "name": "update_epochs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "norm_adv",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.1,
+          "help": "",
+          "name": "clip_coef",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "clip_vloss",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.01,
+          "help": "",
+          "name": "ent_coef",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.5,
+          "help": "",
+          "name": "vf_coef",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.5,
+          "help": "",
+          "name": "max_grad_norm",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "target_kl",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "batch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "minibatch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "num_iterations",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        }
+      ],
+      "module": "cleanrl.ppo_atari_lstm"
+    },
+    "ppo_atari_multigpu": {
+      "fields": [
+        {
+          "default": "ppo_atari_multigpu",
+          "help": "",
+          "name": "exp_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "seed",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "torch_deterministic",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "cuda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "track",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "cleanRL",
+          "help": "",
+          "name": "wandb_project_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "wandb_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "BreakoutNoFrameskip-v4",
+          "help": "",
+          "name": "env_id",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 10000000,
+          "help": "",
+          "name": "total_timesteps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.00025,
+          "help": "",
+          "name": "learning_rate",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 8,
+          "help": "",
+          "name": "local_num_envs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 128,
+          "help": "",
+          "name": "num_steps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "anneal_lr",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.99,
+          "help": "",
+          "name": "gamma",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.95,
+          "help": "",
+          "name": "gae_lambda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 4,
+          "help": "",
+          "name": "num_minibatches",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 4,
+          "help": "",
+          "name": "update_epochs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "norm_adv",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.1,
+          "help": "",
+          "name": "clip_coef",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "clip_vloss",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.01,
+          "help": "",
+          "name": "ent_coef",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.5,
+          "help": "",
+          "name": "vf_coef",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.5,
+          "help": "",
+          "name": "max_grad_norm",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "target_kl",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "local_batch_size",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "local_minibatch_size",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "num_envs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "batch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "minibatch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "num_iterations",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "world_size",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        }
+      ],
+      "module": "cleanrl.ppo_atari_multigpu"
+    },
+    "ppo_continuous_action": {
+      "fields": [
+        {
+          "default": "ppo_continuous_action",
+          "help": "",
+          "name": "exp_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "seed",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "torch_deterministic",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "cuda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "track",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "cleanRL",
+          "help": "",
+          "name": "wandb_project_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "wandb_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": "HalfCheetah-v4",
+          "help": "",
+          "name": "env_id",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1000000,
+          "help": "",
+          "name": "total_timesteps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.0003,
+          "help": "",
+          "name": "learning_rate",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "num_envs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 2048,
+          "help": "",
+          "name": "num_steps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "anneal_lr",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.99,
+          "help": "",
+          "name": "gamma",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.95,
+          "help": "",
+          "name": "gae_lambda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 32,
+          "help": "",
+          "name": "num_minibatches",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 10,
+          "help": "",
+          "name": "update_epochs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "norm_adv",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.2,
+          "help": "",
+          "name": "clip_coef",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "clip_vloss",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.0,
+          "help": "",
+          "name": "ent_coef",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.5,
+          "help": "",
+          "name": "vf_coef",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.5,
+          "help": "",
+          "name": "max_grad_norm",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "target_kl",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "batch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "minibatch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "num_iterations",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        }
+      ],
+      "module": "cleanrl.ppo_continuous_action"
+    },
+    "pqn": {
+      "fields": [
+        {
+          "default": "pqn",
+          "help": "",
+          "name": "exp_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "seed",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "torch_deterministic",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "cuda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "track",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "cleanRL",
+          "help": "",
+          "name": "wandb_project_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "wandb_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "CartPole-v1",
+          "help": "",
+          "name": "env_id",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 500000,
+          "help": "",
+          "name": "total_timesteps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.00025,
+          "help": "",
+          "name": "learning_rate",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 4,
+          "help": "",
+          "name": "num_envs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 128,
+          "help": "",
+          "name": "num_steps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 4,
+          "help": "",
+          "name": "num_minibatches",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 4,
+          "help": "",
+          "name": "update_epochs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "anneal_lr",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.99,
+          "help": "",
+          "name": "gamma",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "start_e",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.05,
+          "help": "",
+          "name": "end_e",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.5,
+          "help": "",
+          "name": "exploration_fraction",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 10.0,
+          "help": "",
+          "name": "max_grad_norm",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.65,
+          "help": "",
+          "name": "q_lambda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        }
+      ],
+      "module": "cleanrl.pqn"
+    },
+    "rainbow_atari": {
+      "fields": [
+        {
+          "default": "rainbow_atari",
+          "help": "",
+          "name": "exp_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "seed",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "torch_deterministic",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "cuda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "track",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "cleanRL",
+          "help": "",
+          "name": "wandb_project_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "wandb_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": "BreakoutNoFrameskip-v4",
+          "help": "",
+          "name": "env_id",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 10000000,
+          "help": "",
+          "name": "total_timesteps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 6.25e-05,
+          "help": "",
+          "name": "learning_rate",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "num_envs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 1000000,
+          "help": "",
+          "name": "buffer_size",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.99,
+          "help": "",
+          "name": "gamma",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 1.0,
+          "help": "",
+          "name": "tau",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 8000,
+          "help": "",
+          "name": "target_network_frequency",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 32,
+          "help": "",
+          "name": "batch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "start_e",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.01,
+          "help": "",
+          "name": "end_e",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.1,
+          "help": "",
+          "name": "exploration_fraction",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 80000,
+          "help": "",
+          "name": "learning_starts",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 4,
+          "help": "",
+          "name": "train_frequency",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 3,
+          "help": "",
+          "name": "n_step",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.5,
+          "help": "",
+          "name": "prioritized_replay_alpha",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.4,
+          "help": "",
+          "name": "prioritized_replay_beta",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 1e-06,
+          "help": "",
+          "name": "prioritized_replay_eps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 51,
+          "help": "",
+          "name": "n_atoms",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": -10,
+          "help": "",
+          "name": "v_min",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 10,
+          "help": "",
+          "name": "v_max",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        }
+      ],
+      "module": "cleanrl.rainbow_atari"
+    },
+    "rpo_continuous_action": {
+      "fields": [
+        {
+          "default": "rpo_continuous_action",
+          "help": "",
+          "name": "exp_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "seed",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "torch_deterministic",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "cuda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "track",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "cleanRL",
+          "help": "",
+          "name": "wandb_project_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "wandb_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "HalfCheetah-v4",
+          "help": "",
+          "name": "env_id",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 8000000,
+          "help": "",
+          "name": "total_timesteps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.0003,
+          "help": "",
+          "name": "learning_rate",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "num_envs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 2048,
+          "help": "",
+          "name": "num_steps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "anneal_lr",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.99,
+          "help": "",
+          "name": "gamma",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.95,
+          "help": "",
+          "name": "gae_lambda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 32,
+          "help": "",
+          "name": "num_minibatches",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 10,
+          "help": "",
+          "name": "update_epochs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "norm_adv",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.2,
+          "help": "",
+          "name": "clip_coef",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "clip_vloss",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.0,
+          "help": "",
+          "name": "ent_coef",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.5,
+          "help": "",
+          "name": "vf_coef",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.5,
+          "help": "",
+          "name": "max_grad_norm",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "target_kl",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.5,
+          "help": "",
+          "name": "rpo_alpha",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "batch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "minibatch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 0,
+          "help": "",
+          "name": "num_iterations",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        }
+      ],
+      "module": "cleanrl.rpo_continuous_action"
+    },
+    "sac_atari": {
+      "fields": [
+        {
+          "default": "sac_atari",
+          "help": "",
+          "name": "exp_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "seed",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "torch_deterministic",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "cuda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "track",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "cleanRL",
+          "help": "",
+          "name": "wandb_project_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "wandb_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "BeamRiderNoFrameskip-v4",
+          "help": "",
+          "name": "env_id",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 5000000,
+          "help": "",
+          "name": "total_timesteps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 1000000,
+          "help": "",
+          "name": "buffer_size",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.99,
+          "help": "",
+          "name": "gamma",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 1.0,
+          "help": "",
+          "name": "tau",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 64,
+          "help": "",
+          "name": "batch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 20000.0,
+          "help": "",
+          "name": "learning_starts",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.0003,
+          "help": "",
+          "name": "policy_lr",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.0003,
+          "help": "",
+          "name": "q_lr",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 4,
+          "help": "",
+          "name": "update_frequency",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 8000,
+          "help": "",
+          "name": "target_network_frequency",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.2,
+          "help": "",
+          "name": "alpha",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "autotune",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": 0.89,
+          "help": "",
+          "name": "target_entropy_scale",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        }
+      ],
+      "module": "cleanrl.sac_atari"
+    },
+    "sac_continuous_action": {
+      "fields": [
+        {
+          "default": "sac_continuous_action",
+          "help": "",
+          "name": "exp_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "seed",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "torch_deterministic",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "cuda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "track",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "cleanRL",
+          "help": "",
+          "name": "wandb_project_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "wandb_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "Hopper-v4",
+          "help": "",
+          "name": "env_id",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1000000,
+          "help": "",
+          "name": "total_timesteps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "num_envs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 1000000,
+          "help": "",
+          "name": "buffer_size",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.99,
+          "help": "",
+          "name": "gamma",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.005,
+          "help": "",
+          "name": "tau",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 256,
+          "help": "",
+          "name": "batch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 5000.0,
+          "help": "",
+          "name": "learning_starts",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.0003,
+          "help": "",
+          "name": "policy_lr",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.001,
+          "help": "",
+          "name": "q_lr",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 2,
+          "help": "",
+          "name": "policy_frequency",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "target_network_frequency",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.2,
+          "help": "",
+          "name": "alpha",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "autotune",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        }
+      ],
+      "module": "cleanrl.sac_continuous_action"
+    },
+    "td3_continuous_action": {
+      "fields": [
+        {
+          "default": "td3_continuous_action",
+          "help": "",
+          "name": "exp_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "seed",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "torch_deterministic",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": true,
+          "help": "",
+          "name": "cuda",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "track",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "cleanRL",
+          "help": "",
+          "name": "wandb_project_name",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": null,
+          "help": "",
+          "name": "wandb_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": "Hopper-v4",
+          "help": "",
+          "name": "env_id",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        },
+        {
+          "default": 1000000,
+          "help": "",
+          "name": "total_timesteps",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.0003,
+          "help": "",
+          "name": "learning_rate",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 1,
+          "help": "",
+          "name": "num_envs",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 1000000,
+          "help": "",
+          "name": "buffer_size",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.99,
+          "help": "",
+          "name": "gamma",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.005,
+          "help": "",
+          "name": "tau",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 256,
+          "help": "",
+          "name": "batch_size",
+          "optional": false,
+          "runtime_only": true,
+          "type": "int"
+        },
+        {
+          "default": 0.2,
+          "help": "",
+          "name": "policy_noise",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 0.1,
+          "help": "",
+          "name": "exploration_noise",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        },
+        {
+          "default": 25000.0,
+          "help": "",
+          "name": "learning_starts",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 2,
+          "help": "",
+          "name": "policy_frequency",
+          "optional": false,
+          "runtime_only": false,
+          "type": "int"
+        },
+        {
+          "default": 0.5,
+          "help": "",
+          "name": "noise_clip",
+          "optional": false,
+          "runtime_only": false,
+          "type": "float"
+        }
+      ],
+      "module": "cleanrl.td3_continuous_action"
+    },
+    "ppo_atari_envpool": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        }
+      ],
+      "module": "cleanrl.ppo_atari_envpool"
+    },
+    "ppo_atari_envpool_xla_jax": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        }
+      ],
+      "module": "cleanrl.ppo_atari_envpool_xla_jax"
+    },
+    "ppo_atari_envpool_xla_jax_scan": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        }
+      ],
+      "module": "cleanrl.ppo_atari_envpool_xla_jax_scan"
+    },
+    "ppo_procgen": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        }
+      ],
+      "module": "cleanrl.ppo_procgen"
+    },
+    "ppo_rnd_envpool": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        }
+      ],
+      "module": "cleanrl.ppo_rnd_envpool"
+    },
+    "ppo_pettingzoo_ma_atari": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        }
+      ],
+      "module": "cleanrl.ppo_pettingzoo_ma_atari"
+    },
+    "ppg_procgen": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        }
+      ],
+      "module": "cleanrl.ppg_procgen"
+    },
+    "pqn_atari_envpool": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        }
+      ],
+      "module": "cleanrl.pqn_atari_envpool"
+    },
+    "pqn_atari_envpool_lstm": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        }
+      ],
+      "module": "cleanrl.pqn_atari_envpool_lstm"
+    },
+    "dqn_atari_jax": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        }
+      ],
+      "module": "cleanrl.dqn_atari_jax"
+    },
+    "dqn_jax": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        }
+      ],
+      "module": "cleanrl.dqn_jax"
+    },
+    "qdagger_dqn_atari_impalacnn": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        }
+      ],
+      "module": "cleanrl.qdagger_dqn_atari_impalacnn"
+    },
+    "qdagger_dqn_atari_jax_impalacnn": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        }
+      ],
+      "module": "cleanrl.qdagger_dqn_atari_jax_impalacnn"
+    },
+    "c51_jax": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        }
+      ],
+      "module": "cleanrl.c51_jax"
+    },
+    "c51_atari_jax": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        }
+      ],
+      "module": "cleanrl.c51_atari_jax"
+    },
+    "ddpg_continuous_action_jax": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        }
+      ],
+      "module": "cleanrl.ddpg_continuous_action_jax"
+    },
+    "td3_continuous_action_jax": {
+      "fields": [
+        {
+          "default": false,
+          "help": "Record evaluation or gameplay videos when supported",
+          "name": "capture_video",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Persist the trained policy checkpoint at the end of a run",
+          "name": "save_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": false,
+          "help": "Upload the saved checkpoint to external storage (e.g., wandb/HF)",
+          "name": "upload_model",
+          "optional": false,
+          "runtime_only": false,
+          "type": "bool"
+        },
+        {
+          "default": "",
+          "help": "Hugging Face entity or namespace for model uploads",
+          "name": "hf_entity",
+          "optional": false,
+          "runtime_only": false,
+          "type": "str"
+        }
+      ],
+      "module": "cleanrl.td3_continuous_action_jax"
+    }
+  },
+  "cleanrl_version": "0.1.0",
+  "generated_at": "2025-11-07T15:43:06.022601+00:00"
+}

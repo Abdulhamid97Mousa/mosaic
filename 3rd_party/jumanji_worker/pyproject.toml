@@ -1,0 +1,33 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mosaic-jumanji-worker"
+version = "0.1.0"
+description = "Jumanji JAX-based RL environments integration for MOSAIC BDI-RL framework"
+requires-python = ">=3.10"
+license = {text = "Apache-2.0"}
+# Dependencies are managed via the main project's requirements.txt
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+jumanji-worker = "jumanji_worker.cli:main"
+
+[project.entry-points."mosaic.workers"]
+jumanji = "jumanji_worker:get_worker_metadata"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["jumanji_worker*"]
+
+[tool.setuptools.package-dir]
+# Upstream Jumanji library
+"jumanji" = "jumanji/jumanji"
+# Our integration harness
+"jumanji_worker" = "jumanji_worker"

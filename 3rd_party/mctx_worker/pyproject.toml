@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mosaic-mctx-worker"
+version = "0.1.0"
+description = "MCTS/AlphaZero worker using mctx + PGX for turn-based games in MOSAIC"
+requires-python = ">=3.10"
+license = {text = "MIT"}
+authors = [
+    {name = "MOSAIC Team", email = "mousa.abdulhamid@bit.edu.cn"}
+]
+keywords = [
+    "mcts",
+    "alphazero",
+    "muzero",
+    "jax",
+    "pgx",
+    "chess",
+    "go",
+    "reinforcement-learning",
+]
+# Dependencies are managed via the main project's requirements.txt
+dependencies = []
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+]
+
+[project.scripts]
+mctx-worker = "mctx_worker.cli:main"
+
+[project.entry-points."mosaic.workers"]
+mctx = "mctx_worker:get_worker_metadata"
+
+[tool.setuptools]
+packages = [
+    "mctx_worker",
+]
+
+[tool.setuptools.package-dir]
+"mctx_worker" = "mctx_worker"

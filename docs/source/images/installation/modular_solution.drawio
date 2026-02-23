@@ -1,0 +1,106 @@
+<mxfile host="65bd71144e" pages="1">
+    <diagram id="modular-solution" name="Modular Extras Solution">
+        <mxGraphModel dx="758" dy="441" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="900" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="title" value="&lt;font style=&quot;font-size: 20px;&quot;&gt;&lt;b&gt;✅ The Solution: Modular Extras&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="420" y="20" width="360" height="40" as="geometry"/>
+                </mxCell>
+                <mxCell id="mosaic" value="&lt;b&gt;🧩 MOSAIC Core&lt;/b&gt;&lt;br&gt;&lt;i&gt;pip install -e .&lt;/i&gt;&lt;br&gt;PyQt6 + gRPC + Telemetry&lt;br&gt;&lt;b&gt;~200 MB, no conflicts&lt;/b&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#2ecc71;strokeColor=#27ae60;fontColor=#ffffff;fontSize=13;shadow=1;" parent="1" vertex="1">
+                    <mxGeometry x="440" y="80" width="280" height="80" as="geometry"/>
+                </mxCell>
+                <mxCell id="workers_bg" value="&lt;font style=&quot;font-size: 14px;&quot;&gt;&lt;b&gt;Training Backends&lt;/b&gt; — pick one per venv&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf7ea;strokeColor=#27ae60;verticalAlign=top;fontSize=12;dashed=1;dashPattern=8 4;spacingTop=5;" parent="1" vertex="1">
+                    <mxGeometry x="300" y="220" width="560" height="170" as="geometry"/>
+                </mxCell>
+                <mxCell id="cleanrl" value="&lt;b&gt;🏋️ CleanRL&lt;/b&gt;&lt;br&gt;&lt;code&gt;.[cleanrl]&lt;/code&gt;&lt;br&gt;&lt;i&gt;PPO, DQN, SAC&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5f5e3;strokeColor=#27ae60;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="270" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="xuance" value="&lt;b&gt;⚡&lt;/b&gt;&lt;b&gt;&amp;nbsp;XuanCe&lt;/b&gt;&lt;br&gt;&lt;code&gt;.[xuance]&lt;/code&gt;&lt;br&gt;&lt;i&gt;MAPPO, QMIX&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5f5e3;strokeColor=#27ae60;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="460" y="270" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="rllib" value="&lt;b&gt;⚡ RLlib&lt;/b&gt;&lt;br&gt;&lt;code&gt;.[ray-rllib]&lt;/code&gt;&lt;br&gt;&lt;i&gt;Distributed RL&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5f5e3;strokeColor=#27ae60;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="270" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="balrog" value="&lt;b&gt;🧠 BALROG&lt;/b&gt;&lt;br&gt;&lt;code&gt;.[balrog]&lt;/code&gt;&lt;br&gt;&lt;i&gt;LLM evaluation&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5f5e3;strokeColor=#27ae60;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="728" y="270" width="120" height="60" as="geometry"/>
+                </mxCell>
+                <mxCell id="envs_bg" value="&lt;b style=&quot;font-size: 14px&quot;&gt;Environments&lt;/b&gt;&lt;span style=&quot;font-size: 14px&quot;&gt;&amp;nbsp;— mix and match freely&amp;nbsp; &amp;nbsp;&amp;nbsp;&lt;/span&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#eaf2f8;strokeColor=#2980b9;verticalAlign=top;fontSize=12;dashed=1;dashPattern=8 4;spacingTop=5;align=right;" parent="1" vertex="1">
+                    <mxGeometry x="310" y="460" width="590" height="170" as="geometry"/>
+                </mxCell>
+                <mxCell id="minigrid" value="&lt;b&gt;🔲 MiniGrid&lt;/b&gt;&lt;br&gt;&lt;code&gt;.[minigrid]&lt;/code&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d6eaf8;strokeColor=#2980b9;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="342.5" y="500" width="110" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="multigrid" value="&lt;b&gt;⚽ MultiGrid&lt;/b&gt;&lt;br&gt;&lt;code&gt;.[mosaic_multigrid]&lt;/code&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d6eaf8;strokeColor=#2980b9;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="343" y="560" width="108" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="box2d" value="&lt;b&gt;🚀 Box2D&lt;/b&gt;&lt;br&gt;&lt;code&gt;.[box2d]&lt;/code&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d6eaf8;strokeColor=#2980b9;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="480" y="500" width="110" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="smac" value="&lt;b&gt;⭐ SMAC&lt;/b&gt;&lt;br&gt;&lt;code&gt;.[smac]&lt;/code&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d6eaf8;strokeColor=#2980b9;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="610" y="560" width="140" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="crafter" value="&lt;b&gt;🌲 Crafter&lt;/b&gt;&lt;br&gt;&lt;code&gt;.[crafter]&lt;/code&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d6eaf8;strokeColor=#2980b9;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="769" y="500" width="112" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="more" value="&lt;b&gt;... 15+ more&lt;/b&gt;&lt;br&gt;&lt;i&gt;Atari, MuJoCo,&lt;br&gt;NetHack, PettingZoo&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d6eaf8;strokeColor=#2980b9;fontSize=11;strokeDasharray=4 4;" parent="1" vertex="1">
+                    <mxGeometry x="610" y="500" width="140" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_workers" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#27ae60;strokeWidth=3;" parent="1" source="mosaic" target="workers_bg" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="e_envs" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#2980b9;strokeWidth=3;exitX=0;exitY=0.5;exitDx=0;exitDy=0;" parent="1" source="mosaic" target="envs_bg" edge="1">
+                    <mxGeometry relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="260" y="120"/>
+                            <mxPoint x="260" y="545"/>
+                        </Array>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="combo1" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#27ae60;strokeWidth=2;dashPattern=8 4;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="cleanrl" target="minigrid" edge="1">
+                    <mxGeometry x="0.3684" relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="380" y="380"/>
+                            <mxPoint x="379" y="380"/>
+                            <mxPoint x="379" y="420"/>
+                            <mxPoint x="398" y="420"/>
+                        </Array>
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="example" value="&lt;font style=&quot;font-size: 13px;&quot;&gt;Example: &lt;code&gt;&lt;b&gt;pip install -e &quot;.[cleanrl,minigrid,box2d]&quot;&lt;/b&gt;&amp;nbsp;&lt;/code&gt;&amp;nbsp;installs &lt;b&gt;one worker + two env families&lt;/b&gt;, zero conflicts&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;strokeColor=none;fillColor=none;" parent="1" vertex="1">
+                    <mxGeometry x="289" y="641" width="643" height="28" as="geometry"/>
+                </mxCell>
+                <mxCell id="3" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#27ae60;strokeWidth=2;dashPattern=8 4;exitX=0.5;exitY=1;exitDx=0;exitDy=0;" parent="1" source="cleanrl" target="multigrid" edge="1">
+                    <mxGeometry x="0.0059" relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="380" y="420"/>
+                            <mxPoint x="320" y="420"/>
+                            <mxPoint x="320" y="585"/>
+                        </Array>
+                        <mxPoint x="380" y="400" as="sourcePoint"/>
+                        <mxPoint x="389" y="469" as="targetPoint"/>
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="5" value="" style="edgeStyle=orthogonalEdgeStyle;rounded=1;orthogonalLoop=1;jettySize=auto;html=1;strokeColor=#27ae60;strokeWidth=2;dashPattern=8 4;" parent="1" target="box2d" edge="1">
+                    <mxGeometry x="0.5077" relative="1" as="geometry">
+                        <Array as="points">
+                            <mxPoint x="380" y="420"/>
+                            <mxPoint x="535" y="420"/>
+                        </Array>
+                        <mxPoint x="380" y="330" as="sourcePoint"/>
+                        <mxPoint x="408" y="510" as="targetPoint"/>
+                        <mxPoint as="offset"/>
+                    </mxGeometry>
+                </mxCell>
+                <mxCell id="6" value="&lt;b&gt;🤝&lt;/b&gt;&lt;b&gt;&amp;nbsp;Overcooked&lt;/b&gt;&lt;br&gt;&lt;code&gt;.[overcooked]&lt;/code&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d6eaf8;strokeColor=#2980b9;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="769" y="560" width="112" height="50" as="geometry"/>
+                </mxCell>
+                <mxCell id="7" value="&lt;b&gt;⭐ SMACv2&lt;/b&gt;&lt;br&gt;&lt;code&gt;.[smacv2]&lt;/code&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d6eaf8;strokeColor=#2980b9;fontSize=11;" parent="1" vertex="1">
+                    <mxGeometry x="480" y="560" width="110" height="50" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

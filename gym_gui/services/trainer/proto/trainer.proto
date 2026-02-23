@@ -1,0 +1,194 @@
+syntax = "proto3";
+
+package gymgui.trainer;
+
+import "google/protobuf/timestamp.proto";
+
+option cc_enable_arenas = true;
+
+// RPC surface for the trainer daemon.
+service TrainerService {
+  // Registers a new training run and returns the canonical digest.
+  rpc SubmitRun(SubmitRunRequest) returns (SubmitRunResponse);
+
+  // Cancels an in-flight run. No-op if the run already finished.
+  rpc CancelRun(CancelRunRequest) returns (CancelRunResponse);
+
+  // Returns a snapshot of runs filtered by status.
+  rpc ListRuns(ListRunsRequest) returns (ListRunsResponse);
+
+  // Streams updates for active runs. Yields whenever a run changes.
+  rpc WatchRuns(WatchRunsRequest) returns (stream RunRecord);
+
+  // Worker heartbeat hook to keep the run marked as healthy.
+  rpc Heartbeat(HeartbeatRequest) returns (HeartbeatResponse);
+
+  // Worker capability handshake that must succeed before telemetry streams start.
+  rpc RegisterWorker(RegisterWorkerRequest) returns (RegisterWorkerResponse);
+
+  // Bidirectional control-plane stream for credit grants and pause/resume flow.
+  rpc ControlStream(stream ControlEvent) returns (stream ControlEvent);
+
+  // Lightweight daemon heartbeat so the GUI can report liveness.
+  rpc GetHealth(HealthCheckRequest) returns (HealthCheckResponse);
+
+  // Streams telemetry step records for the requested run.
+  rpc StreamRunSteps(StreamStepsRequest) returns (stream RunStep);
+
+  // Streams telemetry episode rollups for the requested run.
+  rpc StreamRunEpisodes(StreamEpisodesRequest) returns (stream RunEpisode);
+
+  // Worker-side ingestion stream for step telemetry.
+  rpc PublishRunSteps(stream RunStep) returns (PublishTelemetryResponse);
+
+  // Worker-side ingestion stream for episode telemetry.
+  rpc PublishRunEpisodes(stream RunEpisode) returns (PublishTelemetryResponse);
+}
+
+message SubmitRunRequest {
+  string run_id = 1;
+  string config_json = 2;
+}
+
+message SubmitRunResponse {
+  string run_id = 1;
+  string digest = 2;
+}
+
+message CancelRunRequest {
+  string run_id = 1;
+}
+
+message CancelRunResponse {}
+
+message RegisterWorkerRequest {
+  string run_id = 1;
+  string worker_id = 2;
+  string worker_kind = 3;       // "cleanrl" | "ray" | "xuance" | "llm-agent"
+  string proto_version = 4;     // e.g., "MOSAIC/1.0"
+  string schema_id = 5;         // e.g., "telemetry.step.grid"
+  uint32 schema_version = 6;
+  bool supports_pause = 7;
+  bool supports_checkpoint = 8;
+}
+
+message RegisterWorkerResponse {
+  string accepted_version = 1;
+  string session_token = 2;     // use for subsequent streams
+}
+
+message ControlEvent {
+  string run_id = 1;
+  oneof event {
+    uint32 grant_steps = 10;     // add credits
+    bool pause = 11;             // soft pause
+    bool resume = 12;
+    uint32 max_rate_hz = 13;     // optional soft rate cap
+  }
+}
+
+enum RunStatus {
+  RUN_STATUS_UNSPECIFIED = 0;
+  RUN_STATUS_INIT = 1;
+  RUN_STATUS_HSHK = 2;
+  RUN_STATUS_RDY = 3;
+  RUN_STATUS_EXEC = 4;
+  RUN_STATUS_PAUSE = 5;
+  RUN_STATUS_FAULT = 6;
+  RUN_STATUS_TERM = 7;
+}
+
+message RunRecord {
+  string run_id = 1;
+  RunStatus status = 2;
+  string digest = 3;
+  google.protobuf.Timestamp created_at = 4;
+  google.protobuf.Timestamp updated_at = 5;
+  google.protobuf.Timestamp last_heartbeat = 6;
+  optional int32 gpu_slot = 7;
+  optional string failure_reason = 8;
+  repeated int32 gpu_slots = 9;
+  // Monotonic sequence identifier per broadcasted update.
+  uint64 seq_id = 10;
+}
+
+message ListRunsRequest {
+  repeated RunStatus status_filter = 1;
+}
+
+message ListRunsResponse {
+  repeated RunRecord runs = 1;
+}
+
+message WatchRunsRequest {
+  repeated RunStatus status_filter = 1;
+  // Replay any events with seq_id greater than this value before streaming.
+  uint64 since_seq = 2;
+}
+
+message HeartbeatRequest {
+  string run_id = 1;
+}
+
+message HeartbeatResponse {}
+
+message HealthCheckRequest {}
+
+message HealthCheckResponse {
+  uint64 pid = 1;
+  google.protobuf.Timestamp started_at = 2;
+  string listen_address = 3;
+  bool healthy = 4;
+}
+
+message StreamStepsRequest {
+  string run_id = 1;
+  uint64 since_seq = 2;
+}
+
+message StreamEpisodesRequest {
+  string run_id = 1;
+  uint64 since_seq = 2;
+}
+
+message RunStep {
+  string run_id = 1;
+  uint64 episode_index = 2;
+  uint64 step_index = 3;
+  string action_json = 4;
+  string observation_json = 5;
+  double reward = 6;
+  bool terminated = 7;
+  bool truncated = 8;
+  google.protobuf.Timestamp timestamp = 9;
+  string policy_label = 10;
+  string backend = 11;
+  uint64 seq_id = 12;
+  string agent_id = 13;
+  string render_hint_json = 14;
+  string frame_ref = 15;
+  uint32 payload_version = 16;
+  string render_payload_json = 17;  // Grid/RGB rendering data
+  uint64 episode_seed = 18;  // NEW: Unique seed per episode for environment variation
+  string worker_id = 19;  // NEW: Worker identifier for distributed runs
+}
+
+message RunEpisode {
+  string run_id = 1;
+  uint64 episode_index = 2;
+  
+  double total_reward = 3;
+  uint64 steps = 4;
+  bool terminated = 5;
+  bool truncated = 6;
+  string metadata_json = 7;
+  google.protobuf.Timestamp timestamp = 8;
+  uint64 seq_id = 9;
+  string agent_id = 10;
+  string worker_id = 11;  // NEW: Worker identifier for distributed runs
+}
+
+message PublishTelemetryResponse {
+  uint64 accepted = 1;
+  uint64 dropped = 2;
+}

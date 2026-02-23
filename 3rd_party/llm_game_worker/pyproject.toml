@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "llm_game_worker"
+version = "0.1.0"
+description = "LLM-based player for PettingZoo classic board games"
+authors = [
+    {name = "MOSAIC Team"}
+]
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "openai>=1.0.0",
+    "pettingzoo>=1.24.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+]
+
+[project.scripts]
+llm-game-worker = "llm_game_worker.cli:main"
+
+[project.entry-points."mosaic.workers"]
+llm_game = "llm_game_worker:get_worker_metadata"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["llm_game_worker*"]

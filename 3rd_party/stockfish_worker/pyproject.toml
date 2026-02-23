@@ -1,0 +1,59 @@
+[build-system]
+requires = ["setuptools>=65", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mosaic-stockfish-worker"
+version = "1.0.0"
+description = "Stockfish chess engine worker for MOSAIC operators"
+readme = "README.md"
+requires-python = ">=3.10"
+license = {text = "GPL-3.0"}
+authors = [
+    {name = "MOSAIC Team", email = "mosaic@example.com"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: GNU General Public License v3 (GPLv3)",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Games/Entertainment :: Board Games",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+keywords = ["stockfish", "chess", "mosaic", "reinforcement-learning", "multi-agent"]
+
+dependencies = [
+    "stockfish>=3.28.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+    "pytest-cov",
+]
+
+[project.scripts]
+stockfish-worker = "stockfish_worker.cli:main"
+
+# CRITICAL: Register worker for MOSAIC discovery
+[project.entry-points."mosaic.workers"]
+stockfish = "stockfish_worker:get_worker_metadata"
+
+[project.urls]
+Homepage = "https://github.com/Abdulhamid97Mousa/MOSAIC"
+Documentation = "https://stockfishchess.org/"
+Repository = "https://github.com/Abdulhamid97Mousa/MOSAIC"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["stockfish_worker*"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_functions = ["test_*"]
+addopts = "-v --tb=short"

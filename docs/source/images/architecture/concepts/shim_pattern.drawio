@@ -1,0 +1,55 @@
+<mxfile host="65bd71144e">
+    <diagram id="shim-pattern" name="Shim Pattern">
+        <mxGraphModel dx="1269" dy="719" grid="0" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1100" pageHeight="850" math="0" shadow="0">
+            <root>
+                <mxCell id="0"/>
+                <mxCell id="1" parent="0"/>
+                <mxCell id="core-bg" value="MOSAIC Core" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#4472C4;strokeColor=#2F528F;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#ffffff;verticalAlign=top;arcSize=4;" parent="1" vertex="1">
+                    <mxGeometry x="270" y="60" width="560" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="trainer" value="Trainer Daemon" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#2F528F;strokeWidth=1.5;fontSize=12;fontColor=#1a1a1a;arcSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="320" y="100" width="180" height="64" as="geometry"/>
+                </mxCell>
+                <mxCell id="qt6gui" value="Qt6 GUI" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#2F528F;strokeWidth=1.5;fontSize=12;fontColor=#1a1a1a;arcSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="600" y="100" width="180" height="64" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow-core-shim" value="gRPC + JSONL" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#555555;strokeWidth=2;fontColor=#333333;fontSize=11;fontStyle=1;endArrow=block;endFill=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="core-bg" target="shim-bg" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="shim-bg" value="MOSAIC Shim Layer (e.g., cleanrl_worker)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E07B2A;strokeColor=#B85D0D;strokeWidth=2;fontSize=13;fontStyle=1;fontColor=#ffffff;verticalAlign=top;arcSize=4;" parent="1" vertex="1">
+                    <mxGeometry x="60" y="270" width="980" height="160" as="geometry"/>
+                </mxCell>
+                <mxCell id="config" value="&lt;b&gt;config.py&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px;&#39;&gt;Translate JSON → CLI&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#B85D0D;strokeWidth=1.5;fontSize=12;fontColor=#1a1a1a;arcSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="80" y="308" width="155" height="86" as="geometry"/>
+                </mxCell>
+                <mxCell id="runtime" value="&lt;b&gt;runtime.py&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px;&#39;&gt;Manage lifecycle&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#B85D0D;strokeWidth=1.5;fontSize=12;fontColor=#1a1a1a;arcSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="258" y="308" width="155" height="86" as="geometry"/>
+                </mxCell>
+                <mxCell id="telemetry" value="&lt;b&gt;telemetry.py&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px;&#39;&gt;Emit JSONL&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#B85D0D;strokeWidth=1.5;fontSize=12;fontColor=#1a1a1a;arcSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="473" y="308" width="155" height="86" as="geometry"/>
+                </mxCell>
+                <mxCell id="analytics" value="&lt;b&gt;analytics.py&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px;&#39;&gt;Generate manifests&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#B85D0D;strokeWidth=1.5;fontSize=12;fontColor=#1a1a1a;arcSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="688" y="308" width="155" height="86" as="geometry"/>
+                </mxCell>
+                <mxCell id="fastlane" value="&lt;b&gt;fastlane.py&lt;/b&gt;&lt;br/&gt;&lt;font style=&#39;font-size:10px;&#39;&gt;Shared-memory rendering&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#B85D0D;strokeWidth=1.5;fontSize=12;fontColor=#1a1a1a;arcSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="880" y="308" width="140" height="86" as="geometry"/>
+                </mxCell>
+                <mxCell id="arrow-shim-upstream" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#555555;strokeWidth=2;endArrow=block;endFill=1;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" parent="1" source="shim-bg" target="upstream-bg" edge="1">
+                    <mxGeometry relative="1" as="geometry"/>
+                </mxCell>
+                <mxCell id="upstream-bg" value="Upstream Library (Unmodified) (e.g., cleanrl_worker)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F2F2F2;strokeColor=#AAAAAA;strokeWidth=2;dashed=1;fontSize=13;fontStyle=1;fontColor=#555555;verticalAlign=top;arcSize=4;" parent="1" vertex="1">
+                    <mxGeometry x="230" y="520" width="640" height="130" as="geometry"/>
+                </mxCell>
+                <mxCell id="ppo" value="ppo.py" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#AAAAAA;strokeWidth=1.5;fontSize=12;fontColor=#1a1a1a;arcSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="270" y="568" width="140" height="56" as="geometry"/>
+                </mxCell>
+                <mxCell id="dqn" value="dqn.py" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#AAAAAA;strokeWidth=1.5;fontSize=12;fontColor=#1a1a1a;arcSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="480" y="568" width="140" height="56" as="geometry"/>
+                </mxCell>
+                <mxCell id="sac" value="sac.py" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#AAAAAA;strokeWidth=1.5;fontSize=12;fontColor=#1a1a1a;arcSize=10;" parent="1" vertex="1">
+                    <mxGeometry x="690" y="568" width="140" height="56" as="geometry"/>
+                </mxCell>
+            </root>
+        </mxGraphModel>
+    </diagram>
+</mxfile>

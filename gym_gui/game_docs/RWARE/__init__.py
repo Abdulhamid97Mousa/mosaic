@@ -1,0 +1,37 @@
+"""RWARE (Robotic Warehouse) game documentation re-exports."""
+
+from gym_gui.game_docs.RWARE.RWARE_Tiny import (
+    RWARE_TINY_2AG_HTML,
+    RWARE_TINY_4AG_HTML,
+)
+from gym_gui.game_docs.RWARE.RWARE_Small import (
+    RWARE_SMALL_2AG_HTML,
+    RWARE_SMALL_4AG_HTML,
+)
+from gym_gui.game_docs.RWARE.RWARE_Medium import (
+    RWARE_MEDIUM_2AG_HTML,
+    RWARE_MEDIUM_4AG_HTML,
+    RWARE_MEDIUM_4AG_EASY_HTML,
+    RWARE_MEDIUM_4AG_HARD_HTML,
+)
+from gym_gui.game_docs.RWARE.RWARE_Large import (
+    RWARE_LARGE_4AG_HTML,
+    RWARE_LARGE_4AG_HARD_HTML,
+    RWARE_LARGE_8AG_HTML,
+    RWARE_LARGE_8AG_HARD_HTML,
+)
+
+__all__ = [
+    "RWARE_TINY_2AG_HTML",
+    "RWARE_TINY_4AG_HTML",
+    "RWARE_SMALL_2AG_HTML",
+    "RWARE_SMALL_4AG_HTML",
+    "RWARE_MEDIUM_2AG_HTML",
+    "RWARE_MEDIUM_4AG_HTML",
+    "RWARE_MEDIUM_4AG_EASY_HTML",
+    "RWARE_MEDIUM_4AG_HARD_HTML",
+    "RWARE_LARGE_4AG_HTML",
+    "RWARE_LARGE_4AG_HARD_HTML",
+    "RWARE_LARGE_8AG_HTML",
+    "RWARE_LARGE_8AG_HARD_HTML",
+]
