@@ -51,29 +51,32 @@ creating a synchronized step loop.
 .. mermaid::
 
    %%{init: {"flowchart": {"curve": "linear"}} }%%
-   graph LR
-       subgraph GUI["MOSAIC GUI (Main Process)"]
+   graph TB
+       subgraph GUI["MOSAIC GUI  (Main Process)"]
+           direction LR
            LAUNCHER["OperatorLauncher"]
            HANDLE["OperatorProcessHandle"]
        end
 
-       subgraph OP["Operator (Agent-Level Interface)"]
-           subgraph WORKER["Worker Subprocess"]
-               RUNTIME["InteractiveRuntime"]
-               ENV["Environment"]
-               POLICY["Policy / LLM"]
-           end
+       LAUNCHER -- "subprocess.Popen()" --> RUNTIME
+       HANDLE -- "stdin: JSON command<br/>{'cmd':'step'}" --> RUNTIME
+       RUNTIME -- "stdout: JSON response<br/>{'type':'step', ...}" --> HANDLE
+
+       subgraph WORKER["Worker Subprocess  (Operator / Agent-Level Interface)"]
+           RUNTIME["InteractiveRuntime<br/>(stdin/stdout loop)"]
+           ENV["Environment<br/>(Gymnasium)"]
+           POLICY["Policy / LLM / Human"]
+           RUNTIME -- "obs = env.step(action)" --> ENV
+           RUNTIME -- "action = select_action(obs)" --> POLICY
        end
 
-       LAUNCHER -->|"spawn"| WORKER
-       HANDLE -->|"stdin: JSON commands"| RUNTIME
-       RUNTIME -->|"stdout: JSON responses"| HANDLE
-       RUNTIME --> ENV
-       RUNTIME --> POLICY
-
        style GUI fill:#4a90d9,stroke:#2e5a87,color:#fff
-       style OP fill:#9370db,stroke:#6a0dad,color:#fff
-       style WORKER fill:#ff7f50,stroke:#cc5500,color:#fff
+       style WORKER fill:#50c878,stroke:#2e8b57,color:#fff
+       style LAUNCHER fill:#2a6db5,stroke:#1a4d80,color:#fff
+       style HANDLE fill:#2a6db5,stroke:#1a4d80,color:#fff
+       style RUNTIME fill:#ff7f50,stroke:#cc5500,color:#fff
+       style ENV fill:#ddd,stroke:#999,color:#333
+       style POLICY fill:#ddd,stroke:#999,color:#333
 
 Interactive JSON Protocol
 -------------------------

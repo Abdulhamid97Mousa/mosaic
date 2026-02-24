@@ -152,3 +152,7 @@
 [submodule "3rd_party/mosaic_multigrid"]
 	path = 3rd_party/mosaic_multigrid
 	url = https://github.com/Abdulhamid97Mousa/mosaic_multigrid.git
+
+[submodule "llm_chess"]
+	path = 3rd_party/chess_worker/llm_chess
+	url = https://github.com/maxim-saplin/llm_chess.git

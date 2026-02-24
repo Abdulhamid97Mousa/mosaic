@@ -4,9 +4,6 @@ Common Errors
 This page lists frequently encountered errors when working with the
 CleanRL worker, along with their causes and fixes.
 
-.. contents:: On this page
-   :local:
-   :depth: 1
 
 ModuleNotFoundError: No module named 'tyro'
 --------------------------------------------
@@ -54,7 +51,7 @@ extras, install those as well:
    pip install "cleanrl[atari]"
    pip install "cleanrl[envpool]"
 
-TensorBoard -- "No module named 'pkg_resources'"
+TensorBoard: "No module named 'pkg_resources'"
 --------------------------------------------------
 
 .. code-block:: text

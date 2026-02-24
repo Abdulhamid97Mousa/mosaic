@@ -1,9 +1,9 @@
 Integrated Workers
 ==================
 
-MOSAIC ships with seven production-ready workers that wrap major RL
+MOSAIC ships with eight production-ready workers that wrap major RL
 frameworks, LLM evaluation suites, multi-agent LLM coordination,
-human-in-the-loop control, and baseline agents.  Each worker follows the
+LLM chess play, human-in-the-loop control, and baseline agents.  Each worker follows the
 :doc:`shim pattern <../concept>`: upstream libraries are **never
 modified**; a thin integration layer translates between MOSAIC and
 the library.
@@ -42,6 +42,11 @@ the library.
      - GPT-4o, Claude 3, Gemini, vLLM (local)
      - NetHack, MiniHack, BabyAI, Crafter, TextWorld
      - Subprocess (parallel)
+   * - :doc:`Chess LLM <Chess_LLM_Worker/index>`
+     - LLM Chess
+     - GPT-4o, Claude 3, Gemini, vLLM (local)
+     - PettingZoo Chess (chess_v6)
+     - Subprocess (interactive)
    * - :doc:`MOSAIC Human <MOSAIC_Human_Worker/index>`
      - Human-in-the-Loop
      - Human action selection via GUI
@@ -130,6 +135,7 @@ Each worker has dedicated GUI form widgets for experiment configuration:
    :maxdepth: 1
 
    MOSAIC_LLM_Worker/index
+   Chess_LLM_Worker/index
    MOSAIC_Human_Worker/index
    MOSAIC_Random_Worker/index
    CleanRL_Worker/index

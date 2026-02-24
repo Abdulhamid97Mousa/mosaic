@@ -56,7 +56,7 @@ MOSAIC supports two fundamentally different operator configurations:
            H3["RL"]
        end
 
-       subgraph "Hybrid"
+       subgraph "Heterogeneous"
            X1["RL"]
            X2["LLM"]
            X3["Human"]
@@ -75,7 +75,7 @@ MOSAIC supports two fundamentally different operator configurations:
    baseline), the single-worker pattern, and GUI adaptation by
    category.
 
-:doc:`Hybrid Decision-Maker <hybrid_decision_maker/index>`
+:doc:`Heterogeneous Decision-Maker <heterogeneous_decision_maker/index>`
    Agents use **different** paradigms in the same experiment (e.g., RL +
    LLM as teammates).  Covers the research gap this addresses, the
    WorkerAssignment system, experimental configurations, deterministic
@@ -191,7 +191,7 @@ regardless of what runs behind it, the environment only ever calls
        style A1 fill:#50c878,stroke:#2e8b57,color:#fff
        style A2 fill:#ff7f50,stroke:#cc5500,color:#fff
 
-This is what makes hybrid teams possible -- each agent slot is
+This is what makes heterogeneous teams possible -- each agent slot is
 independently configured, yet they all plug into the same environment
 through a single protocol.
 
@@ -259,7 +259,7 @@ changes, which the parent widget uses to:
    # How the widget builds a multi-agent config (any multi-agent env)
    config = OperatorConfig.multi_agent(
        operator_id="op_0",
-       display_name="Hybrid Team",
+       display_name="Heterogeneous Team",
        env_name="<env_family>",        # e.g. mosaic_multigrid, meltingpot, pettingzoo
        task="<env_id>",                # e.g. Soccer-2v2, predator_prey, chess_v6
        player_workers={

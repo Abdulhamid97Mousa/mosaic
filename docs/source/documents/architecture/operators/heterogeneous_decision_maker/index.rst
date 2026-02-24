@@ -1,4 +1,4 @@
-Hybrid Decision-Maker
+Heterogeneous Decision-Maker
 =====================
 
 .. raw:: html
@@ -13,8 +13,8 @@ Hybrid Decision-Maker
      and <a href="../../../architecture/operators/architecture.html">IPC Architecture</a>.
    </p>
 
-A **hybrid** setup is one where agents in the same experiment use
-**different decision-making paradigms** -- for example, an RL-trained
+A **heterogeneous** setup is one where agents in the same experiment use
+**different decision-making paradigms**. For example, an RL-trained
 policy and an LLM playing side-by-side as teammates, or an RL agent
 competing against an LLM agent.
 
@@ -53,7 +53,7 @@ Existing frameworks are paradigm-siloed:
 
 No prior framework allowed **fair, reproducible, head-to-head
 comparison** between RL agents and LLM agents in the same multi-agent
-environment.  The root cause is an interface mismatch -- RL agents
+environment.  The root cause is an interface mismatch. RL agents
 expect tensor observations and produce integer actions, while LLM
 agents expect text prompts and produce text responses.
 
@@ -72,7 +72,7 @@ Operator Protocol fills this gap:
    %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph LR
        subgraph "Gymnasium (Environments)"
-           E1["CartPole"]
+           E1["MultiGrid Soccer"]
            E2["MiniGrid"]
            E3["Chess"]
        end
@@ -104,10 +104,10 @@ Operator Protocol fills this gap:
        style A3 fill:#ddd,stroke:#999,color:#333
 
 Just as Gymnasium made environments interchangeable, the Operator
-Protocol makes **agents interchangeable** -- any decision-maker can be
+Protocol makes **agents interchangeable**. Any decision-maker can be
 plugged into any compatible environment without modifying either side.
 
-How Hybrid Teams Work
+How Heterogeneous Teams Work
 ---------------------
 
 The ``WorkerAssignment`` system maps each agent slot in a multi-agent
@@ -117,14 +117,14 @@ across agent slots:
 
 .. code-block:: python
 
-   # Hybrid team: RL + LLM in 2v2 soccer
+   # Heterogeneous team: RL + LLM in 2v2 soccer
    config = OperatorConfig.multi_agent(
-       operator_id="hybrid_team",
-       display_name="RL + LLM Hybrid vs RL + Random",
+       operator_id="heterogeneous_team",
+       display_name="RL + LLM Heterogeneous vs RL + Random",
        env_name="multigrid",
-       task="MultiGrid-Soccer-2v2-v0",
+       task="MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0",
        player_workers={
-           # Green team: hybrid (RL + LLM)
+           # Green team: heterogeneous (RL + LLM)
            "green_0": WorkerAssignment(
                worker_id="cleanrl_worker",
                worker_type="rl",
@@ -163,7 +163,7 @@ This creates four agent slots, each backed by a different subprocess:
    graph TB
        ENV["MultiGrid Soccer 2v2<br/>(PettingZoo AEC)"]
 
-       subgraph "Green Team (Hybrid)"
+       subgraph "Green Team (Heterogeneous)"
            G0["green_0: RL<br/>cleanrl_worker<br/>MAPPO checkpoint"]
            G1["green_1: LLM<br/>mosaic_llm_worker<br/>GPT-4o"]
        end
@@ -196,7 +196,7 @@ different decision-making mechanism.  The environment only sees
 Multi-Worker Pattern
 --------------------
 
-The hybrid setup uses the **multi-worker pattern**: one Operator wraps
+The heterogeneous setup uses the **multi-worker pattern**: one Operator wraps
 N Worker subprocesses via the ``OperatorController`` protocol:
 
 .. code-block:: python
@@ -244,7 +244,7 @@ JSONL-over-stdout.  This process isolation means:
 Experimental Configurations
 ---------------------------
 
-Hybrid decision-making enables a systematic ablation matrix for
+Heterogeneous decision-making enables a systematic ablation matrix for
 cross-paradigm research.  Here are examples using 2v2 soccer:
 
 Adversarial Cross-Paradigm
@@ -277,35 +277,30 @@ Testing how paradigms perform **against** each other:
      - Random + Random
      - Sanity check
 
-Cooperative Hybrid Teams
+Cooperative Heterogeneous Teams
 ^^^^^^^^^^^^^^^^^^^^^^^^
 
 Testing how paradigms work **together** as teammates:
 
 .. list-table::
    :header-rows: 1
-   :widths: 25 25 25 25
+   :widths: 34 33 33
 
    * - Configuration
      - Green Team
      - Blue Team
-     - Research Question
-   * - Hybrid vs Crippled
+   * - Heterogeneous vs Crippled
      - RL + LLM
      - RL + Random
-     - Does LLM reasoning beat random as a teammate?
-   * - Hybrid vs Solo
+   * - Heterogeneous vs Solo
      - RL + LLM
      - RL + NoOp
-     - Does the LLM actively help or just "not hurt"?
    * - Solo-pair vs Solo-pair
      - RL + RL
      - RL + RL
-     - Uncoordinated RL pair baseline
-   * - Hybrid vs Co-trained
+   * - Heterogeneous vs Co-trained
      - RL + LLM
      - RL(2v2) + RL(2v2)
-     - Can zero-shot LLM match million-step co-training?
 
 .. important::
 
@@ -330,7 +325,7 @@ paradigms -- the first time this has been possible.
 
        SEEDS --> RL["RL Operator<br/>same 100 seeds"]
        SEEDS --> LLM["LLM Operator<br/>same 100 seeds"]
-       SEEDS --> HYB["Hybrid Team<br/>same 100 seeds"]
+       SEEDS --> HYB["Heterogeneous Team<br/>same 100 seeds"]
        SEEDS --> BASE["Baseline<br/>same 100 seeds"]
 
        RL --> TEL["Unified Telemetry<br/>JSONL logs"]
@@ -357,52 +352,6 @@ with its own environment instance but sharing the same seed:
        def start_all(self) -> None: ...
        def stop_all(self) -> None: ...
 
-Research Questions
-------------------
-
-The hybrid decision-maker architecture enables research questions that
-were previously impossible to investigate:
-
-.. list-table::
-   :header-rows: 1
-   :widths: 10 60 30
-
-   * - #
-     - Question
-     - Priority
-   * - Q1
-     - Does an LLM teammate help a solo-trained RL agent in 2v2?
-     - High
-   * - Q2
-     - Does the LLM actively help or just "not hurt"? (vs NoOp)
-     - High
-   * - Q3
-     - Is an LLM teammate better than a second solo RL agent?
-     - High
-   * - Q4
-     - Can zero-shot LLM teaming compete with million-step co-training?
-     - High
-   * - Q5
-     - What role does the LLM play? (ball possession, assists, defense)
-     - High
-   * - Q6
-     - Is hybrid advantage robust across seeds?
-     - High
-   * - Q7
-     - Does hybrid advantage generalize across environments?
-     - Medium
-
-These questions span four possible outcomes:
-
-- **Hypothesis A (RL Carries)**: the LLM adds nothing -- hybrid
-  performance matches RL + dummy
-- **Hypothesis B (LLM Carries)**: the RL agent adds nothing -- hybrid
-  performance matches dummy + LLM
-- **Hypothesis C (True Synergy)**: hybrid outperforms both homogeneous
-  teams -- the most publishable result
-- **Hypothesis D (Interference)**: hybrid underperforms both
-  homogeneous teams -- still publishable as a negative result
-
 .. raw:: html
 
    <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
@@ -416,7 +365,7 @@ These questions span four possible outcomes:
 GUI Integration
 ---------------
 
-The hybrid decision-maker is configured through the
+The heterogeneous decision-maker is configured through the
 ``OperatorsTab`` in the GUI, which provides two execution modes:
 
 **Manual Mode** -- step-by-step execution where the user clicks

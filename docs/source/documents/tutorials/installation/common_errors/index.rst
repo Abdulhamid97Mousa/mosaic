@@ -85,7 +85,7 @@ the fix is usually installing the missing system package.
        libbz2-dev \
        libopenmpi-dev
 
-``box2d-py`` -- "command 'swig' failed"
+``box2d-py``: "command 'swig' failed"
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error:**
@@ -107,7 +107,7 @@ by default.
    sudo apt-get install -y swig build-essential
    pip install -e ".[box2d]"
 
-``nle`` (NetHack) -- build failure
+``nle`` (NetHack): build failure
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error:**
@@ -127,7 +127,7 @@ game engine from C source. It requires ``cmake``, ``flex``, ``bison``, and
    sudo apt-get install -y build-essential cmake flex bison libbz2-dev
    pip install -e ".[nethack]"
 
-``mpi4py`` -- "Cannot compile MPI programs"
+``mpi4py``: "Cannot compile MPI programs"
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error:**
@@ -164,7 +164,7 @@ MPI libraries. The MPI compiler wrapper ``mpicc`` is not installed by default.
    ``MPI_Init()`` from blocking when XuanCe is imported outside of ``mpirun``.
    Make sure your ``.env`` file includes this setting.
 
-TensorBoard -- "No module named 'pkg_resources'"
+TensorBoard: "No module named 'pkg_resources'"
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error:**
@@ -200,7 +200,7 @@ this on fresh installs.
 Dependency Conflicts
 --------------------
 
-``smac`` / ``smacv2`` -- protobuf version conflict
+``smac`` / ``smacv2``:  protobuf version conflict
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error:**
@@ -263,11 +263,11 @@ proto stubs, regenerate them:
 This runs ``grpc_tools.protoc`` on ``gym_gui/services/trainer/proto/trainer.proto``
 and produces:
 
-- ``trainer_pb2.py`` -- message classes
-- ``trainer_pb2_grpc.py`` -- gRPC service stubs
-- ``trainer_pb2.pyi`` -- type stubs
+- ``trainer_pb2.py``:  message classes
+- ``trainer_pb2_grpc.py``:  gRPC service stubs
+- ``trainer_pb2.pyi``:  type stubs
 
-``grpcio-tools`` -- "grpcio-tools not installed"
+``grpcio-tools``:  "grpcio-tools not installed"
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error (when running ``tools/generate_protos.sh``):**
@@ -309,7 +309,7 @@ Then re-run the proto generation:
 Startup Errors
 --------------
 
-Trainer daemon failed to start -- "VersionError: Detected incompatible Protobuf Gencode/Runtime versions"
+Trainer daemon failed to start: "VersionError: Detected incompatible Protobuf Gencode/Runtime versions"
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error (when running ``./run.sh``):**
@@ -346,7 +346,7 @@ Then restart the application:
 
    ./run.sh
 
-Trainer daemon failed to start -- "No module named 'dotenv'"
+Trainer daemon failed to start: "No module named 'dotenv'"
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error (when running ``./run.sh``):**
@@ -377,7 +377,7 @@ installed in your environment.
    bash tools/generate_protos.sh
    ./run.sh
 
-Trainer daemon -- "No module named 'dotenv'"
+Trainer daemon: "No module named 'dotenv'"
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error (in ``var/logs/trainer_daemon.log``):**
@@ -445,8 +445,8 @@ Key variables you should review:
    The ``.env`` file contains **API keys and secrets**. It is gitignored by
    default. Never commit it to version control.
 
-Startup crash -- "No module named 'torch'" / "No module named 'psutil'"
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+Startup crash: "No module named 'torch'" / "No module named 'psutil'"
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error:**
 
@@ -477,7 +477,7 @@ unconditionally at startup for GPU detection and system info display.
 
       pip install torch --index-url https://download.pytorch.org/whl/cu121
 
-Startup crash -- "No module named 'stockfish'" (misleading Qt error)
+Startup crash: "No module named 'stockfish'" (misleading Qt error)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error:**
@@ -498,7 +498,7 @@ If you encounter this on an older version:
 
    pip install stockfish
 
-Startup crash -- "No module named 'syllabus'"
+Startup crash: "No module named 'syllabus'"
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error:**
@@ -547,7 +547,7 @@ These are informational -- install the relevant extras to enable each worker:
 Runtime Errors
 --------------
 
-CleanRL training crash -- "No module named 'tyro'"
+CleanRL training crash: "No module named 'tyro'"
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error (in ``var/logs/trainer_daemon.log``):**
@@ -581,7 +581,7 @@ CleanRL training crash -- "No module named 'tyro'"
    pip uninstall -y pynvml
    pip install nvidia-ml-py
 
-gRPC -- "Log level DEBUG is not suitable for production"
+gRPC: "Log level DEBUG is not suitable for production"
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Warning (when running ``./run.sh``):**
@@ -605,7 +605,7 @@ gRPC -- "Log level DEBUG is not suitable for production"
 
 **This is harmless.** The tracker cleans up the leaked segments automatically.
 
-Syllabus / CleanRL -- missing transitive dependencies
+Syllabus / CleanRL: missing transitive dependencies
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error:**
@@ -645,7 +645,7 @@ Stockfish not found (Chess Engine)
    # macOS
    brew install stockfish
 
-CleanRL PPO crash -- "mat1 and mat2 shapes cannot be multiplied" (Discrete obs)
+CleanRL PPO crash: "mat1 and mat2 shapes cannot be multiplied" (Discrete obs)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error (when training PPO on FrozenLake-v1, Taxi-v3, CliffWalking-v0, etc.):**

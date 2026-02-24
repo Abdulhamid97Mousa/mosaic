@@ -42,7 +42,7 @@ API Key Setup
 Configure API keys in the ``.env`` file or export them as environment
 variables:
 
-**OpenRouter (recommended --- unified access to all providers):**
+**OpenRouter (recommended, unified access to all providers):**
 
 .. code-block:: bash
 
@@ -97,8 +97,8 @@ Core (always installed):
 
 Optional (via extras):
 
-- ``openai >= 1.0.0`` --- OpenAI, OpenRouter, vLLM, NVIDIA clients
-- ``anthropic >= 0.18.0`` --- Anthropic Claude client
-- ``vllm >= 0.6.0`` --- Local model inference server
-- ``omegaconf`` --- Configuration management (used by agent factory)
-- ``google-genai`` --- Google Gemini client
+- ``openai >= 1.0.0``: OpenAI, OpenRouter, vLLM, NVIDIA clients
+- ``anthropic >= 0.18.0``: Anthropic Claude client
+- ``vllm >= 0.6.0``: Local model inference server
+- ``omegaconf``: Configuration management (used by agent factory)
+- ``google-genai``: Google Gemini client
