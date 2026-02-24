@@ -24,12 +24,12 @@ MOSAIC is a visual-first platform that enables researchers to configure, run, an
 
 MOSAIC provides two evaluation modes designed for reproducibility:
 
-<video src="https://mosaic-platform.readthedocs.io/en/latest/_static/videos/demo_shared_seed.mp4" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
+<video src="https://github.com/user-attachments/assets/ea9ebc18-2216-4fb2-913c-5d354ebea56e" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
 <p align="center"><b>Manual Mode:</b> Side-by-side lock-step evaluation with shared seeds.</p>
 
 - **Manual Mode:** side-by-side comparison where multiple operators step through the same environment with shared seeds, letting researchers visually inspect decision-making differences between paradigms in real time.
 
-<video src="https://mosaic-platform.readthedocs.io/en/latest/_static/videos/script_based_experiments.mp4" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
+<video src="https://github.com/user-attachments/assets/a9b3f6f4-661c-492f-b43f-34d7125a6d2e" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
 <p align="center"><b>Script Mode:</b> Automated batch evaluation with deterministic seed sequences.</p>
 
 - **Script Mode:** automated, long-running evaluation driven by Python scripts that define operator configurations, worker assignments, seed sequences, and episode counts. Scripts execute deterministically with no manual intervention, producing reproducible telemetry logs (JSONL) for every step and episode.
@@ -48,16 +48,16 @@ Today's AI landscape offers powerful but **fragmented** tools: RL frameworks ([C
 - **Per-Agent Policy Binding**: Route each agent to different workers via `PolicyMappingService`.
 - **Worker Lifecycle Orchestration**: Subprocess management with heartbeat monitoring and graceful termination.
 
-<video src="https://mosaic-platform.readthedocs.io/en/latest/_static/videos/human_vs_human.mp4" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
+<video src="https://github.com/user-attachments/assets/ded17cdc-f23c-404f-a9f6-074fbe74816c" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
 <p align="center"><b>Human vs Human:</b> Two human players competing via dedicated USB keyboards.</p>
 
-<video src="https://mosaic-platform.readthedocs.io/en/latest/_static/videos/random_worker.mp4" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
+<video src="https://github.com/user-attachments/assets/2625a8f8-476c-4171-86cc-a9970cbf1665" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
 <p align="center"><b>Random Agents:</b> Baseline agents across 26 environment families.</p>
 
-<video src="https://mosaic-platform.readthedocs.io/en/latest/_static/videos/heterogeneous_agents_adversarial.mp4" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
+<video src="https://github.com/user-attachments/assets/f2d79901-a93d-465b-9058-1b9cdabf311a" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
 <p align="center"><b>Heterogeneous Multi-Agent Ad-Hoc Teamwork in Adversarial Settings:</b> Different decision-making paradigms (RL, LLM, Random) competing head-to-head in the same multi-agent environment.</p>
 
-<video src="https://mosaic-platform.readthedocs.io/en/latest/_static/videos/random_team_vs_llm_team.mp4" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
+<video src="https://github.com/user-attachments/assets/2ae1665b-3a57-44be-98a3-4e7223b37628" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
 <p align="center"><b>Homogeneous Teams: Random vs LLM:</b> Two homogeneous teams (all-Random vs all-LLM) competing in the same multi-agent environment.</p>
 
 ## Agent-Level Interface and Cross-Paradigm Evaluation
