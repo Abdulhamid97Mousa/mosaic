@@ -312,6 +312,16 @@ spawns one subprocess **per player**:
        style W0 fill:#ff7f50,stroke:#cc5500,color:#fff
        style W1 fill:#ff7f50,stroke:#cc5500,color:#fff
 
+.. raw:: html
+
+   <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15); margin-top:16px;" controls autoplay muted loop playsinline>
+     <source src="../../../_static/videos/pettingzoo_chess_v6.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+   <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
+     <strong>Multi-Agent Operator in Action:</strong> Two LLM workers (GPT-4o vs Claude) each running in a separate subprocess, coordinated by a single <code>MultiAgentOperatorHandle</code> over PettingZoo Chess (chess_v6).
+   </p>
+
 .. code-block:: python
 
    class MultiAgentOperatorHandle:

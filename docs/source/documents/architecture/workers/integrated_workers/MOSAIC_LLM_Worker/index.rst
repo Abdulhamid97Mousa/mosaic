@@ -1,6 +1,16 @@
 MOSAIC LLM Worker
 =================
 
+.. raw:: html
+
+   <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
+     <source src="../../../../../_static/videos/pettingzoo_chess_v6.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+   <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
+     <strong>LLM vs LLM Chess:</strong> Two LLM agents playing PettingZoo Chess (chess_v6) through the MOSAIC LLM Worker action-selector protocol.
+   </p>
+
 The MOSAIC LLM Worker is MOSAIC's **native multi-agent LLM coordination and
 adversarial evaluation** worker. It drives pre-trained language models through
 MOSAIC environments with built-in support for **LLM coordination** (cooperative
