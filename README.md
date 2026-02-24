@@ -24,7 +24,13 @@ MOSAIC is a visual-first platform that enables researchers to configure, run, an
 
 MOSAIC provides two evaluation modes designed for reproducibility:
 
+<video src="docs/source/_static/videos/demo_shared_seed.mp4" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
+<p align="center"><b>Manual Mode:</b> Side-by-side lock-step evaluation with shared seeds.</p>
+
 - **Manual Mode:** side-by-side comparison where multiple operators step through the same environment with shared seeds, letting researchers visually inspect decision-making differences between paradigms in real time.
+
+<video src="docs/source/_static/videos/script_based_experiments.mp4" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
+<p align="center"><b>Script Mode:</b> Automated batch evaluation with deterministic seed sequences.</p>
 
 - **Script Mode:** automated, long-running evaluation driven by Python scripts that define operator configurations, worker assignments, seed sequences, and episode counts. Scripts execute deterministically with no manual intervention, producing reproducible telemetry logs (JSONL) for every step and episode.
 
@@ -41,6 +47,91 @@ Today's AI landscape offers powerful but **fragmented** tools: RL frameworks ([C
 - **Resource Management & Quotas**: GPU allocation, queue limits, credit-based backpressure, health monitoring.
 - **Per-Agent Policy Binding**: Route each agent to different workers via `PolicyMappingService`.
 - **Worker Lifecycle Orchestration**: Subprocess management with heartbeat monitoring and graceful termination.
+
+<video src="docs/source/_static/videos/human_vs_human.mp4" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
+<p align="center"><b>Human vs Human:</b> Two human players competing via dedicated USB keyboards.</p>
+
+<video src="docs/source/_static/videos/random_worker.mp4" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
+<p align="center"><b>Random Agents:</b> Baseline agents across 26 environment families.</p>
+
+<video src="docs/source/_static/videos/heterogeneous_agents_adversarial.mp4" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
+<p align="center"><b>Heterogeneous Multi-Agent Ad-Hoc Teamwork in Adversarial Settings:</b> Different decision-making paradigms (RL, LLM, Random) competing head-to-head in the same multi-agent environment.</p>
+
+<video src="docs/source/_static/videos/random_team_vs_llm_team.mp4" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
+<p align="center"><b>Homogeneous Teams: Random vs LLM:</b> Two homogeneous teams (all-Random vs all-LLM) competing in the same multi-agent environment.</p>
+
+## Agent-Level Interface and Cross-Paradigm Evaluation
+
+**Agent-Level Interface.** Existing infrastructure lacks the ability to deploy agents from different decision-making paradigms within the same environment. The root cause is an **interface mismatch**: RL agents expect tensor observations and produce integer actions, while LLM agents expect text prompts and produce text responses. MOSAIC addresses this through an *operator abstraction* that forms an agent-level interface by mapping workers to agents: each operator, regardless of whether it is backed by an RL policy, an LLM, or a human, conforms to a minimal unified interface (`select_action(obs) → action`). The environment never needs to know what kind of decision-maker it is communicating with. This is the agent-side counterpart to what [Gymnasium](https://gymnasium.farama.org/) did for environments: Gymnasium standardized the environment interface (`reset()` / `step()`), so any algorithm can interact with any environment; MOSAIC's Operator Protocol standardizes the agent interface, so any decision-maker can be plugged into any compatible environment without modifying either side.
+
+**Cross-Paradigm Evaluation.** Cross-paradigm evaluation is the ability to deploy decision-makers from *different paradigms* (RL, LLM/VLM, Human, scripted baselines) within the same multi-agent environment under identical conditions, and to produce directly comparable results. Both evaluation modes described above ([Manual Mode](https://mosaic-platform.readthedocs.io/en/latest/documents/architecture/operators/lifecycle.html#manual-mode) and [Script Mode](https://mosaic-platform.readthedocs.io/en/latest/documents/architecture/operators/lifecycle.html#script-mode)) guarantee that all decision-makers face the same environment states, observations, and shared seeds, making this the first infrastructure to enable fair, reproducible cross-paradigm evaluation.
+
+## Comparison with Existing Frameworks
+
+Existing frameworks are paradigm-siloed. No prior framework allowed fair, reproducible, head-to-head comparison between RL agents and LLM agents in the same multi-agent environment.
+
+*Agent Paradigms*: which decision-maker types are supported. *Framework*: algorithms can be integrated without source-code modifications. *Platform GUI*: real-time visualization during execution. *Cross-Paradigm*: infrastructure for comparing different agent types (e.g., RL vs. LLM) on identical environment instances with shared random seeds for reproducible head-to-head evaluation.
+
+> ✅ Supported · ❌ Not supported · 🔵 Partial
+
+| | | **Agent Paradigms** | | | **Infrastructure** | | **Evaluation** |
+|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
+| **System** | | **RL** | **LLM/VLM** | **Human** | **Framework** | **Platform GUI** | **Cross-Paradigm** |
+| | *RL Frameworks* | | | | | | |
+| RLlib | [[1]](#references) | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| CleanRL | [[2]](#references) | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| Tianshou | [[3]](#references) | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| Acme | [[4]](#references) | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| XuanCe | [[5]](#references) | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| OpenRL | [[6]](#references) | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| Stable-Baselines3 | [[7]](#references) | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| Coach | [[8]](#references) | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
+| BenchMARL | [[15]](#references) | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
+| | *LLM/VLM Benchmarks* | | | | | | |
+| BALROG | [[9]](#references) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| TextArena | [[10]](#references) | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ |
+| GameBench | [[11]](#references) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| lmgame-Bench | [[12]](#references) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| LLM Chess | [[13]](#references) | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| LLM-Game-Bench | [[14]](#references) | ❌ | ✅ | ❌ | ✅ | 🔵 | ❌ |
+| AgentBench | [[16]](#references) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| MultiAgentBench | [[17]](#references) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| GAMEBoT | [[18]](#references) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| Collab-Overcooked | [[19]](#references) | 🔵 | ✅ | ❌ | ✅ | ❌ | ❌ |
+| BotzoneBench | [[20]](#references) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| AgentGym | [[21]](#references) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
+| | | | | | | | |
+| **MOSAIC (Ours)** | | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** |
+
+## Experimental Configurations
+
+Heterogeneous decision-making enables a systematic ablation matrix for cross-paradigm research. Here are examples using 2v2 soccer:
+
+### Adversarial Cross-Paradigm
+
+Testing how paradigms perform against each other:
+
+| Configuration | Team A | Team B | Purpose |
+|---|---|---|---|
+| RL vs RL | MAPPO + MAPPO | MAPPO + MAPPO | Homogeneous RL baseline |
+| LLM vs LLM | GPT-4o + GPT-4o | GPT-4o + GPT-4o | Homogeneous LLM baseline |
+| RL vs LLM | MAPPO + MAPPO | GPT-4o + GPT-4o | Cross-paradigm matchup |
+| RL vs Random | MAPPO + MAPPO | Random + Random | Sanity check |
+
+### Cooperative Heterogeneous Teams
+
+Testing how paradigms work together as teammates:
+
+| Configuration | Green Team | Blue Team |
+|---|---|---|
+| Heterogeneous vs Crippled | RL + LLM | RL + Random |
+| Heterogeneous vs Solo | RL + LLM | RL + No-Operation (action=NOOP/STILL) |
+| Solo-pair vs Solo-pair | RL + RL | RL + RL |
+| Heterogeneous vs Co-trained | RL + LLM | RL + RL (trained 2vs2 policy) |
+
+> **1v1-to-2v2 Transfer Design.** RL agents are trained as solo experts in 1v1, then deployed as teammates alongside an LLM in 2v2. This eliminates the **co-training confound**: if RL agents were instead trained in 2v2 via MAPPO self-play, their policies would encode implicit partner models calibrated against another MAPPO agent. Swapping one teammate with an LLM would then conflate two effects: the paradigm difference *and* the partner mismatch. With 1v1-trained agents, the RL policy has zero partner expectations because it never had a partner, isolating the paradigm variable.
+>
+> This is distinct from **zero-shot coordination (ZSC)** in the ad-hoc teamwork literature. ZSC studies RL agents cooperating with unknown *RL* partners, agents from the same paradigm that share the same observation and action representations. The 1v1-to-2v2 design studies an LLM as an ad-hoc partner for a frozen RL policy, where the partner is not just unknown but from a fundamentally different paradigm (text-based reasoning vs. learned tensor-to-action mapping). The comparison baseline also changes: in ZSC the reference is a co-trained RL+RL team, while here the fair reference is two independently trained 1v1 solo experts paired in 2v2 (the "Solo-pair vs Solo-pair" configuration above), since neither agent was trained with any partner.
 
 ## Supported Environment Families (26)
 
@@ -136,6 +227,30 @@ If you use MOSAIC in your research, please cite:
   note    = {Available at \url{https://github.com/Abdulhamid97Mousa/mosaic}}
 }
 ```
+
+## References
+
+1. E. Liang et al., "RLlib: Abstractions for Distributed Reinforcement Learning," *ICML*, 2018.
+2. S. Huang et al., "CleanRL: High-quality Single-file Implementations of Deep Reinforcement Learning Algorithms," *JMLR*, 2022.
+3. J. Weng et al., "Tianshou: A Highly Modularized Deep Reinforcement Learning Library," *JMLR*, 2022.
+4. M. Hoffman et al., "Acme: A Research Framework for Distributed Reinforcement Learning," *arXiv:2006.00979*, 2020.
+5. W. Liu et al., "XuanCe: A Comprehensive and Unified Deep Reinforcement Learning Library," *arXiv:2312.16248*, 2023.
+6. S. Huang et al., "OpenRL: A Unified Reinforcement Learning Framework," *arXiv:2312.16189*, 2023.
+7. A. Raffin et al., "Stable-Baselines3: Reliable Reinforcement Learning Implementations," *JMLR*, 2021.
+8. I. Caspi et al., "Reinforcement Learning Coach," 2017. https://github.com/IntelLabs/coach
+9. D. Paglieri et al., "BALROG: Benchmarking Agentic LLM and VLM Reasoning On Games," *arXiv:2411.13543*, 2024.
+10. G. De Magistris et al., "TextArena," 2025. https://github.com/LeonGuertworktler/TextArena
+11. D. Costarelli et al., "GameBench: Evaluating Strategic Reasoning Abilities of LLM Agents," *arXiv:2406.06613*, 2024.
+12. Y. Huang et al., "lmgame-Bench: Evaluating LLMs on Game-Theoretic Decision-Making," 2025.
+13. M. Saplin, "LLM Chess," 2025. https://github.com/maxim-saplin/llm_chess
+14. J. Guo et al., "LLM-Game-Bench: Evaluating LLM Reasoning through Game-Playing," 2024.
+15. M. Bettini et al., "BenchMARL: Benchmarking Multi-Agent Reinforcement Learning," *JMLR*, 2024. *arXiv:2312.01472*.
+16. X. Liu et al., "AgentBench: Evaluating LLMs as Agents," *ICLR*, 2024. *arXiv:2308.03688*.
+17. K. Zhu et al., "MultiAgentBench: Evaluating the Collaboration and Competition of LLM Agents," *ACL*, 2025. *arXiv:2503.01935*.
+18. Y. Lin et al., "GAMEBoT: Transparent Assessment of LLM Reasoning in Games," *ACL*, 2025. *arXiv:2412.13602*.
+19. H. Sun et al., "Collab-Overcooked: Benchmarking and Evaluating Large Language Models as Collaborative Agents," *EMNLP*, 2025. *arXiv:2502.20073*.
+20. "BotzoneBench: Scalable LLM Evaluation via Graded AI Anchors," *arXiv:2602.13214*, 2026.
+21. Z. Xi et al., "AgentGym: Evolving Large Language Model-based Agents across Diverse Environments," *ACL*, 2025. *arXiv:2406.04151*.
 
 ## License
 

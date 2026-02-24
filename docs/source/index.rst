@@ -163,6 +163,288 @@ under a unified, visual-first interface.
      See <a href="documents/architecture/operators/homogenous_decision_makers/index.html">Homogeneous Decision-Makers</a>.
    </p>
 
+Agent-Level Interface and Cross-Paradigm Evaluation
+-----------------------------------------------------
+
+**Agent-Level Interface.** Existing infrastructure lacks the ability to deploy
+agents from different decision-making paradigms within the same environment.
+The root cause is an **interface mismatch**: RL agents expect tensor
+observations and produce integer actions, while LLM agents expect text prompts
+and produce text responses.  MOSAIC addresses this through an *operator
+abstraction* that forms an agent-level interface by mapping workers to agents:
+each operator, regardless of whether it is backed by an RL policy, an LLM, or
+a human, conforms to a minimal unified interface
+(``select_action(obs) → action``).  The environment never needs to know what
+kind of decision-maker it is communicating with.  This is the agent-side
+counterpart to what `Gymnasium <https://gymnasium.farama.org/>`_ did for
+environments: Gymnasium standardized the environment interface
+(``reset()`` / ``step()``), so any algorithm can interact with any environment;
+MOSAIC's Operator Protocol standardizes the agent interface, so any
+decision-maker can be plugged into any compatible environment without modifying
+either side.
+
+**Cross-Paradigm Evaluation.** Cross-paradigm evaluation is the ability to
+deploy decision-makers from *different paradigms* (RL, LLM/VLM, Human,
+scripted baselines) within the same multi-agent environment under identical
+conditions, and to produce directly comparable results.  Both evaluation modes described above
+(:doc:`Manual Mode <documents/architecture/operators/lifecycle>` and
+:doc:`Script Mode <documents/architecture/operators/architecture>`) guarantee
+that all decision-makers face the same environment states, observations, and
+shared seeds, making this the first infrastructure to enable fair, reproducible
+cross-paradigm evaluation.
+
+See :doc:`Operator Concept <documents/architecture/operators/concept>` for the
+full Agent-Level Interface specification,
+:doc:`Heterogeneous Decision-Maker <documents/architecture/operators/heterogeneous_decision_maker/index>`
+for the research gap and design rationale, and
+:doc:`IPC Architecture <documents/architecture/operators/architecture>` for
+Manual Mode and Script Mode implementation details.
+
+Comparison with Existing Frameworks
+------------------------------------
+
+Existing frameworks are paradigm-siloed. No prior framework allowed fair,
+reproducible, head-to-head comparison between RL agents and LLM agents in the
+same multi-agent environment.
+
+*Agent Paradigms*: which decision-maker types are supported.
+*Framework*: algorithms can be integrated without source-code modifications.
+*Platform GUI*: real-time visualization during execution.
+*Cross-Paradigm*: infrastructure for comparing different agent types (e.g., RL
+vs. LLM) on identical environment instances with shared random seeds for
+reproducible head-to-head evaluation.
+Legend: ✓ Supported, ✗ Not supported, ◉ Partial.
+
+.. raw:: html
+
+   <style>
+     .cmp-table { width:100%; border-collapse:collapse; margin:1.5em 0; font-size:0.95em; }
+     .cmp-table th, .cmp-table td { padding:6px 10px; text-align:center; }
+     .cmp-table th { background:#f5f5f5; }
+     .cmp-table td:first-child { text-align:left; }
+     .cmp-table tbody tr { border-bottom:1px solid #eee; }
+     .cmp-table .section-row td { font-style:italic; background:#f8f8f8; padding:8px 10px; }
+     .cmp-table .mosaic-row { border-top:2.5px solid #333; background:#eef6ff; font-weight:bold; }
+     .cmp-yes { color:#1a7f37; font-size:1.2em; } /* green checkmark */
+     .cmp-no  { color:#cf222e; font-size:1.2em; } /* red cross */
+     .cmp-part { color:#0969da; font-size:1.1em; } /* blue partial */
+   </style>
+   <table class="cmp-table">
+     <thead>
+       <tr style="border-bottom:2px solid #333;">
+         <th rowspan="2" style="text-align:left;">System</th>
+         <th colspan="3" style="border-bottom:1px solid #aaa;">Agent Paradigms</th>
+         <th colspan="2" style="border-bottom:1px solid #aaa;">Infrastructure</th>
+         <th style="border-bottom:1px solid #aaa;">Evaluation</th>
+       </tr>
+       <tr style="border-bottom:2px solid #333;">
+         <th>RL</th><th>LLM/VLM</th><th>Human</th>
+         <th>Framework</th><th>Platform GUI</th><th>Cross-Paradigm</th>
+       </tr>
+     </thead>
+     <tbody>
+       <tr class="section-row"><td colspan="7"><strong>RL Frameworks</strong></td></tr>
+       <tr>
+         <td>RLlib <a href="#ref1">[1]</a></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>CleanRL <a href="#ref2">[2]</a></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>Tianshou <a href="#ref3">[3]</a></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>Acme <a href="#ref4">[4]</a></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>XuanCe <a href="#ref5">[5]</a></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>OpenRL <a href="#ref6">[6]</a></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>Stable-Baselines3 <a href="#ref7">[7]</a></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>Coach <a href="#ref8">[8]</a></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>BenchMARL <a href="#ref15">[15]</a></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr class="section-row"><td colspan="7"><strong>LLM/VLM Benchmarks</strong></td></tr>
+       <tr>
+         <td>BALROG <a href="#ref9">[9]</a></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>TextArena <a href="#ref10">[10]</a></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>GameBench <a href="#ref11">[11]</a></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>lmgame-Bench <a href="#ref12">[12]</a></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>LLM Chess <a href="#ref13">[13]</a></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>LLM-Game-Bench <a href="#ref14">[14]</a></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-part">&#9673;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>AgentBench <a href="#ref16">[16]</a></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>MultiAgentBench <a href="#ref17">[17]</a></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>GAMEBoT <a href="#ref18">[18]</a></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>Collab-Overcooked <a href="#ref19">[19]</a></td>
+         <td><span class="cmp-part">&#9673;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>BotzoneBench <a href="#ref20">[20]</a></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>AgentGym <a href="#ref21">[21]</a></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr class="mosaic-row">
+         <td>MOSAIC (Ours)</td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td>
+       </tr>
+     </tbody>
+   </table>
+   <p style="font-size:0.85em; color:#555; margin-top:4px;">
+     <span class="cmp-yes">&#10003;</span> Supported &nbsp;&nbsp;
+     <span class="cmp-no">&#10007;</span> Not supported &nbsp;&nbsp;
+     <span class="cmp-part">&#9673;</span> Partial
+   </p>
+
+Experimental Configurations
+----------------------------
+
+Heterogeneous decision-making enables a systematic ablation matrix for
+cross-paradigm research. Here are examples using 2v2 soccer:
+
+**Adversarial Cross-Paradigm**
+
+Testing how paradigms perform against each other:
+
+.. list-table::
+   :widths: 25 25 25 25
+   :header-rows: 1
+
+   * - Configuration
+     - Team A
+     - Team B
+     - Purpose
+   * - RL vs RL
+     - MAPPO + MAPPO
+     - MAPPO + MAPPO
+     - Homogeneous RL baseline
+   * - LLM vs LLM
+     - GPT-4o + GPT-4o
+     - GPT-4o + GPT-4o
+     - Homogeneous LLM baseline
+   * - RL vs LLM
+     - MAPPO + MAPPO
+     - GPT-4o + GPT-4o
+     - Cross-paradigm matchup
+   * - RL vs Random
+     - MAPPO + MAPPO
+     - Random + Random
+     - Sanity check
+
+**Cooperative Heterogeneous Teams**
+
+Testing how paradigms work together as teammates:
+
+.. list-table::
+   :widths: 34 33 33
+   :header-rows: 1
+
+   * - Configuration
+     - Green Team
+     - Blue Team
+   * - Heterogeneous vs Crippled
+     - RL + LLM
+     - RL + Random
+   * - Heterogeneous vs Solo
+     - RL + LLM
+     - RL + NoOp
+   * - Solo-pair vs Solo-pair
+     - RL + RL
+     - RL + RL
+   * - Heterogeneous vs Co-trained
+     - RL + LLM
+     - RL(2v2) + RL(2v2)
+
+.. important::
+
+   **1v1-to-2v2 Transfer Design.** RL agents are trained as solo experts in
+   1v1, then deployed as teammates alongside an LLM in 2v2.  This eliminates
+   the **co-training confound**: if RL agents were instead trained in 2v2 via
+   MAPPO self-play, their policies would encode implicit partner models
+   calibrated against another MAPPO agent.  Swapping one teammate with an LLM
+   would then conflate two effects: the paradigm difference *and* the partner
+   mismatch.  With 1v1-trained agents, the RL policy has zero partner
+   expectations because it never had a partner, isolating the paradigm variable.
+
+   This is distinct from **zero-shot coordination (ZSC)** in the ad-hoc
+   teamwork literature.  ZSC studies RL agents cooperating with unknown *RL*
+   partners, agents from the same paradigm that share the same observation and
+   action representations.  The 1v1-to-2v2 design studies an LLM as an ad-hoc
+   partner for a frozen RL policy, where the partner is not just unknown but
+   from a fundamentally different paradigm (text-based reasoning vs. learned
+   tensor-to-action mapping).  The comparison baseline also changes: in ZSC
+   the reference is a co-trained RL+RL team, while here the fair reference is
+   two independently trained 1v1 solo experts paired in 2v2 (the "Solo-pair
+   vs Solo-pair" configuration above), since neither agent was trained with
+   any partner.
+
 Supported Environment Families
 ------------------------------
 
@@ -170,6 +452,7 @@ MOSAIC supports **26 environment families** spanning single-agent, multi-agent,
 and cooperative/competitive paradigms.  See the full
 :doc:`Environment Families <documents/environments/index>` reference for
 installation instructions, environment lists, and academic citations.
+
 
 .. list-table::
    :widths: 28 42 30
@@ -289,6 +572,35 @@ If you use MOSAIC in your research, please cite the following paper:
      url     = {https://github.com/Abdulhamid97Mousa/MOSAIC},
      note    = {Available at \url{https://github.com/Abdulhamid97Mousa/MOSAIC}}
    }
+
+References
+----------
+
+.. raw:: html
+
+   <p style="font-size:0.9em; color:#555;">
+     <span id="ref1">[1]</span> E. Liang et al., "RLlib: Abstractions for Distributed Reinforcement Learning," <em>ICML</em>, 2018.<br>
+     <span id="ref2">[2]</span> S. Huang et al., "CleanRL: High-quality Single-file Implementations of Deep RL Algorithms," <em>JMLR</em>, 2022.<br>
+     <span id="ref3">[3]</span> J. Weng et al., "Tianshou: A Highly Modularized Deep RL Library," <em>JMLR</em>, 2022.<br>
+     <span id="ref4">[4]</span> M. Hoffman et al., "Acme: A Research Framework for Distributed RL," <em>arXiv:2006.00979</em>, 2020.<br>
+     <span id="ref5">[5]</span> W. Liu et al., "XuanCe: A Comprehensive and Unified Deep RL Library," <em>arXiv:2312.16248</em>, 2023.<br>
+     <span id="ref6">[6]</span> S. Huang et al., "OpenRL: A Unified Reinforcement Learning Framework," <em>arXiv:2312.16189</em>, 2023.<br>
+     <span id="ref7">[7]</span> A. Raffin et al., "Stable-Baselines3: Reliable RL Implementations," <em>JMLR</em>, 2021.<br>
+     <span id="ref8">[8]</span> I. Caspi et al., "Reinforcement Learning Coach," 2017.<br>
+     <span id="ref9">[9]</span> D. Paglieri et al., "BALROG: Benchmarking Agentic LLM and VLM Reasoning On Games," <em>arXiv:2411.13543</em>, 2024.<br>
+     <span id="ref10">[10]</span> G. De Magistris et al., "TextArena," 2025.<br>
+     <span id="ref11">[11]</span> D. Costarelli et al., "GameBench: Evaluating Strategic Reasoning Abilities of LLM Agents," <em>arXiv:2406.06613</em>, 2024.<br>
+     <span id="ref12">[12]</span> Y. Huang et al., "lmgame-Bench: Evaluating LLMs on Game-Theoretic Decision-Making," 2025.<br>
+     <span id="ref13">[13]</span> M. Saplin, "LLM Chess," 2025.<br>
+     <span id="ref14">[14]</span> J. Guo et al., "LLM-Game-Bench: Evaluating LLM Reasoning through Game-Playing," 2024.<br>
+     <span id="ref15">[15]</span> M. Bettini et al., "BenchMARL: Benchmarking Multi-Agent Reinforcement Learning," <em>JMLR</em>, 2024. arXiv:2312.01472.<br>
+     <span id="ref16">[16]</span> X. Liu et al., "AgentBench: Evaluating LLMs as Agents," <em>ICLR</em>, 2024. arXiv:2308.03688.<br>
+     <span id="ref17">[17]</span> K. Zhu et al., "MultiAgentBench: Evaluating the Collaboration and Competition of LLM Agents," <em>ACL</em>, 2025. arXiv:2503.01935.<br>
+     <span id="ref18">[18]</span> Y. Lin et al., "GAMEBoT: Transparent Assessment of LLM Reasoning in Games," <em>ACL</em>, 2025. arXiv:2412.13602.<br>
+     <span id="ref19">[19]</span> H. Sun et al., "Collab-Overcooked: Benchmarking and Evaluating Large Language Models as Collaborative Agents," <em>EMNLP</em>, 2025. arXiv:2502.20073.<br>
+     <span id="ref20">[20]</span> "BotzoneBench: Scalable LLM Evaluation via Graded AI Anchors," arXiv:2602.13214, 2026.<br>
+     <span id="ref21">[21]</span> Z. Xi et al., "AgentGym: Evolving Large Language Model-based Agents across Diverse Environments," <em>ACL</em>, 2025. arXiv:2406.04151.
+   </p>
 
 .. raw:: html
 
