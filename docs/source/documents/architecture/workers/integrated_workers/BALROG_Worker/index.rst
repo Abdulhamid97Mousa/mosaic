@@ -1,11 +1,23 @@
 BALROG Worker
 =============
 
+.. figure:: /images/workers/balrog_banner.png
+   :alt: BALROG Banner
+   :align: center
+   :width: 80%
+
+   BALROG: Benchmarking Agentic LLM and VLM Reasoning On Games
+   (`Paglieri et al., 2024 <https://arxiv.org/abs/2411.13543>`_).
+
+.. raw:: html
+
+   <br>
+
 The BALROG worker is MOSAIC's **LLM/VLM agentic evaluation** integration.
-It wraps `BALROG <https://github.com/balrog-ai/BALROG>`_ — a benchmark
+It wraps `BALROG <https://github.com/balrog-ai/BALROG>`, A benchmark
 framework for evaluating large language models and vision-language models
-as agents on complex, long-horizon interactive tasks — behind the standard
-:doc:`shim pattern <../../concept>`.
+as agents on complex, long-horizon interactive tasks behind the standard
+:doc:`shim pattern <../../concept>`.  
 
 .. list-table::
    :widths: 25 75
@@ -32,7 +44,7 @@ as agents on complex, long-horizon interactive tasks — behind the standard
 Overview
 --------
 
-BALROG benchmarks agentic LLM and VLM reasoning on games — environments
+BALROG benchmarks agentic LLM and VLM reasoning on reinforcement learning games, environments
 that demand long sequences of decisions, partial observability, and
 adaptive behaviour.  Unlike standard RL workers that train neural
 policies, the BALROG worker **drives pre-trained language models** through
@@ -57,7 +69,9 @@ The diagram below shows the BALROG evaluation pipeline from the original paper:
    :align: center
    :width: 90%
 
-   BALROG architecture: ``env_wrapper.py``, ``client.py``, ``evaluator.py``, and ``agent.py`` collaborate to drive LLM/VLM agents through game environments.
+   BALROG evaluation pipeline (`Paglieri et al., 2024 <https://arxiv.org/abs/2411.13543>`_):
+   ``env_wrapper.py``, ``client.py``, ``evaluator.py``, and ``agent.py`` collaborate
+   to drive LLM/VLM agents through game environments.
 
 The BALROG worker follows the standard MOSAIC :doc:`shim pattern <../../concept>`.
 

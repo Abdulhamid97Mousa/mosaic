@@ -1,96 +1,6 @@
-[submodule "openshot-qt"]
-	path = openshot-qt
-	url = https://github.com/OpenShot/openshot-qt.git
-
-[submodule "PyQt5-Apps"]
-  path = PyQt5-Apps
-  url = https://github.com/taseikyo/PyQt5-Apps.git 
-
-[submodule "PyQt-Fluent-Widgets"]
-  path = PyQt-Fluent-Widgets
-  url = https://github.com/zhiyiYo/PyQt-Fluent-Widgets.git
-
-[submodule "pyqtgraph"]
-  path = pyqtgraph
-  url = https://github.com/pyqtgraph/pyqtgraph.git
-
-[submodule "qtawesome"]
-  path = qtawesome
-  url = https://github.com/username/qtawesome.git
-
-[submodule "qt-material"]
-  path = qt-material
-  url = https://github.com/UN-GCPDS/qt-material.git
-
-[submodule "qtpy"]
-  path = qtpy
-  url = https://github.com/spyder-ide/qtpy.git
-
-[submodule "qt-python-mvc"]
-  path = qt-python-mvc
-  url = https://github.com/tom-a-horrocks/qt-python-mvc.git 
-
-[submodule "graphrag"]
-  path = graphrag
-  url = https://github.com/microsoft/graphrag.git
-
-[submodule "spadeBDI_RL"]
-  path = spadeBDI_RL
-  url = https://github.com/ZahraD-a/spadeBDI_RL.git
-
-[submodule "fbs"]
-  path = fbs
-  url = https://github.com/mherrmann/fbs.git
-
-[submodule "fbs-tutorial"]
-  path = fbs-tutorial
-  url = https://github.com/mherrmann/fbs-tutorial
-
-[submodule "BallonsTranslator"]
-  path = BallonsTranslator
-  url = https://github.com/dmMaze/BallonsTranslator.git
-
-[submodule "Cura"]
-  path = Cura
-  url = https://github.com/Ultimaker/Cura.git
-
-
-[submodule "examples"]
-  path = examples
-  url = https://github.com/pyqt/examples.git
-
-[submodule "BallonsTranslator"]
-  path = BallonsTranslator
-  url = https://github.com/dmMaze/BallonsTranslator.git
-
-
 [submodule "cleanrl"]
   path = 3rd_party/cleanrl_worker/cleanrl
   url = https://github.com/vwxyzjn/cleanrl.git
-
-[submodule "openrlbenchmark"]
-  path = openrlbenchmark
-  url = https://github.com/openrlbenchmark/openrlbenchmark.git
-
-[submodule "fbs-tutorial"]
-  path = fbs-tutorial
-  url = https://github.com/mherrmann/fbs-tutorial.git 
-
-[submodule "CORL"]
-  path = CORL
-  url = https://github.com/corl-team/CORL.git
-
-[submodule "katakomba"]
-  path = katakomba
-  url = https://github.com/corl-team/katakomba.git
-
-[submodule "LeanRL"]
-  path = LeanRL
-  url = https://github.com/meta-pytorch/LeanRL.git
-
-[submodule "valkka-core"]
-  path = valkka-core
-  url = https://github.com/elsampsa/valkka-core.git
 
 [submodule "ray"]
   path = 3rd_party/ray_worker/ray
@@ -112,7 +22,6 @@
   path = 3rd_party/pettingzoo_worker/PettingZoo
   url = https://github.com/Farama-Foundation/PettingZoo.git
 
-
 [submodule "SuperSuit"]
   path = 3rd_party/supersuit_worker/SuperSuit
   url = https://github.com/Farama-Foundation/SuperSuit.git
@@ -125,12 +34,9 @@
   path = 3rd_party/balrog_worker/BALROG
   url = https://github.com/balrog-ai/BALROG.git
 
-
 [submodule "multigrid"]
   path = 3rd_party/multigrid-ini
   url = https://github.com/ini/multigrid.git
-
-# https://github.com/openai/procgen.git
 
 [submodule "procgen"]
   path = 3rd_party/procgen
@@ -140,103 +46,14 @@
   path = 3rd_party/Syllabus
   url = https://github.com/RyanNavillus/Syllabus.git
 
-[submodule "3rd_party/DI-engine"]
-	path = 3rd_party/DI-engine
-	url = https://github.com/opendilab/DI-engine.git
-[submodule "3rd_party/Syllabus"]
-	path = 3rd_party/Syllabus
-	url = https://github.com/RyanNavillus/Syllabus.git
-[submodule "3rd_party/multigrid-ini"]
-	path = 3rd_party/multigrid-ini
-	url = https://github.com/ini/multigrid.git
-[submodule "3rd_party/mosaic_multigrid"]
-	path = 3rd_party/mosaic_multigrid
-	url = https://github.com/Abdulhamid97Mousa/mosaic_multigrid.git
+[submodule "DI-engine"]
+  path = 3rd_party/DI-engine
+  url = https://github.com/opendilab/DI-engine.git
 
-[submodule "3rd_party/Collab-Overcooked"]
-	path = 3rd_party/Collab-Overcooked
-	url = https://github.com/YusaeMeow/Collab-Overcooked.git
+[submodule "mosaic_multigrid"]
+  path = 3rd_party/mosaic_multigrid
+  url = https://github.com/Abdulhamid97Mousa/mosaic_multigrid.git
 
-[submodule "3rd_party/crafter"]
-	path = 3rd_party/crafter
-	url = https://github.com/danijar/crafter.git
-
-[submodule "3rd_party/BenchMARL"]
-	path = 3rd_party/BenchMARL
-	url = https://github.com/facebookresearch/BenchMARL.git
-
-[submodule "3rd_party/babyai"]
-	path = 3rd_party/babyai
-	url = https://github.com/mila-iqia/babyai.git
-
-[submodule "3rd_party/Grounding_LLMs_with_online_RL"]
-	path = 3rd_party/Grounding_LLMs_with_online_RL
-	url = https://github.com/flowersteam/Grounding_LLMs_with_online_RL.git
-
-[submodule "3rd_party/gym-multigrid"]
-	path = 3rd_party/gym-multigrid
-	url = https://github.com/ArnaudFickinger/gym-multigrid.git
-
-[submodule "3rd_party/gym-pybullet-drones"]
-	path = 3rd_party/gym-pybullet-drones
-	url = https://github.com/utiasDSL/gym-pybullet-drones.git
-
-[submodule "3rd_party/llm_coordination"]
-	path = 3rd_party/llm_coordination
-	url = https://github.com/eric-ai-lab/llm_coordination.git
-
-[submodule "3rd_party/marLo"]
-	path = 3rd_party/marLo
-	url = https://github.com/crowdAI/marLo.git
-
-[submodule "3rd_party/meltingpot"]
-	path = 3rd_party/meltingpot
-	url = https://github.com/google-deepmind/meltingpot.git
-
-[submodule "3rd_party/Minigrid"]
-	path = 3rd_party/Minigrid
-	url = https://github.com/BartekCupial/Minigrid.git
-
-[submodule "3rd_party/minihack"]
-	path = 3rd_party/minihack
-	url = https://github.com/facebookresearch/minihack.git
-
-[submodule "3rd_party/NetHack"]
-	path = 3rd_party/NetHack
-	url = https://github.com/NetHack/NetHack.git
-
-[submodule "3rd_party/overcooked_ai"]
-	path = 3rd_party/overcooked_ai
-	url = https://github.com/HumanCompatibleAI/overcooked_ai.git
-
-[submodule "3rd_party/ProAgent"]
-	path = 3rd_party/ProAgent
-	url = https://github.com/PKU-Alignment/ProAgent.git
-
-[submodule "3rd_party/robotic-warehouse"]
-	path = 3rd_party/robotic-warehouse
-	url = https://github.com/semitable/robotic-warehouse.git
-
-[submodule "3rd_party/smac"]
-	path = 3rd_party/smac
-	url = https://github.com/oxwhirl/smac.git
-
-[submodule "3rd_party/smac_exp"]
-	path = 3rd_party/smac_exp
-	url = https://github.com/osilab-kaist/smac_exp.git
-
-[submodule "3rd_party/smacv2"]
-	path = 3rd_party/smacv2
-	url = https://github.com/oxwhirl/smacv2.git
-
-[submodule "3rd_party/stable-baselines3"]
-	path = 3rd_party/stable-baselines3
-	url = https://github.com/DLR-RM/stable-baselines3.git
-
-[submodule "3rd_party/sumo"]
-	path = 3rd_party/sumo
-	url = https://github.com/eclipse-sumo/sumo.git
-
-[submodule "3rd_party/tianshou"]
-	path = 3rd_party/tianshou
-	url = https://github.com/thu-ml/tianshou.git
+[submodule "llm_chess"]
+  path = 3rd_party/chess_worker/llm_chess
+  url = https://github.com/maxim-saplin/llm_chess.git

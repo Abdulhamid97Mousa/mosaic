@@ -69,5 +69,5 @@ running_steps: 2000000
 eval_interval: 100000
 test_episode: 5
 
-log_dir: "./logs/ippo/"
-model_dir: "./models/ippo/"
+log_dir: "./logs/mappo/"
+model_dir: "./models/mappo/"

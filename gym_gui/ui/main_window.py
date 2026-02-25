@@ -65,7 +65,11 @@ from gym_gui.ui.presenters.main_window_presenter import MainWindowPresenter, Mai
 from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWidget
 from gym_gui.ui.indicators.busy_indicator import modal_busy_indicator
 from gym_gui.ui.widgets.render_tabs import RenderTabs
-from gym_gui.ui.widgets.multi_agent_action_panel import MultiAgentActionPanel
+from gym_gui.ui.widgets.multi_agent_action_panel import (
+    MultiAgentActionPanel,
+    COLOR_PALETTE,
+    DEFAULT_AGENT_COLOR_NAMES,
+)
 from gym_gui.game_docs import get_game_info
 from gym_gui.game_docs.mosaic_welcome import MOSAIC_WELCOME_HTML
 from gym_gui.services.actor import ActorService
@@ -877,6 +881,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # Human operator interaction signals (from Multi-Operator view)
         self._render_tabs.human_action_submitted.connect(self._on_human_action_submitted)
         self._render_tabs.board_game_move_made.connect(self._on_human_board_game_move)
+        # Container resize (user dragged edge) — sync back to config dropdown
+        self._render_tabs.container_resized.connect(self._on_container_resized)
 
         # Keyboard assignment widget signals (multi-human gameplay)
         self._control_panel._keyboard_widget.assignment_changed.connect(self._on_keyboard_assignment_changed)
@@ -2846,6 +2852,79 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         else:
             raise ValueError(f"Unknown parallel multi-agent environment: {env_name}")
 
+    def _resolve_agent_colors(
+        self, config: "OperatorConfig",
+    ) -> Dict[str, tuple[str, str]]:
+        """Build agent_id -> (primary_hex, bg_hex) from operator config.
+
+        Reads ``agent_color`` from each worker's settings and maps it
+        through :data:`COLOR_PALETTE`.  Falls back to the default
+        palette assignment when no custom color is set.
+        """
+        colors: Dict[str, tuple[str, str]] = {}
+        for player_id, worker in config.workers.items():
+            color_name = worker.settings.get("agent_color")
+            if color_name and color_name != "auto" and color_name in COLOR_PALETTE:
+                colors[player_id] = COLOR_PALETTE[color_name]
+            else:
+                default_name = DEFAULT_AGENT_COLOR_NAMES.get(player_id)
+                if default_name and default_name in COLOR_PALETTE:
+                    colors[player_id] = COLOR_PALETTE[default_name]
+        return colors
+
+    def _get_parallel_action_labels(self, config: "OperatorConfig", env: Any) -> list[str]:
+        """Get human-readable action labels for a parallel multi-agent environment.
+
+        Looks up the correct action list from the adapter module based on
+        the operator config's ``env_name``.  Falls back to generic labels
+        derived from the action space size when the env family is unknown.
+
+        Args:
+            config: Operator configuration (used for env_name).
+            env: The parallel environment instance.
+
+        Returns:
+            List of action label strings, one per discrete action.
+        """
+        env_name = config.env_name
+
+        if env_name == "mosaic_multigrid":
+            from gym_gui.core.adapters.mosaic_multigrid import MOSAIC_MULTIGRID_ACTIONS
+            return list(MOSAIC_MULTIGRID_ACTIONS)
+        elif env_name == "ini_multigrid":
+            from gym_gui.core.adapters.ini_multigrid import INI_MULTIGRID_ACTIONS
+            return list(INI_MULTIGRID_ACTIONS)
+
+        # Generic fallback: discover action count from the environment
+        num_actions: int | None = None
+
+        # Single action_space (gymnasium standard)
+        if hasattr(env, "action_space") and hasattr(env.action_space, "n"):
+            num_actions = env.action_space.n
+        # Per-agent action_spaces (PettingZoo parallel)
+        elif hasattr(env, "action_spaces"):
+            for space in env.action_spaces.values():
+                if hasattr(space, "n"):
+                    num_actions = space.n
+                    break
+        # PettingZoo AEC: action_space(agent) is a method
+        elif callable(getattr(env, "action_space", None)) and hasattr(env, "agents") and env.agents:
+            try:
+                space = env.action_space(env.agents[0])
+                if hasattr(space, "n"):
+                    num_actions = space.n
+            except Exception:
+                pass
+
+        if num_actions is None:
+            _OP_LOGGER.warning(
+                "Could not determine action count for env_name=%s, defaulting to 4",
+                env_name,
+            )
+            num_actions = 4
+
+        return [f"Action {i}" for i in range(num_actions)]
+
     def _get_parallel_agent_obs(self, agent_id: str) -> Optional[Any]:
         """Get the stored observation for an agent, handling int/string key mismatch.
 
@@ -3095,13 +3174,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             return
 
         # Show action panel for human agents
-        # Get action labels from environment
-        if hasattr(env, "action_space") and hasattr(env.action_space, "n"):
-            num_actions = env.action_space.n
-            # Default action labels for MultiGrid
-            action_labels = ["Still", "Left", "Right", "Forward", "Pickup", "Drop", "Toggle", "Done"][:num_actions]
-        else:
-            action_labels = ["Action 0", "Action 1", "Action 2", "Action 3", "Action 4", "Action 5", "Action 6", "Action 7"]
+        action_labels = self._get_parallel_action_labels(config, env)
 
         # Create and show action panel
         if self._parallel_action_panel is not None:
@@ -3110,7 +3183,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._parallel_action_panel = MultiAgentActionPanel(
             human_agents=human_agents,
             action_labels=action_labels,
-            agent_labels={f"agent_{i}": f"Agent {i}" for i in range(len(human_agents))},
+            agent_labels={aid: f"Agent {aid.split('_')[-1]}" for aid in human_agents},
+            agent_colors=self._resolve_agent_colors(config),
         )
         self._parallel_action_panel.all_actions_submitted.connect(
             self._on_parallel_human_actions_submitted
@@ -3269,16 +3343,16 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             # ---------------------------------------------------------------
             # Human agent's turn: show one-agent action panel
             # ---------------------------------------------------------------
+            action_labels = self._get_parallel_action_labels(config, env)
+
             try:
                 act_space = env.action_space(current_agent)
-                num_actions = act_space.n if hasattr(act_space, "n") else 8
+                num_actions = act_space.n if hasattr(act_space, "n") else len(action_labels)
             except (TypeError, KeyError):
-                num_actions = 8
+                num_actions = len(action_labels)
 
-            action_labels = [
-                "NOOP", "LEFT", "RIGHT", "FORWARD",
-                "PICKUP", "DROP", "TOGGLE", "DONE",
-            ][:num_actions]
+            # Trim labels to match actual action space size
+            action_labels = action_labels[:num_actions]
 
             if self._parallel_action_panel is not None:
                 self._parallel_action_panel.deleteLater()
@@ -3286,7 +3360,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._parallel_action_panel = MultiAgentActionPanel(
                 human_agents=[current_agent],
                 action_labels=action_labels,
-                agent_labels={current_agent: current_agent},
+                agent_labels={current_agent: f"Agent {current_agent.split('_')[-1]}"},
+                agent_colors=self._resolve_agent_colors(config),
             )
             self._parallel_action_panel.all_actions_submitted.connect(
                 self._on_aec_human_action_submitted
@@ -4926,6 +5001,24 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             message=f"Operator keyboard {device_name} assigned to {agent_str}",
             extra={"device_path": device_path, "agent_id": agent_str},
         )
+
+    def _on_container_resized(self, operator_id: str, width: int, height: int) -> None:
+        """Handle operator render container resize (user dragged the size grip).
+
+        Updates the Container dropdown in the operator config widget to reflect
+        the new size, adding a custom entry if it doesn't match a preset.
+
+        Args:
+            operator_id: The operator whose container was resized.
+            width: New container width in pixels.
+            height: New container height in pixels.
+        """
+        _LOGGER.info("Container resized: %s → %dx%d", operator_id, width, height)
+        # Use the larger dimension as the container_size value (square-ish)
+        size = max(width, height)
+        config_widget = self._control_panel.operators_tab.operator_config_widget
+        if hasattr(config_widget, "set_container_size"):
+            config_widget.set_container_size(size)
 
     def _on_status_message(self, message: str) -> None:
         self._status_bar.showMessage(message, 5000)

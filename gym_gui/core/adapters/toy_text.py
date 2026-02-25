@@ -529,9 +529,9 @@ class FrozenLakeAdapter(ToyTextAdapter):
         return payload
 
     def set_goal(self, x: int, y: int) -> None:
-        """Store goal position for BDI planning.
-        
-        For dynamic goal scenarios in BDI. Stores the goal but may not
+        """Store goal position for planning.
+
+        For dynamic goal scenarios. Stores the goal but may not
         reconfigure the environment (depends on environment implementation).
         
         Args:
@@ -548,7 +548,7 @@ class FrozenLakeAdapter(ToyTextAdapter):
     def reset_q_table(self) -> None:
         """Reset Q-table for goal-switching scenarios.
         
-        Called by BDI when switching goals to clear learned policy.
+        Called when switching goals to clear learned policy.
         The actual Q-table is managed by the RL agent/trainer, not the adapter.
         This is a hook for coordination.
         """
@@ -561,7 +561,7 @@ class FrozenLakeAdapter(ToyTextAdapter):
     def get_grid_size(self) -> tuple[int, int]:
         """Get (height, width) of the FrozenLake grid.
         
-        Required for BDI pathfinding and goal validation.
+        Required for pathfinding and goal validation.
         
         Returns:
             Tuple of (height, width) dimensions

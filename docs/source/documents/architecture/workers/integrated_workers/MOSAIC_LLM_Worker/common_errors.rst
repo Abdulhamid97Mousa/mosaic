@@ -29,9 +29,9 @@ aggressively.
 
 **Fix:** Use models hosted on their own infrastructure (less rate-limiting):
 
-- ``nvidia/nemotron-3-nano-30b-a3b:free`` --- NVIDIA-hosted, ~1.6s latency
-- ``arcee-ai/trinity-large-preview:free`` --- Arcee-hosted, ~2.4s latency
-- ``upstage/solar-pro-3:free`` --- Upstage-hosted, ~4s latency
+- ``nvidia/nemotron-3-nano-30b-a3b:free``: NVIDIA-hosted, ~1.6s latency
+- ``arcee-ai/trinity-large-preview:free``: Arcee-hosted, ~2.4s latency
+- ``upstage/solar-pro-3:free``: Upstage-hosted, ~4s latency
 
 LLM returns invalid action
 ---------------------------
@@ -42,7 +42,7 @@ LLM returns invalid action
 
 The LLM returned text that doesn't match any known action name.
 
-**Fix:** This is handled automatically --- the worker defaults to ``still``
+**Fix:** This is handled automatically, the worker defaults to ``still``
 (do nothing) for Legacy environments or ``done`` for INI environments.
 Consider using the ``robust_cot`` or ``robust_naive`` agent type for better
 action parsing:

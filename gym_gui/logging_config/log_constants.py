@@ -3255,42 +3255,6 @@ LOG_WORKER_POLICY_LOAD_FAILED = _constant(
     tags=_tags("worker", "policy", "missing"),
 )
 
-LOG_WORKER_BDI_EVENT = _constant(
-    "LOG912",
-    "INFO",
-    "Worker BDI event",
-    component="Worker",
-    subcomponent="BDI",
-    tags=_tags("worker", "bdi"),
-)
-
-LOG_WORKER_BDI_WARNING = _constant(
-    "LOG913",
-    "WARNING",
-    "Worker BDI warning",
-    component="Worker",
-    subcomponent="BDI",
-    tags=_tags("worker", "bdi", "warning"),
-)
-
-LOG_WORKER_BDI_ERROR = _constant(
-    "LOG914",
-    "ERROR",
-    "Worker BDI error",
-    component="Worker",
-    subcomponent="BDI",
-    tags=_tags("worker", "bdi", "error"),
-)
-
-LOG_WORKER_BDI_DEBUG = _constant(
-    "LOG915",
-    "DEBUG",
-    "Worker BDI debug event",
-    component="Worker",
-    subcomponent="BDI",
-    tags=_tags("worker", "bdi", "debug"),
-)
-
 
 # ---------------------------------------------------------------------------
 # Episode Counter constants (LOG921–LOG930)
@@ -4896,10 +4860,6 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_WORKER_POLICY_EVENT,
     LOG_WORKER_POLICY_WARNING,
     LOG_WORKER_POLICY_ERROR,
-    LOG_WORKER_BDI_EVENT,
-    LOG_WORKER_BDI_WARNING,
-    LOG_WORKER_BDI_ERROR,
-    LOG_WORKER_BDI_DEBUG,
     LOG_COUNTER_INITIALIZED,
     LOG_COUNTER_RESUME_SUCCESS,
     LOG_COUNTER_RESUME_FAILURE,
@@ -5317,10 +5277,6 @@ __all__ = (
     "LOG_WORKER_POLICY_EVAL_BATCH_STARTED",
     "LOG_WORKER_POLICY_EVAL_BATCH_COMPLETED",
     "LOG_WORKER_POLICY_LOAD_FAILED",
-    "LOG_WORKER_BDI_EVENT",
-    "LOG_WORKER_BDI_WARNING",
-    "LOG_WORKER_BDI_ERROR",
-    "LOG_WORKER_BDI_DEBUG",
     "LOG_COUNTER_INITIALIZED",
     "LOG_COUNTER_RESUME_SUCCESS",
     "LOG_COUNTER_RESUME_FAILURE",

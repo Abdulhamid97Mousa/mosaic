@@ -109,7 +109,7 @@ training, policy evaluation, and resume training work without it.
 Verifying the Installation
 --------------------------
 
-**Import check** -- confirm the worker package is importable:
+**Import check:** confirm the worker package is importable:
 
 .. code-block:: bash
 
@@ -117,7 +117,7 @@ Verifying the Installation
 
 This should print the ``WorkerCapabilities`` descriptor without errors.
 
-**Dry run** -- validate that a config resolves correctly without
+**Dry run:** validate that a config resolves correctly without
 launching training:
 
 .. code-block:: bash
@@ -127,7 +127,7 @@ launching training:
 A successful dry run prints the resolved module name and exits with
 code 0.
 
-**Entry point discovery** -- verify MOSAIC can discover the worker:
+**Entry point discovery:** verify MOSAIC can discover the worker:
 
 .. code-block:: bash
 
@@ -156,15 +156,15 @@ GUI's training form selector.
 The GUI discovers the worker via ``WorkerDiscovery``, which scans the
 ``mosaic.workers`` entry point group at startup.
 
-**Form widgets** -- four dedicated dialogs are provided:
+**Form widgets:** four dedicated dialogs are provided:
 
-- **Train** (``cleanrl_train_form.py``) -- standard training with
+- **Train** (``cleanrl_train_form.py``): standard training with
   algorithm selection, hyperparameter tuning, and environment filtering.
-- **Script** (``cleanrl_script_form.py``) -- launch custom shell scripts
+- **Script** (``cleanrl_script_form.py``): launch custom shell scripts
   for multi-phase training workflows.
-- **Resume** (``cleanrl_resume_form.py``) -- continue training from a
+- **Resume** (``cleanrl_resume_form.py``): continue training from a
   saved ``.cleanrl_model`` checkpoint.
-- **Policy Eval** (``cleanrl_policy_form.py``) -- load and evaluate
+- **Policy Eval** (``cleanrl_policy_form.py``): load and evaluate
   a trained policy with configurable episode counts and rendering.
 
 Configuration via .env

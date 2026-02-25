@@ -10,23 +10,43 @@ made before the environment can step.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from PyQt6.QtCore import pyqtSignal
 from qtpy import QtCore, QtWidgets
 
 _LOGGER = logging.getLogger(__name__)
 
-# Agent colors for visual distinction
+# Named color palette for agent customization.
+# The 6 names match MosaicMultiGrid's core/constants.py COLORS dict.
+# Hex values are Material Design approximations for readable UI buttons.
+COLOR_PALETTE: Dict[str, Tuple[str, str]] = {
+    "red":    ("#e53935", "#ffcdd2"),
+    "green":  ("#43a047", "#c8e6c9"),
+    "blue":   ("#1e88e5", "#bbdefb"),
+    "purple": ("#8e24aa", "#e1bee7"),
+    "yellow": ("#fdd835", "#fff9c4"),
+    "grey":   ("#757575", "#e0e0e0"),
+}
+
+# Default agent -> color_name mapping (preserves current behaviour).
+DEFAULT_AGENT_COLOR_NAMES: Dict[str, str] = {
+    # MosaicMultiGrid / PettingZoo agent IDs
+    "agent_0": "green",
+    "agent_1": "blue",
+    "agent_2": "red",
+    "agent_3": "yellow",
+    "agent_4": "purple",
+    "agent_5": "grey",
+    # Chess / classic game player IDs
+    "player_0": "grey",   # White
+    "player_1": "blue",   # Black
+}
+
+# Legacy dict used internally — kept for fallback.
 AGENT_COLORS = {
-    "agent_0": ("#43a047", "#c8e6c9"),  # Green (primary, background)
-    "agent_1": ("#1e88e5", "#bbdefb"),  # Blue
-    "agent_2": ("#e53935", "#ffcdd2"),  # Red
-    "agent_3": ("#fdd835", "#fff9c4"),  # Yellow
-    "agent_4": ("#8e24aa", "#e1bee7"),  # Purple
-    "agent_5": ("#00897b", "#b2dfdb"),  # Teal
-    "agent_6": ("#f4511e", "#ffccbc"),  # Deep Orange
-    "agent_7": ("#3949ab", "#c5cae9"),  # Indigo
+    f"agent_{i}": COLOR_PALETTE[name]
+    for i, name in enumerate(DEFAULT_AGENT_COLOR_NAMES.values())
 }
 
 
@@ -44,6 +64,7 @@ class AgentActionRow(QtWidgets.QWidget):
         agent_id: str,
         agent_label: str,
         action_labels: List[str],
+        color_override: Optional[Tuple[str, str]] = None,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         """Initialize agent action row.
@@ -52,6 +73,7 @@ class AgentActionRow(QtWidgets.QWidget):
             agent_id: The agent identifier (e.g., "agent_0").
             agent_label: Human-readable label (e.g., "Agent 0 (Red)").
             action_labels: List of action names (e.g., ["Still", "Left", "Right", ...]).
+            color_override: Optional (primary_hex, bg_hex) to use instead of default.
             parent: Parent widget.
         """
         super().__init__(parent)
@@ -61,8 +83,11 @@ class AgentActionRow(QtWidgets.QWidget):
         self._selected_action: Optional[int] = None
         self._action_buttons: List[QtWidgets.QPushButton] = []
 
-        # Get agent color scheme
-        primary_color, bg_color = AGENT_COLORS.get(agent_id, ("#666666", "#e0e0e0"))
+        # Get agent color scheme — use override if provided
+        if color_override is not None:
+            primary_color, bg_color = color_override
+        else:
+            primary_color, bg_color = AGENT_COLORS.get(agent_id, ("#666666", "#e0e0e0"))
         self._primary_color = primary_color
         self._bg_color = bg_color
 
@@ -219,6 +244,7 @@ class MultiAgentActionPanel(QtWidgets.QWidget):
         human_agents: List[str],
         action_labels: List[str],
         agent_labels: Optional[Dict[str, str]] = None,
+        agent_colors: Optional[Dict[str, Tuple[str, str]]] = None,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         """Initialize multi-agent action panel.
@@ -227,12 +253,15 @@ class MultiAgentActionPanel(QtWidgets.QWidget):
             human_agents: List of human-controlled agent IDs.
             action_labels: List of action names (same for all agents).
             agent_labels: Optional dict mapping agent_id to display label.
+            agent_colors: Optional per-agent color overrides
+                {agent_id: (primary_hex, bg_hex)}.
             parent: Parent widget.
         """
         super().__init__(parent)
         self._human_agents = human_agents
         self._action_labels = action_labels
         self._agent_labels = agent_labels or {}
+        self._agent_colors: Dict[str, Tuple[str, str]] = agent_colors or {}
         self._agent_rows: Dict[str, AgentActionRow] = {}
         self._pending_actions: Dict[str, int] = {}
 
@@ -286,6 +315,7 @@ class MultiAgentActionPanel(QtWidgets.QWidget):
                 agent_id=agent_id,
                 agent_label=label,
                 action_labels=self._action_labels,
+                color_override=self._agent_colors.get(agent_id),
                 parent=rows_container,
             )
             row.action_selected.connect(self._on_agent_action_selected)
@@ -332,18 +362,19 @@ class MultiAgentActionPanel(QtWidgets.QWidget):
         layout.addLayout(button_row)
 
     def _get_color_name(self, agent_id: str) -> Optional[str]:
-        """Get color name for an agent."""
-        color_names = {
-            "agent_0": "Green",
-            "agent_1": "Blue",
-            "agent_2": "Red",
-            "agent_3": "Yellow",
-            "agent_4": "Purple",
-            "agent_5": "Teal",
-            "agent_6": "Orange",
-            "agent_7": "Indigo",
-        }
-        return color_names.get(agent_id)
+        """Get display color name for an agent."""
+        # Check custom override first
+        if agent_id in self._agent_colors:
+            primary, _ = self._agent_colors[agent_id]
+            for name, (p, _) in COLOR_PALETTE.items():
+                if p == primary:
+                    return name.replace("_", " ").title()
+            return None
+        # Fall back to default mapping
+        default_name = DEFAULT_AGENT_COLOR_NAMES.get(agent_id)
+        if default_name:
+            return default_name.replace("_", " ").title()
+        return None
 
     def _on_agent_action_selected(self, agent_id: str, action: int) -> None:
         """Handle action selection from an agent row."""

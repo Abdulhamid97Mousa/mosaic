@@ -29,11 +29,11 @@ normalize: "LayerNorm"
 initialize: "orthogonal"
 gain: 0.01
 
-# Network architecture — TeamObs: 27 (image) + 4 (teammate) = 31 features
-# Slightly wider hidden layers to accommodate richer observations
-representation_hidden_size: [128, 64]
-actor_hidden_size: [128, 64]
-critic_hidden_size: [128, 64]
+# Network architecture — TeamObs with view_size=7: 147 (image) + 4 (teammate) = 151 features
+# Wider hidden layers for higher-dimensional observations (view_size=7)
+representation_hidden_size: [128, 128]
+actor_hidden_size: [128, 128]
+critic_hidden_size: [128, 128]
 activation: "relu"
 activation_action: "softmax"
 
@@ -70,9 +70,9 @@ gae_lambda: 0.95
 use_grad_clip: True
 grad_clip_norm: 10.0
 
-running_steps: 2000000
+running_steps: 5000000
 eval_interval: 100000
 test_episode: 5
 
-log_dir: "./logs/ippo/"
-model_dir: "./models/ippo/"
+log_dir: "./logs/mappo/"
+model_dir: "./models/mappo/"

@@ -2,10 +2,10 @@
 
 This module provides:
 - ParadigmAdapter: ABC for paradigm-aware stepping behavior
-- Concrete adapters: SingleAgentAdapter, SequentialAdapter, SimultaneousAdapter, HierarchicalAdapter
+- Concrete adapters: SingleAgentAdapter, SequentialAdapter, SimultaneousAdapter
 
 The ParadigmAdapter bridges between the GUI/orchestrator and paradigm-specific
-environments (Gymnasium, PettingZoo AEC, PettingZoo Parallel, Jason/BDI).
+environments (Gymnasium, PettingZoo AEC, PettingZoo Parallel).
 
 See Also:
     - :doc:`/documents/architecture/paradigms` for stepping paradigm details
@@ -72,8 +72,6 @@ class ParadigmAdapter(ABC):
     - SingleAgentAdapter: Gymnasium-style single agent
     - SequentialAdapter: PettingZoo AEC-style turn-based
     - SimultaneousAdapter: PettingZoo Parallel / RLlib POSG-style
-    - HierarchicalAdapter: Jason/BDI goal-driven agents
-
     Example:
         >>> adapter = get_paradigm_adapter(env)
         >>> while not adapter.is_done():
@@ -228,7 +226,7 @@ class ParadigmAdapter(ABC):
         return self.paradigm == SteppingParadigm.SIMULTANEOUS
 
     def is_hierarchical(self) -> bool:
-        """Check if this is a hierarchical (BDI) environment."""
+        """Check if this is a hierarchical environment."""
         return self.paradigm == SteppingParadigm.HIERARCHICAL
 
     def num_agents(self) -> int:
@@ -615,136 +613,6 @@ class SimultaneousParadigmAdapter(ParadigmAdapter):
         return self._env.render()
 
 
-class HierarchicalParadigmAdapter(ParadigmAdapter):
-    """Paradigm adapter for hierarchical (BDI) goal-driven agents.
-
-    This adapter supports Jason/BDI-style agents where:
-    1. High-level goals drive behavior
-    2. Plans are selected and executed
-    3. Sub-goals can be spawned
-    4. Agents may wait for events/percepts
-
-    This is a placeholder implementation. Full BDI integration requires
-    the Jason/AgentSpeak bridge which is separate from RL stepping.
-
-    See Also:
-        - :doc:`/documents/architecture/paradigms` for multi-paradigm orchestration
-    """
-
-    def __init__(self, env: Any) -> None:
-        """Initialize with a BDI-compatible environment.
-
-        Args:
-            env: A BDI/Jason environment bridge.
-        """
-        self._env = env
-        self._done = False
-
-    @property
-    def paradigm(self) -> SteppingParadigm:
-        return SteppingParadigm.HIERARCHICAL
-
-    @property
-    def agent_ids(self) -> Sequence[str]:
-        # BDI environments may have dynamic agent lists
-        if hasattr(self._env, "agents"):
-            return tuple(self._env.agents)
-        if hasattr(self._env, "possible_agents"):
-            return tuple(self._env.possible_agents)
-        return ("bdi_agent_0",)
-
-    def get_agents_to_act(self) -> List[str]:
-        if self._done:
-            return []
-        # In BDI, agents with pending intentions/goals need to act
-        if hasattr(self._env, "get_agents_with_pending_intentions"):
-            return self._env.get_agents_with_pending_intentions()
-        return list(self.agent_ids)
-
-    def get_observation(self, agent_id: str) -> Any:
-        if hasattr(self._env, "get_percepts"):
-            return self._env.get_percepts(agent_id)
-        return {}
-
-    def get_observations(self, agent_ids: Optional[List[str]] = None) -> Dict[str, Any]:
-        ids = agent_ids if agent_ids is not None else list(self.agent_ids)
-        return {agent_id: self.get_observation(agent_id) for agent_id in ids}
-
-    def step(self, actions: Dict[str, Any]) -> ParadigmStepResult:
-        # BDI actions are typically high-level intentions or plan selections
-        if hasattr(self._env, "execute_intentions"):
-            result = self._env.execute_intentions(actions)
-        else:
-            # Fallback: treat as simple step
-            result = self._env.step(actions) if hasattr(self._env, "step") else None
-
-        # Parse result (implementation depends on BDI bridge)
-        observations: Dict[str, Any] = {}
-        rewards: Dict[str, float] = {}
-        terminations: Dict[str, bool] = {}
-        truncations: Dict[str, bool] = {}
-        infos: Dict[str, Dict[str, Any]] = {}
-
-        if result is not None and isinstance(result, tuple):
-            if len(result) >= 5:
-                observations, rewards_raw, terminations, truncations, infos = result[:5]
-                rewards = {k: float(v) for k, v in rewards_raw.items()}
-
-        # Check if all goals are achieved
-        if hasattr(self._env, "all_goals_achieved"):
-            self._done = self._env.all_goals_achieved()
-        elif "__all__" in terminations:
-            self._done = terminations["__all__"]
-
-        return ParadigmStepResult(
-            observations=observations,
-            rewards=rewards,
-            terminations=terminations,
-            truncations=truncations,
-            infos=infos,
-            current_agent=None,
-            all_done=self._done,
-        )
-
-    def reset(
-        self,
-        *,
-        seed: Optional[int] = None,
-        options: Optional[Dict[str, Any]] = None,
-    ) -> ParadigmStepResult:
-        reset_kwargs: Dict[str, Any] = {}
-        if seed is not None:
-            reset_kwargs["seed"] = seed
-        if options is not None:
-            reset_kwargs["options"] = options
-
-        if hasattr(self._env, "reset"):
-            result = self._env.reset(**reset_kwargs)
-        else:
-            result = ({}, {})
-
-        observations, infos = result if isinstance(result, tuple) else ({}, {})
-        self._done = False
-
-        agents = list(self.agent_ids)
-        return ParadigmStepResult(
-            observations=observations,
-            rewards={agent: 0.0 for agent in agents},
-            terminations={agent: False for agent in agents},
-            truncations={agent: False for agent in agents},
-            infos=infos if isinstance(infos, dict) else {},
-            current_agent=None,
-            all_done=False,
-        )
-
-    def is_done(self) -> bool:
-        return self._done
-
-    def close(self) -> None:
-        if hasattr(self._env, "close"):
-            self._env.close()
-
-
 # =============================================================================
 # Factory Function
 # =============================================================================
@@ -776,8 +644,6 @@ def create_paradigm_adapter(
         return SequentialParadigmAdapter(env)
     elif paradigm == SteppingParadigm.SIMULTANEOUS:
         return SimultaneousParadigmAdapter(env)
-    elif paradigm == SteppingParadigm.HIERARCHICAL:
-        return HierarchicalParadigmAdapter(env)
     else:
         raise ValueError(f"Unknown paradigm: {paradigm}")
 
@@ -801,10 +667,6 @@ def _detect_paradigm(env: Any) -> SteppingParadigm:
         if not hasattr(env, "agent_iter"):
             return SteppingParadigm.SIMULTANEOUS
 
-    # Check for BDI markers
-    if hasattr(env, "execute_intentions") or hasattr(env, "get_percepts"):
-        return SteppingParadigm.HIERARCHICAL
-
     # Default to single-agent (standard Gymnasium)
     return SteppingParadigm.SINGLE_AGENT
 
@@ -815,6 +677,5 @@ __all__ = [
     "SingleAgentParadigmAdapter",
     "SequentialParadigmAdapter",
     "SimultaneousParadigmAdapter",
-    "HierarchicalParadigmAdapter",
     "create_paradigm_adapter",
 ]

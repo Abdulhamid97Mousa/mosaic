@@ -70,7 +70,7 @@ gae_lambda: 0.95
 use_grad_clip: True
 grad_clip_norm: 10.0
 
-running_steps: 2000000
+running_steps: 5000000
 eval_interval: 100000
 test_episode: 5
 

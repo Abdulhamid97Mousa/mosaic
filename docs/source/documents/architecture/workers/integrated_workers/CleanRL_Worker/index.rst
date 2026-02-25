@@ -2,8 +2,8 @@ CleanRL Worker
 ==============
 
 The CleanRL worker is MOSAIC's **single-agent RL** integration.  It wraps
-the `CleanRL <https://github.com/vwxyzjn/cleanrl>`_ library -- a
-collection of single-file, research-friendly algorithm implementations --
+the `CleanRL <https://github.com/vwxyzjn/cleanrl>`_ library. A
+collection of single-file, research-friendly algorithm implementations
 behind the standard :doc:`shim pattern <../../concept>`, adding
 subprocess isolation, FastLane telemetry, curriculum learning, and GUI
 configuration.
@@ -242,13 +242,13 @@ Stopping conditions per stage: ``steps>=N``, ``episodes>=N``,
 
 The ``BabyAITaskWrapper`` (a ``ReinitTaskWrapper`` subclass) handles
 environment switching at runtime.  The training loop (PPO) requires
-no modification -- curriculum learning operates entirely at the
+no modification, curriculum learning operates entirely at the
 environment level.
 
 Built-in preset schedules are available in ``wrappers/curriculum.py``:
 
-- ``BABYAI_GOTO_CURRICULUM`` -- four-stage GoTo progression
-- ``BABYAI_DOORKEY_CURRICULUM`` -- four-stage DoorKey progression (5x5 to 16x16)
+- ``BABYAI_GOTO_CURRICULUM``: four-stage GoTo progression
+- ``BABYAI_DOORKEY_CURRICULUM``: four-stage DoorKey progression (5x5 to 16x16)
 
 FastLane Telemetry
 ------------------
@@ -268,24 +268,24 @@ subprocess to the MOSAIC GUI via shared memory.
 
 **Video modes:**
 
-- ``single`` -- only the probe environment (selected by ``fastlane_slot``)
+- ``single``: only the probe environment (selected by ``fastlane_slot``)
   emits frames.
-- ``grid`` -- multiple environments contribute frames; slot 0 coordinates
+- ``grid``: multiple environments contribute frames; slot 0 coordinates
   tiling via ``_GridCoordinator``.  The ``fastlane_grid_limit`` parameter
   controls how many environments participate.
-- ``off`` -- no frame emission.
+- ``off``: no frame emission.
 
 **Metrics published alongside each frame:**
 
-- ``last_reward`` -- reward from the most recent step
-- ``rolling_return`` -- exponentially smoothed episode return
-- ``step_rate_hz`` -- current training throughput
+- ``last_reward``: reward from the most recent step
+- ``rolling_return``: exponentially smoothed episode return
+- ``step_rate_hz``: current training throughput
 
 **Tuning parameters (environment variables):**
 
-- ``CLEANRL_FASTLANE_INTERVAL_MS`` -- minimum milliseconds between frames
+- ``CLEANRL_FASTLANE_INTERVAL_MS``: minimum milliseconds between frames
   (throttling)
-- ``CLEANRL_FASTLANE_MAX_DIM`` -- maximum pixel dimension before
+- ``CLEANRL_FASTLANE_MAX_DIM``: maximum pixel dimension before
   downscaling
 
 GUI Integration
@@ -373,50 +373,17 @@ The config loader accepts two JSON formats:
 
 Key ``extras`` fields:
 
-- ``mode`` -- ``"train"`` (default), ``"policy_eval"``,
-  ``"resume_training"``, ``"interactive"``
-- ``cuda`` / ``use_cuda`` -- enable GPU acceleration
-- ``tensorboard_dir`` -- relative path for TensorBoard logs
-- ``track_wandb`` -- enable Weights & Biases logging
-- ``algo_params`` -- dict of algorithm-specific hyperparameters passed
+- ``mode``: ``"train"`` (default), ``"policy_eval"``, ``"resume_training"``, ``"interactive"``
+- ``cuda`` / ``use_cuda``: enable GPU acceleration
+- ``tensorboard_dir``: relative path for TensorBoard logs
+- ``track_wandb``: enable Weights & Biases logging
+- ``algo_params``: dict of algorithm-specific hyperparameters passed
   as CLI flags to the upstream script
-- ``curriculum_schedule`` -- list of stage dicts (triggers curriculum
+- ``curriculum_schedule``: list of stage dicts (triggers curriculum
   mode)
-- ``fastlane_video_mode`` -- ``"single"``, ``"grid"``, or ``"off"``
-- ``policy_path`` -- path to trained model (for eval/resume)
+- ``fastlane_video_mode``: ``"single"``, ``"grid"``, or ``"off"``
+- ``policy_path``: path to trained model (for eval/resume)
 
-File Layout
------------
-
-.. code-block:: text
-
-   3rd_party/cleanrl_worker/cleanrl_worker/
-   +-- __init__.py              # get_worker_metadata(), re-exports
-   +-- cli.py                   # CLI entry point (--config, --interactive)
-   +-- config.py                # CleanRLWorkerConfig dataclass
-   +-- runtime.py               # CleanRLWorkerRuntime, InteractiveRuntime
-   +-- launcher.py              # Algorithm subprocess dispatch
-   +-- fastlane.py              # FastLaneTelemetryWrapper, _GridCoordinator
-   +-- sitecustomize.py         # Import-time gym.make() patch
-   +-- analytics.py             # AnalyticsManifest, build_manifest()
-   +-- eval_registry.py         # EvalEntry, EVAL_REGISTRY, unified_evaluate()
-   +-- curriculum_training.py   # CurriculumTrainingConfig, run_curriculum_training()
-   +-- train.py                 # Training helpers
-   +-- save.py                  # Checkpoint saving helpers
-   +-- agents/
-   |   +-- minigrid.py          # MinigridCNN, MinigridAgent
-   |   +-- mlp.py               # MLPAgent
-   +-- algorithms/
-   |   +-- ppo.py               # MOSAIC-patched PPO
-   +-- wrappers/
-   |   +-- curriculum.py        # BabyAITaskWrapper, curriculum env factories
-   |   +-- minigrid.py          # MiniGrid observation wrappers
-   |   +-- procedural_generation.py
-   +-- unified_eval/
-       +-- evaluator.py         # Unified evaluation engine
-       +-- base.py              # Evaluator base class
-       +-- registry.py          # Adapter registry
-       +-- adapters/            # Per-algorithm eval adapters (ppo, dqn, c51, ...)
 
 .. toctree::
    :maxdepth: 1

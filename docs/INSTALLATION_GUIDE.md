@@ -74,8 +74,6 @@ pip install -e ".[full]"
 | `procgen` | Procgen benchmark (16 envs) | `procgen` or `procgen-mirror` |
 | `ray-rllib` | Ray/RLlib distributed training | `ray[rllib]` |
 | `xuance` | XuanCe MARL algorithms | `xuance` |
-| `jason` | Jason BDI agents | Java + Jason runtime |
-| `spade-bdi` | SPADE BDI agents | `spade`, `spade-bdi` |
 | `full` | Everything | All of the above |
 
 ---

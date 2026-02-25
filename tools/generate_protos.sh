@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Proto generation script for gym_gui Jason supervisor + bridge stubs.
+# Proto generation script for the MOSAIC trainer gRPC service.
 # Usage:
 #   source .venv/bin/activate  # ensure grpcio-tools installed
 #   bash tools/generate_protos.sh
 #
 # This regenerates:
-#   - gym_gui/services/jason_supervisor/proto/supervisor.proto
-#   - gym_gui/services/jason_bridge/bridge.proto
-# into their canonical package paths (preventing nested duplicates).
+#   - gym_gui/services/trainer/proto/trainer_pb2.py
+#   - gym_gui/services/trainer/proto/trainer_pb2_grpc.py
+#   - gym_gui/services/trainer/proto/trainer_pb2.pyi
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
 PYTHON_BIN="${PYTHON_BIN:-python}"

@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 
 from gym_gui.config.paths import VAR_MODELS_HF_CACHE
 from gym_gui.logging_config.helpers import log_constant
@@ -23,6 +23,10 @@ from gym_gui.ui.worker_catalog.catalog import get_worker_catalog, WorkerDefiniti
 from gym_gui.constants.constants_operator import (
     BALROG_SUPPORTED_ENVS,
     BALROG_DEFAULT_TASK,
+)
+from gym_gui.ui.widgets.multi_agent_action_panel import (
+    COLOR_PALETTE,
+    DEFAULT_AGENT_COLOR_NAMES,
 )
 
 
@@ -690,6 +694,25 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         self._type_combo.addItems(["LLM", "RL", "Human", "Random"])
         row1.addWidget(self._type_combo)
 
+        # Agent color selector
+        row1.addWidget(QtWidgets.QLabel("Color:", self))
+        self._color_combo = QtWidgets.QComboBox(self)
+        self._color_combo.setFixedWidth(100)
+        self._color_combo.addItem("Auto", "auto")
+        for color_name, (primary_hex, _) in COLOR_PALETTE.items():
+            display_name = color_name.replace("_", " ").title()
+            self._color_combo.addItem(display_name, color_name)
+            idx = self._color_combo.count() - 1
+            self._color_combo.setItemData(
+                idx, QtGui.QColor(primary_hex), QtCore.Qt.ItemDataRole.DecorationRole,
+            )
+        # Default selection matches the agent's traditional colour
+        default_color = DEFAULT_AGENT_COLOR_NAMES.get(self._player_id, "auto")
+        cidx = self._color_combo.findData(default_color)
+        if cidx >= 0:
+            self._color_combo.setCurrentIndex(cidx)
+        row1.addWidget(self._color_combo)
+
         # Worker dropdown
         row1.addWidget(QtWidgets.QLabel("Worker:", self))
         self._worker_combo = QtWidgets.QComboBox(self)
@@ -799,6 +822,7 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
 
     def _connect_signals(self) -> None:
         self._type_combo.currentIndexChanged.connect(self._on_type_changed)
+        self._color_combo.currentIndexChanged.connect(self._on_changed)
         self._worker_combo.currentIndexChanged.connect(self._on_changed)
         self._client_combo.currentIndexChanged.connect(self._on_client_changed)
         self._model_combo.currentIndexChanged.connect(self._on_changed)
@@ -994,6 +1018,11 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
             # Default worker if none selected
             if not worker_id:
                 worker_id = "balrog_worker"
+
+        # Agent color preference (applies to all worker types)
+        color_name = self._color_combo.currentData()
+        if color_name and color_name != "auto":
+            settings["agent_color"] = color_name
 
         return WorkerAssignment(
             worker_id=worker_id,
@@ -1345,6 +1374,12 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._square_size_combo.setFixedWidth(150)
         self._square_size_combo.hide()  # Hidden by default
         right_col.addRow(self._square_size_label, self._square_size_combo)
+
+        # Connect display-related combos so changes propagate to renderers
+        self._container_size_combo.currentIndexChanged.connect(self._on_config_changed)
+        self._image_scale_combo.currentIndexChanged.connect(self._on_config_changed)
+        self._square_size_combo.currentIndexChanged.connect(self._on_config_changed)
+        self._game_resolution_combo.currentIndexChanged.connect(self._on_config_changed)
 
         row2.addLayout(right_col)
 
@@ -2446,6 +2481,36 @@ class OperatorConfigRow(QtWidgets.QWidget):
         else:
             self._size_label.setText(f"Image: {width}×{height}")
         self._size_label.show()
+
+    def set_container_size(self, size: int) -> None:
+        """Set the container size dropdown to match a drag-resized value.
+
+        If the size matches a preset entry, selects it.  Otherwise adds
+        a custom entry (e.g., ``"523px"``) so the dropdown reflects the
+        actual container size after dragging.
+
+        Args:
+            size: Container size in pixels (the larger of width/height).
+        """
+        combo = self._container_size_combo
+        # Try to find an existing preset that matches (within 5px tolerance)
+        for idx in range(combo.count()):
+            preset = combo.itemData(idx)
+            if preset and abs(preset - size) <= 5:
+                combo.setCurrentIndex(idx)
+                return
+
+        # No preset matches — add a custom entry
+        label = f"{size}px"
+        # Remove previous custom entry if any
+        for idx in range(combo.count()):
+            if combo.itemText(idx).endswith("px") and combo.itemData(idx) not in (
+                0, 300, 350, 400, 512, 600, 700, 768, 800, 1024, 1280, 1440, 1600, 1920,
+            ):
+                combo.removeItem(idx)
+                break
+        combo.addItem(label, size)
+        combo.setCurrentIndex(combo.count() - 1)
 
     def clear_environment_size(self) -> None:
         """Clear the environment size label."""

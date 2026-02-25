@@ -401,61 +401,22 @@ class TrainerDispatcher:
                 if worker_id and "--worker-id" not in args:
                     args.extend(["--worker-id", worker_id])
                 
-                # Add BDI flags if BDI mode is enabled
                 agent_type = worker_meta.get("agent_type", "Headless")
-                if worker_meta.get("bdi_enabled"):
-                    if "--bdi" not in args:
-                        args.append("--bdi")
-                    bdi_config = worker_meta.get("bdi_config", {})
-                    bdi_jid = bdi_config.get("jid", "agent@localhost")
-                    bdi_password = bdi_config.get("password", "secret")
-                    
-                    if "--bdi-jid" not in args:
-                        args.extend(["--bdi-jid", bdi_jid])
-                    if "--bdi-password" not in args:
-                        args.extend(["--bdi-password", bdi_password])
-                    
-                    if "asl_file" in bdi_config:
-                        asl_file = bdi_config.get("asl_file")
-                        if asl_file and "--asl-file" not in args:
-                            args.extend(["--asl-file", asl_file])
-                    
-                    # Log BDI configuration details
-                    agent_config = get_agent_config("BDI")
-                    schema = agent_config.get_telemetry_schema()
-                    required_fields = agent_config.get_required_fields()
-                    optional_fields = agent_config.get_optional_fields()
-                    
-                    _LOGGER.info(
-                        "BDI Agent worker command prepared",
-                        extra={
-                            "run_id": run.run_id,
-                            "agent_type": agent_type,
-                            "bdi_jid": bdi_jid,
-                            "bdi_password": "[***]",
-                            "bdi_asl_file": bdi_config.get("asl_file", "(not provided)"),
-                            "bdi_config_keys": list(bdi_config.keys()),
-                            "telemetry_schema_categories": list(schema.keys()),
-                            "required_telemetry_fields": sorted(required_fields),
-                            "optional_telemetry_fields": sorted(optional_fields),
-                        },
-                    )
-                else:
-                    # Log Headless agent configuration
-                    agent_config = get_agent_config(agent_type)
-                    schema = agent_config.get_telemetry_schema()
-                    required_fields = agent_config.get_required_fields()
-                    
-                    _LOGGER.info(
-                        "Headless Agent worker command prepared",
-                        extra={
-                            "run_id": run.run_id,
-                            "agent_type": agent_type,
-                            "algorithm": worker_meta.get("algorithm", "unknown"),
-                            "telemetry_schema_categories": list(schema.keys()),
-                            "required_telemetry_fields": sorted(required_fields),
-                        },
-                    )
+                # Log agent configuration
+                agent_config = get_agent_config(agent_type)
+                schema = agent_config.get_telemetry_schema()
+                required_fields = agent_config.get_required_fields()
+
+                _LOGGER.info(
+                    "Agent worker command prepared",
+                    extra={
+                        "run_id": run.run_id,
+                        "agent_type": agent_type,
+                        "algorithm": worker_meta.get("algorithm", "unknown"),
+                        "telemetry_schema_categories": list(schema.keys()),
+                        "required_telemetry_fields": sorted(required_fields),
+                    },
+                )
                 
                 worker_cmd.extend(args)
                 _LOGGER.info(

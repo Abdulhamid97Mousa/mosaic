@@ -86,7 +86,13 @@ def _shim_tqdm_disabled() -> None:
 
         def _silent_tqdm(iterable=None, *args, **kwargs):
             kwargs["disable"] = True
-            return original_tqdm(iterable, *args, **kwargs)
+            result = original_tqdm(iterable, *args, **kwargs)
+            # tqdm(disable=True) drops internal counters like last_print_n.
+            # XuanCe's RNN training path (on_policy_marl.py:394) reads
+            # process_bar.last_print_n, so we must ensure it exists.
+            if not hasattr(result, "last_print_n"):
+                result.last_print_n = 0
+            return result
 
         marl_mod.tqdm = _silent_tqdm
         LOGGER.debug("Shim applied: tqdm disabled in on_policy_marl")
@@ -180,6 +186,123 @@ def _shim_get_runner_directories() -> None:
 
 
 # ---------------------------------------------------------------------------
+# Shim 4: MAPPO values_next — missing dict wrapper for RNN critic input
+# ---------------------------------------------------------------------------
+# XuanCe v1.4.0 bug: MAPPO_Agents.values_next() with
+#   use_parameter_sharing=False + use_rnn=True + use_global_state=True
+# builds critic_input as a bare numpy array instead of a dict keyed by
+# agent_keys.  The downstream get_values() then does observation[key]
+# on a numpy array with a string key → IndexError.
+#
+# Root cause: mappo_agents.py line ~235:
+#     critic_input = state.reshape([n_env, 1, -1])   # bare array!
+# Should be:
+#     critic_input = {k: state.reshape([n_env, 1, -1]) for k in self.agent_keys}
+#
+# Compare with the non-RNN path (line ~244) which correctly wraps in dict,
+# and _build_critic_inputs() which also wraps in dict for all code paths.
+# ---------------------------------------------------------------------------
+
+_MAPPO_VALUES_NEXT_PATCHED = False
+
+
+def _shim_mappo_values_next() -> None:
+    """Fix MAPPO values_next to wrap critic_input in a dict for RNN + global state."""
+    global _MAPPO_VALUES_NEXT_PATCHED
+    if _MAPPO_VALUES_NEXT_PATCHED:
+        return
+
+    try:
+        from xuance.torch.agents.multi_agent_rl.mappo_agents import MAPPO_Agents
+    except ImportError:
+        return
+
+    import numpy as np
+    from operator import itemgetter
+    import torch
+
+    _original_values_next = MAPPO_Agents.values_next
+
+    def _patched_values_next(self, i_env, obs_dict, state=None, rnn_hidden_critic=None):
+        # Only intervene for the specific buggy path:
+        # use_parameter_sharing=False + use_rnn=True + use_global_state=True
+        if (not self.use_parameter_sharing) and self.use_rnn and self.use_global_state:
+            n_env = 1
+            rnn_hidden_critic_i = {k: self.policy.critic_representation[k].get_hidden_item(
+                [i_env, ], *rnn_hidden_critic[k]) for k in self.agent_keys}
+
+            critic_input_array = state.reshape([n_env, 1, -1])
+            critic_input = {k: critic_input_array for k in self.agent_keys}
+
+            rnn_hidden_critic_new, values_out = self.policy.get_values(
+                observation=critic_input, rnn_hidden=rnn_hidden_critic_i)
+            values_dict = {k: values_out[k].cpu().detach().numpy().reshape([])
+                           for k in self.agent_keys}
+            return rnn_hidden_critic_new, values_dict
+
+        return _original_values_next(self, i_env, obs_dict, state, rnn_hidden_critic)
+
+    MAPPO_Agents.values_next = _patched_values_next
+    _MAPPO_VALUES_NEXT_PATCHED = True
+    LOGGER.debug("Shim applied: MAPPO values_next dict-wraps critic_input for RNN + global state")
+
+
+# ---------------------------------------------------------------------------
+# Shim 5: On-policy MARL values_next — RNN input dimension mismatch
+# ---------------------------------------------------------------------------
+# XuanCe v1.4.0 bug: OnPolicyMARLAgents.values_next() (base class used by
+# IPPO) with use_parameter_sharing=False + use_rnn=True builds obs_input as:
+#     obs_input = {k: obs_dict[k][None, :] for k in self.agent_keys}
+# This produces shape (1, obs_dim) — 2-D.  But the GRU hidden state from
+# get_hidden_item is 3-D (num_layers, 1, hidden_size).  PyTorch GRU with
+# batch_first=True rejects the mismatch:
+#     RuntimeError: For unbatched 2-D input, hx should also be 2-D
+#
+# Fix: reshape to (1, 1, obs_dim) — 3-D — matching the batched hidden state.
+# Compare with MAPPO's override which correctly uses reshape([n_env, 1, -1]).
+# ---------------------------------------------------------------------------
+
+_IPPO_VALUES_NEXT_PATCHED = False
+
+
+def _shim_ippo_values_next() -> None:
+    """Fix base class values_next to use 3-D observation for RNN."""
+    global _IPPO_VALUES_NEXT_PATCHED
+    if _IPPO_VALUES_NEXT_PATCHED:
+        return
+
+    try:
+        from xuance.torch.agents.core.on_policy_marl import OnPolicyMARLAgents
+    except ImportError:
+        return
+
+    _original_values_next = OnPolicyMARLAgents.values_next
+
+    def _patched_values_next(self, i_env, obs_dict, state=None, rnn_hidden_critic=None):
+        # Only intervene for the specific buggy path:
+        # use_parameter_sharing=False + use_rnn=True
+        if (not self.use_parameter_sharing) and self.use_rnn:
+            n_env = 1
+            rnn_hidden_critic_i = {k: self.policy.critic_representation[k].get_hidden_item(
+                [i_env, ], *rnn_hidden_critic[k]) for k in self.agent_keys}
+
+            # Key fix: [None, None, :] gives (1, 1, obs_dim) — 3-D for GRU
+            obs_input = {k: obs_dict[k][None, None, :] for k in self.agent_keys}
+
+            rnn_hidden_critic_new, values_out = self.policy.get_values(
+                observation=obs_input, rnn_hidden=rnn_hidden_critic_i)
+            values_dict = {k: values_out[k].cpu().detach().numpy().reshape([])
+                           for k in self.agent_keys}
+            return rnn_hidden_critic_new, values_dict
+
+        return _original_values_next(self, i_env, obs_dict, state, rnn_hidden_critic)
+
+    OnPolicyMARLAgents.values_next = _patched_values_next
+    _IPPO_VALUES_NEXT_PATCHED = True
+    LOGGER.debug("Shim applied: OnPolicyMARLAgents values_next uses 3-D obs for RNN")
+
+
+# ---------------------------------------------------------------------------
 # Public entry point
 # ---------------------------------------------------------------------------
 
@@ -192,3 +315,5 @@ def apply_shims() -> None:
     _shim_learner_use_cnn()
     _shim_tqdm_disabled()
     _shim_get_runner_directories()
+    _shim_mappo_values_next()
+    _shim_ippo_values_next()

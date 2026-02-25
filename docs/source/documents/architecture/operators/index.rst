@@ -136,7 +136,7 @@ Available Operators
    An Operator *wraps* one or more Workers.  The Operator is the
    agent-level interface (``select_action(obs) -> action``) that the
    GUI interacts with.  The Worker is the process-level engine that
-   runs inside the Operator.  This separation is what enables hybrid
+   runs inside the Operator.  This separation is what enables heterogeneous
    teams -- e.g., an RL-trained policy and an LLM playing side-by-side
    in the same multi-agent environment.  See :doc:`concept` for the
    full motivation and diagrams.
@@ -148,7 +148,7 @@ Available Operators
 
    concept
    homogenous_decision_makers/index
-   hybrid_decision_maker/index
+   heterogeneous_decision_maker/index
    architecture
    lifecycle
    development

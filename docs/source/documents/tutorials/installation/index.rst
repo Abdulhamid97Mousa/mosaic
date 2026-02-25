@@ -316,7 +316,7 @@ without executing any module code:
    We use ``find_spec()`` instead of ``import`` because some packages execute
    blocking code at import time:
 
-   - **XuanCe** calls ``from mpi4py import MPI`` which invokes ``MPI_Init()`` —
+   - **XuanCe** calls ``from mpi4py import MPI`` which invokes ``MPI_Init()``,
      this blocks forever when not launched via ``mpirun``
    - **Ray** imports TensorFlow, Pydantic, and W&B at module level, adding
      several seconds of startup delay
@@ -330,12 +330,12 @@ Additionally, the ``gym_gui/constants/optional_deps.py`` module provides
 .. code-block:: python
 
    from gym_gui.constants import (
-       is_cleanrl_available,   # → bool
-       is_vizdoom_available,   # → bool
-       is_pettingzoo_available,# → bool
-       is_torch_available,     # → bool
-       require_cleanrl,        # → raises OptionalDependencyError if missing
-       require_vizdoom,        # → raises OptionalDependencyError if missing
+       is_cleanrl_available,   # bool
+       is_vizdoom_available,   # bool
+       is_pettingzoo_available,# bool
+       is_torch_available,     # bool
+       require_cleanrl,        # raises OptionalDependencyError if missing
+       require_vizdoom,        # raises OptionalDependencyError if missing
    )
 
    # Lazy worker launchers (import on first use)
