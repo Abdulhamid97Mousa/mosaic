@@ -363,87 +363,104 @@ Legend: ✓ Supported, ✗ Not supported, ◉ Partial.
      <span class="cmp-part">&#9673;</span> Partial
    </p>
 
+
 Experimental Configurations
-----------------------------
+---------------------------
 
 Heterogeneous decision-making enables a systematic ablation matrix for
-cross-paradigm research. Here are examples using 2v2 soccer:
+cross-paradigm research. The following configurations illustrate the design
+using 2v2 soccer in :doc:`MOSAIC MultiGrid <documents/environments/mosaic_multigrid>`.
+Notation follows the :ref:`paper's appendix <paper-notation>`:
+:math:`\pi^{RL}` denotes a solo‑trained RL policy (frozen at evaluation),
+:math:`\lambda^{LLM}` an LLM agent, :math:`\rho` a uniform random policy, and
+:math:`\nu` a no‑op (null action) policy.
 
-**Adversarial Cross-Paradigm**
+Adversarial Cross‑Paradigm Matchups
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Testing how paradigms perform against each other:
+Testing how paradigms perform against each other. Each configuration pits two
+homogeneous teams against one another.
 
 .. list-table::
-   :widths: 25 25 25 25
+   :widths: 20 25 25 30
    :header-rows: 1
 
    * - Configuration
      - Team A
      - Team B
      - Purpose
-   * - RL vs RL
-     - MAPPO + MAPPO
-     - MAPPO + MAPPO
-     - Homogeneous RL baseline
-   * - LLM vs LLM
-     - GPT-4o + GPT-4o
-     - GPT-4o + GPT-4o
+   * - **A1** (RL vs RL)
+     - :math:`\pi^{RL}_1 + \pi^{RL}_2`
+     - :math:`\pi^{RL}_3 + \pi^{RL}_4`
+     - Homogeneous RL baseline (ceiling)
+   * - **A2** (LLM vs LLM)
+     - :math:`\lambda^{LLM}_1 + \lambda^{LLM}_2`
+     - :math:`\lambda^{LLM}_3 + \lambda^{LLM}_4`
      - Homogeneous LLM baseline
-   * - RL vs LLM
-     - MAPPO + MAPPO
-     - GPT-4o + GPT-4o
-     - Cross-paradigm matchup
-   * - RL vs Random
-     - MAPPO + MAPPO
-     - Random + Random
-     - Sanity check
+   * - **A3** (RL vs LLM)
+     - :math:`\pi^{RL}_1 + \pi^{RL}_2`
+     - :math:`\lambda^{LLM}_1 + \lambda^{LLM}_2`
+     - Central cross‑paradigm comparison
+   * - **A4** (RL vs Random)
+     - :math:`\pi^{RL}_1 + \pi^{RL}_2`
+     - :math:`\rho_1 + \rho_2`
+     - Sanity check (trained vs random)
 
-**Cooperative Heterogeneous Teams**
+Cooperative Heterogeneous Teams
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-Testing how paradigms work together as teammates:
+Testing how paradigms work together **within** a team. All RL policies are
+trained solo (1v1) and frozen before deployment; LLM agents are zero‑shot.
 
 .. list-table::
-   :widths: 34 33 33
+   :widths: 25 35 40
    :header-rows: 1
 
    * - Configuration
      - Green Team
      - Blue Team
-   * - Heterogeneous vs Crippled
-     - RL + LLM
-     - RL + Random
-   * - Heterogeneous vs Solo
-     - RL + LLM
-     - RL + NoOp
-   * - Solo-pair vs Solo-pair
-     - RL + RL
-     - RL + RL
-   * - Heterogeneous vs Co-trained
-     - RL + LLM
-     - RL(2v2) + RL(2v2)
+   * - **C1** (Heterogeneous vs Crippled)
+     - :math:`\pi^{RL} + \lambda^{LLM}`
+     - :math:`\pi^{RL} + \rho`
+   * - **C2** (Heterogeneous vs Solo)
+     - :math:`\pi^{RL} + \lambda^{LLM}`
+     - :math:`\pi^{RL} + \nu`
+   * - **C3** (Solo‑pair vs Solo‑pair)
+     - :math:`\pi^{RL}_i + \pi^{RL}_j`
+     - :math:`\pi^{RL}_k + \pi^{RL}_l`
+   * - **C4** (Heterogeneous vs Co‑trained)
+     - :math:`\pi^{RL} + \lambda^{LLM}`
+     - :math:`\pi^{RL}_{2v2} + \pi^{RL}_{2v2}`
 
-.. important::
 
-   **1v1-to-2v2 Transfer Design.** RL agents are trained as solo experts in
-   1v1, then deployed as teammates alongside an LLM in 2v2.  This eliminates
-   the **co-training confound**: if RL agents were instead trained in 2v2 via
-   MAPPO self-play, their policies would encode implicit partner models
-   calibrated against another MAPPO agent.  Swapping one teammate with an LLM
-   would then conflate two effects: the paradigm difference *and* the partner
-   mismatch.  With 1v1-trained agents, the RL policy has zero partner
-   expectations because it never had a partner, isolating the paradigm variable.
+.. admonition:: 1v1‑to‑2v2 Transfer Design – Why Solo Training?
+   :class: important
 
-   This is distinct from **zero-shot coordination (ZSC)** in the ad-hoc
-   teamwork literature.  ZSC studies RL agents cooperating with unknown *RL*
-   partners, agents from the same paradigm that share the same observation and
-   action representations.  The 1v1-to-2v2 design studies an LLM as an ad-hoc
-   partner for a frozen RL policy, where the partner is not just unknown but
-   from a fundamentally different paradigm (text-based reasoning vs. learned
-   tensor-to-action mapping).  The comparison baseline also changes: in ZSC
-   the reference is a co-trained RL+RL team, while here the fair reference is
-   two independently trained 1v1 solo experts paired in 2v2 (the "Solo-pair
-   vs Solo-pair" configuration above), since neither agent was trained with
+
+   RL agents are trained as **solo experts in 1v1** (single‑agent environment),
+   then deployed as teammates in 2v2 **without any fine‑tuning**. This design
+   eliminates the *co‑training confound*: if agents were trained together in
+   2v2 via MAPPO self‑play, their policies would encode implicit partner models
+   calibrated against another MAPPO agent. Swapping one teammate with an LLM
+   would then conflate two effects – the paradigm difference **and** the partner
+   mismatch. With 1v1‑trained agents, the RL policy carries **zero partner
+   expectations** because it never had a partner, cleanly isolating the paradigm
+   variable.
+
+   This is distinct from **zero‑shot coordination (ZSC)** in the ad‑hoc teamwork
+   literature. ZSC studies RL agents cooperating with unknown *RL* partners,
+   agents that share the same observation and action representations
+   (:math:`\mathcal{O} = \mathbb{R}^d`, :math:`\mathcal{A}` discrete). Here we
+   study an LLM as an ad‑hoc partner for a frozen RL policy – the partner is not
+   only unknown but operates through a fundamentally different paradigm
+   (text‑based reasoning vs. learned tensor‑to‑action mapping). The fair
+   comparison baseline also changes: in ZSC the reference is a co‑trained
+   RL+RL team, while here the appropriate baseline is **C3**: two independently
+   trained 1v1 solo experts paired in 2v2, since neither agent was trained with
    any partner.
+
+   For full mathematical details and further configurations, see
+   :ref:`Appendix A <paper-appendix>` of the companion paper.
 
 Supported Environment Families
 ------------------------------

@@ -69,9 +69,7 @@ The diagram below shows the BALROG evaluation pipeline from the original paper:
    :align: center
    :width: 90%
 
-   BALROG evaluation pipeline (`Paglieri et al., 2024 <https://arxiv.org/abs/2411.13543>`_):
-   ``env_wrapper.py``, ``client.py``, ``evaluator.py``, and ``agent.py`` collaborate
-   to drive LLM/VLM agents through game environments.
+   :caption: BALROG evaluation pipeline (`Paglieri et al., 2024 <https://arxiv.org/abs/2411.13543>`_): ``env_wrapper.py``, ``client.py``, ``evaluator.py``, and ``agent.py`` collaborate to drive LLM/VLM agents through game environments.
 
 The BALROG worker follows the standard MOSAIC :doc:`shim pattern <../../concept>`.
 
