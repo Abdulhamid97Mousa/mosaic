@@ -58,42 +58,6 @@ State Machine
        style RESETTING fill:#0dcaf0,stroke:#0aa2c0,color:#000
        style STOPPED fill:#dc3545,stroke:#b02a37,color:#fff
 
-Signal Flow
-~~~~~~~~~~~
-
-.. mermaid::
-
-   sequenceDiagram
-       actor User
-       participant Panel as ControlPanel
-       participant MW as MainWindow
-       participant LAUNCH as OperatorLauncher
-       participant HANDLE as ProcessHandle
-       participant WORKER as Operator Subprocess
-
-       User->>Panel: Click "Start All"
-       Panel->>MW: start_operators_requested
-       MW->>LAUNCH: launch_operator(config, interactive=True)
-       LAUNCH-->>MW: OperatorProcessHandle
-
-       User->>Panel: Click "Reset All"
-       Panel->>MW: reset_operators_requested
-       MW->>HANDLE: send_reset(seed=42)
-       MW->>MW: QTimer.singleShot(100ms, poll)
-       WORKER-->>HANDLE: {"type": "ready", ...}
-       MW->>MW: Render initial frame
-
-       User->>Panel: Click "Step All"
-       Panel->>MW: step_operators_requested
-       MW->>HANDLE: send_step()
-       MW->>MW: QTimer.singleShot(100ms, poll)
-       WORKER-->>HANDLE: {"type": "step", ...}
-       MW->>MW: Render frame + update stats
-
-       User->>Panel: Click "Stop All"
-       Panel->>MW: stop_operators_requested
-       MW->>HANDLE: send_stop()
-       MW->>LAUNCH: cleanup subprocess
 
 Script Mode
 -----------
@@ -155,30 +119,16 @@ entire automatic execution lifecycle:
 
 The manager coordinates with ``MainWindow`` through signals:
 
-.. mermaid::
+.. figure:: ../../../images/operators/script_mode_signal_flow.png
+   :alt: Script Mode Signal Flow
+   :align: center
+   :width: 50%
 
-   %%{init: {"flowchart": {"curve": "linear"}} }%%
-   graph TD
-       SCRIPT["ScriptExperimentWidget<br/>(UI)"]
-       MGR["OperatorScriptExecutionManager<br/>(State Machine)"]
-       MW["MainWindow<br/>(Signal Router)"]
-       PROC["Operator Subprocess"]
-
-       SCRIPT -->|"start_experiment()"| MGR
-       MGR -->|"launch_operator signal"| MW
-       MW -->|"spawn + send_reset()"| PROC
-       PROC -->|"stdout response"| MW
-       MW -->|"on_ready_received()"| MGR
-       MGR -->|"step_operator signal"| MW
-       MW -->|"send_step()"| PROC
-       PROC -->|"stdout response"| MW
-       MW -->|"on_step_received()"| MGR
-       MGR -->|"progress_updated signal"| SCRIPT
-
-       style SCRIPT fill:#4a90d9,stroke:#2e5a87,color:#fff
-       style MGR fill:#50c878,stroke:#2e8b57,color:#fff
-       style MW fill:#ff7f50,stroke:#cc5500,color:#fff
-       style PROC fill:#9370db,stroke:#6a0dad,color:#fff
+   Signal flow between the four components: ScriptExperimentWidget triggers
+   ``start_experiment()``, the Manager emits ``launch_operator`` and
+   ``step_operator`` signals to MainWindow, which spawns the subprocess and
+   relays ``send_reset()`` / ``send_step()`` commands.  Responses flow back
+   via stdout, and progress is reported to the UI via ``progress_updated``.
 
 Paced Stepping
 ~~~~~~~~~~~~~~

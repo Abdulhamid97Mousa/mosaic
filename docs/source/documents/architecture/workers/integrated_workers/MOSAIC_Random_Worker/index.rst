@@ -195,7 +195,7 @@ Runtime Modes
 
 Interactive mode reads JSON commands from stdin and emits telemetry to stdout:
 
-.. code-block:: json
+.. code-block:: none
 
    {"cmd": "init_agent", "game_name": "chess_v6", "player_id": "player_0"}
    {"cmd": "select_action", "observation": [...], "player_id": "player_0"}

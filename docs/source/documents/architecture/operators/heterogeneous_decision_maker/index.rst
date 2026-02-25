@@ -1,5 +1,5 @@
-Heterogeneous Decision-Maker
-=====================
+Heterogeneous Decision-Maker 
+============================
 
 .. raw:: html
 
@@ -108,7 +108,7 @@ Protocol makes **agents interchangeable**. Any decision-maker can be
 plugged into any compatible environment without modifying either side.
 
 How Heterogeneous Teams Work
----------------------
+----------------------------
 
 The ``WorkerAssignment`` system maps each agent slot in a multi-agent
 environment to a specific worker subprocess.  A single
@@ -278,7 +278,7 @@ Testing how paradigms perform **against** each other:
      - Sanity check
 
 Cooperative Heterogeneous Teams
-^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 Testing how paradigms work **together** as teammates:
 

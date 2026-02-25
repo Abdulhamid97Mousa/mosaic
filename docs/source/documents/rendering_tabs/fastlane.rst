@@ -212,7 +212,7 @@ See Also
   by worker presenters.
 - :doc:`/documents/architecture/workers/index`: the worker subprocess layer
   that produces fast-lane frames.
-- :doc:`/documents/architecture/workers/integrated_workers/CleanRL_Worker/index`
- : CleanRL's ``FastLaneTelemetryWrapper`` integration.
+- :doc:`/documents/architecture/workers/integrated_workers/CleanRL_Worker/index`:
+  CleanRL's ``FastLaneTelemetryWrapper`` integration.
 - :doc:`/documents/runtime_logging/constants`: ``RenderDefaults`` and
   ``BufferDefaults`` for queue-size tuning.
