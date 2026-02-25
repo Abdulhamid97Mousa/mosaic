@@ -239,8 +239,6 @@ Agent Training Form
      - ≤ 256 chars
    * - ``worker_id``
      - Alphanumeric + underscore + hyphen
-   * - ``bdi_jid``
-     - ``user@host`` format (if BDI enabled)
 
 Directory Layout
 ----------------

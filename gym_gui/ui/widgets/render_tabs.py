@@ -80,6 +80,8 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
     human_action_submitted: "QtCore.SignalInstance" = QtCore.Signal(str, int)  # type: ignore[assignment]  # operator_id, action_index
     board_game_move_made: "QtCore.SignalInstance" = QtCore.Signal(str, str, str)  # type: ignore[assignment]  # operator_id, from_sq, to_sq
     chess_move_button_clicked: "QtCore.SignalInstance" = QtCore.Signal(str, str)  # type: ignore[assignment]  # operator_id, uci_move
+    # Container resize (user dragged edge)
+    container_resized: "QtCore.SignalInstance" = QtCore.Signal(str, int, int)  # type: ignore[assignment]  # operator_id, w, h
 
     _current_game: GameId | None
 
@@ -152,6 +154,7 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
         self._multi_operator_view.human_action_submitted.connect(self.human_action_submitted.emit)
         self._multi_operator_view.board_game_move_made.connect(self.board_game_move_made.emit)
         self._multi_operator_view.chess_move_button_clicked.connect(self.chess_move_button_clicked.emit)
+        self._multi_operator_view.container_resized.connect(self.container_resized.emit)
 
         # Management tab for training runs (optional, requires run_manager)
         self._management_tab: Optional["ManagementTab"] = None

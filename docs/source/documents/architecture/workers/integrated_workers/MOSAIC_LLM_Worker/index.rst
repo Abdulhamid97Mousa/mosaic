@@ -1,6 +1,16 @@
 MOSAIC LLM Worker
 =================
 
+.. raw:: html
+
+   <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
+     <source src="../../../../../_static/videos/pettingzoo_chess_v6.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+   <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
+     <strong>LLM vs LLM Chess:</strong> Two LLM agents playing PettingZoo Chess (chess_v6) through the MOSAIC LLM Worker action-selector protocol.
+   </p>
+
 The MOSAIC LLM Worker is MOSAIC's **native multi-agent LLM coordination and
 adversarial evaluation** worker. It drives pre-trained language models through
 MOSAIC environments with built-in support for **LLM coordination** (cooperative
@@ -10,10 +20,10 @@ observations**, and **three coordination-level prompt strategies**.
 The MOSAIC LLM Worker grew out of the :doc:`BALROG Worker <../BALROG_Worker/index>`
 integration.  After wrapping BALROG with a
 :doc:`shim <../../concept>` for single-agent LLM evaluation, the potential of
-multi-agent setups became clear --- both
+multi-agent setups became clear, both
 :doc:`homogeneous </documents/architecture/operators/homogenous_decision_makers/index>`
 (all-LLM teams) and
-:doc:`hybrid </documents/architecture/operators/hybrid_decision_maker/index>`
+:doc:`heterogeneous </documents/architecture/operators/heterogeneous_decision_maker/index>`
 (LLM + RL + Human) configurations.  This motivated extending the BALROG
 foundation into a purpose-built worker for multi-agent LLM research, supporting
 cooperative coordination, adversarial matchups, and cross-paradigm evaluation
@@ -26,7 +36,7 @@ within the MOSAIC :doc:`Operator <../../concept>` framework.
      - Multi-agent LLM coordination and adversarial (also single-agent)
    * - **Task Type**
      - LLM coordination (cooperative teams), LLM adversarial (competitive
-       opponents), heterogeneous hybrid teams (LLM + RL + Human)
+       opponents), heterogeneous teams (LLM + RL + Human)
    * - **Model Support**
      - OpenRouter (unified), OpenAI, Anthropic, Google Gemini, vLLM (local)
    * - **Environments**
@@ -56,8 +66,8 @@ This enables two complementary research directions:
 - **LLM Adversarial:** How do different LLM models perform head-to-head?
   Can an LLM team compete against RL-trained policies?
 
-Combined with MOSAIC's :doc:`hybrid decision-maker
-</documents/architecture/operators/hybrid_decision_maker/index>`, the worker
+Combined with MOSAIC's :doc:`heterogeneous decision-maker
+</documents/architecture/operators/heterogeneous_decision_maker/index>`, the worker
 enables heterogeneous experiments (e.g., RL + LLM teammates vs RL + Random
 opponents) that were previously impossible in any single framework.
 
@@ -65,7 +75,7 @@ Key features:
 
 - **LLM coordination:** cooperative multi-agent teams with shared objectives
 - **LLM adversarial:** head-to-head matchups between different LLM models or paradigms
-- **Homogeneous and hybrid setups:** all-LLM teams or mixed LLM + RL + Human teams
+- **Homogeneous and heterogeneous setups:** all-LLM teams or mixed LLM + RL + Human teams
 - **Theory of Mind observations:** egocentric or teammate-aware text
 - **3 coordination levels:** emergent, basic hints, role-based (Forward/Defender)
 - **Pluggable API backends:** OpenRouter, OpenAI, Anthropic, Google Gemini, vLLM
@@ -126,7 +136,7 @@ the LLM. The pipeline handles both single-agent and multi-agent environments:
 
 .. code-block:: text
 
-   3x3x3 numpy array  ──►  observations.py  ──►  Natural language  ──►  LLM
+   3x3x3 numpy array  -->  observations.py  -->  Natural language  -->  LLM
                             (type/color/state      "You see:
                              decoding)              - red ball 1 step ahead
                                                     - green goal 2 steps east
@@ -317,34 +327,34 @@ Multi-Agent Configurations
 The MOSAIC LLM Worker supports the full range of
 :doc:`operator configurations </documents/architecture/operators/concept>`:
 
-**LLM Adversarial** --- different models compete head-to-head:
+**LLM Adversarial:** different models compete head-to-head:
 
 .. code-block:: text
 
    Soccer 1v1:
-     Agent 0 (Green) ──► Nemotron 3 Nano (OpenRouter, free)
-     Agent 1 (Red)   ──► Arcee Trinity Large (OpenRouter, free)
+     Agent 0 (Green) --> Nemotron 3 Nano (OpenRouter, free)
+     Agent 1 (Red)   --> Arcee Trinity Large (OpenRouter, free)
 
    Soccer 2v2:
-     Agent 0 (Green) ──► Model A     Agent 2 (Red) ──► Model B
-     Agent 1 (Green) ──► Model A     Agent 3 (Red) ──► Model B
+     Agent 0 (Green) --> Model A     Agent 2 (Red) --> Model B
+     Agent 1 (Green) --> Model A     Agent 3 (Red) --> Model B
 
-**LLM Coordination** --- same or different models cooperate as teammates:
+**LLM Coordination:** same or different models cooperate as teammates:
 
 .. code-block:: text
 
    Soccer 2v2 (homogeneous):
-     Agent 0 (Green) ──► GPT-4o      Agent 2 (Red) ──► GPT-4o
-     Agent 1 (Green) ──► GPT-4o      Agent 3 (Red) ──► GPT-4o
+     Agent 0 (Green) --> GPT-4o      Agent 2 (Red) --> GPT-4o
+     Agent 1 (Green) --> GPT-4o      Agent 3 (Red) --> GPT-4o
 
-**Hybrid (LLM + RL)** --- cross-paradigm teams (see
-:doc:`hybrid decision-maker </documents/architecture/operators/hybrid_decision_maker/index>`):
+**Heterogeneous (LLM + RL):** cross-paradigm teams (see
+:doc:`heterogeneous decision-maker </documents/architecture/operators/heterogeneous_decision_maker/index>`):
 
 .. code-block:: text
 
    Soccer 2v2:
-     Agent 0 (Green) ──► RL (MAPPO)   Agent 2 (Red) ──► RL (MAPPO)
-     Agent 1 (Green) ──► LLM (GPT-4o) Agent 3 (Red) ──► Random Baseline
+     Agent 0 (Green) --> RL (MAPPO)   Agent 2 (Red) --> RL (MAPPO)
+     Agent 1 (Green) --> LLM (GPT-4o) Agent 3 (Red) --> Random Baseline
 
 Each agent runs in its own worker subprocess. The GUI collects actions
 from all workers simultaneously and steps the environment in parallel mode.

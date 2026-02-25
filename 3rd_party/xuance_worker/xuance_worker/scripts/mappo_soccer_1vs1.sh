@@ -76,6 +76,8 @@ export TRACK_TENSORBOARD="${TRACK_TENSORBOARD:-1}"
 RUN_DIR="${MOSAIC_RUN_DIR:-$SCRIPTS_DIR/$RUN_ID}"
 mkdir -p "$RUN_DIR/checkpoints"
 mkdir -p "$RUN_DIR/tensorboard"
+mkdir -p "$RUN_DIR/logs"
+mkdir -p "$RUN_DIR/models/mappo"
 
 # ============================================================================
 # Display training configuration
@@ -135,6 +137,8 @@ jq --argjson steps "$TOTAL_TIMESTEPS" \
    --argjson num_envs "$NUM_ENVS" \
    --arg checkpoint_dir "$RUN_DIR/checkpoints" \
    --arg tensorboard_dir "$RUN_DIR/tensorboard" \
+   --arg log_dir "$RUN_DIR/logs" \
+   --arg model_dir "$RUN_DIR/models/mappo" \
    --arg training_mode "$TRAINING_MODE" \
    --arg seed "${SEED:-null}" '
     # Algorithm selection
@@ -146,6 +150,10 @@ jq --argjson steps "$TOTAL_TIMESTEPS" \
 
     # Training mode (always competitive for 1v1)
     .extras.training_mode = $training_mode |
+
+    # Output directories
+    .log_dir = $log_dir |
+    .model_dir = $model_dir |
 
     # Training steps
     .running_steps = $steps |

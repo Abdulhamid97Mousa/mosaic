@@ -81,13 +81,6 @@ def bootstrap_default_services() -> ServiceLocator:
         activate=True,
     )
     # actors.register_actor(
-    #     BDIQAgent(),
-    #     display_name="BDI Agent",
-    #     description="Belief-Desire-Intention agent with pluggable learning backends.",
-    #     policy_label="BDI planner + RL policy",
-    #     backend_label="In-process Python actor",
-    # )
-    # actors.register_actor(
     #     LLMMultiStepAgent(),
     #     display_name="LLM Multi-Step Agent",
     #     description="Delegates decisions to an integrated language model pipeline.",

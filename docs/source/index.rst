@@ -149,7 +149,7 @@ under a unified, visual-first interface.
    </video>
    <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
      <strong>Heterogeneous Multi-Agent Ad-Hoc Teamwork in Adversarial Settings:</strong> Different decision-making paradigms (RL, LLM, Random) competing head-to-head in the same multi-agent environment.
-     See <a href="documents/architecture/operators/hybrid_decision_maker/index.html">Hybrid Decision-Maker</a>.
+     See <a href="documents/architecture/operators/heterogeneous_decision_maker/index.html">Heterogeneous Decision-Maker</a>.
    </p>
 
 .. raw:: html
@@ -268,7 +268,7 @@ Supported Workers (8)
 * :doc:`Ray RLlib <documents/architecture/workers/integrated_workers/RLlib_Worker/index>`: RL with distributed training and large-batch optimization (PPO, IMPALA, APPO)
 * :doc:`BALROG <documents/architecture/workers/integrated_workers/BALROG_Worker/index>`: LLM/VLM agentic evaluation (GPT-4o, Claude 3, Gemini · NetHack, BabyAI, Crafter)
 * :doc:`MOSAIC LLM <documents/architecture/workers/integrated_workers/MOSAIC_LLM_Worker/index>`: Multi-agent LLM with coordination strategies and Theory of Mind (MultiGrid, BabyAI, MeltingPot, PettingZoo)
-* **Chess LLM:** LLM chess play with multi-turn dialog (PettingZoo Chess)
+* :doc:`Chess LLM <documents/architecture/workers/integrated_workers/Chess_LLM_Worker/index>`: LLM chess play with multi-turn dialog (PettingZoo Chess)
 * :doc:`MOSAIC Human Worker <documents/architecture/workers/integrated_workers/MOSAIC_Human_Worker/index>`: Human-in-the-loop play via keyboard for any Gymnasium-compatible environment (MiniGrid, Crafter, Chess, NetHack)
 * :doc:`MOSAIC Random Worker <documents/architecture/workers/integrated_workers/MOSAIC_Random_Worker/index>`: Baseline agents with random, no-op, and cycling action behaviours across all 26 environment families
 

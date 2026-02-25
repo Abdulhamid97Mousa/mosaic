@@ -87,6 +87,8 @@ RUN_DIR="${MOSAIC_RUN_DIR:-$SCRIPTS_DIR/$RUN_ID}"
 
 mkdir -p "$RUN_DIR/checkpoints"
 mkdir -p "$RUN_DIR/tensorboard"
+mkdir -p "$RUN_DIR/logs"
+mkdir -p "$RUN_DIR/models/ippo"
 mkdir -p "$RUN_DIR/config"
 
 # ============================================================================
@@ -155,11 +157,15 @@ jq --argjson phase1_steps "$PHASE1_STEPS" \
    --argjson num_envs "$NUM_ENVS" \
    --arg checkpoint_dir "$RUN_DIR/checkpoints" \
    --arg tensorboard_dir "$RUN_DIR/tensorboard" \
+   --arg log_dir "$RUN_DIR/logs" \
+   --arg model_dir "$RUN_DIR/models/ippo" \
    --arg training_mode "$TRAINING_MODE" \
    --arg seed "${SEED:-null}" '
     .method = "ippo" |
     .env = "multigrid" |
     .env_id = "collect_1vs1" |
+    .log_dir = $log_dir |
+    .model_dir = $model_dir |
     .running_steps = ($phase1_steps + $phase2_steps) |
     .parallels = $num_envs |
     .extras.training_mode = $training_mode |

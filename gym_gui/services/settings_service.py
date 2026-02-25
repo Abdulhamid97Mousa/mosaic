@@ -617,14 +617,6 @@ class SettingsService:
             value_type=SettingType.ENUM,
             enum_options=["debug", "info", "error"],
         )
-        metadata["JASON_BRIDGE_ENABLED"] = SettingMetadata(
-            key="JASON_BRIDGE_ENABLED",
-            category="gRPC",
-            description="Enable Jason BDI bridge (0=disabled, 1=enabled)",
-            default_value="1",
-            value_type=SettingType.BOOLEAN,
-        )
-
         # Category 6: LLM & Chat (6 variables, 3 sensitive)
         metadata["OPENROUTER_API_KEY"] = SettingMetadata(
             key="OPENROUTER_API_KEY",

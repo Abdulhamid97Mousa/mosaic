@@ -258,6 +258,49 @@ docs/my_paper/
 3rd_party/dragon_worker/
 3rd_party/test_worker/
 
+# =============================================================================
+# 3rd Party - Non-submodule directories (not tracked in .gitmodules)
+# =============================================================================
+
+3rd_party/babyai/
+3rd_party/BenchMARL/
+3rd_party/Collab-Overcooked/
+3rd_party/crafter/
+3rd_party/godot_worker/
+3rd_party/Grounding_LLMs_with_online_RL/
+3rd_party/gui_jason_grpc_cleanrl/
+3rd_party/gym-multigrid/
+3rd_party/gym-pybullet-drones/
+3rd_party/hemac/
+3rd_party/Hierarchical-Language-Agent/
+3rd_party/Hypothetical-Minds/
+3rd_party/jumanji_worker/
+3rd_party/llm_coordination/
+3rd_party/llm_game_worker/
+3rd_party/marllib_worker/
+3rd_party/marLo/
+3rd_party/mctx_worker/
+3rd_party/meltingpot/
+3rd_party/Minigrid/
+3rd_party/minihack/
+3rd_party/mosaic/
+3rd_party/NetHack/
+3rd_party/obstacle-tower-env/
+3rd_party/overcooked_ai/
+3rd_party/ProAgent/
+3rd_party/robotic-warehouse/
+3rd_party/smac/
+3rd_party/smac_exp/
+3rd_party/smacv2/
+3rd_party/stable-baselines3/
+3rd_party/stockfish_worker/
+3rd_party/sumo/
+3rd_party/tianshou/
+3rd_party/train-procgen/
+3rd_party/unreal_map_worker/
+3rd_party/Verlog/
+3rd_party/vllm/
+
 
 # Experiment operator configs are tracked
 # experiments/*

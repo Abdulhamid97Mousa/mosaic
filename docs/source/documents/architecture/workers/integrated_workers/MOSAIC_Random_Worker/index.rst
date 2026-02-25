@@ -18,7 +18,7 @@ The worker supports three action-selection behaviors; **random**
 (uniform sampling), **noop** (always action 0), and **cycling**
 (round-robin through the action space), making it useful for sanity
 checks, environment debugging, and establishing baselines in
-:doc:`hybrid </documents/architecture/operators/hybrid_decision_maker/index>`
+:doc:`heterogeneous </documents/architecture/operators/heterogeneous_decision_maker/index>`
 experiments (e.g., RL + LLM teammates vs Random opponents).
 
 .. list-table::
@@ -56,7 +56,7 @@ This enables several research workflows:
   LLM agent performs compared to random play.
 - **Environment debugging:** Verify that environments, rendering, and
   telemetry pipelines work end-to-end before deploying expensive workers.
-- **Hybrid experiments:** Fill opponent or teammate slots with random agents
+- **Heterogeneous experiments:** Fill opponent or teammate slots with random agents
   in mixed-paradigm evaluations (e.g., RL team vs Random team).
 
 Key features:

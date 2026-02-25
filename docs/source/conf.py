@@ -13,9 +13,9 @@ print("[DOCS] MOSAIC library path: {}".format(sys.path[0]))
 # -- Project information -----------------------------------------------------
 
 project = 'MOSAIC'
-copyright = '2024, MOSAIC Contributors'
+copyright = '2026, MOSAIC Contributors'
 author = 'Abdulhamid Mousa'
-release = '0.1.0'
+release = '1.0.0'
 
 # The master toctree document.
 master_doc = 'index'
@@ -78,6 +78,7 @@ autodoc_mock_imports = [
     "ray",
     "cleanrl",
     "xuance",
+    "dotenv",
 ]
 
 # Pygments style
@@ -101,7 +102,7 @@ html_theme_options = {
     "light_logo": "figures/logo.png",
     "dark_logo": "figures/logo.png",
     # Source links
-    "source_repository": "https://github.com/Abdulhamid97Mousa/MOSAIC",
+    "source_repository": "https://github.com/Abdulhamid97Mousa/mosaic",
     "source_branch": "main",
     "source_directory": "docs/source",
     "top_of_page_buttons": ["view", "edit"],

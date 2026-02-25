@@ -217,7 +217,7 @@ Operator Constants
    OPERATOR_CATEGORY_HUMAN   = "human"
    OPERATOR_CATEGORY_LLM     = "llm"
    OPERATOR_CATEGORY_RL      = "rl"
-   OPERATOR_CATEGORY_HYBRID  = "hybrid"
+   OPERATOR_CATEGORY_HETEROGENEOUS = "heterogeneous"
 
 It also provides BALROG LLM worker defaults:
 

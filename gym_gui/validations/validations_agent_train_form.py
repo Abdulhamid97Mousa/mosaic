@@ -20,9 +20,6 @@ class AgentTrainFormInputs:
     discount: str
     epsilon_decay: str
     agent_id: str
-    bdi_enabled: bool
-    bdi_jid: str
-    bdi_password: str
     worker_id: str
 
 
@@ -97,16 +94,6 @@ def validate_agent_train_form(inputs: AgentTrainFormInputs) -> List[str]:
         errors.append(
             f"Worker ID must be at most {WORKER_ID_WIDTH} characters"
         )
-
-    if inputs.bdi_enabled:
-        bdi_jid = inputs.bdi_jid.strip()
-        if not bdi_jid:
-            errors.append("BDI JID cannot be empty when BDI is enabled")
-        elif "@" not in bdi_jid or bdi_jid.count("@") != 1:
-            errors.append("BDI JID must be in format 'username@hostname'")
-
-        if not inputs.bdi_password:
-            errors.append("BDI Password cannot be empty when BDI is enabled")
 
     return errors
 

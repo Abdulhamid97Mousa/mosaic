@@ -1,5 +1,5 @@
 <div align="center">
-    <a href="https://github.com/Abdulhamid97Mousa/MOSAIC"><img width="1000px" height="auto" src="docs/source/_static/figures/A_Full_Architecture.png"></a>
+    <a href="https://github.com/Abdulhamid97Mousa/mosaic"><img width="1000px" height="auto" src="docs/source/_static/figures/A_Full_Architecture.png"></a>
 </div>
 
 ---
@@ -9,12 +9,16 @@
 [![Gymnasium](https://img.shields.io/badge/gymnasium-%3E%3D0.28.1-blue)](https://gymnasium.farama.org/)
 [![PettingZoo](https://img.shields.io/badge/PettingZoo-%3E%3D1.24.0-blue)](https://pettingzoo.farama.org/)
 [![GitHub license](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/Abdulhamid97Mousa/mosaic/blob/main/LICENSE)
+[![Documentation](https://img.shields.io/badge/docs-ReadTheDocs-blue.svg)](https://mosaic-agent-level-interface.readthedocs.io/en/latest/)
 
 # MOSAIC
 
 **A Unified Platform for Cross-Paradigm Comparison and Evaluation of Homogeneous and Heterogeneous Multi-Agent RL, LLM, VLM, and Human Decision-Makers**
 
 MOSAIC is a visual-first platform that enables researchers to configure, run, and compare experiments across RL, LLM, VLM, and human decision-makers in the same multi-agent environment. Different paradigms like tiles in a mosaic come together to form a complete picture of agent performance.
+
+| **Documentation**: [mosaic-agent-level-interface.readthedocs.io](https://mosaic-agent-level-interface.readthedocs.io/en/latest/) | **GitHub**: [github.com/Abdulhamid97Mousa/mosaic](https://github.com/Abdulhamid97Mousa/mosaic) |
+|---|---|
 
 ## Two Evaluation Modes
 
@@ -40,30 +44,30 @@ Today's AI landscape offers powerful but **fragmented** tools: RL frameworks ([C
 
 ## Supported Environment Families (26)
 
-MOSAIC supports **26 environment families** spanning single-agent, multi-agent, and cooperative/competitive paradigms.
+MOSAIC supports **26 environment families** spanning single-agent, multi-agent, and cooperative/competitive paradigms. See the full [Environment Families](https://mosaic-agent-level-interface.readthedocs.io/en/latest/documents/environments/index.html) reference for installation instructions, environment lists, and academic citations.
 
-| Family | Description |
-|--------|-------------|
-| **Gymnasium** | Standard single-agent RL (Toy Text, Classic Control, Box2D, MuJoCo) |
-| **Atari / ALE** | 128 classic Atari 2600 games |
-| **MiniGrid** | Procedural grid-world navigation |
-| **BabyAI** | Language-grounded instruction following |
-| **ViZDoom** | Doom-based first-person visual RL |
-| **MiniHack / NetHack** | Roguelike dungeon crawling (NLE) |
-| **Crafter** | Open-world survival benchmark |
-| **Procgen** | 16 procedurally generated environments |
-| **BabaIsAI** | Rule-manipulation puzzles |
-| **Jumanji** | JAX-accelerated logic/routing/packing (25 envs) |
-| **PyBullet Drones** | Quadcopter physics simulation |
-| **PettingZoo Classic** | Turn-based board games (AEC) |
-| **MOSAIC MultiGrid** | Competitive team sports (view_size=3) |
-| **INI MultiGrid** | Cooperative exploration (view_size=7) |
-| **Melting Pot** | Social multi-agent scenarios (up to 16 agents) |
-| **Overcooked** | Cooperative cooking (2 agents) |
-| **SMAC** | StarCraft Multi-Agent Challenge (hand-designed maps) |
-| **SMACv2** | StarCraft Multi-Agent Challenge v2 (procedural units) |
-| **RWARE** | Cooperative warehouse delivery |
-| **MuJoCo** | Continuous-control robotics tasks |
+| Family | Description | Example |
+|--------|-------------|---------|
+| **Gymnasium** | Standard single-agent RL (Toy Text, Classic Control, Box2D, MuJoCo) | <img src="docs/source/images/envs/gymnasium/cartpole.gif" width="200"> |
+| **Atari / ALE** | 128 classic Atari 2600 games | <img src="docs/source/images/envs/atari/atari.gif" width="200"> |
+| **MiniGrid** | Procedural grid-world navigation | <img src="docs/source/images/envs/minigrid/minigrid.gif" width="200"> |
+| **BabyAI** | Language-grounded instruction following | <img src="docs/source/images/envs/babyai/GoTo.gif" width="200"> |
+| **ViZDoom** | Doom-based first-person visual RL | <img src="docs/source/images/envs/vizdoom/vizdoom.gif" width="200"> |
+| **MiniHack / NetHack** | Roguelike dungeon crawling (NLE) | <img src="docs/source/images/envs/minihack/minihack.gif" width="200"> |
+| **Crafter** | Open-world survival benchmark | <img src="docs/source/images/envs/crafter/crafter.gif" width="200"> |
+| **Procgen** | 16 procedurally generated environments | <img src="docs/source/images/envs/procgen/coinrun.gif" width="200"> |
+| **BabaIsAI** | Rule-manipulation puzzles | <img src="docs/source/images/envs/babaisai/babaisai.png" width="200"> |
+| **Jumanji** | JAX-accelerated logic/routing/packing (25 envs) | <img src="docs/source/images/envs/jumanji/jumanji.gif" width="200"> |
+| **PyBullet Drones** | Quadcopter physics simulation | <img src="docs/source/images/envs/pybullet_drones/pybullet_drones.gif" width="200"> |
+| **PettingZoo Classic** | Turn-based board games (AEC) | <img src="docs/source/images/envs/pettingzoo/pettingzoo.gif" width="200"> |
+| **MOSAIC MultiGrid** | Competitive team sports (view_size=3) | <img src="docs/source/images/envs/mosaic_multigrid/mosaic_multigrid.gif" width="200"> |
+| **INI MultiGrid** | Cooperative exploration (view_size=7) | <img src="docs/source/images/envs/multigrid_ini/multigrid_ini.gif" width="200"> |
+| **Melting Pot** | Social multi-agent scenarios (up to 16 agents) | <img src="docs/source/images/envs/meltingpot/meltingpot.gif" width="200"> |
+| **Overcooked** | Cooperative cooking (2 agents) | <img src="docs/source/images/envs/overcooked/overcooked_layouts.gif" width="200"> |
+| **SMAC** | StarCraft Multi-Agent Challenge (hand-designed maps) | <img src="docs/source/images/envs/smac/smac.gif" width="200"> |
+| **SMACv2** | StarCraft Multi-Agent Challenge v2 (procedural units) | <img src="docs/source/images/envs/smacv2/smacv2.png" width="200"> |
+| **RWARE** | Cooperative warehouse delivery | <img src="docs/source/images/envs/rware/rware.gif" width="200"> |
+| **MuJoCo** | Continuous-control robotics tasks | <img src="docs/source/images/envs/mujoco/ant.gif" width="200"> |
 
 ## Supported Workers (8)
 
@@ -73,17 +77,17 @@ MOSAIC supports **26 environment families** spanning single-agent, multi-agent, 
 | **[XuanCe](https://github.com/agi-brain/xuance)** | Modular RL framework with flexible algorithm composition. Multi-agent algorithms (MAPPO, QMIX, MADDPG, VDN, COMA) |
 | **[Ray RLlib](https://docs.ray.io/en/latest/rllib/)** | RL with distributed training and large-batch optimization (PPO, IMPALA, APPO) |
 | **[BALROG](https://github.com/balrog-ai/BALROG)** | LLM/VLM agentic evaluation (GPT-4o, Claude 3, Gemini; NetHack, BabyAI, Crafter) |
-| **MOSAIC LLM** | Multi-agent LLM with coordination strategies and Theory of Mind (MultiGrid, BabyAI, MeltingPot, PettingZoo) |
-| **Chess LLM** | LLM chess play with multi-turn dialog (PettingZoo Chess) |
-| **MOSAIC Human Worker** | Human-in-the-loop play via keyboard for any Gymnasium-compatible environment (MiniGrid, Crafter, Chess, NetHack) |
-| **MOSAIC Random Worker** | Baseline agents with random, no-op, and cycling action behaviours across all 26 environment families |
+| **[MOSAIC LLM](docs/source/documents/architecture/workers/integrated_workers/MOSAIC_LLM_Worker)** | Multi-agent LLM with coordination strategies and Theory of Mind (MultiGrid, BabyAI, MeltingPot, PettingZoo) |
+| **[Chess LLM](docs/source/documents/architecture/workers/integrated_workers/Chess_LLM_Worker)** | LLM chess play with multi-turn dialog (PettingZoo Chess) |
+| **[MOSAIC Human Worker](docs/source/documents/architecture/workers/integrated_workers/MOSAIC_Human_Worker)** | Human-in-the-loop play via keyboard for any Gymnasium-compatible environment (MiniGrid, Crafter, Chess, NetHack) |
+| **[MOSAIC Random Worker](docs/source/documents/architecture/workers/integrated_workers/MOSAIC_Random_Worker)** | Baseline agents with random, no-op, and cycling action behaviours across all 26 environment families |
 
 ## Installation
 
 ```bash
 # Clone the repository
-git clone https://github.com/Abdulhamid97Mousa/MOSAIC.git
-cd MOSAIC
+git clone https://github.com/Abdulhamid97Mousa/mosaic.git
+cd mosaic
 
 # Create virtual environment (Python 3.10-3.12)
 python3.11 -m venv .venv
@@ -128,8 +132,8 @@ If you use MOSAIC in your research, please cite:
   author  = {Mousa, Abdulhamid M. and Daoui, Zahra and Khajiev, Rakhmonberdi
              and Azzabi, Jalaledin M. and Mousa, Abdulkarim M. and Liu, Ming},
   year    = {2026},
-  url     = {https://github.com/Abdulhamid97Mousa/MOSAIC},
-  note    = {Available at \url{https://github.com/Abdulhamid97Mousa/MOSAIC}}
+  url     = {https://github.com/Abdulhamid97Mousa/mosaic},
+  note    = {Available at \url{https://github.com/Abdulhamid97Mousa/mosaic}}
 }
 ```
 
@@ -139,10 +143,11 @@ MOSAIC is released under the [MIT License](https://github.com/Abdulhamid97Mousa/
 
 ## Acknowledgments
 
-- [Gymnasium](https://gymnasium.farama.org/) — Standard RL API
-- [PettingZoo](https://pettingzoo.farama.org/) — Multi-agent environments
-- [CleanRL](https://github.com/vwxyzjn/cleanrl) — Clean RL implementations
-- [XuanCe](https://github.com/agi-brain/xuance) — Multi-agent RL algorithms
-- [Ray RLlib](https://docs.ray.io/en/latest/rllib/) — Distributed RL training
-- [BALROG](https://github.com/balrog-ai/BALROG) — LLM/VLM agent benchmark
-- [PyQt6](https://www.riverbankcomputing.com/software/pyqt/) — GUI framework
+- [Gymnasium](https://gymnasium.farama.org/): Standard RL API
+- [PettingZoo](https://pettingzoo.farama.org/): Multi-agent environments
+- [CleanRL](https://github.com/vwxyzjn/cleanrl): Clean RL implementations
+- [XuanCe](https://github.com/agi-brain/xuance): Multi-agent RL algorithms
+- [Ray RLlib](https://docs.ray.io/en/latest/rllib/): Distributed RL training
+- [BALROG](https://github.com/balrog-ai/BALROG): LLM/VLM agent benchmark
+- [llm_chess](https://github.com/maxim-saplin/llm_chess): LLM chess evaluation
+- [PyQt6](https://www.riverbankcomputing.com/software/pyqt/): GUI framework
