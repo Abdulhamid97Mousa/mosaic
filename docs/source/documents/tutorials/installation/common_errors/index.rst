@@ -310,7 +310,7 @@ Startup Errors
 --------------
 
 Trainer daemon failed to start: "VersionError: Detected incompatible Protobuf Gencode/Runtime versions"
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error (when running ``./run.sh``):**
 
@@ -446,7 +446,7 @@ Key variables you should review:
    default. Never commit it to version control.
 
 Startup crash: "No module named 'torch'" / "No module named 'psutil'"
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error:**
 
@@ -478,7 +478,7 @@ unconditionally at startup for GPU detection and system info display.
       pip install torch --index-url https://download.pytorch.org/whl/cu121
 
 Startup crash: "No module named 'stockfish'" (misleading Qt error)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error:**
 
@@ -646,7 +646,7 @@ Stockfish not found (Chess Engine)
    brew install stockfish
 
 CleanRL PPO crash: "mat1 and mat2 shapes cannot be multiplied" (Discrete obs)
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error (when training PPO on FrozenLake-v1, Taxi-v3, CliffWalking-v0, etc.):**
 

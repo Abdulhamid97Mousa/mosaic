@@ -8,46 +8,46 @@ OperatorConfig
 
 .. autoclass:: gym_gui.services.operator.OperatorConfig
    :members:
-   :undoc-members:
+   :noindex:
 
 WorkerAssignment
 ----------------
 
 .. autoclass:: gym_gui.services.operator.WorkerAssignment
    :members:
-   :undoc-members:
+   :noindex:
 
 OperatorLauncher
 ----------------
 
 .. autoclass:: gym_gui.services.operator_launcher.OperatorLauncher
    :members:
-   :undoc-members:
+   :noindex:
 
 OperatorScriptExecutionManager
 ------------------------------
 
 .. autoclass:: gym_gui.services.operator_script_execution_manager.OperatorScriptExecutionManager
    :members:
-   :undoc-members:
+   :noindex:
 
 PolicyMappingService
 --------------------
 
 .. autoclass:: gym_gui.services.policy_mapping.PolicyMappingService
    :members:
-   :undoc-members:
+   :noindex:
 
 ActorService
 ------------
 
 .. autoclass:: gym_gui.services.actor.ActorService
    :members:
-   :undoc-members:
+   :noindex:
 
 AgentPolicyBinding
 ------------------
 
 .. autoclass:: gym_gui.services.policy_mapping.AgentPolicyBinding
    :members:
-   :undoc-members:
+   :noindex:

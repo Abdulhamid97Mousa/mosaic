@@ -532,12 +532,14 @@ class MultiAgentOperatorHandle:
 
 
 class OperatorLauncher:
-    """Launches and manages operator subprocess workers.
+    """
+    Launches and manages operator subprocess workers.
 
     This class handles spawning subprocess workers for both LLM
     and RL operator types, managing their lifecycle and log files.
 
-    Example:
+    Example::
+
         launcher = OperatorLauncher()
 
         # Launch an LLM operator

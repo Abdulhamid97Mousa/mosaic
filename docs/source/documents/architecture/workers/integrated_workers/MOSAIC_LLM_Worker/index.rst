@@ -83,6 +83,7 @@ Key features:
 - **Dual runtime modes:** autonomous (batch episodes) or interactive (GUI step-by-step)
 - **Action-selector mode:** for PettingZoo games where GUI owns the environment
 - **JSONL telemetry:** streamed to GUI and written to disk
+
 Architecture
 ------------
 
