@@ -141,7 +141,10 @@ ml-agents/
 # Documentation Media (keep repo lightweight)
 # =============================================================================
 
+*.mp4
 docs/source/_static/videos/*.mp4
+docs/source/videos/
+docs/source/images/envs/
 
 # =============================================================================
 # 3rd Party Workers - Build Artifacts
@@ -259,6 +262,8 @@ docs/plans/
 docs/reports/
 docs/workers/
 docs/my_paper/
+docs/1.0_DAY_40/
+research_papers/
 
 # Deprecated/internal workers (not for public release)
 3rd_party/dragon_worker/
