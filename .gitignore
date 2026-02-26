@@ -145,6 +145,7 @@ ml-agents/
 docs/source/_static/videos/*.mp4
 docs/source/videos/
 docs/source/images/envs/
+docs/1.0_DAY_22/
 
 # =============================================================================
 # 3rd Party Workers - Build Artifacts
