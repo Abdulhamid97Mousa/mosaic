@@ -60,7 +60,7 @@ MOSAIC provides two evaluation modes designed for reproducibility:
 .. raw:: html
 
    <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
-     <source src="https://github.com/user-attachments/assets/ea9ebc18-2216-4fb2-913c-5d354ebea56e" type="video/mp4">
+     <source src="https://github.com/user-attachments/assets/ea9ebc18-2216-4fb2-913c-5d354ebea56e?raw=true" type="video/mp4">
      Your browser does not support the video tag.
    </video>
    <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
@@ -76,7 +76,7 @@ MOSAIC provides two evaluation modes designed for reproducibility:
 .. raw:: html
 
    <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
-     <source src="https://github.com/user-attachments/assets/a9b3f6f4-661c-492f-b43f-34d7125a6d2e" type="video/mp4">
+     <source src="https://github.com/user-attachments/assets/a9b3f6f4-661c-492f-b43f-34d7125a6d2e?raw=true" type="video/mp4">
      Your browser does not support the video tag.
    </video>
    <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
@@ -120,7 +120,7 @@ under a unified, visual-first interface.
 .. raw:: html
 
    <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
-     <source src="https://github.com/user-attachments/assets/ded17cdc-f23c-404f-a9f6-074fbe74816c" type="video/mp4">
+     <source src="https://github.com/user-attachments/assets/ded17cdc-f23c-404f-a9f6-074fbe74816c?raw=true" type="video/mp4">
      Your browser does not support the video tag.
    </video>
    <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
@@ -132,7 +132,7 @@ under a unified, visual-first interface.
 .. raw:: html
 
    <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
-     <source src="https://github.com/user-attachments/assets/2625a8f8-476c-4171-86cc-a9970cbf1665" type="video/mp4">
+     <source src="https://github.com/user-attachments/assets/2625a8f8-476c-4171-86cc-a9970cbf1665?raw=true" type="video/mp4">
      Your browser does not support the video tag.
    </video>
    <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
@@ -144,7 +144,7 @@ under a unified, visual-first interface.
 .. raw:: html
 
    <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
-     <source src="https://github.com/user-attachments/assets/f2d79901-a93d-465b-9058-1b9cdabf311a" type="video/mp4">
+     <source src="https://github.com/user-attachments/assets/f2d79901-a93d-465b-9058-1b9cdabf311a?raw=true" type="video/mp4">
      Your browser does not support the video tag.
    </video>
    <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
@@ -155,7 +155,7 @@ under a unified, visual-first interface.
 .. raw:: html
 
    <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
-     <source src="https://github.com/user-attachments/assets/2ae1665b-3a57-44be-98a3-4e7223b37628" type="video/mp4">
+     <source src="https://github.com/user-attachments/assets/2ae1665b-3a57-44be-98a3-4e7223b37628?raw=true" type="video/mp4">
      Your browser does not support the video tag.
    </video>
    <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
