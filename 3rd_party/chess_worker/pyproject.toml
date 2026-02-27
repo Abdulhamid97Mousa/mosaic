@@ -54,8 +54,8 @@ chess-worker = "chess_worker.cli:main"
 chess = "chess_worker:get_worker_metadata"
 
 [project.urls]
-Homepage = "https://github.com/MOSAIC-RL/GUI_BDI_RL"
-Repository = "https://github.com/MOSAIC-RL/GUI_BDI_RL"
+Homepage = "https://github.com/Abdulhamid97Mousa/mosaic"
+Repository = "https://github.com/Abdulhamid97Mousa/mosaic"
 
 [tool.setuptools.packages.find]
 where = ["."]

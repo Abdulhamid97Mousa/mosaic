@@ -3255,42 +3255,6 @@ LOG_WORKER_POLICY_LOAD_FAILED = _constant(
     tags=_tags("worker", "policy", "missing"),
 )
 
-LOG_WORKER_BDI_EVENT = _constant(
-    "LOG912",
-    "INFO",
-    "Worker BDI event",
-    component="Worker",
-    subcomponent="BDI",
-    tags=_tags("worker", "bdi"),
-)
-
-LOG_WORKER_BDI_WARNING = _constant(
-    "LOG913",
-    "WARNING",
-    "Worker BDI warning",
-    component="Worker",
-    subcomponent="BDI",
-    tags=_tags("worker", "bdi", "warning"),
-)
-
-LOG_WORKER_BDI_ERROR = _constant(
-    "LOG914",
-    "ERROR",
-    "Worker BDI error",
-    component="Worker",
-    subcomponent="BDI",
-    tags=_tags("worker", "bdi", "error"),
-)
-
-LOG_WORKER_BDI_DEBUG = _constant(
-    "LOG915",
-    "DEBUG",
-    "Worker BDI debug event",
-    component="Worker",
-    subcomponent="BDI",
-    tags=_tags("worker", "bdi", "debug"),
-)
-
 
 # ---------------------------------------------------------------------------
 # Episode Counter constants (LOG921–LOG930)
@@ -3665,6 +3629,46 @@ LOG_XUANCE_WORKER_DEBUG = _constant(
     component="Worker",
     subcomponent="XuanCeRuntime",
     tags=_tags("xuance", "worker", "debug"),
+)
+
+
+# ---------------------------------------------------------------------------
+# Human Action Debug constants (LOG1000–LOG1009)
+# ---------------------------------------------------------------------------
+LOG_HUMAN_ACTION_BUTTON_CLICKED = _constant(
+    "LOG1000",
+    "INFO",
+    "Human action button clicked in render container",
+    component="UI",
+    subcomponent="OperatorRenderContainer",
+    tags=_tags("human", "action", "button", "click", "debug"),
+)
+
+LOG_HUMAN_ACTION_RECEIVED = _constant(
+    "LOG1001",
+    "INFO",
+    "Human action received in main window handler",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("human", "action", "received", "debug"),
+)
+
+LOG_HUMAN_ACTION_SENT_TO_SUBPROCESS = _constant(
+    "LOG1002",
+    "INFO",
+    "Human action sent to subprocess",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("human", "action", "subprocess", "sent", "debug"),
+)
+
+LOG_HUMAN_ACTION_SIGNAL_EMITTED = _constant(
+    "LOG1003",
+    "INFO",
+    "Human action signal emitted from container",
+    component="UI",
+    subcomponent="OperatorRenderContainer",
+    tags=_tags("human", "action", "signal", "emitted", "debug"),
 )
 
 
@@ -4896,10 +4900,6 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_WORKER_POLICY_EVENT,
     LOG_WORKER_POLICY_WARNING,
     LOG_WORKER_POLICY_ERROR,
-    LOG_WORKER_BDI_EVENT,
-    LOG_WORKER_BDI_WARNING,
-    LOG_WORKER_BDI_ERROR,
-    LOG_WORKER_BDI_DEBUG,
     LOG_COUNTER_INITIALIZED,
     LOG_COUNTER_RESUME_SUCCESS,
     LOG_COUNTER_RESUME_FAILURE,
@@ -5317,10 +5317,6 @@ __all__ = (
     "LOG_WORKER_POLICY_EVAL_BATCH_STARTED",
     "LOG_WORKER_POLICY_EVAL_BATCH_COMPLETED",
     "LOG_WORKER_POLICY_LOAD_FAILED",
-    "LOG_WORKER_BDI_EVENT",
-    "LOG_WORKER_BDI_WARNING",
-    "LOG_WORKER_BDI_ERROR",
-    "LOG_WORKER_BDI_DEBUG",
     "LOG_COUNTER_INITIALIZED",
     "LOG_COUNTER_RESUME_SUCCESS",
     "LOG_COUNTER_RESUME_FAILURE",
@@ -5364,6 +5360,11 @@ __all__ = (
     "LOG_XUANCE_WORKER_CONFIG_LOADED",
     "LOG_XUANCE_WORKER_BENCHMARK_STARTED",
     "LOG_XUANCE_WORKER_DEBUG",
+    # Human Action Debug
+    "LOG_HUMAN_ACTION_BUTTON_CLICKED",
+    "LOG_HUMAN_ACTION_RECEIVED",
+    "LOG_HUMAN_ACTION_SENT_TO_SUBPROCESS",
+    "LOG_HUMAN_ACTION_SIGNAL_EMITTED",
     # BALROG Worker
     "LOG_WORKER_BALROG_RUNTIME_STARTED",
     "LOG_WORKER_BALROG_RUNTIME_STOPPED",

@@ -1,4 +1,4 @@
-"""Shared validation utilities across GUI BDI RL.
+"""Shared validation utilities across MOSAIC.
 
 This package centralizes validation logic that was previously scattered across
 core, services, and UI modules. Submodules are organized by domain:

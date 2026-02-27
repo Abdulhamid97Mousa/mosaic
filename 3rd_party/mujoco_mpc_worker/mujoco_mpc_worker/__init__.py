@@ -1,7 +1,7 @@
-"""MuJoCo MPC Worker - Integration wrapper for MOSAIC BDI-RL framework.
+"""MuJoCo MPC Worker - Integration wrapper for MOSAIC framework.
 
 This module provides a wrapper around the vendored mujoco_mpc library,
-enabling MuJoCo MPC visualization and control within the GUI_BDI_RL application.
+enabling MuJoCo MPC visualization and control within the MOSAIC application.
 
 The vendored mujoco_mpc code lives in ../mujoco_mpc/ and should NOT be modified.
 All customizations and integrations belong in this mujoco_mpc_worker package.

@@ -51,9 +51,9 @@ class HumanInteractiveRuntime:
         self._action_space_n: int = 0
         self._action_labels: List[str] = []
 
-        # Episode state
+        # Episode state (start at -1 so first reset makes it 0)
         self._step_index: int = 0
-        self._episode_index: int = 0
+        self._episode_index: int = -1
         self._total_reward: float = 0.0
         self._episode_start_time: Optional[datetime] = None
 

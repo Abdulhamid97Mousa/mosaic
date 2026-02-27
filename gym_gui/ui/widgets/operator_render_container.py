@@ -13,7 +13,7 @@ import logging
 from typing import Any, Dict, Optional
 
 from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 
 from gym_gui.services.operator import OperatorConfig
 from gym_gui.rendering import RendererRegistry, create_default_renderer_registry, RendererContext
@@ -32,6 +32,15 @@ from gym_gui.controllers.human_input import (
     _JUMANJI_MAPPINGS,
     _ALE_MAPPINGS,
 )
+from gym_gui.ui.widgets.multi_agent_action_panel import (
+    COLOR_PALETTE,
+    DEFAULT_AGENT_COLOR_NAMES,
+)
+from gym_gui.logging_config.log_constants import (
+    LOG_HUMAN_ACTION_BUTTON_CLICKED,
+    LOG_HUMAN_ACTION_SIGNAL_EMITTED,
+)
+from gym_gui.logging_config.helpers import log_constant
 
 # Use operators namespace for dedicated operators.log routing
 _LOGGER = logging.getLogger("gym_gui.operators.render_container")
@@ -137,6 +146,243 @@ class FlowLayout(QtWidgets.QLayout):
         return y + line_height - rect.y() + margins.bottom()
 
 
+class _ResizeGrip(QtWidgets.QWidget):
+    """Custom resize grip for widgets embedded inside a layout.
+
+    Unlike ``QSizeGrip`` (which resizes the top-level window), this widget
+    resizes its *target* widget via ``setFixedSize`` so that the parent layout
+    respects the user-chosen dimensions.
+    """
+
+    def __init__(
+        self,
+        target: QtWidgets.QWidget,
+        parent: Optional[QtWidgets.QWidget] = None,
+        color: str = "#999999",
+    ) -> None:
+        super().__init__(parent or target)
+        self._target = target
+        self._dragging = False
+        self._start_pos: Optional[QtCore.QPoint] = None
+        self._start_size: Optional[QtCore.QSize] = None
+        self._dot_color = color
+        self.setFixedSize(16, 16)
+        self.setCursor(QtCore.Qt.CursorShape.SizeFDiagCursor)
+
+    # -- painting -----------------------------------------------------------
+
+    def paintEvent(self, event: Any) -> None:  # noqa: N802
+        """Draw a small triangular grip indicator."""
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        color = QtGui.QColor(self._dot_color)
+        painter.setPen(QtCore.Qt.PenStyle.NoPen)
+        painter.setBrush(color)
+        # Draw three small dots in a diagonal pattern
+        for dx, dy in ((10, 14), (14, 14), (14, 10), (8, 10), (10, 10), (10, 8)):
+            painter.drawEllipse(dx, dy, 2, 2)
+        painter.end()
+
+    # -- mouse handling -----------------------------------------------------
+
+    def mousePressEvent(self, event: Any) -> None:  # noqa: N802
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
+            self._dragging = True
+            self._start_pos = event.globalPosition().toPoint()
+            self._start_size = self._target.size()
+            _LOGGER.info(
+                "ResizeGrip: drag START on %s, start_size=%dx%d",
+                type(self._target).__name__,
+                self._start_size.width(), self._start_size.height(),
+            )
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: Any) -> None:  # noqa: N802
+        if self._dragging and self._start_pos is not None and self._start_size is not None:
+            delta = event.globalPosition().toPoint() - self._start_pos
+            new_w = max(250, self._start_size.width() + delta.x())
+            new_h = max(200, self._start_size.height() + delta.y())
+            self._target.setFixedSize(new_w, new_h)
+            _LOGGER.debug("ResizeGrip: drag MOVE → %dx%d", new_w, new_h)
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: Any) -> None:  # noqa: N802
+        if event.button() == QtCore.Qt.MouseButton.LeftButton and self._dragging:
+            self._dragging = False
+            # Emit resize signal via the target (if it has the method)
+            if hasattr(self._target, '_on_grip_resize_finished'):
+                self._target._on_grip_resize_finished()
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
+
+
+class _ImageScaleGrip(QtWidgets.QWidget):
+    """Grip that scales the rendered image by adjusting ``square_size``.
+
+    Dragging this grip computes a new ``square_size`` proportional to the
+    drag distance and writes it into the operator config settings.  The
+    owning ``OperatorRenderContainer`` then re-renders the current frame at
+    the new scale.
+    """
+
+    def __init__(
+        self,
+        container: "OperatorRenderContainer",
+        parent: Optional[QtWidgets.QWidget] = None,
+    ) -> None:
+        super().__init__(parent)
+        self._container = container
+        self._dragging = False
+        self._start_pos: Optional[QtCore.QPoint] = None
+        self._start_square_size: int = 0
+        self.setFixedSize(16, 16)
+        self.setCursor(QtCore.Qt.CursorShape.SizeFDiagCursor)
+
+    def paintEvent(self, event: Any) -> None:  # noqa: N802
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        # Blue-ish tint to distinguish from the grey container grip
+        painter.setPen(QtCore.Qt.PenStyle.NoPen)
+        painter.setBrush(QtGui.QColor("#4488cc"))
+        for dx, dy in ((10, 14), (14, 14), (14, 10), (8, 10), (10, 10), (10, 8)):
+            painter.drawEllipse(dx, dy, 2, 2)
+        painter.end()
+
+    def mousePressEvent(self, event: Any) -> None:  # noqa: N802
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
+            self._dragging = True
+            self._start_pos = event.globalPosition().toPoint()
+            cur = self._container._config.settings.get("square_size", 70)
+            self._start_square_size = cur if cur else 70
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: Any) -> None:  # noqa: N802
+        if self._dragging and self._start_pos is not None:
+            delta = event.globalPosition().toPoint() - self._start_pos
+            # Use the larger of dx/dy so dragging in either direction works
+            pixel_delta = max(delta.x(), delta.y())
+            # Every 3 pixels of drag = 1 unit of square_size change
+            new_sq = max(10, self._start_square_size + pixel_delta // 3)
+            new_sq = min(new_sq, 300)  # cap at 300px per tile
+            self._container._config.settings["square_size"] = new_sq
+            # Force the renderer to repaint with the new scale
+            renderer = self._container._renderer_strategy
+            if renderer is not None:
+                widget = renderer.widget
+                sq_attr = getattr(widget, "_square_size", None)
+                if sq_attr is not None or hasattr(widget, "_square_size"):
+                    widget._square_size = new_sq
+                    widget.update()
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: Any) -> None:  # noqa: N802
+        if event.button() == QtCore.Qt.MouseButton.LeftButton and self._dragging:
+            self._dragging = False
+            new_sq = self._container._config.settings.get("square_size", 70)
+            _LOGGER.info("ImageScaleGrip: final square_size=%s", new_sq)
+            # Also expand the container if the image now overflows
+            if self._container._renderer_strategy:
+                widget = self._container._renderer_strategy.widget
+                img_rect = getattr(widget, "_image_rect", None)
+                if img_rect and not img_rect.isNull():
+                    needed_w = img_rect.width() + 40
+                    needed_h = img_rect.height() + 100
+                    cur_w = self._container.width()
+                    cur_h = self._container.height()
+                    if needed_w > cur_w or needed_h > cur_h:
+                        self._container.setFixedSize(
+                            max(cur_w, needed_w), max(cur_h, needed_h),
+                        )
+            if hasattr(self._container, '_on_grip_resize_finished'):
+                self._container._on_grip_resize_finished()
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
+
+
+class _RenderAreaGrip(QtWidgets.QWidget):
+    """Grip that resizes the active renderer widget (the dark area with the image).
+
+    On drag it calls ``setFixedSize`` on the renderer widget (e.g. ``_RgbView``)
+    and expands the parent ``OperatorRenderContainer`` to accommodate.
+    """
+
+    def __init__(
+        self,
+        container: "OperatorRenderContainer",
+        parent: Optional[QtWidgets.QWidget] = None,
+    ) -> None:
+        super().__init__(parent)
+        self._container = container
+        self._dragging = False
+        self._start_pos: Optional[QtCore.QPoint] = None
+        self._start_size: Optional[QtCore.QSize] = None
+        self.setFixedSize(16, 16)
+        self.setCursor(QtCore.Qt.CursorShape.SizeFDiagCursor)
+
+    def _renderer_widget(self) -> Optional[QtWidgets.QWidget]:
+        strategy = self._container._renderer_strategy
+        return strategy.widget if strategy is not None else None
+
+    def paintEvent(self, event: Any) -> None:  # noqa: N802
+        painter = QtGui.QPainter(self)
+        painter.setRenderHint(QtGui.QPainter.RenderHint.Antialiasing)
+        painter.setPen(QtCore.Qt.PenStyle.NoPen)
+        painter.setBrush(QtGui.QColor("#44aa44"))  # green
+        for dx, dy in ((10, 14), (14, 14), (14, 10), (8, 10), (10, 10), (10, 8)):
+            painter.drawEllipse(dx, dy, 2, 2)
+        painter.end()
+
+    def mousePressEvent(self, event: Any) -> None:  # noqa: N802
+        if event.button() == QtCore.Qt.MouseButton.LeftButton:
+            w = self._renderer_widget()
+            if w is not None:
+                self._dragging = True
+                self._start_pos = event.globalPosition().toPoint()
+                self._start_size = w.size()
+            event.accept()
+        else:
+            super().mousePressEvent(event)
+
+    def mouseMoveEvent(self, event: Any) -> None:  # noqa: N802
+        if self._dragging and self._start_pos is not None and self._start_size is not None:
+            w = self._renderer_widget()
+            if w is None:
+                return
+            delta = event.globalPosition().toPoint() - self._start_pos
+            new_w = max(200, self._start_size.width() + delta.x())
+            new_h = max(150, self._start_size.height() + delta.y())
+            # Resize the renderer widget (the dark area)
+            w.setFixedSize(new_w, new_h)
+            # Expand the container if the renderer now needs more room
+            needed_w = new_w + 30   # side margins
+            needed_h = new_h + 120  # header + stats + grip row
+            cw, ch = self._container.width(), self._container.height()
+            if needed_w > cw or needed_h > ch:
+                self._container.setFixedSize(max(cw, needed_w), max(ch, needed_h))
+            event.accept()
+        else:
+            super().mouseMoveEvent(event)
+
+    def mouseReleaseEvent(self, event: Any) -> None:  # noqa: N802
+        if event.button() == QtCore.Qt.MouseButton.LeftButton and self._dragging:
+            self._dragging = False
+            if hasattr(self._container, '_on_grip_resize_finished'):
+                self._container._on_grip_resize_finished()
+            event.accept()
+        else:
+            super().mouseReleaseEvent(event)
+
+
 class OperatorRenderContainer(QtWidgets.QFrame):
     """Render container for a single operator.
 
@@ -155,6 +401,8 @@ class OperatorRenderContainer(QtWidgets.QFrame):
     human_action_submitted = pyqtSignal(str, int)  # operator_id, action_index
     board_game_move_made = pyqtSignal(str, str, str)  # operator_id, from_square, to_square
     chess_move_button_clicked = pyqtSignal(str, str)  # operator_id, uci_move (e.g., "e2e4")
+    # Resize signal: emitted when user drags the container edge to a new size
+    container_resized = pyqtSignal(str, int, int)  # operator_id, width, height
 
     # Status colors
     STATUS_COLORS = {
@@ -212,6 +460,8 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         )
         self._available_actions: list[int] = []  # Available action indices for human selection
         self._action_labels: list[str] = []  # Human-readable labels for actions
+        self._action_buttons: list[QtWidgets.QPushButton] = []  # Action buttons for style updates
+        self._selected_action: Optional[int] = None  # Currently selected action index
         self._game_id: Optional[GameId] = None  # Current game for key mappings
         self._key_mappings: dict[int, int] = {}  # Qt key -> action index
 
@@ -428,6 +678,12 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         header_layout.addStretch()
         action_panel_layout.addWidget(header_row)
 
+        # Selection indicator label
+        self._selected_action_label = QtWidgets.QLabel("", self._action_panel)
+        self._selected_action_label.setStyleSheet("font-size: 9px; color: #4CAF50; font-weight: bold;")
+        self._selected_action_label.setVisible(False)
+        action_panel_layout.addWidget(self._selected_action_label)
+
         # Container for action buttons with FlowLayout (wraps to multiple lines)
         self._action_buttons_container = QtWidgets.QWidget(self._action_panel)
         self._action_buttons_layout = FlowLayout(self._action_buttons_container, margin=0, spacing=3)
@@ -467,6 +723,31 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         self._chess_legal_moves: list[str] = []
         self._chess_current_player: str = ""
 
+        # --- Three resize grips ---
+        # 1) Image grip (blue): scales the environment image via square_size.
+        #    Overlaid at the rendered image's bottom-right corner.
+        self._image_grip = _ImageScaleGrip(container=self, parent=self._render_container)
+        self._image_grip.raise_()
+        self._render_container.installEventFilter(self)
+
+        # 2) Render-area grip (green): resizes the renderer widget (_RgbView).
+        #    Overlaid at the renderer widget's bottom-right corner.
+        self._render_area_grip = _RenderAreaGrip(container=self, parent=self._render_container)
+        self._render_area_grip.raise_()
+
+        # 3) Container grip (grey): resizes the whole operator frame.
+        #    Sits in a layout row at the very bottom.
+        self._container_grip = _ResizeGrip(target=self, parent=self)
+        container_grip_row = QtWidgets.QHBoxLayout()
+        container_grip_row.setContentsMargins(0, 0, 0, 0)
+        container_grip_row.addStretch()
+        container_grip_row.addWidget(self._container_grip)
+        layout.addLayout(container_grip_row)
+
+        # Track preferred size for resize events
+        self._preferred_width: int = 0
+        self._preferred_height: int = 0
+
     def _build_agent_legend(self, legend_layout: QtWidgets.QHBoxLayout) -> None:
         """Build agent identification labels dynamically from operator config."""
         if not self._config.is_multiagent:
@@ -489,12 +770,24 @@ class OperatorRenderContainer(QtWidgets.QFrame):
             except (ValueError, IndexError):
                 agent_idx = 0
 
+            # Resolve agent colour from settings or default palette
+            color_name = worker.settings.get("agent_color") if worker.settings else None
+            if color_name and color_name != "auto" and color_name in COLOR_PALETTE:
+                agent_primary, _ = COLOR_PALETTE[color_name]
+            else:
+                default_name = DEFAULT_AGENT_COLOR_NAMES.get(player_id)
+                if default_name and default_name in COLOR_PALETTE:
+                    agent_primary, _ = COLOR_PALETTE[default_name]
+                else:
+                    agent_primary = "#666"
+
             type_color = self.TYPE_COLORS.get(worker.worker_type, "#666")
             worker_type_short = worker.worker_type.upper()
 
             chip = QtWidgets.QLabel(self._agent_legend)
             chip.setText(
-                f'<b>A{agent_idx}</b>'
+                f'<span style="color:{agent_primary};">\u25CF</span>'
+                f' <b>A{agent_idx}</b>'
                 f' <span style="background:{type_color}; color:white;'
                 f' padding:1px 4px; border-radius:2px; font-size:8px;">'
                 f'{worker_type_short}</span>'
@@ -502,7 +795,8 @@ class OperatorRenderContainer(QtWidgets.QFrame):
             chip.setToolTip(
                 f"{player_id}\n"
                 f"Type: {worker.worker_type}\n"
-                f"Worker: {worker.worker_id}"
+                f"Worker: {worker.worker_id}\n"
+                f"Color: {color_name or 'default'}"
             )
             chip.setStyleSheet("font-size: 10px; padding: 0 2px;")
             legend_layout.addWidget(chip)
@@ -610,7 +904,7 @@ class OperatorRenderContainer(QtWidgets.QFrame):
         _LOGGER.debug(
             f"set_config: operator_id={config.operator_id}, "
             f"old_interactive={old_interactive}, new_interactive={self._is_interactive}, "
-            f"workers={list(config.workers.keys())}",
+            f"operator_type={config.operator_type}, workers={list(config.workers.keys())}",
             extra=self._log_extra()
         )
         if self._is_interactive and not old_interactive:
@@ -622,6 +916,14 @@ class OperatorRenderContainer(QtWidgets.QFrame):
             # Reconnect board game signals if renderer exists
             if self._board_game_renderer:
                 self.connect_board_game_signals()
+        elif not self._is_interactive and old_interactive:
+            # Transitioning from interactive to non-interactive - clear "Your Turn" indicator
+            _LOGGER.debug(
+                f"set_config: Disabling interactive mode for {config.operator_id}, clearing orange border",
+                extra=self._log_extra()
+            )
+            # Explicitly call set_your_turn to clear the orange border
+            self.set_your_turn(False)
         self._update_header()
 
     def set_status(self, status: str) -> None:
@@ -668,6 +970,88 @@ class OperatorRenderContainer(QtWidgets.QFrame):
             parent.updateGeometry()  # type: ignore[union-attr]
 
         _LOGGER.debug(f"Set display size to {width}x{height} for {self._config.operator_id}")
+
+    def _on_grip_resize_finished(self) -> None:
+        """Called by ``_ResizeGrip`` when the user releases the mouse button.
+
+        Emits ``container_resized`` so the config widget dropdown can be
+        updated to reflect the new size.
+        """
+        w = self.width()
+        h = self.height()
+        self.container_resized.emit(self._config.operator_id, w, h)
+        # Reposition the image and render-area grips after resize
+        self._reposition_image_grip()
+        self._reposition_render_area_grip()
+        _LOGGER.debug(
+            "Container resized to %dx%d for %s", w, h, self._config.operator_id,
+        )
+
+    def eventFilter(self, obj: Any, event: Any) -> bool:  # noqa: N802
+        """Reposition grips when the render area resizes."""
+        if obj is self._render_container and event.type() == QtCore.QEvent.Type.Resize:
+            self._reposition_image_grip()
+            self._reposition_render_area_grip()
+        return super().eventFilter(obj, event)
+
+    def _reposition_image_grip(self) -> None:
+        """Move the image grip to the bottom-right corner of the actual image.
+
+        Falls back to the bottom-right of the render container when the
+        image rect is not yet known.
+        """
+        grip = self._image_grip
+        # Try to get the actual image rect from the renderer widget
+        img_rect = None
+        if self._renderer_strategy is not None:
+            widget = self._renderer_strategy.widget
+            rect = getattr(widget, "_image_rect", None)
+            if rect is not None and not rect.isNull():
+                # _image_rect is in renderer-widget coords; map to _render_container
+                br = widget.mapTo(self._render_container, rect.bottomRight())
+                img_rect = br
+
+        if img_rect is not None:
+            grip.move(
+                img_rect.x() - grip.width(),
+                img_rect.y() - grip.height(),
+            )
+        else:
+            # Fallback: bottom-right of render container
+            rc = self._render_container
+            grip.move(
+                rc.width() - grip.width() - 2,
+                rc.height() - grip.height() - 2,
+            )
+        grip.raise_()
+
+    def _reposition_render_area_grip(self) -> None:
+        """Move the render-area grip to the bottom-right of the renderer widget.
+
+        The renderer widget is the ``_RgbView`` (or grid view) — the dark area
+        that contains the image.  Falls back to the render container's
+        bottom-right when no renderer is active yet.
+        """
+        grip = self._render_area_grip
+        widget = None
+        if self._renderer_strategy is not None:
+            widget = self._renderer_strategy.widget
+
+        if widget is not None and widget.isVisible():
+            # Map renderer widget's bottom-right to _render_container coords
+            br = widget.mapTo(self._render_container, QtCore.QPoint(widget.width(), widget.height()))
+            grip.move(
+                br.x() - grip.width(),
+                br.y() - grip.height(),
+            )
+        else:
+            # Fallback: bottom-right of render container
+            rc = self._render_container
+            grip.move(
+                rc.width() - grip.width() - 2,
+                rc.height() - grip.height() - 2,
+            )
+        grip.raise_()
 
     def display_payload(self, payload: Dict[str, Any]) -> None:
         """Display a render payload from telemetry.
@@ -781,6 +1165,10 @@ class OperatorRenderContainer(QtWidgets.QFrame):
                         extra=self._log_extra(),
                     )
                     self._renderer_strategy.render(render_payload, context=context)
+
+            # After rendering, reposition grips to track image/widget
+            self._reposition_image_grip()
+            self._reposition_render_area_grip()
 
         except Exception as e:
             _LOGGER.error(f"Error displaying payload: {e}")
@@ -1292,6 +1680,11 @@ class OperatorRenderContainer(QtWidgets.QFrame):
             actions: List of action indices.
             labels: Human-readable labels for each action.
         """
+        _LOGGER.debug(
+            f"_populate_action_buttons called: actions={actions}, labels={labels}",
+            extra=self._log_extra()
+        )
+
         # Clear existing buttons
         while self._action_buttons_layout.count():
             item = self._action_buttons_layout.takeAt(0)
@@ -1302,6 +1695,10 @@ class OperatorRenderContainer(QtWidgets.QFrame):
 
         # Create buttons for ALL actions (FlowLayout handles wrapping)
         for action_idx, label in zip(actions, labels):
+            _LOGGER.debug(
+                f"Creating button: action_idx={action_idx}, label='{label}'",
+                extra=self._log_extra()
+            )
             btn = QtWidgets.QPushButton(label, self._action_buttons_container)
             btn.setFixedHeight(22)
             btn.setMinimumWidth(40)
@@ -1313,23 +1710,51 @@ class OperatorRenderContainer(QtWidgets.QFrame):
                 "QPushButton:pressed { background-color: #90caf9; }"
             )
             # Connect click to emit action
-            btn.clicked.connect(lambda checked, a=action_idx: self._on_action_button_clicked(a))
+            btn.clicked.connect(lambda checked=False, a=action_idx, lbl=label: self._on_action_button_clicked(a, lbl))
             self._action_buttons_layout.addWidget(btn)
 
         # Update container geometry to trigger flow layout recalculation
         self._action_buttons_container.updateGeometry()
 
-    def _on_action_button_clicked(self, action: int) -> None:
+    def _on_action_button_clicked(self, action: int, button_label: str = "") -> None:
         """Handle action button click.
 
         Args:
             action: The action index that was clicked.
+            button_label: The label on the button that was clicked (for debugging).
         """
-        _LOGGER.info(
-            f"Human action via button click: {action}",
+        # Update selected action display
+        self._selected_action = action
+        if self._action_labels and action < len(self._action_labels):
+            action_label = self._action_labels[action]
+            self._selected_action_label.setText(f"Selected Action: {action_label}")
+            self._selected_action_label.setVisible(True)
+
+        log_constant(
+            _LOGGER,
+            LOG_HUMAN_ACTION_BUTTON_CLICKED,
+            message=f"Button clicked: label='{button_label}', action_idx={action}",
             extra=self._log_extra()
         )
         self.human_action_submitted.emit(self._config.operator_id, action)
+        log_constant(
+            _LOGGER,
+            LOG_HUMAN_ACTION_SIGNAL_EMITTED,
+            message=f"Signal emitted: operator_id={self._config.operator_id}, action={action}",
+            extra=self._log_extra()
+        )
+
+    def _resolve_player_color(self, player_id: str) -> tuple[str, str]:
+        """Resolve (primary_hex, bg_hex) for a player from config or defaults."""
+        worker = self._config.get_worker_for_player(player_id)
+        if worker is not None:
+            color_name = worker.settings.get("agent_color")
+            if color_name and color_name != "auto" and color_name in COLOR_PALETTE:
+                return COLOR_PALETTE[color_name]
+        default_name = DEFAULT_AGENT_COLOR_NAMES.get(player_id)
+        if default_name and default_name in COLOR_PALETTE:
+            return COLOR_PALETTE[default_name]
+        return ("#666666", "#e0e0e0")
 
     def set_chess_legal_moves(
         self,

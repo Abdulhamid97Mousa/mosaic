@@ -283,6 +283,98 @@ to the newly created environment after the swap.
 Runtime Errors
 --------------
 
+``Unknown command: init_agent`` when using CleanRL worker for multi-agent environments
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Error (when launching multi-agent parallel environments like soccer_2vs2):**
+
+.. code-block:: text
+
+   2026-02-27 10:58:16,768 | WARNING | gym_gui.operators.main_window | Unexpected init_agent response for agent_0: {'type': 'error', 'message': 'Unknown command: init_agent'}
+   2026-02-27 10:58:16,769 | WARNING | gym_gui.operators.main_window | Unexpected init_agent response for agent_1: {'type': 'error', 'message': 'Unknown command: init_agent'}
+   ...
+   2026-02-27 10:59:04,769 | ERROR   | gym_gui.operators.main_window | Failed to get action from AI agent agent_0 after 5 attempts. Last response: None
+
+**Cause:** The **CleanRL worker** (``cleanrl_worker``) only supports single-agent
+environments where it owns the environment. It has only two command handlers:
+
+- ``_handle_reset`` - Initialize environment with seed
+- ``_handle_step`` - Execute action and return next observation
+
+For **parallel multi-agent environments** (MosaicMultiGrid soccer, MeltingPot, Overcooked),
+the GUI owns the shared environment and sends observations to multiple worker processes
+for action selection. This requires the **action-selector protocol**:
+
+- ``init_agent`` - Initialize worker in action-selector mode (no env ownership)
+- ``select_action`` - Given observation, return action for specific agent
+
+The CleanRL worker does **not** implement these commands, so it responds with
+``Unknown command: init_agent`` and all agents timeout waiting for actions.
+
+**Fix -- use XuanCe worker for multi-agent environments:**
+
+Multi-agent parallel environments require the **XuanCe worker** (``mosaic-xuance-worker``),
+which implements the full action-selector protocol including ``init_agent`` and
+``select_action`` commands.
+
+When configuring operators for multi-agent environments:
+
+.. code-block:: python
+
+   # ❌ WRONG - CleanRL worker doesn't support multi-agent parallel mode
+   operators = [
+       {
+           "id": "soccer_team",
+           "name": "Soccer 2v2",
+           "env_name": "mosaic_multigrid",
+           "task": "MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0",
+           "workers": {
+               "agent_0": {"type": "rl", ...},  # cleanrl_worker
+               "agent_1": {"type": "rl", ...},  # cleanrl_worker
+               "agent_2": {"type": "rl", ...},  # cleanrl_worker
+               "agent_3": {"type": "rl", ...},  # cleanrl_worker
+           }
+       }
+   ]
+
+   # ✅ CORRECT - XuanCe worker supports multi-agent parallel mode
+   operators = [
+       {
+           "id": "soccer_team",
+           "name": "Soccer 2v2",
+           "env_name": "mosaic_multigrid",
+           "task": "MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0",
+           "workers": {
+               "agent_0": {"type": "xuance", "method": "ippo", "policy_path": "..."},
+               "agent_1": {"type": "xuance", "method": "ippo", "policy_path": "..."},
+               "agent_2": {"type": "xuance", "method": "ippo", "policy_path": "..."},
+               "agent_3": {"type": "xuance", "method": "ippo", "policy_path": "..."},
+           }
+       }
+   ]
+
+.. important::
+
+   **Worker compatibility by environment type:**
+
+   - **Single-agent environments** (MiniGrid, Atari, Gymnasium):
+     Use either CleanRL worker or XuanCe worker
+
+   - **Multi-agent parallel environments** (MosaicMultiGrid, MeltingPot, Overcooked):
+     Must use XuanCe worker (CleanRL worker will fail with "Unknown command: init_agent")
+
+   The system detects parallel multi-agent mode when:
+
+   1. Environment name is in: ``mosaic_multigrid``, ``ini_multigrid``, ``meltingpot``, ``overcooked``
+   2. Operator has multiple workers (``len(config.workers) > 1``)
+
+   See ``main_window.py:1069`` (``_is_parallel_multiagent()``) for detection logic.
+
+.. tip::
+
+   If you see "Unknown command: init_agent" errors, check your operator configuration
+   and verify you're using ``"type": "xuance"`` for all agents in multi-agent environments.
+
 ``Could not register MOSAIC environments with XuanCe`` (non-fatal warning)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

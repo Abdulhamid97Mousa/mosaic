@@ -1349,8 +1349,12 @@ class InteractiveRuntime:
         # Auto-import environment packages to register their environments
         if self._env_id.startswith("MiniGrid") or self._env_id.startswith("BabyAI"):
             try:
-                import minigrid  # noqa: F401 - registers MiniGrid/BabyAI envs
-                LOGGER.debug("Imported minigrid to register environments")
+                import minigrid
+                import gymnasium
+                # Only register if not already registered (avoid duplicate registration warnings)
+                if "MiniGrid-Empty-5x5-v0" not in gymnasium.registry:
+                    minigrid.register_minigrid_envs()  # Required in minigrid 2.3.1+
+                LOGGER.debug("Registered minigrid environments")
             except ImportError:
                 LOGGER.warning("minigrid package not installed")
 

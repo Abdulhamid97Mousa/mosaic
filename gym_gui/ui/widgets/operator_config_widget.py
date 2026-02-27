@@ -13,7 +13,7 @@ from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
 from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
-from qtpy import QtCore, QtWidgets
+from qtpy import QtCore, QtGui, QtWidgets
 
 from gym_gui.config.paths import VAR_MODELS_HF_CACHE
 from gym_gui.logging_config.helpers import log_constant
@@ -23,6 +23,10 @@ from gym_gui.ui.worker_catalog.catalog import get_worker_catalog, WorkerDefiniti
 from gym_gui.constants.constants_operator import (
     BALROG_SUPPORTED_ENVS,
     BALROG_DEFAULT_TASK,
+)
+from gym_gui.ui.widgets.multi_agent_action_panel import (
+    COLOR_PALETTE,
+    DEFAULT_AGENT_COLOR_NAMES,
 )
 
 
@@ -604,7 +608,10 @@ def _get_registered_envs(prefix: str) -> List[str]:
         # MiniGrid and BabyAI environments are registered by the minigrid package
         if prefix in ("MiniGrid-", "BabyAI-"):
             try:
-                import minigrid  # noqa: F401 - registers envs on import
+                import minigrid
+                # Only register if not already registered (avoid duplicate registration warnings)
+                if "MiniGrid-Empty-5x5-v0" not in gymnasium.registry:
+                    minigrid.register_minigrid_envs()  # Required in minigrid 2.3.1+
             except ImportError:
                 _LOGGER.debug("minigrid package not installed")
                 return []
@@ -676,12 +683,12 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         row1 = QtWidgets.QHBoxLayout()
         row1.setSpacing(6)
 
-        # Player label with ID
+        # Player label with ID (will be updated to show worker name)
         label_text = f"{self._player_label} ({self._player_id})"
-        player_label = QtWidgets.QLabel(label_text, self)
-        player_label.setMinimumWidth(160)
-        player_label.setStyleSheet("font-weight: bold;")
-        row1.addWidget(player_label)
+        self._player_label_widget = QtWidgets.QLabel(label_text, self)
+        self._player_label_widget.setMinimumWidth(200)
+        self._player_label_widget.setStyleSheet("font-weight: bold;")
+        row1.addWidget(self._player_label_widget)
 
         # Type selector (LLM / RL / Human)
         row1.addWidget(QtWidgets.QLabel("Type:", self))
@@ -689,6 +696,25 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         self._type_combo.setFixedWidth(80)
         self._type_combo.addItems(["LLM", "RL", "Human", "Random"])
         row1.addWidget(self._type_combo)
+
+        # Agent color selector
+        row1.addWidget(QtWidgets.QLabel("Color:", self))
+        self._color_combo = QtWidgets.QComboBox(self)
+        self._color_combo.setFixedWidth(100)
+        self._color_combo.addItem("Auto", "auto")
+        for color_name, (primary_hex, _) in COLOR_PALETTE.items():
+            display_name = color_name.replace("_", " ").title()
+            self._color_combo.addItem(display_name, color_name)
+            idx = self._color_combo.count() - 1
+            self._color_combo.setItemData(
+                idx, QtGui.QColor(primary_hex), QtCore.Qt.ItemDataRole.DecorationRole,
+            )
+        # Default selection matches the agent's traditional colour
+        default_color = DEFAULT_AGENT_COLOR_NAMES.get(self._player_id, "auto")
+        cidx = self._color_combo.findData(default_color)
+        if cidx >= 0:
+            self._color_combo.setCurrentIndex(cidx)
+        row1.addWidget(self._color_combo)
 
         # Worker dropdown
         row1.addWidget(QtWidgets.QLabel("Worker:", self))
@@ -799,7 +825,8 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
 
     def _connect_signals(self) -> None:
         self._type_combo.currentIndexChanged.connect(self._on_type_changed)
-        self._worker_combo.currentIndexChanged.connect(self._on_changed)
+        self._color_combo.currentIndexChanged.connect(self._on_changed)
+        self._worker_combo.currentIndexChanged.connect(self._on_worker_changed)
         self._client_combo.currentIndexChanged.connect(self._on_client_changed)
         self._model_combo.currentIndexChanged.connect(self._on_changed)
         self._api_key_edit.textChanged.connect(self._on_changed)
@@ -822,7 +849,28 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
             return
         self._update_worker_dropdown()
         self._update_type_visibility()
+        self._update_player_label()
         self.assignment_changed.emit()
+
+    def _on_worker_changed(self) -> None:
+        """Handle worker selection change."""
+        if not self._updating:
+            self._update_player_label()
+            self.assignment_changed.emit()
+
+    def _update_player_label(self) -> None:
+        """Update player label to show agent info and current worker."""
+        worker_name = self._worker_combo.currentText()
+        worker_type = self._type_combo.currentText()
+
+        # Build label: "Agent Name (agent_id) - Worker Name"
+        if worker_name and worker_type not in ("Human", "Random"):
+            label_text = f"{self._player_label} ({self._player_id}) - {worker_name}"
+        else:
+            # For Human/Random or when no worker selected, just show agent info
+            label_text = f"{self._player_label} ({self._player_id}) - {worker_type}"
+
+        self._player_label_widget.setText(label_text)
 
     def _update_worker_dropdown(self) -> None:
         """Update worker dropdown based on selected type (LLM, RL, or Human)."""
@@ -853,6 +901,7 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
                 self._worker_combo.setCurrentIndex(idx)
 
         self._updating = False
+        self._update_player_label()
 
     def _update_type_visibility(self) -> None:
         """Show/hide LLM, RL, or Human settings based on selected type."""
@@ -994,6 +1043,11 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
             # Default worker if none selected
             if not worker_id:
                 worker_id = "balrog_worker"
+
+        # Agent color preference (applies to all worker types)
+        color_name = self._color_combo.currentData()
+        if color_name and color_name != "auto":
+            settings["agent_color"] = color_name
 
         return WorkerAssignment(
             worker_id=worker_id,
@@ -1167,13 +1221,15 @@ class OperatorConfigRow(QtWidgets.QWidget):
         self._name_edit.setFixedWidth(120)
         row1.addWidget(self._name_edit)
 
-        # Type selector (LLM / VLM / RL / Human)
+        # Decision-Maker selector (LLM / VLM / RL / Human / Random)
+        row1.addWidget(QtWidgets.QLabel("Decision-Maker:", self))
         self._type_combo = QtWidgets.QComboBox(self)
-        self._type_combo.addItems(["LLM", "VLM", "RL", "Human"])
+        self._type_combo.addItems(["LLM", "VLM", "RL", "Human", "Random"])
         self._type_combo.setFixedWidth(80)
         row1.addWidget(self._type_combo)
 
         # Worker dropdown
+        row1.addWidget(QtWidgets.QLabel("Worker:", self))
         self._worker_combo = QtWidgets.QComboBox(self)
         self._worker_combo.setMinimumWidth(160)
         row1.addWidget(self._worker_combo)
@@ -1938,6 +1994,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
         operator_type = self._type_combo.currentText().lower()
         is_llm_or_vlm = operator_type in ("llm", "vlm")
         is_human = operator_type == "human"
+        is_random = operator_type == "random"
         is_multiagent = self._is_multiagent_env_selected()
 
         # For multi-agent environments: hide single-worker UI, workers are per-agent
@@ -1951,11 +2008,11 @@ class OperatorConfigRow(QtWidgets.QWidget):
             # Single-agent mode: show appropriate container
             self._type_combo.show()
 
-            if is_human:
-                # Human operators: hide all config (no LLM/RL settings needed)
+            if is_human or is_random:
+                # Human and Random operators: hide all config (no LLM/RL settings needed)
                 self._llm_container.hide()
                 self._rl_container.hide()
-                self._worker_combo.hide()  # No worker selection for human
+                self._worker_combo.hide()  # No worker selection for human/random
             else:
                 self._worker_combo.show()
                 self._llm_container.setVisible(is_llm_or_vlm)
@@ -2082,11 +2139,18 @@ class OperatorConfigRow(QtWidgets.QWidget):
         # LLM and VLM both use LLM workers (same BALROG worker, different image settings)
         if operator_type in ("llm", "vlm"):
             workers = _get_llm_workers()
+            for worker in workers:
+                self._worker_combo.addItem(worker.display_name, worker.worker_id)
+        elif operator_type == "random":
+            # Random: uses random_worker subprocess
+            self._worker_combo.addItem("Random Agent", "random_worker")
+        elif operator_type == "human":
+            self._worker_combo.addItem("MOSAIC Human Worker", "human_worker")
         else:
+            # RL workers
             workers = _get_rl_workers()
-
-        for worker in workers:
-            self._worker_combo.addItem(worker.display_name, worker.worker_id)
+            for worker in workers:
+                self._worker_combo.addItem(worker.display_name, worker.worker_id)
 
         # Restore selection if possible
         if current_worker:
@@ -2106,8 +2170,8 @@ class OperatorConfigRow(QtWidgets.QWidget):
         # LLM and VLM use same env families (text-based reasoning environments)
         if operator_type in ("llm", "vlm"):
             envs = LLM_ENV_FAMILIES
-        elif operator_type == "human":
-            # Human can play any environment (same as RL)
+        elif operator_type == "human" or operator_type == "random":
+            # Human and Random can play any environment (same as RL)
             envs = RL_ENV_FAMILIES
         else:
             # RL: all environment families

@@ -30,7 +30,6 @@ class Operator(Protocol):
     - Human keyboard input
     - Trained RL policy
     - LLM agent
-    - BDI reasoning system
     """
 
     @property

@@ -825,9 +825,9 @@ class SteppingParadigm(StrEnum):
     """
 
     HIERARCHICAL = "hierarchical"
-    """BDI + RL: high-level goals decomposed into low-level RL actions.
+    """Hierarchical RL: high-level goals decomposed into low-level RL actions.
 
-    Used by: Jason/BDI workers, goal-driven agents
+    Used by: Goal-driven agents with hierarchical policies
     API: Custom goal → action mapping with RL sub-policies
     """
 

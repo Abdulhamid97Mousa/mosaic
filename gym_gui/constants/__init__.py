@@ -1,4 +1,4 @@
-"""Centralized constants package for GUI BDI RL.
+"""Centralized constants package for MOSAIC.
 
 This package consolidates all project-wide configuration constants into a
 single, discoverable location. All module-level constants are organized by

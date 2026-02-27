@@ -9,7 +9,7 @@
 [![Gymnasium](https://img.shields.io/badge/gymnasium-%3E%3D0.28.1-blue)](https://gymnasium.farama.org/)
 [![PettingZoo](https://img.shields.io/badge/PettingZoo-%3E%3D1.24.0-blue)](https://pettingzoo.farama.org/)
 [![GitHub license](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/Abdulhamid97Mousa/mosaic/blob/main/LICENSE)
-[![Documentation](https://img.shields.io/badge/docs-ReadTheDocs-blue.svg)](https://mosaic-platform.readthedocs.io/en/latest/index.html)
+[![Documentation](https://img.shields.io/badge/docs-ReadTheDocs-blue.svg)](https://mosaic-agent-level-interface.readthedocs.io/en/latest/)
 
 # MOSAIC
 
@@ -17,19 +17,19 @@
 
 MOSAIC is a visual-first platform that enables researchers to configure, run, and compare experiments across RL, LLM, VLM, and human decision-makers in the same multi-agent environment. Different paradigms like tiles in a mosaic come together to form a complete picture of agent performance.
 
-| **Documentation**: [mosaic-platform.readthedocs.io](https://mosaic-platform.readthedocs.io/en/latest/index.html) | **GitHub**: [github.com/Abdulhamid97Mousa/mosaic](https://github.com/Abdulhamid97Mousa/mosaic) |
+| **Documentation**: [mosaic-agent-level-interface.readthedocs.io](https://mosaic-agent-level-interface.readthedocs.io/en/latest/) | **GitHub**: [github.com/Abdulhamid97Mousa/mosaic](https://github.com/Abdulhamid97Mousa/mosaic) |
 |---|---|
 
 ## Two Evaluation Modes
 
 MOSAIC provides two evaluation modes designed for reproducibility:
 
-<video src="https://github.com/user-attachments/assets/ea9ebc18-2216-4fb2-913c-5d354ebea56e" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
+<video src="https://private-user-images.githubusercontent.com/80536675/553915409-ea9ebc18-2216-4fb2-913c-5d354ebea56e.mp4?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzIxNjgzMzQsIm5iZiI6MTc3MjE2ODAzNCwicGF0aCI6Ii84MDUzNjY3NS81NTM5MTU0MDktZWE5ZWJjMTgtMjIxNi00ZmIyLTkxM2MtNWQzNTRlYmVhNTZlLm1wND9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjAyMjclMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYwMjI3VDA0NTM1NFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTAyZDkzMWQwZjczOTI1NzFiNjk2MGU4N2I2ZTAxNDE0M2Y2YmQxNjM5ZTAxMTkxYzA5NGU4ZGE3YzZkZmJkZWEmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.9BimKYjxGrdN_g1eDbXC69weDC7-My85Gl-ou2wNzxQ" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
 <p align="center"><b>Manual Mode:</b> Side-by-side lock-step evaluation with shared seeds.</p>
 
 - **Manual Mode:** side-by-side comparison where multiple operators step through the same environment with shared seeds, letting researchers visually inspect decision-making differences between paradigms in real time.
 
-<video src="https://github.com/user-attachments/assets/a9b3f6f4-661c-492f-b43f-34d7125a6d2e" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
+<video src="https://private-user-images.githubusercontent.com/80536675/553915854-a9b3f6f4-661c-492f-b43f-34d7125a6d2e.mp4?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzIxNjgzMzQsIm5iZiI6MTc3MjE2ODAzNCwicGF0aCI6Ii84MDUzNjY3NS81NTM5MTU4NTQtYTliM2Y2ZjQtNjYxYy00OTJmLWI0M2YtMzRkNzEyNWE2ZDJlLm1wND9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjAyMjclMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYwMjI3VDA0NTM1NFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWNhMjM0ZjBjYjU1NWFlNmYxOGU2Yzc2N2U0ODE4OTYzZGVkYTc5YTIyMjM5YzRjODU0MTRhODFhOWI4ZDU3NmImWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.tk8Ezu0ivgFlp-xm6YEkIsWlbFPcpOgSq30Hq_JEJvs" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
 <p align="center"><b>Script Mode:</b> Automated batch evaluation with deterministic seed sequences.</p>
 
 - **Script Mode:** automated, long-running evaluation driven by Python scripts that define operator configurations, worker assignments, seed sequences, and episode counts. Scripts execute deterministically with no manual intervention, producing reproducible telemetry logs (JSONL) for every step and episode.
@@ -48,94 +48,58 @@ Today's AI landscape offers powerful but **fragmented** tools: RL frameworks ([C
 - **Per-Agent Policy Binding**: Route each agent to different workers via `PolicyMappingService`.
 - **Worker Lifecycle Orchestration**: Subprocess management with heartbeat monitoring and graceful termination.
 
-<video src="https://github.com/user-attachments/assets/ded17cdc-f23c-404f-a9f6-074fbe74816c" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
+<video src="https://private-user-images.githubusercontent.com/80536675/553915983-ded17cdc-f23c-404f-a9f6-074fbe74816c.mp4?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzIxNjgzMzQsIm5iZiI6MTc3MjE2ODAzNCwicGF0aCI6Ii84MDUzNjY3NS81NTM5MTU5ODMtZGVkMTdjZGMtZjIzYy00MDRmLWE5ZjYtMDc0ZmJlNzQ4MTZjLm1wND9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjAyMjclMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYwMjI3VDA0NTM1NFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPWUwZmZiZTlmZjQ3OGQ4NTk1ZWQzODEzMGVlYTMyY2E0Y2E1ZjJjZTU0NTg0MDMxYmU0OThlMGVkNjc1ZGVjNDgmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.1DWDiXB20L5dr8Hx60M70zd0pL1JKkOO5roOjr2kkaQ" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
 <p align="center"><b>Human vs Human:</b> Two human players competing via dedicated USB keyboards.</p>
 
-<video src="https://github.com/user-attachments/assets/2625a8f8-476c-4171-86cc-a9970cbf1665" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
+<video src="https://private-user-images.githubusercontent.com/80536675/553916105-2625a8f8-476c-4171-86cc-a9970cbf1665.mp4?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzIxNjgzMzQsIm5iZiI6MTc3MjE2ODAzNCwicGF0aCI6Ii84MDUzNjY3NS81NTM5MTYxMDUtMjYyNWE4ZjgtNDc2Yy00MTcxLTg2Y2MtYTk5NzBjYmYxNjY1Lm1wND9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjAyMjclMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYwMjI3VDA0NTM1NFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTQwMzljOWNhYWQwNjZjNzRlZDU4ZmM3M2M0YWJlNjYwNWM0NzM2YjkxNmQ4YTQxYmEzYTNmNzJkYWQwZGI3MWQmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.Lvwy-I3p1fNP-kmUhHtUXO7FtJ9Q_K_NCVuGbxZ6VbY" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
 <p align="center"><b>Random Agents:</b> Baseline agents across 26 environment families.</p>
 
-<video src="https://github.com/user-attachments/assets/f2d79901-a93d-465b-9058-1b9cdabf311a" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
+<video src="https://private-user-images.githubusercontent.com/80536675/553916227-f2d79901-a93d-465b-9058-1b9cdabf311a.mp4?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzIxNjgzMzQsIm5iZiI6MTc3MjE2ODAzNCwicGF0aCI6Ii84MDUzNjY3NS81NTM5MTYyMjctZjJkNzk5MDEtYTkzZC00NjViLTkwNTgtMWI5Y2RhYmYzMTFhLm1wND9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjAyMjclMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYwMjI3VDA0NTM1NFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTU2MzNiMDJjM2ZjOWQwNjA2Y2Q1NWI0MzljMzhmNTNlOTlmMzU4OWNjOGQ1Y2NmMDdlODVkZDBjZTRhOWI4ODgmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.NQwmmI3Yyu_ePoPhLvU8ZAvp-Jn-q3q90j48n7-TEFk" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
 <p align="center"><b>Heterogeneous Multi-Agent Ad-Hoc Teamwork in Adversarial Settings:</b> Different decision-making paradigms (RL, LLM, Random) competing head-to-head in the same multi-agent environment.</p>
 
-<video src="https://github.com/user-attachments/assets/2ae1665b-3a57-44be-98a3-4e7223b37628" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
+<video src="https://private-user-images.githubusercontent.com/80536675/553916417-2ae1665b-3a57-44be-98a3-4e7223b37628.mp4?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzIxNjgzMzQsIm5iZiI6MTc3MjE2ODAzNCwicGF0aCI6Ii84MDUzNjY3NS81NTM5MTY0MTctMmFlMTY2NWItM2E1Ny00NGJlLTk4YTMtNGU3MjIzYjM3NjI4Lm1wND9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjAyMjclMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYwMjI3VDA0NTM1NFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTIyYzllNjc4OTYwNzg5MGFkZDA5N2Q4ZTZmMzk4Yzg0ZTYzOGNmYTgxNGZkYTU2OWYzMGZiNDk2NmJjY2FiYjMmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.FK9hfbmCA1GOl80CJkenINfr5iD5CckeipYVYfFy3_Y" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
 <p align="center"><b>Homogeneous Teams: Random vs LLM:</b> Two homogeneous teams (all-Random vs all-LLM) competing in the same multi-agent environment.</p>
-
-## Agent-Level Interface and Cross-Paradigm Evaluation
-
-**Agent-Level Interface.** Existing infrastructure lacks the ability to deploy agents from different decision-making paradigms within the same environment. The root cause is an **interface mismatch**: RL agents expect tensor observations and produce integer actions, while LLM agents expect text prompts and produce text responses. MOSAIC addresses this through an *operator abstraction* that forms an agent-level interface by mapping workers to agents: each operator, regardless of whether it is backed by an RL policy, an LLM, or a human, conforms to a minimal unified interface (`select_action(obs) → action`). The environment never needs to know what kind of decision-maker it is communicating with. This is the agent-side counterpart to what [Gymnasium](https://gymnasium.farama.org/) did for environments: Gymnasium standardized the environment interface (`reset()` / `step()`), so any algorithm can interact with any environment; MOSAIC's Operator Protocol standardizes the agent interface, so any decision-maker can be plugged into any compatible environment without modifying either side.
-
-**Cross-Paradigm Evaluation.** Cross-paradigm evaluation is the ability to deploy decision-makers from *different paradigms* (RL, LLM/VLM, Human, scripted baselines) within the same multi-agent environment under identical conditions, and to produce directly comparable results. Both evaluation modes described above ([Manual Mode](https://mosaic-platform.readthedocs.io/en/latest/documents/architecture/operators/lifecycle.html#manual-mode) and [Script Mode](https://mosaic-platform.readthedocs.io/en/latest/documents/architecture/operators/lifecycle.html#script-mode)) guarantee that all decision-makers face the same environment states, observations, and shared seeds, making this the first infrastructure to enable fair, reproducible cross-paradigm evaluation.
-
-## Comparison with Existing Frameworks
-
-Existing frameworks are paradigm-siloed. No prior framework allowed fair, reproducible, head-to-head comparison between RL agents and LLM agents in the same multi-agent environment.
-
-*Agent Paradigms*: which decision-maker types are supported. *Framework*: algorithms can be integrated without source-code modifications. *Platform GUI*: real-time visualization during execution. *Cross-Paradigm*: infrastructure for comparing different agent types (e.g., RL vs. LLM) on identical environment instances with shared random seeds for reproducible head-to-head evaluation.
-
-> ✅ Supported · ❌ Not supported · 🔵 Partial
-
-| | | **Agent Paradigms** | | | **Infrastructure** | | **Evaluation** |
-|---|---|:---:|:---:|:---:|:---:|:---:|:---:|
-| **System** | | **RL** | **LLM/VLM** | **Human** | **Framework** | **Platform GUI** | **Cross-Paradigm** |
-| | *RL Frameworks* | | | | | | |
-| RLlib | [[1]](#references) | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| CleanRL | [[2]](#references) | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| Tianshou | [[3]](#references) | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| Acme | [[4]](#references) | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| XuanCe | [[5]](#references) | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| OpenRL | [[6]](#references) | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| Stable-Baselines3 | [[7]](#references) | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| Coach | [[8]](#references) | ✅ | ❌ | ❌ | ✅ | ✅ | ❌ |
-| BenchMARL | [[15]](#references) | ✅ | ❌ | ❌ | ✅ | ❌ | ❌ |
-| | *LLM/VLM Benchmarks* | | | | | | |
-| BALROG | [[9]](#references) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
-| TextArena | [[10]](#references) | ❌ | ✅ | ✅ | ✅ | ❌ | ❌ |
-| GameBench | [[11]](#references) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
-| lmgame-Bench | [[12]](#references) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
-| LLM Chess | [[13]](#references) | ✅ | ✅ | ❌ | ✅ | ❌ | ❌ |
-| LLM-Game-Bench | [[14]](#references) | ❌ | ✅ | ❌ | ✅ | 🔵 | ❌ |
-| AgentBench | [[16]](#references) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
-| MultiAgentBench | [[17]](#references) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
-| GAMEBoT | [[18]](#references) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
-| Collab-Overcooked | [[19]](#references) | 🔵 | ✅ | ❌ | ✅ | ❌ | ❌ |
-| BotzoneBench | [[20]](#references) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
-| AgentGym | [[21]](#references) | ❌ | ✅ | ❌ | ✅ | ❌ | ❌ |
-| | | | | | | | |
-| **MOSAIC (Ours)** | | **✅** | **✅** | **✅** | **✅** | **✅** | **✅** |
 
 ## Experimental Configurations
 
-Heterogeneous decision-making enables a systematic ablation matrix for cross-paradigm research. Here are examples using 2v2 soccer:
+Heterogeneous decision-making enables a systematic ablation matrix for cross-paradigm research. The following configurations illustrate the design using 2v2 soccer in [MOSAIC MultiGrid](https://mosaic-agent-level-interface.readthedocs.io/en/latest/documents/environments/mosaic_multigrid/index.html). Notation follows the paper's appendix.
+- $\pi^{RL}$ denotes a solo‑trained RL policy (frozen at evaluation).
+- $\lambda^{LLM}$ denotes an LLM agent.
+- $\rho$ denotes a uniform random policy.
+- $\nu$ denotes a no‑op (null action) policy.
 
-### Adversarial Cross-Paradigm
+### Adversarial Cross‑Paradigm Matchups
 
-Testing how paradigms perform against each other:
+Testing how paradigms perform against each other. Each configuration pits two homogeneous teams against one another.
 
 | Configuration | Team A | Team B | Purpose |
-|---|---|---|---|
-| RL vs RL | MAPPO + MAPPO | MAPPO + MAPPO | Homogeneous RL baseline |
-| LLM vs LLM | GPT-4o + GPT-4o | GPT-4o + GPT-4o | Homogeneous LLM baseline |
-| RL vs LLM | MAPPO + MAPPO | GPT-4o + GPT-4o | Cross-paradigm matchup |
-| RL vs Random | MAPPO + MAPPO | Random + Random | Sanity check |
+|---------------|--------|--------|---------|
+| **A1** (RL vs RL) | $\pi^{RL}_1 + \pi^{RL}_2$ | $\pi^{RL}_3 + \pi^{RL}_4$ | Homogeneous RL baseline (ceiling) |
+| **A2** (LLM vs LLM) | $\lambda^{LLM}_1 + \lambda^{LLM}_2$ | $\lambda^{LLM}_3 + \lambda^{LLM}_4$ | Homogeneous LLM baseline |
+| **A3** (RL vs LLM) | $\pi^{RL}_1 + \pi^{RL}_2$ | $\lambda^{LLM}_1 + \lambda^{LLM}_2$ | Central cross‑paradigm comparison |
+| **A4** (RL vs Random) | $\pi^{RL}_1 + \pi^{RL}_2$ | $\rho_1 + \rho_2$ | Sanity check (trained vs random) |
 
 ### Cooperative Heterogeneous Teams
 
-Testing how paradigms work together as teammates:
+Testing how paradigms work together **within** a team. All RL policies are trained solo (1v1) and frozen before deployment; LLM agents are zero‑shot.
 
 | Configuration | Green Team | Blue Team |
-|---|---|---|
-| Heterogeneous vs Crippled | RL + LLM | RL + Random |
-| Heterogeneous vs Solo | RL + LLM | RL + No-Operation (action=NOOP/STILL) |
-| Solo-pair vs Solo-pair | RL + RL | RL + RL |
-| Heterogeneous vs Co-trained | RL + LLM | RL + RL (trained 2vs2 policy) |
+|---------------|------------|-----------|
+| **C1** (Heterogeneous vs Crippled) | $\pi^{RL} + \lambda^{LLM}$ | $\pi^{RL} + \rho$ |
+| **C2** (Heterogeneous vs Solo) | $\pi^{RL} + \lambda^{LLM}$ | $\pi^{RL} + \nu$ |
+| **C3** (Solo‑pair vs Solo‑pair) | $\pi^{RL}_i + \pi^{RL}_j$ | $\pi^{RL}_k + \pi^{RL}_l$ |
+| **C4** (Heterogeneous vs Co‑trained) | $\pi^{RL} + \lambda^{LLM}$ | $\pi^{RL}_{2v2} + \pi^{RL}_{2v2}$ |
 
-> **1v1-to-2v2 Transfer Design.** RL agents are trained as solo experts in 1v1, then deployed as teammates alongside an LLM in 2v2. This eliminates the **co-training confound**: if RL agents were instead trained in 2v2 via MAPPO self-play, their policies would encode implicit partner models calibrated against another MAPPO agent. Swapping one teammate with an LLM would then conflate two effects: the paradigm difference *and* the partner mismatch. With 1v1-trained agents, the RL policy has zero partner expectations because it never had a partner, isolating the paradigm variable.
->
-> This is distinct from **zero-shot coordination (ZSC)** in the ad-hoc teamwork literature. ZSC studies RL agents cooperating with unknown *RL* partners, agents from the same paradigm that share the same observation and action representations. The 1v1-to-2v2 design studies an LLM as an ad-hoc partner for a frozen RL policy, where the partner is not just unknown but from a fundamentally different paradigm (text-based reasoning vs. learned tensor-to-action mapping). The comparison baseline also changes: in ZSC the reference is a co-trained RL+RL team, while here the fair reference is two independently trained 1v1 solo experts paired in 2v2 (the "Solo-pair vs Solo-pair" configuration above), since neither agent was trained with any partner.
+> **1v1‑to‑2v2 Transfer Design – Why Solo Training?**  
+>  
+> RL agents are trained as **solo experts in 1v1** (single‑agent environment), then deployed as teammates in 2v2 **without any fine‑tuning**. This design eliminates the *co‑training confound*: if agents were trained together in 2v2 via MAPPO self‑play, their policies would encode implicit partner models calibrated against another MAPPO agent. Swapping one teammate with an LLM would then conflate two effects – the paradigm difference **and** the partner mismatch. With 1v1‑trained agents, the RL policy carries **zero partner expectations** because it never had a partner, cleanly isolating the paradigm variable.  
+>  
+> This is distinct from **zero‑shot coordination (ZSC)** in the ad‑hoc teamwork literature. ZSC studies RL agents cooperating with unknown *RL* partners, agents that share the same observation and action representations ($\mathcal{O} = \mathbb{R}^d$, $\mathcal{A}$ discrete). Here we study an LLM as an ad‑hoc partner for a frozen RL policy – the partner is not only unknown but operates through a fundamentally different paradigm (text‑based reasoning vs. learned tensor‑to‑action mapping). The fair comparison baseline also changes: in ZSC the reference is a co‑trained RL+RL team, while here the appropriate baseline is **C3**: two independently trained 1v1 solo experts paired in 2v2, since neither agent was trained with any partner.
+
 
 ## Supported Environment Families (26)
 
-MOSAIC supports **26 environment families** spanning single-agent, multi-agent, and cooperative/competitive paradigms. See the full [Environment Families](https://mosaic-platform.readthedocs.io/en/latest/documents/environments/index.html) reference for installation instructions, environment lists, and academic citations.
+MOSAIC supports **26 environment families** spanning single-agent, multi-agent, and cooperative/competitive paradigms. See the full [Environment Families](https://mosaic-agent-level-interface.readthedocs.io/en/latest/documents/environments/index.html) reference for installation instructions, environment lists, and academic citations.
 
 | Family | Description | Example |
 |--------|-------------|---------|
@@ -228,81 +192,17 @@ If you use MOSAIC in your research, please cite:
 }
 ```
 
-## References
-
-1. E. Liang et al., "RLlib: Abstractions for Distributed Reinforcement Learning," *ICML*, 2018.
-2. S. Huang et al., "CleanRL: High-quality Single-file Implementations of Deep Reinforcement Learning Algorithms," *JMLR*, 2022.
-3. J. Weng et al., "Tianshou: A Highly Modularized Deep Reinforcement Learning Library," *JMLR*, 2022.
-4. M. Hoffman et al., "Acme: A Research Framework for Distributed Reinforcement Learning," *arXiv:2006.00979*, 2020.
-5. W. Liu et al., "XuanCe: A Comprehensive and Unified Deep Reinforcement Learning Library," *arXiv:2312.16248*, 2023.
-6. S. Huang et al., "OpenRL: A Unified Reinforcement Learning Framework," *arXiv:2312.16189*, 2023.
-7. A. Raffin et al., "Stable-Baselines3: Reliable Reinforcement Learning Implementations," *JMLR*, 2021.
-8. I. Caspi et al., "Reinforcement Learning Coach," 2017. https://github.com/IntelLabs/coach
-9. D. Paglieri et al., "BALROG: Benchmarking Agentic LLM and VLM Reasoning On Games," *arXiv:2411.13543*, 2024.
-10. G. De Magistris et al., "TextArena," 2025. https://github.com/LeonGuertworktler/TextArena
-11. D. Costarelli et al., "GameBench: Evaluating Strategic Reasoning Abilities of LLM Agents," *arXiv:2406.06613*, 2024.
-12. Y. Huang et al., "lmgame-Bench: Evaluating LLMs on Game-Theoretic Decision-Making," 2025.
-13. M. Saplin, "LLM Chess," 2025. https://github.com/maxim-saplin/llm_chess
-14. J. Guo et al., "LLM-Game-Bench: Evaluating LLM Reasoning through Game-Playing," 2024.
-15. M. Bettini et al., "BenchMARL: Benchmarking Multi-Agent Reinforcement Learning," *JMLR*, 2024. *arXiv:2312.01472*.
-16. X. Liu et al., "AgentBench: Evaluating LLMs as Agents," *ICLR*, 2024. *arXiv:2308.03688*.
-17. K. Zhu et al., "MultiAgentBench: Evaluating the Collaboration and Competition of LLM Agents," *ACL*, 2025. *arXiv:2503.01935*.
-18. Y. Lin et al., "GAMEBoT: Transparent Assessment of LLM Reasoning in Games," *ACL*, 2025. *arXiv:2412.13602*.
-19. H. Sun et al., "Collab-Overcooked: Benchmarking and Evaluating Large Language Models as Collaborative Agents," *EMNLP*, 2025. *arXiv:2502.20073*.
-20. "BotzoneBench: Scalable LLM Evaluation via Graded AI Anchors," *arXiv:2602.13214*, 2026.
-21. Z. Xi et al., "AgentGym: Evolving Large Language Model-based Agents across Diverse Environments," *ACL*, 2025. *arXiv:2406.04151*.
-
 ## License
 
 MOSAIC is released under the [MIT License](https://github.com/Abdulhamid97Mousa/mosaic/blob/main/LICENSE).
 
 ## Acknowledgments
 
-**RL & MARL Frameworks**
 - [Gymnasium](https://gymnasium.farama.org/): Standard RL API
-- [PettingZoo](https://pettingzoo.farama.org/): Multi-agent environment API
-- [CleanRL](https://github.com/vwxyzjn/cleanrl): Single-file RL implementations
+- [PettingZoo](https://pettingzoo.farama.org/): Multi-agent environments
+- [CleanRL](https://github.com/vwxyzjn/cleanrl): Clean RL implementations
 - [XuanCe](https://github.com/agi-brain/xuance): Multi-agent RL algorithms
 - [Ray RLlib](https://docs.ray.io/en/latest/rllib/): Distributed RL training
-- [Stable-Baselines3](https://stable-baselines3.readthedocs.io/): RL algorithms library (PPO, A2C, DQN)
-- [MARLlib](https://github.com/Farama-Foundation/Marllib): Multi-agent RL library
-- [SuperSuit](https://github.com/Farama-Foundation/SuperSuit): PettingZoo wrapper utilities
-- [Shimmy](https://shimmy.farama.org/): Environment compatibility wrappers
-
-**Environment Families**
-- [Atari / ALE](https://github.com/mgbellemare/Arcade-Learning-Environment): Classic Atari 2600 games
-- [MiniGrid](https://github.com/Farama-Foundation/Minigrid): Procedural grid-world navigation
-- [ViZDoom](https://github.com/Farama-Foundation/ViZDoom): Doom-based first-person visual RL
-- [NLE](https://github.com/facebookresearch/nle) / [MiniHack](https://github.com/facebookresearch/minihack): Roguelike dungeon crawling
-- [Crafter](https://github.com/danijar/crafter): Open-world survival benchmark
-- [Procgen](https://github.com/openai/procgen): Procedurally generated environments
-- [Baba Is AI](https://github.com/nacloos/baba-is-ai): Rule-manipulation puzzles
-- [Jumanji](https://github.com/google-deepmind/jumanji): JAX-accelerated logic/routing/packing environments
-- [PyBullet Drones](https://github.com/utiasDSL/gym-pybullet-drones): Quadcopter physics simulation
-- [INI MultiGrid](https://github.com/ini/multigrid): Cooperative multi-agent exploration
-- [SMAC](https://github.com/oxwhirl/smac) / [SMACv2](https://github.com/oxwhirl/smacv2): StarCraft Multi-Agent Challenge
-- [RWARE](https://github.com/uoe-agents/robotic-warehouse): Cooperative warehouse delivery
-- [Melting Pot](https://github.com/google-deepmind/meltingpot): Multi-agent social scenarios
-- [Overcooked-AI](https://github.com/HumanCompatibleAI/overcooked_ai): Cooperative cooking benchmark
-- [OpenSpiel](https://github.com/google-deepmind/open_spiel): Board games collection
-- [MuJoCo](https://mujoco.org/): Continuous-control physics engine
-
-**LLM / VLM Agents**
-- [BALROG](https://github.com/balrog-ai/BALROG): LLM/VLM agentic evaluation benchmark
+- [BALROG](https://github.com/balrog-ai/BALROG): LLM/VLM agent benchmark
 - [llm_chess](https://github.com/maxim-saplin/llm_chess): LLM chess evaluation
-- [python-chess](https://github.com/niklasf/python-chess): Chess move generation and validation
-- [Stockfish](https://stockfishchess.org/): Chess engine for evaluation
-- [vLLM](https://github.com/vllm-project/vllm): Local GPU LLM inference
-
-**JAX Ecosystem**
-- [JAX](https://github.com/google/jax): Composable transformations of Python+NumPy programs
-- [Flax](https://github.com/google/flax): Neural network library for JAX
-- [Optax](https://github.com/google-deepmind/optax): Gradient transformation library
-- [MCTX](https://github.com/google-deepmind/mctx): GPU-accelerated Monte-Carlo Tree Search
-- [Pgx](https://github.com/sotetsuk/pgx): JAX-based board game environments
-
-**GUI, Visualization & Core**
 - [PyQt6](https://www.riverbankcomputing.com/software/pyqt/): GUI framework
-- [PyTorch](https://pytorch.org/): Deep learning framework
-- [gRPC](https://grpc.io/) / [Protobuf](https://developers.google.com/protocol-buffers): Inter-process communication
-- [TensorBoard](https://www.tensorflow.org/tensorboard) / [Weights & Biases](https://wandb.ai/): Experiment tracking

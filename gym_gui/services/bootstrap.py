@@ -80,20 +80,6 @@ def bootstrap_default_services() -> ServiceLocator:
         backend_label="Qt keyboard input",
         activate=True,
     )
-    # actors.register_actor(
-    #     BDIQAgent(),
-    #     display_name="BDI Agent",
-    #     description="Belief-Desire-Intention agent with pluggable learning backends.",
-    #     policy_label="BDI planner + RL policy",
-    #     backend_label="In-process Python actor",
-    # )
-    # actors.register_actor(
-    #     LLMMultiStepAgent(),
-    #     display_name="LLM Multi-Step Agent",
-    #     description="Delegates decisions to an integrated language model pipeline.",
-    #     policy_label="LLM planning with tool calls",
-    #     backend_label="External language model service",
-    # )
     actors.register_actor(
         CleanRLWorkerActor(),
         display_name="CleanRL Worker",

@@ -1,4 +1,4 @@
-"""Ray/RLlib worker integration for MOSAIC BDI-RL framework.
+"""Ray/RLlib worker integration for MOSAIC framework.
 
 This module provides the integration layer between MOSAIC's GUI and
 Ray/RLlib's distributed reinforcement learning capabilities.

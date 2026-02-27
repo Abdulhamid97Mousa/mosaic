@@ -36,6 +36,9 @@ except ImportError:  # pragma: no cover - handled gracefully at runtime
 
 _MINIGRID_STEP_LOG_FREQUENCY = 100
 
+# MiniGrid/BabyAI action labels (7 actions)
+MINIGRID_ACTIONS = ["Turn Left", "Turn Right", "Forward", "Pickup", "Drop", "Toggle", "Done"]
+
 
 @dataclass(slots=True)
 class _MiniGridMetrics:
@@ -555,6 +558,7 @@ MINIGRID_ADAPTERS: dict[GameId, type[MiniGridAdapter]] = {
 
 
 __all__ = [
+    "MINIGRID_ACTIONS",
     "MiniGridAdapter",
     "MiniGridEmpty5x5Adapter",
     "MiniGridEmptyRandom5x5Adapter",

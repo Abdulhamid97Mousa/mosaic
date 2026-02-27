@@ -10,13 +10,40 @@ made before the environment can step.
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from PyQt6.QtCore import pyqtSignal
 from qtpy import QtCore, QtWidgets
 
 _LOGGER = logging.getLogger(__name__)
 
+# Named color palette for agent customization.
+# The 6 names match MosaicMultiGrid's core/constants.py COLORS dict.
+# Hex values are Material Design approximations for readable UI buttons.
+COLOR_PALETTE: Dict[str, Tuple[str, str]] = {
+    "red":    ("#e53935", "#ffcdd2"),
+    "green":  ("#43a047", "#c8e6c9"),
+    "blue":   ("#1e88e5", "#bbdefb"),
+    "purple": ("#8e24aa", "#e1bee7"),
+    "yellow": ("#fdd835", "#fff9c4"),
+    "grey":   ("#757575", "#e0e0e0"),
+}
+
+# Default agent -> color_name mapping (preserves current behaviour).
+DEFAULT_AGENT_COLOR_NAMES: Dict[str, str] = {
+    # MosaicMultiGrid / PettingZoo agent IDs
+    "agent_0": "green",
+    "agent_1": "blue",
+    "agent_2": "red",
+    "agent_3": "yellow",
+    "agent_4": "purple",
+    "agent_5": "grey",
+    # Chess / classic game player IDs
+    "player_0": "grey",   # White
+    "player_1": "blue",   # Black
+}
+
+# Legacy dict used internally — kept for fallback.
 # Agent colors for visual distinction
 AGENT_COLORS = {
     "agent_0": ("#43a047", "#c8e6c9"),  # Green (primary, background)
@@ -44,6 +71,7 @@ class AgentActionRow(QtWidgets.QWidget):
         agent_id: str,
         agent_label: str,
         action_labels: List[str],
+        color_name: Optional[str] = None,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         """Initialize agent action row.
@@ -52,6 +80,8 @@ class AgentActionRow(QtWidgets.QWidget):
             agent_id: The agent identifier (e.g., "agent_0").
             agent_label: Human-readable label (e.g., "Agent 0 (Red)").
             action_labels: List of action names (e.g., ["Still", "Left", "Right", ...]).
+            color_name: Optional color name from COLOR_PALETTE (e.g., "green", "blue").
+                       If not provided, uses default from AGENT_COLORS.
             parent: Parent widget.
         """
         super().__init__(parent)
@@ -62,7 +92,11 @@ class AgentActionRow(QtWidgets.QWidget):
         self._action_buttons: List[QtWidgets.QPushButton] = []
 
         # Get agent color scheme
-        primary_color, bg_color = AGENT_COLORS.get(agent_id, ("#666666", "#e0e0e0"))
+        # Priority: 1) user-selected color_name, 2) default AGENT_COLORS
+        if color_name and color_name in COLOR_PALETTE:
+            primary_color, bg_color = COLOR_PALETTE[color_name]
+        else:
+            primary_color, bg_color = AGENT_COLORS.get(agent_id, ("#666666", "#e0e0e0"))
         self._primary_color = primary_color
         self._bg_color = bg_color
 
@@ -143,15 +177,11 @@ class AgentActionRow(QtWidgets.QWidget):
         if selected:
             return (
                 f"QPushButton {{ font-size: 10px; padding: 2px 6px; "
-                f"background-color: {self._primary_color}; color: white; "
-                f"border: 2px solid {self._primary_color}; border-radius: 3px; font-weight: bold; }}"
+                f"font-weight: bold; background-color: {self._primary_color}; color: white; }}"
             )
         else:
             return (
-                f"QPushButton {{ font-size: 10px; padding: 2px 6px; "
-                f"background-color: {self._bg_color}; color: #333; "
-                f"border: 1px solid {self._primary_color}; border-radius: 3px; }}"
-                f"QPushButton:hover {{ background-color: {self._primary_color}; color: white; }}"
+                f"QPushButton {{ font-size: 10px; padding: 2px 6px; }}"
             )
 
     def _on_action_clicked(self, action_index: int) -> None:
@@ -219,6 +249,7 @@ class MultiAgentActionPanel(QtWidgets.QWidget):
         human_agents: List[str],
         action_labels: List[str],
         agent_labels: Optional[Dict[str, str]] = None,
+        agent_colors: Optional[Dict[str, str]] = None,
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         """Initialize multi-agent action panel.
@@ -227,12 +258,14 @@ class MultiAgentActionPanel(QtWidgets.QWidget):
             human_agents: List of human-controlled agent IDs.
             action_labels: List of action names (same for all agents).
             agent_labels: Optional dict mapping agent_id to display label.
+            agent_colors: Optional dict mapping agent_id to color name from COLOR_PALETTE.
             parent: Parent widget.
         """
         super().__init__(parent)
         self._human_agents = human_agents
         self._action_labels = action_labels
         self._agent_labels = agent_labels or {}
+        self._agent_colors = agent_colors or {}
         self._agent_rows: Dict[str, AgentActionRow] = {}
         self._pending_actions: Dict[str, int] = {}
 
@@ -265,7 +298,7 @@ class MultiAgentActionPanel(QtWidgets.QWidget):
         scroll = QtWidgets.QScrollArea(self)
         scroll.setWidgetResizable(True)
         scroll.setFrameShape(QtWidgets.QFrame.Shape.NoFrame)
-        scroll.setMaximumHeight(200)
+        scroll.setMinimumHeight(100)  # Allow resizing, but set minimum
 
         rows_container = QtWidgets.QWidget(scroll)
         rows_layout = QtWidgets.QVBoxLayout(rows_container)
@@ -277,15 +310,22 @@ class MultiAgentActionPanel(QtWidgets.QWidget):
             # Get label with color hint
             default_label = f"Agent {agent_id.split('_')[-1]}"
             label = self._agent_labels.get(agent_id, default_label)
-            # Add color hint
-            color_name = self._get_color_name(agent_id)
+
+            # Get user-selected color or default
+            color_name = self._agent_colors.get(agent_id)
+            if not color_name:
+                color_name = self._get_color_name(agent_id)
+
+            # Add color hint to label
             if color_name:
-                label = f"{label} ({color_name})"
+                display_color = color_name.replace("_", " ").title()
+                label = f"{label} ({display_color})"
 
             row = AgentActionRow(
                 agent_id=agent_id,
                 agent_label=label,
                 action_labels=self._action_labels,
+                color_name=color_name,
                 parent=rows_container,
             )
             row.action_selected.connect(self._on_agent_action_selected)
@@ -308,23 +348,15 @@ class MultiAgentActionPanel(QtWidgets.QWidget):
         # Clear button
         self._clear_btn = QtWidgets.QPushButton("Clear All", self)
         self._clear_btn.setFixedHeight(28)
-        self._clear_btn.setStyleSheet(
-            "QPushButton { padding: 4px 12px; background-color: #f5f5f5; "
-            "border: 1px solid #ccc; border-radius: 4px; }"
-            "QPushButton:hover { background-color: #e0e0e0; }"
-        )
         self._clear_btn.clicked.connect(self._on_clear_clicked)
         button_row.addWidget(self._clear_btn)
 
-        # Submit button
+        # Submit button - use same style as "Step All" button
         self._submit_btn = QtWidgets.QPushButton("Submit All Actions", self)
         self._submit_btn.setFixedHeight(28)
         self._submit_btn.setEnabled(False)
         self._submit_btn.setStyleSheet(
-            "QPushButton { padding: 4px 16px; background-color: #4caf50; color: white; "
-            "border: none; border-radius: 4px; font-weight: bold; }"
-            "QPushButton:hover { background-color: #43a047; }"
-            "QPushButton:disabled { background-color: #c8e6c9; color: #666; }"
+            "QPushButton { font-weight: bold; background-color: #4CAF50; color: white; }"
         )
         self._submit_btn.clicked.connect(self._on_submit_clicked)
         button_row.addWidget(self._submit_btn)

@@ -271,8 +271,7 @@ class XInput2TestWindow(QtWidgets.QWidget):
         else:
             self.log.append("✗ Cannot install event filter - python-xcffib not available")
             self.log.append("\nInstall xcffib:")
-            self.log.append("  cd /home/hamid/Desktop/Projects/GUI_BDI_RL")
-            self.log.append("  .venv/bin/pip install xcffib")
+            self.log.append("  pip install xcffib")
 
     def showEvent(self, event):
         """Called when window is shown - register for XInput2 events."""

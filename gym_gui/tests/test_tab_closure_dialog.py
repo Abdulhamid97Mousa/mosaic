@@ -7,7 +7,6 @@ from pathlib import Path
 from unittest.mock import Mock, patch, MagicMock
 
 os.environ['QT_QPA_PLATFORM'] = 'offscreen'
-sys.path.insert(0, '/home/hamid/Desktop/Projects/GUI_BDI_RL')
 
 import pytest
 from PyQt6 import QtWidgets, QtCore

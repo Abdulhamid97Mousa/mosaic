@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mosaic-ray-worker"
 version = "0.1.0"
-description = "Ray/RLlib integration for MOSAIC BDI-RL framework"
+description = "Ray/RLlib integration for MOSAIC framework"
 requires-python = ">=3.10"
 license = {text = "MIT"}
 # Dependencies are managed via the main project's requirements.txt
