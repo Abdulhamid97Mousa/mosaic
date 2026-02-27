@@ -43,6 +43,8 @@ export TRACK_TENSORBOARD="${TRACK_TENSORBOARD:-1}"
 # Artifact directory -- uses var/trainer/runs/{run_id} when launched from GUI
 RUN_DIR="${MOSAIC_RUN_DIR:-$SCRIPTS_DIR/$RUN_ID}"
 mkdir -p "$RUN_DIR/checkpoints"
+mkdir -p "$RUN_DIR/logs"
+mkdir -p "$RUN_DIR/models/ppo"
 
 # Total timesteps across all curriculum stages
 TOTAL_TIMESTEPS=600000
@@ -74,10 +76,14 @@ CURRICULUM_CONFIG="$RUN_DIR/config/curriculum_config.json"
 jq --argjson steps "$TOTAL_TIMESTEPS" \
    --argjson num_envs "${XUANCE_NUM_ENVS:-4}" \
    --arg checkpoint_dir "$RUN_DIR/checkpoints" \
-   --arg tensorboard_dir "$RUN_DIR/tensorboard" '
+   --arg tensorboard_dir "$RUN_DIR/tensorboard" \
+   --arg log_dir "$RUN_DIR/logs" \
+   --arg model_dir "$RUN_DIR/models/ppo" '
     .method = "ppo" |
     .env = "minigrid" |
     .env_id = "MiniGrid-DoorKey-5x5-v0" |
+    .log_dir = $log_dir |
+    .model_dir = $model_dir |
     .running_steps = $steps |
     .parallels = $num_envs |
     .extras.algo_params.num_envs = $num_envs |

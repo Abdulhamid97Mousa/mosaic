@@ -1,37 +1,45 @@
 #!/bin/bash
-# mappo_soccer_1vs1.sh - MAPPO Training for 1vs1 Soccer (IndAgObs)
+# mappo_soccer_2vs2_indagobs.sh - MAPPO Training for 2vs2 Soccer (IndAgObs, view_size=7)
 #
-# @description: MAPPO 1vs1 Soccer - separate Green/Blue policies
+# @description: MAPPO 2vs2 Soccer - four separate policies (competitive)
 # @env_family: multigrid
-# @environments: soccer_1vs1
+# @environments: soccer_2vs2_indagobs
 # @method: MAPPO
-# @total_timesteps: 2000000
+# @total_timesteps: 5000000
 #
-# This script trains two separate policies using XuanCe's MAPPO algorithm
-# on MosaicMultiGrid-Soccer-1vs1-IndAgObs-v0 (SoccerGame2HIndAgObsEnv16x11N2).
+# This script trains four separate policies using XuanCe's MAPPO algorithm
+# on MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0 (SoccerGame4HIndAgObsEnv16x11N2).
+#
+# IndAgObs: agents cannot see teammates — no explicit cooperation.
+# Each agent receives only its own egocentric 7x7 grid view, with no
+# teammate direction vector. Cooperation must emerge implicitly through
+# shared team rewards alone.
 #
 # Environment Details:
 #   - Grid: 16x11 (FIFA aspect ratio, 14x9 playable)
-#   - Agents: 2 (agent_0 = Green team, agent_1 = Blue team)
-#   - Observations: IndAgObs (3,3,3) per agent
+#   - Agents: 4 (agent_0, agent_1 = Green team; agent_2, agent_3 = Blue team)
+#   - Observations: IndAgObs (7,7,3) = 147 per agent (no teammate info)
 #   - Actions: 7 discrete (left, right, forward, pickup, drop, toggle, done)
 #   - Win condition: First to 2 goals
 #   - Max steps: 200
 #   - Rewards: Positive-only shared team rewards (zero_sum=False)
-#   - No teleport pass (1v1 = no teammates)
+#   - Teleport pass enabled (2v2 = teammates available)
+#   - view_size=7: Agents see a 7x7 grid (vs default 3x3)
 #
 # Training Mode:
-#   - Always competitive: 2 policies (pi_green vs pi_blue)
+#   - Competitive: 4 separate policies (one per agent)
 #   - Policy 0 (Green): controls agent_0
-#   - Policy 1 (Blue):  controls agent_1
-#   - Both policies update via self-play
+#   - Policy 1 (Green): controls agent_1
+#   - Policy 2 (Blue):  controls agent_2
+#   - Policy 3 (Blue):  controls agent_3
+#   - Green team vs Blue team via self-play
 #
 # Usage:
 #   # Launch via GUI (XuanCe Script Form) or manually:
 #   export MOSAIC_CONFIG_FILE="/path/to/config.json"
-#   export MOSAIC_RUN_ID="soccer_1vs1_001"
+#   export MOSAIC_RUN_ID="soccer_2vs2_indagobs_001"
 #   export MOSAIC_CUSTOM_SCRIPTS_DIR="/path/to/output"
-#   bash mappo_soccer_1vs1.sh
+#   bash mappo_soccer_2vs2_indagobs.sh
 
 set -e  # Exit on error
 
@@ -47,11 +55,11 @@ SCRIPTS_DIR="${MOSAIC_CUSTOM_SCRIPTS_DIR:?MOSAIC_CUSTOM_SCRIPTS_DIR not set}"
 # Training Parameters (configurable via environment variables)
 # ============================================================================
 
-TOTAL_TIMESTEPS="${MAPPO_TOTAL_TIMESTEPS:-2000000}"
-NUM_ENVS="${XUANCE_NUM_ENVS:-4}"
+TOTAL_TIMESTEPS="${MAPPO_TOTAL_TIMESTEPS:-5000000}"
+NUM_ENVS="${XUANCE_NUM_ENVS:-8}"
 SEED="${XUANCE_SEED:-}"
 
-# 1v1 is always competitive (2 policies, one per team)
+# 2v2 competitive: 4 separate policies (one per agent)
 TRAINING_MODE="competitive"
 
 # ============================================================================
@@ -67,6 +75,9 @@ export XUANCE_NUM_ENVS="$NUM_ENVS"
 export XUANCE_PARALLELS="$NUM_ENVS"  # Required by FastLane grid mode
 export XUANCE_SEED="$SEED"
 export TRACK_TENSORBOARD="${TRACK_TENSORBOARD:-1}"
+
+# Critical: 7x7 view size for IndAgObs environment
+export MOSAIC_VIEW_SIZE=7
 
 # ============================================================================
 # Create run-specific directory structure
@@ -84,7 +95,7 @@ mkdir -p "$RUN_DIR/models/mappo"
 # ============================================================================
 
 echo "============================================================"
-echo "  MAPPO Training - 1vs1 Soccer (IndAgObs)"
+echo "  MAPPO Training - 2vs2 Soccer (IndAgObs, view_size=7)"
 echo "============================================================"
 echo ""
 echo "Run Configuration:"
@@ -94,22 +105,28 @@ echo "  Output Directory: $RUN_DIR"
 echo ""
 echo "Environment:"
 echo "  Family:           multigrid"
-echo "  Environment:      MosaicMultiGrid-Soccer-1vs1-IndAgObs-v0"
-echo "  Class:            SoccerGame2HIndAgObsEnv16x11N2"
+echo "  Environment:      MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0"
+echo "  Class:            SoccerGame4HIndAgObsEnv16x11N2"
 echo "  Grid Size:        16x11 (14x9 playable)"
-echo "  Agents:           2"
-echo "  Observations:     IndAgObs (3,3,3)"
+echo "  Agents:           4 (agent_0,1 = Green; agent_2,3 = Blue)"
+echo "  Observations:     IndAgObs (7,7,3) = 147 (no teammate info)"
+echo "  View Size:        7x7 (MOSAIC_VIEW_SIZE=7)"
 echo "  Win Condition:    First to 2 goals"
 echo "  Max Steps:        200"
 echo "  Rewards:          Positive-only (zero_sum=False)"
 echo ""
+echo "  NOTE: IndAgObs — agents cannot see teammates."
+echo "        Cooperation must emerge implicitly via shared rewards."
+echo ""
 echo "Training Mode:"
-echo "  Mode:             competitive (parameter sharing)"
-echo "  Num Policies:     1 (shared by both agents)"
+echo "  Mode:             competitive (4 separate policies, one per agent)"
+echo "  Num Policies:     4"
 echo ""
 echo "  Policy Structure:"
-echo "    Shared Policy:    agent_0 + agent_1 (symmetric game)"
-echo "    Benefit:          No competitive collapse possible"
+echo "    Policy 0 (Green): agent_0"
+echo "    Policy 1 (Green): agent_1"
+echo "    Policy 2 (Blue):  agent_2"
+echo "    Policy 3 (Blue):  agent_3"
 echo ""
 echo "Training Parameters:"
 echo "  Algorithm:        MAPPO (Multi-Agent PPO)"
@@ -124,11 +141,11 @@ echo ""
 echo "============================================================"
 
 # ============================================================================
-# Build MAPPO configuration for 1vs1 Soccer
+# Build MAPPO configuration for 2vs2 Soccer (IndAgObs)
 # ============================================================================
 
 mkdir -p "$RUN_DIR/config"
-MAPPO_CONFIG="$RUN_DIR/config/mappo_soccer_1vs1_config.json"
+MAPPO_CONFIG="$RUN_DIR/config/mappo_soccer_2vs2_indagobs_config.json"
 
 echo "Creating MAPPO configuration..."
 
@@ -146,9 +163,9 @@ jq --argjson steps "$TOTAL_TIMESTEPS" \
 
     # Environment configuration
     .env = "multigrid" |
-    .env_id = "soccer_1vs1" |
+    .env_id = "soccer_2vs2_indagobs" |
 
-    # Training mode (always competitive for 1v1)
+    # Training mode (competitive: 4 separate policies)
     .extras.training_mode = $training_mode |
 
     # Output directories
@@ -184,10 +201,11 @@ echo ""
 
 echo "Starting MAPPO training..."
 echo ""
-echo "Training Mode: competitive with parameter sharing (1v1)"
-echo "  - Green + Blue share ONE policy (symmetric game)"
-echo "  - No competitive collapse — both sides train the same network"
-echo "  - Win rate should stay ~50% (identical policies)"
+echo "Training Mode: competitive (2vs2 — 4 separate policies)"
+echo "  - Green team: agent_0 (policy_0), agent_1 (policy_1)"
+echo "  - Blue team:  agent_2 (policy_2), agent_3 (policy_3)"
+echo "  - IndAgObs: each agent sees 7x7 grid only (NO teammate info)"
+echo "  - Agents must learn to cooperate without explicit communication"
 echo ""
 echo "Monitor progress:"
 echo "  - TensorBoard: tensorboard --logdir $RUN_DIR/tensorboard"
@@ -203,25 +221,27 @@ python -m xuance_worker.cli --config "$MAPPO_CONFIG"
 
 echo ""
 echo "============================================================"
-echo "  MAPPO 1vs1 Soccer Training Complete!"
+echo "  MAPPO 2vs2 Soccer (IndAgObs) Training Complete!"
 echo "============================================================"
 echo ""
 echo "Results:"
-echo "  Environment:     MosaicMultiGrid-Soccer-1vs1-IndAgObs-v0"
-echo "  Training Mode:   competitive (parameter sharing)"
-echo "  Num Policies:    1 (shared by both agents)"
+echo "  Environment:     MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0"
+echo "  Training Mode:   competitive (4 separate policies)"
+echo "  Num Policies:    4"
 echo "  Total Timesteps: $TOTAL_TIMESTEPS"
 echo "  Checkpoints:     $RUN_DIR/checkpoints/"
 echo "  TensorBoard:     $RUN_DIR/tensorboard/"
 echo "  Config:          $MAPPO_CONFIG"
 echo ""
 echo "Policy Mapping:"
-echo "  Shared Policy: agent_0 + agent_1 -> pi_shared"
-echo "  (Symmetric game: one policy plays both sides)"
+echo "  Policy 0 (Green): agent_0 -> pi_green_0"
+echo "  Policy 1 (Green): agent_1 -> pi_green_1"
+echo "  Policy 2 (Blue):  agent_2 -> pi_blue_0"
+echo "  Policy 3 (Blue):  agent_3 -> pi_blue_1"
 echo ""
 echo "Next Steps:"
 echo "  1. Review training curves in TensorBoard"
-echo "  2. Load shared checkpoint for 2v2 evaluation"
-echo "  3. Deploy: agents 0,1,2 use pi_shared; agent 3 = LLM/Random"
+echo "  2. Load trained checkpoints for 2v2 evaluation"
+echo "  3. Deploy with MAPPOActor for RL+LLM heterogeneous evaluation"
 echo ""
 echo "============================================================"
