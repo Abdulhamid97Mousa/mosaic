@@ -9,3 +9,4 @@ sphinx-design
 sphinx-favicon
 sphinx-autobuild
 sphinxcontrib-mermaid
+python-dotenv
