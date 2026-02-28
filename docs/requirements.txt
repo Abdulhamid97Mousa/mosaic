@@ -1,6 +1,6 @@
 # Sphinx documentation dependencies
-sphinx>=7.0.0,<9.0
-docutils<0.22
+sphinx>=7.0.0,<8.0
+docutils>=0.18,<0.21
 furo
 myst-parser
 sphinx-copybutton
