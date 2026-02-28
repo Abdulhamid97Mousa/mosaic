@@ -87,6 +87,7 @@ autodoc_mock_imports = [
     "gym_minigrid",
     "evdev",
     "aenum",
+    "python-dotenv",
 ]
 
 # Pygments style
