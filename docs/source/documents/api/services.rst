@@ -9,6 +9,7 @@ OperatorConfig
 .. autoclass:: gym_gui.services.operator.OperatorConfig
    :members:
    :undoc-members:
+   :no-index:
 
 WorkerAssignment
 ----------------
@@ -16,6 +17,7 @@ WorkerAssignment
 .. autoclass:: gym_gui.services.operator.WorkerAssignment
    :members:
    :undoc-members:
+   :no-index:
 
 OperatorLauncher
 ----------------
@@ -51,3 +53,4 @@ AgentPolicyBinding
 .. autoclass:: gym_gui.services.policy_mapping.AgentPolicyBinding
    :members:
    :undoc-members:
+   :no-index:

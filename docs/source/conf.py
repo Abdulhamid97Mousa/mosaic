@@ -61,6 +61,7 @@ autodoc_mock_imports = [
     "numpy",
     "scipy",
     "gymnasium",
+    "gym",
     "pygame",
     "tqdm",
     "pyglet",
@@ -74,11 +75,18 @@ autodoc_mock_imports = [
     "tensorflow",
     "mindspore",
     "PyQt6",
+    "qtpy",
     "grpcio",
     "ray",
     "cleanrl",
     "xuance",
     "dotenv",
+    "mosaic_multigrid",
+    "multigrid",
+    "minigrid",
+    "gym_minigrid",
+    "evdev",
+    "aenum",
 ]
 
 # Pygments style

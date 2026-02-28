@@ -446,7 +446,7 @@ Key variables you should review:
    default. Never commit it to version control.
 
 Startup crash: "No module named 'torch'" / "No module named 'psutil'"
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 **Error:**
 

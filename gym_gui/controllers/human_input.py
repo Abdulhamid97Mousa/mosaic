@@ -676,9 +676,9 @@ def get_key_combination_resolver(
     if family == EnvironmentFamily.MELTINGPOT:
         return MeltingPotKeyCombinationResolver(num_actions=_get_num_actions())
     if family == EnvironmentFamily.MOSAIC_MULTIGRID:
-        # MOSAIC MultiGrid environments (7 actions - same as INI multigrid)
-        # Both original and Enhanced variants use 7 actions: LEFT, RIGHT, FORWARD, PICKUP, DROP, TOGGLE, DONE
-        return INIMultiGridKeyCombinationResolver()
+        # MOSAIC MultiGrid environments (8 actions - PyPI package mosaic-multigrid v6.0.0)
+        # noop=0, left=1, right=2, forward=3, pickup=4, drop=5, toggle=6, done=7
+        return MultiGridKeyCombinationResolver()
     if family == EnvironmentFamily.INI_MULTIGRID:
         # INI multigrid environments (7 actions, no STILL)
         return INIMultiGridKeyCombinationResolver()

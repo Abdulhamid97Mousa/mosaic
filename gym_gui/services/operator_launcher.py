@@ -9,15 +9,17 @@ operator workers, allowing the GUI to run multiple operators in parallel
 for side-by-side comparison.
 
 Architecture Overview:
-    OperatorLauncher creates subprocess workers based on OperatorConfig:
 
-    LLM Operators -> LLM_worker subprocess -> BALROG agent -> LLM API
-    RL Operators  -> RL_worker subprocess -> Policy inference
+OperatorLauncher creates subprocess workers based on OperatorConfig:
 
-    Each subprocess:
-    - Writes logs to VAR_OPERATORS_LOGS_DIR
-    - Emits telemetry to VAR_OPERATORS_TELEMETRY_DIR (JSONL + stdout)
-    - Can be started/stopped independently
+- LLM Operators -> LLM_worker subprocess -> BALROG agent -> LLM API
+- RL Operators  -> RL_worker subprocess -> Policy inference
+
+Each subprocess:
+
+- Writes logs to VAR_OPERATORS_LOGS_DIR
+- Emits telemetry to VAR_OPERATORS_TELEMETRY_DIR (JSONL + stdout)
+- Can be started/stopped independently
 """
 
 import logging
@@ -537,7 +539,8 @@ class OperatorLauncher:
     This class handles spawning subprocess workers for both LLM
     and RL operator types, managing their lifecycle and log files.
 
-    Example:
+    Example::
+
         launcher = OperatorLauncher()
 
         # Launch an LLM operator

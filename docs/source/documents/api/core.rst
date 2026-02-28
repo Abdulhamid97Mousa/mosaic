@@ -19,6 +19,7 @@ WorkerCapabilities
 .. autoclass:: gym_gui.core.adapters.base.WorkerCapabilities
    :members:
    :undoc-members:
+   :no-index:
 
 UI Widgets
 ----------
