@@ -29,6 +29,27 @@ MOSAIC
 
    <br><br>
 
+Interactive 3D Demo: Agent Mixing
+---------------------------------
+
+.. raw:: html
+
+   <div id="root" style="width:100%; height:500px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15); margin:1em 0;"></div>
+   <script src="https://unpkg.com/@icraft/player@latest/dist/umd/icraft-player.min.js"></script>
+   <script>
+     const player = new ICraftPlayer({
+       src: '_static/MOSAIC_AGENT_MIXING.iplayer',
+       container: document.getElementById('root'),
+     });
+   </script>
+   <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
+     <strong>MOSAIC Agent Mixing:</strong> Interactive 3D visualization of heterogeneous agents (RL, LLM, VLM, Human) collaborating in the same environment.
+   </p>
+
+.. raw:: html
+
+   <br>
+
 **A Unified Platform for Cross-Paradigm Comparison and Evaluation of Homogeneous and Heterogeneous Multi-Agent RL, LLM, VLM, and Human Decision-Makers**
 
 MOSAIC is a visual-first platform that enables researchers to configure, run, and
@@ -210,13 +231,17 @@ Existing frameworks are paradigm-siloed. No prior framework allowed fair,
 reproducible, head-to-head comparison between RL agents and LLM agents in the
 same multi-agent environment.
 
-*Agent Paradigms*: which decision-maker types are supported.
-*Framework*: algorithms can be integrated without source-code modifications.
-*Platform GUI*: real-time visualization during execution.
-*Cross-Paradigm*: infrastructure for comparing different agent types (e.g., RL
+**Agent-mixing**: infrastructure for deploying heterogeneous agents from different paradigms in the same environment.
+
+**Platform GUI**: real-time visualization during execution.
+
+**Cross-Paradigm**: infrastructure for comparing different agent types (e.g., RL
 vs. LLM) on identical environment instances with shared random seeds for
 reproducible head-to-head evaluation.
-Legend: ✓ Supported, ✗ Not supported, ◉ Partial.
+
+.. important::
+
+   **Novel Contribution.** MOSAIC introduces an agent-level interface enabling agent-mixing across fundamentally different decision-making paradigms. This capability does not exist in any prior framework.
 
 .. raw:: html
 
@@ -237,145 +262,184 @@ Legend: ✓ Supported, ✗ Not supported, ◉ Partial.
        <tr style="border-bottom:2px solid #333;">
          <th rowspan="2" style="text-align:left;">System</th>
          <th colspan="4" style="border-bottom:1px solid #aaa;">Agent Paradigms</th>
+         <th style="border-bottom:1px solid #aaa;">Agent-mixing</th>
          <th colspan="2" style="border-bottom:1px solid #aaa;">Infrastructure</th>
          <th style="border-bottom:1px solid #aaa;">Evaluation</th>
        </tr>
        <tr style="border-bottom:2px solid #333;">
          <th>RL</th><th>LLM</th><th>VLM</th><th>Human</th>
+         <th></th>
          <th>Framework</th><th>Platform GUI</th><th>Cross-Paradigm</th>
        </tr>
      </thead>
      <tbody>
-       <tr class="section-row"><td colspan="8"><strong>RL Frameworks</strong></td></tr>
+       <tr class="section-row"><td colspan="9"><strong>RL Frameworks</strong></td></tr>
        <tr>
          <td>RLlib <a href="#ref1">[1]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>CleanRL <a href="#ref2">[2]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>Tianshou <a href="#ref3">[3]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>Acme <a href="#ref4">[4]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>XuanCe <a href="#ref5">[5]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>OpenRL <a href="#ref6">[6]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>Stable-Baselines3 <a href="#ref7">[7]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>Coach <a href="#ref8">[8]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>BenchMARL <a href="#ref15">[15]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
-       
-       <tr class="section-row"><td colspan="8"><strong>LLM/VLM Benchmarks</strong></td></tr>
+       <tr>
+         <td>HeMAC <a href="#ref25">[25]</a></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+       <tr>
+         <td>Overcooked-AI <a href="#ref26">[26]</a></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+       </tr>
+
+       <tr class="section-row"><td colspan="9"><strong>LLM/VLM Benchmarks</strong></td></tr>
        <tr>
          <td>BALROG <a href="#ref9">[9]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>TextArena <a href="#ref10">[10]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>GameBench <a href="#ref11">[11]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>lmgame-Bench <a href="#ref12">[12]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>LLM Chess <a href="#ref13">[13]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>LLM-Game-Bench <a href="#ref14">[14]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-part">&#9673;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>AgentBench <a href="#ref16">[16]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>MultiAgentBench <a href="#ref17">[17]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>GAMEBoT <a href="#ref18">[18]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>Collab-Overcooked <a href="#ref19">[19]</a></td>
          <td><span class="cmp-part">&#9673;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>BotzoneBench <a href="#ref20">[20]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>AgentGym <a href="#ref21">[21]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
-       
-       <tr class="section-row"><td colspan="8"><strong>Cross-Paradigm Frameworks</strong></td></tr>
+
+       <tr class="section-row"><td colspan="9"><strong>Cross-Paradigm Frameworks</strong></td></tr>
        <tr>
          <td>Game Reasoning Arena <a href="#ref22">[22]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-part">&#9673;</span></td><td><span class="cmp-part">&#9673;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>CREW <a href="#ref23">[23]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>LLM-PySC2 <a href="#ref24">[24]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
-       
+
        <tr class="mosaic-row">
          <td>MOSAIC (Ours)</td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td>
        </tr>
      </tbody>
    </table>
@@ -460,6 +524,7 @@ Standard Self-Play vs Cross-Paradigm Transfer
    :width: 90%
 
    **Standard Self-Play and Cross-Paradigm Transfer.**
+
    **(a) Standard Self-Play (Baseline):** Agents :math:`\pi^{RL}_1` and :math:`\pi^{RL}_2` are
    co-trained, learning implicit partner models that overfit to the specific environment.
    This approach fails the Zero-Shot Coordination (ZSC) challenge because it struggles to
@@ -468,6 +533,7 @@ Standard Self-Play vs Cross-Paradigm Transfer
    :math:`\lambda^{LLM}`) due to observation space mismatches
    (:math:`\mathcal{O}^{\text{RL}} \neq \mathcal{O}^{\text{LLM}}`) and violated behavioral
    expectations.
+
    **(b) Cross-Paradigm Transfer (MOSAIC):** Agent :math:`\pi^{RL}` is trained solo
    (:math:`N=1`, zero partner expectations), then deployed in multi-agent teams alongside
    heterogeneous partners such as LLM agents :math:`\lambda^{LLM}`, human players :math:`h`,
@@ -793,6 +859,8 @@ References
      <span id="ref22">[22]</span> Cipolina et al., "Game Reasoning Arena: A Comprehensive Evaluation Framework for Large Language Models," <em>arXiv:2501.00363</em>, 2025.<br>
      <span id="ref23">[23]</span> Y. Wang et al., "CREW: A Benchmark for Collaborative Multi-Step Reasoning and Planning," <em>NeurIPS</em>, 2024.<br>
      <span id="ref24">[24]</span> X. Ma et al., "LLM-PySC2: A Benchmark for Large Language Models in StarCraft II," <em>arXiv:2412.19668</em>, 2024.
+     <span id="ref25">[25]</span> C. Dansereau et al., "The Heterogeneous Multi-Agent Challenge," <em>arXiv:2509.19512</em>, 2025.<br>
+     <span id="ref26">[26]</span> M. Carroll et al., "On the Utility of Learning about Humans for Human-AI Coordination," <em>NeurIPS</em>, 2019.
    </p>
 
 .. raw:: html
