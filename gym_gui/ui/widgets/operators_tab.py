@@ -23,9 +23,9 @@ from gym_gui.logging_config.log_constants import (
     LOG_UI_BOARD_CONFIG_STATE_APPLIED,
     LOG_OP_GRID_CONFIG_DIALOG_OPENED,
     LOG_OP_GRID_CONFIG_STATE_APPLIED,
-    LOG_BASELINE_SCRIPT_PARSED,
-    LOG_BASELINE_AUTO_EXECUTION_STARTED,
-    LOG_BASELINE_AUTO_EXECUTION_COMPLETED,
+    LOG_SCRIPT_PARSED,
+    LOG_SCRIPT_AUTO_EXECUTION_STARTED,
+    LOG_SCRIPT_AUTO_EXECUTION_COMPLETED,
 )
 from gym_gui.services.operator import OperatorConfig
 from gym_gui.ui.widgets.keyboard_assignment_widget import KeyboardAssignmentWidget

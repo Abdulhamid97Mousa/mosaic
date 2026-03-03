@@ -182,9 +182,9 @@ class TestResolverSelection:
 
     def test_multigrid_uses_multigrid_resolver(self):
         """Test MultiGrid games use MultiGridKeyCombinationResolver."""
-        # Create a mock GameId that looks like MultiGrid
+        # Create a mock GameId that looks like MOSAIC MultiGrid
         class MockMultiGridGameId:
-            value = "MultiGrid-Soccer-v0"
+            value = "MosaicMultiGrid-Soccer-v0"
 
         resolver = get_key_combination_resolver(MockMultiGridGameId())
         assert isinstance(resolver, MultiGridKeyCombinationResolver)

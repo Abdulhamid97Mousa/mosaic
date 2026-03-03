@@ -48,7 +48,11 @@ from . import sitecustomize  # noqa: F401 - patches gym.make for FastLane
 
 # Register BabyAI/MiniGrid environments before gym.make()
 try:
-    import minigrid  # noqa: F401 - registers MiniGrid envs
+    import minigrid
+    import gymnasium
+    # Only register if not already registered (avoid duplicate registration warnings)
+    if "MiniGrid-Empty-5x5-v0" not in gymnasium.registry:
+        minigrid.register_minigrid_envs()  # Required in minigrid 2.3.1+
 except ImportError:
     pass
 

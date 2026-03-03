@@ -1,4 +1,4 @@
-"""Command-line interface for BALROG Worker.
+"""Command-line interface for LLM Worker.
 
 Entry point: llm-worker
 
@@ -51,7 +51,7 @@ def create_parser() -> argparse.ArgumentParser:
     """Create argument parser for llm-worker CLI."""
     parser = argparse.ArgumentParser(
         prog="llm-worker",
-        description="BALROG Worker - Run LLM agents on BALROG benchmark environments",
+        description="MOSAIC LLM Worker - Run LLM agents on RL environments",
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
@@ -287,7 +287,7 @@ def main(argv: list[str] | None = None) -> int:
         logger.error(f"Config file not found: {e}")
         return 1
 
-    logger.info(f"BALROG Worker v{__version__}")
+    logger.info(f"LLM Worker v{__version__}")
     logger.info(f"Run ID: {config.run_id}")
     logger.info(f"Environment: {config.env_name} / {config.task}")
     logger.info(f"LLM: {config.client_name} / {config.model_id}")
@@ -309,13 +309,13 @@ def main(argv: list[str] | None = None) -> int:
 
             runtime = LLMWorkerRuntime(config)
             runtime.run()
-            logger.info("BALROG Worker completed successfully")
+            logger.info("LLM Worker completed successfully")
         return 0
     except KeyboardInterrupt:
         logger.warning("Interrupted by user")
         return 130
     except Exception as e:
-        logger.exception(f"BALROG Worker failed: {e}")
+        logger.exception(f"LLM Worker failed: {e}")
         return 1
 
 

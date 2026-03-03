@@ -23,13 +23,18 @@ try:
         ModelDownloader,
         LLM_CHAT_AVAILABLE,
     )
+    import huggingface_hub  # noqa: F401
+    _HAS_HF_HUB = True
     SKIP_REASON = None
 except ImportError as e:
     LLM_CHAT_AVAILABLE = False
+    _HAS_HF_HUB = False
     SKIP_REASON = f"LLM chat dependencies not available: {e}"
 
+_SKIP = not LLM_CHAT_AVAILABLE or not _HAS_HF_HUB
 
-@pytest.mark.skipif(not LLM_CHAT_AVAILABLE, reason=SKIP_REASON or "LLM not available")
+
+@pytest.mark.skipif(_SKIP, reason=SKIP_REASON or "LLM/huggingface_hub not available")
 class TestProxyConfiguration:
     """Test proxy configuration management."""
 
@@ -98,7 +103,7 @@ class TestProxyConfiguration:
         assert "HTTPS: https://127.0.0.1:7890" in status
 
 
-@pytest.mark.skipif(not LLM_CHAT_AVAILABLE, reason=SKIP_REASON or "LLM not available")
+@pytest.mark.skipif(_SKIP, reason=SKIP_REASON or "LLM/huggingface_hub not available")
 class TestHuggingFaceAuthWithProxy:
     """Test HuggingFace authentication with proxy settings."""
 
@@ -179,7 +184,7 @@ class TestHuggingFaceAuthWithProxy:
         assert "short" in message.lower()
 
 
-@pytest.mark.skipif(not LLM_CHAT_AVAILABLE, reason=SKIP_REASON or "LLM not available")
+@pytest.mark.skipif(_SKIP, reason=SKIP_REASON or "LLM/huggingface_hub not available")
 class TestModelDownloadWithProxy:
     """Test model download with proxy settings."""
 
@@ -304,7 +309,7 @@ class TestModelDownloadWithProxy:
         assert "license" in str(exc_info.value).lower()
 
 
-@pytest.mark.skipif(not LLM_CHAT_AVAILABLE, reason=SKIP_REASON or "LLM not available")
+@pytest.mark.skipif(_SKIP, reason=SKIP_REASON or "LLM/huggingface_hub not available")
 class TestProxyIntegration:
     """Integration tests for proxy with authentication and download."""
 

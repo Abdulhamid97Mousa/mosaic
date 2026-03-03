@@ -113,8 +113,8 @@ class TestCrafterAdapterReset:
         adapter = _make_adapter()
         try:
             step = adapter.reset()
-            # Crafter returns 64x64 RGB images
-            assert step.observation.shape == (64, 64, 3)
+            # Crafter returns 512x512 RGB images by default
+            assert step.observation.shape == (512, 512, 3)
         finally:
             adapter.close()
 
@@ -176,7 +176,7 @@ class TestCrafterAdapterStep:
         try:
             _ = adapter.reset(seed=42)
             step = adapter.step(0)
-            assert step.observation.shape == (64, 64, 3)
+            assert step.observation.shape == (512, 512, 3)
         finally:
             adapter.close()
 
@@ -293,7 +293,7 @@ class TestCrafterConfig:
         assert config.env_id == GameId.CRAFTER_REWARD.value
         assert config.area == (64, 64)
         assert config.view == (9, 9)
-        assert config.size == (64, 64)
+        assert config.size == (512, 512)
         assert config.reward is True
         assert config.length == 10000
         assert config.seed is None

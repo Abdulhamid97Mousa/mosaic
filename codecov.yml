@@ -1,0 +1,42 @@
+# Codecov configuration for MOSAIC
+# https://docs.codecov.com/docs/codecov-yaml
+
+coverage:
+  status:
+    project:
+      default:
+        # Auto-adjust target based on base commit coverage
+        target: auto
+        # Allow small coverage drops without failing
+        threshold: 0.5%
+        # Don't block PRs on coverage changes
+        if_ci_failed: success
+    patch:
+      default:
+        # Only check coverage on changed lines
+        target: auto
+        threshold: 1%
+
+# Pull request comments
+comment:
+  layout: "header, diff, files"
+  behavior: default
+  require_changes: false
+
+# Ignore these paths
+ignore:
+  - "gym_gui/tests/**"
+  - "3rd_party/**"
+  - ".venv/**"
+
+# Flag management — distinguish test types
+flags:
+  unittests:
+    paths:
+      - gym_gui/
+    carryforward: true
+
+# CI configuration
+ci:
+  # Require CI to pass before posting
+  require_ci_to_pass: true

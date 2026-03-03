@@ -1,6 +1,6 @@
 # MOSAIC Worker Core Module
 
-Standardized infrastructure for building and integrating RL framework workers into the MOSAIC BDI-RL system.
+Standardized infrastructure for building and integrating RL framework workers into the MOSAIC platform.
 
 ## Overview
 

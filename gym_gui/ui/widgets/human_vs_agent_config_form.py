@@ -853,11 +853,7 @@ class HumanVsAgentConfigForm(QtWidgets.QDialog):
 
         # Only apply preset if advanced settings are not manually enabled
         if not self._advanced_group.isChecked():
-            preset = DIFFICULTY_PRESETS.get(difficulty)
-            if preset:
-                self._skill_spin.setValue(preset.skill_level)
-                self._depth_spin.setValue(preset.depth)
-                self._time_spin.setValue(preset.time_limit_ms)
+            self._apply_difficulty_preset(difficulty)
 
     def _on_advanced_toggled(self, checked: bool) -> None:
         """Handle advanced settings toggle."""

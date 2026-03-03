@@ -242,7 +242,7 @@ Each stage adds value:
 3. **gRPC**: typed, backpressure-aware transport
 4. **Daemon**: persists to SQLite (crash-safe, WAL mode)
 5. **Broadcaster**: per-client subscription queues with replay
-6. **Hub**: bridges async gRPC → Qt event loop
+6. **Hub**: bridges async gRPC to Qt event loop
 7. **UI**: renders frames, updates charts, logs metrics
 
 Storage Layout
@@ -266,6 +266,16 @@ All run artifacts are organized under ``/var/gym_gui/``:
    │   │       │   ├── worker.stdout.log
    │   │       │   └── worker.stderr.log
    │   │       └── analytics.json          # GUI manifest
+   │   ├── custom_scripts/                 # Custom script run artifacts
+   │   │   └── {run_id}/
+   │   │       ├── tensorboard/            # TensorBoard logs
+   │   │       ├── checkpoints/            # Model checkpoints
+   │   │       ├── config/                 # Script-specific configs
+   │   │       │   ├── base_config.json
+   │   │       │   └── curriculum_config.json
+   │   │       └── logs/
+   │   │           ├── worker.stdout.log
+   │   │           └── worker.stderr.log
    │   ├── evals/                          # Evaluation run artifacts (separate from training)
    │   │   └── {run_id}/
    │   │       ├── tensorboard/            # Evaluation TensorBoard logs
@@ -284,8 +294,10 @@ All run artifacts are organized under ``/var/gym_gui/``:
        ├── gym_gui.log                     # Application log
        └── trainer_daemon.log              # Daemon log
 
-Training runs and evaluation runs are stored in separate directories.
-CleanRL policy evaluations (``extras.mode == "policy_eval"``) and XuanCe
-test-mode runs (``test_mode == True``) are routed to ``evals/``. All other
-runs go to ``runs/``. The run manager searches both directories for cleanup
-and disk usage reporting.
+Training runs, custom script runs, and evaluation runs are stored in
+separate directories. Runs launched from the CleanRL Train Form go to
+``runs/``. Runs launched via the custom script approach (e.g. curriculum
+training) go to ``custom_scripts/``. CleanRL policy evaluations
+(``extras.mode == "policy_eval"``) and XuanCe test-mode runs
+(``test_mode == True``) are routed to ``evals/``. The run manager searches
+all three directories for cleanup and disk usage reporting.

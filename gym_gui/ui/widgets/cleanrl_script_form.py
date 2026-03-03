@@ -495,13 +495,18 @@ class CleanRlScriptForm(QtWidgets.QDialog):
             "MOSAIC_CHECKPOINT_DIR": str(run_dir / "checkpoints"),
         }
 
+        grid_limit = self._grid_limit_spin.value()
+        video_mode = self._video_mode_combo.currentText()
         apply_fastlane_environment(
             environment,
             fastlane_only=self._fastlane_only_cb.isChecked(),
             fastlane_slot=self._fastlane_slot_spin.value(),
-            video_mode=self._video_mode_combo.currentText(),
-            grid_limit=self._grid_limit_spin.value(),
+            video_mode=video_mode,
+            grid_limit=grid_limit,
         )
+        # Ensure enough parallel envs for the grid
+        if video_mode == "grid" and grid_limit > 1:
+            environment["CLEANRL_NUM_ENVS"] = str(grid_limit)
 
         if track_wandb:
             wandb_api_key = os.environ.get("WANDB_API_KEY", "")

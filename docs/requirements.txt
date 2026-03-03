@@ -1,10 +1,12 @@
 # Sphinx documentation dependencies
-sphinx>=7.0.0
+sphinx>=7.0.0,<8.0
+docutils>=0.18,<0.21
 furo
 myst-parser
 sphinx-copybutton
-sphinx-tabs
+sphinx-tabs>=3.4.5
 sphinx-design
 sphinx-favicon
 sphinx-autobuild
 sphinxcontrib-mermaid
+python-dotenv

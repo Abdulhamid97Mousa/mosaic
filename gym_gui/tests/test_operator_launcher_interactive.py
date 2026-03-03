@@ -62,6 +62,7 @@ class TestOperatorProcessHandleInteractive(unittest.TestCase):
             mock_process.stdin = None
 
         mock_config = MagicMock(spec=OperatorConfig)
+        mock_config.max_steps = None
 
         return OperatorProcessHandle(
             operator_id="test_op",

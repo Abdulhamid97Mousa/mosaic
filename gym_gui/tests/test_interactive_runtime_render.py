@@ -14,8 +14,9 @@ import pytest
 
 
 # Policy and environment configuration
-POLICY_PATH = Path(
-    "/home/hamid/Desktop/Projects/GUI_BDI_RL/var/trainer/runs/"
+PROJECT_ROOT = Path(__file__).resolve().parents[2]
+POLICY_PATH = (
+    PROJECT_ROOT / "var/trainer/runs/"
     "01KE2NMTG89BRFQBSVH7MNZY5H/runs/"
     "MiniGrid-Empty-8x8-v0__ppo_with_save__1__1767468860/"
     "ppo_with_save.cleanrl_model"

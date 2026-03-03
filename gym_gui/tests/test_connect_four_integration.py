@@ -262,7 +262,7 @@ class TestConnectFourHandlerIntegration:
 
     def test_handler_is_connect_four_payload(self) -> None:
         """ConnectFourHandler.is_connect_four_payload identifies payloads correctly."""
-        from gym_gui.ui.handlers.connect_four_handlers import ConnectFourHandler
+        from gym_gui.ui.handlers.game_moves.connect_four import ConnectFourHandler
 
         connect_four_payload = {"game_type": "connect_four", "board": [[0] * 7 for _ in range(6)]}
         assert ConnectFourHandler.is_connect_four_payload(connect_four_payload) is True

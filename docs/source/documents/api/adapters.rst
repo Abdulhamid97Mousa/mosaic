@@ -13,6 +13,7 @@ EnvironmentAdapter
 .. autoclass:: gym_gui.core.adapters.base.EnvironmentAdapter
    :members:
    :undoc-members:
+   :no-index:
 
 PettingZooAdapter
 -----------------
@@ -20,6 +21,7 @@ PettingZooAdapter
 .. autoclass:: gym_gui.core.adapters.pettingzoo.PettingZooAdapter
    :members:
    :undoc-members:
+   :no-index:
 
 ParadigmAdapter
 ---------------

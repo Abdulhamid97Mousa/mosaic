@@ -20,7 +20,7 @@ _LOGGER = logging.getLogger(__name__)
 def parse_args(argv: Optional[list[str]] = None) -> argparse.Namespace:
     """Parse command line arguments."""
     parser = argparse.ArgumentParser(
-        description="MuJoCo MPC Worker for MOSAIC BDI-RL",
+        description="MuJoCo MPC Worker for MOSAIC",
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 

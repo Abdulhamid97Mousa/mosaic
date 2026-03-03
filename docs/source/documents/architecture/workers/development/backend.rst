@@ -43,7 +43,7 @@ Step 1: Create the Package
 Step 2: Configuration (``config.py``)
 --------------------------------------
 
-Implement the ``WorkerConfig`` protocol — a dataclass with ``run_id``,
+Implement the ``WorkerConfig`` protocol, A dataclass with ``run_id``,
 ``seed``, ``to_dict()``, and ``from_dict()``:
 
 .. code-block:: python
@@ -86,7 +86,7 @@ Implement the ``WorkerConfig`` protocol — a dataclass with ``run_id``,
 Step 3: Runtime (``runtime.py``)
 ---------------------------------
 
-Manage the worker lifecycle — emit ``run_started``, run the training
+Manage the worker lifecycle, Emit ``run_started``, run the training
 loop, and emit ``run_completed`` or ``run_failed``:
 
 .. code-block:: python
@@ -151,7 +151,7 @@ loop, and emit ``run_completed`` or ``run_failed``:
 .. important::
 
    Always use ``flush=True`` when printing telemetry.  The Telemetry
-   Proxy reads ``stdout`` line-by-line — buffered output causes
+   Proxy reads ``stdout`` line-by-line, buffered output causes
    delayed or missing telemetry.
 
 Step 4: Worker Metadata (``__init__.py``)

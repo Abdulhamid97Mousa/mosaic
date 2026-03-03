@@ -15,11 +15,9 @@ class RandomWorkerConfig:
         env_name: Environment family (mosaic_multigrid, babyai, etc.).
         task: Specific task / gymnasium ID.
         seed: Random seed for reproducibility.
-        behavior: Action selection strategy (random, noop, cycling).
     """
 
     run_id: str = ""
     env_name: str = ""
     task: str = ""
     seed: Optional[int] = None
-    behavior: str = "random"

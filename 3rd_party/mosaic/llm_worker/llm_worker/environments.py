@@ -1,8 +1,8 @@
-"""Environment wrappers for BALROG Worker.
+"""Environment wrappers for LLM Worker.
 
 This module provides wrappers that fix compatibility issues between
-BALROG and standard Gymnasium environments. Instead of modifying the
-upstream BALROG code, we wrap environments here.
+Gymnasium and PettingZoo environments. Instead of modifying the
+upstream code, we wrap environments here.
 """
 
 from __future__ import annotations
@@ -118,7 +118,7 @@ def generate_babyai_descriptions(obs: Dict[str, Any]) -> list[str]:
 class BabyAIDescriptionWrapper(gym.Wrapper):
     """Wrapper that adds 'descriptions' to info dict for BabyAI environments.
 
-    BALROG's BabyAITextCleanLangWrapper expects info['descriptions'] but
+    BabyAITextCleanLangWrapper expects info['descriptions'] but
     standard BabyAI/MiniGrid environments don't provide it. This wrapper
     generates descriptions from the observation grid.
     """
@@ -263,9 +263,9 @@ def make_env(
     config: Any,
     render_mode: Optional[str] = None,
 ) -> Any:
-    """Create a BALROG-compatible environment with our fixes.
+    """Create an environment with our fixes.
 
-    This function wraps BALROG's make_env but applies our fixes first
+    This function wraps make_env but applies our fixes first
     for environments that need them.
 
     Args:
@@ -275,7 +275,7 @@ def make_env(
         render_mode: Rendering mode
 
     Returns:
-        Wrapped environment ready for BALROG agents
+        Wrapped environment ready for agents
     """
     import sys
     from pathlib import Path

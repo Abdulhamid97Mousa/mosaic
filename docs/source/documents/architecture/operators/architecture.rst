@@ -51,29 +51,32 @@ creating a synchronized step loop.
 .. mermaid::
 
    %%{init: {"flowchart": {"curve": "linear"}} }%%
-   graph LR
-       subgraph GUI["MOSAIC GUI (Main Process)"]
+   graph TB
+       subgraph GUI["MOSAIC GUI  (Main Process)"]
+           direction LR
            LAUNCHER["OperatorLauncher"]
            HANDLE["OperatorProcessHandle"]
        end
 
-       subgraph OP["Operator (Agent-Level Interface)"]
-           subgraph WORKER["Worker Subprocess"]
-               RUNTIME["InteractiveRuntime"]
-               ENV["Environment"]
-               POLICY["Policy / LLM"]
-           end
+       LAUNCHER -- "subprocess.Popen()" --> RUNTIME
+       HANDLE -- "stdin: JSON command<br/>{'cmd':'step'}" --> RUNTIME
+       RUNTIME -- "stdout: JSON response<br/>{'type':'step', ...}" --> HANDLE
+
+       subgraph WORKER["Worker Subprocess  (Operator / Agent-Level Interface)"]
+           RUNTIME["InteractiveRuntime<br/>(stdin/stdout loop)"]
+           ENV["Environment<br/>(Gymnasium)"]
+           POLICY["Policy / LLM / Human"]
+           RUNTIME -- "obs = env.step(action)" --> ENV
+           RUNTIME -- "action = select_action(obs)" --> POLICY
        end
 
-       LAUNCHER -->|"spawn"| WORKER
-       HANDLE -->|"stdin: JSON commands"| RUNTIME
-       RUNTIME -->|"stdout: JSON responses"| HANDLE
-       RUNTIME --> ENV
-       RUNTIME --> POLICY
-
        style GUI fill:#4a90d9,stroke:#2e5a87,color:#fff
-       style OP fill:#9370db,stroke:#6a0dad,color:#fff
-       style WORKER fill:#ff7f50,stroke:#cc5500,color:#fff
+       style WORKER fill:#50c878,stroke:#2e8b57,color:#fff
+       style LAUNCHER fill:#2a6db5,stroke:#1a4d80,color:#fff
+       style HANDLE fill:#2a6db5,stroke:#1a4d80,color:#fff
+       style RUNTIME fill:#ff7f50,stroke:#cc5500,color:#fff
+       style ENV fill:#ddd,stroke:#999,color:#333
+       style POLICY fill:#ddd,stroke:#999,color:#333
 
 Interactive JSON Protocol
 -------------------------
@@ -196,15 +199,23 @@ The ``OperatorLauncher`` spawns operator subprocesses and returns
        LAUNCHER["OperatorLauncher"]
 
        subgraph OP_LLM["LLM Operator"]
-           LLM["balrog_worker / chess_worker / operators_worker"]
+           LLM["llm_worker / balrog_worker"]
+       end
+
+       subgraph OP_VLM["VLM Operator"]
+           VLM_W["vlm_worker"]
        end
 
        subgraph OP_RL["RL Operator"]
            RL["cleanrl_worker --interactive"]
        end
 
-       subgraph OP_BASE["Baseline Operator"]
-           BASE["operators_worker --random"]
+       subgraph OP_RANDOM["Random Operator"]
+           RANDOM["random_worker"]
+       end
+
+       subgraph OP_PASSIVE["Passive Operator"]
+           PASSIVE["passive_worker"]
        end
 
        subgraph OP_HUMAN["Human Operator"]
@@ -212,18 +223,24 @@ The ``OperatorLauncher`` spawns operator subprocesses and returns
        end
 
        LAUNCHER -->|"_build_llm_command()"| OP_LLM
+       LAUNCHER -->|"_build_vlm_command()"| OP_VLM
        LAUNCHER -->|"_build_rl_command()"| OP_RL
-       LAUNCHER -->|"_build_baseline_command()"| OP_BASE
+       LAUNCHER -->|"_build_random_command()"| OP_RANDOM
+       LAUNCHER -->|"_build_passive_command()"| OP_PASSIVE
        LAUNCHER -->|"_build_human_command()"| OP_HUMAN
 
        style LAUNCHER fill:#50c878,stroke:#2e8b57,color:#fff
        style OP_LLM fill:#9370db,stroke:#6a0dad,color:#fff
+       style OP_VLM fill:#9370db,stroke:#6a0dad,color:#fff
        style OP_RL fill:#9370db,stroke:#6a0dad,color:#fff
-       style OP_BASE fill:#9370db,stroke:#6a0dad,color:#fff
+       style OP_RANDOM fill:#9370db,stroke:#6a0dad,color:#fff
+       style OP_PASSIVE fill:#9370db,stroke:#6a0dad,color:#fff
        style OP_HUMAN fill:#9370db,stroke:#6a0dad,color:#fff
        style LLM fill:#ff7f50,stroke:#cc5500,color:#fff
+       style VLM_W fill:#ff7f50,stroke:#cc5500,color:#fff
        style RL fill:#ff7f50,stroke:#cc5500,color:#fff
-       style BASE fill:#ff7f50,stroke:#cc5500,color:#fff
+       style RANDOM fill:#ff7f50,stroke:#cc5500,color:#fff
+       style PASSIVE fill:#ff7f50,stroke:#cc5500,color:#fff
        style HUMAN fill:#ff7f50,stroke:#cc5500,color:#fff
 
 **Command dispatch** -- the launcher selects the correct worker
@@ -244,8 +261,10 @@ subprocess based on operator type:
                cmd = self._build_llm_command(config, run_id, interactive)
            elif config.operator_type == "rl":
                cmd = self._build_rl_command(config, run_id, interactive)
-           elif config.operator_type == "baseline":
-               cmd = self._build_baseline_command(config, run_id, interactive)
+           elif config.operator_type == "random":
+               cmd = self._build_random_command(config, run_id, interactive)
+           elif config.operator_type == "passive":
+               cmd = self._build_passive_command(config, run_id, interactive)
            else:
                cmd = self._build_human_command(config, run_id)
 
@@ -271,11 +290,14 @@ correct LLM worker based on the environment:
      - ``chess_worker``
      - llm_chess multi-turn prompting
    * - BabyAI / MiniGrid
-     - ``barlog_worker``
+     - ``balrog_worker``
      - BALROG-style prompting
-   * - Other environments
-     - ``operators_worker``
-     - General-purpose LLM operator
+   * - MOSAIC LLM environments
+     - ``llm_worker``
+     - MOSAIC native LLM operator
+   * - MOSAIC VLM environments
+     - ``vlm_worker``
+     - MOSAIC native VLM operator (vision)
 
 Multi-Agent Operator Launching
 ------------------------------
@@ -308,6 +330,16 @@ spawns one subprocess **per player**:
        style MULTI fill:#4a90d9,stroke:#2e5a87,color:#fff
        style W0 fill:#ff7f50,stroke:#cc5500,color:#fff
        style W1 fill:#ff7f50,stroke:#cc5500,color:#fff
+
+.. raw:: html
+
+   <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15); margin-top:16px;" controls autoplay muted loop playsinline>
+     <source src="../../../_static/videos/pettingzoo_chess_v6.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+   <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
+     <strong>Multi-Agent Operator in Action:</strong> Two LLM workers (GPT-4o vs Claude) each running in a separate subprocess, coordinated by a single <code>MultiAgentOperatorHandle</code> over PettingZoo Chess (chess_v6).
+   </p>
 
 .. code-block:: python
 

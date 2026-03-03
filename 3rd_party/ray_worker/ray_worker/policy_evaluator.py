@@ -68,6 +68,7 @@ class EvaluationConfig:
     fastlane_enabled: bool = True
     deterministic: bool = True
     seed: Optional[int] = 42
+    frame_skip: int = 1
     agent_policies: Dict[str, str] = field(default_factory=dict)
     save_results: bool = True
     training_run_id: Optional[str] = None

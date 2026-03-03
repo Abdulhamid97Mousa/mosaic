@@ -9,17 +9,14 @@ MOSAIC Random Worker
    </video>
    <br><br>
 
-The MOSAIC Random Worker is MOSAIC's **lightweight baseline agent** for
-multi-agent and single-agent environments. It selects actions without any
-learned policy, providing a performance floor for comparison against RL,
-LLM, and human decision-makers.
+The MOSAIC Random Worker is MOSAIC's **lightweight random baseline agent** for
+multi-agent and single-agent environments. It selects actions via uniform
+random sampling without any learned policy, providing a stochastic
+performance floor for comparison against RL, LLM, and human
+decision-makers.
 
-The worker supports three action-selection behaviors; **random**
-(uniform sampling), **noop** (always action 0), and **cycling**
-(round-robin through the action space), making it useful for sanity
-checks, environment debugging, and establishing baselines in
-:doc:`hybrid </documents/architecture/operators/hybrid_decision_maker/index>`
-experiments (e.g., RL + LLM teammates vs Random opponents).
+For a deterministic do-nothing baseline, see the
+:doc:`Passive Worker </documents/architecture/workers/integrated_workers/MOSAIC_Passive_Worker/index>`.
 
 .. list-table::
    :widths: 25 75
@@ -27,9 +24,9 @@ experiments (e.g., RL + LLM teammates vs Random opponents).
    * - **Paradigm**
      - Baseline agent (single-agent and multi-agent)
    * - **Task Type**
-     - Random baseline, noop baseline, cycling baseline
-   * - **Behaviors**
-     - ``random`` (uniform), ``noop`` (action 0), ``cycling`` (round-robin)
+     - Random baseline
+   * - **Behavior**
+     - ``random`` (uniform sampling from action space)
    * - **Environments**
      - All Gymnasium-compatible: MiniGrid, BabyAI, MosaicMultiGrid, Atari,
        FrozenLake, Taxi, Blackjack, MeltingPot, PettingZoo, and more
@@ -56,12 +53,12 @@ This enables several research workflows:
   LLM agent performs compared to random play.
 - **Environment debugging:** Verify that environments, rendering, and
   telemetry pipelines work end-to-end before deploying expensive workers.
-- **Hybrid experiments:** Fill opponent or teammate slots with random agents
+- **Heterogeneous experiments:** Fill opponent or teammate slots with random agents
   in mixed-paradigm evaluations (e.g., RL team vs Random team).
 
 Key features:
 
-- **3 action behaviors:** random (uniform sampling), noop (always still), cycling (round-robin)
+- **Random action sampling:** Selects uniformly from ``Discrete(N)``
 - **Automatic action space resolution:** creates a temporary env to detect ``Discrete(N)``
 - **Multi-agent support:** handles Dict action spaces (MosaicMultiGrid Soccer, Basketball, etc.)
 - **Dual runtime modes:** autonomous (batch episodes) or interactive (GUI step-by-step)
@@ -105,29 +102,6 @@ two runtime modes:
        style CFG fill:#ff7f50,stroke:#cc5500,color:#fff
        style RT fill:#ff7f50,stroke:#cc5500,color:#fff
        style ENV fill:#e8e8e8,stroke:#999
-
-Action Behaviors
-----------------
-
-.. list-table::
-   :header-rows: 1
-   :widths: 15 30 55
-
-   * - Behavior
-     - Strategy
-     - Description
-   * - **random**
-     - Uniform sampling
-     - Samples uniformly from ``Discrete(N)``. Default behavior.
-       Provides a true random baseline for comparison.
-   * - **noop**
-     - Always action 0
-     - Always selects action 0 (``still`` / do nothing).
-       Tests environment behavior with a passive agent.
-   * - **cycling**
-     - Round-robin
-     - Cycles through actions ``0, 1, 2, ..., N-1, 0, 1, ...``
-       Deterministically exercises every action in order.
 
 Supported Environments
 ----------------------
@@ -184,7 +158,7 @@ Runtime Modes
 
    random-worker --run-id test123 \
        --task MiniGrid-Empty-8x8-v0 \
-       --behavior random --seed 42
+       --seed 42
 
 **Interactive mode** (GUI step-by-step, action-selector protocol):
 
@@ -198,7 +172,7 @@ Interactive mode reads JSON commands from stdin and emits telemetry to stdout:
 .. code-block:: json
 
    {"cmd": "init_agent", "game_name": "chess_v6", "player_id": "player_0"}
-   {"cmd": "select_action", "observation": [...], "player_id": "player_0"}
+   {"cmd": "select_action", "observation": ["..."], "player_id": "player_0"}
    {"cmd": "stop"}
 
 Autonomous mode uses the env-owning protocol:
@@ -233,9 +207,6 @@ Configuration
    * - ``--seed``
      - ``None``
      - Random seed for reproducible action sequences
-   * - ``--behavior``
-     - ``random``
-     - Action selection strategy: ``random``, ``noop``, or ``cycling``
    * - ``--interactive``
      - ``false``
      - Run in interactive (action-selector) mode
@@ -250,7 +221,6 @@ Configuration
        env_name: str = ""
        task: str = ""
        seed: Optional[int] = None
-       behavior: str = "random"  # random | noop | cycling
 
 Test Coverage
 -------------

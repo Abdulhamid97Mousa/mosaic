@@ -91,6 +91,75 @@ Setup
 
    See :doc:`index` for the full list of extras.
 
+Configure Environment Variables
+-------------------------------
+
+MOSAIC uses a ``.env`` file for configuration. Copy the example file and
+customize it for your setup:
+
+.. code-block:: bash
+
+   # Copy the example file
+   cp .env.example .env
+
+   # Edit with your preferred editor
+   nano .env
+   # or: code .env, vim .env, etc.
+
+Required API Keys
+^^^^^^^^^^^^^^^^^
+
+You **must** set your API keys in ``.env`` to use these features:
+
+.. list-table::
+   :widths: 25 45 30
+   :header-rows: 1
+
+   * - Feature
+     - Variable
+     - Get Key From
+   * - **LLM Chat (cloud)**
+     - ``OPENROUTER_API_KEY``
+     - https://openrouter.ai/keys
+   * - **Gated Models (Llama)**
+     - ``HF_TOKEN``
+     - https://huggingface.co/settings/tokens
+   * - **Experiment Tracking**
+     - ``WANDB_API_KEY``
+     - https://wandb.ai/authorize
+
+Edit the ``.env`` file and replace the placeholder values:
+
+.. code-block:: bash
+
+   # Example: Set your OpenRouter API key
+   OPENROUTER_API_KEY=sk-or-v1-your_actual_key_here
+
+   # Example: Set your HuggingFace token
+   HF_TOKEN=hf_your_actual_token_here
+
+   # Example: Set your Weights & Biases API key
+   WANDB_API_KEY=your_actual_wandb_key_here
+   WANDB_ENTITY_NAME=your_wandb_username
+   WANDB_PROJECT_NAME=MOSAIC
+
+Ubuntu-Specific Settings
+^^^^^^^^^^^^^^^^^^^^^^^^
+
+On native Ubuntu, the default settings usually work without modification.
+Key settings to verify:
+
+.. code-block:: bash
+
+   # Platform identifier
+   PLATFORM=ubuntu
+
+   # MuJoCo rendering backend (egl works best on Ubuntu with NVIDIA)
+   MUJOCO_GL=egl
+
+   # Qt platform (xcb for X11, wayland for Wayland)
+   # QT_QPA_PLATFORM=xcb
+
 Install Local 3rd-Party Packages
 ---------------------------------
 

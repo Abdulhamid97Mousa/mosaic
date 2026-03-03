@@ -1,6 +1,6 @@
 # Qt Configuration Directory
 
-This directory stores Qt configuration files for the GUI_BDI_RL application.
+This directory stores Qt configuration files for the MOSAIC application.
 
 ## Purpose
 

@@ -24,7 +24,7 @@ import pytest
 def _find_checkpoint() -> str | None:
     """Find the most recent .pth checkpoint under var/trainer/."""
     from pathlib import Path
-    var_dir = Path("/home/hamid/Desktop/Projects/GUI_BDI_RL/var/trainer")
+    var_dir = Path("/home/hamid/Desktop/software/mosaic/var/trainer")
     if not var_dir.exists():
         return None
     pth_files = sorted(var_dir.rglob("*.pth"), key=lambda p: p.stat().st_mtime, reverse=True)

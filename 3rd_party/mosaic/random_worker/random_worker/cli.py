@@ -30,12 +30,10 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
     parser.add_argument("--env-name", default="", help="Environment family")
     parser.add_argument("--task", default="", help="Gymnasium environment ID")
     parser.add_argument("--seed", type=int, default=None, help="Random seed")
-    parser.add_argument("--behavior", default="random",
-                        choices=("random", "noop", "cycling"),
-                        help="Action selection strategy (default: random)")
     parser.add_argument("--interactive", action="store_true",
                         help="Run in interactive mode (action-selector protocol)")
-    parser.add_argument("--telemetry-dir", default=None, help="Telemetry output directory (unused)")
+    parser.add_argument("--telemetry-dir", default=None,
+                        help="Telemetry output directory (unused)")
 
     return parser.parse_args(argv)
 
@@ -56,7 +54,6 @@ def main(argv: list[str] | None = None) -> int:
         env_name=args.env_name,
         task=args.task,
         seed=args.seed,
-        behavior=args.behavior,
     )
 
     try:

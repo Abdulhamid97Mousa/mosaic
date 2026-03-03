@@ -1,7 +1,7 @@
 """Agent configuration abstraction layer with schema validation.
 
-Provides base class and implementations for different agent types (BDI, Headless, etc.)
-with telemetry schema definitions and validation logic.
+Provides base class and implementations for different agent types with telemetry
+schema definitions and validation logic.
 """
 
 from __future__ import annotations
@@ -15,14 +15,14 @@ _LOGGER = logging.getLogger(__name__)
 
 class AgentConfig(ABC):
     """Base abstraction for agent types with schema validation.
-    
+
     Defines interface for agent-specific telemetry schema validation.
-    Supports multiple agent implementations (BDI, Q-Learning, DQN, etc.)
+    Supports multiple agent implementations (RL, LLM, etc.)
     """
 
     @abstractmethod
     def get_agent_type(self) -> str:
-        """Return agent type identifier (e.g., 'BDI', 'Headless')."""
+        """Return agent type identifier (e.g., 'RL', 'LLM')."""
         pass
 
     @abstractmethod
@@ -122,8 +122,8 @@ class AgentConfig(ABC):
 
 class HeadlessAgentConfig(AgentConfig):
     """Configuration for headless (Q-Learning, DQN, etc.) agents.
-    
-    Headless agents don't use BDI framework, just standard RL algorithms.
+
+    Headless agents use standard RL algorithms.
     Telemetry includes algorithm-specific metrics like Q-values, epsilon, etc.
     """
 
@@ -192,22 +192,19 @@ class HeadlessAgentConfig(AgentConfig):
 
 def get_agent_config(agent_type: str) -> AgentConfig:
     """Factory to get agent config instance by type.
-    
+
     Args:
-        agent_type: Type identifier ("BDI", "Headless", "Q-Learning", etc.)
-        
+        agent_type: Type identifier ("Headless", "Q-Learning", etc.)
+
     Returns:
         AgentConfig instance for the given type
-        
+
     Raises:
         ValueError if agent_type is not recognized (logs warning, returns default)
     """
     agent_type_lower = agent_type.lower()
 
-    if agent_type_lower == "bdi":
-        _LOGGER.info("Loading BDI agent configuration")
-        return BDIAgentConfig()
-    elif agent_type_lower in ["headless", "q-learning", "dqn", "ppo", "a2c"]:
+    if agent_type_lower in ["headless", "q-learning", "dqn", "ppo", "a2c"]:
         _LOGGER.info(f"Loading Headless agent configuration for: {agent_type}")
         return HeadlessAgentConfig()
     else:
@@ -220,7 +217,6 @@ def get_agent_config(agent_type: str) -> AgentConfig:
 
 __all__ = [
     "AgentConfig",
-    "BDIAgentConfig",
     "HeadlessAgentConfig",
     "get_agent_config",
 ]

@@ -151,17 +151,24 @@ def _shim_get_runner_directories() -> None:
 
         # Fix result_dir which is always hardcoded as "results/{algo}/{env_id}"
         # with no getattr fallback -- parser_args cannot override it.
-        def _abs_result_dir(args_obj):
-            rd = getattr(args_obj, "result_dir", None)
+        # Also fix log_dir/model_dir for MARL: get_runner() creates per-agent
+        # args objects from YAML configs that don't inherit our parser_args
+        # overrides, so XuanCe falls back to relative "logs/{algo}" in CWD.
+        def _abs_dir(args_obj, attr: str):
+            rd = getattr(args_obj, attr, None)
             if rd and not os.path.isabs(rd):
-                args_obj.result_dir = os.path.join(_fallback_dir, rd)
+                args_obj.__dict__[attr] = os.path.join(_fallback_dir, rd)
 
         if hasattr(runner, "args"):
             if isinstance(runner.args, list):
                 for a in runner.args:
-                    _abs_result_dir(a)
+                    _abs_dir(a, "result_dir")
+                    _abs_dir(a, "log_dir")
+                    _abs_dir(a, "model_dir")
             else:
-                _abs_result_dir(runner.args)
+                _abs_dir(runner.args, "result_dir")
+                _abs_dir(runner.args, "log_dir")
+                _abs_dir(runner.args, "model_dir")
 
         return runner
 

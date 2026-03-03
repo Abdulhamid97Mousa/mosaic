@@ -14,7 +14,6 @@ from .paradigm import (
     SingleAgentParadigmAdapter,
     SequentialParadigmAdapter,
     SimultaneousParadigmAdapter,
-    HierarchicalParadigmAdapter,
     create_paradigm_adapter,
 )
 from .toy_text import (
@@ -603,7 +602,6 @@ __all__ = [
     "SingleAgentParadigmAdapter",
     "SequentialParadigmAdapter",
     "SimultaneousParadigmAdapter",
-    "HierarchicalParadigmAdapter",
     "create_paradigm_adapter",
     # Toy text adapters
     "FrozenLakeAdapter",

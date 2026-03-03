@@ -221,6 +221,13 @@ def _detect_optional_dependencies() -> dict[str, bool]:
         "ray_worker": "ray",
         "cleanrl_worker": "cleanrl",
         "xuance_worker": "xuance",
+
+        # MOSAIC native workers
+        "llm_worker": "llm_worker",
+        "vlm_worker": "vlm_worker",
+        "human_worker": "human_worker",
+        "passive_worker": "passive_worker",
+        "random_worker": "random_worker",
     }
 
     for dep_name, package_name in checks.items():

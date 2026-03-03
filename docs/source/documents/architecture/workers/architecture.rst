@@ -19,11 +19,11 @@ Process Hierarchy
 .. code-block:: text
 
    MOSAIC GUI (PID 12345)
-   └── Trainer Daemon (PID 12346)          ← spawned at startup
-       ├── Telemetry Proxy (PID 12348)     ← spawned per job
+   └── Trainer Daemon (PID 12346)         <-- spawned at startup
+       ├── Telemetry Proxy (PID 12348)     <-- spawned per job
        │   └── Worker Process (PID 12349)
        │       └── CleanRL PPO (in-process)
-       └── Telemetry Proxy (PID 12350)     ← another job
+       └── Telemetry Proxy (PID 12350)     <-- another job
            └── Worker Process (PID 12351)
 
 Each worker is launched with ``os.setsid()`` to create a new process

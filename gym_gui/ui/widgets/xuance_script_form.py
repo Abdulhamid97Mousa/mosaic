@@ -545,14 +545,20 @@ class XuanCeScriptForm(QtWidgets.QDialog):
 
         # FastLane
         if fastlane_enabled:
+            grid_limit = self._grid_limit_spin.value()
+            video_mode = self._video_mode_combo.currentText()
             apply_fastlane_environment(
                 environment,
                 fastlane_only=self._fastlane_only_cb.isChecked(),
                 fastlane_slot=self._fastlane_slot_spin.value(),
-                video_mode=self._video_mode_combo.currentText(),
-                grid_limit=self._grid_limit_spin.value(),
+                video_mode=video_mode,
+                grid_limit=grid_limit,
             )
             environment["MOSAIC_FASTLANE_ENABLED"] = "1"
+            # Ensure enough parallel envs for the grid
+            if video_mode == "grid" and grid_limit > 1:
+                environment["XUANCE_NUM_ENVS"] = str(grid_limit)
+                environment["XUANCE_PARALLELS"] = str(grid_limit)
         else:
             # Explicitly disable so shell scripts don't default to enabled
             environment["GYM_GUI_FASTLANE_ONLY"] = "0"

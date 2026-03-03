@@ -25,7 +25,7 @@ Every renderer implements the ``RendererStrategy`` protocol defined in
 - ``reset()``: clear state between episodes.
 
 RendererContext
-^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^
 
 A ``RendererContext`` dataclass carries metadata needed by strategies:
 

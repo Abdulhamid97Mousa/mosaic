@@ -451,7 +451,16 @@ def create_adapter(
         else:
             adapter = adapter_cls(context)
     else:
-        adapter = adapter_cls(context)
+        # For MeltingPot, derive substrate config from GameId value
+        if (
+            MeltingPotAdapter is not None
+            and issubclass(adapter_cls, MeltingPotAdapter)
+            and MeltingPotConfig is not None
+        ):
+            substrate = game_id.value.removeprefix("meltingpot/")
+            adapter = adapter_cls(context, config=MeltingPotConfig(substrate_name=substrate))
+        else:
+            adapter = adapter_cls(context)
 
     if context is not None:
         adapter.ensure_control_mode(context.control_mode)

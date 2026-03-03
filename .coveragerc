@@ -1,0 +1,65 @@
+# Coverage.py configuration for MOSAIC
+# https://coverage.readthedocs.io/
+
+[run]
+# Enable concurrency for multiprocessing workers
+concurrency = multiprocessing,thread
+
+# Merge .coverage.* files from parallel subprocesses
+parallel = true
+
+# Measure branch coverage in addition to statement coverage
+branch = true
+
+# Source directory
+source = gym_gui
+
+# Omit these paths from coverage
+omit =
+    gym_gui/tests/*
+    gym_gui/**/tests/*
+    3rd_party/*
+    .venv/*
+    venv/*
+    */__pycache__/*
+    */site-packages/*
+
+[report]
+# Minimum coverage percentage to pass
+fail_under = 0
+
+# Show missing lines in report
+show_missing = true
+
+# Skip empty files
+skip_empty = true
+
+# Exclude these lines from coverage
+exclude_lines =
+    # Standard pragma
+    pragma: no cover
+
+    # Debug-only code
+    def __repr__
+    def __str__
+
+    # Type checking blocks
+    if TYPE_CHECKING:
+
+    # Abstract methods
+    @abstractmethod
+    @abc.abstractmethod
+
+    # Raise NotImplementedError
+    raise NotImplementedError
+    raise NotImplemented
+
+    # Defensive programming
+    assert False
+    assert_never
+
+[html]
+directory = htmlcov
+
+[xml]
+output = coverage.xml

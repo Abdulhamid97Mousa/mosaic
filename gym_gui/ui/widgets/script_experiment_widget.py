@@ -232,7 +232,7 @@ class ScriptExperimentWidget(QtWidgets.QWidget):
             for config in self._operator_configs:
                 worker_type = list(config.workers.values())[0].worker_type if config.workers else "unknown"
                 behavior = ""
-                if worker_type == "baseline":
+                if worker_type in ("random", "passive"):
                     behavior = list(config.workers.values())[0].settings.get("behavior", "")
                     behavior = f" ({behavior})"
                 info_text += f"  • {config.display_name} [{worker_type}{behavior}]<br>"
@@ -303,10 +303,11 @@ class ScriptExperimentWidget(QtWidgets.QWidget):
                         return {"success": False, "error": f"Operator {i}, agent {agent_id}: missing 'type'"}
 
                     worker_id_map = {
-                        "baseline": "random_worker",
+                        "random": "random_worker",
+                        "passive": "passive_worker",
                         "rl": "cleanrl_worker",
                         "llm": "balrog_worker",
-                        "vlm": "balrog_worker",
+                        "vlm": "mosaic_vlm_worker",
                         "human": "human_worker",
                     }
                     worker_id = worker_id_map.get(worker_type)

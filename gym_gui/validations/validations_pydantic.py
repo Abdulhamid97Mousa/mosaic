@@ -149,7 +149,7 @@ class TrainingConfig(BaseModel):
     max_steps_per_episode: int = Field(default=200, ge=1, description="Max steps per episode")
     policy_strategy: str = Field(default="eval", description="Policy strategy")
     policy_path: Optional[str] = Field(None, description="Path to policy file")
-    agent_id: str = Field(default="bdi_rl", description="Agent identifier")
+    agent_id: str = Field(default="agent_0", description="Agent identifier")
     capture_video: bool = Field(default=False, description="Whether to capture video")
     headless: bool = Field(default=True, description="Whether to run headless")
     extra: Dict[str, Any] = Field(default_factory=dict, description="Extra configuration")

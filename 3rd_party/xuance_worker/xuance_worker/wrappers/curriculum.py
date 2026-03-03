@@ -35,7 +35,9 @@ import gymnasium as gym
 
 # Register BabyAI/MiniGrid environments before gym.make()
 try:
-    import minigrid  # noqa: F401 - registers MiniGrid envs
+    import minigrid  # noqa: F401
+    if hasattr(minigrid, "register_minigrid_envs"):
+        minigrid.register_minigrid_envs()
 except ImportError:
     pass
 

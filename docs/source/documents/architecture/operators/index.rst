@@ -22,8 +22,10 @@ should I take?"*
 
        LAUNCHER -- "stdin/stdout JSON" --> H_OP
        LAUNCHER -- "stdin/stdout JSON" --> L_OP
+       LAUNCHER -- "stdin/stdout JSON" --> V_OP
        LAUNCHER -- "stdin/stdout JSON" --> R_OP
-       LAUNCHER -- "stdin/stdout JSON" --> B_OP
+       LAUNCHER -- "stdin/stdout JSON" --> RND_OP
+       LAUNCHER -- "stdin/stdout JSON" --> P_OP
 
        subgraph H_OP["Human Operator"]
            HW["human_worker<br/>Keyboard Input"]
@@ -31,8 +33,12 @@ should I take?"*
 
        subgraph L_OP["LLM Operator"]
            LW1["balrog_worker<br/>Single-Agent"]
-           LW2["mosaic_llm_worker<br/>Multi-Agent"]
+           LW2["llm_worker<br/>MOSAIC Native"]
            LW3["chess_worker<br/>Two-Player"]
+       end
+
+       subgraph V_OP["VLM Operator"]
+           VW["vlm_worker<br/>Vision-Language"]
        end
 
        subgraph R_OP["RL Operator"]
@@ -41,24 +47,32 @@ should I take?"*
            RW3["ray_worker<br/>PPO / IMPALA"]
        end
 
-       subgraph B_OP["Baseline Operator"]
-           BW["operators_worker<br/>Random / Scripted"]
+       subgraph RND_OP["Random Operator"]
+           RNDW["random_worker<br/>Uniform Random"]
+       end
+
+       subgraph P_OP["Passive Operator"]
+           PW["passive_worker<br/>NOOP / STILL"]
        end
 
        style GUI fill:#4a90d9,stroke:#2e5a87,color:#fff
        style LAUNCHER fill:#50c878,stroke:#2e8b57,color:#fff
        style H_OP fill:#9370db,stroke:#6a0dad,color:#fff
        style L_OP fill:#9370db,stroke:#6a0dad,color:#fff
+       style V_OP fill:#9370db,stroke:#6a0dad,color:#fff
        style R_OP fill:#9370db,stroke:#6a0dad,color:#fff
-       style B_OP fill:#9370db,stroke:#6a0dad,color:#fff
+       style RND_OP fill:#9370db,stroke:#6a0dad,color:#fff
+       style P_OP fill:#9370db,stroke:#6a0dad,color:#fff
        style HW fill:#ff7f50,stroke:#cc5500,color:#fff
        style LW1 fill:#ff7f50,stroke:#cc5500,color:#fff
        style LW2 fill:#ff7f50,stroke:#cc5500,color:#fff
        style LW3 fill:#ff7f50,stroke:#cc5500,color:#fff
+       style VW fill:#ff7f50,stroke:#cc5500,color:#fff
        style RW1 fill:#ff7f50,stroke:#cc5500,color:#fff
        style RW2 fill:#ff7f50,stroke:#cc5500,color:#fff
        style RW3 fill:#ff7f50,stroke:#cc5500,color:#fff
-       style BW fill:#ff7f50,stroke:#cc5500,color:#fff
+       style RNDW fill:#ff7f50,stroke:#cc5500,color:#fff
+       style PW fill:#ff7f50,stroke:#cc5500,color:#fff
 
 Key Principles
 --------------
@@ -72,9 +86,9 @@ Key Principles
        inheritance required.  Any object with ``select_action(obs)`` is
        a valid operator.
    * - **Category System**
-     - Every operator belongs to a category: ``human``, ``llm``, ``rl``,
-       or ``baseline``.  The GUI adapts its configuration UI
-       based on category.
+     - Every operator belongs to a category: ``human``, ``llm``, ``vlm``,
+       ``rl``, ``random``, or ``passive``.  The GUI adapts its
+       configuration UI based on category.
    * - **Interactive Mode**
      - Operators run as subprocesses with ``--interactive`` flag, enabling
        step-by-step JSON commands over stdin/stdout.  This keeps the GUI
@@ -126,17 +140,21 @@ Available Operators
      - rl
      - ray_worker (PPO, IMPALA)
      - Distributed RL policy evaluation
-   * - **Random Baseline**
-     - baseline
-     - operators_worker (random action)
-     - Baseline comparison for experiments
+   * - **MOSAIC Random Worker**
+     - random
+     - random_worker (random action)
+     - Random action selection for experiments
+   * - **MOSAIC Passive Worker**
+     - passive
+     - passive_worker (NOOP/STILL)
+     - Do-nothing agent for experiments
 
 .. tip::
 
    An Operator *wraps* one or more Workers.  The Operator is the
    agent-level interface (``select_action(obs) -> action``) that the
    GUI interacts with.  The Worker is the process-level engine that
-   runs inside the Operator.  This separation is what enables hybrid
+   runs inside the Operator.  This separation is what enables heterogeneous
    teams -- e.g., an RL-trained policy and an LLM playing side-by-side
    in the same multi-agent environment.  See :doc:`concept` for the
    full motivation and diagrams.
@@ -148,7 +166,7 @@ Available Operators
 
    concept
    homogenous_decision_makers/index
-   hybrid_decision_maker/index
+   heterogeneous_decision_maker/index
    architecture
    lifecycle
    development

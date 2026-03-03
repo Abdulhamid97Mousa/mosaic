@@ -65,7 +65,11 @@ from gym_gui.ui.presenters.main_window_presenter import MainWindowPresenter, Mai
 from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWidget
 from gym_gui.ui.indicators.busy_indicator import modal_busy_indicator
 from gym_gui.ui.widgets.render_tabs import RenderTabs
-from gym_gui.ui.widgets.multi_agent_action_panel import MultiAgentActionPanel
+from gym_gui.ui.widgets.multi_agent_action_panel import (
+    MultiAgentActionPanel,
+    COLOR_PALETTE,
+    DEFAULT_AGENT_COLOR_NAMES,
+)
 from gym_gui.game_docs import get_game_info
 from gym_gui.game_docs.mosaic_welcome import MOSAIC_WELCOME_HTML
 from gym_gui.services.actor import ActorService
@@ -814,7 +818,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._control_panel.reset_all_requested.connect(self._on_reset_all_operators)
         self._control_panel.stop_operators_requested.connect(self._on_stop_operators)
         self._control_panel.initialize_operator_requested.connect(self._on_initialize_operator)
-        self._control_panel.human_action_requested.connect(self._on_human_action_submitted)
+        # NOTE: human_action_requested from OperatorsTab is NOT connected here.
+        # Human actions come from OperatorRenderContainer via render_tabs.human_action_submitted (line 882)
+        # to avoid duplicate signal connections that cause actions to be processed multiple times.
 
         # Script execution manager signals (separate from Manual Mode)
         script_mgr = self._control_panel.operators_tab.script_execution_manager
@@ -1947,8 +1953,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             action: The action index selected by the human.
         """
         _OP_LOGGER.info(
-            "Human action submitted: operator=%s, action=%d",
-            operator_id, action,
+            "Human action submitted: operator=%s, action=%d (type=%s)",
+            operator_id, action, type(action).__name__,
         )
 
         # ── Parallel multi-agent mode: route to step state, not subprocess ──
@@ -1974,6 +1980,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             return
 
         # Send step command with action to the subprocess
+        _OP_LOGGER.info(
+            "Sending step command: operator=%s, action=%d",
+            operator_id, action,
+        )
         if not handle.send_step_with_action(action):
             _OP_LOGGER.error(f"Failed to send step command to human operator: {operator_id}")
             self._status_bar.showMessage(f"Failed to send action", 3000)
@@ -2846,6 +2856,93 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         else:
             raise ValueError(f"Unknown parallel multi-agent environment: {env_name}")
 
+    def _get_parallel_action_labels(self, config: "OperatorConfig", env: Any) -> list[str]:
+        """Get human-readable action labels for a parallel multi-agent environment.
+
+        Looks up the correct action list from the adapter module based on
+        the operator config's env_name. Falls back to generic labels
+        derived from the action space size when the env family is unknown.
+
+        Note: This method is ONLY for multi-agent environments. Single-agent
+        environments (minigrid, babyai, crafter, procgen) get their action
+        labels from the human_worker subprocess.
+
+        Args:
+            config: Operator configuration (used for env_name).
+            env: The parallel environment instance.
+
+        Returns:
+            List of action label strings, one per discrete action.
+        """
+        env_name = config.env_name
+
+        # Multi-agent environments only
+        if env_name == "mosaic_multigrid":
+            from gym_gui.core.adapters.mosaic_multigrid import MOSAIC_MULTIGRID_ACTIONS
+            return list(MOSAIC_MULTIGRID_ACTIONS)
+        elif env_name == "ini_multigrid":
+            from gym_gui.core.adapters.ini_multigrid import INI_MULTIGRID_ACTIONS
+            return list(INI_MULTIGRID_ACTIONS)
+        elif env_name == "overcooked":
+            from gym_gui.core.adapters.overcooked import OVERCOOKED_ACTIONS
+            return list(OVERCOOKED_ACTIONS)
+        elif env_name == "meltingpot":
+            from gym_gui.core.adapters.meltingpot import MELTINGPOT_ACTION_NAMES
+            return list(MELTINGPOT_ACTION_NAMES)
+        elif env_name == "smac":
+            from gym_gui.core.adapters.smac import SMAC_BASE_ACTIONS
+            return list(SMAC_BASE_ACTIONS)
+
+        # Generic fallback: discover action count from the environment
+        num_actions: int | None = None
+
+        # Single action_space (gymnasium standard)
+        if hasattr(env, "action_space") and hasattr(env.action_space, "n"):
+            num_actions = env.action_space.n
+        # Per-agent action_spaces (PettingZoo parallel)
+        elif hasattr(env, "action_spaces"):
+            for space in env.action_spaces.values():
+                if hasattr(space, "n"):
+                    num_actions = space.n
+                    break
+        # PettingZoo AEC: action_space(agent) is a method
+        elif callable(getattr(env, "action_space", None)) and hasattr(env, "agents") and env.agents:
+            try:
+                space = env.action_space(env.agents[0])
+                if hasattr(space, "n"):
+                    num_actions = space.n
+            except Exception:
+                pass
+
+        if num_actions is None:
+            _OP_LOGGER.warning(
+                "Could not determine action count for env_name=%s, defaulting to 4",
+                env_name,
+            )
+            num_actions = 4
+
+        return [f"Action {i}" for i in range(num_actions)]
+
+    def _resolve_agent_colors(
+        self, config: "OperatorConfig",
+    ) -> Dict[str, tuple[str, str]]:
+        """Build agent_id -> (primary_hex, bg_hex) from operator config.
+
+        Reads agent_color from each worker's settings and maps it
+        through COLOR_PALETTE. Falls back to the default
+        palette assignment when no custom color is set.
+        """
+        colors: Dict[str, tuple[str, str]] = {}
+        for player_id, worker in config.workers.items():
+            color_name = worker.settings.get("agent_color")
+            if color_name and color_name != "auto" and color_name in COLOR_PALETTE:
+                colors[player_id] = COLOR_PALETTE[color_name]
+            else:
+                default_name = DEFAULT_AGENT_COLOR_NAMES.get(player_id)
+                if default_name and default_name in COLOR_PALETTE:
+                    colors[player_id] = COLOR_PALETTE[default_name]
+        return colors
+
     def _get_parallel_agent_obs(self, agent_id: str) -> Optional[Any]:
         """Get the stored observation for an agent, handling int/string key mismatch.
 
@@ -3095,13 +3192,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             return
 
         # Show action panel for human agents
-        # Get action labels from environment
-        if hasattr(env, "action_space") and hasattr(env.action_space, "n"):
-            num_actions = env.action_space.n
-            # Default action labels for MultiGrid
-            action_labels = ["Still", "Left", "Right", "Forward", "Pickup", "Drop", "Toggle", "Done"][:num_actions]
-        else:
-            action_labels = ["Action 0", "Action 1", "Action 2", "Action 3", "Action 4", "Action 5", "Action 6", "Action 7"]
+        action_labels = self._get_parallel_action_labels(config, env)
 
         # Create and show action panel
         if self._parallel_action_panel is not None:
@@ -3110,7 +3201,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._parallel_action_panel = MultiAgentActionPanel(
             human_agents=human_agents,
             action_labels=action_labels,
-            agent_labels={f"agent_{i}": f"Agent {i}" for i in range(len(human_agents))},
+            agent_labels={aid: f"Agent {aid.split('_')[-1]}" for aid in human_agents},
+            agent_colors=self._resolve_agent_colors(config),
         )
         self._parallel_action_panel.all_actions_submitted.connect(
             self._on_parallel_human_actions_submitted
@@ -3269,16 +3361,16 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             # ---------------------------------------------------------------
             # Human agent's turn: show one-agent action panel
             # ---------------------------------------------------------------
+            action_labels = self._get_parallel_action_labels(config, env)
+
             try:
                 act_space = env.action_space(current_agent)
-                num_actions = act_space.n if hasattr(act_space, "n") else 8
+                num_actions = act_space.n if hasattr(act_space, "n") else len(action_labels)
             except (TypeError, KeyError):
-                num_actions = 8
+                num_actions = len(action_labels)
 
-            action_labels = [
-                "NOOP", "LEFT", "RIGHT", "FORWARD",
-                "PICKUP", "DROP", "TOGGLE", "DONE",
-            ][:num_actions]
+            # Trim labels to match actual action space size
+            action_labels = action_labels[:num_actions]
 
             if self._parallel_action_panel is not None:
                 self._parallel_action_panel.deleteLater()
@@ -3286,7 +3378,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._parallel_action_panel = MultiAgentActionPanel(
                 human_agents=[current_agent],
                 action_labels=action_labels,
-                agent_labels={current_agent: current_agent},
+                agent_labels={current_agent: f"Agent {current_agent.split('_')[-1]}"},
+                agent_colors=self._resolve_agent_colors(config),
             )
             self._parallel_action_panel.all_actions_submitted.connect(
                 self._on_aec_human_action_submitted
@@ -3705,6 +3798,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 "system_prompt": response.get("system_prompt", ""),  # Env-family instruction
             }
             self._render_tabs.display_operator_payload(operator_id, payload)
+
+            # Update status to "running" after operator is ready
+            self._render_tabs.set_operator_status(operator_id, "running")
+
             self.log_constant(
                 LOG_UI_MAINWINDOW_INFO,
                 message=f"Operator ready",
@@ -3723,13 +3820,14 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             )
             self._render_tabs.set_operator_status(operator_id, "error")
 
-        elif response_type == "episode_end":
-            # Episode completed - display final state and notify operators tab
+        elif response_type == "episode_done":
+            # Episode completed - workers send "episode_done" with fields:
+            # total_reward, episode_length (or num_steps), episode_number (or episode_index)
             payload = {
-                "step_index": response.get("episode_steps", 0),
-                "episode_index": response.get("episode_index", 0),
+                "step_index": response.get("num_steps", response.get("episode_length", 0)),
+                "episode_index": response.get("episode_number", response.get("episode_index", 0)),
                 "reward": response.get("reward", 0.0),
-                "total_reward": response.get("episode_return", 0.0),
+                "total_reward": response.get("total_reward", 0.0),
                 "terminated": response.get("terminated", False),
                 "truncated": response.get("truncated", False),
                 "render_payload": response.get("render_payload"),
@@ -3753,6 +3851,28 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 response.get("terminated", False),
                 response.get("truncated", False)
             )
+
+            # Auto-reset human_worker for next episode (RL workers auto-reset internally)
+            # Skip auto-reset if script mode is active (script manager controls resets)
+            # Only auto-reset for "interactive" mode (worker owns env), not "board-game" mode (GUI owns env)
+            if not script_mgr.is_running:
+                operator = self._multi_operator_service.get_operator(operator_id)
+                if operator and operator.workers:
+                    # Get the first worker to check if it's human_worker
+                    first_worker = next(iter(operator.workers.values()), None)
+                    if first_worker and first_worker.worker_id == "human_worker":
+                        # Check if this is interactive mode (not PettingZoo board-game mode)
+                        is_interactive_mode = operator.env_name != "pettingzoo"
+                        if is_interactive_mode:
+                            self.log_constant(
+                                LOG_UI_MAINWINDOW_INFO,
+                                message=f"Auto-resetting human_worker for next episode",
+                                extra={"operator_id": operator_id, "env_name": operator.env_name},
+                            )
+                            # Get the operator handle and send reset command
+                            handle = self._operator_launcher.get_handle(operator_id)
+                            if handle:
+                                handle.send_command({"cmd": "reset"})
 
         elif response_type == "stopped":
             self._multi_operator_service.set_operator_state(operator_id, "stopped")
@@ -4517,6 +4637,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     # Assign run_id and update operator state
                     self._multi_operator_service.assign_run_id(operator_id, handle.run_id)
                     self._multi_operator_service.set_operator_state(operator_id, "running")
+
+                    # Update UI status badge to "running"
+                    self._render_tabs.set_operator_status(operator_id, "running")
 
                     self.log_constant(
                         LOG_UI_MAINWINDOW_INFO,
@@ -5721,10 +5844,24 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     message=f"Failed to launch operator {operator_id}",
                     extra={"operator_id": operator_id},
                 )
+                self._render_tabs.set_operator_status(operator_id, "error")
                 return
 
-            # Send reset command - response will come back asynchronously via polling
-            if handle.send_reset(seed):
+            # Set operator status to running in UI
+            self._render_tabs.set_operator_status(operator_id, "running")
+
+            # Send reset command with full environment configuration
+            # (same pattern as Manual Mode - need env_name, task, settings)
+            reset_cmd: Dict[str, Any] = {
+                "cmd": "reset",
+                "seed": seed,
+                "env_name": config.env_name,
+                "task": config.task,
+            }
+            if config.settings:
+                reset_cmd["settings"] = config.settings
+
+            if handle.send_command(reset_cmd):
                 self.log_constant(
                     LOG_UI_MAINWINDOW_INFO,
                     message=f"Script Mode: Sent reset to {operator_id}",
@@ -5760,7 +5897,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             )
             return
 
-        # Send reset command (don't block!)
+        # Send reset command with seed only (env already initialized from first reset)
         if handle.send_reset(seed):
             # Start polling for "ready" response
             from PyQt6.QtCore import QTimer
@@ -5799,6 +5936,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         handle = self._operator_launcher.get_handle(operator_id)
         if handle and handle.is_running:
             handle.stop()
+
+        # Remove the operator view from render tabs so it can be relaunched
+        self._render_tabs.remove_operator_view(operator_id)
 
     def closeEvent(self, a0: QtGui.QCloseEvent | None) -> None:
         logging.getLogger().removeHandler(self._log_handler)

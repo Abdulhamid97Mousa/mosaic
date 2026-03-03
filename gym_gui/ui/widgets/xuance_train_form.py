@@ -14,6 +14,7 @@ from __future__ import annotations
 import copy
 import json
 import logging
+import os
 import sys
 import uuid
 from dataclasses import dataclass, field
@@ -23,7 +24,7 @@ from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from qtpy import QtCore, QtGui, QtWidgets
 
-from gym_gui.config.paths import VAR_TRAINER_DIR
+from gym_gui.config.paths import VAR_TRAINER_DIR, VAR_CUSTOM_SCRIPTS_DIR, XUANCE_SCRIPTS_DIR
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
     LOG_UI_TRAIN_FORM_TRACE,
@@ -517,6 +518,9 @@ class _FormState:
     worker_id: Optional[str]
     notes: Optional[str]
     algo_params: Dict[str, Any] = field(default_factory=dict)
+    # Custom script path (None = standard module training)
+    custom_script_path: Optional[str] = None
+    custom_script_name: Optional[str] = None
     # FastLane settings
     fastlane_enabled: bool = False
     fastlane_only: bool = True
@@ -865,6 +869,21 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
         params_layout.addWidget(worker_label, 4, 0)
         params_layout.addWidget(self._worker_id_input, 4, 1)
 
+        # Custom script combo
+        script_label = QtWidgets.QLabel("Custom Script:", self)
+        self._custom_script_combo = QtWidgets.QComboBox(self)
+        self._custom_script_combo.setToolTip(
+            "Select a custom training script or use standard module training"
+        )
+        self._custom_script_combo.addItem("None (Standard Training)", None)
+        if XUANCE_SCRIPTS_DIR.is_dir():
+            for sh in sorted(XUANCE_SCRIPTS_DIR.glob("*.sh")):
+                self._custom_script_combo.addItem(sh.stem, str(sh))
+        self._custom_script_combo.addItem("Browse...", "BROWSE")
+        self._custom_script_combo.currentIndexChanged.connect(self._on_custom_script_changed)
+        params_layout.addWidget(script_label, 5, 0)
+        params_layout.addWidget(self._custom_script_combo, 5, 1)
+
         layout.addWidget(params_group)
 
     def _setup_notes(self, layout: QtWidgets.QVBoxLayout) -> None:
@@ -983,6 +1002,26 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
         """Handle WandB VPN checkbox toggle."""
         _ = checked
         self._update_wandb_controls()
+
+    def _on_custom_script_changed(self, index: int) -> None:
+        """Handle custom script combo change."""
+        data = self._custom_script_combo.itemData(index)
+        if data == "BROWSE":
+            initial_dir = str(XUANCE_SCRIPTS_DIR) if XUANCE_SCRIPTS_DIR.is_dir() else str(Path.home())
+            path, _ = QtWidgets.QFileDialog.getOpenFileName(
+                self, "Select Custom Script", initial_dir, "Shell Scripts (*.sh);;All Files (*)"
+            )
+            if path:
+                name = Path(path).stem
+                insert_idx = self._custom_script_combo.count() - 1  # before Browse
+                self._custom_script_combo.blockSignals(True)
+                self._custom_script_combo.insertItem(insert_idx, f"{name} (imported)", path)
+                self._custom_script_combo.setCurrentIndex(insert_idx)
+                self._custom_script_combo.blockSignals(False)
+            else:
+                self._custom_script_combo.blockSignals(True)
+                self._custom_script_combo.setCurrentIndex(0)
+                self._custom_script_combo.blockSignals(False)
 
     def _update_wandb_controls(self) -> None:
         """Update WandB control enabled states based on checkbox state."""
@@ -1441,6 +1480,14 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
         video_mode_data = self._video_mode_combo.currentData()
         video_mode = video_mode_data if isinstance(video_mode_data, str) else VideoModes.SINGLE
 
+        # Custom script selection
+        script_data = self._custom_script_combo.currentData()
+        custom_script_path: Optional[str] = None
+        custom_script_name: Optional[str] = None
+        if script_data and script_data != "BROWSE":
+            custom_script_path = script_data
+            custom_script_name = Path(script_data).stem
+
         return _FormState(
             backend=self._backend_combo.currentData() or "torch",
             paradigm=paradigm,
@@ -1456,6 +1503,8 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
             worker_id=self._worker_id_input.text().strip() or None,
             notes=self._notes_edit.toPlainText().strip() or None,
             algo_params=algo_params,
+            custom_script_path=custom_script_path,
+            custom_script_name=custom_script_name,
             fastlane_enabled=self._fastlane_checkbox.isChecked(),
             fastlane_only=self._fastlane_only_checkbox.isChecked(),
             fastlane_slot=self._fastlane_slot_spin.value(),
@@ -1522,26 +1571,44 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
             extras["algo_params"] = state.algo_params
         worker_config["extras"] = extras
 
-        metadata = {
-            "ui": {
-                "worker_id": "xuance_worker",  # Always xuance_worker for tab naming
-                "method": state.method,
-                "env": state.env,
-                "env_id": state.env_id,
-                "backend": state.backend,
-                "paradigm": state.paradigm,
-                # FastLane UI settings
-                "fastlane_enabled": state.fastlane_enabled,
-                "fastlane_only": state.fastlane_only,
-                "fastlane_slot": state.fastlane_slot,
-                "fastlane_video_mode": state.fastlane_video_mode,
-                "fastlane_grid_limit": state.fastlane_grid_limit,
-            },
-            "worker": {
-                "worker_id": "xuance_worker",  # Always xuance_worker for detection
+        # Build worker metadata based on custom script vs standard mode
+        if state.custom_script_path:
+            worker_meta: Dict[str, Any] = {
+                "worker_id": "xuance_worker",
+                "script": "/bin/bash",
+                "arguments": [state.custom_script_path],
+                "use_grpc": True,
+                "grpc_target": "127.0.0.1:50055",
+                "config": worker_config,
+            }
+        else:
+            worker_meta = {
+                "worker_id": "xuance_worker",
                 "module": "xuance_worker.cli",
                 "config": worker_config,
-            },
+            }
+
+        ui_meta: Dict[str, Any] = {
+            "worker_id": "xuance_worker",
+            "method": state.method,
+            "env": state.env,
+            "env_id": state.env_id,
+            "backend": state.backend,
+            "paradigm": state.paradigm,
+            # FastLane UI settings
+            "fastlane_enabled": state.fastlane_enabled,
+            "fastlane_only": state.fastlane_only,
+            "fastlane_slot": state.fastlane_slot,
+            "fastlane_video_mode": state.fastlane_video_mode,
+            "fastlane_grid_limit": state.fastlane_grid_limit,
+        }
+        if state.custom_script_path:
+            ui_meta["custom_script"] = state.custom_script_path
+            ui_meta["custom_script_name"] = state.custom_script_name or Path(state.custom_script_path).stem
+
+        metadata = {
+            "ui": ui_meta,
+            "worker": worker_meta,
             "artifacts": {
                 "tensorboard": {
                     "enabled": track_tensorboard,
@@ -1566,7 +1633,8 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
         environment: Dict[str, str] = {
             "XUANCE_RUN_ID": run_id,
             "XUANCE_DL_TOOLBOX": state.backend,
-            "XUANCE_PARALLELS": str(state.parallels),  # For FastLane grid mode
+            "XUANCE_PARALLELS": str(state.parallels),
+            "XUANCE_NUM_ENVS": str(state.parallels),  # Custom scripts read this
             "CLEANRL_PROCEDURAL_GENERATION": "1" if procedural_gen else "0",
         }
         # Add seed to environment if specified
@@ -1616,8 +1684,25 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
             # Also set the master switch for XuanCe sitecustomize
             environment["MOSAIC_FASTLANE_ENABLED"] = "1"
 
-        entry_point = sys.executable
-        arguments = ["-m", "xuance_worker.cli"]
+        if state.custom_script_path:
+            # Custom script mode: run via /bin/bash
+            config_dir = VAR_CUSTOM_SCRIPTS_DIR / run_id
+            config_dir.mkdir(parents=True, exist_ok=True)
+            run_dir = config_dir
+            config_file_path = config_dir / "config.json"
+            config_file_path.write_text(json.dumps(worker_config, indent=2), encoding="utf-8")
+
+            environment["MOSAIC_CONFIG_FILE"] = str(config_file_path)
+            environment["MOSAIC_RUN_ID"] = run_id
+            environment["MOSAIC_RUN_DIR"] = str(run_dir)
+            environment["MOSAIC_CUSTOM_SCRIPTS_DIR"] = str(config_dir)
+            environment["MOSAIC_CHECKPOINT_DIR"] = str(run_dir / "checkpoints")
+
+            entry_point = "/bin/bash"
+            arguments = [state.custom_script_path]
+        else:
+            entry_point = sys.executable
+            arguments = ["-m", "xuance_worker.cli"]
 
         config: Dict[str, Any] = {
             "run_name": run_id,

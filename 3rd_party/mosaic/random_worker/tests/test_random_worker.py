@@ -5,7 +5,7 @@ Tests verify:
 - CLI argument parsing
 - Runtime init_agent / select_action protocol
 - Action space resolution across many environment families
-- Behavior modes (random, noop, cycling) across different action space sizes
+- Random behavior across different action space sizes
 - Multi-agent scenarios (multiple player IDs)
 - JSON stdin/stdout protocol
 - Subprocess integration (python -m random_worker)
@@ -60,7 +60,6 @@ class TestRandomWorkerConfig:
         assert config.env_name == ""
         assert config.task == ""
         assert config.seed is None
-        assert config.behavior == "random"
 
     def test_custom_values(self):
         config = RandomWorkerConfig(
@@ -68,11 +67,9 @@ class TestRandomWorkerConfig:
             env_name="mosaic_multigrid",
             task="MosaicMultiGrid-Soccer-2vs2-TeamObs-v0",
             seed=42,
-            behavior="noop",
         )
         assert config.run_id == "test_001"
         assert config.seed == 42
-        assert config.behavior == "noop"
 
 
 # ── CLI Tests ───────────────────────────────────────────────────────
@@ -87,7 +84,6 @@ class TestCLI:
         args = parse_args(["--run-id", "test123"])
         assert args.run_id == "test123"
         assert args.interactive is False
-        assert args.behavior == "random"
 
     def test_parse_full(self):
         from random_worker.cli import parse_args
@@ -97,20 +93,12 @@ class TestCLI:
             "--env-name", "mosaic_multigrid",
             "--task", "MosaicMultiGrid-Soccer-2vs2-TeamObs-v0",
             "--seed", "42",
-            "--behavior", "cycling",
             "--interactive",
         ])
         assert args.run_id == "test456"
         assert args.env_name == "mosaic_multigrid"
         assert args.seed == 42
-        assert args.behavior == "cycling"
         assert args.interactive is True
-
-    def test_invalid_behavior_rejected(self):
-        from random_worker.cli import parse_args
-
-        with pytest.raises(SystemExit):
-            parse_args(["--run-id", "x", "--behavior", "invalid"])
 
 
 # ── Runtime Protocol Tests (fallback Discrete(7)) ──────────────────
@@ -119,13 +107,12 @@ class TestCLI:
 class TestRuntimeProtocol:
     """Tests for RandomWorkerRuntime JSON protocol without real envs."""
 
-    def _make_runtime(self, behavior="random", seed=42):
+    def _make_runtime(self, seed=42):
         config = RandomWorkerConfig(
             run_id="test_run",
             env_name="",
             task="",
             seed=seed,
-            behavior=behavior,
         )
         return RandomWorkerRuntime(config)
 
@@ -186,28 +173,6 @@ class TestRuntimeProtocol:
         assert all(0 <= a < 7 for a in actions)
         assert len(set(actions)) > 1  # not all the same
 
-    def test_noop_behavior(self):
-        """Noop behavior should always return 0."""
-        rt = self._make_runtime(behavior="noop")
-        rt.handle_init_agent({"game_name": "X", "player_id": "a0"})
-
-        for _ in range(10):
-            resp = rt.handle_select_action({"observation": [], "player_id": "a0"})
-            assert resp["action"] == 0
-
-    def test_cycling_behavior(self):
-        """Cycling behavior should cycle through 0..n-1."""
-        rt = self._make_runtime(behavior="cycling")
-        rt.handle_init_agent({"game_name": "X", "player_id": "a0"})
-
-        actions = []
-        for _ in range(14):
-            resp = rt.handle_select_action({"observation": [], "player_id": "a0"})
-            actions.append(resp["action"])
-
-        # Discrete(7) → 0,1,2,3,4,5,6,0,1,2,3,4,5,6
-        assert actions == [0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6]
-
 
 # ── Full Stdin/Stdout Loop Tests ────────────────────────────────────
 
@@ -215,12 +180,11 @@ class TestRuntimeProtocol:
 class TestFullLoop:
     """Test the full run() loop with simulated stdin/stdout."""
 
-    def _run_commands(self, commands: list[dict], behavior="random",
+    def _run_commands(self, commands: list[dict],
                       seed=42, task="") -> list[dict]:
         """Send JSON commands to the runtime and collect responses."""
         config = RandomWorkerConfig(
             run_id="loop_test",
-            behavior=behavior,
             seed=seed,
             task=task,
         )
@@ -474,14 +438,13 @@ class TestActionSpaceResolution:
 
 
 class TestBehaviorsWithRealEnvs:
-    """Test all 3 behaviors work correctly across different action space sizes."""
+    """Test random behavior works correctly across different action space sizes."""
 
-    def _init_runtime(self, task: str, behavior: str, seed: int = 42):
+    def _init_runtime(self, task: str, seed: int = 42):
         config = RandomWorkerConfig(
             run_id="behavior_test",
             task=task,
             seed=seed,
-            behavior=behavior,
         )
         rt = RandomWorkerRuntime(config)
         rt.handle_init_agent({"game_name": task, "player_id": "agent_0"})
@@ -497,88 +460,50 @@ class TestBehaviorsWithRealEnvs:
     # ── FrozenLake: Discrete(4) ──
 
     def test_random_frozenlake(self):
-        rt = self._init_runtime("FrozenLake-v1", "random")
+        rt = self._init_runtime("FrozenLake-v1")
         actions = self._sample_n_actions(rt, 200)
         assert all(0 <= a < 4 for a in actions)
         assert len(set(actions)) > 1
 
-    def test_noop_frozenlake(self):
-        rt = self._init_runtime("FrozenLake-v1", "noop")
-        actions = self._sample_n_actions(rt, 20)
-        assert all(a == 0 for a in actions)
-
-    def test_cycling_frozenlake(self):
-        rt = self._init_runtime("FrozenLake-v1", "cycling")
-        actions = self._sample_n_actions(rt, 12)
-        assert actions == [0, 1, 2, 3, 0, 1, 2, 3, 0, 1, 2, 3]
-
     # ── Blackjack: Discrete(2) ──
 
     def test_random_blackjack(self):
-        rt = self._init_runtime("Blackjack-v1", "random")
+        rt = self._init_runtime("Blackjack-v1")
         actions = self._sample_n_actions(rt, 200)
         assert all(a in (0, 1) for a in actions)
         assert len(set(actions)) == 2
 
-    def test_cycling_blackjack(self):
-        rt = self._init_runtime("Blackjack-v1", "cycling")
-        actions = self._sample_n_actions(rt, 6)
-        assert actions == [0, 1, 0, 1, 0, 1]
-
     # ── Taxi: Discrete(6) ──
 
     def test_random_taxi(self):
-        rt = self._init_runtime("Taxi-v3", "random")
+        rt = self._init_runtime("Taxi-v3")
         actions = self._sample_n_actions(rt, 200)
         assert all(0 <= a < 6 for a in actions)
         assert len(set(actions)) > 1
-
-    def test_cycling_taxi(self):
-        rt = self._init_runtime("Taxi-v3", "cycling")
-        actions = self._sample_n_actions(rt, 12)
-        assert actions == [0, 1, 2, 3, 4, 5, 0, 1, 2, 3, 4, 5]
 
     # ── MiniGrid: Discrete(7) ──
 
     @pytest.mark.skipif(not HAS_MINIGRID, reason="minigrid not installed")
     def test_random_minigrid(self):
-        rt = self._init_runtime("MiniGrid-Empty-5x5-v0", "random")
+        rt = self._init_runtime("MiniGrid-Empty-5x5-v0")
         actions = self._sample_n_actions(rt, 200)
         assert all(0 <= a < 7 for a in actions)
         assert len(set(actions)) > 1
-
-    @pytest.mark.skipif(not HAS_MINIGRID, reason="minigrid not installed")
-    def test_cycling_minigrid(self):
-        rt = self._init_runtime("MiniGrid-Empty-5x5-v0", "cycling")
-        actions = self._sample_n_actions(rt, 14)
-        assert actions == [0, 1, 2, 3, 4, 5, 6, 0, 1, 2, 3, 4, 5, 6]
 
     # ── MosaicMultiGrid Soccer 2v2: Discrete(8) ──
 
     @pytest.mark.skipif(not HAS_MOSAIC, reason="mosaic_multigrid not installed")
     def test_random_soccer_2v2(self):
-        rt = self._init_runtime("MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0", "random")
+        rt = self._init_runtime("MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0")
         actions = self._sample_n_actions(rt, 200)
         assert all(0 <= a < 8 for a in actions)
         assert len(set(actions)) > 1
-
-    @pytest.mark.skipif(not HAS_MOSAIC, reason="mosaic_multigrid not installed")
-    def test_noop_soccer_2v2(self):
-        rt = self._init_runtime("MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0", "noop")
-        actions = self._sample_n_actions(rt, 20)
-        assert all(a == 0 for a in actions)
-
-    @pytest.mark.skipif(not HAS_MOSAIC, reason="mosaic_multigrid not installed")
-    def test_cycling_soccer_2v2(self):
-        rt = self._init_runtime("MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0", "cycling")
-        actions = self._sample_n_actions(rt, 16)
-        assert actions == [0, 1, 2, 3, 4, 5, 6, 7, 0, 1, 2, 3, 4, 5, 6, 7]
 
     # ── MosaicMultiGrid Basketball 3v3: Discrete(8), 6 agents ──
 
     @pytest.mark.skipif(not HAS_MOSAIC, reason="mosaic_multigrid not installed")
     def test_random_basketball_3v3(self):
-        rt = self._init_runtime("MosaicMultiGrid-Basketball-3vs3-IndAgObs-v0", "random")
+        rt = self._init_runtime("MosaicMultiGrid-Basketball-3vs3-IndAgObs-v0")
         actions = self._sample_n_actions(rt, 200)
         assert all(0 <= a < 8 for a in actions)
         assert len(set(actions)) > 1
@@ -615,7 +540,6 @@ class TestMultiAgent:
                 run_id=f"op_{player}",
                 task="MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0",
                 seed=42,
-                behavior="random",
             )
             rt = RandomWorkerRuntime(config)
             rt.handle_init_agent({
@@ -647,7 +571,6 @@ class TestMultiAgent:
                 run_id=f"op_{player}",
                 task="MosaicMultiGrid-Basketball-3vs3-IndAgObs-v0",
                 seed=99,
-                behavior="random",
             )
             rt = RandomWorkerRuntime(config)
             rt.handle_init_agent({
@@ -668,20 +591,20 @@ class TestMultiAgent:
 
     def test_reinit_agent_resets_state(self):
         """Calling init_agent again should reset step counter and action space."""
-        rt = RandomWorkerRuntime(RandomWorkerConfig(run_id="reinit", behavior="cycling"))
+        rt = RandomWorkerRuntime(RandomWorkerConfig(run_id="reinit", seed=42))
 
         # First init with fallback Discrete(7)
         rt.handle_init_agent({"game_name": "FakeEnv", "player_id": "a0"})
         resp1 = rt.handle_select_action({"observation": [], "player_id": "a0"})
-        assert resp1["action"] == 0  # cycling starts at 0
+        assert isinstance(resp1["action"], int)
 
         resp2 = rt.handle_select_action({"observation": [], "player_id": "a0"})
-        assert resp2["action"] == 1
+        assert isinstance(resp2["action"], int)
 
         # Re-init should reset
         rt.handle_init_agent({"game_name": "FakeEnv", "player_id": "a0"})
         resp3 = rt.handle_select_action({"observation": [], "player_id": "a0"})
-        assert resp3["action"] == 0  # back to start
+        assert isinstance(resp3["action"], int)
 
 
 # ── Seed Reproducibility ────────────────────────────────────────────
@@ -697,7 +620,7 @@ class TestReproducibility:
 
         for actions_list in [actions_a, actions_b]:
             rt = RandomWorkerRuntime(
-                RandomWorkerConfig(run_id="repro", seed=12345, behavior="random")
+                RandomWorkerConfig(run_id="repro", seed=12345)
             )
             rt.handle_init_agent({"game_name": "FakeEnv", "player_id": "a0"})
             for _ in range(50):
@@ -710,7 +633,7 @@ class TestReproducibility:
         """Different seeds should produce different action sequences."""
         def get_actions(seed):
             rt = RandomWorkerRuntime(
-                RandomWorkerConfig(run_id="x", seed=seed, behavior="random")
+                RandomWorkerConfig(run_id="x", seed=seed)
             )
             rt.handle_init_agent({"game_name": "FakeEnv", "player_id": "a0"})
             return [
@@ -725,7 +648,7 @@ class TestReproducibility:
     def test_no_seed_still_works(self):
         """No seed should still produce valid actions (just not reproducible)."""
         rt = RandomWorkerRuntime(
-            RandomWorkerConfig(run_id="noseed", seed=None, behavior="random")
+            RandomWorkerConfig(run_id="noseed", seed=None)
         )
         rt.handle_init_agent({"game_name": "FakeEnv", "player_id": "a0"})
 
@@ -744,11 +667,10 @@ class TestReproducibility:
 class TestFullLoopRealEnvs:
     """Test full stdin/stdout loop with real environment action spaces."""
 
-    def _run_commands(self, commands: list[dict], behavior="random",
+    def _run_commands(self, commands: list[dict],
                       seed=42, task="") -> list[dict]:
         config = RandomWorkerConfig(
             run_id="real_env_test",
-            behavior=behavior,
             seed=seed,
             task=task,
         )
@@ -970,55 +892,6 @@ class TestSubprocessIntegration:
             if r["type"] == "action_selected":
                 assert 0 <= r["action"] < 8  # Discrete(8) from real env
 
-    def test_subprocess_behavior_noop(self):
-        """Subprocess with --behavior noop should always return action 0."""
-        stdin_text = "\n".join(json.dumps(cmd) for cmd in [
-            {"cmd": "init_agent", "game_name": "FakeEnv", "player_id": "a0"},
-            {"cmd": "select_action", "observation": [], "player_id": "a0"},
-            {"cmd": "select_action", "observation": [], "player_id": "a0"},
-            {"cmd": "select_action", "observation": [], "player_id": "a0"},
-            {"cmd": "stop"},
-        ]) + "\n"
-
-        proc = subprocess.run(
-            [sys.executable, "-m", "random_worker",
-             "--run-id", "noop_test",
-             "--behavior", "noop",
-             "--seed", "42",
-             "--interactive"],
-            input=stdin_text,
-            capture_output=True,
-            text=True,
-            timeout=10.0,
-        )
-
-        responses = []
-        for line in proc.stdout.strip().split("\n"):
-            line = line.strip()
-            if line:
-                try:
-                    responses.append(json.loads(line))
-                except json.JSONDecodeError:
-                    pass
-
-        for r in responses:
-            if r["type"] == "action_selected":
-                assert r["action"] == 0
-
-    def test_subprocess_behavior_cycling(self):
-        """Subprocess with --behavior cycling should cycle actions."""
-        commands = [
-            {"cmd": "init_agent", "game_name": "FakeEnv", "player_id": "a0"},
-        ]
-        for _ in range(7):
-            commands.append({"cmd": "select_action", "observation": [], "player_id": "a0"})
-        commands.append({"cmd": "stop"})
-
-        responses = self._run_subprocess(commands, extra_args=["--behavior", "cycling"])
-
-        actions = [r["action"] for r in responses if r["type"] == "action_selected"]
-        assert actions == [0, 1, 2, 3, 4, 5, 6]
-
     def test_subprocess_exit_code_zero(self):
         """Subprocess should exit cleanly with code 0."""
         stdin_text = json.dumps({"cmd": "stop"}) + "\n"
@@ -1102,7 +975,6 @@ class TestEdgeCases:
         """The auto-emitted init message should contain worker metadata."""
         config = RandomWorkerConfig(
             run_id="meta_test",
-            behavior="cycling",
         )
         rt = RandomWorkerRuntime(config)
 
@@ -1129,7 +1001,7 @@ class TestEdgeCases:
         assert init_msg["type"] == "init"
         assert init_msg["run_id"] == "meta_test"
         assert init_msg["worker"] == "random_worker"
-        assert init_msg["behavior"] == "cycling"
+        assert init_msg["behavior"] == "random"
 
 
 # ── Autonomous Mode Tests ───────────────────────────────────────────
@@ -1139,12 +1011,11 @@ class TestAutonomousMode:
     """Test autonomous (env-owning) mode: reset/step/stop protocol."""
 
     def _run_autonomous(self, commands: list[dict], task: str,
-                        behavior: str = "random", seed: int = 42) -> list[dict]:
+                        seed: int = 42) -> list[dict]:
         """Run autonomous mode with simulated stdin/stdout."""
         config = RandomWorkerConfig(
             run_id="auto_test",
             task=task,
-            behavior=behavior,
             seed=seed,
         )
         rt = RandomWorkerRuntime(config)
@@ -1289,39 +1160,6 @@ class TestAutonomousMode:
         # But we can check that reset works multiple times without crashing
         ready_responses = [r for r in responses if r["type"] == "ready"]
         assert len(ready_responses) == 3
-
-    def test_noop_behavior_autonomous(self):
-        """Noop behavior should always select action 0."""
-        commands = [{"cmd": "reset", "seed": 42}]
-        for _ in range(10):
-            commands.append({"cmd": "step"})
-        commands.append({"cmd": "stop"})
-
-        responses = self._run_autonomous(
-            commands, task="FrozenLake-v1", behavior="noop",
-        )
-
-        step_responses = [r for r in responses if r["type"] == "step"]
-        for r in step_responses:
-            assert r["action"] == 0
-
-    def test_cycling_behavior_autonomous(self):
-        """Cycling behavior should cycle through action space."""
-        commands = [{"cmd": "reset", "seed": 42}]
-        for _ in range(8):
-            commands.append({"cmd": "step"})
-        commands.append({"cmd": "stop"})
-
-        responses = self._run_autonomous(
-            commands, task="FrozenLake-v1", behavior="cycling",
-        )
-
-        step_responses = [r for r in responses if r["type"] == "step"]
-        actions = [r["action"] for r in step_responses]
-        # FrozenLake Discrete(4) -> 0,1,2,3,0,1,2,3
-        # But episode might end early, so just check what we got is valid cycling
-        for i, a in enumerate(actions):
-            assert a == i % 4
 
     # ── Real Environments ──
 
@@ -1530,11 +1368,10 @@ class TestMosaicMultigridAutonomous:
     """
 
     def _run_autonomous(self, commands: list[dict], task: str,
-                        behavior: str = "random", seed: int = 42) -> list[dict]:
+                        seed: int = 42) -> list[dict]:
         config = RandomWorkerConfig(
             run_id="mosaic_test",
             task=task,
-            behavior=behavior,
             seed=seed,
         )
         rt = RandomWorkerRuntime(config)
@@ -1625,44 +1462,6 @@ class TestMosaicMultigridAutonomous:
             assert isinstance(s["terminated"], bool)
             assert isinstance(s["truncated"], bool)
 
-    def test_soccer_2v2_cycling_actions_valid(self):
-        """Cycling behavior with Soccer 2v2: reported action should be in [0,8)."""
-        commands = [{"cmd": "reset", "seed": 42}]
-        for _ in range(16):
-            commands.append({"cmd": "step"})
-        commands.append({"cmd": "stop"})
-
-        responses = self._run_autonomous(
-            commands,
-            task="MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0",
-            behavior="cycling",
-        )
-
-        steps = [r for r in responses if r["type"] == "step"]
-        actions = [s["action"] for s in steps]
-        # Multi-agent: each step calls _select_action once per agent (4 for 2v2),
-        # so the cycling counter advances by 4 each env step.
-        # Reported action is the first agent's action.
-        for a in actions:
-            assert 0 <= a < 8
-
-    def test_soccer_2v2_noop_all_zeros(self):
-        """Noop behavior with Soccer 2v2 should always return 0."""
-        commands = [{"cmd": "reset", "seed": 42}]
-        for _ in range(20):
-            commands.append({"cmd": "step"})
-        commands.append({"cmd": "stop"})
-
-        responses = self._run_autonomous(
-            commands,
-            task="MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0",
-            behavior="noop",
-        )
-
-        steps = [r for r in responses if r["type"] == "step"]
-        for s in steps:
-            assert s["action"] == 0
-
     def test_basketball_3v3_reward_aggregation(self):
         """Basketball 3v3 dict rewards should be aggregated (summed)."""
         commands = [{"cmd": "reset", "seed": 42}]
@@ -1736,7 +1535,6 @@ class TestMosaicMultigridInteractive:
                 run_id=f"op_{player}",
                 task=task,
                 seed=42,
-                behavior="random",
             )
             rt = RandomWorkerRuntime(config)
             resp = rt.handle_init_agent({"game_name": task, "player_id": player})
@@ -1761,7 +1559,7 @@ class TestMosaicMultigridInteractive:
 
         for player in players:
             config = RandomWorkerConfig(
-                run_id=f"op_{player}", task=task, seed=99, behavior="random",
+                run_id=f"op_{player}", task=task, seed=99,
             )
             rt = RandomWorkerRuntime(config)
             resp = rt.handle_init_agent({"game_name": task, "player_id": player})

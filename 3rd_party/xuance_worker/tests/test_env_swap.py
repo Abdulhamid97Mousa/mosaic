@@ -1,11 +1,10 @@
-"""Regression test: curriculum environment swap must update agents.envs.
+"""Regression test: curriculum environment swap must update agent.train_envs.
 
-XuanCe's OnPolicyMARLAgents stores environments in ``self.envs``.
-The on-policy training loop (on_policy_marl.py) reads ``self.envs``
+XuanCe's MARLAgents stores training environments in ``self.train_envs``.
+The on-policy training loop (MAPPO_Agents.train()) reads ``self.train_envs``
 exclusively (buf_obs, step(), buf_state, etc.).  A previous bug set
-``runner.agents.train_envs`` (which doesn't exist on the agent) instead
-of ``runner.agents.envs``, causing the agent to keep training on the
-closed Phase-1 environment and crash.
+``runner.agents`` (which doesn't exist — the attribute is ``runner.agent``)
+causing an AttributeError at runtime.
 
 This test inspects the swap code in ``run_multi_agent_curriculum_training``
 to verify it targets the correct attribute.
@@ -32,11 +31,11 @@ def _make_mock_runner(initial_env_id: str = "collect_1vs1"):
         render_mode=None,
     )
 
-    # The agent exposes envs (used by XuanCe training loop)
-    agents = MagicMock()
-    agents.current_step = 0
-    agents.envs = MagicMock(name="old_collect_envs")
-    runner.agents = agents
+    # The agent exposes train_envs (used by XuanCe training loop)
+    agent = MagicMock()
+    agent.current_step = 0
+    agent.train_envs = MagicMock(name="old_collect_envs")
+    runner.agent = agent
 
     # runner.envs is the vectorized env holder on the runner side
     runner.envs = MagicMock(name="old_runner_envs")
@@ -45,38 +44,37 @@ def _make_mock_runner(initial_env_id: str = "collect_1vs1"):
 
 
 class TestEnvironmentSwapTargetsEnvs:
-    """Verify that environment swap sets agents.envs."""
+    """Verify that environment swap sets agent.train_envs."""
 
-    def test_swap_code_sets_agents_envs(self):
-        """The swap block must assign new_envs to runner.agents.envs."""
+    def test_swap_code_sets_agent_train_envs(self):
+        """The swap block must assign new_envs to runner.agent.train_envs."""
         import xuance_worker.multi_agent_curriculum_training as mod
 
         import inspect
         source = inspect.getsource(mod.run_multi_agent_curriculum_training)
-        assert "runner.agents.envs = new_envs" in source, (
-            "Environment swap must set runner.agents.envs.  XuanCe's "
-            "on_policy_marl.train() reads from self.envs exclusively."
+        assert "runner.agent.train_envs = new_envs" in source, (
+            "Environment swap must set runner.agent.train_envs.  XuanCe's "
+            "MAPPO_Agents.train() reads from self.train_envs exclusively."
         )
 
-    def test_swap_code_does_not_set_train_envs(self):
-        """The swap block must NOT set runner.agents.train_envs (wrong attribute)."""
+    def test_swap_code_does_not_use_agents_plural(self):
+        """The swap block must NOT use runner.agents (wrong attribute name)."""
         import xuance_worker.multi_agent_curriculum_training as mod
 
         import inspect
         source = inspect.getsource(mod.run_multi_agent_curriculum_training)
-        assert "runner.agents.train_envs = new_envs" not in source, (
-            "Environment swap must NOT set runner.agents.train_envs -- "
-            "that attribute does not exist in XuanCe's MARLAgents.  "
-            "Use runner.agents.envs instead."
+        assert "runner.agents." not in source, (
+            "Environment swap must NOT use runner.agents (plural) -- "
+            "RunnerMARL uses self.agent (singular)."
         )
 
     def test_assertion_guard_present(self):
-        """The swap code must contain a runtime assertion on agents.envs."""
+        """The swap code must contain a runtime assertion on agent.train_envs."""
         import xuance_worker.multi_agent_curriculum_training as mod
 
         import inspect
         source = inspect.getsource(mod.run_multi_agent_curriculum_training)
-        assert "assert runner.agents.envs is new_envs" in source, (
+        assert "assert runner.agent.train_envs is new_envs" in source, (
             "Environment swap must include a runtime assertion that "
-            "verifies agents.envs was correctly set."
+            "verifies agent.train_envs was correctly set."
         )

@@ -24,6 +24,7 @@ Analytics Integration:
 
 from __future__ import annotations
 
+import json as _json
 import logging
 import os
 import sys
@@ -129,11 +130,15 @@ from gym_gui.logging_config.log_constants import (
     LOG_WORKER_RAY_RUNTIME_STARTED,
     LOG_WORKER_RAY_RUNTIME_COMPLETED,
     LOG_WORKER_RAY_RUNTIME_FAILED,
+    LOG_WORKER_RAY_CLUSTER_STARTED,
+    LOG_WORKER_RAY_RLLIB_TRAINING_STARTED,
     LOG_WORKER_RAY_HEARTBEAT,
     LOG_WORKER_RAY_TENSORBOARD_ENABLED,
     LOG_WORKER_RAY_WANDB_ENABLED,
     LOG_WORKER_RAY_CHECKPOINT_SAVED,
     LOG_WORKER_RAY_ANALYTICS_MANIFEST_CREATED,
+    LOG_WORKER_RAY_LOG_FILE_CREATED,
+    LOG_WORKER_RAY_ALGORITHM_BUILT,
 )
 
 from .config import (
@@ -154,6 +159,52 @@ from .algo_params import (
 
 if TYPE_CHECKING:
     from torch.utils.tensorboard import SummaryWriter
+
+# Standard LogRecord attribute names (used to identify custom extra fields).
+_STANDARD_LOG_ATTRS = frozenset(
+    logging.LogRecord("", 0, "", 0, "", (), None).__dict__
+)
+
+_HUMAN_FMT = "%(asctime)s [%(levelname)s] %(name)s: %(message)s"
+_DATE_FMT = "%Y-%m-%d %H:%M:%S"
+
+
+class _StructuredLogFormatter(logging.Formatter):
+    """Formatter that emits pipe-delimited output for ``log_constant()`` records.
+
+    Records produced by :func:`log_constant` carry a ``log_code`` attribute in
+    *extra*.  This formatter detects that attribute and renders the line as::
+
+        LOG_CODE | human message | extra={"key": "value", ...}
+
+    which the dispatcher's ``_parse_structured_log_line()`` can parse.
+
+    All other records fall back to the standard human-readable format.
+    """
+
+    def __init__(self) -> None:
+        super().__init__(_HUMAN_FMT, datefmt=_DATE_FMT)
+
+    def format(self, record: logging.LogRecord) -> str:
+        code: str | None = getattr(record, "log_code", None)
+        if not code:
+            return super().format(record)
+
+        # Build message text — strip the leading "LOG_CODE " prefix that
+        # log_constant() prepends via ``"%s %s" % (code, text)``.
+        msg = record.getMessage()
+        prefix = f"{code} "
+        if msg.startswith(prefix):
+            msg = msg[len(prefix):]
+
+        # Collect the extra payload (all non-standard record attributes).
+        extra: dict[str, Any] = {}
+        for key, val in record.__dict__.items():
+            if key not in _STANDARD_LOG_ATTRS:
+                extra[key] = val
+
+        return f"{code} | {msg} | extra={_json.dumps(extra, default=str)}"
+
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -874,12 +925,51 @@ class RayWorkerRuntime:
         return config.training(**training_params)
 
     def _setup_logging(self) -> None:
-        """Set up logging for the training run."""
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s [%(levelname)s] %(name)s: %(message)s",
-            datefmt="%Y-%m-%d %H:%M:%S",
-        )
+        """Set up logging for the training run.
+
+        Configures:
+        * **stdout** — uses :class:`_StructuredLogFormatter` so that
+          ``log_constant()`` records are emitted in the pipe-delimited format
+          the dispatcher's ``_parse_structured_log_line()`` expects.
+        * **File handler** — writes human-readable logs to
+          ``{logs_dir}/worker.log`` for post-mortem diagnostics.
+        """
+        root = logging.getLogger()
+
+        # Remove any handlers left over from cli.py's basicConfig so we can
+        # set up our own stdout handler with the structured formatter.
+        for h in list(root.handlers):
+            root.removeHandler(h)
+        root.setLevel(logging.DEBUG)
+
+        # Stdout handler — structured format for dispatcher parsing
+        stdout_handler = logging.StreamHandler(sys.stdout)
+        stdout_handler.setLevel(logging.INFO)
+        stdout_handler.setFormatter(_StructuredLogFormatter())
+        root.addHandler(stdout_handler)
+
+        # File handler — human-readable format for post-mortem
+        try:
+            logs_dir = self.config.logs_dir
+            logs_dir.mkdir(parents=True, exist_ok=True)
+            file_handler = logging.FileHandler(
+                logs_dir / "worker.log", encoding="utf-8",
+            )
+            file_handler.setLevel(logging.DEBUG)
+            file_handler.setFormatter(
+                logging.Formatter(_HUMAN_FMT, datefmt=_DATE_FMT)
+            )
+            root.addHandler(file_handler)
+            log_constant(
+                _LOGGER,
+                LOG_WORKER_RAY_LOG_FILE_CREATED,
+                extra={
+                    "run_id": self.config.run_id,
+                    "log_file": str(logs_dir / "worker.log"),
+                },
+            )
+        except OSError as exc:
+            _LOGGER.warning("Failed to create log file handler: %s", exc)
 
     def _setup_analytics(self) -> None:
         """Set up TensorBoard and WandB logging.
@@ -1173,10 +1263,16 @@ class RayWorkerRuntime:
         os.environ["SDL_VIDEODRIVER"] = "dummy"
         os.environ["SDL_AUDIODRIVER"] = "dummy"
 
-        _LOGGER.info(f"Starting Ray RLlib training: {self.config.run_id}")
-        _LOGGER.info(f"Environment: {self.config.environment.family}/{self.config.environment.env_id}")
-        _LOGGER.info(f"Policy Configuration: {self.config.policy_configuration.value}")
-        _LOGGER.info(f"Total timesteps: {self.config.training.total_timesteps}")
+        log_constant(
+            _LOGGER,
+            LOG_WORKER_RAY_RLLIB_TRAINING_STARTED,
+            extra={
+                "run_id": self.config.run_id,
+                "env": f"{self.config.environment.family}/{self.config.environment.env_id}",
+                "policy": self.config.policy_configuration.value,
+                "total_timesteps": self.config.training.total_timesteps,
+            },
+        )
 
         # Emit run started event
         self._emitter.run_started(
@@ -1221,6 +1317,11 @@ class RayWorkerRuntime:
         for key, value in runtime_env_vars.items():
             os.environ[key] = value
 
+        # Raise Ray's OOM kill threshold to avoid premature worker kills.
+        # Default 0.95 is too aggressive when the host runs other services
+        # (UI, TensorBoard, gRPC proxy). Set to 0.98 so workers survive init.
+        os.environ.setdefault("RAY_memory_usage_threshold", "0.98")
+
         # Initialize Ray with env vars for all workers
         if not ray.is_initialized():
             ray.init(
@@ -1228,21 +1329,44 @@ class RayWorkerRuntime:
                 log_to_driver=True,
                 runtime_env={"env_vars": runtime_env_vars},
             )
+            log_constant(
+                _LOGGER,
+                LOG_WORKER_RAY_CLUSTER_STARTED,
+                extra={"run_id": self.config.run_id},
+            )
 
         try:
             # Build algorithm (use build_algo() for RLlib 2.x+)
             algo_config = self._build_algorithm_config()
 
-            # Create custom logger_creator to redirect Ray's logs to our run directory
-            # This ensures Ray RLlib writes TensorBoard events to var/trainer/runs/{run_id}/
-            # Note: run_dir was already created above when setting RAY_AIR_LOCAL_CACHE_DIR
+            # Create custom logger_creator to redirect Ray's logs to the tensorboard
+            # subdirectory so they don't pollute the run root with stray tfevents files.
+            tb_log_dir = run_dir / "tensorboard"
+            tb_log_dir.mkdir(parents=True, exist_ok=True)
+
             def custom_logger_creator(config):
                 from ray.tune.logger import UnifiedLogger
-                return UnifiedLogger(config, str(run_dir), loggers=None)
+                return UnifiedLogger(config, str(tb_log_dir), loggers=None)
 
-            self._algorithm = algo_config.build_algo(logger_creator=custom_logger_creator)
+            try:
+                self._algorithm = algo_config.build_algo(logger_creator=custom_logger_creator)
+            except IndexError as e:
+                # Ray's get_spaces() fails with IndexError when ALL env runners
+                # were OOM-killed before init. Surface a clear message.
+                raise RuntimeError(
+                    f"Ray algorithm build failed ({e}). This usually means "
+                    f"RolloutWorker actors were killed by Ray's OOM monitor. "
+                    f"Try reducing num_env_runners or freeing memory on the host."
+                ) from e
 
-            _LOGGER.info(f"Algorithm built successfully, logging to: {run_dir}")
+            log_constant(
+                _LOGGER,
+                LOG_WORKER_RAY_ALGORITHM_BUILT,
+                extra={
+                    "run_id": self.config.run_id,
+                    "tensorboard_dir": str(tb_log_dir),
+                },
+            )
 
             # Calculate iterations using train_batch_size from algo_params
             train_batch_size = self.config.training.algo_params.get("train_batch_size", 4000)
@@ -1296,7 +1420,6 @@ class RayWorkerRuntime:
                         checkpoint_path = ckpt_result.checkpoint.path
                     else:
                         checkpoint_path = str(ckpt_result)
-                    _LOGGER.info(f"Checkpoint saved: {checkpoint_path}")
                     log_constant(
                         _LOGGER,
                         LOG_WORKER_RAY_CHECKPOINT_SAVED,
@@ -1323,7 +1446,6 @@ class RayWorkerRuntime:
                     final_checkpoint = result.checkpoint.path
                 else:
                     final_checkpoint = str(result)
-                _LOGGER.info(f"Final checkpoint saved: {final_checkpoint}")
                 log_constant(
                     _LOGGER,
                     LOG_WORKER_RAY_CHECKPOINT_SAVED,
@@ -1354,7 +1476,13 @@ class RayWorkerRuntime:
             return final_result
 
         except Exception as e:
-            _LOGGER.error(f"Training failed: {e}", exc_info=True)
+            log_constant(
+                _LOGGER,
+                LOG_WORKER_RAY_RUNTIME_FAILED,
+                message=str(e),
+                extra={"run_id": self.config.run_id, "error_type": type(e).__name__},
+                exc_info=e,
+            )
             print(f"[ERROR] run_id={self.config.run_id} error={str(e)}")
             sys.stdout.flush()
             # Emit run failed event

@@ -323,10 +323,40 @@ class TestInteractiveRuntimePlayerIdRouting:
         runtime._emit = lambda data: captured.append(data)
         return captured
 
-    def _mock_agent(self, action: int = 4) -> MagicMock:
-        """Create an agent that always returns a fixed action."""
+    def _mock_agent(self, action: int = 4, parameter_sharing: bool = False,
+                    agent_keys: Optional[List[str]] = None) -> MagicMock:
+        """Create an agent that always returns a fixed action.
+
+        Args:
+            action: The integer action the mock policy returns.
+            parameter_sharing: If True, mock MAPPO shared-network agent.
+                               If False (default), mock IPPO per-agent agent.
+            agent_keys: List of agent key strings. Defaults to ["agent_0", "agent_1"].
+        """
+        import torch
+
+        if agent_keys is None:
+            agent_keys = ["agent_0", "agent_1"]
+
         agent = MagicMock()
+        agent.use_parameter_sharing = parameter_sharing
+        agent.agent_keys = agent_keys
+        agent.model_keys = [agent_keys[0]] if parameter_sharing else agent_keys
         agent.action.return_value = np.array([action])
+
+        # Mock policy() to return (values, {agent_key: dist}) as _get_marl_action expects.
+        action_tensor = torch.tensor([action])
+        dist_mock = MagicMock()
+        dist_mock.stochastic_sample.return_value = action_tensor
+        dist_mock.deterministic_sample.return_value = action_tensor
+        dist_mock.distribution.probs = torch.tensor([[1.0]])
+
+        def _policy_side_effect(observation=None, agent_ids=None, agent_key=None):
+            values = torch.zeros(1)
+            pi_dists = {agent_key: dist_mock} if agent_key else {k: dist_mock for k in agent_keys}
+            return values, pi_dists
+
+        agent.policy.side_effect = _policy_side_effect
         return agent
 
     # --- init_agent ---
@@ -417,7 +447,7 @@ class TestInteractiveRuntimePlayerIdRouting:
         runtime = self._make_runtime(method="mappo")
         captured = self._capture_emit(runtime)
         runtime._n_agents = 2
-        runtime._agent = self._mock_agent(action=1)
+        runtime._agent = self._mock_agent(action=1, parameter_sharing=True)
         runtime._player_id = "agent_0"
 
         obs_27 = np.zeros(27, dtype=np.float32).tolist()
@@ -427,18 +457,17 @@ class TestInteractiveRuntimePlayerIdRouting:
             "player_id": "agent_0",
         })
 
-        # Verify _agent.action was called with obs of length 29 (27 + one_hot)
-        call_args = runtime._agent.action.call_args
-        obs_passed = call_args[0][0]
-        assert len(obs_passed) == 29, "MAPPO obs must be 27 + 2 one-hot = 29"
-        np.testing.assert_array_equal(obs_passed[27:], [1.0, 0.0])
+        # Verify policy() was called with correct agents_id one-hot
+        call_kwargs = runtime._agent.policy.call_args[1]
+        agents_id = call_kwargs["agent_ids"]
+        np.testing.assert_array_equal(agents_id[0].cpu().numpy(), [1.0, 0.0])
 
     def test_mappo_agent_1_one_hot_is_01(self):
         """MAPPO: agent_1's one-hot in a 2-agent game must be [0, 1]."""
         runtime = self._make_runtime(method="mappo")
         captured = self._capture_emit(runtime)
         runtime._n_agents = 2
-        runtime._agent = self._mock_agent(action=2)
+        runtime._agent = self._mock_agent(action=2, parameter_sharing=True)
         runtime._player_id = "agent_1"
 
         obs_27 = np.zeros(27, dtype=np.float32).tolist()
@@ -448,10 +477,9 @@ class TestInteractiveRuntimePlayerIdRouting:
             "player_id": "agent_1",
         })
 
-        call_args = runtime._agent.action.call_args
-        obs_passed = call_args[0][0]
-        assert len(obs_passed) == 29
-        np.testing.assert_array_equal(obs_passed[27:], [0.0, 1.0])
+        call_kwargs = runtime._agent.policy.call_args[1]
+        agents_id = call_kwargs["agent_ids"]
+        np.testing.assert_array_equal(agents_id[0].cpu().numpy(), [0.0, 1.0])
 
     def test_mappo_different_one_hot_per_agent(self):
         """MAPPO agent_0 and agent_1 must receive different one-hot vectors."""
@@ -460,17 +488,17 @@ class TestInteractiveRuntimePlayerIdRouting:
         self._capture_emit(rt0)
         self._capture_emit(rt1)
         rt0._n_agents = rt1._n_agents = 2
-        rt0._agent = self._mock_agent(action=1)
-        rt1._agent = self._mock_agent(action=1)
+        rt0._agent = self._mock_agent(action=1, parameter_sharing=True)
+        rt1._agent = self._mock_agent(action=1, parameter_sharing=True)
 
         obs_27 = np.zeros(27, dtype=np.float32).tolist()
         rt0._handle_select_action({"cmd": "select_action", "observation": obs_27, "player_id": "agent_0"})
         rt1._handle_select_action({"cmd": "select_action", "observation": obs_27, "player_id": "agent_1"})
 
-        obs_0 = rt0._agent.action.call_args[0][0]
-        obs_1 = rt1._agent.action.call_args[0][0]
+        ids_0 = rt0._agent.policy.call_args[1]["agent_ids"][0].cpu().numpy()
+        ids_1 = rt1._agent.policy.call_args[1]["agent_ids"][0].cpu().numpy()
 
-        assert not np.array_equal(obs_0[27:], obs_1[27:]), (
+        assert not np.array_equal(ids_0, ids_1), (
             "agent_0 and agent_1 must have different one-hot suffixes"
         )
 

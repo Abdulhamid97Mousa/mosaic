@@ -8,7 +8,7 @@ import pytest
 
 # Path to the trained IPPO checkpoint (collect_1vs1, phase1)
 CHECKPOINT_PATH = (
-    "/home/hamid/Desktop/Projects/GUI_BDI_RL/var/trainer/custom_scripts/"
+    "/home/hamid/Desktop/software/mosaic/var/trainer/custom_scripts/"
     "01KHZWG493V7QFPQ0NNXQW1Y1A/checkpoints/torch/collect_1vs1/"
     "seed_1_2026_0221_183918/final_train_model.pth"
 )

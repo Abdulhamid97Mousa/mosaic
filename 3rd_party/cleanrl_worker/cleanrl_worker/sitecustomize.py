@@ -100,7 +100,9 @@ try:  # pragma: no cover - gym optional
             if env_id.startswith("MiniGrid") or env_id.startswith("BabyAI"):
                 _is_minigrid_env = True
                 try:
-                    import minigrid  # noqa: F401 - registers MiniGrid/BabyAI envs
+                    import minigrid  # noqa: F401
+                    if hasattr(minigrid, "register_minigrid_envs"):
+                        minigrid.register_minigrid_envs()
                 except ImportError:
                     pass
 

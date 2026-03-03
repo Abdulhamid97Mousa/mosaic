@@ -19,9 +19,9 @@ class TelemetrySchemaValidator:
 
     def __init__(self, agent_type: str = "Headless"):
         """Initialize validator for given agent type.
-        
+
         Args:
-            agent_type: Type of agent ("BDI", "Headless", etc.)
+            agent_type: Type of agent ("Headless", etc.)
         """
         self.agent_type = agent_type
         self.agent_config = get_agent_config(agent_type)

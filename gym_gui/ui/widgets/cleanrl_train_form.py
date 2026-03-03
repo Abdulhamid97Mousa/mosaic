@@ -1089,7 +1089,7 @@ class CleanRlTrainForm(QtWidgets.QDialog, LogConstantMixin):
                 "fastlane_grid_limit": int(state.fastlane_grid_limit),
             },
             "worker": {
-                "worker_id": "cleanrl_worker",
+                "worker_id": state.worker_id or "cleanrl_worker",
                 "module": "cleanrl_worker.cli",
                 "use_grpc": True,
                 "grpc_target": "127.0.0.1:50055",

@@ -1,0 +1,94 @@
+# MANIFEST.in for mosaic-platform
+# This file controls what gets included/excluded in the PyPI distribution
+
+# =============================================================================
+# INCLUDE - Essential files
+# =============================================================================
+
+include LICENSE
+include README.md
+include pyproject.toml
+include MANIFEST.in
+include .env.example
+
+# Include requirements files
+recursive-include requirements *.txt *.md
+
+# Include metadata directory
+recursive-include metadata *
+
+# Include experiment configs (small)
+recursive-include experiments *.py *.yaml *.yml *.json
+
+# =============================================================================
+# EXCLUDE - Documentation (heavy, hosted on ReadTheDocs)
+# =============================================================================
+
+prune docs
+
+# =============================================================================
+# EXCLUDE - Development/IDE files
+# =============================================================================
+
+prune .claude
+prune .cursor
+prune .pytest_cache
+prune .venv
+prune .git
+
+# =============================================================================
+# EXCLUDE - 3rd party directories NOT needed in PyPI package
+# =============================================================================
+
+# Deprecated/internal workers
+prune 3rd_party/DI-engine
+prune 3rd_party/unreal_map_worker
+prune 3rd_party/godot_worker
+
+# Submodule directories (users install via pip)
+prune 3rd_party/Syllabus
+
+# =============================================================================
+# INCLUDE - Essential 3rd party workers (Python packages only)
+# =============================================================================
+
+# Include only the Python source files for workers
+recursive-include 3rd_party/balrog_worker *.py
+recursive-include 3rd_party/chess_worker *.py
+recursive-include 3rd_party/cleanrl_worker *.py
+recursive-include 3rd_party/jumanji_worker *.py
+recursive-include 3rd_party/llm_game_worker *.py
+recursive-include 3rd_party/marllib_worker *.py
+recursive-include 3rd_party/mctx_worker *.py
+recursive-include 3rd_party/mosaic *.py
+recursive-include 3rd_party/mosaic_multigrid *.py
+recursive-include 3rd_party/mujoco_mpc_worker *.py
+recursive-include 3rd_party/multigrid-ini *.py
+recursive-include 3rd_party/pettingzoo_worker *.py
+recursive-include 3rd_party/procgen *.py
+recursive-include 3rd_party/ray_worker *.py
+recursive-include 3rd_party/shimmy_worker *.py
+recursive-include 3rd_party/stockfish_worker *.py
+recursive-include 3rd_party/xuance_worker *.py
+
+# =============================================================================
+# EXCLUDE - Test cache and build artifacts
+# =============================================================================
+
+global-exclude *.pyc
+global-exclude *.pyo
+global-exclude __pycache__
+global-exclude *.egg-info
+global-exclude .DS_Store
+global-exclude *.so
+global-exclude *.dll
+global-exclude *.dylib
+
+# =============================================================================
+# EXCLUDE - Runtime artifacts
+# =============================================================================
+
+prune var
+prune logs
+prune build
+prune dist

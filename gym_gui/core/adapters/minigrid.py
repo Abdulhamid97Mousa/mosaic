@@ -28,13 +28,29 @@ from gym_gui.logging_config.log_constants import (
 )
 
 try:  # pragma: no cover - import guard exercised in integration tests
+    from minigrid import register_minigrid_envs
     from minigrid.wrappers import ImgObsWrapper, RGBImgPartialObsWrapper
+
+    register_minigrid_envs()
+
+    # minigrid >=2.3 bug: RGBImgPartialObsWrapper.observation calls
+    # self.get_frame() but get_frame lives on the unwrapped MiniGridEnv.
+    if not hasattr(RGBImgPartialObsWrapper, "get_frame"):
+
+        def _patched_observation(self, obs):  # type: ignore[override]
+            rgb = self.unwrapped.get_frame(tile_size=self.tile_size, agent_pov=True)
+            return {**obs, "image": rgb}
+
+        RGBImgPartialObsWrapper.observation = _patched_observation  # type: ignore[assignment]
 except ImportError:  # pragma: no cover - handled gracefully at runtime
     ImgObsWrapper = None  # type: ignore[assignment]
     RGBImgPartialObsWrapper = None  # type: ignore[assignment]
 
 
 _MINIGRID_STEP_LOG_FREQUENCY = 100
+
+# MiniGrid/BabyAI action labels (7 actions)
+MINIGRID_ACTIONS = ["Turn Left", "Turn Right", "Forward", "Pickup", "Drop", "Toggle", "Done"]
 
 
 @dataclass(slots=True)
@@ -555,6 +571,7 @@ MINIGRID_ADAPTERS: dict[GameId, type[MiniGridAdapter]] = {
 
 
 __all__ = [
+    "MINIGRID_ACTIONS",
     "MiniGridAdapter",
     "MiniGridEmpty5x5Adapter",
     "MiniGridEmptyRandom5x5Adapter",

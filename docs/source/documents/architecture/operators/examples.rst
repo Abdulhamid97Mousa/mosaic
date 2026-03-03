@@ -318,11 +318,11 @@ zero-sum games.
    and runtime use ``gymnasium.make(task)`` -- never hardcode class
    imports.
 
-Random Baseline Operator
--------------------------
+Random Operator
+----------------
 
-**Category:** ``baseline``
-**Worker:** ``operators_worker``
+**Category:** ``random``
+**Worker:** ``random_worker``
 **Environments:** Any
 
 The simplest non-human operator -- selects random actions from the
@@ -333,8 +333,8 @@ scripted experiments.
 
    config = OperatorConfig.single_agent(
        operator_id="random_1",
-       operator_type="baseline",
-       worker_id="operators_worker",
+       operator_type="random",
+       worker_id="random_worker",
        display_name="Random Agent",
        env_name="minigrid",
        task="MiniGrid-Empty-8x8-v0",
@@ -424,10 +424,10 @@ Each operator gets its own:
            },
        },
        {
-           "id": "random_baseline",
+           "id": "random_agent",
            "name": "Random",
-           "type": "baseline",
-           "worker_id": "operators_worker",
+           "type": "random",
+           "worker_id": "random_worker",
            "env_name": "minigrid",
            "task": "BabyAI-GoToRedBall-v0",
        },
@@ -459,7 +459,7 @@ Comparison Table
      - llm
      - llm
      - rl
-     - baseline
+     - random
      - llm
    * - **Subprocess**
      - No

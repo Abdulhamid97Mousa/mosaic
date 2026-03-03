@@ -234,7 +234,7 @@ class TestChessHandlerIntegration:
 
     def test_handler_get_piece_from_fen(self) -> None:
         """ChessHandler._get_piece_from_fen parses FEN correctly."""
-        from gym_gui.ui.handlers.chess_handlers import ChessHandler
+        from gym_gui.ui.handlers.game_moves.chess import ChessHandler
 
         # Starting position
         fen = "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1"
@@ -255,7 +255,7 @@ class TestChessHandlerIntegration:
 
     def test_handler_is_chess_payload(self) -> None:
         """ChessHandler.is_chess_payload identifies chess payloads."""
-        from gym_gui.ui.handlers.chess_handlers import ChessHandler
+        from gym_gui.ui.handlers.game_moves.chess import ChessHandler
 
         chess_payload = {"fen": "...", "legal_moves": ["e2e4"]}
         assert ChessHandler.is_chess_payload(chess_payload) is True

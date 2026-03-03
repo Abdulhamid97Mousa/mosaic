@@ -1,4 +1,4 @@
-"""MOSAIC MultiGrid Extension for BALROG.
+"""MOSAIC MultiGrid Extension for LLM Worker.
 
 Multi-agent coordination strategies and Theory of Mind observations for LLMs.
 

@@ -855,8 +855,12 @@ class InteractiveRuntime:
         is_minigrid = env_id.startswith("MiniGrid") or env_id.startswith("BabyAI")
         if is_minigrid:
             try:
-                import minigrid  # noqa: F401 - registers MiniGrid/BabyAI envs
-                LOGGER.debug("Imported minigrid to register environments")
+                import minigrid
+                import gymnasium
+                # Only register if not already registered (avoid duplicate registration warnings)
+                if "MiniGrid-Empty-5x5-v0" not in gymnasium.registry:
+                    minigrid.register_minigrid_envs()  # Required in minigrid 2.3.1+
+                LOGGER.debug("Registered minigrid environments")
             except ImportError:
                 LOGGER.warning("minigrid package not installed")
 
@@ -911,13 +915,6 @@ class InteractiveRuntime:
         if env_family in ("mosaic_multigrid", "ini_multigrid"):
             xuance_env = "multigrid"
 
-        # Build parser args for XuanCe
-        parser_args = SimpleNamespace()
-        parser_args.dl_toolbox = self._dl_toolbox
-        parser_args.device = self._device
-        parser_args.parallels = 1
-        parser_args.running_steps = 1  # Not training, just loading
-
         # Resolve config YAML from the worker's own configs directory.
         # XuanCe's get_runner() looks in its vendored package configs/ by default,
         # which doesn't contain our multigrid configs.
@@ -926,6 +923,117 @@ class InteractiveRuntime:
         xuance_env_id = _gymnasium_to_xuance_env_id(self._env_id) or self._env_id
         if xuance_env_id != self._env_id:
             LOGGER.info("Mapped gymnasium ID '%s' -> xuance env_id '%s'", self._env_id, xuance_env_id)
+
+        # Build parser args for XuanCe
+        parser_args = SimpleNamespace()
+        parser_args.dl_toolbox = self._dl_toolbox
+        parser_args.device = self._device
+        parser_args.parallels = 1
+        parser_args.running_steps = 1  # Not training, just loading
+
+        # Auto-detect training config from checkpoint directory to match architecture.
+        # If the checkpoint was trained with RNN (e.g., IPPO+GRU), we need to load
+        # the same architecture parameters (use_rnn, representation, rnn_hidden_size).
+        # Look for training config JSON in the checkpoint's parent directories.
+        training_config_loaded = False
+        checkpoint_dir = policy_file.parent
+        for _ in range(5):  # Search up to 5 levels up
+            config_candidates = [
+                checkpoint_dir / "config" / f"{self._method}_gru_{xuance_env_id}_config.json",
+                checkpoint_dir / "config" / f"{self._method}_{xuance_env_id}_config.json",
+            ]
+
+            # Add fallback: search for ANY config file matching the method pattern
+            # This handles env_id variants (e.g., indagobs vs teamobs)
+            config_dir = checkpoint_dir / "config"
+            if config_dir.exists():
+                for config_file_path in config_dir.glob(f"{self._method}_*.json"):
+                    if config_file_path not in config_candidates:
+                        config_candidates.append(config_file_path)
+
+            # Always check base_config.json last as a final fallback
+            config_candidates.append(checkpoint_dir / "config" / "base_config.json")
+
+            for config_file in config_candidates:
+                if config_file.exists():
+                    try:
+                        import json
+                        with open(config_file, 'r') as f:
+                            training_config = json.load(f)
+
+                        # Extract architecture parameters from training config
+                        extras = training_config.get("extras", {})
+
+                        # Check if algo differs from method (e.g., algo=mappo but method=ippo)
+                        # This happens when the config is mislabeled - use the actual algo
+                        training_algo = training_config.get("algo")
+                        if training_algo and training_algo != self._method:
+                            LOGGER.warning(
+                                "Training config has algo='%s' but runtime method='%s'. "
+                                "Using training algo to match checkpoint architecture.",
+                                training_algo, self._method
+                            )
+                            self._method = training_algo
+
+                        # Apply architecture parameters from training config to match checkpoint.
+                        # This includes RNN settings, hidden layer sizes, and other hyperparameters
+                        # that may differ from the YAML config defaults.
+                        config_applied = False
+
+                        if extras.get("use_rnn") or extras.get("representation") == "Basic_RNN":
+                            LOGGER.info("Detected RNN architecture in training config: %s", config_file)
+                            # Apply RNN parameters to parser_args
+                            # XuanCe expects these as individual attributes on parser_args
+                            parser_args.representation = extras.get("representation", "Basic_RNN")
+                            parser_args.use_rnn = True
+                            parser_args.rnn = extras.get("rnn", "GRU")
+                            parser_args.recurrent_hidden_size = extras.get("recurrent_hidden_size", 64)
+                            parser_args.N_recurrent_layers = extras.get("N_recurrent_layers", 1)
+                            parser_args.dropout = extras.get("dropout", 0)
+                            config_applied = True
+                            LOGGER.info("Loaded RNN config: representation=%s, rnn=%s, recurrent_hidden=%d",
+                                       parser_args.representation, parser_args.rnn,
+                                       parser_args.recurrent_hidden_size)
+
+                        # Apply hidden layer sizes from training config (critical for checkpoint compatibility).
+                        # Training configs often use custom hidden sizes (e.g., 128) that differ from
+                        # YAML defaults (e.g., 64). Must match checkpoint architecture exactly.
+                        if "fc_hidden_sizes" in extras:
+                            parser_args.fc_hidden_sizes = extras["fc_hidden_sizes"]
+                            config_applied = True
+                            LOGGER.info("Applied fc_hidden_sizes from training config: %s", parser_args.fc_hidden_sizes)
+
+                        if "actor_hidden_size" in extras:
+                            parser_args.actor_hidden_size = extras["actor_hidden_size"]
+                            config_applied = True
+
+                        if "critic_hidden_size" in extras:
+                            parser_args.critic_hidden_size = extras["critic_hidden_size"]
+                            config_applied = True
+
+                        if "representation_hidden_size" in extras:
+                            parser_args.representation_hidden_size = extras["representation_hidden_size"]
+                            config_applied = True
+
+                        # Mark as loaded if we applied any config or corrected the algo
+                        if config_applied or (training_algo and training_algo != self._method):
+                            training_config_loaded = True
+
+                        if training_config_loaded:
+                            break
+                    except Exception as e:
+                        LOGGER.warning("Failed to load training config from %s: %s", config_file, e)
+
+            if training_config_loaded:
+                break
+
+            # Move up one directory level
+            if checkpoint_dir.parent == checkpoint_dir:
+                break
+            checkpoint_dir = checkpoint_dir.parent
+
+        if not training_config_loaded:
+            LOGGER.info("No RNN training config found, using default MLP architecture")
 
         config_path = _resolve_custom_config_path(
             method=self._method,

@@ -37,6 +37,7 @@ class FastLaneConsumer(QtCore.QObject):
         self._run_id = run_id
         self._reader: FastLaneReader | None = None
         self._header_warning_emitted = False
+        self._unavailable_logged = False
         self._timer = QtCore.QTimer(self)
         self._timer.setInterval(16)
         self._timer.timeout.connect(self._poll)
@@ -48,11 +49,14 @@ class FastLaneConsumer(QtCore.QObject):
             self._reader = FastLaneReader.attach(self._run_id)
             self.status_changed.emit("connected")
             self._header_warning_emitted = False
+            self._unavailable_logged = False
             log_constant(_LOGGER, LOG_FASTLANE_CONNECTED, extra={"run_id": self._run_id})
         except FileNotFoundError:
             self._reader = None
             self.status_changed.emit("fastlane-unavailable")
-            log_constant(_LOGGER, LOG_FASTLANE_UNAVAILABLE, extra={"run_id": self._run_id})
+            if not self._unavailable_logged:
+                log_constant(_LOGGER, LOG_FASTLANE_UNAVAILABLE, extra={"run_id": self._run_id})
+                self._unavailable_logged = True
 
     def _poll(self) -> None:
         reader = self._reader
@@ -88,7 +92,9 @@ class FastLaneConsumer(QtCore.QObject):
                 return
             frame = reader.latest_frame()
         except FileNotFoundError:
-            log_constant(_LOGGER, LOG_FASTLANE_UNAVAILABLE, extra={"run_id": self._run_id})
+            if not self._unavailable_logged:
+                log_constant(_LOGGER, LOG_FASTLANE_UNAVAILABLE, extra={"run_id": self._run_id})
+                self._unavailable_logged = True
             self._handle_reader_failure()
             return
         except Exception as exc:

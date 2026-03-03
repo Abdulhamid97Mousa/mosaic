@@ -58,7 +58,7 @@ def test_metadata_loader_extracts_run(monkeypatch, tmp_path):
     var_dir = tmp_path / "var" / "trainer"
     monkeypatch.setattr("gym_gui.config.paths.VAR_TRAINER_DIR", var_dir)
     monkeypatch.setattr(
-        "gym_gui.workers.cleanrl_policy_metadata.VAR_TRAINER_DIR",
+        "gym_gui.policy_discovery.cleanrl_policy_metadata.VAR_TRAINER_DIR",
         var_dir,
     )
     run_id = "01TESTMETADATA"

@@ -1,7 +1,7 @@
-"""Runtime for BALROG Worker.
+"""Runtime for LLM Worker.
 
 This module provides the main episode loop that:
-1. Creates BALROG environments and agents
+1. Creates environments and agents
 2. Runs episodes with LLM-based action selection
 3. Emits telemetry for the GUI
 """
@@ -26,25 +26,25 @@ try:
     from gym_gui.core.worker import TelemetryEmitter as StandardTelemetryEmitter
     from gym_gui.logging_config.helpers import log_constant
     from gym_gui.logging_config.log_constants import (
-        LOG_WORKER_BALROG_RUNTIME_STARTED,
-        LOG_WORKER_BALROG_RUNTIME_STOPPED,
-        LOG_WORKER_BALROG_RUNTIME_ERROR,
-        LOG_WORKER_BALROG_EPISODE_STARTED,
-        LOG_WORKER_BALROG_EPISODE_COMPLETED,
-        LOG_WORKER_BALROG_LLM_REQUEST,
-        LOG_WORKER_BALROG_LLM_RESPONSE,
-        LOG_WORKER_BALROG_LLM_ERROR,
-        LOG_WORKER_BALROG_ACTION_SELECTED,
-        LOG_WORKER_BALROG_STEP_TELEMETRY,
-        LOG_WORKER_BALROG_EPISODE_TELEMETRY,
-        LOG_WORKER_BALROG_CONFIG_LOADED,
-        LOG_WORKER_BALROG_ENV_CREATED,
-        LOG_WORKER_BALROG_AGENT_CREATED,
-        LOG_WORKER_BALROG_DEBUG,
+        LOG_MOSAIC_WORKER_LLM_RUNTIME_STARTED,
+        LOG_MOSAIC_WORKER_LLM_RUNTIME_STOPPED,
+        LOG_MOSAIC_WORKER_LLM_RUNTIME_ERROR,
+        LOG_MOSAIC_WORKER_LLM_EPISODE_STARTED,
+        LOG_MOSAIC_WORKER_LLM_EPISODE_COMPLETED,
+        LOG_MOSAIC_WORKER_LLM_REQUEST,
+        LOG_MOSAIC_WORKER_LLM_RESPONSE,
+        LOG_MOSAIC_WORKER_LLM_ERROR,
+        LOG_MOSAIC_WORKER_LLM_ACTION_SELECTED,
+        LOG_MOSAIC_WORKER_LLM_STEP_TELEMETRY,
+        LOG_MOSAIC_WORKER_LLM_EPISODE_TELEMETRY,
+        LOG_MOSAIC_WORKER_LLM_CONFIG_LOADED,
+        LOG_MOSAIC_WORKER_LLM_ENV_CREATED,
+        LOG_MOSAIC_WORKER_LLM_AGENT_CREATED,
+        LOG_MOSAIC_WORKER_LLM_DEBUG,
         LOG_WORKER_MOSAIC_RUNTIME_INTEGRATION,
         LOG_WORKER_MOSAIC_ACTION_PARSED,
-        LOG_WORKER_MOSAIC_LLM_EPISODE_AUTO_RESET,
-        LOG_WORKER_MOSAIC_LLM_ACTION_DEFAULTED,
+        LOG_MOSAIC_WORKER_LLM_EPISODE_AUTO_RESET,
+        LOG_MOSAIC_WORKER_LLM_ACTION_DEFAULTED,
     )
     _HAS_GYM_GUI = True
 except ImportError:
@@ -101,10 +101,10 @@ class EpisodeTelemetry:
 
 
 class LLMTelemetryEmitter:
-    """Emits BALROG-specific telemetry to JSONL files and stdout.
+    """Emits LLM-specific telemetry to JSONL files and stdout.
 
     This is kept separate from the standardized TelemetryEmitter for backwards
-    compatibility with existing BALROG telemetry format.
+    compatibility with existing telemetry format.
     """
 
     def __init__(
@@ -156,7 +156,7 @@ class LLMTelemetryEmitter:
 def _setup_api_key_env(config: LLMWorkerConfig) -> None:
     """Set up API key environment variable from config.
 
-    BALROG clients read API keys from environment variables, not from config.
+    LLM API clients read API keys from environment variables, not from config.
     This function bridges the gap by setting the appropriate env var based on
     the client_name and api_key in the config.
 
@@ -188,7 +188,7 @@ def _setup_api_key_env(config: LLMWorkerConfig) -> None:
 
 
 class LLMWorkerRuntime:
-    """Main runtime for running LLM agents on BALROG environments."""
+    """Main runtime for running LLM agents on RL environments."""
 
     def __init__(self, config: LLMWorkerConfig) -> None:
         self.config = config
@@ -212,12 +212,12 @@ class LLMWorkerRuntime:
         from llm_worker.agents import AgentFactory
         from omegaconf import OmegaConf
 
-        balrog_config = OmegaConf.create(self.config.to_llm_config())
-        factory = AgentFactory(balrog_config)
+        agent_config = OmegaConf.create(self.config.to_llm_config())
+        factory = AgentFactory(agent_config)
         return factory.create_agent()
 
     def _create_env(self) -> Any:
-        """Create BALROG environment based on config.
+        """Create environment based on config.
 
         Uses our own environment wrapper (llm_worker.environments)
         which fixes compatibility issues with standard Gymnasium environments.
@@ -225,11 +225,11 @@ class LLMWorkerRuntime:
         from llm_worker.environments import make_env
         from omegaconf import OmegaConf
 
-        balrog_config = OmegaConf.create(self.config.to_llm_config())
+        agent_config = OmegaConf.create(self.config.to_llm_config())
         return make_env(
             self.config.env_name,
             self.config.task,
-            balrog_config,
+            agent_config,
             render_mode=self.config.render_mode,
         )
 
@@ -245,7 +245,7 @@ class LLMWorkerRuntime:
         if _HAS_GYM_GUI and log_constant:
             log_constant(
                 logger,
-                LOG_WORKER_BALROG_CONFIG_LOADED,
+                LOG_MOSAIC_WORKER_LLM_CONFIG_LOADED,
                 extra={
                     "run_id": self.config.run_id,
                     "env_name": self.config.env_name,
@@ -258,7 +258,7 @@ class LLMWorkerRuntime:
         if self._lifecycle_emitter:
             self._lifecycle_emitter.run_started(
                 {
-                    "worker_type": "balrog",
+                    "worker_type": "llm",
                     "env_name": self.config.env_name,
                     "task": self.config.task,
                     "client_name": self.config.client_name,
@@ -267,7 +267,7 @@ class LLMWorkerRuntime:
                     "num_episodes": self.config.num_episodes,
                     "max_steps": self.config.max_steps,
                 },
-                constant=LOG_WORKER_BALROG_RUNTIME_STARTED,
+                constant=LOG_MOSAIC_WORKER_LLM_RUNTIME_STARTED,
             )
 
         # Track run statistics
@@ -298,7 +298,7 @@ class LLMWorkerRuntime:
                                 "success_rate": successful_episodes / total_episodes if total_episodes > 0 else 0.0,
                                 "average_reward": total_reward / total_episodes if total_episodes > 0 else 0.0,
                             },
-                            constant=LOG_WORKER_BALROG_RUNTIME_STARTED,  # Using RUNTIME_STARTED for heartbeat
+                            constant=LOG_MOSAIC_WORKER_LLM_RUNTIME_STARTED,  # Using RUNTIME_STARTED for heartbeat
                         )
 
                 except Exception as e:
@@ -316,7 +316,7 @@ class LLMWorkerRuntime:
             try:
                 manifest_path = write_analytics_manifest(
                     self.config,
-                    notes=f"BALROG run with {total_episodes} episodes completed",
+                    notes=f"LLM run with {total_episodes} episodes completed",
                 )
                 logger.info(f"Analytics manifest written to: {manifest_path}")
             except Exception as e:
@@ -325,7 +325,7 @@ class LLMWorkerRuntime:
             # Build run summary
             summary = {
                 "run_id": self.config.run_id,
-                "worker_type": "balrog",
+                "worker_type": "llm",
                 "total_episodes": total_episodes,
                 "successful_episodes": successful_episodes,
                 "success_rate": successful_episodes / total_episodes if total_episodes > 0 else 0.0,
@@ -340,7 +340,7 @@ class LLMWorkerRuntime:
             if self._lifecycle_emitter:
                 self._lifecycle_emitter.run_completed(
                     summary,
-                    constant=LOG_WORKER_BALROG_RUNTIME_STOPPED,
+                    constant=LOG_MOSAIC_WORKER_LLM_RUNTIME_STOPPED,
                 )
 
             self.telemetry.close()
@@ -352,7 +352,7 @@ class LLMWorkerRuntime:
             if self._lifecycle_emitter:
                 self._lifecycle_emitter.run_failed(
                     {"error": str(e)},
-                    constant=LOG_WORKER_BALROG_RUNTIME_ERROR,
+                    constant=LOG_MOSAIC_WORKER_LLM_RUNTIME_ERROR,
                 )
             self.telemetry.close()
             raise
@@ -369,7 +369,7 @@ class LLMWorkerRuntime:
         if _HAS_GYM_GUI and log_constant:
             log_constant(
                 logger,
-                LOG_WORKER_BALROG_EPISODE_STARTED,
+                LOG_MOSAIC_WORKER_LLM_EPISODE_STARTED,
                 extra={
                     "run_id": self.config.run_id,
                     "episode_id": episode_id,
@@ -467,7 +467,7 @@ class LLMWorkerRuntime:
         if _HAS_GYM_GUI and log_constant:
             log_constant(
                 logger,
-                LOG_WORKER_BALROG_EPISODE_COMPLETED,
+                LOG_MOSAIC_WORKER_LLM_EPISODE_COMPLETED,
                 extra={
                     "run_id": self.config.run_id,
                     "episode_id": episode_id,
@@ -524,7 +524,7 @@ class LLMWorkerRuntime:
                 return description
 
         if isinstance(obs, dict):
-            # BALROG environments often have 'text' key with nested context
+            # Environments often have 'text' key with nested context
             if "text" in obs:
                 text_data = obs["text"]
                 if isinstance(text_data, dict):
@@ -593,7 +593,7 @@ class InteractiveLLMRuntime:
         else:
             self._lifecycle_emitter = None
 
-        # Set API key environment variable from config (BALROG client reads from env)
+        # Set API key environment variable from config
         _setup_api_key_env(config)
 
         # State
@@ -611,24 +611,24 @@ class InteractiveLLMRuntime:
         self._reset_seed = None
 
     def _create_agent(self) -> Any:
-        """Create BALROG agent based on config."""
+        """Create agent based on config."""
         from llm_worker.agents import AgentFactory
         from omegaconf import OmegaConf
 
-        balrog_config = OmegaConf.create(self.config.to_llm_config())
-        factory = AgentFactory(balrog_config)
+        agent_config = OmegaConf.create(self.config.to_llm_config())
+        factory = AgentFactory(agent_config)
         return factory.create_agent()
 
     def _create_env(self) -> Any:
-        """Create BALROG environment based on config."""
+        """Create environment based on config."""
         from llm_worker.environments import make_env
         from omegaconf import OmegaConf
 
-        balrog_config = OmegaConf.create(self.config.to_llm_config())
+        agent_config = OmegaConf.create(self.config.to_llm_config())
         return make_env(
             self.config.env_name,
             self.config.task,
-            balrog_config,
+            agent_config,
             render_mode=self.config.render_mode,
         )
 
@@ -772,7 +772,7 @@ class InteractiveLLMRuntime:
                 logger.warning(f"Agent act failed at step {self._step_idx}: {e}")
                 action_str = "go forward"  # Default to safe action on LLM failure
                 if _HAS_GYM_GUI and log_constant:
-                    log_constant(logger, LOG_WORKER_MOSAIC_LLM_ACTION_DEFAULTED, extra={
+                    log_constant(logger, LOG_MOSAIC_WORKER_LLM_ACTION_DEFAULTED, extra={
                         "step_index": self._step_idx,
                         "error": str(e),
                         "default_action": action_str,
@@ -808,7 +808,7 @@ class InteractiveLLMRuntime:
                         f"defaulting to '{action_str}'"
                     )
                     if _HAS_GYM_GUI and log_constant:
-                        log_constant(logger, LOG_WORKER_MOSAIC_LLM_ACTION_DEFAULTED, extra={
+                        log_constant(logger, LOG_MOSAIC_WORKER_LLM_ACTION_DEFAULTED, extra={
                             "step_index": self._step_idx,
                             "error": f"Invalid LLM output: '{bad_action}'",
                             "default_action": action_str,
@@ -824,7 +824,7 @@ class InteractiveLLMRuntime:
                 "episode_id": episode_id,
                 "episode_index": self._episode_idx,  # For GUI display
                 "step_index": self._step_idx,
-                # LLM/Provider metadata for verification (BALROG best practice)
+                # LLM/Provider metadata for verification
                 "client_name": self.config.client_name,
                 "model_id": self.config.model_id,
                 "base_url": self.config.base_url,
@@ -896,7 +896,7 @@ class InteractiveLLMRuntime:
                 if self.config.env_name in ("babyai", "minigrid") and self._reset_seed is not None:
                     self._obs, _ = self._env.reset(seed=self._reset_seed)
                     if _HAS_GYM_GUI and log_constant:
-                        log_constant(logger, LOG_WORKER_MOSAIC_LLM_EPISODE_AUTO_RESET, extra={
+                        log_constant(logger, LOG_MOSAIC_WORKER_LLM_EPISODE_AUTO_RESET, extra={
                             "episode_index": self._episode_idx,
                             "seed": self._reset_seed,
                             "env_name": self.config.env_name,
@@ -1055,9 +1055,9 @@ class InteractiveLLMRuntime:
                 obs_str += f"\nLegal moves: {legal_moves}"
 
             # Create observation object for agent
-            # The BALROG agent expects observation as a dict with nested structure:
+            # The agent expects observation as a dict with nested structure:
             # obs["text"]["long_term_context"] and obs["text"]["short_term_context"]
-            # (see HistoryPromptBuilder.update_observation in BALROG)
+            # (see HistoryPromptBuilder.update_observation)
             obs_for_agent = {
                 "text": {
                     "long_term_context": "",  # No long-term context for action-selector mode
@@ -1195,7 +1195,7 @@ class InteractiveLLMRuntime:
         if isinstance(obs, str):
             return obs
         if isinstance(obs, dict):
-            # BALROG environments often have 'text' key with nested context
+            # Environments often have 'text' key with nested context
             if "text" in obs:
                 text_data = obs["text"]
                 if isinstance(text_data, dict):

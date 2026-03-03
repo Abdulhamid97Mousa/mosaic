@@ -1,4 +1,4 @@
-"""Analytics manifest helpers for BARLOG worker runs.
+"""Analytics manifest helpers for LLM worker runs.
 
 This module provides helpers to create and write analytics manifests that
 integrate with the MOSAIC GUI's analytics tab system using the standardized
@@ -28,18 +28,18 @@ except ImportError:
     CheckpointMetadata = None
 
 if TYPE_CHECKING:
-    from balrog_worker.config import BarlogWorkerConfig
+    from llm_worker.config import LLMWorkerConfig
 
 
 def write_analytics_manifest(
-    config: "BarlogWorkerConfig",
+    config: "LLMWorkerConfig",
     *,
     notes: Optional[str] = None,
 ) -> Path:
-    """Build and write analytics manifest for a BARLOG run.
+    """Build and write analytics manifest for an LLM run.
 
     Args:
-        config: BARLOG worker configuration.
+        config: LLM worker configuration.
         notes: Optional notes about the run.
 
     Returns:
@@ -51,7 +51,7 @@ def write_analytics_manifest(
             "Cannot generate standardized analytics manifest."
         )
 
-    # Build checkpoint metadata (BARLOG doesn't use checkpoints like RL agents)
+    # Build checkpoint metadata (LLM worker doesn't use checkpoints)
     checkpoints = CheckpointMetadata(
         directory=None,
         format="none",
@@ -59,16 +59,16 @@ def write_analytics_manifest(
 
     # Build artifacts metadata
     artifacts = ArtifactsMetadata(
-        tensorboard=None,  # BARLOG doesn't use TensorBoard
-        wandb=None,  # BARLOG doesn't use WandB yet
+        tensorboard=None,
+        wandb=None,
         checkpoints=checkpoints,
         logs_dir="logs",
         videos_dir=None,
     )
 
-    # Build BARLOG-specific metadata
+    # Build LLM worker metadata
     metadata = {
-        "worker_type": "balrog",
+        "worker_type": "llm",
         "env_name": config.env_name,
         "task": config.task,
         "client_name": config.client_name,
@@ -92,7 +92,7 @@ def write_analytics_manifest(
     # Create the manifest
     manifest = WorkerAnalyticsManifest(
         run_id=config.run_id,
-        worker_type="balrog",
+        worker_type="llm",
         artifacts=artifacts,
         metadata=metadata,
     )

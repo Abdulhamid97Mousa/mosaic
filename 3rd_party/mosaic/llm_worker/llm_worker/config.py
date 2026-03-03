@@ -1,6 +1,6 @@
-"""Configuration dataclass for BALROG Worker.
+"""Configuration dataclass for LLM Worker.
 
-Defines all configuration options for running LLM agents on BALROG environments.
+Defines all configuration options for running LLM agents on RL environments.
 """
 
 from __future__ import annotations
@@ -11,7 +11,7 @@ from pathlib import Path
 from typing import Any, Dict, Literal, Optional
 
 
-# Valid environment names supported by BALROG
+# Valid environment names
 # Note: "minigrid" uses the same wrapper as "babyai" (BabyAI is built on MiniGrid)
 # Note: "multigrid" is multi-agent extension of MiniGrid with simultaneous stepping
 # Note: "pettingzoo" is used for multi-agent games (chess, go, connect-four, etc.)
@@ -28,7 +28,7 @@ AGENT_TYPES = ("naive", "cot", "robust_naive", "robust_cot", "few_shot", "dummy"
 
 @dataclass
 class LLMWorkerConfig:
-    """Configuration for BALROG Worker subprocess.
+    """Configuration for LLM Worker subprocess.
 
     This config controls which environment, LLM client, and agent type to use,
     along with episode limits and telemetry output settings.
@@ -166,10 +166,10 @@ class LLMWorkerConfig:
         return cls.from_dict(data)
 
     def to_llm_config(self) -> Dict[str, Any]:
-        """Convert to BALROG-compatible OmegaConf structure.
+        """Convert to OmegaConf structure for AgentFactory.
 
         Returns a dict that can be converted to OmegaConf for use with
-        BALROG's AgentFactory and make_env functions.
+        AgentFactory and make_env functions.
         """
         return {
             "client": {

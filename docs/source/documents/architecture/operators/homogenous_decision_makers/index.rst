@@ -229,19 +229,19 @@ forward pass to select actions.
      - Evaluating trained RL policies, comparing algorithms,
        ablation studies
 
-.. _category-baseline:
+.. _category-random:
 
-Baseline
-^^^^^^^^
+Random
+^^^^^^
 
-Baseline operators provide reference points for comparison.  They use
-simple strategies like random action selection or fixed heuristics.
+Random operators select actions uniformly at random from the
+environment's action space, providing a reference point for comparison.
 
 .. mermaid::
 
    %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph TB
-       OBS["Observation<br/>(ignored)"] --> RNG["Random / Heuristic<br/>Action Selection"]
+       OBS["Observation<br/>(ignored)"] --> RNG["Random<br/>Action Selection"]
        RNG --> ACTION["Action"]
 
        style OBS fill:#eee,stroke:#999,color:#333
@@ -253,11 +253,30 @@ simple strategies like random action selection or fixed heuristics.
    :header-rows: 0
 
    * - **Workers**
-     - ``operators_worker``
+     - ``random_worker``
    * - **Configuration**
      - Max steps, seed
    * - **Use case**
      - Sanity checks, lower-bound performance reference
+
+.. _category-passive:
+
+Passive
+^^^^^^^
+
+Passive operators always select the do-nothing (NOOP/STILL) action,
+providing a deterministic reference point.
+
+.. list-table::
+   :widths: 25 75
+   :header-rows: 0
+
+   * - **Workers**
+     - ``passive_worker``
+   * - **Configuration**
+     - Max steps, seed
+   * - **Use case**
+     - Natural dynamics measurement, fault isolation
 
 Single-Worker Pattern
 ---------------------
@@ -322,15 +341,14 @@ method:
        },
    )
 
-   # Random baseline
+   # Random operator
    config = OperatorConfig.single_agent(
-       operator_id="baseline_1",
-       display_name="Random Baseline",
-       worker_id="operators_worker",
-       worker_type="baseline",
+       operator_id="random_1",
+       display_name="Random Agent",
+       worker_id="random_worker",
+       worker_type="random",
        env_name="gymnasium",
        task="CartPole-v1",
-       settings={},
    )
 
 Side-by-Side Comparison
@@ -398,8 +416,11 @@ fields for each type:
    * - ``rl``
      - Policy file picker, algorithm dropdown
      - ``OperatorConfigWidget``
-   * - ``baseline``
-     - Max steps spinner, seed field
+   * - ``random``
+     - Seed field
+     - ``OperatorConfigWidget``
+   * - ``passive``
+     - Seed field
      - ``OperatorConfigWidget``
 
 The ``OperatorRenderContainer`` also adapts its header to show a

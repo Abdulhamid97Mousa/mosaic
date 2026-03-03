@@ -90,7 +90,7 @@ class EvaluationResultsWriter:
         # Try common locations
         candidates = [
             Path.cwd() / "var" / "trainer" / "runs",
-            Path.home() / "Desktop" / "Projects" / "GUI_BDI_RL" / "var" / "trainer" / "runs",
+            Path.home() / "Desktop" / "software" / "mosaic" / "var" / "trainer" / "runs",
             Path(__file__).parent.parent.parent.parent / "var" / "trainer" / "runs",
         ]
 

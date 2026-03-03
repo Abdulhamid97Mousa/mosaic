@@ -76,8 +76,21 @@ class TestMeltingPotAdapterFactory:
         assert "territory__rooms" in adapter.id
 
 
+_HAS_MELTINGPOT_RUNTIME = False
+try:
+    import dm_env  # noqa: F401
+    _HAS_MELTINGPOT_RUNTIME = True
+except ImportError:
+    pass
+
+
 class TestMeltingPotAdapterBasics:
-    """Test basic adapter operations."""
+    """Test basic adapter operations (requires shimmy[meltingpot] + dm_env)."""
+
+    pytestmark = pytest.mark.skipif(
+        not _HAS_MELTINGPOT_RUNTIME,
+        reason="shimmy[meltingpot] / dm_env not installed",
+    )
 
     @pytest.fixture
     def adapter(self) -> "MeltingPotAdapter":
@@ -178,6 +191,10 @@ class TestMeltingPotAdapterCapabilities:
         assert "FORWARD" in meanings
         assert "INTERACT" in meanings
 
+    @pytest.mark.skipif(
+        not _HAS_MELTINGPOT_RUNTIME,
+        reason="shimmy[meltingpot] / dm_env not installed",
+    )
     def test_sample_actions(self) -> None:
         """Adapter can sample actions."""
         from gym_gui.core.adapters.meltingpot import MeltingPotAdapter

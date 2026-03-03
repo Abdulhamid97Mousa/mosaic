@@ -1,0 +1,90 @@
+# MOSAIC VLM Worker Dependencies
+# Install with: pip install -r requirements/mosaic_vlm_worker.txt
+#
+# This file contains dependencies for the MOSAIC native VLM worker,
+# which provides multi-agent VLM coordination with image observations.
+# Fork of the LLM Worker with vision-language model support.
+#
+# Key features:
+# - Image observation history (max_image_history >= 1)
+# - Same 3 coordination levels as LLM Worker
+# - Same 6 agent strategies (naive, cot, robust_naive, robust_cot, few_shot, dummy)
+# - Multiple VLM provider support (OpenRouter, OpenAI, Anthropic, Gemini, vLLM)
+#
+# See: 3rd_party/mosaic/vlm_worker/
+
+# Include base requirements
+-r base.txt
+
+# ═══════════════════════════════════════════════════════════════
+# Core Dependencies (required)
+# ═══════════════════════════════════════════════════════════════
+
+# HTTP client for API calls
+httpx>=0.27.0
+
+# NumPy for observation processing
+numpy>=1.24.0
+
+# ═══════════════════════════════════════════════════════════════
+# VLM Client Libraries (install based on which provider you use)
+# ═══════════════════════════════════════════════════════════════
+
+# OpenAI client (GPT-4o, GPT-4o-mini with vision, etc.)
+# Also used for vLLM local inference (OpenAI-compatible API)
+openai>=1.0.0
+
+# Anthropic client (Claude 3.5 Sonnet, Claude 3 Opus with vision)
+anthropic>=0.18.0
+
+# ═══════════════════════════════════════════════════════════════
+# Environment Dependencies (install based on which envs you use)
+# ═══════════════════════════════════════════════════════════════
+
+# MultiGrid (multi-agent grid world, Soccer, Collect)
+# pip install multigrid
+# Or: pip install -r requirements/multigrid.txt
+
+# PettingZoo (general multi-agent environments)
+# pip install pettingzoo>=1.24.0
+# Or: pip install -r requirements/pettingzoo.txt
+
+# ═══════════════════════════════════════════════════════════════
+# API Key Setup
+# ═══════════════════════════════════════════════════════════════
+#
+# Set in .env file:
+#
+# For OpenRouter (recommended - access to multiple models):
+#   OPENROUTER_API_KEY=sk-or-v1-...
+#
+# For direct OpenAI:
+#   OPENAI_API_KEY=sk-...
+#
+# For direct Anthropic:
+#   ANTHROPIC_API_KEY=sk-ant-...
+#
+# For vLLM local server (vision-capable model):
+#   VLLM_BASE_URL=http://localhost:8100/v1
+#
+# ═══════════════════════════════════════════════════════════════
+# Usage Examples
+# ═══════════════════════════════════════════════════════════════
+#
+# 1. Install the worker:
+#    pip install -e 3rd_party/mosaic/vlm_worker
+#
+# 2. Run with OpenRouter (default, with image observations):
+#    vlm-worker --run-id test --task CrafterReward-v1 \
+#      --client openrouter --model openai/gpt-4o-mini \
+#      --max-image-history 1
+#
+# 3. Run with local vLLM (Qwen2.5-VL-3B):
+#    vlm-worker --run-id test --task BabyAI-GoToRedBall-v0 \
+#      --client vllm --base-url http://localhost:8100/v1 \
+#      --max-image-history 1
+#
+# 4. Text-only fallback (equivalent to LLM Worker):
+#    vlm-worker --run-id test --task MiniGrid-Empty-8x8-v0 \
+#      --max-image-history 0
+#

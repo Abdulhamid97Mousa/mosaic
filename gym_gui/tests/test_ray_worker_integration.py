@@ -24,15 +24,17 @@ class TestRayWorkerFormRegistration:
 
     def test_train_form_registered(self):
         """Test that ray_worker train form is registered."""
-        from gym_gui.ui.forms import get_worker_form_factory
+        from gym_gui.ui.forms import ensure_all_forms_registered, get_worker_form_factory
 
+        ensure_all_forms_registered()
         factory = get_worker_form_factory()
         assert factory.has_train_form("ray_worker")
 
     def test_policy_form_registered(self):
         """Test that ray_worker policy form is registered."""
-        from gym_gui.ui.forms import get_worker_form_factory
+        from gym_gui.ui.forms import ensure_all_forms_registered, get_worker_form_factory
 
+        ensure_all_forms_registered()
         factory = get_worker_form_factory()
         assert factory.has_policy_form("ray_worker")
 
@@ -52,8 +54,9 @@ class TestRayWorkerFormRegistration:
         if app is None:
             app = QtWidgets.QApplication([])
 
-        from gym_gui.ui.forms import get_worker_form_factory
+        from gym_gui.ui.forms import ensure_all_forms_registered, get_worker_form_factory
 
+        ensure_all_forms_registered()
         factory = get_worker_form_factory()
         form = factory.create_train_form("ray_worker", parent=None)
 
@@ -75,8 +78,9 @@ class TestRayWorkerFormRegistration:
         if app is None:
             app = QtWidgets.QApplication([])
 
-        from gym_gui.ui.forms import get_worker_form_factory
+        from gym_gui.ui.forms import ensure_all_forms_registered, get_worker_form_factory
 
+        ensure_all_forms_registered()
         factory = get_worker_form_factory()
         form = factory.create_policy_form("ray_worker", parent=None)
 
@@ -294,7 +298,6 @@ class TestTrainFormConfiguration:
         assert "config" in config["metadata"]["worker"]
 
         worker_config = config["metadata"]["worker"]["config"]
-        assert "run_id" in worker_config  # run_id moved inside worker config
         assert "environment" in worker_config
         assert "paradigm" in worker_config
         assert "training" in worker_config

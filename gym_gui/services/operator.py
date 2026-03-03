@@ -30,7 +30,6 @@ class Operator(Protocol):
     - Human keyboard input
     - Trained RL policy
     - LLM agent
-    - BDI reasoning system
     """
 
     @property
@@ -221,17 +220,17 @@ class WorkerAssignment:
 
     Attributes:
         worker_id: References WorkerDefinition (e.g., "balrog_worker", "cleanrl_worker").
-        worker_type: Type of worker - "llm", "vlm", "rl", "human", or "baseline".
+        worker_type: Type of worker - "llm", "vlm", "rl", "human", "random", or "passive".
         settings: Worker-specific settings (client_name, model_id, api_key, etc.).
     """
 
     worker_id: str  # References WorkerDefinition in worker catalog
-    worker_type: str  # "llm", "vlm", "rl", "human", "baseline"
+    worker_type: str  # "llm", "vlm", "rl", "human", "random", "passive"
     settings: Dict[str, Any] = field(default_factory=dict)
 
     def __post_init__(self) -> None:
         """Validate worker assignment."""
-        valid_types = ("llm", "vlm", "rl", "human", "baseline")
+        valid_types = ("llm", "vlm", "rl", "human", "random", "passive")
         if self.worker_type not in valid_types:
             raise ValueError(f"worker_type must be one of {valid_types}, got '{self.worker_type}'")
 

@@ -9,14 +9,6 @@ MOSAIC Human Worker
    </video>
    <br/><br/>
 
-.. raw:: html
-
-   <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
-     <source src="../../../../../_static/videos/random_worker.mp4" type="video/mp4">
-     Your browser does not support the video tag.
-   </video>
-   <br/><br/>
-
 The MOSAIC Human Worker enables **human-in-the-loop** which is essentially to control the agent via keyboard for any Gymnasium-compatible environment. It bridges human decision-making with
 MOSAIC's multi-agent evaluation framework, allowing researchers to play
 alongside or against RL, LLM, and random agents.
@@ -296,7 +288,7 @@ Supported Environments
      - Language-grounded instruction following
    * - MosaicMultiGrid
      - Interactive
-     - Soccer, Collect, Basketball (multi-agent via hybrid operators)
+     - Soccer, Collect, Basketball (multi-agent via heterogeneous operators)
    * - Crafter
      - Interactive
      - Custom gymnasium wrapper, configurable render size

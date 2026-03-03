@@ -1,8 +1,5 @@
-"""Allow running as: python -m random_worker"""
-
-import sys
+"""Allow ``python -m random_worker`` execution."""
 
 from random_worker.cli import main
 
-if __name__ == "__main__":
-    sys.exit(main())
+raise SystemExit(main())

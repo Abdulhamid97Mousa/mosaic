@@ -9,15 +9,17 @@ operator workers, allowing the GUI to run multiple operators in parallel
 for side-by-side comparison.
 
 Architecture Overview:
-    OperatorLauncher creates subprocess workers based on OperatorConfig:
 
-    LLM Operators -> LLM_worker subprocess -> BALROG agent -> LLM API
-    RL Operators  -> RL_worker subprocess -> Policy inference
+OperatorLauncher creates subprocess workers based on OperatorConfig:
 
-    Each subprocess:
-    - Writes logs to VAR_OPERATORS_LOGS_DIR
-    - Emits telemetry to VAR_OPERATORS_TELEMETRY_DIR (JSONL + stdout)
-    - Can be started/stopped independently
+- LLM Operators -> LLM_worker subprocess -> BALROG agent -> LLM API
+- RL Operators  -> RL_worker subprocess -> Policy inference
+
+Each subprocess:
+
+- Writes logs to VAR_OPERATORS_LOGS_DIR
+- Emits telemetry to VAR_OPERATORS_TELEMETRY_DIR (JSONL + stdout)
+- Can be started/stopped independently
 """
 
 import logging
@@ -537,7 +539,8 @@ class OperatorLauncher:
     This class handles spawning subprocess workers for both LLM
     and RL operator types, managing their lifecycle and log files.
 
-    Example:
+    Example::
+
         launcher = OperatorLauncher()
 
         # Launch an LLM operator
@@ -608,12 +611,16 @@ class OperatorLauncher:
         # Build command based on operator type
         if config.operator_type == "llm":
             cmd = self._build_llm_command(config, run_id, interactive=interactive)
+        elif config.operator_type == "vlm":
+            cmd = self._build_vlm_command(config, run_id, interactive=interactive)
         elif config.operator_type == "rl":
             cmd = self._build_rl_command(config, run_id, interactive=interactive)
         elif config.operator_type == "human":
             cmd = self._build_human_command(config, run_id)
-        elif config.operator_type == "baseline":
-            cmd = self._build_baseline_command(config, run_id, interactive=interactive)
+        elif config.operator_type == "random":
+            cmd = self._build_random_command(config, run_id, interactive=interactive)
+        elif config.operator_type == "passive":
+            cmd = self._build_passive_command(config, run_id, interactive=interactive)
         else:
             log_file.close()
             raise OperatorLaunchError(f"Unknown operator type: {config.operator_type}")
@@ -934,6 +941,109 @@ class OperatorLauncher:
 
         return cmd
 
+    def _build_vlm_command(
+        self,
+        config: OperatorConfig,
+        run_id: str,
+        *,
+        interactive: bool = False,
+    ) -> list[str]:
+        """Build command line for VLM operator.
+
+        Dispatches to the appropriate worker based on config.worker_id:
+        - mosaic_vlm_worker: MOSAIC VLM worker with vision observations (default)
+        - balrog_worker: BALROG worker with max_image_history>=1 (fallback)
+
+        Args:
+            config: Operator configuration with VLM settings.
+            run_id: Run ID for telemetry.
+            interactive: Whether to run in interactive (stdin/stdout) mode.
+
+        Returns:
+            Command line as list of strings.
+        """
+        settings = config.settings or {}
+
+        # Get VLM-specific settings
+        client_name = settings.get("client_name", "openai")
+        model_id = settings.get("model_id", "gpt-4o-mini")
+        base_url = settings.get("base_url")
+        api_key = settings.get("api_key")
+        agent_type = settings.get("agent_type", "naive")
+        num_episodes = settings.get("num_episodes", 5)
+        max_steps = settings.get("max_steps", 100)
+        temperature = settings.get("temperature", 0.7)
+
+        # Dispatch based on worker_id
+        worker_id = config.worker_id or "mosaic_vlm_worker"
+
+        if worker_id == "mosaic_vlm_worker":
+            # MOSAIC VLM Worker - uses vlm_worker.cli
+            cmd = [
+                self._python_executable,
+                "-m", "vlm_worker.cli",
+                "--run-id", run_id,
+                "--env", config.env_name,
+                "--task", config.task,
+                "--client", client_name,
+                "--model", model_id,
+                "--agent-type", agent_type,
+                "--num-episodes", str(num_episodes),
+                "--max-steps", str(max_steps),
+                "--temperature", str(temperature),
+                "--telemetry-dir", str(VAR_OPERATORS_TELEMETRY_DIR),
+                "--render-mode", "rgb_array",
+                "-v",
+            ]
+
+            if interactive:
+                cmd.append("--interactive")
+
+            if base_url:
+                cmd.extend(["--base-url", base_url])
+
+            if api_key:
+                cmd.extend(["--api-key", api_key])
+
+            # VLM default: vision enabled
+            max_image_history = settings.get("max_image_history", 1)
+            cmd.extend(["--max-image-history", str(max_image_history)])
+
+        else:
+            # Fallback to BALROG worker with VLM mode
+            cmd = [
+                self._python_executable,
+                "-m", "balrog_worker.cli",
+                "--run-id", run_id,
+                "--env", config.env_name,
+                "--task", config.task,
+                "--client", client_name,
+                "--model", model_id,
+                "--agent-type", agent_type,
+                "--num-episodes", str(num_episodes),
+                "--max-steps", str(max_steps),
+                "--temperature", str(temperature),
+                "--telemetry-dir", str(VAR_OPERATORS_TELEMETRY_DIR),
+                "-v",
+            ]
+
+            if interactive:
+                cmd.append("--interactive")
+
+            if base_url:
+                cmd.extend(["--base-url", base_url])
+
+            if api_key:
+                cmd.extend(["--api-key", api_key])
+
+            # VLM mode: default max_image_history=1
+            max_image_history = settings.get("max_image_history", 1)
+            cmd.extend(["--max-image-history", str(max_image_history)])
+
+            cmd.extend(["--render-mode", "rgb_array"])
+
+        return cmd
+
     def _build_rl_command(
         self,
         config: OperatorConfig,
@@ -1099,20 +1209,19 @@ class OperatorLauncher:
 
         return cmd
 
-    def _build_baseline_command(
+    def _build_random_command(
         self,
         config: OperatorConfig,
         run_id: str,
         *,
         interactive: bool = False,
     ) -> list[str]:
-        """Build command line for baseline operator.
+        """Build command line for random operator.
 
-        Uses random_worker for simple baseline behaviors (random, noop, cycling).
-        Baseline operators are used for ablation studies and credit assignment research.
+        Uses random_worker for uniformly random action selection.
 
         Args:
-            config: Operator configuration with baseline settings.
+            config: Operator configuration with random worker settings.
             run_id: Run ID for telemetry.
             interactive: If True, add --interactive flag for step-by-step control.
 
@@ -1123,34 +1232,23 @@ class OperatorLauncher:
             OperatorLaunchError: If required settings are missing.
         """
         settings = config.settings or {}
-
-        # Get baseline-specific settings
-        behavior = settings.get("behavior", "random")
         seed = settings.get("seed")
-
-        # Validate behavior
-        valid_behaviors = ("random", "noop", "cycling")
-        if behavior not in valid_behaviors:
-            raise OperatorLaunchError(
-                f"Invalid baseline behavior '{behavior}'. Must be one of {valid_behaviors}"
-            )
 
         # Determine environment ID (task field contains the full env ID)
         env_id = config.task
         if not env_id:
             raise OperatorLaunchError(
-                f"Baseline operator {config.operator_id} requires 'task' (environment ID)"
+                f"Random operator {config.operator_id} requires 'task' (environment ID)"
             )
 
         # Determine environment name
         env_name = config.env_name or "babyai"
 
-        # Build operators-worker command
+        # Build random-worker command
         cmd = [
             self._python_executable,
             "-m", "random_worker",
             "--run-id", run_id,
-            "--behavior", behavior,
             "--env-name", env_name,
             "--task", env_id,
             "--telemetry-dir", str(VAR_OPERATORS_TELEMETRY_DIR),
@@ -1165,9 +1263,70 @@ class OperatorLauncher:
             cmd.extend(["--seed", str(seed)])
 
         LOGGER.info(
-            "Built baseline command for operator %s | behavior=%s env=%s task=%s",
+            "Built random command for operator %s | env=%s task=%s",
             config.operator_id,
-            behavior,
+            env_name,
+            env_id,
+        )
+
+        return cmd
+
+    def _build_passive_command(
+        self,
+        config: OperatorConfig,
+        run_id: str,
+        *,
+        interactive: bool = False,
+    ) -> list[str]:
+        """Build command line for passive (noop) operator.
+
+        Uses passive_worker which always selects the environment's do-nothing
+        action (NOOP or STILL), providing a deterministic passive agent.
+
+        Args:
+            config: Operator configuration with passive worker settings.
+            run_id: Run ID for telemetry.
+            interactive: If True, add --interactive flag for step-by-step control.
+
+        Returns:
+            Command arguments list.
+
+        Raises:
+            OperatorLaunchError: If required settings are missing.
+        """
+        settings = config.settings or {}
+
+        # Determine environment ID (task field contains the full env ID)
+        env_id = config.task
+        if not env_id:
+            raise OperatorLaunchError(
+                f"Passive operator {config.operator_id} requires 'task' (environment ID)"
+            )
+
+        # Determine environment name
+        env_name = config.env_name or "babyai"
+        seed = settings.get("seed")
+
+        # Build passive-worker command
+        cmd = [
+            self._python_executable,
+            "-m", "passive_worker",
+            "--run-id", run_id,
+            "--env-name", env_name,
+            "--task", env_id,
+        ]
+
+        # Add interactive mode flag (required for GUI control)
+        if interactive:
+            cmd.append("--interactive")
+
+        # Add seed if provided
+        if seed is not None:
+            cmd.extend(["--seed", str(seed)])
+
+        LOGGER.info(
+            "Built passive command for operator %s | env=%s task=%s",
+            config.operator_id,
             env_name,
             env_id,
         )

@@ -48,7 +48,8 @@ def _ensure_env_registered(task: str) -> None:
         if "MosaicMultiGrid" in task or "MultiGrid" in task:
             import mosaic_multigrid.envs  # noqa: F401
         elif "MiniGrid" in task or "BabyAI" in task:
-            import minigrid  # noqa: F401
+            from minigrid import register_minigrid_envs
+            register_minigrid_envs()
     except ImportError:
         pass
 
@@ -63,13 +64,12 @@ class RandomWorkerRuntime:
     def __init__(self, config: RandomWorkerConfig) -> None:
         self.config = config
         self._action_space: Optional[gym.spaces.Space] = None
-        self._rng = np.random.default_rng(config.seed)
         self._step_count = 0
 
         # Autonomous mode state
         self._env: Optional[gym.Env] = None
-        self._raw_action_space: Optional[gym.spaces.Space] = None  # original (possibly Dict)
-        self._agent_keys: Optional[list] = None  # keys for multi-agent Dict spaces
+        self._raw_action_space: Optional[gym.spaces.Space] = None
+        self._agent_keys: Optional[list] = None
         self._episode_index = 0
         self._episode_reward = 0.0
 
@@ -78,22 +78,15 @@ class RandomWorkerRuntime:
         print(json.dumps(data, default=_json_default), flush=True)
 
     def _resolve_action_space(self, game_name: str) -> gym.spaces.Space:
-        """Determine the action space from the game/task name.
-
-        Tries to create a temporary env to read the action space.
-        Falls back to Discrete(7) for multigrid environments.
-        """
+        """Determine the action space from the game/task name."""
         task = self.config.task or game_name
 
-        # Try creating a temporary environment
         try:
             _ensure_env_registered(task)
             env = gym.make(task, render_mode=None, disable_env_checker=True)
             action_space = env.action_space
             env.close()
 
-            # Multi-agent envs may return a Dict action space — extract
-            # a single agent's Discrete space.
             if hasattr(action_space, "spaces"):
                 first_key = next(iter(action_space.spaces))
                 action_space = action_space.spaces[first_key]
@@ -101,27 +94,18 @@ class RandomWorkerRuntime:
             logger.info("Resolved action space from %s: %s", task, action_space)
             return action_space
         except Exception as exc:
-            logger.warning("Could not create env %s: %s — defaulting to Discrete(7)", task, exc)
+            logger.warning(
+                "Could not create env %s: %s — defaulting to Discrete(7)",
+                task, exc,
+            )
 
-        # Fallback for multigrid-style environments
         return gym.spaces.Discrete(7)
 
     def _select_action(self) -> int:
-        """Select an action according to the configured behavior."""
+        """Select a uniformly random action."""
         if self._action_space is None:
             return 0
-
-        behavior = self.config.behavior
-
-        if behavior == "noop":
-            return 0
-        elif behavior == "cycling":
-            action = self._step_count % self._action_space.n
-            self._step_count += 1
-            return int(action)
-        else:
-            # random (default)
-            return int(self._action_space.sample())
+        return int(self._action_space.sample())
 
     # ── Render Helpers ───────────────────────────────────────────────
 
@@ -152,15 +136,14 @@ class RandomWorkerRuntime:
 
         self._action_space = self._resolve_action_space(game_name)
 
-        # Seed the action space for reproducibility
         if self.config.seed is not None:
             self._action_space.seed(self.config.seed)
 
         self._step_count = 0
 
         logger.info(
-            "Agent ready: player=%s game=%s action_space=%s behavior=%s",
-            player_id, game_name, self._action_space, self.config.behavior,
+            "Agent ready: player=%s game=%s action_space=%s",
+            player_id, game_name, self._action_space,
         )
 
         return {
@@ -169,7 +152,7 @@ class RandomWorkerRuntime:
             "game_name": game_name,
             "player_id": player_id,
             "mode": "action_selector",
-            "behavior": self.config.behavior,
+            "behavior": "random",
         }
 
     def handle_select_action(self, cmd: Dict[str, Any]) -> Dict[str, Any]:
@@ -182,6 +165,7 @@ class RandomWorkerRuntime:
 
         player_id = cmd.get("player_id", "unknown")
         action = self._select_action()
+        self._step_count += 1
 
         return {
             "type": "action_selected",
@@ -200,7 +184,6 @@ class RandomWorkerRuntime:
             raise ValueError("--task is required for autonomous (non-interactive) mode")
 
         kwargs: Dict[str, Any] = {"render_mode": "rgb_array", "disable_env_checker": True}
-
         _ensure_env_registered(task)
 
         logger.info("Creating env: %s", task)
@@ -209,33 +192,27 @@ class RandomWorkerRuntime:
     def handle_reset(self, cmd: Dict[str, Any]) -> Dict[str, Any]:
         """Handle reset: reset or create env, return ready response."""
         seed = cmd.get("seed")
-        max_steps = cmd.get("max_steps")
 
-        # Create env on first reset
         if self._env is None:
             self._env = self._create_env()
             self._raw_action_space = self._env.action_space
             self._action_space = self._raw_action_space
-            # Unwrap Dict action space for multi-agent envs
             if hasattr(self._raw_action_space, "spaces"):
                 self._agent_keys = list(self._raw_action_space.spaces.keys())
                 first_key = self._agent_keys[0]
                 self._action_space = self._raw_action_space.spaces[first_key]
 
-        # Seed the action space
         if seed is not None:
             self._action_space.seed(seed)
 
         self._step_count = 0
         self._episode_reward = 0.0
 
-        # Reset env
         reset_kwargs: Dict[str, Any] = {}
         if seed is not None:
             reset_kwargs["seed"] = seed
         obs, info = self._env.reset(**reset_kwargs)
 
-        # Build observation shape
         obs_shape: Optional[List[int]] = None
         if isinstance(obs, np.ndarray):
             obs_shape = list(obs.shape)
@@ -271,10 +248,8 @@ class RandomWorkerRuntime:
         each agent key to a sampled action.
         """
         if self._agent_keys is not None:
-            # Multi-agent: build {agent_key: action} for each agent
             return {key: self._select_action() for key in self._agent_keys}
-        else:
-            return self._select_action()
+        return self._select_action()
 
     def handle_step(self, cmd: Dict[str, Any]) -> None:
         """Handle step: pick action, step env, emit step + possibly episode_end."""
@@ -286,7 +261,6 @@ class RandomWorkerRuntime:
             return
 
         env_action = self._build_env_action()
-        # For reporting, use a single representative action
         if isinstance(env_action, dict):
             report_action = next(iter(env_action.values()))
         else:
@@ -294,7 +268,6 @@ class RandomWorkerRuntime:
 
         obs, reward, terminated, truncated, info = self._env.step(env_action)
 
-        # Handle multi-agent dict returns
         if isinstance(reward, dict):
             reward = sum(reward.values())
         if isinstance(terminated, dict):
@@ -305,7 +278,6 @@ class RandomWorkerRuntime:
         self._episode_reward += float(reward)
         payload = self._render_payload()
 
-        # Emit step response
         self._emit({
             "type": "step",
             "run_id": self.config.run_id,
@@ -319,13 +291,14 @@ class RandomWorkerRuntime:
             "render_payload": payload,
         })
 
-        # Emit episode_end if episode is over
+        self._step_count += 1
+
         if terminated or truncated:
             self._emit({
                 "type": "episode_end",
                 "run_id": self.config.run_id,
                 "episode_index": self._episode_index,
-                "episode_steps": self._step_count + 1,
+                "episode_steps": self._step_count,
                 "episode_return": self._episode_reward,
                 "terminated": bool(terminated),
                 "truncated": bool(truncated),
@@ -337,16 +310,17 @@ class RandomWorkerRuntime:
 
     def run(self) -> None:
         """Interactive mode: read JSON commands from stdin (action-selector protocol)."""
-        # Auto-emit init message so GUI knows the subprocess is alive
         self._emit({
             "type": "init",
             "run_id": self.config.run_id,
             "worker": "random_worker",
-            "behavior": self.config.behavior,
+            "behavior": "random",
         })
 
-        logger.info("Random worker started [interactive] (run_id=%s, behavior=%s)",
-                     self.config.run_id, self.config.behavior)
+        logger.info(
+            "Random worker started [interactive] (run_id=%s)",
+            self.config.run_id,
+        )
 
         try:
             for line in sys.stdin:
@@ -364,17 +338,24 @@ class RandomWorkerRuntime:
 
                 if cmd_type == "init_agent":
                     self._emit(self.handle_init_agent(cmd))
-
                 elif cmd_type == "select_action":
                     self._emit(self.handle_select_action(cmd))
-
+                elif cmd_type == "reset":
+                    # Also handle env-owning reset/step for single-agent manual mode
+                    try:
+                        self._emit(self.handle_reset(cmd))
+                    except Exception as exc:
+                        self._emit({"type": "error", "message": f"Reset failed: {exc}"})
+                elif cmd_type == "step":
+                    try:
+                        self.handle_step(cmd)
+                    except Exception as exc:
+                        self._emit({"type": "error", "message": f"Step failed: {exc}"})
                 elif cmd_type == "stop":
                     self._emit({"type": "stopped"})
                     break
-
                 elif cmd_type == "ping":
                     self._emit({"type": "pong"})
-
                 else:
                     self._emit({
                         "type": "error",
@@ -384,6 +365,11 @@ class RandomWorkerRuntime:
         except KeyboardInterrupt:
             logger.info("Interrupted")
         finally:
+            if self._env is not None:
+                try:
+                    self._env.close()
+                except Exception:
+                    pass
             logger.info("Random worker stopped")
 
     def run_autonomous(self) -> None:
@@ -392,12 +378,14 @@ class RandomWorkerRuntime:
             "type": "init",
             "run_id": self.config.run_id,
             "worker": "random_worker",
-            "behavior": self.config.behavior,
+            "behavior": "random",
             "mode": "autonomous",
         })
 
-        logger.info("Random worker started [autonomous] (run_id=%s, task=%s, behavior=%s)",
-                     self.config.run_id, self.config.task, self.config.behavior)
+        logger.info(
+            "Random worker started [autonomous] (run_id=%s, task=%s)",
+            self.config.run_id, self.config.task,
+        )
 
         try:
             for line in sys.stdin:
@@ -418,20 +406,16 @@ class RandomWorkerRuntime:
                         self._emit(self.handle_reset(cmd))
                     except Exception as exc:
                         self._emit({"type": "error", "message": f"Reset failed: {exc}"})
-
                 elif cmd_type == "step":
                     try:
                         self.handle_step(cmd)
                     except Exception as exc:
                         self._emit({"type": "error", "message": f"Step failed: {exc}"})
-
                 elif cmd_type == "stop":
                     self._emit({"type": "stopped"})
                     break
-
                 elif cmd_type == "ping":
                     self._emit({"type": "pong"})
-
                 else:
                     self._emit({
                         "type": "error",

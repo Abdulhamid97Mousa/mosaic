@@ -10,13 +10,14 @@ from qtpy import QtWidgets
 class InfoLogContainer(QtWidgets.QWidget):
     """Container for game info and runtime log panels."""
 
-    # Component-level filters (module prefixes)
+    # Component-level filters (matches component field from LogConstant)
     LOG_FILTER_OPTIONS: Dict[str, str | None] = {
         "All": None,
-        "UI": "gym_gui.ui",
-        "Controller": "gym_gui.controllers",
-        "Adapter": "gym_gui.core.adapters",
-        "Worker": "gym_gui.workers",
+        "UI": "UI",
+        "Controller": "Controller",
+        "Adapter": "Adapter",
+        "Worker": "Worker",
+        "Service": "Service",
     }
 
     # Severity-level filters

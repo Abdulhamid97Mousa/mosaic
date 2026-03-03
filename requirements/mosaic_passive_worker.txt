@@ -1,0 +1,54 @@
+# MOSAIC Passive Worker Dependencies
+# Install with: pip install -r requirements/mosaic_passive_worker.txt
+#
+# This file contains dependencies for the MOSAIC Passive Worker,
+# which provides a deterministic do-nothing baseline agent.
+# Always selects the environment's NOOP or STILL action.
+#
+# Key features:
+# - Environment-aware passive action resolution (NOOP/STILL)
+# - Multi-agent support (Dict action spaces)
+# - Dual runtime modes (autonomous/interactive)
+# - No training, no API keys, no GPU required
+#
+# See: 3rd_party/mosaic/passive_worker/
+
+# Include base requirements
+-r base.txt
+
+# ═══════════════════════════════════════════════════════════════
+# Core Dependencies (required)
+# ═══════════════════════════════════════════════════════════════
+
+# Gymnasium for environment interface
+gymnasium>=0.29.0
+
+# NumPy for observation processing
+numpy>=1.20.0
+
+# ═══════════════════════════════════════════════════════════════
+# Environment Dependencies (install based on which envs you use)
+# ═══════════════════════════════════════════════════════════════
+
+# MiniGrid / BabyAI
+# pip install -e ".[minigrid]"
+
+# MosaicMultiGrid (Soccer, Basketball, Collect)
+# pip install -e 3rd_party/mosaic_multigrid
+
+# PettingZoo (Chess, Connect Four, Go)
+# pip install -e ".[pettingzoo]"
+
+# ═══════════════════════════════════════════════════════════════
+# Usage Examples
+# ═══════════════════════════════════════════════════════════════
+#
+# 1. Install the worker:
+#    pip install -e 3rd_party/mosaic/passive_worker
+#
+# 2. Run autonomous baseline:
+#    passive-worker --run-id test --task MiniGrid-Empty-8x8-v0 --seed 42
+#
+# 3. Run in interactive mode (GUI step-by-step):
+#    passive-worker --run-id test --interactive
+#

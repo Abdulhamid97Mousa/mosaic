@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "mosaic-mujoco-mpc"
 version = "0.1.0"
-description = "MuJoCo MPC integration for MOSAIC BDI-RL framework"
+description = "MuJoCo MPC integration for MOSAIC framework"
 requires-python = ">=3.10"
 license = {text = "Apache-2.0"}
 # Dependencies are managed via the main project's requirements.txt

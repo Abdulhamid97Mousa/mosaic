@@ -19,6 +19,7 @@ WorkerCapabilities
 .. autoclass:: gym_gui.core.adapters.base.WorkerCapabilities
    :members:
    :undoc-members:
+   :no-index:
 
 UI Widgets
 ----------
@@ -70,8 +71,8 @@ PlayerAssignmentRow
    .. py:method:: get_assignment() -> WorkerAssignment
 
       Build and return a :class:`~gym_gui.services.operator.WorkerAssignment`
-      from the current UI state.  The ``Random`` type is mapped to
-      ``worker_type="baseline"`` with ``behavior="random"``.
+      from the current UI state.  The ``Random`` type maps to
+      ``worker_type="random"`` and ``Passive`` maps to ``worker_type="passive"``.
 
 OperatorConfigWidget
 ^^^^^^^^^^^^^^^^^^^^

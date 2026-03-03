@@ -117,6 +117,82 @@ All commands below must be run **inside the WSL terminal**:
    # Install with optional extras
    pip install -e ".[minigrid,mosaic_multigrid,multigrid_ini,pettingzoo,mujoco,atari,vizdoom,crafter,nethack,overcooked,rware,cleanrl,xuance,chat]"
 
+Configure Environment Variables
+-------------------------------
+
+MOSAIC uses a ``.env`` file for configuration. Copy the example file and
+customize it for your setup:
+
+.. code-block:: bash
+
+   # Copy the example file
+   cp .env.example .env
+
+   # Edit with your preferred editor
+   nano .env
+   # or: code .env, vim .env, etc.
+
+Required API Keys
+^^^^^^^^^^^^^^^^^
+
+You **must** set your API keys in ``.env`` to use these features:
+
+.. list-table::
+   :widths: 25 45 30
+   :header-rows: 1
+
+   * - Feature
+     - Variable
+     - Get Key From
+   * - **LLM Chat (cloud)**
+     - ``OPENROUTER_API_KEY``
+     - https://openrouter.ai/keys
+   * - **Gated Models (Llama)**
+     - ``HF_TOKEN``
+     - https://huggingface.co/settings/tokens
+   * - **Experiment Tracking**
+     - ``WANDB_API_KEY``
+     - https://wandb.ai/authorize
+
+Edit the ``.env`` file and replace the placeholder values:
+
+.. code-block:: bash
+
+   # Example: Set your OpenRouter API key
+   OPENROUTER_API_KEY=sk-or-v1-your_actual_key_here
+
+   # Example: Set your HuggingFace token
+   HF_TOKEN=hf_your_actual_token_here
+
+   # Example: Set your Weights & Biases API key
+   WANDB_API_KEY=your_actual_wandb_key_here
+   WANDB_ENTITY_NAME=your_wandb_username
+   WANDB_PROJECT_NAME=MOSAIC
+
+WSL-Specific Settings
+^^^^^^^^^^^^^^^^^^^^^
+
+On WSL, you may need to adjust these settings for proper GUI and GPU support:
+
+.. code-block:: bash
+
+   # Platform identifier
+   PLATFORM=ubuntu
+
+   # MuJoCo rendering backend (egl works best with WSLg)
+   MUJOCO_GL=egl
+
+   # Qt debugging (set to 1 if you have display issues)
+   QT_DEBUG_PLUGINS=0
+
+   # For WSLg (Windows 11), DISPLAY should be :0
+   # If using an external X server (VcXsrv, X410), uncomment and set:
+   # export DISPLAY=$(hostname).local:0
+
+.. important::
+
+   If you experience GUI issues on WSL, see the :ref:`wsl-gui-issues` section below.
+
 Install Local 3rd-Party Packages
 ---------------------------------
 
@@ -129,6 +205,8 @@ Install Local 3rd-Party Packages
 
 WSL-Specific Issues
 -------------------
+
+.. _wsl-gui-issues:
 
 Broken ``.venv`` symlinks (I/O errors)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^

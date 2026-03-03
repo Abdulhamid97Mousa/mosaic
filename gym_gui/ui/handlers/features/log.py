@@ -84,7 +84,9 @@ class LogHandler:
         """Format a log record for display in the console."""
         ts = datetime.fromtimestamp(payload.created).strftime("%H:%M:%S")
         component = payload.component or "Unknown"
-        return f"{ts} | {payload.level:<7} | {component:<12} | {payload.name} | {payload.message}"
+        if payload.worker_type:
+            component = f"{component}({payload.worker_type})"
+        return f"{ts} | {payload.level:<7} | {component:<18} | {payload.name} | {payload.message}"
 
     def _refresh_console(self) -> None:
         """Refresh the log console by re-applying filters to all records."""

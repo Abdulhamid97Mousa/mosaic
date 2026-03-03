@@ -19,6 +19,8 @@ class LogRecordPayload:
     component: str
     subcomponent: str
     log_code: str | None
+    worker_id: str
+    worker_type: str
 
 
 class LogEmitter(QtCore.QObject):
@@ -53,6 +55,8 @@ class QtLogHandler(logging.Handler):
             component=component,
             subcomponent=subcomponent,
             log_code=log_code,
+            worker_id=getattr(record, "worker_id", ""),
+            worker_type=getattr(record, "worker_type", ""),
         )
         self.emitter.record_emitted.emit(payload)
 

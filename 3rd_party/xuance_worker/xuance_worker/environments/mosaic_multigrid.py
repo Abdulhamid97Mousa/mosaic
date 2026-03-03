@@ -42,6 +42,7 @@ Example:
 from __future__ import annotations
 
 import logging
+import os
 from collections import defaultdict
 from enum import Enum
 from typing import Any, Dict, List, Optional, Tuple, Type
@@ -672,7 +673,33 @@ class MultiGrid_Env(RawMultiAgentEnv):
         # never created, causing "fastlane-unavailable" on the GUI side.
         fastlane_active = maybe_wrap_env is not None and is_fastlane_enabled()
         render_mode = "rgb_array" if fastlane_active else None
-        self.env = env_cls(render_mode=render_mode)
+
+        # Allow view_size override via MOSAIC_VIEW_SIZE environment variable.
+        # With view_size=7 (vs default 3), agents see 49 cells instead of 9,
+        # changing obs from (3,3,3)=27 to (7,7,3)=147 flattened features.
+        env_extra_kwargs: dict[str, Any] = {}
+        view_size_str = os.environ.get("MOSAIC_VIEW_SIZE", "")
+        if view_size_str:
+            env_extra_kwargs["view_size"] = int(view_size_str)
+            try:
+                from gym_gui.logging_config.helpers import log_constant
+                from gym_gui.logging_config.log_constants import (
+                    LOG_OPERATOR_VIEW_SIZE_CONFIGURED,
+                )
+                log_constant(
+                    _logger,
+                    LOG_OPERATOR_VIEW_SIZE_CONFIGURED,
+                    extra={
+                        "view_size": int(view_size_str),
+                        "env_id": env_id,
+                    },
+                )
+            except ImportError:
+                _logger.info(
+                    "Using view_size=%d from MOSAIC_VIEW_SIZE",
+                    int(view_size_str),
+                )
+        self.env = env_cls(render_mode=render_mode, **env_extra_kwargs)
 
         # mosaic_multigrid uses Gymnasium API - no wrapper needed (already reproducible)
         # Seed will be passed to reset() instead of calling env.seed()

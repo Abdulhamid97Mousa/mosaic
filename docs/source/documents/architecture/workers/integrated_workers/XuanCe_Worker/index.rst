@@ -1,10 +1,19 @@
 XuanCe Worker
 =============
 
+.. image:: /images/workers/xuance_logo.png
+   :alt: XuanCe Logo
+   :align: center
+   :width: 60%
+
+.. raw:: html
+
+   <br>
+
 The XuanCe worker is MOSAIC's **multi-agent and comprehensive RL** integration.
-It wraps the `XuanCe <https://github.com/agi-brain/xuance>`_ library — a
+It wraps the `XuanCe <https://github.com/agi-brain/xuance>`_ library. A
 unified deep RL library with 46+ algorithms across single-agent, multi-agent,
-and offline RL — behind the standard :doc:`shim pattern <../../concept>`, adding
+and offline RL behind the standard :doc:`shim pattern <../../concept>`, adding
 subprocess isolation, FastLane telemetry, curriculum learning, and GUI
 configuration.
 
@@ -190,11 +199,12 @@ of truth for all run parameters:
 
 Key ``extras`` fields:
 
-- ``training_mode`` — ``"cooperative"`` or ``"competitive"`` (for MARL)
-- ``curriculum_schedule`` — list of ``{"env_id": ..., "steps": ...}`` dicts
-- ``tensorboard_dir`` — relative path for TensorBoard logs
-- ``checkpoint_dir`` — relative path for model checkpoints
-- ``num_envs`` — alias for ``parallels`` (used by some MARL algorithms)
+- ``training_mode``: ``"cooperative"`` or ``"competitive"`` (for MARL)
+- ``curriculum_schedule``: list of ``{"env_id": ..., "steps": ...}`` dicts
+- ``tensorboard_dir``: relative path for TensorBoard logs
+- ``checkpoint_dir``: relative path for model checkpoints
+- ``num_envs``: alias for ``parallels`` (used by some MARL algorithms)
+
 
 Curriculum Training
 -------------------
@@ -250,10 +260,10 @@ FastLane Telemetry
 FastLane streams render frames from the training process to the MOSAIC
 GUI via shared memory.  Environment variables controlling behaviour:
 
-- ``GYM_GUI_FASTLANE_ONLY`` — ``1`` to stream, ``0`` to disable
-- ``GYM_GUI_FASTLANE_SLOT`` — which parallel env index to probe
-- ``GYM_GUI_FASTLANE_VIDEO_MODE`` — ``"single"`` or ``"grid"``
-- ``GYM_GUI_FASTLANE_GRID_LIMIT`` — max envs to tile in grid mode
+- ``GYM_GUI_FASTLANE_ONLY``: ``1`` to stream, ``0`` to disable
+- ``GYM_GUI_FASTLANE_SLOT``: which parallel env index to probe
+- ``GYM_GUI_FASTLANE_VIDEO_MODE``: ``"single"`` or ``"grid"``
+- ``GYM_GUI_FASTLANE_GRID_LIMIT``: max envs to tile in grid mode
 
 GUI Integration
 ---------------

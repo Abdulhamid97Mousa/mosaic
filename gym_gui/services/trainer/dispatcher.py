@@ -27,7 +27,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_TRAINER_WORKER_IMPORT_ERROR,
 )
 
-_LOGGER = logging.getLogger("gym_gui.trainer.dispatcher")
+_LOGGER = logging.getLogger(__name__)
 
 # Import signals for lifecycle events (lazy initialization)
 _signals = None
@@ -75,7 +75,14 @@ def _parse_structured_log_line(line: str) -> tuple[str | None, dict[str, Any] | 
     return code, extra
 
 
-def _re_emit_worker_log(run_id: str, code: str, extra: dict[str, Any]) -> None:
+def _re_emit_worker_log(
+    run_id: str,
+    code: str,
+    extra: dict[str, Any],
+    *,
+    worker_id: str = "",
+    worker_type: str = "",
+) -> None:
     """Re-emit a worker log as a structured log constant.
     
     Looks up the LOG_CODE, extracts component/subcomponent, and calls log_constant.
@@ -93,6 +100,10 @@ def _re_emit_worker_log(run_id: str, code: str, extra: dict[str, Any]) -> None:
     worker_extra = dict(extra)
     worker_extra.setdefault('component', constant.component)
     worker_extra.setdefault('subcomponent', constant.subcomponent)
+    if worker_id:
+        worker_extra.setdefault('worker_id', worker_id)
+    if worker_type:
+        worker_extra.setdefault('worker_type', worker_type)
     
     try:
         log_constant(_LOGGER, constant, extra=worker_extra)
@@ -115,11 +126,16 @@ class WorkerHandle:
         process: asyncio.subprocess.Process,
         gpu_slots: list[int],
         started_at: datetime,
+        *,
+        worker_id: str = "",
+        worker_type: str = "",
     ) -> None:
         self.run_id = run_id
         self.process = process
         self.gpu_slots = gpu_slots
         self.started_at = started_at
+        self.worker_id = worker_id
+        self.worker_type = worker_type
         self.cancelled = False
         self.stderr_tail: deque[str] = deque(maxlen=_STDERR_TAIL_LINES)
         self.stdout_log: Any = None
@@ -230,7 +246,26 @@ class TrainerDispatcher:
         cmd = self._build_worker_command(run)
         env = self._build_worker_env(run)
 
-        _LOGGER.info("Spawning worker", extra={"run_id": run.run_id, "cmd": cmd})
+        # Extract worker identity from config metadata for log tagging
+        worker_id = ""
+        worker_type = ""
+        try:
+            config_payload = self._registry.get_run_config_json(run.run_id)
+            if config_payload:
+                cj = json.loads(config_payload)
+                wm = cj.get("metadata", {}).get("worker", {})
+                if isinstance(wm, dict):
+                    raw_wid = wm.get("worker_id")
+                    if raw_wid is not None:
+                        worker_id = str(raw_wid).strip()
+                    module = wm.get("module", "")
+                    if module:
+                        worker_type = module.removesuffix(".cli").replace("_worker", "")
+        except Exception:
+            pass
+
+        _LOGGER.info("Spawning worker", extra={"run_id": run.run_id, "cmd": cmd,
+                                                "worker_id": worker_id, "worker_type": worker_type})
 
         # nosemgrep: python.lang.security.audit.dangerous-asyncio-create-subprocess.dangerous-asyncio-create-subprocess
         # Safe: Command validated via validated_create_subprocess_exec wrapper which:
@@ -252,6 +287,8 @@ class TrainerDispatcher:
             process=process,
             gpu_slots=run.gpu_slots,
             started_at=datetime.now(timezone.utc),
+            worker_id=worker_id,
+            worker_type=worker_type,
         )
         self._workers[run.run_id] = handle
 
@@ -282,40 +319,32 @@ class TrainerDispatcher:
     def _maybe_open_log_files(
         self, handle: WorkerHandle, env: dict[str, str]
     ) -> None:
-        """Open log files for custom script runs.
+        """Open dispatcher-side log files for worker stdout/stderr.
 
-        Custom scripts don't use runtime.py, which normally creates log files
-        in ``var/trainer/runs/{run_id}/logs/``.  Instead, the dispatcher tees
-        captured stdout/stderr to ``{MOSAIC_RUN_DIR}/logs/``.
+        For **all** worker types the dispatcher tees captured stdout/stderr
+        to ``{MOSAIC_RUN_DIR}/logs/worker.stdout.log`` and
+        ``worker.stderr.log``.  Module-based workers (e.g. ray_worker) also
+        write their own ``worker.log`` via a ``FileHandler``; the dispatcher
+        logs are complementary and capture output that bypasses the Python
+        logging system (e.g. Ray C++ messages, segfault traces).
         """
-        config_raw = self._registry.get_run_config_json(handle.run_id)
-        if not config_raw:
-            return
-        try:
-            cfg = json.loads(config_raw)
-        except json.JSONDecodeError:
-            return
-        wmeta = cfg.get("metadata", {}).get("worker", {}) if isinstance(cfg, dict) else {}
-        if not isinstance(wmeta, dict):
-            return
-        # Only open log files for custom scripts (script set, no module).
-        if not wmeta.get("script") or wmeta.get("module"):
-            return
         run_dir_str = env.get("MOSAIC_RUN_DIR")
         if not run_dir_str:
             return
         try:
             logs_dir = Path(run_dir_str) / "logs"
             logs_dir.mkdir(parents=True, exist_ok=True)
-            handle.stdout_log = open(logs_dir / "worker.stdout.log", "w", encoding="utf-8")
-            handle.stderr_log = open(logs_dir / "worker.stderr.log", "w", encoding="utf-8")
+            # Use worker_id for log file naming (e.g. cleanrl_worker → cleanrl_worker.stdout.log)
+            prefix = handle.worker_id or "worker"
+            handle.stdout_log = open(logs_dir / f"{prefix}.stdout.log", "w", encoding="utf-8")
+            handle.stderr_log = open(logs_dir / f"{prefix}.stderr.log", "w", encoding="utf-8")
             _LOGGER.debug(
-                "Opened log files for custom script",
+                "Opened dispatcher log files for worker",
                 extra={"run_id": handle.run_id, "logs_dir": str(logs_dir)},
             )
         except OSError as exc:
             _LOGGER.warning(
-                "Failed to create log files for custom script",
+                "Failed to create dispatcher log files",
                 extra={"run_id": handle.run_id, "error": str(exc)},
             )
 
@@ -400,63 +429,7 @@ class TrainerDispatcher:
                         args.extend(["--grpc-target", grpc_target])
                 if worker_id and "--worker-id" not in args:
                     args.extend(["--worker-id", worker_id])
-                
-                # Add BDI flags if BDI mode is enabled
-                agent_type = worker_meta.get("agent_type", "Headless")
-                if worker_meta.get("bdi_enabled"):
-                    if "--bdi" not in args:
-                        args.append("--bdi")
-                    bdi_config = worker_meta.get("bdi_config", {})
-                    bdi_jid = bdi_config.get("jid", "agent@localhost")
-                    bdi_password = bdi_config.get("password", "secret")
-                    
-                    if "--bdi-jid" not in args:
-                        args.extend(["--bdi-jid", bdi_jid])
-                    if "--bdi-password" not in args:
-                        args.extend(["--bdi-password", bdi_password])
-                    
-                    if "asl_file" in bdi_config:
-                        asl_file = bdi_config.get("asl_file")
-                        if asl_file and "--asl-file" not in args:
-                            args.extend(["--asl-file", asl_file])
-                    
-                    # Log BDI configuration details
-                    agent_config = get_agent_config("BDI")
-                    schema = agent_config.get_telemetry_schema()
-                    required_fields = agent_config.get_required_fields()
-                    optional_fields = agent_config.get_optional_fields()
-                    
-                    _LOGGER.info(
-                        "BDI Agent worker command prepared",
-                        extra={
-                            "run_id": run.run_id,
-                            "agent_type": agent_type,
-                            "bdi_jid": bdi_jid,
-                            "bdi_password": "[***]",
-                            "bdi_asl_file": bdi_config.get("asl_file", "(not provided)"),
-                            "bdi_config_keys": list(bdi_config.keys()),
-                            "telemetry_schema_categories": list(schema.keys()),
-                            "required_telemetry_fields": sorted(required_fields),
-                            "optional_telemetry_fields": sorted(optional_fields),
-                        },
-                    )
-                else:
-                    # Log Headless agent configuration
-                    agent_config = get_agent_config(agent_type)
-                    schema = agent_config.get_telemetry_schema()
-                    required_fields = agent_config.get_required_fields()
-                    
-                    _LOGGER.info(
-                        "Headless Agent worker command prepared",
-                        extra={
-                            "run_id": run.run_id,
-                            "agent_type": agent_type,
-                            "algorithm": worker_meta.get("algorithm", "unknown"),
-                            "telemetry_schema_categories": list(schema.keys()),
-                            "required_telemetry_fields": sorted(required_fields),
-                        },
-                    )
-                
+
                 worker_cmd.extend(args)
                 _LOGGER.info(
                     "Prepared worker command from metadata",
@@ -630,12 +603,19 @@ class TrainerDispatcher:
                 # Try to parse as structured log
                 code, extra = _parse_structured_log_line(decoded)
                 if code is not None and extra is not None:
-                    _re_emit_worker_log(handle.run_id, code, extra)
+                    _re_emit_worker_log(
+                        handle.run_id, code, extra,
+                        worker_id=handle.worker_id,
+                        worker_type=handle.worker_type,
+                    )
                 else:
-                    # Fallback: log as plain DEBUG message
+                    # Fallback: log as plain DEBUG message tagged as Worker component
                     _LOGGER.debug(
                         "Worker stdout",
-                        extra={"run_id": handle.run_id, "line": decoded}
+                        extra={"run_id": handle.run_id, "line": decoded,
+                               "component": "Worker", "subcomponent": "stdout",
+                               "worker_id": handle.worker_id,
+                               "worker_type": handle.worker_type}
                     )
         except asyncio.CancelledError:
             pass
@@ -662,7 +642,13 @@ class TrainerDispatcher:
                     except OSError:
                         pass
 
-                _LOGGER.warning("Worker stderr", extra={"run_id": handle.run_id, "line": decoded})
+                _LOGGER.warning(
+                    "Worker stderr",
+                    extra={"run_id": handle.run_id, "line": decoded,
+                           "component": "Worker", "subcomponent": "stderr",
+                           "worker_id": handle.worker_id,
+                           "worker_type": handle.worker_type},
+                )
         except asyncio.CancelledError:
             pass
 

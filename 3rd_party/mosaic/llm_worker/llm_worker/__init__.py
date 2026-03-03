@@ -1,4 +1,4 @@
-"""MOSAIC LLM Worker - Based on BALROG.
+"""MOSAIC LLM Worker.
 
 This package provides LLM-based agents for RL environments.
 """
@@ -23,10 +23,10 @@ def get_worker_metadata() -> tuple:
     metadata = WorkerMetadata(
         name="LLM Worker",
         version=__version__,
-        description="LLM-based agents for RL environments (based on BALROG)",
+        description="LLM-based agents for RL environments",
         author="MOSAIC Team",
         homepage="https://github.com/MOSAIC-RL/GUI_BDI_RL",
-        upstream_library="balrog",
+        upstream_library=None,
         upstream_version=None,
         license="MIT",
     )

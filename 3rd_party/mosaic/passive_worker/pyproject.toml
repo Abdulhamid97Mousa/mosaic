@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "passive-worker"
+version = "0.1.0"
+description = "Passive (noop) baseline worker for MOSAIC multi-agent environments"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+dependencies = [
+    "gymnasium>=0.29.0",
+    "numpy>=1.20.0",
+]
+
+[project.scripts]
+passive-worker = "passive_worker.cli:main"
+
+[project.entry-points."mosaic.workers"]
+passive = "passive_worker:get_worker_metadata"
+
+[tool.setuptools.packages.find]
+include = ["passive_worker*"]

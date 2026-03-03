@@ -12,13 +12,13 @@ if str(THIRD_PARTY) not in sys.path:
 
 from cleanrl_worker.eval import run_batched_evaluation
 
-MODEL_PATH = Path(
-    "/home/hamid/Desktop/Projects/GUI_BDI_RL/var/trainer/runs/01KAW8JYRDJZDG1G9G29PYGZ91/"
+MODEL_PATH = (
+    ROOT / "var/trainer/runs/01KAW8JYRDJZDG1G9G29PYGZ91/"
     "runs/Walker2d-v5__ppo_continuous_action__1__1764032618/ppo_continuous_action.cleanrl_model"
 ).resolve()
 
-LOG_DIR = Path(
-    "/home/hamid/Desktop/Projects/GUI_BDI_RL/var/trainer/evals/01KAWCW4PZP8R9BBQD8F595WST/tensorboard"
+LOG_DIR = (
+    ROOT / "var/trainer/evals/01KAWCW4PZP8R9BBQD8F595WST/tensorboard"
 ).resolve()
 
 RUN_DIR = LOG_DIR.parent

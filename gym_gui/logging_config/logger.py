@@ -46,8 +46,22 @@ class _ComponentRegistry:
             "gym_gui.core.adapters": "Adapter",
             "gym_gui.core": "Core",
             "gym_gui.services": "Service",
+            "gym_gui.trainer": "Service",  # Compat: some loggers use gym_gui.trainer.*
             "gym_gui.telemetry": "Telemetry",
             "gym_gui.logging": "Logging",
+            # 3rd-party worker subprocess loggers
+            "balrog_worker": "Worker",
+            "chess_worker": "Worker",
+            "cleanrl_worker": "Worker",
+            "jumanji_worker": "Worker",
+            "llm_game_worker": "Worker",
+            "marllib_worker": "Worker",
+            "mctx_worker": "Worker",
+            "mujoco_mpc_worker": "Worker",
+            "pettingzoo_worker": "Worker",
+            "ray_worker": "Worker",
+            "stockfish_worker": "Worker",
+            "xuance_worker": "Worker",
         }
         for prefix, component in defaults.items():
             self.register_prefix(prefix, component)

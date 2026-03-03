@@ -4,12 +4,18 @@ Test USB hub and keyboard devices using standard Linux input subsystem.
 This verifies that each keyboard is seen as a separate device.
 
 No special libraries needed - uses built-in Python only.
+
+NOTE: This is a standalone diagnostic script, not a pytest test module.
 """
 import os
 import glob
 import struct
 import select
 import sys
+
+import pytest
+pytestmark = pytest.mark.skip(reason="Standalone hardware diagnostic script, not a pytest test")
+
 
 def list_keyboard_devices():
     """List all keyboard input devices."""

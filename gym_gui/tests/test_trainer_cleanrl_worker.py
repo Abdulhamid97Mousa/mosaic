@@ -216,5 +216,6 @@ def test_analytics_tab_manager_creates_tensorboard_and_wandb_tabs(qt_app: QtWidg
     manager.ensure_wandb_tab(run_id, agent_id, metadata)
 
     agent_tabs = render_tabs._agent_tabs.get(run_id, {})
-    assert "TensorBoard-Agent-agent-42" in agent_tabs
+    expected_tb_key = f"TensorBoard-{agent_id}-{run_id[:8]}"
+    assert expected_tb_key in agent_tabs
     assert "WANDB-Agent-agent-42" in agent_tabs

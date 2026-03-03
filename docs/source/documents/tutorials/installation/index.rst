@@ -66,7 +66,45 @@ Quick Start Installation
    source .venv/bin/activate  # Linux/macOS
    # or: .venv\Scripts\activate  # Windows
 
-2. Install Core GUI (Minimal)
+2. Configure Environment Variables
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+MOSAIC uses a ``.env`` file for configuration. Copy the example file and
+customize it for your setup:
+
+.. code-block:: bash
+
+   cp .env.example .env
+
+The ``.env`` file contains all configurable settings with sensible defaults.
+Key sections include:
+
+.. list-table::
+   :widths: 30 70
+   :header-rows: 1
+
+   * - Section
+     - Description
+   * - **Qt Configuration**
+     - Display settings, platform plugins (especially important for WSL)
+   * - **Environment Defaults**
+     - Gymnasium settings, episode limits, render FPS for each environment family
+   * - **LLM API Keys**
+     - OpenRouter API key, HuggingFace token for gated models
+   * - **Weights & Biases**
+     - WANDB API key and project settings for experiment tracking
+   * - **SMAC / SMACv2**
+     - StarCraft II path and difficulty settings
+
+.. important::
+
+   You **must** set your API keys in ``.env`` to use:
+
+   - **OpenRouter** (cloud LLM access): Get your key from https://openrouter.ai/keys
+   - **HuggingFace** (gated models like Llama): Get your token from https://huggingface.co/settings/tokens
+   - **Weights & Biases** (experiment tracking): Get your key from https://wandb.ai/authorize
+
+3. Install Core GUI (Minimal)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 This installs only what's needed to launch the GUI:
@@ -82,7 +120,7 @@ This gives you:
 - Telemetry and replay storage
 - No training workers or environments
 
-3. Add What You Need
+4. Add What You Need
 ^^^^^^^^^^^^^^^^^^^^
 
 Choose your installation based on your use case:
@@ -316,7 +354,7 @@ without executing any module code:
    We use ``find_spec()`` instead of ``import`` because some packages execute
    blocking code at import time:
 
-   - **XuanCe** calls ``from mpi4py import MPI`` which invokes ``MPI_Init()`` —
+   - **XuanCe** calls ``from mpi4py import MPI`` which invokes ``MPI_Init()``,
      this blocks forever when not launched via ``mpirun``
    - **Ray** imports TensorFlow, Pydantic, and W&B at module level, adding
      several seconds of startup delay
@@ -330,12 +368,12 @@ Additionally, the ``gym_gui/constants/optional_deps.py`` module provides
 .. code-block:: python
 
    from gym_gui.constants import (
-       is_cleanrl_available,   # → bool
-       is_vizdoom_available,   # → bool
-       is_pettingzoo_available,# → bool
-       is_torch_available,     # → bool
-       require_cleanrl,        # → raises OptionalDependencyError if missing
-       require_vizdoom,        # → raises OptionalDependencyError if missing
+       is_cleanrl_available,   # bool
+       is_vizdoom_available,   # bool
+       is_pettingzoo_available,# bool
+       is_torch_available,     # bool
+       require_cleanrl,        # raises OptionalDependencyError if missing
+       require_vizdoom,        # raises OptionalDependencyError if missing
    )
 
    # Lazy worker launchers (import on first use)

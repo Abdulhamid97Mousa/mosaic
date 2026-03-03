@@ -283,6 +283,162 @@ to the newly created environment after the swap.
 Runtime Errors
 --------------
 
+``buffer_size must be divisible by the number of envs (parallels)``
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Error:**
+
+.. code-block:: text
+
+   AssertionError: buffer_size must be divisible by the number of envs (parallels)
+
+**Cause:** XuanCe's on-policy replay buffer (``MARL_OnPolicyBuffer``) requires
+that ``buffer_size % n_envs == 0``.  The number of parallel environments
+(``n_envs``) is set by the **Parallel Envs** field in the training form or by
+the ``XUANCE_PARALLELS`` / ``XUANCE_NUM_ENVS`` environment variables in custom
+scripts.
+
+This error typically appears when the **Grid Limit** in FastLane is set to a
+value that is not a divisor of the buffer size.  For example, the default
+buffer size is **256**.  Setting Grid Limit (and therefore parallel envs) to
+**6** causes ``256 % 6 = 4 ≠ 0``, which triggers the assertion.
+
+.. important::
+
+   **Use power-of-2 values for Parallel Envs and Grid Limit.**
+
+   The following values are safe with the default buffer size of 256:
+
+   - **1** — single environment (slowest, useful for debugging)
+   - **2** — two parallel environments
+   - **4** — four parallel environments (default)
+   - **8** — eight parallel environments (recommended for grid view)
+
+   Values like **3**, **5**, **6**, **7** will crash because 256 is not
+   divisible by them.
+
+**Fix — choose a compatible value:**
+
+If you are using the **training form**, set **Parallel Envs** to 1, 2, 4, or 8.
+
+If you are using a **custom script**, set the environment variable to a
+power-of-2 value:
+
+.. code-block:: bash
+
+   # In your custom script
+   NUM_ENVS="${XUANCE_NUM_ENVS:-4}"   # safe default
+   export XUANCE_PARALLELS="$NUM_ENVS"
+
+If you need a specific number of environments that does not divide the buffer
+size, you can adjust the buffer size in your XuanCe configuration to a
+multiple of ``n_envs``.  For example, for 6 environments use
+``buffer_size = 252`` (252 / 6 = 42) or ``buffer_size = 256`` with 8 envs.
+
+.. tip::
+
+   The **Grid Limit** field in FastLane controls how many environments are
+   displayed in the grid view.  It does **not** override the number of
+   parallel environments used for training.  If you want to see 8
+   environments in the grid, set **both** Parallel Envs and Grid Limit to 8.
+
+   The grid display is clamped: ``grid_limit = min(grid_limit, parallels)``.
+   Setting Grid Limit higher than Parallel Envs will show at most
+   ``parallels`` environments.
+
+
+``Unknown command: init_agent`` when using CleanRL worker for multi-agent environments
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+**Error (when launching multi-agent parallel environments like soccer_2vs2):**
+
+.. code-block:: text
+
+   2026-02-27 10:58:16,768 | WARNING | gym_gui.operators.main_window | Unexpected init_agent response for agent_0: {'type': 'error', 'message': 'Unknown command: init_agent'}
+   2026-02-27 10:58:16,769 | WARNING | gym_gui.operators.main_window | Unexpected init_agent response for agent_1: {'type': 'error', 'message': 'Unknown command: init_agent'}
+   ...
+   2026-02-27 10:59:04,769 | ERROR   | gym_gui.operators.main_window | Failed to get action from AI agent agent_0 after 5 attempts. Last response: None
+
+**Cause:** The **CleanRL worker** (``cleanrl_worker``) only supports single-agent
+environments where it owns the environment. It has only two command handlers:
+
+- ``_handle_reset`` - Initialize environment with seed
+- ``_handle_step`` - Execute action and return next observation
+
+For **parallel multi-agent environments** (MosaicMultiGrid soccer, MeltingPot, Overcooked),
+the GUI owns the shared environment and sends observations to multiple worker processes
+for action selection. This requires the **action-selector protocol**:
+
+- ``init_agent`` - Initialize worker in action-selector mode (no env ownership)
+- ``select_action`` - Given observation, return action for specific agent
+
+The CleanRL worker does **not** implement these commands, so it responds with
+``Unknown command: init_agent`` and all agents timeout waiting for actions.
+
+**Fix -- use XuanCe worker for multi-agent environments:**
+
+Multi-agent parallel environments require the **XuanCe worker** (``mosaic-xuance-worker``),
+which implements the full action-selector protocol including ``init_agent`` and
+``select_action`` commands.
+
+When configuring operators for multi-agent environments:
+
+.. code-block:: python
+
+   # ❌ WRONG - CleanRL worker doesn't support multi-agent parallel mode
+   operators = [
+       {
+           "id": "soccer_team",
+           "name": "Soccer 2v2",
+           "env_name": "mosaic_multigrid",
+           "task": "MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0",
+           "workers": {
+               "agent_0": {"type": "rl", ...},  # cleanrl_worker
+               "agent_1": {"type": "rl", ...},  # cleanrl_worker
+               "agent_2": {"type": "rl", ...},  # cleanrl_worker
+               "agent_3": {"type": "rl", ...},  # cleanrl_worker
+           }
+       }
+   ]
+
+   # ✅ CORRECT - XuanCe worker supports multi-agent parallel mode
+   operators = [
+       {
+           "id": "soccer_team",
+           "name": "Soccer 2v2",
+           "env_name": "mosaic_multigrid",
+           "task": "MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0",
+           "workers": {
+               "agent_0": {"type": "xuance", "method": "ippo", "policy_path": "..."},
+               "agent_1": {"type": "xuance", "method": "ippo", "policy_path": "..."},
+               "agent_2": {"type": "xuance", "method": "ippo", "policy_path": "..."},
+               "agent_3": {"type": "xuance", "method": "ippo", "policy_path": "..."},
+           }
+       }
+   ]
+
+.. important::
+
+   **Worker compatibility by environment type:**
+
+   - **Single-agent environments** (MiniGrid, Atari, Gymnasium):
+     Use either CleanRL worker or XuanCe worker
+
+   - **Multi-agent parallel environments** (MosaicMultiGrid, MeltingPot, Overcooked):
+     Must use XuanCe worker (CleanRL worker will fail with "Unknown command: init_agent")
+
+   The system detects parallel multi-agent mode when:
+
+   1. Environment name is in: ``mosaic_multigrid``, ``ini_multigrid``, ``meltingpot``, ``overcooked``
+   2. Operator has multiple workers (``len(config.workers) > 1``)
+
+   See ``main_window.py:1069`` (``_is_parallel_multiagent()``) for detection logic.
+
+.. tip::
+
+   If you see "Unknown command: init_agent" errors, check your operator configuration
+   and verify you're using ``"type": "xuance"`` for all agents in multi-agent environments.
+
 ``Could not register MOSAIC environments with XuanCe`` (non-fatal warning)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 

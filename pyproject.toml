@@ -3,9 +3,9 @@ requires = ["setuptools>=65", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "mosaic"
-version = "0.1.0"
-description = "MOSAIC: Multi-Agent Orchestration System with Adaptive Intelligent Control for Heterogeneous Agent Workloads"
+name = "mosaic-platform"
+version = "1.0.1"
+description = "MOSAIC: A Unified Platform for Cross-Paradigm Comparison and Evaluation of Homogeneous and Heterogeneous Multi-Agent RL, LLM, VLM, and Human Decision-Makers"
 readme = "README.md"
 requires-python = ">=3.10,<3.13"
 license = {text = "MIT"}
@@ -392,12 +392,22 @@ dev = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
     "pytest-qt>=4.5.0",
+    "pytest-cov>=4.0.0",
+    "pytest-xdist>=3.5.0",
+    "pytest-timeout>=2.2.0",
+    "pytest-rerunfailures>=13.0",
     "pyright>=1.1.0",
+    "ruff>=0.1.0",
 ]
 
 # =============================================================================
-# Convenience Bundles
+# Packaging & Distribution
 # =============================================================================
+
+# PyInstaller for creating standalone executables (Ubuntu, Windows, WSL)
+packaging = [
+    "pyinstaller>=6.0.0",
+]
 
 # All Gymnasium single-agent environments
 all-gymnasium = [
@@ -428,6 +438,9 @@ where = [
     # MOSAIC native workers
     "3rd_party/mosaic/human_worker",
     "3rd_party/mosaic/llm_worker",
+    "3rd_party/mosaic/vlm_worker",
+    "3rd_party/mosaic/passive_worker",
+    "3rd_party/mosaic/random_worker",
 ]
 include = [
     "gym_gui*",
@@ -442,6 +455,9 @@ include = [
     # MOSAIC native workers (under 3rd_party/mosaic/)
     "human_worker*",
     "llm_worker*",
+    "vlm_worker*",
+    "passive_worker*",
+    "random_worker*",
 ]
 
 [project.entry-points."mosaic.workers"]
@@ -455,6 +471,9 @@ mctx = "mctx_worker:get_worker_metadata"
 # MOSAIC native workers (under 3rd_party/mosaic/)
 human = "human_worker:get_worker_metadata"
 llm = "llm_worker:get_worker_metadata"
+vlm = "vlm_worker:get_worker_metadata"
+passive = "passive_worker:get_worker_metadata"
+random = "random_worker:get_worker_metadata"
 marllib = "marllib_worker:get_worker_metadata"
 
 [project.urls]
@@ -465,3 +484,33 @@ Documentation = "https://mosaic-multi-agent-orchestration-system.readthedocs.io/
 [tool.pyright]
 pythonVersion = "3.11"
 typeCheckingMode = "basic"
+
+# =============================================================================
+# Ruff Configuration (replaces flake8, isort, black)
+# =============================================================================
+[tool.ruff]
+target-version = "py310"
+line-length = 120
+
+[tool.ruff.lint]
+select = [
+    "E",      # pycodestyle errors
+    "F",      # Pyflakes
+    "I",      # isort
+    "W",      # pycodestyle warnings
+]
+ignore = [
+    "E226",   # Missing whitespace around arithmetic operator
+    "E265",   # Block comment should start with '# '
+    "E722",   # Do not use bare except
+    "E731",   # Do not assign a lambda expression
+    "E741",   # Ambiguous variable name
+    "F401",   # Imported but unused (handled by pyright)
+    "F403",   # Unable to detect undefined names
+    "W503",   # Line break before binary operator
+    "W504",   # Line break after binary operator
+    "W605",   # Invalid escape sequence
+]
+
+[tool.ruff.lint.isort]
+known-first-party = ["gym_gui"]

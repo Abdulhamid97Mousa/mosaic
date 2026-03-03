@@ -3,7 +3,7 @@
 import logging
 from typing import Any, Optional
 
-from gym import spaces
+from gymnasium import spaces
 
 from llm_worker.environments.env_wrapper import EnvWrapper
 

@@ -1,9 +1,18 @@
 Ray RLlib Worker
 ================
 
+.. image:: /images/workers/ray_map.svg
+   :alt: Ray Ecosystem Map
+   :align: center
+   :width: 80%
+
+.. raw:: html
+
+   <br>
+
 The Ray RLlib worker is MOSAIC's **distributed multi-agent RL** integration.
-It wraps `Ray RLlib <https://docs.ray.io/en/latest/rllib/index.html>`_ —
-Ray's scalable reinforcement learning library — behind the standard
+It wraps `Ray RLlib <https://docs.ray.io/en/latest/rllib/index.html>`, 
+Ray's scalable reinforcement learning library behind the standard
 :doc:`shim pattern <../../concept>`, providing distributed training across
 multiple CPUs or GPUs, PettingZoo multi-agent environment support, and
 flexible policy configurations including self-play and independent learning.

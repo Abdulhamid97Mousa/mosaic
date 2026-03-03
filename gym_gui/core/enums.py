@@ -53,7 +53,7 @@ class GameId(StrEnum):
 
     FROZEN_LAKE = "FrozenLake-v1"
     FROZEN_LAKE_V2 = "FrozenLake-v2"
-    CLIFF_WALKING = "CliffWalking-v0"  # Gymnasium 1.0.0 only has v0
+    CLIFF_WALKING = "CliffWalking-v1"  # Gymnasium 1.1.0+ has v1
     TAXI = "Taxi-v3"
     BLACKJACK = "Blackjack-v1"
     LUNAR_LANDER = "LunarLander-v3"
@@ -559,6 +559,15 @@ class GameId(StrEnum):
     MELTINGPOT_TERRITORY__OPEN = "meltingpot/territory__open"
     MELTINGPOT_TERRITORY__ROOMS = "meltingpot/territory__rooms"
 
+    # Convenience aliases (short names for common substrates)
+    MELTINGPOT_COLLABORATIVE_COOKING = MELTINGPOT_COLLABORATIVE_COOKING__CIRCUIT
+    MELTINGPOT_COMMONS_HARVEST = MELTINGPOT_COMMONS_HARVEST__OPEN
+    MELTINGPOT_TERRITORY = MELTINGPOT_TERRITORY__ROOMS
+    MELTINGPOT_KING_OF_THE_HILL = MELTINGPOT_PAINTBALL__KING_OF_THE_HILL
+    MELTINGPOT_PRISONERS_DILEMMA = MELTINGPOT_PRISONERS_DILEMMA_IN_THE_MATRIX__REPEATED
+    MELTINGPOT_STAG_HUNT = MELTINGPOT_STAG_HUNT_IN_THE_MATRIX__REPEATED
+    MELTINGPOT_ALLELOPATHIC_HARVEST = MELTINGPOT_ALLELOPATHIC_HARVEST__OPEN
+
     # ─────────────────────────────────────────────────────────────────────────
     # Overcooked-AI (Cooperative Cooking - Human-AI Coordination)
     # Repository: https://github.com/HumanCompatibleAI/overcooked_ai
@@ -822,13 +831,6 @@ class SteppingParadigm(StrEnum):
 
     Used by: RLlib MultiAgentEnv, PettingZoo parallel_env(), MPE
     API: obs_dict, rewards, dones, infos = env.step(action_dict)
-    """
-
-    HIERARCHICAL = "hierarchical"
-    """BDI + RL: high-level goals decomposed into low-level RL actions.
-
-    Used by: Jason/BDI workers, goal-driven agents
-    API: Custom goal → action mapping with RL sub-policies
     """
 
 

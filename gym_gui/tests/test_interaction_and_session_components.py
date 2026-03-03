@@ -16,6 +16,8 @@ class _OwnerStub:
         self._passive_action = 0
         self._adapter = object()
         self._game_id = object()
+        self._game_started = True
+        self._last_step = None
 
 
 def test_turn_based_controller_behavior():

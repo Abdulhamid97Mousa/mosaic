@@ -1475,96 +1475,96 @@ LOG_OPERATOR_STOP_ALL_COMPLETED = _constant(
 )
 
 # ---------------------------------------------------------------------------
-# Baseline Operator constants (LOG4080–LOG4089)
+# Script Operator constants (LOG4080–LOG4089)
 # ---------------------------------------------------------------------------
-LOG_BASELINE_OPERATOR_LAUNCHED = _constant(
+LOG_SCRIPT_OPERATOR_LAUNCHED = _constant(
     "LOG4080",
     "INFO",
-    "Baseline operator launched for ablation study",
+    "Script operator launched for automated experiment",
     component="Service",
     subcomponent="OperatorLauncher",
-    tags=_tags("operator", "baseline", "launch", "ablation"),
+    tags=_tags("operator", "script", "launch", "experiment"),
 )
 
-LOG_BASELINE_OPERATOR_BEHAVIOR_SET = _constant(
+LOG_SCRIPT_OPERATOR_BEHAVIOR_SET = _constant(
     "LOG4081",
     "DEBUG",
-    "Baseline operator behavior configured",
+    "Script operator behavior configured",
     component="Service",
     subcomponent="OperatorLauncher",
-    tags=_tags("operator", "baseline", "config", "behavior"),
+    tags=_tags("operator", "script", "config", "behavior"),
 )
 
-LOG_BASELINE_OPERATOR_EPISODE_START = _constant(
+LOG_SCRIPT_OPERATOR_EPISODE_START = _constant(
     "LOG4082",
     "INFO",
-    "Baseline operator episode started",
+    "Script operator episode started",
     component="Worker",
     subcomponent="OperatorsWorker",
-    tags=_tags("operator", "baseline", "episode", "start"),
+    tags=_tags("operator", "script", "episode", "start"),
 )
 
-LOG_BASELINE_OPERATOR_EPISODE_END = _constant(
+LOG_SCRIPT_OPERATOR_EPISODE_END = _constant(
     "LOG4083",
     "INFO",
-    "Baseline operator episode completed",
+    "Script operator episode completed",
     component="Worker",
     subcomponent="OperatorsWorker",
-    tags=_tags("operator", "baseline", "episode", "end"),
+    tags=_tags("operator", "script", "episode", "end"),
 )
 
-LOG_BASELINE_OPERATOR_TELEMETRY_EMITTED = _constant(
+LOG_SCRIPT_OPERATOR_TELEMETRY_EMITTED = _constant(
     "LOG4084",
     "DEBUG",
-    "Baseline operator telemetry written to JSONL",
+    "Script operator telemetry written to JSONL",
     component="Worker",
     subcomponent="OperatorsWorker",
-    tags=_tags("operator", "baseline", "telemetry", "jsonl"),
+    tags=_tags("operator", "script", "telemetry", "jsonl"),
 )
 
-LOG_BASELINE_SCRIPT_LOADED = _constant(
+LOG_SCRIPT_LOADED = _constant(
     "LOG4085",
     "INFO",
-    "Baseline operator script loaded from file",
+    "Operator script loaded from file",
     component="UI",
     subcomponent="ScriptWidget",
-    tags=_tags("operator", "baseline", "script", "load"),
+    tags=_tags("operator", "script", "load"),
 )
 
-LOG_BASELINE_SCRIPT_PARSED = _constant(
+LOG_SCRIPT_PARSED = _constant(
     "LOG4086",
     "INFO",
-    "Baseline operator script parsed successfully",
+    "Operator script parsed successfully",
     component="UI",
     subcomponent="ScriptWidget",
-    tags=_tags("operator", "baseline", "script", "parse"),
+    tags=_tags("operator", "script", "parse"),
 )
 
-LOG_BASELINE_SCRIPT_VALIDATION_FAILED = _constant(
+LOG_SCRIPT_VALIDATION_FAILED = _constant(
     "LOG4087",
     "WARNING",
-    "Baseline operator script validation failed",
+    "Operator script validation failed",
     component="UI",
     subcomponent="ScriptWidget",
-    tags=_tags("operator", "baseline", "script", "validation", "error"),
+    tags=_tags("operator", "script", "validation", "error"),
 )
 
-LOG_BASELINE_AUTO_EXECUTION_STARTED = _constant(
+LOG_SCRIPT_AUTO_EXECUTION_STARTED = _constant(
     "LOG4088",
     "INFO",
-    "Baseline operator auto-execution started",
+    "Script auto-execution started",
     component="UI",
     subcomponent="OperatorsTab",
-    tags=_tags("operator", "baseline", "auto-execution", "start"),
+    tags=_tags("operator", "script", "auto-execution", "start"),
 )
 
-LOG_BASELINE_AUTO_EXECUTION_COMPLETED = _constant(
+LOG_SCRIPT_AUTO_EXECUTION_COMPLETED = _constant(
     "LOG4089",
     "INFO",
-    "Baseline operator auto-execution completed",
+    "Script auto-execution completed",
     component="UI",
     subcomponent="OperatorsTab",
-    tags=_tags("operator", "baseline", "auto-execution", "complete"),
+    tags=_tags("operator", "script", "auto-execution", "complete"),
 )
 
 # ---------------------------------------------------------------------------
@@ -3255,42 +3255,6 @@ LOG_WORKER_POLICY_LOAD_FAILED = _constant(
     tags=_tags("worker", "policy", "missing"),
 )
 
-LOG_WORKER_BDI_EVENT = _constant(
-    "LOG912",
-    "INFO",
-    "Worker BDI event",
-    component="Worker",
-    subcomponent="BDI",
-    tags=_tags("worker", "bdi"),
-)
-
-LOG_WORKER_BDI_WARNING = _constant(
-    "LOG913",
-    "WARNING",
-    "Worker BDI warning",
-    component="Worker",
-    subcomponent="BDI",
-    tags=_tags("worker", "bdi", "warning"),
-)
-
-LOG_WORKER_BDI_ERROR = _constant(
-    "LOG914",
-    "ERROR",
-    "Worker BDI error",
-    component="Worker",
-    subcomponent="BDI",
-    tags=_tags("worker", "bdi", "error"),
-)
-
-LOG_WORKER_BDI_DEBUG = _constant(
-    "LOG915",
-    "DEBUG",
-    "Worker BDI debug event",
-    component="Worker",
-    subcomponent="BDI",
-    tags=_tags("worker", "bdi", "debug"),
-)
-
 
 # ---------------------------------------------------------------------------
 # Episode Counter constants (LOG921–LOG930)
@@ -3669,6 +3633,46 @@ LOG_XUANCE_WORKER_DEBUG = _constant(
 
 
 # ---------------------------------------------------------------------------
+# Human Action Debug constants (LOG1000–LOG1009)
+# ---------------------------------------------------------------------------
+LOG_HUMAN_ACTION_BUTTON_CLICKED = _constant(
+    "LOG1000",
+    "INFO",
+    "Human action button clicked in render container",
+    component="UI",
+    subcomponent="OperatorRenderContainer",
+    tags=_tags("human", "action", "button", "click", "debug"),
+)
+
+LOG_HUMAN_ACTION_RECEIVED = _constant(
+    "LOG1001",
+    "INFO",
+    "Human action received in main window handler",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("human", "action", "received", "debug"),
+)
+
+LOG_HUMAN_ACTION_SENT_TO_SUBPROCESS = _constant(
+    "LOG1002",
+    "INFO",
+    "Human action sent to subprocess",
+    component="UI",
+    subcomponent="MainWindow",
+    tags=_tags("human", "action", "subprocess", "sent", "debug"),
+)
+
+LOG_HUMAN_ACTION_SIGNAL_EMITTED = _constant(
+    "LOG1003",
+    "INFO",
+    "Human action signal emitted from container",
+    component="UI",
+    subcomponent="OperatorRenderContainer",
+    tags=_tags("human", "action", "signal", "emitted", "debug"),
+)
+
+
+# ---------------------------------------------------------------------------
 # CleanRL Worker constants (LOG431–LOG445)
 # ---------------------------------------------------------------------------
 LOG_WORKER_CLEANRL_RUNTIME_STARTED = _constant(
@@ -3943,6 +3947,24 @@ LOG_WORKER_RAY_ANALYTICS_MANIFEST_CREATED = _constant(
     component="Worker",
     subcomponent="RayRuntime",
     tags=_tags("ray", "worker", "analytics", "manifest"),
+)
+
+LOG_WORKER_RAY_LOG_FILE_CREATED = _constant(
+    "LOG461",
+    "INFO",
+    "Ray worker log file handler created",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "logging", "file"),
+)
+
+LOG_WORKER_RAY_ALGORITHM_BUILT = _constant(
+    "LOG462",
+    "INFO",
+    "Ray RLlib algorithm built successfully",
+    component="Worker",
+    subcomponent="RayRuntime",
+    tags=_tags("ray", "worker", "rllib", "algorithm"),
 )
 
 
@@ -4353,7 +4375,7 @@ LOG_WORKER_MOSAIC_RUNTIME_INTEGRATION = _constant(
 # ---------------------------------------------------------------------------
 # LLM Worker constants (LOG1044–LOG1058)
 # ---------------------------------------------------------------------------
-LOG_WORKER_LLM_RUNTIME_STARTED = _constant(
+LOG_MOSAIC_WORKER_LLM_RUNTIME_STARTED = _constant(
     "LOG1044",
     "INFO",
     "LLM worker runtime started",
@@ -4362,7 +4384,7 @@ LOG_WORKER_LLM_RUNTIME_STARTED = _constant(
     tags=_tags("llm", "worker", "runtime", "lifecycle"),
 )
 
-LOG_WORKER_LLM_RUNTIME_STOPPED = _constant(
+LOG_MOSAIC_WORKER_LLM_RUNTIME_STOPPED = _constant(
     "LOG1045",
     "INFO",
     "LLM worker runtime stopped",
@@ -4371,7 +4393,7 @@ LOG_WORKER_LLM_RUNTIME_STOPPED = _constant(
     tags=_tags("llm", "worker", "runtime", "lifecycle"),
 )
 
-LOG_WORKER_LLM_RUNTIME_ERROR = _constant(
+LOG_MOSAIC_WORKER_LLM_RUNTIME_ERROR = _constant(
     "LOG1046",
     "ERROR",
     "LLM worker runtime error",
@@ -4380,7 +4402,7 @@ LOG_WORKER_LLM_RUNTIME_ERROR = _constant(
     tags=_tags("llm", "worker", "runtime", "error"),
 )
 
-LOG_WORKER_LLM_EPISODE_STARTED = _constant(
+LOG_MOSAIC_WORKER_LLM_EPISODE_STARTED = _constant(
     "LOG1047",
     "INFO",
     "LLM episode started",
@@ -4389,7 +4411,7 @@ LOG_WORKER_LLM_EPISODE_STARTED = _constant(
     tags=_tags("llm", "worker", "episode", "start"),
 )
 
-LOG_WORKER_LLM_EPISODE_COMPLETED = _constant(
+LOG_MOSAIC_WORKER_LLM_EPISODE_COMPLETED = _constant(
     "LOG1048",
     "INFO",
     "LLM episode completed",
@@ -4398,7 +4420,7 @@ LOG_WORKER_LLM_EPISODE_COMPLETED = _constant(
     tags=_tags("llm", "worker", "episode", "complete"),
 )
 
-LOG_WORKER_LLM_REQUEST = _constant(
+LOG_MOSAIC_WORKER_LLM_REQUEST = _constant(
     "LOG1049",
     "DEBUG",
     "LLM request sent",
@@ -4407,7 +4429,7 @@ LOG_WORKER_LLM_REQUEST = _constant(
     tags=_tags("llm", "worker", "llm", "request"),
 )
 
-LOG_WORKER_LLM_RESPONSE = _constant(
+LOG_MOSAIC_WORKER_LLM_RESPONSE = _constant(
     "LOG1050",
     "DEBUG",
     "LLM response received",
@@ -4416,7 +4438,7 @@ LOG_WORKER_LLM_RESPONSE = _constant(
     tags=_tags("llm", "worker", "llm", "response"),
 )
 
-LOG_WORKER_LLM_ERROR = _constant(
+LOG_MOSAIC_WORKER_LLM_ERROR = _constant(
     "LOG1051",
     "ERROR",
     "LLM request failed",
@@ -4425,7 +4447,7 @@ LOG_WORKER_LLM_ERROR = _constant(
     tags=_tags("llm", "worker", "llm", "error"),
 )
 
-LOG_WORKER_LLM_ACTION_SELECTED = _constant(
+LOG_MOSAIC_WORKER_LLM_ACTION_SELECTED = _constant(
     "LOG1052",
     "DEBUG",
     "LLM agent selected action",
@@ -4434,7 +4456,7 @@ LOG_WORKER_LLM_ACTION_SELECTED = _constant(
     tags=_tags("llm", "worker", "action"),
 )
 
-LOG_WORKER_LLM_STEP_TELEMETRY = _constant(
+LOG_MOSAIC_WORKER_LLM_STEP_TELEMETRY = _constant(
     "LOG1053",
     "DEBUG",
     "LLM step telemetry emitted",
@@ -4443,7 +4465,7 @@ LOG_WORKER_LLM_STEP_TELEMETRY = _constant(
     tags=_tags("llm", "worker", "telemetry", "step"),
 )
 
-LOG_WORKER_LLM_EPISODE_TELEMETRY = _constant(
+LOG_MOSAIC_WORKER_LLM_EPISODE_TELEMETRY = _constant(
     "LOG1054",
     "INFO",
     "LLM episode telemetry emitted",
@@ -4452,7 +4474,7 @@ LOG_WORKER_LLM_EPISODE_TELEMETRY = _constant(
     tags=_tags("llm", "worker", "telemetry", "episode"),
 )
 
-LOG_WORKER_LLM_CONFIG_LOADED = _constant(
+LOG_MOSAIC_WORKER_LLM_CONFIG_LOADED = _constant(
     "LOG1055",
     "INFO",
     "LLM configuration loaded",
@@ -4461,7 +4483,7 @@ LOG_WORKER_LLM_CONFIG_LOADED = _constant(
     tags=_tags("llm", "worker", "config", "loaded"),
 )
 
-LOG_WORKER_LLM_ENV_CREATED = _constant(
+LOG_MOSAIC_WORKER_LLM_ENV_CREATED = _constant(
     "LOG1056",
     "INFO",
     "LLM environment created",
@@ -4470,7 +4492,7 @@ LOG_WORKER_LLM_ENV_CREATED = _constant(
     tags=_tags("llm", "worker", "environment", "created"),
 )
 
-LOG_WORKER_LLM_AGENT_CREATED = _constant(
+LOG_MOSAIC_WORKER_LLM_AGENT_CREATED = _constant(
     "LOG1057",
     "INFO",
     "LLM agent created",
@@ -4479,13 +4501,167 @@ LOG_WORKER_LLM_AGENT_CREATED = _constant(
     tags=_tags("llm", "worker", "agent", "created"),
 )
 
-LOG_WORKER_LLM_DEBUG = _constant(
+LOG_MOSAIC_WORKER_LLM_DEBUG = _constant(
     "LOG1058",
     "DEBUG",
     "LLM worker debug event",
     component="Worker",
     subcomponent="LLMRuntime",
     tags=_tags("llm", "worker", "debug"),
+)
+
+# VLM Worker constants (LOG1071–LOG1087)
+LOG_MOSAIC_WORKER_VLM_RUNTIME_STARTED = _constant(
+    "LOG1071",
+    "INFO",
+    "VLM worker runtime started",
+    component="Worker",
+    subcomponent="VLMRuntime",
+    tags=_tags("vlm", "worker", "runtime", "lifecycle"),
+)
+
+LOG_MOSAIC_WORKER_VLM_RUNTIME_STOPPED = _constant(
+    "LOG1072",
+    "INFO",
+    "VLM worker runtime stopped",
+    component="Worker",
+    subcomponent="VLMRuntime",
+    tags=_tags("vlm", "worker", "runtime", "lifecycle"),
+)
+
+LOG_MOSAIC_WORKER_VLM_RUNTIME_ERROR = _constant(
+    "LOG1073",
+    "ERROR",
+    "VLM worker runtime error",
+    component="Worker",
+    subcomponent="VLMRuntime",
+    tags=_tags("vlm", "worker", "runtime", "error"),
+)
+
+LOG_MOSAIC_WORKER_VLM_EPISODE_STARTED = _constant(
+    "LOG1074",
+    "INFO",
+    "VLM episode started",
+    component="Worker",
+    subcomponent="VLMRuntime",
+    tags=_tags("vlm", "worker", "episode", "start"),
+)
+
+LOG_MOSAIC_WORKER_VLM_EPISODE_COMPLETED = _constant(
+    "LOG1075",
+    "INFO",
+    "VLM episode completed",
+    component="Worker",
+    subcomponent="VLMRuntime",
+    tags=_tags("vlm", "worker", "episode", "complete"),
+)
+
+LOG_MOSAIC_WORKER_VLM_REQUEST = _constant(
+    "LOG1076",
+    "DEBUG",
+    "VLM request sent",
+    component="Worker",
+    subcomponent="VLMRuntime",
+    tags=_tags("vlm", "worker", "llm", "request"),
+)
+
+LOG_MOSAIC_WORKER_VLM_RESPONSE = _constant(
+    "LOG1077",
+    "DEBUG",
+    "VLM response received",
+    component="Worker",
+    subcomponent="VLMRuntime",
+    tags=_tags("vlm", "worker", "llm", "response"),
+)
+
+LOG_MOSAIC_WORKER_VLM_ERROR = _constant(
+    "LOG1078",
+    "ERROR",
+    "VLM request failed",
+    component="Worker",
+    subcomponent="VLMRuntime",
+    tags=_tags("vlm", "worker", "llm", "error"),
+)
+
+LOG_MOSAIC_WORKER_VLM_ACTION_SELECTED = _constant(
+    "LOG1079",
+    "DEBUG",
+    "VLM agent selected action",
+    component="Worker",
+    subcomponent="VLMRuntime",
+    tags=_tags("vlm", "worker", "action"),
+)
+
+LOG_MOSAIC_WORKER_VLM_STEP_TELEMETRY = _constant(
+    "LOG1080",
+    "DEBUG",
+    "VLM step telemetry emitted",
+    component="Worker",
+    subcomponent="VLMRuntime",
+    tags=_tags("vlm", "worker", "telemetry", "step"),
+)
+
+LOG_MOSAIC_WORKER_VLM_EPISODE_TELEMETRY = _constant(
+    "LOG1081",
+    "INFO",
+    "VLM episode telemetry emitted",
+    component="Worker",
+    subcomponent="VLMRuntime",
+    tags=_tags("vlm", "worker", "telemetry", "episode"),
+)
+
+LOG_MOSAIC_WORKER_VLM_CONFIG_LOADED = _constant(
+    "LOG1082",
+    "INFO",
+    "VLM configuration loaded",
+    component="Worker",
+    subcomponent="VLMRuntime",
+    tags=_tags("vlm", "worker", "config", "loaded"),
+)
+
+LOG_MOSAIC_WORKER_VLM_ENV_CREATED = _constant(
+    "LOG1083",
+    "INFO",
+    "VLM environment created",
+    component="Worker",
+    subcomponent="VLMRuntime",
+    tags=_tags("vlm", "worker", "environment", "created"),
+)
+
+LOG_MOSAIC_WORKER_VLM_AGENT_CREATED = _constant(
+    "LOG1084",
+    "INFO",
+    "VLM agent created",
+    component="Worker",
+    subcomponent="VLMRuntime",
+    tags=_tags("vlm", "worker", "agent", "created"),
+)
+
+LOG_MOSAIC_WORKER_VLM_DEBUG = _constant(
+    "LOG1085",
+    "DEBUG",
+    "VLM worker debug event",
+    component="Worker",
+    subcomponent="VLMRuntime",
+    tags=_tags("vlm", "worker", "debug"),
+)
+
+LOG_MOSAIC_WORKER_VLM_EPISODE_AUTO_RESET = _constant(
+    "LOG1086",
+    "INFO",
+    "VLM episode auto-reset with seed",
+    component="Worker",
+    subcomponent="VLMRuntime",
+    tags=_tags("vlm", "worker", "episode", "auto-reset", "seed"),
+)
+
+LOG_MOSAIC_WORKER_VLM_ACTION_DEFAULTED = _constant(
+    "LOG1087",
+    "WARNING",
+    "VLM action defaulted due to error",
+    component="Worker",
+    subcomponent="VLMRuntime",
+    tags=_tags("vlm", "worker", "llm", "action", "default"),
 )
 
 # Auto-reset and action-defaulting events (LOG1059–LOG1062)
@@ -4505,7 +4681,7 @@ LOG_WORKER_BALROG_ACTION_DEFAULTED = _constant(
     subcomponent="BarlogRuntime",
     tags=_tags("balrog", "worker", "llm", "action", "default"),
 )
-LOG_WORKER_MOSAIC_LLM_EPISODE_AUTO_RESET = _constant(
+LOG_MOSAIC_WORKER_LLM_EPISODE_AUTO_RESET = _constant(
     "LOG1061",
     "INFO",
     "MOSAIC LLM episode auto-reset with seed",
@@ -4513,7 +4689,7 @@ LOG_WORKER_MOSAIC_LLM_EPISODE_AUTO_RESET = _constant(
     subcomponent="LLMRuntime",
     tags=_tags("mosaic", "llm", "worker", "episode", "auto-reset", "seed"),
 )
-LOG_WORKER_MOSAIC_LLM_ACTION_DEFAULTED = _constant(
+LOG_MOSAIC_WORKER_LLM_ACTION_DEFAULTED = _constant(
     "LOG1062",
     "WARNING",
     "MOSAIC LLM action defaulted due to error",
@@ -4528,6 +4704,64 @@ LOG_WORKER_CLEANRL_EPISODE_AUTO_RESET = _constant(
     component="Worker",
     subcomponent="CleanRLRuntime",
     tags=_tags("cleanrl", "worker", "episode", "auto-reset", "seed"),
+)
+
+# ── Passive Worker ──────────────────────────────────────────────────
+LOG_WORKER_PASSIVE_RUNTIME_STARTED = _constant(
+    "LOG1064",
+    "INFO",
+    "Passive worker runtime started",
+    component="Worker",
+    subcomponent="PassiveRuntime",
+    tags=_tags("passive", "worker", "runtime", "lifecycle"),
+)
+LOG_WORKER_PASSIVE_RUNTIME_STOPPED = _constant(
+    "LOG1065",
+    "INFO",
+    "Passive worker runtime stopped",
+    component="Worker",
+    subcomponent="PassiveRuntime",
+    tags=_tags("passive", "worker", "runtime", "lifecycle"),
+)
+LOG_WORKER_PASSIVE_RUNTIME_ERROR = _constant(
+    "LOG1066",
+    "ERROR",
+    "Passive worker runtime error",
+    component="Worker",
+    subcomponent="PassiveRuntime",
+    tags=_tags("passive", "worker", "runtime", "error"),
+)
+LOG_WORKER_PASSIVE_AGENT_READY = _constant(
+    "LOG1067",
+    "INFO",
+    "Passive worker agent ready",
+    component="Worker",
+    subcomponent="PassiveRuntime",
+    tags=_tags("passive", "worker", "agent", "lifecycle"),
+)
+LOG_WORKER_PASSIVE_ENV_CREATED = _constant(
+    "LOG1068",
+    "INFO",
+    "Passive worker environment created",
+    component="Worker",
+    subcomponent="PassiveRuntime",
+    tags=_tags("passive", "worker", "env", "lifecycle"),
+)
+LOG_WORKER_PASSIVE_ENV_RESET = _constant(
+    "LOG1069",
+    "INFO",
+    "Passive worker environment reset",
+    component="Worker",
+    subcomponent="PassiveRuntime",
+    tags=_tags("passive", "worker", "env", "reset"),
+)
+LOG_WORKER_PASSIVE_DEBUG = _constant(
+    "LOG1070",
+    "DEBUG",
+    "Passive worker debug",
+    component="Worker",
+    subcomponent="PassiveRuntime",
+    tags=_tags("passive", "worker", "debug"),
 )
 
 
@@ -4773,16 +5007,16 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_OPERATOR_RESET_ALL_STARTED,
     LOG_OPERATOR_STEP_ALL_COMPLETED,
     LOG_OPERATOR_STOP_ALL_COMPLETED,
-    LOG_BASELINE_OPERATOR_LAUNCHED,
-    LOG_BASELINE_OPERATOR_BEHAVIOR_SET,
-    LOG_BASELINE_OPERATOR_EPISODE_START,
-    LOG_BASELINE_OPERATOR_EPISODE_END,
-    LOG_BASELINE_OPERATOR_TELEMETRY_EMITTED,
-    LOG_BASELINE_SCRIPT_LOADED,
-    LOG_BASELINE_SCRIPT_PARSED,
-    LOG_BASELINE_SCRIPT_VALIDATION_FAILED,
-    LOG_BASELINE_AUTO_EXECUTION_STARTED,
-    LOG_BASELINE_AUTO_EXECUTION_COMPLETED,
+    LOG_SCRIPT_OPERATOR_LAUNCHED,
+    LOG_SCRIPT_OPERATOR_BEHAVIOR_SET,
+    LOG_SCRIPT_OPERATOR_EPISODE_START,
+    LOG_SCRIPT_OPERATOR_EPISODE_END,
+    LOG_SCRIPT_OPERATOR_TELEMETRY_EMITTED,
+    LOG_SCRIPT_LOADED,
+    LOG_SCRIPT_PARSED,
+    LOG_SCRIPT_VALIDATION_FAILED,
+    LOG_SCRIPT_AUTO_EXECUTION_STARTED,
+    LOG_SCRIPT_AUTO_EXECUTION_COMPLETED,
     LOG_OPERATOR_INIT_AGENT_SENT,
     LOG_OPERATOR_SELECT_ACTION_SENT,
     LOG_OPERATOR_MULTIAGENT_LAUNCHED,
@@ -4896,10 +5130,6 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_WORKER_POLICY_EVENT,
     LOG_WORKER_POLICY_WARNING,
     LOG_WORKER_POLICY_ERROR,
-    LOG_WORKER_BDI_EVENT,
-    LOG_WORKER_BDI_WARNING,
-    LOG_WORKER_BDI_ERROR,
-    LOG_WORKER_BDI_DEBUG,
     LOG_COUNTER_INITIALIZED,
     LOG_COUNTER_RESUME_SUCCESS,
     LOG_COUNTER_RESUME_FAILURE,
@@ -4921,6 +5151,24 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_RAY_WORKER_ENV_WRAPPED,
     LOG_RAY_WORKER_POLICY_LOADED,
     LOG_RAY_WORKER_ANALYTICS_WRITTEN,
+    # Ray Worker (LOG446–LOG462)
+    LOG_WORKER_RAY_RUNTIME_STARTED,
+    LOG_WORKER_RAY_RUNTIME_COMPLETED,
+    LOG_WORKER_RAY_RUNTIME_FAILED,
+    LOG_WORKER_RAY_CLUSTER_STARTED,
+    LOG_WORKER_RAY_CLUSTER_SHUTDOWN,
+    LOG_WORKER_RAY_TUNE_STARTED,
+    LOG_WORKER_RAY_TUNE_COMPLETED,
+    LOG_WORKER_RAY_RLLIB_TRAINING_STARTED,
+    LOG_WORKER_RAY_RLLIB_TRAINING_ITERATION,
+    LOG_WORKER_RAY_CHECKPOINT_SAVED,
+    LOG_WORKER_RAY_CHECKPOINT_LOADED,
+    LOG_WORKER_RAY_TENSORBOARD_ENABLED,
+    LOG_WORKER_RAY_WANDB_ENABLED,
+    LOG_WORKER_RAY_HEARTBEAT,
+    LOG_WORKER_RAY_ANALYTICS_MANIFEST_CREATED,
+    LOG_WORKER_RAY_LOG_FILE_CREATED,
+    LOG_WORKER_RAY_ALGORITHM_BUILT,
     # Ray Evaluation
     LOG_RAY_EVAL_REQUESTED,
     LOG_RAY_EVAL_SETUP_STARTED,
@@ -4975,27 +5223,53 @@ ALL_LOG_CONSTANTS: Tuple[LogConstant, ...] = (
     LOG_WORKER_XUANCE_METRICS_LOGGED,
     LOG_WORKER_XUANCE_DEBUG,
     # LLM Worker
-    LOG_WORKER_LLM_RUNTIME_STARTED,
-    LOG_WORKER_LLM_RUNTIME_STOPPED,
-    LOG_WORKER_LLM_RUNTIME_ERROR,
-    LOG_WORKER_LLM_EPISODE_STARTED,
-    LOG_WORKER_LLM_EPISODE_COMPLETED,
-    LOG_WORKER_LLM_REQUEST,
-    LOG_WORKER_LLM_RESPONSE,
-    LOG_WORKER_LLM_ERROR,
-    LOG_WORKER_LLM_ACTION_SELECTED,
-    LOG_WORKER_LLM_STEP_TELEMETRY,
-    LOG_WORKER_LLM_EPISODE_TELEMETRY,
-    LOG_WORKER_LLM_CONFIG_LOADED,
-    LOG_WORKER_LLM_ENV_CREATED,
-    LOG_WORKER_LLM_AGENT_CREATED,
-    LOG_WORKER_LLM_DEBUG,
+    LOG_MOSAIC_WORKER_LLM_RUNTIME_STARTED,
+    LOG_MOSAIC_WORKER_LLM_RUNTIME_STOPPED,
+    LOG_MOSAIC_WORKER_LLM_RUNTIME_ERROR,
+    LOG_MOSAIC_WORKER_LLM_EPISODE_STARTED,
+    LOG_MOSAIC_WORKER_LLM_EPISODE_COMPLETED,
+    LOG_MOSAIC_WORKER_LLM_REQUEST,
+    LOG_MOSAIC_WORKER_LLM_RESPONSE,
+    LOG_MOSAIC_WORKER_LLM_ERROR,
+    LOG_MOSAIC_WORKER_LLM_ACTION_SELECTED,
+    LOG_MOSAIC_WORKER_LLM_STEP_TELEMETRY,
+    LOG_MOSAIC_WORKER_LLM_EPISODE_TELEMETRY,
+    LOG_MOSAIC_WORKER_LLM_CONFIG_LOADED,
+    LOG_MOSAIC_WORKER_LLM_ENV_CREATED,
+    LOG_MOSAIC_WORKER_LLM_AGENT_CREATED,
+    LOG_MOSAIC_WORKER_LLM_DEBUG,
+    # VLM Worker
+    LOG_MOSAIC_WORKER_VLM_RUNTIME_STARTED,
+    LOG_MOSAIC_WORKER_VLM_RUNTIME_STOPPED,
+    LOG_MOSAIC_WORKER_VLM_RUNTIME_ERROR,
+    LOG_MOSAIC_WORKER_VLM_EPISODE_STARTED,
+    LOG_MOSAIC_WORKER_VLM_EPISODE_COMPLETED,
+    LOG_MOSAIC_WORKER_VLM_REQUEST,
+    LOG_MOSAIC_WORKER_VLM_RESPONSE,
+    LOG_MOSAIC_WORKER_VLM_ERROR,
+    LOG_MOSAIC_WORKER_VLM_ACTION_SELECTED,
+    LOG_MOSAIC_WORKER_VLM_STEP_TELEMETRY,
+    LOG_MOSAIC_WORKER_VLM_EPISODE_TELEMETRY,
+    LOG_MOSAIC_WORKER_VLM_CONFIG_LOADED,
+    LOG_MOSAIC_WORKER_VLM_ENV_CREATED,
+    LOG_MOSAIC_WORKER_VLM_AGENT_CREATED,
+    LOG_MOSAIC_WORKER_VLM_DEBUG,
+    LOG_MOSAIC_WORKER_VLM_EPISODE_AUTO_RESET,
+    LOG_MOSAIC_WORKER_VLM_ACTION_DEFAULTED,
     # Auto-reset and action-defaulting events
     LOG_WORKER_BALROG_EPISODE_AUTO_RESET,
     LOG_WORKER_BALROG_ACTION_DEFAULTED,
-    LOG_WORKER_MOSAIC_LLM_EPISODE_AUTO_RESET,
-    LOG_WORKER_MOSAIC_LLM_ACTION_DEFAULTED,
+    LOG_MOSAIC_WORKER_LLM_EPISODE_AUTO_RESET,
+    LOG_MOSAIC_WORKER_LLM_ACTION_DEFAULTED,
     LOG_WORKER_CLEANRL_EPISODE_AUTO_RESET,
+    # Passive Worker
+    LOG_WORKER_PASSIVE_RUNTIME_STARTED,
+    LOG_WORKER_PASSIVE_RUNTIME_STOPPED,
+    LOG_WORKER_PASSIVE_RUNTIME_ERROR,
+    LOG_WORKER_PASSIVE_AGENT_READY,
+    LOG_WORKER_PASSIVE_ENV_CREATED,
+    LOG_WORKER_PASSIVE_ENV_RESET,
+    LOG_WORKER_PASSIVE_DEBUG,
 )
 
 
@@ -5147,16 +5421,16 @@ __all__ = (
     "LOG_OPERATOR_RESET_ALL_STARTED",
     "LOG_OPERATOR_STEP_ALL_COMPLETED",
     "LOG_OPERATOR_STOP_ALL_COMPLETED",
-    "LOG_BASELINE_OPERATOR_LAUNCHED",
-    "LOG_BASELINE_OPERATOR_BEHAVIOR_SET",
-    "LOG_BASELINE_OPERATOR_EPISODE_START",
-    "LOG_BASELINE_OPERATOR_EPISODE_END",
-    "LOG_BASELINE_OPERATOR_TELEMETRY_EMITTED",
-    "LOG_BASELINE_SCRIPT_LOADED",
-    "LOG_BASELINE_SCRIPT_PARSED",
-    "LOG_BASELINE_SCRIPT_VALIDATION_FAILED",
-    "LOG_BASELINE_AUTO_EXECUTION_STARTED",
-    "LOG_BASELINE_AUTO_EXECUTION_COMPLETED",
+    "LOG_SCRIPT_OPERATOR_LAUNCHED",
+    "LOG_SCRIPT_OPERATOR_BEHAVIOR_SET",
+    "LOG_SCRIPT_OPERATOR_EPISODE_START",
+    "LOG_SCRIPT_OPERATOR_EPISODE_END",
+    "LOG_SCRIPT_OPERATOR_TELEMETRY_EMITTED",
+    "LOG_SCRIPT_LOADED",
+    "LOG_SCRIPT_PARSED",
+    "LOG_SCRIPT_VALIDATION_FAILED",
+    "LOG_SCRIPT_AUTO_EXECUTION_STARTED",
+    "LOG_SCRIPT_AUTO_EXECUTION_COMPLETED",
     "LOG_OPERATOR_INIT_AGENT_SENT",
     "LOG_OPERATOR_SELECT_ACTION_SENT",
     "LOG_OPERATOR_MULTIAGENT_LAUNCHED",
@@ -5317,10 +5591,6 @@ __all__ = (
     "LOG_WORKER_POLICY_EVAL_BATCH_STARTED",
     "LOG_WORKER_POLICY_EVAL_BATCH_COMPLETED",
     "LOG_WORKER_POLICY_LOAD_FAILED",
-    "LOG_WORKER_BDI_EVENT",
-    "LOG_WORKER_BDI_WARNING",
-    "LOG_WORKER_BDI_ERROR",
-    "LOG_WORKER_BDI_DEBUG",
     "LOG_COUNTER_INITIALIZED",
     "LOG_COUNTER_RESUME_SUCCESS",
     "LOG_COUNTER_RESUME_FAILURE",
@@ -5342,6 +5612,24 @@ __all__ = (
     "LOG_RAY_WORKER_ENV_WRAPPED",
     "LOG_RAY_WORKER_POLICY_LOADED",
     "LOG_RAY_WORKER_ANALYTICS_WRITTEN",
+    # Ray Worker (LOG446–LOG462)
+    "LOG_WORKER_RAY_RUNTIME_STARTED",
+    "LOG_WORKER_RAY_RUNTIME_COMPLETED",
+    "LOG_WORKER_RAY_RUNTIME_FAILED",
+    "LOG_WORKER_RAY_CLUSTER_STARTED",
+    "LOG_WORKER_RAY_CLUSTER_SHUTDOWN",
+    "LOG_WORKER_RAY_TUNE_STARTED",
+    "LOG_WORKER_RAY_TUNE_COMPLETED",
+    "LOG_WORKER_RAY_RLLIB_TRAINING_STARTED",
+    "LOG_WORKER_RAY_RLLIB_TRAINING_ITERATION",
+    "LOG_WORKER_RAY_CHECKPOINT_SAVED",
+    "LOG_WORKER_RAY_CHECKPOINT_LOADED",
+    "LOG_WORKER_RAY_TENSORBOARD_ENABLED",
+    "LOG_WORKER_RAY_WANDB_ENABLED",
+    "LOG_WORKER_RAY_HEARTBEAT",
+    "LOG_WORKER_RAY_ANALYTICS_MANIFEST_CREATED",
+    "LOG_WORKER_RAY_LOG_FILE_CREATED",
+    "LOG_WORKER_RAY_ALGORITHM_BUILT",
     # Ray Evaluation
     "LOG_RAY_EVAL_REQUESTED",
     "LOG_RAY_EVAL_SETUP_STARTED",
@@ -5364,6 +5652,11 @@ __all__ = (
     "LOG_XUANCE_WORKER_CONFIG_LOADED",
     "LOG_XUANCE_WORKER_BENCHMARK_STARTED",
     "LOG_XUANCE_WORKER_DEBUG",
+    # Human Action Debug
+    "LOG_HUMAN_ACTION_BUTTON_CLICKED",
+    "LOG_HUMAN_ACTION_RECEIVED",
+    "LOG_HUMAN_ACTION_SENT_TO_SUBPROCESS",
+    "LOG_HUMAN_ACTION_SIGNAL_EMITTED",
     # BALROG Worker
     "LOG_WORKER_BALROG_RUNTIME_STARTED",
     "LOG_WORKER_BALROG_RUNTIME_STOPPED",
@@ -5396,27 +5689,53 @@ __all__ = (
     "LOG_WORKER_XUANCE_METRICS_LOGGED",
     "LOG_WORKER_XUANCE_DEBUG",
     # LLM Worker
-    "LOG_WORKER_LLM_RUNTIME_STARTED",
-    "LOG_WORKER_LLM_RUNTIME_STOPPED",
-    "LOG_WORKER_LLM_RUNTIME_ERROR",
-    "LOG_WORKER_LLM_EPISODE_STARTED",
-    "LOG_WORKER_LLM_EPISODE_COMPLETED",
-    "LOG_WORKER_LLM_REQUEST",
-    "LOG_WORKER_LLM_RESPONSE",
-    "LOG_WORKER_LLM_ERROR",
-    "LOG_WORKER_LLM_ACTION_SELECTED",
-    "LOG_WORKER_LLM_STEP_TELEMETRY",
-    "LOG_WORKER_LLM_EPISODE_TELEMETRY",
-    "LOG_WORKER_LLM_CONFIG_LOADED",
-    "LOG_WORKER_LLM_ENV_CREATED",
-    "LOG_WORKER_LLM_AGENT_CREATED",
-    "LOG_WORKER_LLM_DEBUG",
+    "LOG_MOSAIC_WORKER_LLM_RUNTIME_STARTED",
+    "LOG_MOSAIC_WORKER_LLM_RUNTIME_STOPPED",
+    "LOG_MOSAIC_WORKER_LLM_RUNTIME_ERROR",
+    "LOG_MOSAIC_WORKER_LLM_EPISODE_STARTED",
+    "LOG_MOSAIC_WORKER_LLM_EPISODE_COMPLETED",
+    "LOG_MOSAIC_WORKER_LLM_REQUEST",
+    "LOG_MOSAIC_WORKER_LLM_RESPONSE",
+    "LOG_MOSAIC_WORKER_LLM_ERROR",
+    "LOG_MOSAIC_WORKER_LLM_ACTION_SELECTED",
+    "LOG_MOSAIC_WORKER_LLM_STEP_TELEMETRY",
+    "LOG_MOSAIC_WORKER_LLM_EPISODE_TELEMETRY",
+    "LOG_MOSAIC_WORKER_LLM_CONFIG_LOADED",
+    "LOG_MOSAIC_WORKER_LLM_ENV_CREATED",
+    "LOG_MOSAIC_WORKER_LLM_AGENT_CREATED",
+    "LOG_MOSAIC_WORKER_LLM_DEBUG",
+    # VLM Worker
+    "LOG_MOSAIC_WORKER_VLM_RUNTIME_STARTED",
+    "LOG_MOSAIC_WORKER_VLM_RUNTIME_STOPPED",
+    "LOG_MOSAIC_WORKER_VLM_RUNTIME_ERROR",
+    "LOG_MOSAIC_WORKER_VLM_EPISODE_STARTED",
+    "LOG_MOSAIC_WORKER_VLM_EPISODE_COMPLETED",
+    "LOG_MOSAIC_WORKER_VLM_REQUEST",
+    "LOG_MOSAIC_WORKER_VLM_RESPONSE",
+    "LOG_MOSAIC_WORKER_VLM_ERROR",
+    "LOG_MOSAIC_WORKER_VLM_ACTION_SELECTED",
+    "LOG_MOSAIC_WORKER_VLM_STEP_TELEMETRY",
+    "LOG_MOSAIC_WORKER_VLM_EPISODE_TELEMETRY",
+    "LOG_MOSAIC_WORKER_VLM_CONFIG_LOADED",
+    "LOG_MOSAIC_WORKER_VLM_ENV_CREATED",
+    "LOG_MOSAIC_WORKER_VLM_AGENT_CREATED",
+    "LOG_MOSAIC_WORKER_VLM_DEBUG",
+    "LOG_MOSAIC_WORKER_VLM_EPISODE_AUTO_RESET",
+    "LOG_MOSAIC_WORKER_VLM_ACTION_DEFAULTED",
     # Auto-reset and action-defaulting events
     "LOG_WORKER_BALROG_EPISODE_AUTO_RESET",
     "LOG_WORKER_BALROG_ACTION_DEFAULTED",
-    "LOG_WORKER_MOSAIC_LLM_EPISODE_AUTO_RESET",
-    "LOG_WORKER_MOSAIC_LLM_ACTION_DEFAULTED",
+    "LOG_MOSAIC_WORKER_LLM_EPISODE_AUTO_RESET",
+    "LOG_MOSAIC_WORKER_LLM_ACTION_DEFAULTED",
     "LOG_WORKER_CLEANRL_EPISODE_AUTO_RESET",
+    # Passive Worker
+    "LOG_WORKER_PASSIVE_RUNTIME_STARTED",
+    "LOG_WORKER_PASSIVE_RUNTIME_STOPPED",
+    "LOG_WORKER_PASSIVE_RUNTIME_ERROR",
+    "LOG_WORKER_PASSIVE_AGENT_READY",
+    "LOG_WORKER_PASSIVE_ENV_CREATED",
+    "LOG_WORKER_PASSIVE_ENV_RESET",
+    "LOG_WORKER_PASSIVE_DEBUG",
     # Worker Availability Messages
     "GODOT_NOT_INSTALLED_TITLE",
     "GODOT_NOT_INSTALLED_MSG",

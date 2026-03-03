@@ -234,6 +234,7 @@ class TestMultiAgentGameHandler:
             connect_four_loader=MagicMock(),
             go_loader=MagicMock(),
             tictactoe_loader=MagicMock(),
+            checkers_loader=MagicMock(),
             set_game_info=MagicMock(),
             get_game_info=MagicMock(return_value=None),
         )
@@ -250,6 +251,7 @@ class TestMultiAgentGameHandler:
             connect_four_loader=MagicMock(),
             go_loader=MagicMock(),
             tictactoe_loader=MagicMock(),
+            checkers_loader=MagicMock(),
             set_game_info=MagicMock(),
             get_game_info=MagicMock(return_value=None),
         )
@@ -272,6 +274,7 @@ class TestMultiAgentGameHandler:
             connect_four_loader=MagicMock(),
             go_loader=MagicMock(),
             tictactoe_loader=MagicMock(),
+            checkers_loader=MagicMock(),
             set_game_info=MagicMock(),
             get_game_info=mock_get_game_info,
         )
@@ -293,6 +296,7 @@ class TestMultiAgentGameHandler:
             connect_four_loader=mock_connect_four_loader,
             go_loader=MagicMock(),
             tictactoe_loader=MagicMock(),
+            checkers_loader=MagicMock(),
             set_game_info=MagicMock(),
             get_game_info=mock_get_game_info,
         )

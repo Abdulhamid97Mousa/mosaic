@@ -39,7 +39,8 @@ Operator vs Worker
        Manages library lifecycle, API calls, or scripted behaviors.
        Lives in ``3rd_party/`` and communicates via stdin/stdout JSON.
      - ``balrog_worker``, ``cleanrl_worker``, ``xuance_worker``,
-       ``ray_worker``, ``operators_worker``
+       ``ray_worker``, ``llm_worker``, ``vlm_worker``,
+       ``random_worker``, ``passive_worker``, ``human_worker``
 
 Two Modes of Operation
 ----------------------
@@ -56,7 +57,7 @@ MOSAIC supports two fundamentally different operator configurations:
            H3["RL"]
        end
 
-       subgraph "Hybrid"
+       subgraph "Heterogeneous"
            X1["RL"]
            X2["LLM"]
            X3["Human"]
@@ -75,7 +76,7 @@ MOSAIC supports two fundamentally different operator configurations:
    baseline), the single-worker pattern, and GUI adaptation by
    category.
 
-:doc:`Hybrid Decision-Maker <hybrid_decision_maker/index>`
+:doc:`Heterogeneous Decision-Maker <heterogeneous_decision_maker/index>`
    Agents use **different** paradigms in the same experiment (e.g., RL +
    LLM as teammates).  Covers the research gap this addresses, the
    WorkerAssignment system, experimental configurations, deterministic
@@ -110,8 +111,8 @@ environments there is one per player:
 
    @dataclass
    class WorkerAssignment:
-       worker_id: str   # e.g. "cleanrl_worker", "operators_worker"
-       worker_type: str  # "llm", "vlm", "rl", "human", "baseline"
+       worker_id: str   # e.g. "cleanrl_worker", "random_worker"
+       worker_type: str  # "llm", "vlm", "rl", "human", "random", "passive"
        settings: Dict[str, Any] = field(default_factory=dict)
 
 The ``worker_type`` controls how the GUI renders configuration fields
@@ -139,21 +140,22 @@ types:
        ``algorithm``.
    * - ``human``
      - Human
-     - Keyboard-driven.  No subprocess; the GUI captures input.
-   * - ``baseline``
+     - Keyboard-driven.  The GUI captures input via action buttons.
+   * - ``random``
      - Random
-     - Simple scripted behavior.  Settings include ``behavior``
-       (``"random"``, ``"noop"``, ``"cycling"``).  Uses
-       ``operators_worker``.
+     - Uniformly random action selection.  Uses ``random_worker``.
+   * - ``passive``
+     - Passive
+     - Always selects the do-nothing (NOOP/STILL) action.  Uses
+       ``passive_worker``.
 
 .. note::
 
-   In the Configure Operators widget the user selects **"Random"** from
-   the Type dropdown.  The widget maps this to ``worker_type="baseline"``
-   and ``worker_id="operators_worker"`` with ``behavior="random"``
-   internally.  The distinction between the UI label and the internal
-   type is intentional: users think in terms of *what the agent does*
-   (random actions), not the internal worker category.
+   Each decision-maker type maps directly to its own ``worker_type``.
+   For example, selecting **"Random"** in the Type dropdown sets
+   ``worker_type="random"`` and ``worker_id="random_worker"``.
+   Selecting **"Passive"** sets ``worker_type="passive"`` and
+   ``worker_id="passive_worker"``.
 
 Agent-Level Interface
 ---------------------
@@ -191,7 +193,7 @@ regardless of what runs behind it, the environment only ever calls
        style A1 fill:#50c878,stroke:#2e8b57,color:#fff
        style A2 fill:#ff7f50,stroke:#cc5500,color:#fff
 
-This is what makes hybrid teams possible -- each agent slot is
+This is what makes heterogeneous teams possible -- each agent slot is
 independently configured, yet they all plug into the same environment
 through a single protocol.
 
@@ -259,7 +261,7 @@ changes, which the parent widget uses to:
    # How the widget builds a multi-agent config (any multi-agent env)
    config = OperatorConfig.multi_agent(
        operator_id="op_0",
-       display_name="Hybrid Team",
+       display_name="Heterogeneous Team",
        env_name="<env_family>",        # e.g. mosaic_multigrid, meltingpot, pettingzoo
        task="<env_id>",                # e.g. Soccer-2v2, predator_prey, chess_v6
        player_workers={
@@ -269,9 +271,8 @@ changes, which the parent widget uses to:
                settings={"policy_path": "/path/to/final_train_model.pth"},
            ),
            "agent_1": WorkerAssignment(
-               worker_id="operators_worker",
-               worker_type="baseline",
-               settings={"behavior": "random"},
+               worker_id="random_worker",
+               worker_type="random",
            ),
        },
        observation_mode="visible_teammates",
