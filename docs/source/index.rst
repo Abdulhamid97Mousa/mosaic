@@ -262,14 +262,14 @@ reproducible head-to-head evaluation.
        <tr style="border-bottom:2px solid #333;">
          <th rowspan="2" style="text-align:left;">System</th>
          <th colspan="4" style="border-bottom:1px solid #aaa;">Agent Paradigms</th>
-         <th style="border-bottom:1px solid #aaa;">Agent-mixing</th>
          <th colspan="2" style="border-bottom:1px solid #aaa;">Infrastructure</th>
          <th style="border-bottom:1px solid #aaa;">Evaluation</th>
+         <th style="border-bottom:1px solid #aaa;">Agent-mixing</th>
        </tr>
        <tr style="border-bottom:2px solid #333;">
          <th>RL</th><th>LLM</th><th>VLM</th><th>Human</th>
-         <th></th>
          <th>Framework</th><th>Platform GUI</th><th>Cross-Paradigm</th>
+         <th></th>
        </tr>
      </thead>
      <tbody>
