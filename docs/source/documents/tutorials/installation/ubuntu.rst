@@ -179,6 +179,65 @@ Some environments install from local source in ``3rd_party/``:
    # RWARE (warehouse delivery)
    pip install -e 3rd_party/robotic-warehouse/
 
+Install MOSAIC Native Workers
+------------------------------
+
+MOSAIC ships five native worker packages in ``3rd_party/mosaic/``.
+These workers cover human, LLM, VLM, random-baseline, and passive-baseline
+paradigms:
+
+.. code-block:: bash
+
+   # Human Worker (human-in-the-loop action selection via GUI)
+   pip install -e 3rd_party/mosaic/human_worker/
+
+   # LLM Worker (multi-agent LLM coordination with Theory of Mind)
+   pip install -e 3rd_party/mosaic/llm_worker/
+
+   # VLM Worker (vision-language model agents with image observations)
+   pip install -e 3rd_party/mosaic/vlm_worker/
+
+   # Random Worker (uniform random action baseline)
+   pip install -e 3rd_party/mosaic/random_worker/
+
+   # Passive Worker (deterministic noop/still baseline)
+   pip install -e 3rd_party/mosaic/passive_worker/
+
+.. list-table::
+   :widths: 25 75
+   :header-rows: 1
+
+   * - Worker
+     - Description
+   * - ``human_worker``
+     - Human-in-the-loop action selection via GUI clicks.
+   * - ``llm_worker``
+     - Multi-agent LLM coordination with Theory of Mind.
+       Supports OpenRouter, OpenAI, Anthropic, and local vLLM.
+   * - ``vlm_worker``
+     - Vision-Language Model agents with image observations.
+       Fork of LLM Worker with vision support.
+   * - ``random_worker``
+     - Uniform random action selection baseline.
+       Deterministic seeding for reproducibility.
+   * - ``passive_worker``
+     - Deterministic do-nothing (noop/still) baseline agent.
+
+.. tip::
+
+   The LLM and VLM workers require API keys. Set them in your ``.env`` file:
+
+   .. code-block:: bash
+
+      # For OpenRouter (recommended - access to multiple models)
+      OPENROUTER_API_KEY=sk-or-v1-your_key_here
+
+   See the :ref:`Required API Keys <required-api-keys>` section above.
+
+   Each worker also has a matching requirements file in ``requirements/``
+   (e.g., ``requirements/mosaic_llm_worker.txt``) for fine-grained
+   dependency management.
+
 Common Errors
 -------------
 

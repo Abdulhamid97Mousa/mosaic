@@ -184,6 +184,25 @@ Choose your installation based on your use case:
          pip install -r requirements/mosaic_llm_worker.txt
          pip install -e 3rd_party/mosaic/llm_worker
 
+   .. tab:: MOSAIC VLM
+
+      For vision-language model agents with image observations:
+
+      .. code-block:: bash
+
+         pip install -r requirements/mosaic_vlm_worker.txt
+         pip install -e 3rd_party/mosaic/vlm_worker
+
+   .. tab:: Baselines
+
+      For random and passive (noop) baseline agents:
+
+      .. code-block:: bash
+
+         pip install -e 3rd_party/mosaic/random_worker
+         pip install -e 3rd_party/mosaic/passive_worker
+         pip install -e 3rd_party/mosaic/human_worker
+
    .. tab:: Full Development
 
       Everything for development and testing:
@@ -577,6 +596,64 @@ LLM-based agents using OpenRouter (cloud) or vLLM (local GPU).
    # For local vLLM inference, also install Ollama
    curl -fsSL https://ollama.ai/install.sh | sh
    ollama pull llama3.2
+
+MOSAIC Native Workers
+^^^^^^^^^^^^^^^^^^^^^
+
+MOSAIC ships five native worker packages in ``3rd_party/mosaic/``.
+These cover human, LLM, VLM, random-baseline, and passive-baseline paradigms:
+
+.. code-block:: bash
+
+   # Human Worker (human-in-the-loop action selection via GUI)
+   pip install -e 3rd_party/mosaic/human_worker/
+
+   # LLM Worker (multi-agent LLM coordination with Theory of Mind)
+   pip install -r requirements/mosaic_llm_worker.txt
+   pip install -e 3rd_party/mosaic/llm_worker/
+
+   # VLM Worker (vision-language model agents with image observations)
+   pip install -r requirements/mosaic_vlm_worker.txt
+   pip install -e 3rd_party/mosaic/vlm_worker/
+
+   # Random Worker (uniform random action baseline)
+   pip install -r requirements/mosaic_random_worker.txt
+   pip install -e 3rd_party/mosaic/random_worker/
+
+   # Passive Worker (deterministic noop/still baseline)
+   pip install -r requirements/mosaic_passive_worker.txt
+   pip install -e 3rd_party/mosaic/passive_worker/
+
+.. list-table::
+   :widths: 20 55 25
+   :header-rows: 1
+
+   * - Worker
+     - Description
+     - Requirements File
+   * - ``human_worker``
+     - Human-in-the-loop action selection via GUI clicks
+     - (no extra deps)
+   * - ``llm_worker``
+     - Multi-agent LLM coordination with Theory of Mind.
+       Supports OpenRouter, OpenAI, Anthropic, and local vLLM.
+     - ``mosaic_llm_worker.txt``
+   * - ``vlm_worker``
+     - Vision-Language Model agents with image observations.
+       Fork of LLM Worker with vision support.
+     - ``mosaic_vlm_worker.txt``
+   * - ``random_worker``
+     - Uniform random action selection baseline.
+       Deterministic seeding for reproducibility.
+     - ``mosaic_random_worker.txt``
+   * - ``passive_worker``
+     - Deterministic do-nothing (noop/still) baseline agent.
+     - ``mosaic_passive_worker.txt``
+
+.. tip::
+
+   The LLM and VLM workers require API keys. Set them in your ``.env`` file
+   (see the API Keys section above).
 
 MuJoCo MPC Worker
 ^^^^^^^^^^^^^^^^^

@@ -11,6 +11,8 @@ import numpy as np
 import pytest
 from gymnasium import spaces
 
+pytest.importorskip("cleanrl_worker", reason="cleanrl fastlane tests require cleanrl_worker")
+
 from gym_gui.fastlane import FastLaneReader
 from gym_gui.fastlane import buffer as fastlane_buffer
 from gym_gui.telemetry.semconv import TelemetryEnv, VideoModes

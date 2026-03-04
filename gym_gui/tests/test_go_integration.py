@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+pettingzoo = pytest.importorskip("pettingzoo", reason="Go integration requires pettingzoo[classic]")
+
 if TYPE_CHECKING:
     from gym_gui.core.adapters.pettingzoo_classic import GoEnvironmentAdapter
 

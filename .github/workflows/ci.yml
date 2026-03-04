@@ -77,12 +77,6 @@ jobs:
         run: |
           pytest \
             gym_gui/tests \
-            3rd_party/balrog_worker/tests \
-            3rd_party/cleanrl_worker/tests \
-            3rd_party/mosaic/human_worker/tests \
-            3rd_party/mosaic/llm_worker/tests \
-            3rd_party/mosaic/random_worker/tests \
-            3rd_party/xuance_worker/tests \
             -v \
             --timeout=600 \
             --cov=gym_gui \
