@@ -9,7 +9,7 @@ This test verifies that:
 
 import pytest
 import gymnasium as gym
-import minigrid
+minigrid = pytest.importorskip("minigrid")
 from cleanrl_worker.wrappers.procedural_generation import ProceduralGenerationWrapper
 
 # Register MiniGrid environments

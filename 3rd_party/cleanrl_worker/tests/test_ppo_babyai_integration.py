@@ -12,7 +12,7 @@ Note: This is a QUICK test (2048 steps). For real results, train 500K+ steps fro
 
 import pytest
 import gymnasium as gym
-import minigrid
+minigrid = pytest.importorskip("minigrid")
 import numpy as np
 import torch
 import torch.nn as nn
