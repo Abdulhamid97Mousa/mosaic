@@ -56,6 +56,16 @@ jobs:
         with:
           python-version: ${{ matrix.python-version }}
 
+      - name: Install system dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y \
+            libegl1 libgl1 libopengl0 libxkbcommon0 \
+            libnss3 libnspr4 libasound2 \
+            libxcomposite1 libxdamage1 libxkbfile1 \
+            libxcb-cursor0 \
+            fontconfig
+
       - name: Install package with dev dependencies
         run: |
           pip install -e ".[dev]"
