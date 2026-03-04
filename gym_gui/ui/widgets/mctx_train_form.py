@@ -16,7 +16,6 @@ from typing import Any, Dict, List, Optional
 
 from qtpy import QtCore, QtGui, QtWidgets
 
-
 _LOGGER = logging.getLogger(__name__)
 
 # PGX Environment definitions

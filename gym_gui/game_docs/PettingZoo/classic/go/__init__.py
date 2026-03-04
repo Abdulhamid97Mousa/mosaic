@@ -13,7 +13,7 @@ def get_go_html(board_size: int = 19) -> str:
         13: "13×13 board for intermediate play (169 positions)",
         19: "19×19 standard board for full gameplay (361 positions)",
     }
-    desc = size_desc.get(board_size, size_desc[19])
+    size_desc.get(board_size, size_desc[19])
     action_space = board_size * board_size + 1  # positions + pass
 
     return (

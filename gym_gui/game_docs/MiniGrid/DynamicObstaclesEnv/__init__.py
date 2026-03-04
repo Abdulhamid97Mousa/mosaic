@@ -5,7 +5,7 @@ def get_dynamic_obstacles_html(env_id: str) -> str:
     """Generate Dynamic Obstacles HTML documentation for a specific variant."""
     size = "8×8"
     obstacle_type = "moving obstacles"
-    
+
     if "5x5" in env_id:
         size = "5×5"
         desc = "compact challenge"
@@ -18,12 +18,12 @@ def get_dynamic_obstacles_html(env_id: str) -> str:
     else:  # 8x8
         size = "8×8"
         desc = "standard benchmark"
-    
+
     if "Random" in env_id:
         obstacle_type = "randomized moving obstacles"
     else:
         obstacle_type = "moving obstacles"
-    
+
     return (
         f"<h2>{env_id}</h2>"
         f"<p>This environment is an empty <strong>{size}</strong> room with {obstacle_type}. The goal is to reach the green goal square without colliding with any obstacle. "

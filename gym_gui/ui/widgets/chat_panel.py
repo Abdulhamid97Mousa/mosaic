@@ -12,47 +12,48 @@ Uses QThread for async HTTP requests to avoid blocking the Qt event loop.
 from __future__ import annotations
 
 import logging
-from typing import List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, List, Optional
 
-from qtpy import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
+from qtpy import QtCore, QtGui, QtWidgets
+
+from gym_gui.logging_config.helpers import log_constant
+from gym_gui.logging_config.log_constants import (
+    LOG_UI_CHAT_CLEANUP_WARNING,
+    LOG_UI_CHAT_GPU_DETECTION_COMPLETED,
+    LOG_UI_CHAT_GPU_DETECTION_ERROR,
+    LOG_UI_CHAT_GPU_DETECTION_STARTED,
+    LOG_UI_CHAT_HF_TOKEN_SAVE_ERROR,
+    LOG_UI_CHAT_HF_TOKEN_SAVE_STARTED,
+    LOG_UI_CHAT_HF_TOKEN_SAVED,
+    LOG_UI_CHAT_HF_TOKEN_VALIDATED,
+    LOG_UI_CHAT_HF_TOKEN_VALIDATION_ERROR,
+    LOG_UI_CHAT_HF_TOKEN_VALIDATION_STARTED,
+    LOG_UI_CHAT_MODEL_DOWNLOAD_ERROR,
+    LOG_UI_CHAT_MODEL_DOWNLOAD_PROGRESS,
+    LOG_UI_CHAT_MODEL_DOWNLOAD_STARTED,
+    LOG_UI_CHAT_MODEL_DOWNLOADED,
+    LOG_UI_CHAT_PROXY_DISABLED,
+    LOG_UI_CHAT_PROXY_ENABLED,
+    LOG_UI_CHAT_REQUEST_CANCELLED,
+    LOG_UI_CHAT_REQUEST_COMPLETED,
+    LOG_UI_CHAT_REQUEST_ERROR,
+    LOG_UI_CHAT_REQUEST_STARTED,
+)
 from gym_gui.services.llm import (
+    MODEL_SIZES_GB,
+    ChatMessage,
+    CompletionResult,
+    GPUDetectionResult,
+    GPUDetector,
+    HuggingFaceAuth,
     LLMConfig,
     LLMProvider,
     LLMService,
     ModelIdentity,
-    ChatMessage,
-    CompletionResult,
-    HuggingFaceAuth,
-    ProxyConfig,
     ModelManager,
     ModelStatus,
-    GPUDetector,
-    GPUDetectionResult,
-    MODEL_SIZES_GB,
-)
-from gym_gui.logging_config.helpers import log_constant
-from gym_gui.logging_config.log_constants import (
-    LOG_UI_CHAT_GPU_DETECTION_STARTED,
-    LOG_UI_CHAT_GPU_DETECTION_COMPLETED,
-    LOG_UI_CHAT_GPU_DETECTION_ERROR,
-    LOG_UI_CHAT_HF_TOKEN_SAVE_STARTED,
-    LOG_UI_CHAT_HF_TOKEN_SAVED,
-    LOG_UI_CHAT_HF_TOKEN_SAVE_ERROR,
-    LOG_UI_CHAT_HF_TOKEN_VALIDATION_STARTED,
-    LOG_UI_CHAT_HF_TOKEN_VALIDATED,
-    LOG_UI_CHAT_HF_TOKEN_VALIDATION_ERROR,
-    LOG_UI_CHAT_MODEL_DOWNLOAD_STARTED,
-    LOG_UI_CHAT_MODEL_DOWNLOAD_PROGRESS,
-    LOG_UI_CHAT_MODEL_DOWNLOADED,
-    LOG_UI_CHAT_MODEL_DOWNLOAD_ERROR,
-    LOG_UI_CHAT_REQUEST_STARTED,
-    LOG_UI_CHAT_REQUEST_COMPLETED,
-    LOG_UI_CHAT_REQUEST_ERROR,
-    LOG_UI_CHAT_REQUEST_CANCELLED,
-    LOG_UI_CHAT_PROXY_ENABLED,
-    LOG_UI_CHAT_PROXY_DISABLED,
-    LOG_UI_CHAT_CLEANUP_WARNING,
+    ProxyConfig,
 )
 
 if TYPE_CHECKING:

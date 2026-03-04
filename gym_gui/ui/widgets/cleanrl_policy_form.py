@@ -3,36 +3,35 @@
 from __future__ import annotations
 
 import logging
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
-import sys
 
 from qtpy import QtCore, QtGui, QtWidgets
 
-from gym_gui.config.paths import VAR_TRAINER_DIR
 from gym_gui.config.cleanrl_eval_presets import get_eval_preset
+from gym_gui.config.paths import VAR_TRAINER_DIR
 from gym_gui.core.enums import EnvironmentFamily, GameId
 from gym_gui.fastlane.worker_helpers import apply_fastlane_environment
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
-    LOG_UI_POLICY_FORM_TRACE,
-    LOG_UI_POLICY_FORM_INFO,
     LOG_UI_POLICY_FORM_ERROR,
+    LOG_UI_POLICY_FORM_INFO,
+    LOG_UI_POLICY_FORM_TRACE,
 )
-from gym_gui.telemetry.semconv import VideoModes, VIDEO_MODE_DESCRIPTORS
-from gym_gui.ui.widgets.cleanrl_train_form import (
-    CLEANRL_ENVIRONMENT_FAMILY_INDEX,
-    get_cleanrl_environment_family_index,
-)
-from gym_gui.ui.widgets.cleanrl_train_form import _generate_run_id as generate_run_id
-from gym_gui.ui.widgets.cleanrl_train_form import _format_cleanrl_family_label as format_family_label
 from gym_gui.policy_discovery.cleanrl_policy_metadata import (
     CleanRlCheckpoint,
     discover_policies,
     load_metadata_for_policy,
 )
-
+from gym_gui.telemetry.semconv import VIDEO_MODE_DESCRIPTORS, VideoModes
+from gym_gui.ui.widgets.cleanrl_train_form import (
+    CLEANRL_ENVIRONMENT_FAMILY_INDEX,
+    get_cleanrl_environment_family_index,
+)
+from gym_gui.ui.widgets.cleanrl_train_form import _format_cleanrl_family_label as format_family_label
+from gym_gui.ui.widgets.cleanrl_train_form import _generate_run_id as generate_run_id
 
 _LOGGER = logging.getLogger(__name__)
 

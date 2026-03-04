@@ -6,8 +6,8 @@ with the trainer daemon and GUI.
 
 from __future__ import annotations
 
-from typing import Protocol, Dict, Any, Optional, runtime_checkable
 from dataclasses import dataclass
+from typing import Any, Dict, Optional, Protocol, runtime_checkable
 
 
 @runtime_checkable

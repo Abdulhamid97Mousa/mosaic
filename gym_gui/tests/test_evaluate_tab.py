@@ -68,6 +68,7 @@ class TestRayPolicyForm:
             os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
         from qtpy import QtWidgets
+
         from gym_gui.ui.widgets.ray_policy_form import RayPolicyForm
 
         app = QtWidgets.QApplication.instance()
@@ -88,6 +89,7 @@ class TestRayPolicyForm:
             os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
         from qtpy import QtWidgets
+
         from gym_gui.ui.widgets.ray_policy_form import RayPolicyForm
 
         app = QtWidgets.QApplication.instance()
@@ -108,6 +110,7 @@ class TestRayPolicyForm:
             os.environ["QT_QPA_PLATFORM"] = "offscreen"
 
         from qtpy import QtWidgets
+
         from gym_gui.ui.widgets.ray_policy_form import RayPolicyForm
 
         app = QtWidgets.QApplication.instance()
@@ -348,8 +351,8 @@ class TestActualCheckpoints:
 
     def test_discover_actual_checkpoints(self):
         """Test discovering actual checkpoints if they exist."""
-        from gym_gui.policy_discovery.ray_policy_metadata import discover_ray_checkpoints
         from gym_gui.config.paths import VAR_TRAINER_DIR
+        from gym_gui.policy_discovery.ray_policy_metadata import discover_ray_checkpoints
 
         runs_dir = VAR_TRAINER_DIR / "runs"
         if not runs_dir.exists():
@@ -371,8 +374,8 @@ class TestActualCheckpoints:
 
     def test_specific_checkpoint_exists(self):
         """Test that the specific checkpoint mentioned by user exists."""
-        from gym_gui.policy_discovery.ray_policy_metadata import load_checkpoint_metadata
         from gym_gui.config.paths import VAR_TRAINER_DIR
+        from gym_gui.policy_discovery.ray_policy_metadata import load_checkpoint_metadata
 
         run_id = "01KCFRQYQ49CKSHCWAY7K1P1WC"
         checkpoint_dir = VAR_TRAINER_DIR / "runs" / run_id / "checkpoints"
@@ -453,8 +456,9 @@ class TestRunEvaluation:
 
     def test_run_evaluation_function_signature(self):
         """Test run_evaluation has expected parameters."""
-        from ray_worker.policy_evaluator import run_evaluation
         import inspect
+
+        from ray_worker.policy_evaluator import run_evaluation
 
         sig = inspect.signature(run_evaluation)
         params = list(sig.parameters.keys())
@@ -502,8 +506,9 @@ class TestMainWindowEvaluationHandler:
 def qapp():
     """Create QApplication for GUI tests."""
     try:
-        from qtpy import QtWidgets
         import os
+
+        from qtpy import QtWidgets
         if not os.environ.get("DISPLAY") and not os.environ.get("QT_QPA_PLATFORM"):
             os.environ["QT_QPA_PLATFORM"] = "offscreen"
 

@@ -1,35 +1,77 @@
 from __future__ import annotations
 
 import os
+from collections import defaultdict
 from dataclasses import dataclass
 from typing import Any, Dict, Iterable, Optional, Tuple
-from collections import defaultdict
 
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 
 from gym_gui.config.game_configs import (
-    CliffWalkingConfig,
-    CarRacingConfig,
-    BipedalWalkerConfig,
+    DEFAULT_FROZEN_LAKE_V2_CONFIG,
     ALEConfig,
+    BipedalWalkerConfig,
+    CarRacingConfig,
+    CliffWalkingConfig,
     FrozenLakeConfig,
     LunarLanderConfig,
+    MeltingPotConfig,
     MiniGridConfig,
+    MultiGridConfig,
+    ProcgenConfig,
+    RWAREConfig,
+    SMACConfig,
     TaxiConfig,
-    DEFAULT_FROZEN_LAKE_V2_CONFIG,
 )
+from gym_gui.core.adapters.vizdoom import ViZDoomConfig
 from gym_gui.core.enums import (
+    ENVIRONMENT_FAMILY_BY_GAME,
+    INPUT_MODE_INFO,
     ControlMode,
     EnvironmentFamily,
     GameId,
     InputMode,
-    INPUT_MODE_INFO,
-    ENVIRONMENT_FAMILY_BY_GAME,
     get_game_display_name,
 )
-from gym_gui.services.operator import OperatorDescriptor, OperatorConfig
-from gym_gui.ui.widgets.operator_config_widget import OperatorConfigWidget
+from gym_gui.services.operator import OperatorConfig, OperatorDescriptor
+from gym_gui.telemetry.semconv import (
+    TELEMETRY_MODE_DESCRIPTORS,
+    TelemetryModeDescriptor,
+    TelemetryModes,
+)
+from gym_gui.ui.config_panels.multi_agent.meltingpot import (
+    MELTINGPOT_GAME_IDS,
+    build_meltingpot_controls,
+)
+from gym_gui.ui.config_panels.multi_agent.meltingpot import (
+    ControlCallbacks as MeltingPotControlCallbacks,
+)
+from gym_gui.ui.config_panels.multi_agent.multigrid import (
+    MULTIGRID_GAME_IDS,
+    build_multigrid_controls,
+)
+from gym_gui.ui.config_panels.multi_agent.multigrid import (
+    ControlCallbacks as MultiGridControlCallbacks,
+)
+from gym_gui.ui.config_panels.multi_agent.rware import (
+    ALL_RWARE_GAME_IDS,
+    build_rware_controls,
+)
+from gym_gui.ui.config_panels.multi_agent.smac import (
+    ALL_SMAC_GAME_IDS,
+    build_smac_controls,
+)
+from gym_gui.ui.config_panels.multi_agent.smac import (
+    ControlCallbacks as SMACControlCallbacks,
+)
+from gym_gui.ui.config_panels.single_agent.ale import (
+    ALE_GAME_IDS,
+    build_ale_controls,
+)
+from gym_gui.ui.config_panels.single_agent.ale import (
+    ControlCallbacks as ALEControlCallbacks,
+)
 from gym_gui.ui.config_panels.single_agent.gym import (
     build_bipedal_controls,
     build_car_racing_controls,
@@ -41,64 +83,42 @@ from gym_gui.ui.config_panels.single_agent.gym import (
 )
 from gym_gui.ui.config_panels.single_agent.minigrid.config_panel import (
     MINIGRID_GAME_IDS,
-    ControlCallbacks as MinigridControlCallbacks,
     build_minigrid_controls,
+)
+from gym_gui.ui.config_panels.single_agent.minigrid.config_panel import (
+    ControlCallbacks as MinigridControlCallbacks,
+)
+from gym_gui.ui.config_panels.single_agent.minigrid.config_panel import (
     resolve_default_config as resolve_minigrid_default_config,
-)
-from gym_gui.ui.config_panels.single_agent.ale import (
-    ALE_GAME_IDS,
-    ControlCallbacks as ALEControlCallbacks,
-    build_ale_controls,
-)
-from gym_gui.ui.config_panels.single_agent.vizdoom import (
-    VIZDOOM_GAME_IDS,
-    ControlCallbacks as ViZDoomControlCallbacks,
-    build_vizdoom_controls,
 )
 from gym_gui.ui.config_panels.single_agent.procgen import (
     PROCGEN_GAME_IDS,
-    ControlCallbacks as ProcgenControlCallbacks,
     build_procgen_controls,
 )
-from gym_gui.ui.config_panels.multi_agent.meltingpot import (
-    MELTINGPOT_GAME_IDS,
-    ControlCallbacks as MeltingPotControlCallbacks,
-    build_meltingpot_controls,
+from gym_gui.ui.config_panels.single_agent.procgen import (
+    ControlCallbacks as ProcgenControlCallbacks,
 )
-from gym_gui.ui.config_panels.multi_agent.multigrid import (
-    MULTIGRID_GAME_IDS,
-    ControlCallbacks as MultiGridControlCallbacks,
-    build_multigrid_controls,
+from gym_gui.ui.config_panels.single_agent.vizdoom import (
+    VIZDOOM_GAME_IDS,
+    build_vizdoom_controls,
 )
-from gym_gui.ui.config_panels.multi_agent.smac import (
-    ALL_SMAC_GAME_IDS,
-    ControlCallbacks as SMACControlCallbacks,
-    build_smac_controls,
+from gym_gui.ui.config_panels.single_agent.vizdoom import (
+    ControlCallbacks as ViZDoomControlCallbacks,
 )
-from gym_gui.ui.config_panels.multi_agent.rware import (
-    ALL_RWARE_GAME_IDS,
-    build_rware_controls,
-)
-from gym_gui.core.adapters.vizdoom import ViZDoomConfig
-from gym_gui.config.game_configs import ProcgenConfig, MeltingPotConfig, MultiGridConfig, SMACConfig, RWAREConfig
-from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
-from gym_gui.ui.widgets.mujoco_mpc_tab import MuJoCoMPCTab
-from gym_gui.ui.widgets.multi_agent_tab import MultiAgentTab
-from gym_gui.ui.widgets.single_agent_tab import SingleAgentTab
-from gym_gui.ui.widgets.operators_tab import OperatorsTab
 from gym_gui.ui.widgets.godot_ge_tab import GodotGETab
 from gym_gui.ui.widgets.keyboard_assignment_widget import KeyboardAssignmentWidget
-from gym_gui.telemetry.semconv import (
-    TelemetryModes,
-    TELEMETRY_MODE_DESCRIPTORS,
-    TelemetryModeDescriptor,
-)
+from gym_gui.ui.widgets.mujoco_mpc_tab import MuJoCoMPCTab
+from gym_gui.ui.widgets.multi_agent_tab import MultiAgentTab
+from gym_gui.ui.widgets.operator_config_widget import OperatorConfigWidget
+from gym_gui.ui.widgets.operators_tab import OperatorsTab
+from gym_gui.ui.widgets.single_agent_tab import SingleAgentTab
+from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
 
 
 @dataclass(frozen=True)
 class ControlPanelConfig:
     """Configuration for the control panel with game-specific configs."""
-    
+
     available_modes: Dict[GameId, Iterable[ControlMode]]
     default_mode: ControlMode
     frozen_lake_config: FrozenLakeConfig
@@ -1453,24 +1473,24 @@ class ControlPanelWidget(QtWidgets.QWidget):
     def _update_control_states(self) -> None:
         """Update button states based on game flow."""
         is_human = self._current_mode == ControlMode.HUMAN_ONLY
-        
+
         # Start button: enabled only if game not started and environment loaded
         self._start_button.setEnabled(not self._game_started)
-        
+
         # Pause button: enabled only if game started and not paused
         self._pause_button.setEnabled(self._game_started and not self._game_paused)
-        
+
         # Continue button: enabled only if game paused
         self._continue_button.setEnabled(self._game_paused)
-        
+
         # Terminate button: enabled only if game started
         self._terminate_button.setEnabled(self._game_started)
-        
+
         # Agent Step: enabled only if game started, not paused, not human-only, and not auto-running
         self._step_button.setEnabled(
             self._game_started and not self._game_paused and not is_human and not self._auto_running
         )
-        
+
         # Reset: always enabled (can reset even during active game)
         self._reset_button.setEnabled(True)
 
@@ -1478,7 +1498,7 @@ class ControlPanelWidget(QtWidgets.QWidget):
         has_agent_component = self._current_mode != ControlMode.HUMAN_ONLY
         agent_only_mode = self._current_mode == ControlMode.AGENT_ONLY
         self._operator_combo.setEnabled(has_agent_component and self._operator_combo.count() > 0)
-        
+
         worker_def = self._current_worker_definition()
         supports_training = bool(worker_def and worker_def.supports_training)
         supports_policy = bool(worker_def and worker_def.supports_policy_load)

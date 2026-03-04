@@ -9,23 +9,21 @@ from __future__ import annotations
 import math
 import random
 from dataclasses import dataclass, field
-from typing import Optional, List, Tuple
+from typing import List, Optional, Tuple
 
-from PyQt6.QtCore import (
-    Qt, QTimer, QPointF, QRectF, pyqtSignal, QPoint
-)
+from PyQt6.QtCore import QPoint, QPointF, QRectF, Qt, QTimer, pyqtSignal
 from PyQt6.QtGui import (
-    QPainter,
+    QBrush,
     QColor,
-    QRadialGradient,
-    QLinearGradient,
-    QPen,
+    QCursor,
     QFont,
     QFontMetrics,
-    QPainterPath,
-    QBrush,
-    QCursor,
+    QLinearGradient,
     QMouseEvent,
+    QPainter,
+    QPainterPath,
+    QPen,
+    QRadialGradient,
     QWheelEvent,
 )
 from PyQt6.QtWidgets import QWidget

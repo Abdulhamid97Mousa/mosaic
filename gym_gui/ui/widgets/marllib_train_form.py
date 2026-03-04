@@ -21,27 +21,25 @@ from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
-from qtpy import QtCore, QtGui, QtWidgets
-
-from gym_gui.logging_config.helpers import LogConstantMixin
-from gym_gui.logging_config.log_constants import (
-    LOG_UI_TRAIN_FORM_TRACE,
-    LOG_UI_TRAIN_FORM_INFO,
-    LOG_UI_TRAIN_FORM_WARNING,
-    LOG_UI_TRAIN_FORM_ERROR,
-)
-
 from marllib_worker.registries import (
     ALGO_TYPE_DICT,
     ALL_ALGORITHMS,
     ALL_ENVIRONMENTS,
-    SHARE_POLICY_OPTIONS,
+    CONTINUOUS_ONLY_ALGOS,
     CORE_ARCH_OPTIONS,
     DISCRETE_ONLY_ALGOS,
-    CONTINUOUS_ONLY_ALGOS,
+    SHARE_POLICY_OPTIONS,
     get_algo_type,
 )
+from qtpy import QtCore, QtGui, QtWidgets
 
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_UI_TRAIN_FORM_ERROR,
+    LOG_UI_TRAIN_FORM_INFO,
+    LOG_UI_TRAIN_FORM_TRACE,
+    LOG_UI_TRAIN_FORM_WARNING,
+)
 
 _LOGGER = logging.getLogger("gym_gui.ui.marllib_train_form")
 

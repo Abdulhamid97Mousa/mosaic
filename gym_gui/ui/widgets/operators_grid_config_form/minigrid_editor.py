@@ -16,20 +16,20 @@ import copy
 import json
 import logging
 from dataclasses import dataclass, field
-from typing import Dict, List, Optional, Tuple, Any
+from typing import Any, Dict, List, Optional, Tuple
 
-from PyQt6 import QtWidgets, QtCore, QtGui
+from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import pyqtSignal
 
 from .base import (
-    GridState,
     GridCell,
-    GridObject,
-    GridEditorWidget,
-    GridObjectTray,
     GridConfigDialog,
-    ObjectType,
+    GridEditorWidget,
+    GridObject,
+    GridObjectTray,
+    GridState,
     ObjectColor,
+    ObjectType,
 )
 
 _LOGGER = logging.getLogger(__name__)

@@ -145,8 +145,8 @@ class MctxWorkerPresenter:
 
         try:
             # MCTX is primarily for board games, use BoardGameFastLaneTab
-            from gym_gui.ui.widgets.board_game_fastlane_tab import BoardGameFastLaneTab
             from gym_gui.core.enums import GameId
+            from gym_gui.ui.widgets.board_game_fastlane_tab import BoardGameFastLaneTab
 
             # Map Pgx env_id to GameId
             game_id = self._pgx_to_game_id(env_id)

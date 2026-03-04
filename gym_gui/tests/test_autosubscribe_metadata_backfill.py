@@ -5,8 +5,8 @@ from pathlib import Path
 import pytest
 
 from gym_gui.ui.main_window import MainWindow
-from gym_gui.ui.widgets.render_tabs import RenderTabs
 from gym_gui.ui.widgets.fastlane_tab import FastLaneTab
+from gym_gui.ui.widgets.render_tabs import RenderTabs
 
 
 @pytest.mark.skip("Integration-heavy; requires Qt event loop and trainer daemon")

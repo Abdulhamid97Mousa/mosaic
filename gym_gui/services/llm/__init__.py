@@ -23,28 +23,28 @@ _LOGGER = logging.getLogger(__name__)
 # Always import types for static type checking (pyright/mypy)
 # These imports are only used by type checkers, not at runtime
 if TYPE_CHECKING:
-    from gym_gui.services.llm.models import LLMProvider, ModelIdentity
     from gym_gui.services.llm.config import LLMConfig
-    from gym_gui.services.llm.service import (
-        LLMService,
-        ChatMessage,
-        CompletionResult,
-        LLMServiceError,
-    )
-    from gym_gui.services.llm.model_manager import (
-        ModelStatus,
-        ModelInfo,
-        HuggingFaceAuth,
-        ProxyConfig,
-        ModelDownloader,
-        VLLMServerManager,
-        ModelManager,
-        MODEL_SIZES_GB,
-    )
     from gym_gui.services.llm.gpu_detector import (
-        GPUInfo,
         GPUDetectionResult,
         GPUDetector,
+        GPUInfo,
+    )
+    from gym_gui.services.llm.model_manager import (
+        MODEL_SIZES_GB,
+        HuggingFaceAuth,
+        ModelDownloader,
+        ModelInfo,
+        ModelManager,
+        ModelStatus,
+        ProxyConfig,
+        VLLMServerManager,
+    )
+    from gym_gui.services.llm.models import LLMProvider, ModelIdentity
+    from gym_gui.services.llm.service import (
+        ChatMessage,
+        CompletionResult,
+        LLMService,
+        LLMServiceError,
     )
 
 # Check if requests is available (the only external dependency)
@@ -61,28 +61,28 @@ except ImportError:
 
 # Runtime imports - only if dependencies are available
 if LLM_CHAT_AVAILABLE:
-    from gym_gui.services.llm.models import LLMProvider, ModelIdentity
     from gym_gui.services.llm.config import LLMConfig
-    from gym_gui.services.llm.service import (
-        LLMService,
-        ChatMessage,
-        CompletionResult,
-        LLMServiceError,
-    )
-    from gym_gui.services.llm.model_manager import (
-        ModelStatus,
-        ModelInfo,
-        HuggingFaceAuth,
-        ProxyConfig,
-        ModelDownloader,
-        VLLMServerManager,
-        ModelManager,
-        MODEL_SIZES_GB,
-    )
     from gym_gui.services.llm.gpu_detector import (
-        GPUInfo,
         GPUDetectionResult,
         GPUDetector,
+        GPUInfo,
+    )
+    from gym_gui.services.llm.model_manager import (
+        MODEL_SIZES_GB,
+        HuggingFaceAuth,
+        ModelDownloader,
+        ModelInfo,
+        ModelManager,
+        ModelStatus,
+        ProxyConfig,
+        VLLMServerManager,
+    )
+    from gym_gui.services.llm.models import LLMProvider, ModelIdentity
+    from gym_gui.services.llm.service import (
+        ChatMessage,
+        CompletionResult,
+        LLMService,
+        LLMServiceError,
     )
 
 __all__ = [

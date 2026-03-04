@@ -2,20 +2,18 @@ import importlib
 import os
 import sys
 from contextlib import suppress
+from multiprocessing import shared_memory
 from pathlib import Path
 from typing import Any
-from multiprocessing import shared_memory
-
-import numpy as np
-import pytest
 
 import gymnasium as gym
+import numpy as np
+import pytest
 from gymnasium import spaces
 
 from gym_gui.fastlane import FastLaneReader
 from gym_gui.fastlane import buffer as fastlane_buffer
 from gym_gui.telemetry.semconv import TelemetryEnv, VideoModes
-
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 THIRD_PARTY = REPO_ROOT / "3rd_party"

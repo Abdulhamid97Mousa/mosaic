@@ -2,20 +2,19 @@ from __future__ import annotations
 
 """Configuration helpers for trainer runs and schema validation."""
 
-from dataclasses import dataclass
-from datetime import datetime
 import hashlib
 import json
+from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Any, Mapping, MutableMapping
 
 from jsonschema import Draft202012Validator, ValidationError
 from ulid import ULID
 
-from gym_gui.constants import TRAINER_DEFAULTS
 from gym_gui.config.paths import VAR_EVALS_DIR, VAR_TENSORBOARD_DIR, VAR_WANDB_DIR
+from gym_gui.constants import TRAINER_DEFAULTS
 from gym_gui.utils import json_serialization
-
 
 SCHEMA_DEFAULTS = TRAINER_DEFAULTS.schema
 

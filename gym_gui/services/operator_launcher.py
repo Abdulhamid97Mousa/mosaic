@@ -22,6 +22,7 @@ Each subprocess:
 - Can be started/stopped independently
 """
 
+import json
 import logging
 import os
 import select
@@ -31,26 +32,24 @@ import uuid
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
-import json
 from typing import IO, Any, Dict, List, Optional
 
 from gym_gui.config.paths import VAR_OPERATORS_LOGS_DIR, VAR_OPERATORS_TELEMETRY_DIR, ensure_var_directories
 from gym_gui.core.subprocess_validation import validated_popen
-from gym_gui.services.operator import OperatorConfig
 from gym_gui.logging_config.helpers import log_constant
 from gym_gui.logging_config.log_constants import (
-    LOG_OPERATOR_INTERACTIVE_LAUNCHED,
-    LOG_OPERATOR_RESET_COMMAND_SENT,
-    LOG_OPERATOR_STEP_COMMAND_SENT,
-    LOG_OPERATOR_STOP_COMMAND_SENT,
     LOG_OPERATOR_COMMAND_FAILED,
     LOG_OPERATOR_INIT_AGENT_SENT,
-    LOG_OPERATOR_SELECT_ACTION_SENT,
-    LOG_OPERATOR_MULTIAGENT_LAUNCHED,
-    LOG_OPERATOR_MULTIAGENT_INIT_FAILED,
+    LOG_OPERATOR_INTERACTIVE_LAUNCHED,
     LOG_OPERATOR_MULTIAGENT_ACTION_FAILED,
+    LOG_OPERATOR_MULTIAGENT_INIT_FAILED,
+    LOG_OPERATOR_MULTIAGENT_LAUNCHED,
+    LOG_OPERATOR_RESET_COMMAND_SENT,
+    LOG_OPERATOR_SELECT_ACTION_SENT,
+    LOG_OPERATOR_STEP_COMMAND_SENT,
+    LOG_OPERATOR_STOP_COMMAND_SENT,
 )
-
+from gym_gui.services.operator import OperatorConfig
 
 LOGGER = logging.getLogger("gym_gui.services.operator_launcher")
 
@@ -694,7 +693,7 @@ class OperatorLauncher:
         if interactive:
             log_constant(
                 LOGGER, LOG_OPERATOR_INTERACTIVE_LAUNCHED,
-                message=f"Operator launched in interactive mode",
+                message="Operator launched in interactive mode",
                 extra={
                     "operator_id": config.operator_id,
                     "run_id": run_id,

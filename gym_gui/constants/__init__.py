@@ -88,7 +88,6 @@ from gym_gui.constants.constants_core import (
     EPISODE_ID_COLUMN,
     EPISODE_ID_PREFIX,
     EPISODE_ID_SEPARATOR,
-    EpisodeCounterConfig,
     INVALID_MAX_EPISODES_ERROR,
     MAX_COUNTER_VALUE,
     MAX_EPISODES_COLUMN,
@@ -97,47 +96,68 @@ from gym_gui.constants.constants_core import (
     WORKER_ID_COLUMN,
     WORKER_ID_PREFIX,
     WORKER_ID_WIDTH,
+    EpisodeCounterConfig,
     format_episode_id,
     parse_episode_id,
 )
 
 # ================================================================
-# UI Constants
+# Operator Constants
 # ================================================================
+from gym_gui.constants.constants_operator import (
+    BALROG_AGENT_TYPES,
+    BALROG_DEFAULT_AGENT_TYPE,
+    BALROG_DEFAULT_CLIENT,
+    BALROG_DEFAULT_ENV,
+    BALROG_DEFAULT_MAX_STEPS,
+    BALROG_DEFAULT_MODEL,
+    BALROG_DEFAULT_NUM_EPISODES,
+    BALROG_DEFAULT_TASK,
+    BALROG_DEFAULT_TEMPERATURE,
+    BALROG_SUPPORTED_CLIENTS,
+    BALROG_SUPPORTED_ENVS,
+    DEFAULT_OPERATOR_ID_BALROG_LLM,
+    DEFAULT_OPERATOR_ID_HUMAN,
+    OPERATOR_CATEGORIES,
+    OPERATOR_CATEGORY_HUMAN,
+    OPERATOR_CATEGORY_HYBRID,
+    OPERATOR_CATEGORY_LLM,
+    OPERATOR_CATEGORY_RL,
+    OPERATOR_DEFAULTS,
+    OPERATOR_DESCRIPTION_BALROG_LLM,
+    OPERATOR_DESCRIPTION_HUMAN,
+    OPERATOR_DISPLAY_NAME_BALROG_LLM,
+    OPERATOR_DISPLAY_NAME_HUMAN,
+    WORKER_ID_BALROG,
+    BarlogDefaults,
+    OperatorCategoryDefaults,
+    OperatorDefaults,
+)
 
-from gym_gui.constants.constants_ui import (
-    BUFFER_BUFFER_MIN,  # For backwards compatibility aliases
-    BufferDefaults,
-    DEFAULT_EPISODE_BUFFER_SIZE,
-    DEFAULT_RENDER_DELAY_MS,
-    DEFAULT_TELEMETRY_BUFFER_SIZE,
-    EPISODE_BUFFER_MAX,
-    EPISODE_BUFFER_MIN,
-    LayoutDefaults,
-    LOG_SEVERITY_OPTIONS,
-    RENDER_DELAY_MAX_MS,
-    RENDER_DELAY_MIN_MS,
-    RENDER_DELAY_TICK_INTERVAL_MS,
-    RenderDefaults,
-    SliderDefaults,
-    TELEMETRY_BUFFER_MAX,
-    TELEMETRY_BUFFER_MIN,
-    TRAINING_TELEMETRY_THROTTLE_MAX,
-    TRAINING_TELEMETRY_THROTTLE_MIN,
-    UI_DEFAULTS,
-    UI_RENDERING_THROTTLE_MAX,
-    UI_RENDERING_THROTTLE_MIN,
-    UI_TRAINING_SPEED_MAX,
-    UI_TRAINING_SPEED_MIN,
-    UIDefaults,
-    get_control_mode_labels,
-    get_human_input_modes,
+# ================================================================
+# Replay Storage Constants (HDF5)
+# ================================================================
+from gym_gui.constants.constants_replay import (
+    FRAME_REF_FRAMES_DATASET,
+    FRAME_REF_OBS_DATASET,
+    FRAME_REF_SCHEME,
+    REPLAY_COMPRESSION,
+    REPLAY_DEFAULTS,
+    REPLAY_FRAME_CHUNK_SIZE,
+    REPLAY_MAX_STEPS_PER_RUN,
+    REPLAY_SUBDIR,
+    REPLAY_WRITE_BATCH_SIZE,
+    REPLAY_WRITE_QUEUE_SIZE,
+    FrameRefDefaults,
+    ReplayDefaults,
+    ReplayPathDefaults,
+    ReplayReaderDefaults,
+    ReplayWriterDefaults,
 )
 
 # ================================================================
 # Telemetry Constants
 # ================================================================
-
 from gym_gui.constants.constants_telemetry import (
     BATCH_LOG_LEVEL,
     DB_SINK_BATCH_SIZE,
@@ -150,42 +170,28 @@ from gym_gui.constants.constants_telemetry import (
     LIVE_EPISODE_QUEUE_SIZE,
     LIVE_STEP_QUEUE_SIZE,
     MIN_CREDITS_THRESHOLD,
+    RENDER_BOOTSTRAP_TIMEOUT_MS,
     RENDER_PAYLOAD_GRAPH,
     RENDER_PAYLOAD_GRID,
     RENDER_PAYLOAD_RGB,
-    RENDER_BOOTSTRAP_TIMEOUT_MS,
     RENDER_QUEUE_SIZE,
     RUNBUS_DB_PATH_QUEUE_SIZE,
     RUNBUS_DEFAULT_QUEUE_SIZE,
     RUNBUS_UI_PATH_QUEUE_SIZE,
     STEP_BUFFER_SIZE,
     STEP_LOG_LEVEL,
+    TELEMETRY_HUB_BUFFER_SIZE,
+    TELEMETRY_HUB_MAX_QUEUE,
     TELEMETRY_KEY_AUTORESET_MODE,
     TELEMETRY_KEY_SPACE_SIGNATURE,
     TELEMETRY_KEY_TIME_STEP,
     TELEMETRY_KEY_VECTOR_METADATA,
-    TELEMETRY_HUB_BUFFER_SIZE,
-    TELEMETRY_HUB_MAX_QUEUE,
     TELEMETRY_SERVICE_HISTORY_LIMIT,
-)
-
-# ================================================================
-# Vector Metadata Constants
-# ================================================================
-
-from gym_gui.constants.constants_vector import (
-    DEFAULT_AUTORESET_MODE,
-    RESET_MASK_KEY,
-    SUPPORTED_AUTORESET_MODES,
-    VECTOR_ENV_BATCH_SIZE_KEY,
-    VECTOR_ENV_INDEX_KEY,
-    VECTOR_SEED_KEY,
 )
 
 # ================================================================
 # Telemetry Bus Constants
 # ================================================================
-
 from gym_gui.constants.constants_telemetry_bus import (
     BUS_DEFAULTS,
     BusDefaults,
@@ -200,7 +206,6 @@ from gym_gui.constants.constants_telemetry_bus import (
 # ================================================================
 # Telemetry DB Constants
 # ================================================================
-
 from gym_gui.constants.constants_telemetry_db import (
     DB_DEFAULTS,
     DatabaseDefaults,
@@ -209,9 +214,18 @@ from gym_gui.constants.constants_telemetry_db import (
 )
 
 # ================================================================
+# TensorBoard Constants
+# ================================================================
+from gym_gui.constants.constants_tensorboard import (
+    DEFAULT_TENSORBOARD,
+    TensorboardDefaults,
+    build_tensorboard_log_dir,
+    build_tensorboard_relative_path,
+)
+
+# ================================================================
 # Trainer Constants
 # ================================================================
-
 from gym_gui.constants.constants_trainer import (
     TRAINER_DEFAULTS,
     TrainerClientDefaults,
@@ -222,9 +236,57 @@ from gym_gui.constants.constants_trainer import (
 )
 
 # ================================================================
+# UI Constants
+# ================================================================
+from gym_gui.constants.constants_ui import (
+    BUFFER_BUFFER_MIN,  # For backwards compatibility aliases
+    DEFAULT_EPISODE_BUFFER_SIZE,
+    DEFAULT_RENDER_DELAY_MS,
+    DEFAULT_TELEMETRY_BUFFER_SIZE,
+    EPISODE_BUFFER_MAX,
+    EPISODE_BUFFER_MIN,
+    LOG_SEVERITY_OPTIONS,
+    RENDER_DELAY_MAX_MS,
+    RENDER_DELAY_MIN_MS,
+    RENDER_DELAY_TICK_INTERVAL_MS,
+    TELEMETRY_BUFFER_MAX,
+    TELEMETRY_BUFFER_MIN,
+    TRAINING_TELEMETRY_THROTTLE_MAX,
+    TRAINING_TELEMETRY_THROTTLE_MIN,
+    UI_DEFAULTS,
+    UI_RENDERING_THROTTLE_MAX,
+    UI_RENDERING_THROTTLE_MIN,
+    UI_TRAINING_SPEED_MAX,
+    UI_TRAINING_SPEED_MIN,
+    BufferDefaults,
+    LayoutDefaults,
+    RenderDefaults,
+    SliderDefaults,
+    UIDefaults,
+    get_control_mode_labels,
+    get_human_input_modes,
+)
+
+# ================================================================
+# Vector Metadata Constants
+# ================================================================
+from gym_gui.constants.constants_vector import (
+    DEFAULT_AUTORESET_MODE,
+    RESET_MASK_KEY,
+    SUPPORTED_AUTORESET_MODES,
+    VECTOR_ENV_BATCH_SIZE_KEY,
+    VECTOR_ENV_INDEX_KEY,
+    VECTOR_SEED_KEY,
+)
+from gym_gui.constants.constants_wandb import (
+    DEFAULT_WANDB,
+    WandbDefaults,
+    build_wandb_run_url,
+)
+
+# ================================================================
 # Worker Constants
 # ================================================================
-
 from gym_gui.constants.constants_worker import (
     WORKER_DEFAULTS,
     WORKER_DISCOVERY_TIMEOUT_S,
@@ -243,96 +305,22 @@ from gym_gui.constants.constants_worker import (
 )
 
 # ================================================================
-# TensorBoard Constants
-# ================================================================
-
-from gym_gui.constants.constants_tensorboard import (
-    DEFAULT_TENSORBOARD,
-    TensorboardDefaults,
-    build_tensorboard_log_dir,
-    build_tensorboard_relative_path,
-)
-
-from gym_gui.constants.constants_wandb import (
-    DEFAULT_WANDB,
-    WandbDefaults,
-    build_wandb_run_url,
-)
-
-# ================================================================
-# Replay Storage Constants (HDF5)
-# ================================================================
-
-from gym_gui.constants.constants_replay import (
-    REPLAY_DEFAULTS,
-    ReplayDefaults,
-    ReplayWriterDefaults,
-    ReplayReaderDefaults,
-    FrameRefDefaults,
-    ReplayPathDefaults,
-    REPLAY_MAX_STEPS_PER_RUN,
-    REPLAY_FRAME_CHUNK_SIZE,
-    REPLAY_COMPRESSION,
-    REPLAY_WRITE_BATCH_SIZE,
-    REPLAY_WRITE_QUEUE_SIZE,
-    FRAME_REF_SCHEME,
-    FRAME_REF_FRAMES_DATASET,
-    FRAME_REF_OBS_DATASET,
-    REPLAY_SUBDIR,
-)
-
-# ================================================================
 # Optional Dependencies
 # ================================================================
-
 from gym_gui.constants.optional_deps import (
     OptionalDependencyError,
     get_mjpc_launcher,
-    is_mjpc_available,
-    is_vizdoom_available,
-    require_vizdoom,
-    is_pettingzoo_available,
-    require_pettingzoo,
-    is_stockfish_available,
-    require_stockfish,
     is_cleanrl_available,
-    require_cleanrl,
+    is_mjpc_available,
+    is_pettingzoo_available,
+    is_stockfish_available,
     is_torch_available,
+    is_vizdoom_available,
+    require_cleanrl,
+    require_pettingzoo,
+    require_stockfish,
     require_torch,
-)
-
-# ================================================================
-# Operator Constants
-# ================================================================
-
-from gym_gui.constants.constants_operator import (
-    OPERATOR_CATEGORY_HUMAN,
-    OPERATOR_CATEGORY_LLM,
-    OPERATOR_CATEGORY_RL,
-    OPERATOR_CATEGORY_HYBRID,
-    OPERATOR_CATEGORIES,
-    DEFAULT_OPERATOR_ID_HUMAN,
-    DEFAULT_OPERATOR_ID_BALROG_LLM,
-    WORKER_ID_BALROG,
-    OPERATOR_DISPLAY_NAME_HUMAN,
-    OPERATOR_DISPLAY_NAME_BALROG_LLM,
-    OPERATOR_DESCRIPTION_HUMAN,
-    OPERATOR_DESCRIPTION_BALROG_LLM,
-    BALROG_SUPPORTED_ENVS,
-    BALROG_SUPPORTED_CLIENTS,
-    BALROG_AGENT_TYPES,
-    BALROG_DEFAULT_ENV,
-    BALROG_DEFAULT_TASK,
-    BALROG_DEFAULT_CLIENT,
-    BALROG_DEFAULT_MODEL,
-    BALROG_DEFAULT_AGENT_TYPE,
-    BALROG_DEFAULT_NUM_EPISODES,
-    BALROG_DEFAULT_MAX_STEPS,
-    BALROG_DEFAULT_TEMPERATURE,
-    OperatorCategoryDefaults,
-    BarlogDefaults,
-    OperatorDefaults,
-    OPERATOR_DEFAULTS,
+    require_vizdoom,
 )
 
 # ================================================================

@@ -12,23 +12,23 @@ import threading
 from typing import Optional
 
 from gym_gui.constants import (
-    DEFAULT_MAX_EPISODES_PER_RUN,
-    EPISODE_COUNTER_WIDTH,
-    format_episode_id,
-    COUNTER_NOT_INITIALIZED_ERROR,
-    MAX_EPISODES_REACHED_ERROR,
-    INVALID_MAX_EPISODES_ERROR,
     COUNTER_CAPACITY_EXCEEDED_ERROR,
     COUNTER_EXCEEDS_MAX_ERROR,
+    COUNTER_NOT_INITIALIZED_ERROR,
+    DEFAULT_MAX_EPISODES_PER_RUN,
+    EPISODE_COUNTER_WIDTH,
+    INVALID_MAX_EPISODES_ERROR,
+    MAX_EPISODES_REACHED_ERROR,
+    format_episode_id,
 )
 from gym_gui.logging_config.log_constants import (
     LOG_COUNTER_INITIALIZED,
-    LOG_COUNTER_RESUME_SUCCESS,
-    LOG_COUNTER_RESUME_FAILURE,
-    LOG_COUNTER_MAX_REACHED,
     LOG_COUNTER_INVALID_STATE,
+    LOG_COUNTER_MAX_REACHED,
     LOG_COUNTER_NEXT_EPISODE,
     LOG_COUNTER_RESET,
+    LOG_COUNTER_RESUME_FAILURE,
+    LOG_COUNTER_RESUME_SUCCESS,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ _LOGGER = logging.getLogger(__name__)
 
 class RunCounterManager:
     """Manages episode counter per run with persistence and concurrency safety.
-    
+
     Features:
     - Per-run counter (tied to run_id/ULID)
     - Reset on new run
@@ -44,11 +44,11 @@ class RunCounterManager:
     - Resume from database (read last committed ep_index)
     - Hard maximum enforcement (default 1M episodes)
     - 6-digit fixed width (0-999999)
-    
+
     Usage:
         manager = RunCounterManager(db_conn, run_id="...")
         manager.initialize()  # Load from DB or start at 0
-        
+
         # Thread-safe increment
         with manager.next_episode() as ep_index:
             # Use ep_index in current thread
@@ -63,14 +63,14 @@ class RunCounterManager:
         worker_id: Optional[str] = None,
     ) -> None:
         """Initialize counter manager for a specific run.
-        
+
         Args:
             db_conn: SQLite connection (must have episodes table) or None for headless mode
             run_id: Unique run identifier (ULID format)
             max_episodes: Hard limit (default: DEFAULT_MAX_EPISODES_PER_RUN)
             worker_id: Optional worker ID for multi-process scenarios
                       (generates IDs like f"{run_id}-w{worker_id}-ep{index:06d}")
-        
+
         Raises:
             ValueError: If max_episodes is invalid or stored counter > max_episodes
         """
@@ -97,10 +97,10 @@ class RunCounterManager:
 
     def initialize(self) -> None:
         """Load counter state from database or start fresh.
-        
+
         For a new run: counter starts at -1 (first increment → 0)
         For a resumed run: counter loads from last committed episode
-        
+
         Raises:
             ValueError: If stored counter is invalid or exceeds max_episodes
             sqlite3.Error: If database query fails
@@ -115,20 +115,20 @@ class RunCounterManager:
 
     def next_episode(self) -> _EpisodeCounterContext:
         """Get the next episode index in a thread-safe manner.
-        
+
         Increments counter atomically and returns a context manager that
         yields the episode index. The counter is committed on context exit
         (outside critical section, to avoid DB calls inside the lock).
-        
+
         Usage:
             with manager.next_episode() as ep_index:
                 episode_id = f"{run_id}-ep{ep_index:06d}"
                 # ... record telemetry ...
                 # Counter auto-committed on context exit
-        
+
         Returns:
             Context manager that yields (int) episode index
-            
+
         Raises:
             RuntimeError: If counter not initialized
             RuntimeError: If max_episodes reached
@@ -157,7 +157,7 @@ class RunCounterManager:
 
     def get_current_index(self) -> int:
         """Get the last allocated episode index (thread-safe).
-        
+
         Returns -1 if not yet initialized.
         """
         with self._lock:
@@ -165,7 +165,7 @@ class RunCounterManager:
 
     def reset(self) -> None:
         """Reset counter to -1 (for new runs).
-        
+
         Call this before re-using the manager with a different run_id
         (or create a new RunCounterManager instance instead).
         """
@@ -182,10 +182,10 @@ class RunCounterManager:
 
     def _load_from_db(self) -> int:
         """Load the last committed episode index from database.
-        
+
         Returns:
             Last committed ep_index (or -1 if no episodes exist yet)
-            
+
         Raises:
             ValueError: If loaded counter exceeds max_episodes
             sqlite3.Error: If database query fails
@@ -194,15 +194,15 @@ class RunCounterManager:
         if self._db_conn is None:
             _LOGGER.debug(f"No DB connection; starting at index -1 for run {self._run_id}")
             return -1
-            
+
         try:
             cursor = self._db_conn.cursor()
-            
+
             # Check if worker_id column exists in the episodes table
             cursor.execute("PRAGMA table_info(episodes)")
             columns = [col[1] for col in cursor.fetchall()]
             has_worker_id_column = "worker_id" in columns
-            
+
             # Get max ep_index for this run_id
             if self._worker_id and has_worker_id_column:
                 cursor.execute(
@@ -235,7 +235,7 @@ class RunCounterManager:
             row = cursor.fetchone()
             last_index = row[0] if row else -1
 
-            max_possible = 10 ** EPISODE_COUNTER_WIDTH - 1
+            10 ** EPISODE_COUNTER_WIDTH - 1
             if last_index >= self._max_episodes:
                 error_msg = COUNTER_EXCEEDS_MAX_ERROR.format(
                     idx=last_index,
@@ -253,17 +253,17 @@ class RunCounterManager:
         except sqlite3.OperationalError as e:
             # Table might not exist yet; treat as -1
             if "no such table" in str(e).lower():
-                _LOGGER.debug(f"Episodes table does not exist yet; starting at index -1")
+                _LOGGER.debug("Episodes table does not exist yet; starting at index -1")
                 return -1
             raise
 
     def _commit_episode(self, ep_index: int) -> None:
         """Mark an episode as committed in the database.
-        
+
         This is called by _EpisodeCounterContext on context exit.
         Currently a no-op placeholder; actual commit happens when
         telemetry writes the episode record to the DB.
-        
+
         Args:
             ep_index: Episode index to commit
         """
@@ -274,7 +274,7 @@ class RunCounterManager:
 
 class _EpisodeCounterContext:
     """Context manager for safe episode counter acquisition and commitment.
-    
+
     Yields episode index and optionally commits it to DB on exit.
     """
 

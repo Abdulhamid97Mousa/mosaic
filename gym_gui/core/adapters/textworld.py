@@ -29,10 +29,10 @@ from gym_gui.logging_config.log_constants import (
     LOG_ADAPTER_ENV_RESET,
     LOG_ADAPTER_STEP_SUMMARY,
     LOG_ENV_TEXTWORLD_BOOT,
-    LOG_ENV_TEXTWORLD_STEP,
+    LOG_ENV_TEXTWORLD_COMMAND,
     LOG_ENV_TEXTWORLD_ERROR,
     LOG_ENV_TEXTWORLD_GAME_GENERATED,
-    LOG_ENV_TEXTWORLD_COMMAND,
+    LOG_ENV_TEXTWORLD_STEP,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -41,8 +41,8 @@ try:  # pragma: no cover - import guard exercised in integration tests
     import textworld
     import textworld.gym
     from textworld import EnvInfos
-    from textworld.generator import compile_game
     from textworld.challenges import CHALLENGES
+    from textworld.generator import compile_game
 
     _HAS_TEXTWORLD = True
 except ImportError:  # pragma: no cover - handled gracefully at runtime

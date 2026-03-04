@@ -10,7 +10,7 @@ inherit from MiniGridAdapter and simply specialize the default environment ID.
 
 from __future__ import annotations
 
-from gym_gui.core.adapters.minigrid import MiniGridAdapter, MINIGRID_ACTIONS
+from gym_gui.core.adapters.minigrid import MINIGRID_ACTIONS, MiniGridAdapter
 from gym_gui.core.enums import GameId
 
 # BabyAI uses the same action space as MiniGrid

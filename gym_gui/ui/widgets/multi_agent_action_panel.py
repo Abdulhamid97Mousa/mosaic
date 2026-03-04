@@ -181,7 +181,7 @@ class AgentActionRow(QtWidgets.QWidget):
             )
         else:
             return (
-                f"QPushButton {{ font-size: 10px; padding: 2px 6px; }}"
+                "QPushButton { font-size: 10px; padding: 2px 6px; }"
             )
 
     def _on_action_clicked(self, action_index: int) -> None:

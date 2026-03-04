@@ -83,12 +83,12 @@ def _patch_launch_for_3d(smac_env: Any, render_size: int = _3D_RENDER_SIZE) -> N
     This patch overrides ``_launch()`` to pass ``want_rgb=True`` and add a
     ``SpatialCameraSetup`` so the SC2 engine returns RGB frames via EGL.
     """
-    original_launch = smac_env._launch
 
     def _launch_with_render(self_env: Any = smac_env) -> None:
         # Ensure absl flags are parsed (pysc2 requirement)
         try:
             import sys
+
             from absl import flags
             if not flags.FLAGS.is_parsed():
                 flags.FLAGS(sys.argv)
@@ -97,8 +97,7 @@ def _patch_launch_for_3d(smac_env: Any, render_size: int = _3D_RENDER_SIZE) -> N
 
         # Register SMAC maps with pysc2 before maps.get()
         import smac.env.starcraft2.maps  # noqa: F401
-
-        from pysc2 import run_configs, maps
+        from pysc2 import maps, run_configs
         from s2clientprotocol import sc2api_pb2 as sc_pb
 
         self_env._run_config = run_configs.get(version=self_env.game_version)
@@ -131,7 +130,7 @@ def _patch_launch_for_3d(smac_env: Any, render_size: int = _3D_RENDER_SIZE) -> N
         )
         create.player_setup.add(type=sc_pb.Participant)
 
-        from smac.env.starcraft2.starcraft2 import races, difficulties
+        from smac.env.starcraft2.starcraft2 import difficulties, races
         create.player_setup.add(
             type=sc_pb.Computer,
             race=races[self_env._bot_race],

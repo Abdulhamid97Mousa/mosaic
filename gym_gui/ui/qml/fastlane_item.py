@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-from PyQt6 import QtCore, QtGui, QtQuick, QtQml
-from PyQt6.QtCore import pyqtSlot, pyqtProperty  # type: ignore[attr-defined]
+from PyQt6 import QtCore, QtGui, QtQml, QtQuick
+from PyQt6.QtCore import pyqtProperty, pyqtSlot  # type: ignore[attr-defined]
 
 try:
     from PyQt6.QtQml import QmlElement  # type: ignore[attr-defined]

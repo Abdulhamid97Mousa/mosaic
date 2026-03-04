@@ -2,15 +2,15 @@ from __future__ import annotations
 
 """Lightweight session recording utilities used by StorageRecorderService."""
 
+import json
+import logging
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from datetime import datetime
-import json
-from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any, Iterable, List
 
 import numpy as np
-import logging
 
 from gym_gui.constants.constants_telemetry import (
     TELEMETRY_KEY_AUTORESET_MODE,
@@ -20,11 +20,11 @@ from gym_gui.constants.constants_telemetry import (
 )
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
-    LOG_SERVICE_SESSION_NUMPY_SCALAR_COERCE_FAILED,
-    LOG_SERVICE_SESSION_NDARRAY_SUMMARY_FAILED,
-    LOG_SERVICE_SESSION_LAZYFRAMES_SUMMARY_FAILED,
-    LOG_SERVICE_SESSION_TOLIST_COERCE_FAILED,
     LOG_SERVICE_SESSION_ITERABLE_COERCE_FAILED,
+    LOG_SERVICE_SESSION_LAZYFRAMES_SUMMARY_FAILED,
+    LOG_SERVICE_SESSION_NDARRAY_SUMMARY_FAILED,
+    LOG_SERVICE_SESSION_NUMPY_SCALAR_COERCE_FAILED,
+    LOG_SERVICE_SESSION_TOLIST_COERCE_FAILED,
 )
 
 

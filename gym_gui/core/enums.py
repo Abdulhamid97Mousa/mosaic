@@ -619,14 +619,14 @@ class GameId(StrEnum):
 
 def get_game_display_name(game_id: GameId) -> str:
     """Get the display name for a GameId with family prefix.
-    
+
     Converts actual environment IDs to user-friendly display names:
     - 'FrozenLake-v1' → 'Gym-ToyText-FrozenLake-v1'
     - 'LunarLander-v3' → 'Gym-Box2D-LunarLander-v3'
     - 'MiniGrid-Empty-5x5-v0' → 'MiniGrid-Empty-5x5-v0' (no prefix, separate library)
     """
     value = game_id.value
-    
+
     # MiniGrid is a separate library, not part of Gym - keep as-is
     if value.startswith("MiniGrid-"):
         return value
@@ -669,7 +669,7 @@ def get_game_display_name(game_id: GameId) -> str:
         return value
 
     # Determine Gym family based on enum
-    if game_id in (GameId.FROZEN_LAKE, GameId.FROZEN_LAKE_V2, GameId.CLIFF_WALKING, 
+    if game_id in (GameId.FROZEN_LAKE, GameId.FROZEN_LAKE_V2, GameId.CLIFF_WALKING,
                    GameId.TAXI, GameId.BLACKJACK):
         return f"Gym-ToyText-{value}"
     elif game_id in (GameId.LUNAR_LANDER, GameId.CAR_RACING, GameId.BIPEDAL_WALKER):

@@ -7,7 +7,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from typing import Dict, Any, Type, TypeVar
+from typing import Any, Dict, Type, TypeVar
 
 T = TypeVar("T")
 

@@ -39,13 +39,13 @@ Demos
 """
 
 import sys
-import numpy as np
+
 import gymnasium.spaces as spaces
+import numpy as np
 
 sys.path.insert(0, ".")
 
 from gym_gui.services.aec_wrapper import GymnasiumMultiAgentAECWrapper
-
 
 # ============================================================================
 # Deterministic 1D soccer environment  (mirrors mosaic_multigrid interface)

@@ -1,16 +1,33 @@
 """Single-agent environment UI helpers."""
 
 # Re-export gym family helpers
+# Re-export ALE helpers (Atari via ALE)
+from .ale import (
+    ALE_GAME_IDS,
+    build_ale_controls,
+)
+from .ale import (
+    ControlCallbacks as ALEControlCallbacks,
+)
+
+# Re-export Crafter helpers
+from .crafter import (
+    CRAFTER_GAME_IDS,
+    build_crafter_controls,
+)
+from .crafter import (
+    ControlCallbacks as CrafterControlCallbacks,
+)
 from .gym import (
-    TOY_TEXT_FAMILY,
     BOX2D_FAMILY,
+    TOY_TEXT_FAMILY,
+    build_bipedal_controls,
+    build_car_racing_controls,
+    build_cliff_controls,
     build_frozenlake_controls,
     build_frozenlake_v2_controls,
-    build_taxi_controls,
-    build_cliff_controls,
     build_lunarlander_controls,
-    build_car_racing_controls,
-    build_bipedal_controls,
+    build_taxi_controls,
 )
 
 # Re-export minigrid helpers
@@ -20,25 +37,12 @@ from .minigrid import (
     build_minigrid_controls,
     resolve_default_config,
 )
-
-# Re-export ALE helpers (Atari via ALE)
-from .ale import (
-    ALE_GAME_IDS,
-    ControlCallbacks as ALEControlCallbacks,
-    build_ale_controls,
-)
-
 from .vizdoom import (
     VIZDOOM_GAME_IDS,
-    ControlCallbacks as ViZDoomControlCallbacks,
     build_vizdoom_controls,
 )
-
-# Re-export Crafter helpers
-from .crafter import (
-    CRAFTER_GAME_IDS,
-    ControlCallbacks as CrafterControlCallbacks,
-    build_crafter_controls,
+from .vizdoom import (
+    ControlCallbacks as ViZDoomControlCallbacks,
 )
 
 __all__ = [

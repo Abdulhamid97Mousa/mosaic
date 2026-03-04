@@ -1,34 +1,34 @@
 import asyncio
 import errno
-from collections import deque
-from dataclasses import dataclass
 import logging
 import threading
-from typing import Any, Deque, Dict, Optional, TYPE_CHECKING
+from collections import deque
+from dataclasses import dataclass
+from typing import TYPE_CHECKING, Any, Deque, Dict, Optional
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 
-from gym_gui.telemetry.events import Topic, TelemetryEvent
-from gym_gui.telemetry.run_bus import get_bus
-from gym_gui.telemetry.credit_manager import get_credit_manager
 from gym_gui.constants import (
-    TELEMETRY_HUB_MAX_QUEUE,
     TELEMETRY_HUB_BUFFER_SIZE,
+    TELEMETRY_HUB_MAX_QUEUE,
 )
+from gym_gui.logging_config.helpers import log_constant
 from gym_gui.logging_config.log_constants import (
-    LOG_SERVICE_TELEMETRY_BRIDGE_STEP_QUEUED,
-    LOG_SERVICE_TELEMETRY_BRIDGE_EPISODE_QUEUED,
-    LOG_SERVICE_TELEMETRY_BRIDGE_STEP_DELIVERED,
     LOG_SERVICE_TELEMETRY_BRIDGE_EPISODE_DELIVERED,
+    LOG_SERVICE_TELEMETRY_BRIDGE_EPISODE_QUEUED,
     LOG_SERVICE_TELEMETRY_BRIDGE_OVERFLOW,
     LOG_SERVICE_TELEMETRY_BRIDGE_RUN_COMPLETED,
+    LOG_SERVICE_TELEMETRY_BRIDGE_STEP_DELIVERED,
+    LOG_SERVICE_TELEMETRY_BRIDGE_STEP_QUEUED,
+    LOG_SERVICE_TELEMETRY_HUB_ERROR,
     LOG_SERVICE_TELEMETRY_HUB_STARTED,
     LOG_SERVICE_TELEMETRY_HUB_SUBSCRIBED,
     LOG_SERVICE_TELEMETRY_HUB_TRACE,
-    LOG_SERVICE_TELEMETRY_HUB_ERROR,
 )
-from gym_gui.logging_config.helpers import log_constant
+from gym_gui.telemetry.credit_manager import get_credit_manager
+from gym_gui.telemetry.events import TelemetryEvent, Topic
+from gym_gui.telemetry.run_bus import get_bus
 
 if TYPE_CHECKING:  # pragma: no cover - typing only
     from gym_gui.telemetry.run_bus import RunBus
@@ -108,7 +108,7 @@ class TelemetryEpisode:
 class _TelemetryEvent(QtCore.QEvent):
     """Custom event for thread-safe telemetry delivery."""
     EVENT_TYPE = QtCore.QEvent.Type(QtCore.QEvent.registerEventType())
-    
+
     def __init__(self, event_name: str, data: object) -> None:
         super().__init__(self.EVENT_TYPE)
         self.event_name = event_name
@@ -300,10 +300,10 @@ class TelemetryAsyncHub:
 
     def set_run_buffer_size(self, run_id: str, buffer_size: int) -> None:
         """Set custom buffer size for a specific run.
-        
+
         This should be called BEFORE subscribing to the run to ensure the buffer
         is created with the correct size based on training configuration.
-        
+
         Args:
             run_id: The run identifier
             buffer_size: Buffer size for this run's telemetry stream

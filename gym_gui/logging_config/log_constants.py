@@ -47,9 +47,9 @@ To validate that all log constants conform to logging standards:
 
 from __future__ import annotations
 
-from dataclasses import dataclass
-from typing import Iterable, Tuple, Dict, Set
 import logging
+from dataclasses import dataclass
+from typing import Dict, Iterable, Set, Tuple
 
 
 @dataclass(frozen=True, slots=True)

@@ -16,12 +16,13 @@ from qtpy import QtCore
 
 if TYPE_CHECKING:
     from qtpy.QtWidgets import QStatusBar
-    from gym_gui.ui.widgets.render_tabs import RenderTabs
+
     from gym_gui.ui.widgets.control_panel import ControlPanelWidget
+    from gym_gui.ui.widgets.render_tabs import RenderTabs
 
 from gym_gui.controllers.chess_controller import ChessGameController
-from gym_gui.ui.widgets.human_vs_agent_board import InteractiveChessBoard
 from gym_gui.ui.handlers.features.human_vs_agent import HumanVsAgentHandler
+from gym_gui.ui.widgets.human_vs_agent_board import InteractiveChessBoard
 
 _LOG = logging.getLogger(__name__)
 

@@ -5,14 +5,14 @@ Evdev-based keyboard monitoring for multi-keyboard support.
 This module provides direct access to Linux input devices via evdev,
 bypassing X11/Qt keyboard event merging to enable true multi-keyboard support.
 """
-import os
 import glob
-import struct
-import select
 import logging
+import os
+import select
+import struct
 from dataclasses import dataclass
-from typing import Dict, List, Optional
 from pathlib import Path
+from typing import Dict, List, Optional
 
 from PyQt6.QtCore import QObject, QThread, pyqtSignal
 

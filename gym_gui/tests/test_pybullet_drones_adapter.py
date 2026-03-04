@@ -14,7 +14,7 @@ import logging
 import numpy as np
 import pytest
 
-from gym_gui.core.enums import ControlMode, GameId, RenderMode, EnvironmentFamily
+from gym_gui.core.enums import ControlMode, EnvironmentFamily, GameId, RenderMode
 
 # Check if gym-pybullet-drones is available
 try:
@@ -27,15 +27,15 @@ except ImportError:
 if PYBULLET_DRONES_AVAILABLE:
     from gym_gui.core.adapters.base import AdapterContext
     from gym_gui.core.adapters.pybullet_drones import (
-        PyBulletDronesAdapter,
-        PyBulletDronesConfig,
+        PYBULLET_DRONES_ADAPTERS,
+        CtrlAviaryAdapter,
         HoverAviaryAdapter,
         MultiHoverAviaryAdapter,
-        CtrlAviaryAdapter,
+        PyBulletDronesAdapter,
+        PyBulletDronesConfig,
         VelocityAviaryAdapter,
-        PYBULLET_DRONES_ADAPTERS,
     )
-    from gym_gui.core.factories.adapters import get_adapter_cls, create_adapter
+    from gym_gui.core.factories.adapters import create_adapter, get_adapter_cls
 
 
 # Helper function only available when package is installed

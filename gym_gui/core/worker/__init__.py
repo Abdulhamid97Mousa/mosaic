@@ -22,34 +22,34 @@ Workers should:
 6. Register via entry point for automatic discovery
 """
 
-from .protocol import (
-    WorkerConfig,
-    WorkerRuntime,
-    WorkerCapabilities,
-    WorkerMetadata,
-)
-from .telemetry import (
-    TelemetryEmitter,
-    LifecycleEvent,
-    LifecycleEventType,
-)
 from .analytics import (
-    WorkerAnalyticsManifest,
     ArtifactsMetadata,
+    CheckpointMetadata,
     TensorBoardMetadata,
     WandBMetadata,
-    CheckpointMetadata,
+    WorkerAnalyticsManifest,
 )
 from .cli_base import WorkerCLI
 from .config_loader import (
-    load_worker_config_from_file,
     extract_worker_config,
+    load_worker_config_from_file,
 )
 from .discovery import (
-    WorkerDiscovery,
-    DiscoveredWorker,
-    discover_workers,
     WORKER_ENTRY_POINT_GROUP,
+    DiscoveredWorker,
+    WorkerDiscovery,
+    discover_workers,
+)
+from .protocol import (
+    WorkerCapabilities,
+    WorkerConfig,
+    WorkerMetadata,
+    WorkerRuntime,
+)
+from .telemetry import (
+    LifecycleEvent,
+    LifecycleEventType,
+    TelemetryEmitter,
 )
 
 __all__ = [

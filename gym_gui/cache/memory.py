@@ -2,7 +2,7 @@ from __future__ import annotations
 
 """In-memory cache abstractions used across the GUI."""
 
-from functools import lru_cache, _lru_cache_wrapper
+from functools import _lru_cache_wrapper, lru_cache
 from typing import Callable, ParamSpec, TypeVar
 
 T = TypeVar("T")

@@ -463,7 +463,7 @@ class CheckersEnvironmentAdapter(EnvironmentAdapter[Dict[str, Any], int]):
             return None
         try:
             # Access the underlying OpenSpiel state through Shimmy
-            game = pyspiel.load_game("checkers")
+            pyspiel.load_game("checkers")
             # Reconstruct state - this is a simplified approach
             # In practice, we'd need to track the state properly
             return f"action_{action}"

@@ -6,10 +6,10 @@ and logs mismatches with detailed error information.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Optional
 import logging
+from typing import Any, Dict, Optional
 
-from gym_gui.core.agent_config import get_agent_config, AgentConfig
+from gym_gui.core.agent_config import AgentConfig, get_agent_config
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -30,7 +30,7 @@ class TelemetrySchemaValidator:
         self.validation_warnings = 0
 
         _LOGGER.debug(
-            f"TelemetrySchemaValidator initialized",
+            "TelemetrySchemaValidator initialized",
             extra={
                 "agent_type": agent_type,
                 "config_class": self.agent_config.__class__.__name__,
@@ -41,10 +41,10 @@ class TelemetrySchemaValidator:
 
     def validate_step_record(self, record: Dict[str, Any]) -> Dict[str, Any]:
         """Validate a step record and return validation result with metadata.
-        
+
         Args:
             record: StepRecord dict to validate
-            
+
         Returns:
             Dict with keys:
             - is_valid: bool, True if all required fields present
@@ -104,7 +104,7 @@ class TelemetrySchemaValidator:
 
     def validate_episode_rollup(self, record: Dict[str, Any]) -> Dict[str, Any]:
         """Validate an episode rollup record.
-        
+
         Similar to step record validation but for aggregate episode data.
         """
         result = self.agent_config.validate_episode_rollup(record)

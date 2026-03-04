@@ -39,9 +39,9 @@ from gym_gui.logging_config.log_constants import (
 )
 
 try:  # pragma: no cover - import guard
-    from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Recipe
-    from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
     from overcooked_ai_py.mdp.actions import Action, Direction
+    from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+    from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Recipe
 except ImportError:  # pragma: no cover
     OvercookedGridworld = None  # type: ignore[assignment, misc]
     OvercookedEnv = None  # type: ignore[assignment, misc]

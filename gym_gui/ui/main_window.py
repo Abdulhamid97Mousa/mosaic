@@ -5,140 +5,138 @@ from __future__ import annotations
 import logging
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, List, Optional, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, Dict, List, Optional, cast
 
 if TYPE_CHECKING:
     from gym_gui.core.adapters.base import AdapterStep
 import json
 import threading
+
 import grpc
 import numpy as np
-
-from PyQt6.QtCore import pyqtSlot, pyqtSignal  # type: ignore[attr-defined]
+from PyQt6.QtCore import pyqtSignal, pyqtSlot  # type: ignore[attr-defined]
 from qtpy import QtCore, QtGui, QtWidgets  # type: ignore[attr-defined]
+
 try:
     from qtpy.QtGui import QAction
 except ImportError:
     from qtpy.QtWidgets import QAction  # type: ignore[attr-defined]
 
 from gym_gui.config import game_configs
-from gym_gui.constants import UI_DEFAULTS, TRAINER_DEFAULTS
 from gym_gui.config.game_config_builder import GameConfigBuilder
 from gym_gui.config.paths import VAR_TRAINER_DIR
 from gym_gui.config.settings import Settings, get_settings
-from gym_gui.core.enums import ControlMode, GameId
-from gym_gui.rendering import RendererRegistry
-from gym_gui.core.factories.adapters import available_games
+from gym_gui.constants import DEFAULT_RENDER_DELAY_MS, TRAINER_DEFAULTS, UI_DEFAULTS
 from gym_gui.controllers.human_input import HumanInputController
-from gym_gui.controllers.session import SessionController
 from gym_gui.controllers.live_telemetry_controllers import LiveTelemetryController
+from gym_gui.controllers.session import SessionController
+from gym_gui.core.enums import ControlMode, GameId
+from gym_gui.core.factories.adapters import available_games
+from gym_gui.game_docs import get_game_info
+from gym_gui.game_docs.mosaic_welcome import MOSAIC_WELCOME_HTML
+from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
-    LOG_UI_MAINWINDOW_TRACE,
-    LOG_UI_MAINWINDOW_INFO,
-    LOG_UI_MAINWINDOW_WARNING,
-    LOG_UI_MAINWINDOW_ERROR,
-    LOG_UI_MAINWINDOW_INVALID_CONFIG,
-    LOG_TELEMETRY_SUBSCRIBE_ERROR,
     LOG_LIVE_CONTROLLER_RUN_COMPLETED,
-    LOG_UI_WORKER_TABS_WARNING,
-    LOG_UI_WORKER_TABS_ERROR,
-    LOG_UI_WORKER_TABS_INFO,
-    LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING,
-    LOG_UI_MULTI_AGENT_ENV_LOAD_REQUESTED,
+    LOG_OPERATOR_ENV_PREVIEW_ERROR,
+    LOG_OPERATOR_ENV_PREVIEW_IMPORT_ERROR,
+    LOG_OPERATOR_ENV_PREVIEW_STARTED,
+    LOG_OPERATOR_ENV_PREVIEW_SUCCESS,
+    LOG_OPERATOR_PARALLEL_RESET_STARTED,
+    LOG_OPERATOR_PARALLEL_STEP_COMPLETED,
+    LOG_OPERATOR_PARALLEL_STEP_STARTED,
     LOG_OPERATOR_RESET_ALL_STARTED,
     LOG_OPERATOR_STEP_ALL_COMPLETED,
     LOG_OPERATOR_STOP_ALL_COMPLETED,
-    LOG_OPERATOR_ENV_PREVIEW_STARTED,
-    LOG_OPERATOR_ENV_PREVIEW_SUCCESS,
-    LOG_OPERATOR_ENV_PREVIEW_IMPORT_ERROR,
-    LOG_OPERATOR_ENV_PREVIEW_ERROR,
-    LOG_OPERATOR_PARALLEL_RESET_STARTED,
-    LOG_OPERATOR_PARALLEL_STEP_STARTED,
-    LOG_OPERATOR_PARALLEL_STEP_COMPLETED,
+    LOG_TELEMETRY_SUBSCRIBE_ERROR,
     LOG_UI_BOARD_CONFIG_ENV_INIT_CUSTOM,
+    LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING,
+    LOG_UI_MAINWINDOW_ERROR,
+    LOG_UI_MAINWINDOW_INFO,
+    LOG_UI_MAINWINDOW_INVALID_CONFIG,
+    LOG_UI_MAINWINDOW_TRACE,
+    LOG_UI_MAINWINDOW_WARNING,
+    LOG_UI_MULTI_AGENT_ENV_LOAD_REQUESTED,
+    LOG_UI_WORKER_TABS_ERROR,
+    LOG_UI_WORKER_TABS_INFO,
+    LOG_UI_WORKER_TABS_WARNING,
 )
-from gym_gui.constants import DEFAULT_RENDER_DELAY_MS
 from gym_gui.logging_config.logger import list_known_components
-from gym_gui.logging_config.helpers import LogConstantMixin
-from gym_gui.ui.logging_bridge import LogRecordPayload, QtLogHandler
-from gym_gui.ui.presenters.main_window_presenter import MainWindowPresenter, MainWindowView
-from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWidget
-from gym_gui.ui.indicators.busy_indicator import modal_busy_indicator
-from gym_gui.ui.widgets.render_tabs import RenderTabs
-from gym_gui.ui.widgets.multi_agent_action_panel import (
-    MultiAgentActionPanel,
-    COLOR_PALETTE,
-    DEFAULT_AGENT_COLOR_NAMES,
-)
-from gym_gui.game_docs import get_game_info
-from gym_gui.game_docs.mosaic_welcome import MOSAIC_WELCOME_HTML
+from gym_gui.rendering import RendererRegistry
 from gym_gui.services.actor import ActorService
+from gym_gui.services.llm import LLM_CHAT_AVAILABLE
 from gym_gui.services.operator import (
+    MultiAgentStepState,
+    MultiOperatorService,
     OperatorConfig,
     OperatorDescriptor,
-    MultiOperatorService,
-    MultiAgentStepState,
 )
 from gym_gui.services.operator_launcher import OperatorLauncher, OperatorLaunchError
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
 from gym_gui.services.trainer import (
+    RunRegistry,
     TrainerClient,
     TrainerClientRunner,
     TrainingRunManager,
-    RunRegistry,
 )
 from gym_gui.services.trainer.streams import TelemetryAsyncHub
-from gym_gui.ui.widgets.live_telemetry_tab import LiveTelemetryTab
-from gym_gui.ui.widgets.fastlane_tab import FastLaneTab
-from gym_gui.ui.widgets.ray_multi_worker_fastlane_tab import RayMultiWorkerFastLaneTab
+from gym_gui.ui.indicators.busy_indicator import modal_busy_indicator
+from gym_gui.ui.logging_bridge import LogRecordPayload, QtLogHandler
+from gym_gui.ui.presenters.main_window_presenter import MainWindowPresenter, MainWindowView
 from gym_gui.ui.presenters.workers import (
     get_worker_presenter_registry,
 )
-from gym_gui.services.llm import LLM_CHAT_AVAILABLE
-from gym_gui.ui.themes import apply_theme, DARK_THEME, LIGHT_THEME
+from gym_gui.ui.themes import DARK_THEME, LIGHT_THEME, apply_theme
+from gym_gui.ui.widgets.control_panel import ControlPanelConfig, ControlPanelWidget
+from gym_gui.ui.widgets.fastlane_tab import FastLaneTab
+from gym_gui.ui.widgets.live_telemetry_tab import LiveTelemetryTab
+from gym_gui.ui.widgets.multi_agent_action_panel import (
+    COLOR_PALETTE,
+    DEFAULT_AGENT_COLOR_NAMES,
+    MultiAgentActionPanel,
+)
+from gym_gui.ui.widgets.ray_multi_worker_fastlane_tab import RayMultiWorkerFastLaneTab
+from gym_gui.ui.widgets.render_tabs import RenderTabs
 
 if LLM_CHAT_AVAILABLE:
     from gym_gui.ui.widgets.chat_panel import ChatPanel
 else:
     ChatPanel = None  # type: ignore[misc, assignment]
-from gym_gui.ui.widgets.settings import SettingsDialog
-from gym_gui.ui.panels.analytics_tabs import AnalyticsTabManager
-from gym_gui.ui.forms import get_worker_form_factory, ensure_all_forms_registered
+from gym_gui.constants.optional_deps import (
+    OptionalDependencyError,
+    get_godot_launcher,
+    get_mjpc_launcher,
+)
+from gym_gui.services.trainer.signals import get_trainer_signals
+from gym_gui.ui.forms import ensure_all_forms_registered, get_worker_form_factory
 from gym_gui.ui.handlers import (
+    CheckersEnvLoader,
+    CheckersHandler,
+    ChessEnvLoader,
+    ChessHandler,
+    ConnectFourEnvLoader,
+    ConnectFourHandler,
+    FastLaneTabHandler,
     GameConfigHandler,
+    GodotHandler,
+    GoEnvLoader,
+    GoHandler,
+    HumanVsAgentHandler,
+    JumanjiGridClickLoader,
     LogHandler,
     MPCHandler,
-    GodotHandler,
-    ChessHandler,
-    ConnectFourHandler,
-    GoHandler,
-    SudokuHandler,
-    CheckersHandler,
-    HumanVsAgentHandler,
-    CheckersEnvLoader,
-    ChessEnvLoader,
-    ConnectFourEnvLoader,
-    GoEnvLoader,
-    SmacCameraLoader,
-    TicTacToeEnvLoader,
-    VizdoomEnvLoader,
-    JumanjiGridClickLoader,
     # New composed handlers for extracted functionality
     MultiAgentGameHandler,
-    TrainingFormHandler,
     PolicyEvaluationHandler,
-    FastLaneTabHandler,
+    SmacCameraLoader,
+    SudokuHandler,
+    TicTacToeEnvLoader,
+    TrainingFormHandler,
     TrainingMonitorHandler,
+    VizdoomEnvLoader,
 )
-
-from gym_gui.constants.optional_deps import (
-    get_mjpc_launcher,
-    get_godot_launcher,
-    OptionalDependencyError,
-)
-
-from gym_gui.services.trainer.signals import get_trainer_signals
+from gym_gui.ui.panels.analytics_tabs import AnalyticsTabManager
+from gym_gui.ui.widgets.settings import SettingsDialog
 
 TRAINER_SUBMIT_DEADLINE_MULTIPLIER = 6
 
@@ -335,7 +333,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._control_panel = ControlPanelWidget(config=control_config, parent=self)
         if default_operator_id is not None:
             self._control_panel.set_active_operator(default_operator_id)
-        
+
         # Create presenter to coordinate
         self._presenter = MainWindowPresenter(self._session, self._human_input, parent=self)
 
@@ -360,7 +358,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._session.set_slow_lane_enabled(not self._control_panel.fastlane_only_enabled())
         self._render_tabs.set_human_replay_enabled(not self._control_panel.fastlane_only_enabled())
         QtCore.QTimer.singleShot(0, self._render_tabs.refresh_replays)
-        
+
         # Poll for new training runs and auto-subscribe (delegated to handler)
         self._run_poll_timer = QtCore.QTimer(self)
         self._run_poll_timer.setInterval(2000)  # Poll every 2 seconds
@@ -924,12 +922,12 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         try:
             trainer_signals = get_trainer_signals()
             trainer_signals.training_finished.connect(self._on_training_finished)
-            self.log_constant( 
+            self.log_constant(
                 LOG_UI_MAINWINDOW_TRACE,
                 message="Connected to trainer lifecycle signals",
             )
         except Exception as e:
-            self.log_constant( 
+            self.log_constant(
                 LOG_UI_MAINWINDOW_WARNING,
                 message=f"Failed to connect trainer signals: {e}",
                 extra={"exception": type(e).__name__},
@@ -1114,9 +1112,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         try:
             # Import MiniGrid object types
-            from minigrid.core.world_object import (
-                Wall, Goal, Key, Door, Ball, Box, Lava, Floor
-            )
+            from minigrid.core.world_object import Ball, Box, Door, Floor, Goal, Key, Lava, Wall
 
             # Map our object types to MiniGrid classes
             # Colors available: red, green, blue, purple, yellow, grey
@@ -1273,7 +1269,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 move_for_encoding = move
 
             # Get the UCI string for the (possibly mirrored) move
-            move_uci = move_for_encoding.uci()
+            move_for_encoding.uci()
 
             # Use PettingZoo's encoding: action = (col * 8 + row) * 73 + plane
             source = move_for_encoding.from_square
@@ -1453,7 +1449,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
                     self.log_constant(
                         LOG_UI_MAINWINDOW_INFO,
-                        message=f"Launched human_worker subprocess for operator",
+                        message="Launched human_worker subprocess for operator",
                         extra={
                             "operator_id": operator_id,
                             "seed": seed,
@@ -1493,7 +1489,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
                 self.log_constant(
                     LOG_UI_MAINWINDOW_INFO,
-                    message=f"Launched interactive operator subprocess with seed",
+                    message="Launched interactive operator subprocess with seed",
                     extra={
                         "operator_id": operator_id,
                         "seed": seed,
@@ -1544,7 +1540,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     reset_count += 1
                     self.log_constant(
                         LOG_UI_MAINWINDOW_TRACE,
-                        message=f"Sent reset command to already-running operator",
+                        message="Sent reset command to already-running operator",
                         extra={"operator_id": operator_id, "seed": seed},
                     )
 
@@ -1685,7 +1681,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
                     self.log_constant(
                         LOG_UI_MAINWINDOW_INFO,
-                        message=f"Initialized worker in action_selector mode",
+                        message="Initialized worker in action_selector mode",
                         extra={
                             "operator_id": operator_id,
                             "player_id": player_id,
@@ -1750,7 +1746,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         )
         self.log_constant(
             LOG_OPERATOR_RESET_ALL_STARTED,
-            message=f"PettingZoo multi-agent reset complete",
+            message="PettingZoo multi-agent reset complete",
             extra={
                 "task": task,
                 "seed": seed,
@@ -1872,7 +1868,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 skipped_human_count += 1
                 self.log_constant(
                     LOG_UI_MAINWINDOW_TRACE,
-                    message=f"Skipping human operator in Step All (use action buttons)",
+                    message="Skipping human operator in Step All (use action buttons)",
                     extra={"operator_id": operator_id},
                 )
                 continue
@@ -1881,7 +1877,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             if handle is None:
                 self.log_constant(
                     LOG_UI_MAINWINDOW_WARNING,
-                    message=f"No process handle for operator",
+                    message="No process handle for operator",
                     extra={"operator_id": operator_id},
                 )
                 continue
@@ -1889,7 +1885,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             if not handle.is_running:
                 self.log_constant(
                     LOG_UI_MAINWINDOW_WARNING,
-                    message=f"Operator process not running",
+                    message="Operator process not running",
                     extra={"operator_id": operator_id, "return_code": handle.return_code},
                 )
                 self._multi_operator_service.set_operator_state(operator_id, "stopped")
@@ -1901,13 +1897,13 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 stepped_handles.append((operator_id, handle))
                 self.log_constant(
                     LOG_UI_MAINWINDOW_TRACE,
-                    message=f"Sent step command to operator",
+                    message="Sent step command to operator",
                     extra={"operator_id": operator_id},
                 )
             else:
                 self.log_constant(
                     LOG_UI_MAINWINDOW_WARNING,
-                    message=f"Failed to send step command to operator",
+                    message="Failed to send step command to operator",
                     extra={"operator_id": operator_id},
                 )
 
@@ -1918,7 +1914,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         self.log_constant(
             LOG_OPERATOR_STEP_ALL_COMPLETED,
-            message=f"Step all operators completed",
+            message="Step all operators completed",
             extra={
                 "stepped_count": stepped_count,
                 "skipped_human": skipped_human_count,
@@ -1976,7 +1972,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         handle = self._operator_launcher.get_handle(operator_id)
         if handle is None or not handle.is_running:
             _OP_LOGGER.warning(f"No running subprocess for human operator: {operator_id}")
-            self._status_bar.showMessage(f"Human operator not running", 3000)
+            self._status_bar.showMessage("Human operator not running", 3000)
             return
 
         # Send step command with action to the subprocess
@@ -1986,14 +1982,14 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         )
         if not handle.send_step_with_action(action):
             _OP_LOGGER.error(f"Failed to send step command to human operator: {operator_id}")
-            self._status_bar.showMessage(f"Failed to send action", 3000)
+            self._status_bar.showMessage("Failed to send action", 3000)
             return
 
         # Wait for step response (blocking with short timeout)
         response = handle.read_response(timeout=5.0)
         if response is None:
             _OP_LOGGER.warning(f"Timeout waiting for step response from human operator: {operator_id}")
-            self._status_bar.showMessage(f"Timeout waiting for response", 3000)
+            self._status_bar.showMessage("Timeout waiting for response", 3000)
             return
 
         response_type = response.get("type", "unknown")
@@ -2302,7 +2298,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         if current_player != player_id:
             self.log_constant(
                 LOG_UI_MAINWINDOW_WARNING,
-                message=f"Attempted to step wrong player",
+                message="Attempted to step wrong player",
                 extra={"requested": player_id, "current": current_player},
             )
             self._status_bar.showMessage(
@@ -2541,11 +2537,11 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                         _OP_LOGGER.debug("Random legal action_index = %s", action_index)
                     else:
                         _OP_LOGGER.debug("No legal actions in action_mask")
-                        self._status_bar.showMessage(f"No legal moves available", 3000)
+                        self._status_bar.showMessage("No legal moves available", 3000)
                         return
                 else:
                     _OP_LOGGER.debug("No action_mask available")
-                    self._status_bar.showMessage(f"Cannot determine legal moves", 3000)
+                    self._status_bar.showMessage("Cannot determine legal moves", 3000)
                     return
             except Exception as mask_err:
                 _OP_LOGGER.debug("Error getting action_mask: %s", mask_err)
@@ -2594,7 +2590,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 self._status_bar.showMessage(f"Game over! Winner: {winner}", 5000)
                 self.log_constant(
                     LOG_UI_MAINWINDOW_INFO,
-                    message=f"PettingZoo game ended",
+                    message="PettingZoo game ended",
                     extra={"winner": winner, "rewards": rewards},
                 )
                 # Disable both player step buttons when game is over
@@ -2617,7 +2613,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
             self.log_constant(
                 LOG_OPERATOR_STEP_ALL_COMPLETED,
-                message=f"PettingZoo step completed",
+                message="PettingZoo step completed",
                 extra={
                     "player": player_id,
                     "action": action_str,
@@ -3712,7 +3708,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             if elapsed > max_wait_ms:
                 self.log_constant(
                     LOG_UI_MAINWINDOW_WARNING,
-                    message=f"Timeout waiting for operator responses",
+                    message="Timeout waiting for operator responses",
                     extra={"pending_count": len(pending)},
                 )
                 return
@@ -3734,7 +3730,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     else:
                         self.log_constant(
                             LOG_UI_MAINWINDOW_WARNING,
-                            message=f"Operator process terminated while waiting for response",
+                            message="Operator process terminated while waiting for response",
                             extra={"operator_id": operator_id},
                         )
                         self._multi_operator_service.set_operator_state(operator_id, "stopped")
@@ -3773,7 +3769,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._render_tabs.display_operator_payload(operator_id, payload)
             self.log_constant(
                 LOG_UI_MAINWINDOW_TRACE,
-                message=f"Received step response from operator",
+                message="Received step response from operator",
                 extra={
                     "operator_id": operator_id,
                     "step_index": payload["step_index"],
@@ -3804,7 +3800,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
             self.log_constant(
                 LOG_UI_MAINWINDOW_INFO,
-                message=f"Operator ready",
+                message="Operator ready",
                 extra={"operator_id": operator_id, "seed": response.get("seed")},
             )
 
@@ -3835,7 +3831,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._render_tabs.display_operator_payload(operator_id, payload)
             self.log_constant(
                 LOG_UI_MAINWINDOW_INFO,
-                message=f"Episode ended",
+                message="Episode ended",
                 extra={
                     "operator_id": operator_id,
                     "return": payload["total_reward"],
@@ -3866,7 +3862,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                         if is_interactive_mode:
                             self.log_constant(
                                 LOG_UI_MAINWINDOW_INFO,
-                                message=f"Auto-resetting human_worker for next episode",
+                                message="Auto-resetting human_worker for next episode",
                                 extra={"operator_id": operator_id, "env_name": operator.env_name},
                             )
                             # Get the operator handle and send reset command
@@ -3882,14 +3878,14 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             # Worker startup message — logged for diagnostics but no UI action needed
             self.log_constant(
                 LOG_UI_MAINWINDOW_TRACE,
-                message=f"Operator init received",
+                message="Operator init received",
                 extra={"operator_id": operator_id, "run_id": response.get("run_id")},
             )
 
         else:
             self.log_constant(
                 LOG_UI_MAINWINDOW_WARNING,
-                message=f"Unknown response type from operator",
+                message="Unknown response type from operator",
                 extra={"operator_id": operator_id, "type": response_type},
             )
 
@@ -4008,12 +4004,12 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 if initial_state:
                     if self._apply_minigrid_custom_state(env, initial_state):
                         self._status_bar.showMessage(
-                            f"Custom MiniGrid configuration applied!",
+                            "Custom MiniGrid configuration applied!",
                             3000
                         )
                     else:
                         self._status_bar.showMessage(
-                            f"Failed to apply custom MiniGrid configuration",
+                            "Failed to apply custom MiniGrid configuration",
                             5000
                         )
 
@@ -4040,8 +4036,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             elif env_name == "nle":
                 # NLE (NetHack) uses TTY rendering - convert to RGB via nle_render
                 try:
-                    import nle  # noqa: F401
                     import gymnasium as gym
+                    import nle  # noqa: F401
+
                     from gym_gui.core.adapters.nle_render import render_tty_to_rgb
 
                     # NLE doesn't support rgb_array mode - use default and get tty_chars
@@ -4072,8 +4069,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             elif env_name == "minihack":
                 # MiniHack supports 'rgb_array' mode
                 try:
-                    import minihack  # noqa: F401
                     import gymnasium as gym
+                    import minihack  # noqa: F401
                     env = gym.make(task, render_mode="rgb_array")
                     env.reset(seed=seed)
                     rgb_frame = env.render()
@@ -4088,9 +4085,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             elif env_name == "textworld":
                 # TextWorld is text-based - render text observation as image
                 try:
+                    import glob
+
                     import textworld
                     import textworld.gym
-                    import glob
                     from PIL import Image, ImageDraw, ImageFont
 
                     # Find game files for this task
@@ -4199,7 +4197,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                         try:
                             self.log_constant(
                                 LOG_OPERATOR_ENV_PREVIEW_STARTED,
-                                message=f"Applying custom chess position",
+                                message="Applying custom chess position",
                                 extra={
                                     "operator_id": operator_id,
                                     "custom_fen": initial_state,
@@ -4208,7 +4206,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                             env.board.set_fen(initial_state)
                             self.log_constant(
                                 LOG_UI_BOARD_CONFIG_ENV_INIT_CUSTOM,
-                                message=f"Custom chess position applied successfully",
+                                message="Custom chess position applied successfully",
                                 extra={
                                     "operator_id": operator_id,
                                     "game_id": task,
@@ -4217,7 +4215,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                                 },
                             )
                             self._status_bar.showMessage(
-                                f"Custom chess position applied!",
+                                "Custom chess position applied!",
                                 3000
                             )
                         except Exception as e:
@@ -4237,7 +4235,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     else:
                         self.log_constant(
                             LOG_OPERATOR_ENV_PREVIEW_STARTED,
-                            message=f"Using standard starting position (no custom state configured)",
+                            message="Using standard starting position (no custom state configured)",
                             extra={
                                 "operator_id": operator_id,
                                 "task": task,
@@ -4346,9 +4344,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 # ini_multigrid: cooperative exploration environments
                 # Uses INI multigrid from 3rd_party/multigrid-ini (gymnasium API)
                 try:
-                    import gymnasium
-                    import sys
                     import os
+                    import sys
+
+                    import gymnasium
 
                     # Add INI multigrid to path if available
                     ini_multigrid_path = os.path.join(
@@ -4446,8 +4445,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 # Overcooked-AI cooperative cooking (custom API)
                 try:
                     import pygame
-                    from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Recipe
                     from overcooked_ai_py.mdp.overcooked_env import OvercookedEnv
+                    from overcooked_ai_py.mdp.overcooked_mdp import OvercookedGridworld, Recipe
                     from overcooked_ai_py.visualization.state_visualizer import StateVisualizer
 
                     # Extract layout name from task (format: overcooked/layout_name)
@@ -4643,7 +4642,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
                     self.log_constant(
                         LOG_UI_MAINWINDOW_INFO,
-                        message=f"Human operator subprocess launched",
+                        message="Human operator subprocess launched",
                         extra={
                             "operator_id": operator_id,
                             "seed": seed,
@@ -4917,7 +4916,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             outcome_wall_clock=self._session._timers.outcome_wall_clock_formatted(),
             team_rewards=team_rewards,
         )
-        
+
         self._render_tabs.display_payload(render_payload)
 
     def _on_fps_updated(self, fps: float) -> None:
@@ -4961,9 +4960,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         # Setup evdev monitoring with the new assignments
         if assignments:
             from gym_gui.logging_config.log_constants import (
+                LOG_KEYBOARD_EVDEV_SETUP_FAILED,
                 LOG_KEYBOARD_EVDEV_SETUP_START,
                 LOG_KEYBOARD_EVDEV_SETUP_SUCCESS,
-                LOG_KEYBOARD_EVDEV_SETUP_FAILED,
             )
 
             self.log_constant(
@@ -5016,9 +5015,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._human_input.set_agent_names(unique_agents)
 
         from gym_gui.logging_config.log_constants import (
+            LOG_KEYBOARD_EVDEV_SETUP_FAILED,
             LOG_KEYBOARD_EVDEV_SETUP_START,
             LOG_KEYBOARD_EVDEV_SETUP_SUCCESS,
-            LOG_KEYBOARD_EVDEV_SETUP_FAILED,
         )
 
         self.log_constant(
@@ -5056,7 +5055,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
     def _on_awaiting_human(self, waiting: bool, message: str) -> None:
         """
         Handle awaiting_human signal to update UI and keyboard shortcuts.
-        
+
         Shortcuts are disabled if the episode has finished OR if the game hasn't been started.
         In HUMAN_ONLY mode, shortcuts stay enabled during active started episodes.
         In hybrid modes, shortcuts are only enabled when waiting for human input.
@@ -5088,17 +5087,17 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self, worker_id: str, policy_path: Path
     ) -> Optional[dict[str, object]]:
         """Build training config using the worker presenter registry.
-        
+
         Delegates configuration composition to the appropriate worker presenter,
         which handles worker-specific logic for config building, metadata composition, etc.
         """
         try:
             registry = get_worker_presenter_registry()
             presenter = registry.get(worker_id)
-            
+
             if presenter is None:
                 raise ValueError(f"Worker presenter '{worker_id}' not found in registry")
-            
+
             config = presenter.build_train_request(
                 policy_path=policy_path,
                 current_game=self._control_panel.current_game(),
@@ -5129,12 +5128,12 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
     def _submit_training_config(self, config: dict) -> None:
         """Submit a training configuration to the trainer daemon."""
         try:
-            self.log_constant( 
+            self.log_constant(
                 LOG_UI_MAINWINDOW_TRACE,
                 message="_submit_training_config: START",
             )
             config_json = json.dumps(config)
-            self.log_constant( 
+            self.log_constant(
                 LOG_UI_MAINWINDOW_TRACE,
                 message=f"_submit_training_config: Config JSON length={len(config_json)}",
                 extra={"config_length": len(config_json)},
@@ -5145,7 +5144,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             if runner is None:
                 raise RuntimeError("TrainerClientRunner not registered")
 
-            self.log_constant( 
+            self.log_constant(
                 LOG_UI_MAINWINDOW_TRACE,
                 message="_submit_training_config: TrainerClientRunner resolved",
             )
@@ -5153,27 +5152,27 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
             # Submit returns a Future
             future = runner.submit_run(config_json, deadline=_training_submit_deadline_seconds())
-            self.log_constant( 
+            self.log_constant(
                 LOG_UI_MAINWINDOW_TRACE,
                 message="_submit_training_config: submit_run() called, future created",
             )
 
             # Add callback to handle result
             def on_done(fut):
-                self.log_constant( 
+                self.log_constant(
                     LOG_UI_MAINWINDOW_TRACE,
                     message="_submit_training_config: on_done callback called",
                 )
                 try:
                     response = fut.result()
-                    self.log_constant( 
+                    self.log_constant(
                         LOG_UI_MAINWINDOW_TRACE,
                         message=f"_submit_training_config: Got response with run_id={response.run_id}",
                         extra={"run_id": str(response.run_id)},
                     )
                 except Exception as error:
                     if isinstance(error, grpc.aio.AioRpcError) and error.code() == grpc.StatusCode.INVALID_ARGUMENT:
-                        self.log_constant( 
+                        self.log_constant(
                             LOG_UI_MAINWINDOW_INVALID_CONFIG,
                             message="Trainer rejected training config",
                             extra={
@@ -5183,16 +5182,16 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                             exc_info=error,
                         )
                     else:
-                        self.log_constant( 
+                        self.log_constant(
                             LOG_UI_MAINWINDOW_ERROR,
                             message="_submit_training_config: on_done got exception",
                             extra={"exception": type(error).__name__},
                             exc_info=error,
                         )
-                    QtCore.QTimer.singleShot(0, lambda: self._on_training_submit_failed(error))
+                    QtCore.QTimer.singleShot(0, lambda e=error: self._on_training_submit_failed(e))
                     return
                 run_id = str(response.run_id)
-                self.log_constant( 
+                self.log_constant(
                     LOG_UI_MAINWINDOW_INFO,
                     message=f"_submit_training_config: Scheduling _on_training_submitted with run_id={run_id}",
                     extra={"run_id": run_id},
@@ -5200,13 +5199,13 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 QtCore.QTimer.singleShot(0, lambda: self._on_training_submitted(run_id, config))
 
             future.add_done_callback(on_done)
-            self.log_constant( 
+            self.log_constant(
                 LOG_UI_MAINWINDOW_TRACE,
                 message="_submit_training_config: Callback added to future",
             )
 
         except Exception as e:
-            self.log_constant( 
+            self.log_constant(
                 LOG_UI_MAINWINDOW_ERROR,
                 message="Failed to prepare training submission",
                 extra={"exception": type(e).__name__},
@@ -5217,11 +5216,11 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 "Training Preparation Failed",
                 f"Could not prepare training request:\n{e}",
             )
-    
+
     def _on_training_submitted(self, run_id: str, config: dict) -> None:
         """Handle successful training submission (called on main thread)."""
         self._status_bar.showMessage(f"Training run submitted: {run_id[:12]}...", 5000)
-        self.log_constant( 
+        self.log_constant(
             LOG_UI_MAINWINDOW_INFO,
             message="Submitted training run",
             extra={"run_id": run_id, "config": config},
@@ -5237,13 +5236,13 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             step_buffer_size = ui_config.get("telemetry_buffer_size", 100)
             episode_buffer_size = ui_config.get("episode_buffer_size", 100)
             hub_buffer_size = ui_config.get("hub_buffer_size")  # Hub buffer from training config
-            
+
             self._live_controller.set_buffer_sizes_for_run(run_id, step_buffer_size, episode_buffer_size)
-            
+
             # Set hub buffer size if provided
             if hub_buffer_size is not None:
                 self._telemetry_hub.set_run_buffer_size(run_id, hub_buffer_size)
-                self.log_constant( 
+                self.log_constant(
                     LOG_UI_MAINWINDOW_TRACE,
                     message="Set hub buffer size for run",
                     extra={
@@ -5251,8 +5250,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                         "hub_buffer_size": hub_buffer_size,
                     },
                 )
-            
-            self.log_constant( 
+
+            self.log_constant(
                 LOG_UI_MAINWINDOW_TRACE,
                 message="Set buffer sizes for run",
                 extra={
@@ -5263,7 +5262,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 },
             )
         except Exception as e:
-            self.log_constant( 
+            self.log_constant(
                 LOG_UI_MAINWINDOW_WARNING,
                 message=f"Failed to set buffer sizes: {e}",
                 extra={"exception": type(e).__name__},
@@ -5275,20 +5274,20 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             game_id = environment_dict.get("GYM_ENV_ID", "")
             if game_id:
                 self._live_controller.set_game_id_for_run(run_id, game_id)
-                self.log_constant( 
+                self.log_constant(
                     LOG_UI_MAINWINDOW_TRACE,
                     message="Set game_id for run",
                     extra={"run_id": run_id, "game_id": game_id},
                 )
         except Exception as e:
-            self.log_constant( 
+            self.log_constant(
                 LOG_UI_MAINWINDOW_WARNING,
                 message=f"Failed to set game_id: {e}",
                 extra={"exception": type(e).__name__},
                 exc_info=e,
             )
 
-        self.log_constant( 
+        self.log_constant(
             LOG_UI_MAINWINDOW_INFO,
             message="Waiting for live telemetry to create dynamic agent tabs",
             extra={
@@ -5308,13 +5307,13 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 throttle_str = environment_dict.get("TELEMETRY_SAMPLING_INTERVAL", "2")
                 throttle_interval = int(throttle_str)
                 self._live_controller.set_render_throttle_for_run(run_id, throttle_interval)
-                self.log_constant( 
+                self.log_constant(
                     LOG_UI_MAINWINDOW_TRACE,
                     message="Set render throttle for run",
                     extra={"run_id": run_id, "throttle": throttle_interval},
                 )
             except (ValueError, TypeError):
-                self.log_constant( 
+                self.log_constant(
                     LOG_UI_MAINWINDOW_WARNING,
                     message="Failed to parse TELEMETRY_SAMPLING_INTERVAL",
                     extra={
@@ -5371,7 +5370,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
     def _on_training_submit_failed(self, error: Exception) -> None:
         """Handle training submission failure (called on main thread)."""
-        self.log_constant( 
+        self.log_constant(
             LOG_UI_MAINWINDOW_ERROR,
             message="Failed to submit training run",
             extra={"exception": type(error).__name__},
@@ -5384,7 +5383,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             "Make sure the trainer daemon is running:\n"
             "  python -m gym_gui.services.trainer_daemon",
         )
-    
+
     def _on_live_telemetry_tab_requested(self, run_id: str, agent_id: str, tab_title: str) -> None:
         """Create and register a new live telemetry tab dynamically."""
 
@@ -5401,7 +5400,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             try:
                 game_id = GameId(game_id_str)
             except (ValueError, KeyError):
-                self.log_constant( 
+                self.log_constant(
                     LOG_UI_MAINWINDOW_WARNING,
                     message="Invalid game_id for run",
                     extra={"run_id": run_id, "game_id": game_id_str},
@@ -5453,7 +5452,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         For visual environments (Atari, etc.):
         - Online tab shows video rendering
         - Replay tab shows episode browser
-        
+
         Delegates tab creation to the appropriate worker presenter based on
         the worker type, which handles environment detection and conditional
         tab instantiation.
@@ -5463,17 +5462,17 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             registry = get_worker_presenter_registry()
             worker_id = "cleanrl_worker"  # TODO: Extract from config/payload if supporting multiple workers
             presenter = registry.get(worker_id)
-            
+
             if presenter is None:
-                self.log_constant( 
+                self.log_constant(
                     LOG_UI_WORKER_TABS_ERROR,
                     message="Worker presenter not found in registry",
                     extra={"run_id": run_id, "agent_id": agent_id, "worker_id": worker_id},
                 )
                 return
-            
+
             tabs = presenter.create_tabs(run_id, agent_id, first_payload, parent=self)
-            
+
             # Tab names and registration order must match presenter output
             tab_names = [
                 f"Agent-{agent_id}-Online",
@@ -5481,17 +5480,17 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 f"Agent-{agent_id}-Live – Grid",
                 f"Agent-{agent_id}-Debug",
             ]
-            
+
             # Determine if video tab was created (check if environment is visual)
             game_id_str = first_payload.get("game_id", "").lower()
             is_toytext = any(name in game_id_str for name in ["frozenlake", "cliffwalking", "taxi", "gridworld"])
-            
+
             if not is_toytext:
                 tab_names.append(f"Agent-{agent_id}-Live – Video")
-            
+
             # Register tabs with the render container
             if len(tabs) != len(tab_names):
-                self.log_constant( 
+                self.log_constant(
                     LOG_UI_WORKER_TABS_WARNING,
                     message="Tab count mismatch",
                     extra={
@@ -5501,18 +5500,18 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                         "actual": len(tabs),
                     },
                 )
-            
+
             for tab_name, tab_widget in zip(tab_names, tabs):
                 self._render_tabs.add_dynamic_tab(run_id, tab_name, tab_widget)
-            
+
             # Update metadata if available
             metadata = self._run_metadata.get((run_id, agent_id))
             if metadata:
                 grid_tab = tabs[2] if len(tabs) > 2 else None
                 if grid_tab and hasattr(grid_tab, "update_metadata"):
                     grid_tab.update_metadata(metadata)
-            
-            self.log_constant( 
+
+            self.log_constant(
                 LOG_UI_WORKER_TABS_INFO,
                 message="Created dynamic agent tabs via presenter registry",
                 extra={
@@ -5525,7 +5524,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 },
             )
         except Exception as e:
-            self.log_constant( 
+            self.log_constant(
                 LOG_UI_WORKER_TABS_ERROR,
                 message="Failed to create agent tabs",
                 extra={"run_id": run_id, "agent_id": agent_id, "error": str(e)},
@@ -5554,7 +5553,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
     def _on_training_finished(self, run_id: str, outcome: str, failure_reason: str) -> None:
         """Handle training_finished signal - create/refresh replay tabs for all agents in this run."""
-        self.log_constant( 
+        self.log_constant(
             LOG_UI_MAINWINDOW_INFO,
             message="Training finished signal received",
             extra={"run_id": run_id, "outcome": outcome, "failure_reason": failure_reason},
@@ -5562,8 +5561,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         # Get all agents that participated in this run
         agent_tabs = self._render_tabs._agent_tabs.get(run_id, {})
-        
-        self.log_constant( 
+
+        self.log_constant(
             LOG_UI_MAINWINDOW_TRACE,
             message="_on_training_finished: agent_tabs for run",
             extra={"run_id": run_id, "tab_count": len(agent_tabs), "tab_names": list(agent_tabs.keys())},
@@ -5613,11 +5612,11 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         # Create or refresh replay tabs for each agent, and switch to the first one created
         first_replay_tab_index: int | None = None
-        
+
         for agent_id in agent_ids_with_tabs:
             replay_tab_name = f"Agent-{agent_id}-Replay"
-            
-            self.log_constant( 
+
+            self.log_constant(
                 LOG_UI_MAINWINDOW_TRACE,
                 message="_on_training_finished: processing agent",
                 extra={"run_id": run_id, "agent_id": agent_id, "replay_tab_name": replay_tab_name},
@@ -5633,13 +5632,13 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     tab_widget = agent_tabs[replay_tab_name]
                     refresh = getattr(tab_widget, "refresh", None)
                     if callable(refresh):
-                        self.log_constant( 
+                        self.log_constant(
                             LOG_UI_MAINWINDOW_TRACE,
                             message="_on_training_finished: calling refresh on existing replay tab",
                             extra={"run_id": run_id, "agent_id": agent_id},
                         )
                         refresh()
-                        self.log_constant( 
+                        self.log_constant(
                             LOG_UI_MAINWINDOW_TRACE,
                             message="Refreshed replay tab",
                             extra={"run_id": run_id, "tab_name": replay_tab_name},
@@ -5647,13 +5646,13 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     # Record the tab index for switching later
                     if first_replay_tab_index is None:
                         first_replay_tab_index = self._render_tabs.indexOf(tab_widget)
-                        self.log_constant( 
+                        self.log_constant(
                             LOG_UI_MAINWINDOW_TRACE,
                             message="_on_training_finished: recorded existing replay tab index",
                             extra={"run_id": run_id, "agent_id": agent_id, "tab_index": first_replay_tab_index},
                         )
                 except Exception as e:
-                    self.log_constant( 
+                    self.log_constant(
                         LOG_UI_MAINWINDOW_WARNING,
                         message="Failed to refresh replay tab",
                         exc_info=e,
@@ -5667,23 +5666,23 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     message="_on_training_finished: replay tab not available for this worker",
                     extra={"run_id": run_id, "agent_id": agent_id, "replay_tab_name": replay_tab_name},
                 )
-        
-        self.log_constant( 
+
+        self.log_constant(
             LOG_UI_MAINWINDOW_TRACE,
             message="_on_training_finished: about to switch to replay tab",
             extra={"run_id": run_id, "first_replay_tab_index": first_replay_tab_index},
         )
-        
+
         # Switch to the first replay tab created/refreshed so user can see results
         if first_replay_tab_index is not None and first_replay_tab_index >= 0:
             self._render_tabs.setCurrentIndex(first_replay_tab_index)
-            self.log_constant( 
+            self.log_constant(
                 LOG_UI_MAINWINDOW_INFO,
                 message="Switched to replay tab after training completion",
                 extra={"run_id": run_id, "tab_index": first_replay_tab_index},
             )
         else:
-            self.log_constant( 
+            self.log_constant(
                 LOG_UI_MAINWINDOW_WARNING,
                 message="_on_training_finished: could not find valid replay tab to switch to",
                 extra={"run_id": run_id, "first_replay_tab_index": first_replay_tab_index},
@@ -5704,13 +5703,13 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         if self._live_controller:
             try:
                 self._live_controller.unsubscribe_from_run(run_id)
-                self.log_constant( 
+                self.log_constant(
                     LOG_UI_MAINWINDOW_TRACE,
                     message="Unsubscribed from telemetry",
                     extra={"run_id": run_id},
                 )
             except Exception as e:
-                self.log_constant( 
+                self.log_constant(
                     LOG_UI_MAINWINDOW_WARNING,
                     message="Failed to unsubscribe from telemetry",
                     exc_info=e,

@@ -12,9 +12,9 @@ The state-based mode tracks all currently pressed keys and computes combined act
 For multi-keyboard support on Linux, uses evdev to bypass X11 keyboard merging.
 """
 
-from dataclasses import dataclass
 import logging
 import sys
+from dataclasses import dataclass
 from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple
 
 import gymnasium.spaces as spaces
@@ -22,16 +22,16 @@ from qtpy import QtCore, QtWidgets
 from qtpy.QtCore import Qt
 from qtpy.QtGui import QKeyEvent, QKeySequence, QShortcut
 
-from gym_gui.core.enums import ControlMode, EnvironmentFamily, GameId, InputMode
 from gym_gui.controllers.session import SessionController
+from gym_gui.core.enums import ControlMode, EnvironmentFamily, GameId, InputMode
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
-    LOG_INPUT_CONTROLLER_ERROR,
-    LOG_KEY_RESOLVER_INITIALIZED,
-    LOG_KEY_RESOLVER_UNAVAILABLE,
-    LOG_INPUT_MODE_CONFIGURED,
     LOG_EVDEV_KEY_PRESSED,
     LOG_EVDEV_KEY_RELEASED,
+    LOG_INPUT_CONTROLLER_ERROR,
+    LOG_INPUT_MODE_CONFIGURED,
+    LOG_KEY_RESOLVER_INITIALIZED,
+    LOG_KEY_RESOLVER_UNAVAILABLE,
 )
 
 # Import evdev support for multi-keyboard (Linux only)
@@ -1650,7 +1650,7 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
                     f"Active agents: {', '.join(agents_with_input)}"
                 )
             else:
-                _LOGGER.debug(f"Multi-agent actions: all agents waiting for input")
+                _LOGGER.debug("Multi-agent actions: all agents waiting for input")
 
             self._session.perform_human_action(actions, key_label="multi_agent")
 

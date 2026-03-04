@@ -1,14 +1,14 @@
 """Script Experiment Widget - Clean interface for automatic baseline execution."""
 
+import logging
+from pathlib import Path
+from typing import Any, Dict, List, Optional
+
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import pyqtSignal
-from pathlib import Path
-from typing import Optional, Dict, Any, List
-import logging
 
 from gym_gui.services.operator import OperatorConfig, WorkerAssignment
 from gym_gui.services.operator_script_execution_manager import OperatorScriptExecutionManager
-
 
 _LOGGER = logging.getLogger(__name__)
 

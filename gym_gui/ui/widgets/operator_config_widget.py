@@ -16,18 +16,18 @@ from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 from qtpy import QtCore, QtGui, QtWidgets
 
 from gym_gui.config.paths import VAR_MODELS_HF_CACHE
+from gym_gui.constants.constants_operator import (
+    BALROG_DEFAULT_TASK,
+    BALROG_SUPPORTED_ENVS,
+)
 from gym_gui.logging_config.helpers import log_constant
 from gym_gui.logging_config.log_constants import LOG_OPERATOR_VIEW_SIZE_CONFIGURED
 from gym_gui.services.operator import OperatorConfig, WorkerAssignment
-from gym_gui.ui.worker_catalog.catalog import get_worker_catalog, WorkerDefinition
-from gym_gui.constants.constants_operator import (
-    BALROG_SUPPORTED_ENVS,
-    BALROG_DEFAULT_TASK,
-)
 from gym_gui.ui.widgets.multi_agent_action_panel import (
     COLOR_PALETTE,
     DEFAULT_AGENT_COLOR_NAMES,
 )
+from gym_gui.ui.worker_catalog.catalog import WorkerDefinition, get_worker_catalog
 
 
 @dataclass
@@ -273,8 +273,8 @@ def _auto_detect_agent_count(env_family: str, env_id: str) -> int:
 
         elif env_family in ("mosaic_multigrid", "ini_multigrid"):
             # MultiGrid: instantiate environment and query agent count
-            from gym_gui.core.factories.adapters import create_adapter
             from gym_gui.core.enums import GameId
+            from gym_gui.core.factories.adapters import create_adapter
 
             # Map UI env_id to GameId enum
             try:
@@ -292,8 +292,8 @@ def _auto_detect_agent_count(env_family: str, env_id: str) -> int:
         elif env_family == "meltingpot":
             # Melting Pot: variable agent count (2-16)
             # Instantiate adapter to query
-            from gym_gui.core.factories.adapters import create_adapter
             from gym_gui.core.enums import GameId
+            from gym_gui.core.factories.adapters import create_adapter
 
             try:
                 game_id = GameId(env_id)
@@ -910,8 +910,6 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         worker_type = self._type_combo.currentText().lower()
         is_llm = worker_type == "llm"
         is_rl = worker_type == "rl"
-        is_human = worker_type == "human"
-        is_random = worker_type == "random"
 
         # LLM row visibility
         self._llm_row.setVisible(is_llm)

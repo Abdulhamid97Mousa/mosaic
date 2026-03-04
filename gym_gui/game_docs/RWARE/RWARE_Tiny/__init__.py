@@ -14,7 +14,7 @@ _TD = 'style="border: 1px solid #ddd; padding: 8px;"'
 _TABLE = 'style="width:100%; border-collapse: collapse; margin: 10px 0;"'
 _HDR = 'style="background-color: #f0f0f0;"'
 
-_TINY_INTRO = f"""
+_TINY_INTRO = """
 <h2>Robotic Warehouse - Tiny</h2>
 <p>A small warehouse with <b>1x3 shelf layout</b> (1 row, 3 columns of shelves).
 Grid size is approximately 10x11 cells. Good for quick experiments and debugging.</p>

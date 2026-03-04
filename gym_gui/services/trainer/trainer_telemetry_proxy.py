@@ -12,21 +12,20 @@ import argparse
 import asyncio
 import contextlib
 import json
+import logging
 import os
 import sys
-import logging
 from multiprocessing import shared_memory
-from typing import Any, AsyncIterator, Dict, Optional
 from time import perf_counter
+from typing import Any, AsyncIterator, Dict, Optional
 
 import grpc
-
-from gym_gui.services.trainer.proto import trainer_pb2, trainer_pb2_grpc
-from gym_gui.core.subprocess_validation import validated_create_subprocess_exec
-from gym_gui.fastlane import FastLaneConfig, FastLaneWriter, FastLaneMetrics
-from gym_gui.fastlane.buffer import create_fastlane_name
-
 import numpy as np
+
+from gym_gui.core.subprocess_validation import validated_create_subprocess_exec
+from gym_gui.fastlane import FastLaneConfig, FastLaneMetrics, FastLaneWriter
+from gym_gui.fastlane.buffer import create_fastlane_name
+from gym_gui.services.trainer.proto import trainer_pb2, trainer_pb2_grpc
 
 _LOGGER = logging.getLogger("gym_gui.trainer.telemetry_proxy")
 
@@ -267,7 +266,7 @@ async def run_proxy(
 ) -> int:
     """
     Run worker subprocess, tail JSONL stdout, and proxy to gRPC streams.
-    
+
     Returns worker exit code.
     """
     _LOGGER.info(
@@ -493,7 +492,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     # Manual handling of '--' separator for worker command
     if argv is None:
         argv = sys.argv[1:]
-    
+
     # Split on '--' separator
     try:
         sep_idx = argv.index("--")
@@ -502,11 +501,11 @@ def main(argv: Optional[list[str]] = None) -> int:
     except ValueError:
         print("Proxy requires a worker command after `--`.", file=sys.stderr)
         return 2
-    
+
     if not worker_cmd:
         print("Proxy requires a worker command after `--`.", file=sys.stderr)
         return 2
-    
+
     # Parse proxy-specific arguments
     p = argparse.ArgumentParser(description="Telemetry JSONL → gRPC proxy sidecar")
     p.add_argument("--target", required=True, help="daemon address, e.g. 127.0.0.1:50055")

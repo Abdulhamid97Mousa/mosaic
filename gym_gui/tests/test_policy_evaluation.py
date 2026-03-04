@@ -214,8 +214,8 @@ class TestPolicyAssignmentPanel:
         pytest.importorskip("qtpy")
 
         from gym_gui.ui.widgets.policy_assignment_panel import (
-            PolicyAssignmentPanel,
             PolicyAssignmentDialog,
+            PolicyAssignmentPanel,
         )
 
         assert PolicyAssignmentPanel is not None
@@ -255,8 +255,8 @@ class TestPolicyEvaluator:
     def test_import_policy_evaluator(self):
         """Test that PolicyEvaluator can be imported."""
         from ray_worker.policy_evaluator import (
-            EvaluationConfig,
             EpisodeMetrics,
+            EvaluationConfig,
             PolicyEvaluator,
             run_evaluation,
         )
@@ -269,8 +269,8 @@ class TestPolicyEvaluator:
     def test_ray_worker_exports_evaluator(self):
         """Test that ray_worker exports evaluator classes."""
         from ray_worker import (
-            EvaluationConfig,
             EpisodeMetrics,
+            EvaluationConfig,
             PolicyEvaluator,
             run_evaluation,
         )
@@ -357,10 +357,10 @@ class TestLogConstants:
     def test_policy_assignment_log_constants(self):
         """Test policy assignment log constants are defined."""
         from gym_gui.logging_config.log_constants import (
-            LOG_UI_POLICY_ASSIGNMENT_REQUESTED,
             LOG_UI_POLICY_ASSIGNMENT_LOADED,
-            LOG_UI_POLICY_DISCOVERY_SCAN,
+            LOG_UI_POLICY_ASSIGNMENT_REQUESTED,
             LOG_UI_POLICY_DISCOVERY_FOUND,
+            LOG_UI_POLICY_DISCOVERY_SCAN,
         )
 
         assert LOG_UI_POLICY_ASSIGNMENT_REQUESTED.code == "LOG760"
@@ -416,8 +416,8 @@ class TestIntegrationWithActualCheckpoints:
 
     def test_discover_actual_checkpoints(self):
         """Test discovering actual checkpoints in the project."""
-        from gym_gui.policy_discovery.ray_policy_metadata import discover_ray_checkpoints
         from gym_gui.config.paths import VAR_TRAINER_DIR
+        from gym_gui.policy_discovery.ray_policy_metadata import discover_ray_checkpoints
 
         runs_dir = VAR_TRAINER_DIR / "runs"
         if not runs_dir.exists():
@@ -484,8 +484,9 @@ class TestCleanRLPolicyMetadata:
 def qapp():
     """Create QApplication for GUI tests."""
     try:
-        from qtpy import QtWidgets
         import os
+
+        from qtpy import QtWidgets
         if not os.environ.get("DISPLAY") and not os.environ.get("QT_QPA_PLATFORM"):
             os.environ["QT_QPA_PLATFORM"] = "offscreen"
 

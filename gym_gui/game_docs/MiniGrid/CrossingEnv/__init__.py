@@ -3,16 +3,15 @@
 
 def get_crossing_html(env_id: str) -> str:
     """Generate HTML documentation for a specific Crossing variant.
-    
+
     Args:
         env_id: The environment ID (e.g., "MiniGrid-LavaCrossingS9N1-v0")
-        
+
     Returns:
         HTML documentation string for the specified variant
     """
     # Determine obstacle type
     if "Lava" in env_id:
-        obstacle = "lava"
         mission = "avoid the lava and get to the green goal square"
         description_detail = (
             "The agent has to reach the green goal square on the other corner of the room while "
@@ -23,7 +22,6 @@ def get_crossing_html(env_id: str) -> str:
         )
         obstacle_desc = "Lava rivers with safe crossing points"
     else:
-        obstacle = "walls"
         mission = "find the opening and get to the green goal square"
         description_detail = (
             "Similar to the LavaCrossing environment, the agent has to reach the green goal square "
@@ -31,7 +29,7 @@ def get_crossing_html(env_id: str) -> str:
             "This MDP is therefore much easier and may be useful for quickly testing your algorithms."
         )
         obstacle_desc = "Wall barriers with openings"
-    
+
     # Extract size and crossings from env_id
     if "S9N1" in env_id:
         size = "9×9"
@@ -48,7 +46,7 @@ def get_crossing_html(env_id: str) -> str:
     else:
         size = "variable"
         crossings = "variable crossings"
-    
+
     return (
         f"<h2>{env_id}</h2>"
         "<h3>Description</h3>"

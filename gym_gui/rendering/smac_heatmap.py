@@ -103,12 +103,24 @@ def _smooth_hue_palette(scale: int) -> np.ndarray:
     c = 255.0
     out = np.zeros((scale, 3), dtype=np.float64)
     r, g, b = out[:, 0], out[:, 1], out[:, 2]
-    m = (0 < h) & (h < 1);  r[m] = c; g[m] = x[m]
-    m = (1 <= h) & (h < 2); r[m] = x[m]; g[m] = c
-    m = (2 <= h) & (h < 3); g[m] = c; b[m] = x[m]
-    m = (3 <= h) & (h < 4); g[m] = x[m]; b[m] = c
-    m = (4 <= h) & (h < 5); r[m] = x[m]; b[m] = c
-    m = 5 <= h;             r[m] = c; b[m] = x[m]
+    m = (0 < h) & (h < 1)
+    r[m] = c
+    g[m] = x[m]
+    m = (1 <= h) & (h < 2)
+    r[m] = x[m]
+    g[m] = c
+    m = (2 <= h) & (h < 3)
+    g[m] = c
+    b[m] = x[m]
+    m = (3 <= h) & (h < 4)
+    g[m] = x[m]
+    b[m] = c
+    m = (4 <= h) & (h < 5)
+    r[m] = x[m]
+    b[m] = c
+    m = 5 <= h
+    r[m] = c
+    b[m] = x[m]
     return out.astype(np.uint8)
 
 

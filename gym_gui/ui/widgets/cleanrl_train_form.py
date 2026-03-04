@@ -4,36 +4,35 @@ from __future__ import annotations
 
 import copy
 import json
+import logging
 import os
 import sys
-from pathlib import Path
+from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timezone
+from pathlib import Path
 from typing import Any, Dict, Optional, Sequence
-from collections import defaultdict
 
 from qtpy import QtCore, QtGui, QtWidgets
-import logging
 
+from gym_gui.Algo_docs.cleanrl_worker import get_algo_doc
 from gym_gui.core.enums import (
+    ENVIRONMENT_FAMILY_BY_GAME,
     EnvironmentFamily,
     GameId,
-    ENVIRONMENT_FAMILY_BY_GAME,
 )
-from gym_gui.validations.validation_cleanrl_worker_form import run_cleanrl_dry_run
+from gym_gui.fastlane.worker_helpers import apply_fastlane_environment
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
-    LOG_UI_TRAIN_FORM_TRACE,
-    LOG_UI_TRAIN_FORM_INFO,
-    LOG_UI_TRAIN_FORM_WARNING,
     LOG_UI_TRAIN_FORM_ERROR,
-    LOG_UI_TRAIN_FORM_UI_PATH,
+    LOG_UI_TRAIN_FORM_INFO,
     LOG_UI_TRAIN_FORM_TELEMETRY_PATH,
+    LOG_UI_TRAIN_FORM_TRACE,
+    LOG_UI_TRAIN_FORM_UI_PATH,
+    LOG_UI_TRAIN_FORM_WARNING,
 )
-from gym_gui.Algo_docs.cleanrl_worker import get_algo_doc
-from gym_gui.telemetry.semconv import VideoModes, VIDEO_MODE_DESCRIPTORS
-from gym_gui.fastlane.worker_helpers import apply_fastlane_environment
-
+from gym_gui.telemetry.semconv import VIDEO_MODE_DESCRIPTORS, VideoModes
+from gym_gui.validations.validation_cleanrl_worker_form import run_cleanrl_dry_run
 
 REPO_ROOT = Path(__file__).resolve().parents[3]
 _LEGACY_ALGOS: tuple[str, ...] = (

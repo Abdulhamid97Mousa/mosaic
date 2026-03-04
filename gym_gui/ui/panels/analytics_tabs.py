@@ -6,8 +6,8 @@ import json
 import logging
 from pathlib import Path
 from typing import Any, Mapping, Optional
-import yaml
 
+import yaml
 from qtpy import QtCore
 
 from gym_gui.config.paths import VAR_ROOT, VAR_TRAINER_DIR
@@ -677,7 +677,7 @@ class AnalyticsTabManager(LogConstantMixin):
 
     def _discover_wandb_slug(self, run_id: str) -> str:
         """Discover WANDB run slug from the wandb directory structure.
-        
+
         WANDB creates directories like: wandb/run-20251105_085314-sc26ki0p/
         We need to extract the slug (sc26ki0p) from the directory name.
         """
@@ -716,7 +716,7 @@ class AnalyticsTabManager(LogConstantMixin):
                 exc,
                 exc_info=exc,
             )
-        
+
         return ""
 
 

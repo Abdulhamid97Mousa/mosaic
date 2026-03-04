@@ -2,15 +2,16 @@ from __future__ import annotations
 
 """Safe JSON-based serialization helpers for telemetry payloads."""
 
-from collections.abc import Mapping, Sequence, Set
 import base64
 import json
+import logging
 import math
+from collections.abc import Mapping, Sequence, Set
 from datetime import datetime
 from typing import Any
 
 import numpy as np
-import logging
+
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import LOG_UTIL_JSON_NUMPY_SCALAR_COERCE_FAILED
 

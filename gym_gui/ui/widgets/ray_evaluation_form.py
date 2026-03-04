@@ -26,11 +26,13 @@ from gym_gui.core.pettingzoo_enums import (
     get_display_name,
     get_envs_by_family,
 )
-from gym_gui.ui.forms.factory import get_worker_form_factory
 from gym_gui.policy_discovery.ray_policy_metadata import (
     RayRLlibCheckpoint,
+)
+from gym_gui.policy_discovery.ray_policy_metadata import (
     discover_ray_checkpoints as discover_checkpoints,
 )
+from gym_gui.ui.forms.factory import get_worker_form_factory
 
 _LOGGER = logging.getLogger(__name__)
 

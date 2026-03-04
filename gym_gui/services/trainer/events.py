@@ -21,7 +21,7 @@ class EpisodeFinalized:
     episode_index: int
     seq_id: int
     timestamp_iso: str
-    
+
     @classmethod
     def now(cls, run_id: str, agent_id: str, episode_index: int, seq_id: int) -> "EpisodeFinalized":
         """Create with current timestamp."""
@@ -43,9 +43,9 @@ class TrainingStarted:
     timestamp_iso: str
     seed: Optional[int] = None
     meta: Optional[dict] = None
-    
+
     @classmethod
-    def now(cls, run_id: str, agent_id: Optional[str], game_id: Optional[str], 
+    def now(cls, run_id: str, agent_id: Optional[str], game_id: Optional[str],
             seed: Optional[int] = None, meta: Optional[dict] = None) -> "TrainingStarted":
         """Create with current timestamp."""
         return cls(
@@ -69,7 +69,7 @@ class TrainingFinished:
     steps_total: Optional[int] = None
     total_reward: Optional[float] = None
     error_message: Optional[str] = None
-    
+
     @classmethod
     def now(cls, run_id: str, agent_id: Optional[str], outcome: TrainingOutcome,
             episodes_total: Optional[int] = None, steps_total: Optional[int] = None,

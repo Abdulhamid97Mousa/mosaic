@@ -9,7 +9,6 @@ from PyQt6 import QtWidgets
 from gym_gui.config.game_configs import RWAREConfig
 from gym_gui.core.enums import GameId
 
-
 ALL_RWARE_GAME_IDS: tuple[GameId, ...] = (
     GameId.RWARE_TINY_2AG,
     GameId.RWARE_TINY_4AG,

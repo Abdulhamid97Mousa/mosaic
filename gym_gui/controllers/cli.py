@@ -10,12 +10,11 @@ import gymnasium as gym
 
 from gym_gui.config.settings import get_settings
 from gym_gui.core.adapters.base import AdapterContext, AdapterStep
-from gym_gui.core.factories import available_games, create_adapter
 from gym_gui.core.enums import ControlMode, GameId
+from gym_gui.core.factories import available_games, create_adapter
 from gym_gui.logging_config.helpers import log_constant
-from gym_gui.logging_config.logger import configure_logging
 from gym_gui.logging_config.log_constants import LOG_SESSION_STEP_ERROR
-
+from gym_gui.logging_config.logger import configure_logging
 
 _LOGGER = logging.getLogger(__name__)
 

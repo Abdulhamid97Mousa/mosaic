@@ -4,19 +4,18 @@ from __future__ import annotations
 
 import asyncio
 import json
-from dataclasses import dataclass, field
-from datetime import datetime, timezone
-from enum import Enum
 import logging
 import sqlite3
 import threading
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from enum import Enum
 from threading import RLock
 from typing import Iterable, Optional
 
 from gym_gui.config.paths import VAR_TRAINER_DB, ensure_var_directories
-from gym_gui.telemetry.events import Topic, TelemetryEvent
+from gym_gui.telemetry.events import TelemetryEvent, Topic
 from gym_gui.telemetry.run_bus import RunBus, get_bus
-
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -361,7 +360,7 @@ class RunRegistry:
                         extra={"table_name": table_name}
                     )
                     continue
-                
+
                 # nosemgrep: python.sqlalchemy.security.sqlalchemy-execute-raw-query.sqlalchemy-execute-raw-query
                 # Safe: table_name validated as alphanumeric above, comes from sqlite_master
                 # SQLite PRAGMA doesn't support parameterized queries
@@ -563,7 +562,7 @@ class RunRegistry:
         base_query = "SELECT run_id, status, digest, created_at, updated_at, last_heartbeat, gpu_slot, failure_reason, gpu_slots_json, finished_at, outcome, reason FROM runs"
         params: tuple[object, ...] = ()
         status_list = list(statuses) if statuses else []
-        
+
         if status_list:
             # Build placeholders safely - count-based, not user input
             placeholders = ",".join("?" for _ in status_list)
@@ -579,15 +578,15 @@ class RunRegistry:
         else:
             query = base_query
             _LOGGER.debug("Loading all runs (no status filter)")
-        
+
         with self._lock, self._connect() as conn:
             rows = conn.execute(query, params).fetchall()
-        
+
         _LOGGER.debug(
             "Loaded runs from database",
             extra={"count": len(rows), "requested_statuses": [s.value for s in status_list] if status_list else None}
         )
-        
+
         records: list[RunRecord] = []
         for row in rows:
             gpu_slots: list[int] = []
@@ -772,13 +771,13 @@ class RunRegistry:
             "RESTART": "PRAGMA wal_checkpoint(RESTART)",
             "TRUNCATE": "PRAGMA wal_checkpoint(TRUNCATE)",
         }
-        
+
         if mode_normalized not in allowed_modes:
             raise ValueError(f"Invalid checkpoint mode: {mode}. Must be one of {allowed_modes.keys()}")
-        
+
         # Use pre-constructed SQL from whitelist dictionary to satisfy static analysis
         sql_statement = allowed_modes[mode_normalized]
-        
+
         with self._lock, self._connect() as conn:
             # The PRAGMA returns a single row with three integers:
             # (busy, log_size, checkpointed)
@@ -793,7 +792,7 @@ class RunRegistry:
             log_frames=row[1],
             checkpointed_frames=row[2],
         )
-        
+
         _LOGGER.info("WAL Checkpoint executed: %s", stats)
         return stats
 

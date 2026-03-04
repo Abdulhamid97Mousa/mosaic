@@ -14,6 +14,7 @@ from typing import TYPE_CHECKING, Optional
 
 if TYPE_CHECKING:
     from stockfish import Stockfish as StockfishType
+
     from gym_gui.core.adapters.chess_adapter import ChessState
 
 _LOG = logging.getLogger(__name__)

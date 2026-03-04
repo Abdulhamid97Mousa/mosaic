@@ -18,7 +18,6 @@ from gym_gui.core.subprocess_validation import validated_popen
 from gym_gui.logging_config.helpers import log_constant
 from gym_gui.logging_config.log_constants import LOG_TRAINER_LAUNCHER_LOG_FLUSH_WARNING
 
-
 CLIENT_DEFAULTS = TRAINER_DEFAULTS.client
 DAEMON_DEFAULTS = TRAINER_DEFAULTS.daemon
 

@@ -19,14 +19,14 @@ _LOGGER = logging.getLogger(__name__)
 
 class CreditManager:
     """Manages credit allocation per (run_id, agent_id) pair.
-    
+
     Tracks available credits for each stream and provides methods to
     check, consume, and replenish credits.
     """
 
     def __init__(self, initial_credits: int = 200) -> None:
         """Initialize the credit manager.
-        
+
         Args:
             initial_credits: Initial credit allocation per stream
         """
@@ -37,11 +37,11 @@ class CreditManager:
 
     def get_credits(self, run_id: str, agent_id: str) -> int:
         """Get current credits for a stream.
-        
+
         Args:
             run_id: Training run ID
             agent_id: Agent ID
-            
+
         Returns:
             Current credit count (0 if stream not initialized)
         """
@@ -114,7 +114,7 @@ class CreditManager:
 
     def grant_credits(self, run_id: str, agent_id: str, amount: int) -> None:
         """Grant credits to a stream (called when UI queue drops below threshold).
-        
+
         Args:
             run_id: Training run ID
             agent_id: Agent ID
@@ -122,12 +122,12 @@ class CreditManager:
         """
         key = (run_id, agent_id)
         self.initialize_stream(run_id, agent_id)
-        
+
         old_credits = self._credits[key]
         self._credits[key] = min(self._credits[key] + amount, self._initial_credits * 2)
-        
+
         _LOGGER.debug(
-            f"Granted credits to stream",
+            "Granted credits to stream",
             extra={
                 "run_id": run_id,
                 "agent_id": agent_id,
@@ -139,11 +139,11 @@ class CreditManager:
 
     def get_dropped_count(self, run_id: str, agent_id: str) -> int:
         """Get total events dropped due to no credits.
-        
+
         Args:
             run_id: Training run ID
             agent_id: Agent ID
-            
+
         Returns:
             Total dropped count
         """
@@ -152,7 +152,7 @@ class CreditManager:
 
     def reset_stream(self, run_id: str, agent_id: str) -> None:
         """Reset credits for a stream (e.g., when run completes).
-        
+
         Args:
             run_id: Training run ID
             agent_id: Agent ID
@@ -161,13 +161,13 @@ class CreditManager:
         self._credits.pop(key, None)
         self._total_dropped.pop(key, None)
         _LOGGER.debug(
-            f"Reset credits for stream",
+            "Reset credits for stream",
             extra={"run_id": run_id, "agent_id": agent_id},
         )
 
     def get_stats(self) -> Dict[str, int]:
         """Get credit statistics for all streams.
-        
+
         Returns:
             Dict mapping "run_id:agent_id" to current credits
         """
@@ -183,7 +183,7 @@ _credit_manager: CreditManager | None = None
 
 def get_credit_manager() -> CreditManager:
     """Get or create the global CreditManager singleton.
-    
+
     Returns:
         The global CreditManager instance
     """

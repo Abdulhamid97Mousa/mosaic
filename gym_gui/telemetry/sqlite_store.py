@@ -2,31 +2,31 @@ from __future__ import annotations
 
 """SQLite-backed telemetry storage."""
 
-from datetime import datetime
-from pathlib import Path
 import logging
 import queue
 import sqlite3
 import sys
 import threading
+from datetime import datetime
+from pathlib import Path
 from typing import Any, List, Mapping, Optional, Sequence
 
-from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.constants import parse_episode_id
-from gym_gui.utils import json_serialization
-from gym_gui.telemetry.migrations import MigrationRunner, WALConfiguration
+from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.logging_config.helpers import LogConstantMixin, log_constant
 from gym_gui.logging_config.log_constants import (
     LOG_SERVICE_SQLITE_DEBUG,
-    LOG_SERVICE_SQLITE_INFO,
-    LOG_SERVICE_SQLITE_WARNING,
     LOG_SERVICE_SQLITE_DESERIALIZATION_FAILED,
+    LOG_SERVICE_SQLITE_DISK_IO_ERROR,
+    LOG_SERVICE_SQLITE_INFO,
+    LOG_SERVICE_SQLITE_INIT_ERROR,
+    LOG_SERVICE_SQLITE_WARNING,
     LOG_SERVICE_SQLITE_WORKER_STARTED,
     LOG_SERVICE_SQLITE_WORKER_STOPPED,
     LOG_SERVICE_SQLITE_WRITE_ERROR,
-    LOG_SERVICE_SQLITE_DISK_IO_ERROR,
-    LOG_SERVICE_SQLITE_INIT_ERROR,
 )
+from gym_gui.telemetry.migrations import MigrationRunner, WALConfiguration
+from gym_gui.utils import json_serialization
 
 _LOGGER = logging.getLogger("gym_gui.telemetry.sqlite_store")
 
@@ -504,7 +504,7 @@ class TelemetrySQLiteStore(LogConstantMixin):
     def _flush_steps(self, steps: List[dict[str, object]]) -> None:
         if not steps:
             return
-        
+
         # Log what we're about to insert (DEBUG for individual steps to avoid spam)
         batch_size = len(steps)
         for index, step in enumerate(steps, start=1):
@@ -531,7 +531,7 @@ class TelemetrySQLiteStore(LogConstantMixin):
                     "truncated_type": type(step.get("truncated")).__name__,
                 },
             )
-        
+
         cursor = self._conn.cursor()
         cursor.execute("BEGIN")
         cursor.executemany(
@@ -575,10 +575,10 @@ class TelemetrySQLiteStore(LogConstantMixin):
         """Delete all telemetry data for a run and mark its status."""
         try:
             cursor = self._conn.cursor()
-            
+
             # Explicit transaction with BEGIN/COMMIT (required since isolation_level=None)
             cursor.execute("BEGIN")
-            
+
             # Delete all steps and episodes for this run. Older builds stored the run identifier
             # only in the episode_id column ("{run_id}-epXXXX"), leaving run_id NULL. The
             # fallback LIKE clause ensures those legacy rows are also purged.
@@ -592,7 +592,7 @@ class TelemetrySQLiteStore(LogConstantMixin):
                 "DELETE FROM episodes WHERE run_id = ? OR (run_id IS NULL AND episode_id LIKE ?)",
                 (run_id, legacy_episode_prefix),
             )
-            
+
             # Mark run status
             if mark_deleted:
                 from datetime import datetime, timezone
@@ -618,7 +618,7 @@ class TelemetrySQLiteStore(LogConstantMixin):
                     message=f"Run archived and marked in database: run_id={run_id}",
                     extra={"run_id": run_id}
                 )
-            
+
             # Commit the transaction
             cursor.execute("COMMIT")
         except Exception as e:
@@ -815,17 +815,17 @@ class TelemetrySQLiteStore(LogConstantMixin):
             "RESTART": "PRAGMA wal_checkpoint(RESTART)",
             "TRUNCATE": "PRAGMA wal_checkpoint(TRUNCATE)",
         }
-        
+
         if mode_normalized not in allowed_modes:
             self.log_constant(
                 LOG_SERVICE_SQLITE_WRITE_ERROR,
                 extra={"context": "wal_checkpoint_invalid_mode", "mode": mode},
             )
             return
-        
+
         # Use pre-constructed SQL from whitelist dictionary to satisfy static analysis
         sql_statement = allowed_modes[mode_normalized]
-        
+
         try:
             self._conn.execute(sql_statement)
             self.log_constant(

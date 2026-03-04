@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
     from qtpy.QtWidgets import QStatusBar
+
     from gym_gui.controllers.chess_controller import ChessGameController
     from gym_gui.core.adapters.chess_adapter import ChessState
     from gym_gui.ui.widgets.human_vs_agent_board import InteractiveChessBoard

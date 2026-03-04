@@ -12,7 +12,6 @@ from pathlib import Path
 
 import pytest
 
-
 # Policy and environment configuration
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 POLICY_PATH = (
@@ -185,7 +184,7 @@ class TestInteractiveRuntimeRenderPayload:
 
         # Check render_payload exists and has correct structure
         render_payload = response.get("render_payload")
-        print(f"\n=== STEP RESPONSE ===")
+        print("\n=== STEP RESPONSE ===")
         print(f"Keys: {list(response.keys())}")
         print(f"render_payload: {render_payload is not None}")
 
@@ -196,8 +195,8 @@ class TestInteractiveRuntimeRenderPayload:
         assert "mode" in render_payload, f"Missing 'mode' in render_payload: {render_payload.keys()}"
         assert render_payload["mode"] == "rgb_array", f"Expected mode='rgb_array', got: {render_payload['mode']}"
         assert "rgb" in render_payload, f"Missing 'rgb' in render_payload: {render_payload.keys()}"
-        assert "width" in render_payload, f"Missing 'width' in render_payload"
-        assert "height" in render_payload, f"Missing 'height' in render_payload"
+        assert "width" in render_payload, "Missing 'width' in render_payload"
+        assert "height" in render_payload, "Missing 'height' in render_payload"
 
         # Verify dimensions
         rgb = render_payload["rgb"]

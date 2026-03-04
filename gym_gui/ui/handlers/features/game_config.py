@@ -15,6 +15,7 @@ from gym_gui.ui.config_panels.single_agent.vizdoom import VIZDOOM_GAME_IDS
 
 if TYPE_CHECKING:
     from qtpy.QtWidgets import QStatusBar
+
     from gym_gui.controllers.session import SessionController
     from gym_gui.ui.widgets.control_panel import ControlPanelWidget
 

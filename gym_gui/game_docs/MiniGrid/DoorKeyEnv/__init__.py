@@ -18,7 +18,7 @@ def get_doorkey_html(env_id: str) -> str:
     else:  # 8x8
         size = "8×8"
         description = "This standard benchmark is a classic test-bed for curiosity and curriculum learning."
-    
+
     return f"""
 <h2>{env_id}</h2>
 

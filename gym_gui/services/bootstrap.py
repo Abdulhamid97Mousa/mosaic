@@ -5,47 +5,47 @@ from __future__ import annotations
 import logging
 import os
 
-from gym_gui.config.paths import VAR_TELEMETRY_DIR, VAR_REPLAY_DIR, ensure_var_directories, VAR_ROOT
-from gym_gui.rendering import RendererRegistry, create_default_renderer_registry
-from gym_gui.services.action_mapping import ContinuousActionMapper, create_default_action_mapper
-from gym_gui.services.actor import (
-    ActorService,
-    CleanRLWorkerActor,
-    HumanKeyboardActor,
-    XuanCeWorkerActor,
-    RayRLlibWorkerActor,
-)
-from gym_gui.services.operator import (
-    OperatorService,
-    HumanOperator,
-    WorkerOperator,
-)
-from gym_gui.services.policy_mapping import PolicyMappingService
-from gym_gui.services.service_locator import ServiceLocator, get_service_locator
-from gym_gui.services.trainer import TrainerClient, TrainerClientConfig, TrainerClientRunner, RunRegistry
-from gym_gui.services.trainer.launcher import TrainerDaemonHandle, ensure_trainer_daemon_running
-from gym_gui.services.trainer.streams import TelemetryAsyncHub
-from gym_gui.services.storage import StorageRecorderService
-from gym_gui.services.telemetry import TelemetryService
-from gym_gui.telemetry import TelemetrySQLiteStore
-from gym_gui.telemetry.db_sink import TelemetryDBSink
-from gym_gui.telemetry.run_bus import get_bus
+from gym_gui.config.paths import VAR_REPLAY_DIR, VAR_ROOT, VAR_TELEMETRY_DIR, ensure_var_directories
 from gym_gui.constants import (
-    TELEMETRY_HUB_MAX_QUEUE,
-    TELEMETRY_HUB_BUFFER_SIZE,
     DB_SINK_BATCH_SIZE,
     DB_SINK_CHECKPOINT_INTERVAL,
     DB_SINK_WRITER_QUEUE_SIZE,
     OPERATOR_CATEGORY_HUMAN,
     OPERATOR_CATEGORY_LLM,
     OPERATOR_CATEGORY_RL,
-    WORKER_ID_BALROG,
-    OPERATOR_DISPLAY_NAME_HUMAN,
-    OPERATOR_DISPLAY_NAME_BALROG_LLM,
-    OPERATOR_DESCRIPTION_HUMAN,
     OPERATOR_DESCRIPTION_BALROG_LLM,
+    OPERATOR_DESCRIPTION_HUMAN,
+    OPERATOR_DISPLAY_NAME_BALROG_LLM,
+    OPERATOR_DISPLAY_NAME_HUMAN,
+    TELEMETRY_HUB_BUFFER_SIZE,
+    TELEMETRY_HUB_MAX_QUEUE,
+    WORKER_ID_BALROG,
 )
 from gym_gui.controllers.live_telemetry_controllers import LiveTelemetryController
+from gym_gui.rendering import RendererRegistry, create_default_renderer_registry
+from gym_gui.services.action_mapping import ContinuousActionMapper, create_default_action_mapper
+from gym_gui.services.actor import (
+    ActorService,
+    CleanRLWorkerActor,
+    HumanKeyboardActor,
+    RayRLlibWorkerActor,
+    XuanCeWorkerActor,
+)
+from gym_gui.services.operator import (
+    HumanOperator,
+    OperatorService,
+    WorkerOperator,
+)
+from gym_gui.services.policy_mapping import PolicyMappingService
+from gym_gui.services.service_locator import ServiceLocator, get_service_locator
+from gym_gui.services.storage import StorageRecorderService
+from gym_gui.services.telemetry import TelemetryService
+from gym_gui.services.trainer import RunRegistry, TrainerClient, TrainerClientConfig, TrainerClientRunner
+from gym_gui.services.trainer.launcher import TrainerDaemonHandle, ensure_trainer_daemon_running
+from gym_gui.services.trainer.streams import TelemetryAsyncHub
+from gym_gui.telemetry import TelemetrySQLiteStore
+from gym_gui.telemetry.db_sink import TelemetryDBSink
+from gym_gui.telemetry.run_bus import get_bus
 
 
 def bootstrap_default_services() -> ServiceLocator:

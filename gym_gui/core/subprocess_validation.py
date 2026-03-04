@@ -17,8 +17,8 @@ from typing import Optional
 
 from pydantic import ValidationError
 
-from gym_gui.validations import SubprocessCommand
 from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.validations import SubprocessCommand
 
 _LOGGER = logging.getLogger("gym_gui.subprocess_utils")
 
@@ -28,7 +28,7 @@ class SubprocessExecutionError(RuntimeError):
 
     def __init__(self, message: str, context: Optional[dict] = None) -> None:
         """Initialize error with context.
-        
+
         Args:
             message: Error message
             context: Optional context dict with run_id, cmd, etc.
@@ -39,15 +39,15 @@ class SubprocessExecutionError(RuntimeError):
 
 def validate_command(cmd: list[str], run_id: str = "") -> None:
     """Validate subprocess command arguments to prevent injection.
-    
+
     Validates that all command arguments are strings using Pydantic model.
     All arguments must come from internal trusted sources (registry metadata,
     system paths, file paths).
-    
+
     Args:
         cmd: Command argument list
         run_id: Optional run ID for logging context
-        
+
     Raises:
         SubprocessExecutionError: If validation fails
     """
@@ -78,22 +78,22 @@ def validated_popen(
     **popen_kwargs,
 ) -> subprocess.Popen:
     """Create a subprocess with validated command arguments.
-    
+
     Validates command before passing to subprocess.Popen to prevent injection.
-    
+
     Args:
         cmd: Command argument list
         run_id: Optional run ID for logging context
         **popen_kwargs: Additional arguments to subprocess.Popen
-        
+
     Returns:
         subprocess.Popen instance
-        
+
     Raises:
         SubprocessExecutionError: If command validation fails
     """
     validate_command(cmd, run_id)
-    
+
     _LOGGER.info(
         "Spawning subprocess via Popen",
         extra={
@@ -102,7 +102,7 @@ def validated_popen(
             "cmd_len": len(cmd),
         },
     )
-    
+
     try:
         return subprocess.Popen(cmd, **popen_kwargs)
     except Exception as e:
@@ -118,23 +118,23 @@ async def validated_create_subprocess_exec(
     **exec_kwargs,
 ) -> asyncio.subprocess.Process:
     """Create an async subprocess with validated command arguments.
-    
+
     Validates command before passing to asyncio.create_subprocess_exec.
-    
+
     Args:
         *args: Command arguments (validated as list[str])
         run_id: Optional run ID for logging context
         **exec_kwargs: Additional arguments to asyncio.create_subprocess_exec
-        
+
     Returns:
         asyncio.subprocess.Process instance
-        
+
     Raises:
         SubprocessExecutionError: If command validation fails
     """
     cmd = list(args)
     validate_command(cmd, run_id)
-    
+
     _LOGGER.info(
         "Spawning async subprocess",
         extra={
@@ -143,7 +143,7 @@ async def validated_create_subprocess_exec(
             "cmd_len": len(cmd),
         },
     )
-    
+
     try:
         return await asyncio.create_subprocess_exec(*args, **exec_kwargs)
     except Exception as e:
@@ -160,22 +160,22 @@ def validated_run(
     **run_kwargs,
 ) -> subprocess.CompletedProcess:
     """Run subprocess with validated command arguments.
-    
+
     Validates command before passing to subprocess.run.
-    
+
     Args:
         cmd: Command argument list
         run_id: Optional run ID for logging context
         **run_kwargs: Additional arguments to subprocess.run
-        
+
     Returns:
         subprocess.CompletedProcess instance
-        
+
     Raises:
         SubprocessExecutionError: If command validation fails
     """
     validate_command(cmd, run_id)
-    
+
     _LOGGER.info(
         "Running subprocess",
         extra={
@@ -184,7 +184,7 @@ def validated_run(
             "cmd_len": len(cmd),
         },
     )
-    
+
     try:
         return subprocess.run(cmd, **run_kwargs)
     except Exception as e:

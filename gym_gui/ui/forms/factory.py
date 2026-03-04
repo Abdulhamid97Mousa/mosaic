@@ -6,7 +6,6 @@ from typing import Callable, Dict, Optional
 
 from qtpy import QtWidgets
 
-
 TrainFormFactory = Callable[..., QtWidgets.QDialog]
 PolicyFormFactory = Callable[..., QtWidgets.QDialog]
 ResumeFormFactory = Callable[..., QtWidgets.QDialog]

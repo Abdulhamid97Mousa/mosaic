@@ -522,7 +522,7 @@ class JumanjiSudokuAdapter(JumanjiAdapter):
         - fixed_cells: List of (row, col) tuples for initial clues
         - game_type: "sudoku" for renderer detection
         """
-        env = self._require_env()
+        self._require_env()
 
         # Get base render (RGB frame)
         base_render = super().render()

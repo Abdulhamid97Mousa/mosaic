@@ -24,7 +24,7 @@ class ErrorHandler:
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         """Handle an exception with logging and optional dialog.
-        
+
         Args:
             exc: Exception to handle
             context: Context description for logging
@@ -49,7 +49,7 @@ class ErrorHandler:
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         """Handle a warning with logging and optional dialog.
-        
+
         Args:
             message: Warning message
             context: Context description
@@ -73,7 +73,7 @@ class ErrorHandler:
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         """Handle an info message with logging and optional dialog.
-        
+
         Args:
             message: Info message
             context: Context description
@@ -100,7 +100,7 @@ class ErrorHandler:
         **kwargs: Any,
     ) -> Optional[T]:
         """Safely call a function with error handling.
-        
+
         Args:
             func: Function to call
             *args: Positional arguments
@@ -109,7 +109,7 @@ class ErrorHandler:
             show_dialog: Whether to show error dialog
             parent: Parent widget for dialog
             **kwargs: Keyword arguments
-            
+
         Returns:
             Function result or default value
         """
@@ -127,10 +127,10 @@ class ErrorHandler:
     @staticmethod
     def get_traceback_string(exc: Exception) -> str:
         """Get formatted traceback string for an exception.
-        
+
         Args:
             exc: Exception to format
-            
+
         Returns:
             Formatted traceback string
         """
@@ -139,7 +139,7 @@ class ErrorHandler:
     @staticmethod
     def log_traceback(exc: Exception, context: str = "Exception") -> None:
         """Log full traceback for an exception.
-        
+
         Args:
             exc: Exception to log
             context: Context description
@@ -159,7 +159,7 @@ class ErrorContext:
         reraise: bool = False,
     ) -> None:
         """Initialize error context.
-        
+
         Args:
             context: Context description
             show_dialog: Whether to show error dialog

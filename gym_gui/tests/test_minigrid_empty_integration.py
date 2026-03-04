@@ -13,17 +13,17 @@ import pytest
 
 pytest.importorskip("minigrid")
 
-from gym_gui.core.adapters.base import AdapterContext
-from gym_gui.core.adapters.minigrid import MiniGridAdapter
 from gym_gui.config.game_configs import (
     DEFAULT_MINIGRID_EMPTY_5x5_CONFIG,
-    DEFAULT_MINIGRID_EMPTY_RANDOM_5x5_CONFIG,
     DEFAULT_MINIGRID_EMPTY_6x6_CONFIG,
-    DEFAULT_MINIGRID_EMPTY_RANDOM_6x6_CONFIG,
     DEFAULT_MINIGRID_EMPTY_8x8_CONFIG,
     DEFAULT_MINIGRID_EMPTY_16x16_CONFIG,
+    DEFAULT_MINIGRID_EMPTY_RANDOM_5x5_CONFIG,
+    DEFAULT_MINIGRID_EMPTY_RANDOM_6x6_CONFIG,
     MiniGridConfig,
 )
+from gym_gui.core.adapters.base import AdapterContext
+from gym_gui.core.adapters.minigrid import MiniGridAdapter
 from gym_gui.core.enums import ControlMode, GameId
 from gym_gui.game_docs import get_game_info
 from gym_gui.logging_config.log_constants import (
@@ -34,7 +34,6 @@ from gym_gui.ui.config_panels.single_agent.minigrid import (
     MINIGRID_GAME_IDS,
     resolve_default_config,
 )
-
 
 # All Empty environment variants that should be registered
 ALL_EMPTY_VARIANTS = [
@@ -60,7 +59,7 @@ class TestEmptyEnvironmentRegistration:
             GameId.MINIGRID_EMPTY_8x8,
             GameId.MINIGRID_EMPTY_16x16,
         ]
-        
+
         for game_id in expected_ids:
             assert game_id in GameId
             assert "Empty" in game_id.value
@@ -69,7 +68,7 @@ class TestEmptyEnvironmentRegistration:
     def test_all_empty_configs_exported(self) -> None:
         """Verify all Empty default configs are exported."""
         from gym_gui.config import game_configs
-        
+
         expected_configs = [
             "DEFAULT_MINIGRID_EMPTY_5x5_CONFIG",
             "DEFAULT_MINIGRID_EMPTY_RANDOM_5x5_CONFIG",
@@ -78,7 +77,7 @@ class TestEmptyEnvironmentRegistration:
             "DEFAULT_MINIGRID_EMPTY_8x8_CONFIG",
             "DEFAULT_MINIGRID_EMPTY_16x16_CONFIG",
         ]
-        
+
         for config_name in expected_configs:
             assert hasattr(game_configs, config_name)
             config = getattr(game_configs, config_name)
@@ -94,7 +93,7 @@ class TestEmptyEnvironmentRegistration:
             GameId.MINIGRID_EMPTY_8x8,
             GameId.MINIGRID_EMPTY_16x16,
         ]
-        
+
         for game_id in empty_game_ids:
             assert game_id in MINIGRID_GAME_IDS
 
@@ -122,7 +121,7 @@ class TestEmptyEnvironmentConfiguration:
         self, game_id: GameId, config: MiniGridConfig, variant_name: str
     ) -> None:
         """Verify keyboard mappings exist for all Empty variants.
-        
+
         Note: Keyboard mappings are defined in human_input.py but not exported.
         This test verifies the structure exists by importing the controller.
         """
@@ -152,7 +151,7 @@ class TestEmptyEnvironmentAdapter:
         """Verify adapter can load each Empty variant."""
         context = AdapterContext(settings=None, control_mode=ControlMode.AGENT_ONLY)
         adapter = MiniGridAdapter(context, config=config)
-        
+
         try:
             adapter.load()
             assert adapter._env is not None  # Check internal state since is_loaded doesn't exist
@@ -167,20 +166,20 @@ class TestEmptyEnvironmentAdapter:
         """Verify reset produces valid observations for all Empty variants."""
         context = AdapterContext(settings=None, control_mode=ControlMode.AGENT_ONLY)
         adapter = MiniGridAdapter(context, config=config)
-        
+
         try:
             adapter.load()
             step = adapter.reset(seed=42)
-            
+
             # Check observation properties
             assert isinstance(step.observation, np.ndarray)
             assert step.observation.dtype == np.uint8
             assert step.observation.ndim == 1
             assert step.observation.shape[0] > 0  # Should have some observation
-            
+
             # Check state metadata
             assert step.state.environment["env_id"] == game_id.value
-            
+
             # Check render payload
             assert isinstance(step.render_payload, dict)
             assert step.render_payload.get("mode") == "rgb_array"
@@ -188,7 +187,7 @@ class TestEmptyEnvironmentAdapter:
             assert isinstance(rgb, np.ndarray)
             assert rgb.ndim == 3  # H x W x C
             assert rgb.shape[2] == 3  # RGB channels
-            
+
         finally:
             adapter.close()
 
@@ -199,21 +198,21 @@ class TestEmptyEnvironmentAdapter:
         """Verify step function works for all Empty variants."""
         context = AdapterContext(settings=None, control_mode=ControlMode.AGENT_ONLY)
         adapter = MiniGridAdapter(context, config=config)
-        
+
         try:
             adapter.load()
             _ = adapter.reset(seed=42)
-            
+
             # Take a step (action 2 = move forward)
             step = adapter.step(2)
-            
+
             assert isinstance(step.observation, np.ndarray)
             assert step.observation.dtype == np.uint8
             assert isinstance(step.reward, (int, float))
             assert isinstance(step.terminated, bool)
             assert isinstance(step.truncated, bool)
             assert isinstance(step.info, dict)
-            
+
         finally:
             adapter.close()
 
@@ -224,15 +223,15 @@ class TestEmptyEnvironmentAdapter:
         """Verify action space is Discrete(7) for all Empty variants."""
         context = AdapterContext(settings=None, control_mode=ControlMode.AGENT_ONLY)
         adapter = MiniGridAdapter(context, config=config)
-        
+
         try:
             adapter.load()
             action_space = adapter.action_space
-            
+
             # MiniGrid environments have 7 discrete actions
             assert hasattr(action_space, 'n'), "Action space should be Discrete with 'n' attribute"
             assert action_space.n == 7  # type: ignore[attr-defined]
-            
+
         finally:
             adapter.close()
 
@@ -250,20 +249,20 @@ class TestEmptyEnvironmentLogging:
     ) -> None:
         """Verify LOG_ENV_MINIGRID_BOOT is emitted for all Empty variants."""
         caplog.set_level(logging.INFO, logger="gym_gui.core.adapters.base")
-        
+
         context = AdapterContext(settings=None, control_mode=ControlMode.AGENT_ONLY)
         adapter = MiniGridAdapter(context, config=config)
-        
+
         try:
             adapter.load()
             _ = adapter.reset(seed=42)
-            
+
             boot_codes = [
                 record.log_code for record in caplog.records  # type: ignore[attr-defined]
                 if hasattr(record, "log_code")
             ]
             assert LOG_ENV_MINIGRID_BOOT.code in boot_codes
-            
+
         finally:
             adapter.close()
 
@@ -277,21 +276,21 @@ class TestEmptyEnvironmentLogging:
     ) -> None:
         """Verify LOG_ENV_MINIGRID_STEP is emitted for all Empty variants."""
         caplog.set_level(logging.DEBUG, logger="gym_gui.core.adapters.base")
-        
+
         context = AdapterContext(settings=None, control_mode=ControlMode.AGENT_ONLY)
         adapter = MiniGridAdapter(context, config=config)
-        
+
         try:
             adapter.load()
             _ = adapter.reset(seed=42)
             _ = adapter.step(2)  # Move forward
-            
+
             step_codes = [
                 record.log_code for record in caplog.records  # type: ignore[attr-defined]
                 if hasattr(record, "log_code")
             ]
             assert LOG_ENV_MINIGRID_STEP.code in step_codes
-            
+
         finally:
             adapter.close()
 
@@ -302,47 +301,47 @@ class TestEmptyEnvironmentRandomness:
     def test_random_variant_changes_starting_position(self) -> None:
         """Verify Random variants randomize agent starting position."""
         context = AdapterContext(settings=None, control_mode=ControlMode.AGENT_ONLY)
-        
+
         # Test Random-5x5 variant
         adapter = MiniGridAdapter(context, config=DEFAULT_MINIGRID_EMPTY_RANDOM_5x5_CONFIG)
-        
+
         try:
             adapter.load()
-            
+
             # Reset with different seeds should give different observations
             step1 = adapter.reset(seed=1)
             step2 = adapter.reset(seed=2)
-            
+
             # Observations should differ (different starting positions)
             # Note: They might be the same by chance, but very unlikely
-            obs_equal = np.array_equal(step1.observation, step2.observation)
+            np.array_equal(step1.observation, step2.observation)
             # We can't guarantee they're different, but we can check structure
             assert step1.observation.shape == step2.observation.shape
-            
+
             # Same seed should give same observation
             step3 = adapter.reset(seed=1)
             np.testing.assert_array_equal(step1.observation, step3.observation)
-            
+
         finally:
             adapter.close()
 
     def test_fixed_variant_has_consistent_starting_position(self) -> None:
         """Verify fixed variants always start in the same position."""
         context = AdapterContext(settings=None, control_mode=ControlMode.AGENT_ONLY)
-        
+
         # Test fixed 5x5 variant
         adapter = MiniGridAdapter(context, config=DEFAULT_MINIGRID_EMPTY_5x5_CONFIG)
-        
+
         try:
             adapter.load()
-            
+
             # Multiple resets should give same starting observation
             # (when using the same seed for RNG determinism)
             step1 = adapter.reset(seed=42)
             step2 = adapter.reset(seed=42)
-            
+
             np.testing.assert_array_equal(step1.observation, step2.observation)
-            
+
         finally:
             adapter.close()
 
@@ -353,7 +352,7 @@ class TestEmptyEnvironmentSizeProgression:
     def test_size_progression_exists(self) -> None:
         """Verify we have size progression: 5x5, 6x6, 8x8, 16x16."""
         sizes = ["5x5", "6x6", "8x8", "16x16"]
-        
+
         for size in sizes:
             # Check both fixed and random variants exist
             fixed_found = any(
@@ -361,7 +360,7 @@ class TestEmptyEnvironmentSizeProgression:
                 if "Random" not in game_id.value
             )
             assert fixed_found, f"Fixed {size} variant not found"
-            
+
             # Random variants only exist for 5x5 and 6x6
             if size in ["5x5", "6x6"]:
                 random_found = any(
@@ -373,14 +372,14 @@ class TestEmptyEnvironmentSizeProgression:
     def test_all_sizes_produce_valid_environments(self) -> None:
         """Verify all size variants produce valid, working environments."""
         context = AdapterContext(settings=None, control_mode=ControlMode.AGENT_ONLY)
-        
+
         size_configs = [
             DEFAULT_MINIGRID_EMPTY_5x5_CONFIG,
             DEFAULT_MINIGRID_EMPTY_6x6_CONFIG,
             DEFAULT_MINIGRID_EMPTY_8x8_CONFIG,
             DEFAULT_MINIGRID_EMPTY_16x16_CONFIG,
         ]
-        
+
         for config in size_configs:
             adapter = MiniGridAdapter(context, config=config)
             try:
@@ -396,14 +395,14 @@ def test_empty_integration_summary() -> None:
     """Summary test verifying complete Empty environment integration."""
     # 1. Verify count
     assert len(ALL_EMPTY_VARIANTS) == 6, "Should have 6 Empty variants"
-    
+
     # 2. Verify all are in MINIGRID_GAME_IDS
     empty_count_in_tuple = sum(
-        1 for game_id in MINIGRID_GAME_IDS 
+        1 for game_id in MINIGRID_GAME_IDS
         if "Empty" in game_id.value
     )
     assert empty_count_in_tuple == 6, "All 6 Empty variants should be in MINIGRID_GAME_IDS"
-    
+
     # 3. Verify all can be instantiated
     context = AdapterContext(settings=None, control_mode=ControlMode.AGENT_ONLY)
     for game_id, config, variant_name in ALL_EMPTY_VARIANTS:
@@ -415,5 +414,5 @@ def test_empty_integration_summary() -> None:
             print(f"✓ {variant_name}: {game_id.value}")
         finally:
             adapter.close()
-    
+
     print(f"\n✓ All {len(ALL_EMPTY_VARIANTS)} MiniGrid Empty variants integrated successfully!")

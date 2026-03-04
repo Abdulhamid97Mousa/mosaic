@@ -2,49 +2,49 @@
 
 from __future__ import annotations
 
+import random
 import re
 from collections.abc import Iterable
 from datetime import datetime
 from typing import Any, List, Sequence, Tuple, Type
 
 import gymnasium as gym
-import random
 
 from gym_gui.config.game_configs import (
-    FrozenLakeConfig,
-    TaxiConfig,
-    CliffWalkingConfig,
-    BlackjackConfig,
+    DEFAULT_BLACKJACK_CONFIG,
+    DEFAULT_CLIFF_WALKING_CONFIG,
     DEFAULT_FROZEN_LAKE_CONFIG,
     DEFAULT_FROZEN_LAKE_V2_CONFIG,
     DEFAULT_TAXI_CONFIG,
-    DEFAULT_CLIFF_WALKING_CONFIG,
-    DEFAULT_BLACKJACK_CONFIG,
+    BlackjackConfig,
+    CliffWalkingConfig,
+    FrozenLakeConfig,
+    TaxiConfig,
 )
 from gym_gui.config.paths import VAR_DATA_DIR
-from gym_gui.core.adapters.base import AdapterContext, EnvironmentAdapter, StepState
-from gym_gui.core.enums import ControlMode, GameId, RenderMode
 from gym_gui.constants.constants_game import (
-    ToyTextDefaults,
-    TOY_TEXT_DEFAULTS,
+    BLACKJACK_DEFAULTS,
+    CLIFF_WALKING_DEFAULTS,
     FROZEN_LAKE_DEFAULTS,
     FROZEN_LAKE_V2_DEFAULTS,
-    CLIFF_WALKING_DEFAULTS,
     TAXI_DEFAULTS,
-    BLACKJACK_DEFAULTS,
+    TOY_TEXT_DEFAULTS,
+    ToyTextDefaults,
 )
+from gym_gui.core.adapters.base import AdapterContext, EnvironmentAdapter, StepState
+from gym_gui.core.enums import ControlMode, GameId, RenderMode
 from gym_gui.logging_config.log_constants import (
     LOG_ADAPTER_ENV_CREATED,
-    LOG_ADAPTER_STEP_SUMMARY,
-    LOG_ADAPTER_INIT_ERROR,
-    LOG_ADAPTER_STEP_ERROR,
-    LOG_ADAPTER_RENDER_ERROR,
-    LOG_ADAPTER_STATE_INVALID,
-    LOG_ADAPTER_MAP_GENERATION,
-    LOG_ADAPTER_HOLE_PLACEMENT,
     LOG_ADAPTER_GOAL_OVERRIDE,
+    LOG_ADAPTER_HOLE_PLACEMENT,
+    LOG_ADAPTER_INIT_ERROR,
+    LOG_ADAPTER_MAP_GENERATION,
+    LOG_ADAPTER_RENDER_ERROR,
     LOG_ADAPTER_RENDER_PAYLOAD,
     LOG_ADAPTER_RENDERING_WARNING,
+    LOG_ADAPTER_STATE_INVALID,
+    LOG_ADAPTER_STEP_ERROR,
+    LOG_ADAPTER_STEP_SUMMARY,
 )
 
 _TOY_TEXT_DATA_DIR = (VAR_DATA_DIR / "toy_text").resolve()
@@ -188,35 +188,35 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
 
     def _get_grid_width(self) -> int:
         """Get grid width from environment.
-        
+
         Returns the number of columns in the grid. Override in subclasses
         if special handling is needed (e.g., CliffWalking always 12).
-        
+
         Returns:
             Grid width (ncol). Defaults to 8 if unable to determine.
         """
         env = self._require_env()
         unwrapped = getattr(env, "unwrapped", env)
-        
+
         # Try ncol attribute first (FrozenLake)
         if hasattr(unwrapped, "ncol"):
             return int(getattr(unwrapped, "ncol"))
-        
+
         # Try desc attribute (map descriptor)
         if hasattr(unwrapped, "desc"):
             desc = getattr(unwrapped, "desc")
             if desc and len(desc) > 0:
                 return len(desc[0])
-        
+
         # Fallback to canonical defaults
         return self.defaults.grid_width
 
     def state_to_pos(self, state: int) -> tuple[int, int]:
         """Convert state (single integer) to grid position (row, col).
-        
+
         Args:
             state: Integer state from environment (0 to ncol*nrow - 1)
-            
+
         Returns:
             Tuple of (row, col) grid indices (0-indexed)
         """
@@ -227,11 +227,11 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
 
     def pos_to_state(self, x: int, y: int) -> int:
         """Convert grid position (col, row) to state (single integer).
-        
+
         Args:
             x: Column index (0-indexed)
             y: Row index (0-indexed)
-            
+
         Returns:
             Integer state representation
         """
@@ -284,7 +284,7 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
             agent_pos = env_position
         snapshot_path = _TOY_TEXT_DATA_DIR / f"{self.id}.txt"
         snapshot_path.write_text(ansi, encoding="utf-8")
-        
+
         payload = {
             "mode": RenderMode.GRID.value,
             "grid": grid,
@@ -352,7 +352,7 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
                         "passenger_index": int(pass_idx),  # 0-3 = at depot R/G/Y/B, 4 = in taxi
                         "destination_index": int(dest_idx),  # 0-3 = depot R/G/Y/B
                     }
-        
+
         return payload
 
     def build_frame_reference(self, render_payload: Any | None, state: StepState) -> str | None:
@@ -463,7 +463,7 @@ class ToyTextAdapter(EnvironmentAdapter[int, int]):
 
 class FrozenLakeAdapter(ToyTextAdapter):
     """Adapter for FrozenLake environment with game-specific configuration."""
-    
+
     id = GameId.FROZEN_LAKE.value
     toy_text_defaults = FROZEN_LAKE_DEFAULTS
 
@@ -520,12 +520,12 @@ class FrozenLakeAdapter(ToyTextAdapter):
     def render(self) -> dict[str, Any]:
         """Render with FrozenLake-specific terminated state."""
         payload = super().render()
-        
+
         # Add terminated state for cracked_hole visualization
         payload["terminated"] = self._last_terminated
         payload["truncated"] = self._last_truncated
         payload["last_action"] = self._last_action
-        
+
         return payload
 
     def set_goal(self, x: int, y: int) -> None:
@@ -569,18 +569,18 @@ class FrozenLakeAdapter(ToyTextAdapter):
         env = self._require_env()
         unwrapped = getattr(env, "unwrapped", env)
         height, width = None, None
-        
+
         if hasattr(unwrapped, "nrow"):
             height = int(getattr(unwrapped, "nrow"))
         if hasattr(unwrapped, "ncol"):
             width = int(getattr(unwrapped, "ncol"))
-        
+
         if hasattr(unwrapped, "desc"):
             desc = getattr(unwrapped, "desc")
             if desc:
                 height = height or len(desc)
                 width = width or (len(desc[0]) if len(desc) > 0 else 0)
-        
+
         fallback_height = self.defaults.grid_height
         fallback_width = self.defaults.grid_width
         return (height or fallback_height, width or fallback_width)
@@ -588,7 +588,7 @@ class FrozenLakeAdapter(ToyTextAdapter):
 
 class FrozenLakeV2Adapter(ToyTextAdapter):
     """Adapter for FrozenLake-v2 with configurable grid, start, goal, and hole count."""
-    
+
     id = GameId.FROZEN_LAKE_V2.value
     toy_text_defaults = FROZEN_LAKE_V2_DEFAULTS
 
@@ -600,11 +600,11 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
     ) -> None:
         """Initialize with optional game-specific configuration."""
         super().__init__(context, defaults=self.toy_text_defaults)
-        
+
         # Convert dictionary to FrozenLakeConfig if needed
         if isinstance(game_config, dict):
             game_config = FrozenLakeConfig(**game_config)
-        
+
         self._game_config = game_config or DEFAULT_FROZEN_LAKE_V2_CONFIG
         self._last_action: int | None = None
         self._custom_desc: list[str] | None = None
@@ -613,7 +613,7 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
 
     def _generate_map_descriptor(self) -> list[str]:
         """Generate custom map descriptor based on configuration.
-        
+
         If random_holes=False and using standard 4×4 or 8×8 grid with default positions,
         returns the official Gymnasium default map. Otherwise generates a custom map.
         """
@@ -666,7 +666,7 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
             self._resolved_start = start_pos
             self._resolved_goal = goal_pos
             return list(defaults.official_map)
-        
+
         # Generate custom map (random holes or custom start/goal positions)
         # Default hole count if not specified
         if hole_count is None:
@@ -676,7 +676,7 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
             else:
                 # Scale holes proportionally
                 hole_count = max(1, int(total_tiles * 0.15))  # ~15% holes
-        
+
         # Initialize grid with frozen tiles
         self._resolved_start = start_pos
         self._resolved_goal = goal_pos
@@ -686,15 +686,15 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
         # Place start and goal
         grid[start_pos[0]][start_pos[1]] = 'S'
         grid[goal_pos[0]][goal_pos[1]] = 'G'
-        
+
         # Collect available positions for holes (exclude start and goal)
         available_positions = [
             (r, c) for r in range(height) for c in range(width)
             if (r, c) != start_pos and (r, c) != goal_pos
         ]
-        
+
         hole_count = min(hole_count, len(available_positions))
-        
+
         if random_holes:
             # RANDOM: Randomly place holes across the entire grid
             hole_positions = random.sample(available_positions, hole_count)
@@ -715,7 +715,7 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
                 # Different grid size or no official map - use first N positions as fallback
                 # This is only used for non-standard grids (e.g., 6x6, 10x10)
                 hole_positions = available_positions[:hole_count]
-        
+
         # Log detailed hole placement configuration
         self.log_constant(
             LOG_ADAPTER_HOLE_PLACEMENT,
@@ -730,10 +730,10 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
                 "goal_pos": goal_pos,
             },
         )
-        
+
         for r, c in hole_positions:
             grid[r][c] = 'H'
-        
+
         # Convert to list of strings
         return [''.join(row) for row in grid]
 
@@ -748,7 +748,7 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
         # Current version (1.0.0) doesn't support these parameters
         # Use FrozenLake-v1 (base variant) instead of FrozenLake8x8-v1
         env = gym.make("FrozenLake-v1", render_mode=self._gym_render_mode, **kwargs)
-        
+
         # Log complete map configuration
         self.log_constant(
             LOG_ADAPTER_MAP_GENERATION,
@@ -784,12 +784,12 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
     def render(self) -> dict[str, Any]:
         """Render with FrozenLake-specific terminated state."""
         payload = super().render()
-        
+
         # Add terminated state for cracked_hole visualization
         payload["terminated"] = self._last_terminated
         payload["truncated"] = self._last_truncated
         payload["last_action"] = self._last_action
-        
+
         # Log render payload details (for debugging visualization issues)
         self.log_constant(
             LOG_ADAPTER_RENDER_PAYLOAD,
@@ -804,7 +804,7 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
                 "terminated": self._last_terminated,
             },
         )
-        
+
         return payload
 
     def goal_pos(self) -> tuple[int, int] | None:
@@ -816,7 +816,7 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
         """Get list of valid positions for goal selection (excludes start and existing holes)."""
         exclude_holes = exclude_holes or []
         excluded_set = {start_position} | set(exclude_holes)
-        
+
         return [
             (r, c) for r in range(grid_height) for c in range(grid_width)
             if (r, c) not in excluded_set
@@ -825,7 +825,7 @@ class FrozenLakeV2Adapter(ToyTextAdapter):
 
 class CliffWalkingAdapter(ToyTextAdapter):
     """Adapter for CliffWalking environment with game-specific configuration."""
-    
+
     id = GameId.CLIFF_WALKING.value
     toy_text_defaults = CLIFF_WALKING_DEFAULTS
 
@@ -837,28 +837,28 @@ class CliffWalkingAdapter(ToyTextAdapter):
     ) -> None:
         """Initialize with optional game-specific configuration."""
         super().__init__(context, defaults=self.toy_text_defaults)
-        
+
         # Convert dictionary to CliffWalkingConfig if needed
         if isinstance(game_config, dict):
             game_config = CliffWalkingConfig(**game_config)
-        
+
         self._game_config = game_config or DEFAULT_CLIFF_WALKING_CONFIG
         self._last_action: int | None = None
 
     def gym_kwargs(self) -> dict[str, Any]:
         """Return Gymnasium environment kwargs from game configuration."""
         return self._game_config.to_gym_kwargs()
-    
+
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         """Reset and clear last action."""
         self._last_action = None
         return super().reset(seed=seed, options=options)
-    
+
     def step(self, action: int):
         """Step and track the action for rendering."""
         self._last_action = int(action)
         return super().step(action)
-    
+
     def _agent_position_from_state(self, grid: List[List[str]]) -> Tuple[int, int] | None:
         """Override to correctly calculate position for CliffWalking's 4x12 grid."""
         env = self._require_env()
@@ -867,57 +867,57 @@ class CliffWalkingAdapter(ToyTextAdapter):
             state = getattr(unwrapped, "s", None)
             if state is None:
                 return None
-            
+
             # CliffWalking is 4 rows × 12 columns
             width = self.defaults.grid_width
-            
+
             # State is a single integer from 0-47
             row = int(state) // width
             col = int(state) % width
-            
+
             return (row, col)
         except Exception:
             return None
-    
+
     def render(self) -> dict[str, Any]:
         """Override render to strip spacing columns from CliffWalking ANSI grid.
-        
+
         CliffWalking ANSI format includes spacing between cells: 'o  o  o...'
         This creates a 34-column grid (['o', ' ', ' ', 'o', ' ', ' ', ...])
         We need to remove the spacing columns to get a clean 12-column grid.
         """
         # Get the base render payload with the raw grid
         payload = super().render()
-        
+
         # Extract the grid with spacing
         grid_with_spacing = payload.get("grid", [])
         if not grid_with_spacing:
             return payload
-        
+
         # Strip spacing columns: keep only columns 0, 3, 6, 9, ... (every 3rd)
         clean_grid = []
         for row in grid_with_spacing:
             clean_row = [row[col] for col in range(len(row)) if col % 3 == 0]
             clean_grid.append(clean_row)
-        
+
         # Update payload with clean grid
         payload["grid"] = clean_grid
-        
+
         # Agent position was already calculated correctly by our override above
         # (using 4x12 dimensions), so no adjustment needed
-        
+
         # Add last action for directional elf rendering
         payload["last_action"] = self._last_action
-        
+
         return payload
 
 
 class TaxiAdapter(ToyTextAdapter):
     """Adapter for Taxi-v3 environment with game-specific configuration."""
-    
+
     id = GameId.TAXI.value
     toy_text_defaults = TAXI_DEFAULTS
-    
+
     def __init__(
         self,
         context: AdapterContext | None = None,
@@ -926,71 +926,71 @@ class TaxiAdapter(ToyTextAdapter):
     ) -> None:
         """Initialize with optional game-specific configuration."""
         super().__init__(context, defaults=self.toy_text_defaults)
-        
+
         # Convert dictionary to TaxiConfig if needed
         if isinstance(game_config, dict):
             game_config = TaxiConfig(**game_config)
-        
+
         self._game_config = game_config or DEFAULT_TAXI_CONFIG
         self._last_action: int | None = None
 
     def gym_kwargs(self) -> dict[str, Any]:
         """Return Gymnasium environment kwargs from game configuration."""
         return self._game_config.to_gym_kwargs()
-    
+
     def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None):
         """Reset and clear last action."""
         self._last_action = None
         return super().reset(seed=seed, options=options)
-    
+
     def step(self, action: int):
         """Step and track the action for rendering."""
         self._last_action = int(action)
         return super().step(action)
-    
+
     def render(self) -> dict[str, Any]:
         """Override render to convert taxi position from 5×5 logical to 11×11 grid coordinates."""
         # Get the base render payload with full 11×11 ANSI grid
         payload = super().render()
-        
+
         # Taxi uses an 11×11 character grid with borders
         # The taxi_state has taxi_position in 5×5 logical coordinates
         # We need to convert it to 11×11 grid coordinates
-        
+
         taxi_state = payload.get("taxi_state")
         if taxi_state and "taxi_position" in taxi_state:
             logical_row, logical_col = taxi_state["taxi_position"]
-            
+
             # Convert 5×5 logical coordinates to 11×11 grid coordinates
             # Logical row N → grid row (N + 1)
             # Logical col N → grid col (N * 2 + 1)
             # This accounts for borders and spacing in the ANSI grid
             grid_row = logical_row + 1  # Skip top border row
             grid_col = logical_col * 2 + 1  # Account for spacing (each cell takes 2 chars)
-            
+
             payload["agent_position"] = (grid_row, grid_col)
             # Add last action for directional cab rendering
             taxi_state["last_action"] = self._last_action
-        
+
         return payload
 
 
 class BlackjackAdapter(ToyTextAdapter):
     """Adapter for Blackjack environment with pygame-based card rendering."""
-    
+
     id = GameId.BLACKJACK.value
     toy_text_defaults = BLACKJACK_DEFAULTS
     _gym_render_mode = "rgb_array"  # Override: use pygame rendering instead of ANSI
-    
+
     default_render_mode = RenderMode.RGB_ARRAY
     supported_render_modes = (RenderMode.RGB_ARRAY,)
-    
+
     supported_control_modes = (
         ControlMode.HUMAN_ONLY,
         ControlMode.AGENT_ONLY,
         ControlMode.HYBRID_TURN_BASED,
     )
-    
+
     def __init__(
         self,
         context: AdapterContext | None = None,
@@ -999,35 +999,36 @@ class BlackjackAdapter(ToyTextAdapter):
     ) -> None:
         """Initialize with optional game-specific configuration."""
         super().__init__(context, defaults=self.toy_text_defaults)
-        
+
         # Convert dictionary to BlackjackConfig if needed
         if isinstance(game_config, dict):
             game_config = BlackjackConfig(**game_config)
-        
+
         self._game_config = game_config or DEFAULT_BLACKJACK_CONFIG
-    
+
     def gym_kwargs(self) -> dict[str, Any]:
         """Return Gymnasium environment kwargs from game configuration."""
         return self._game_config.to_gym_kwargs()
-    
+
     def render(self) -> dict[str, Any]:
         """Render Blackjack game state using pygame card display.
-        
+
         Returns RGB array from pygame renderer along with game state information.
         """
         env = self._require_env()
-        
+
         # Get RGB array from pygame renderer (returns numpy array H×W×3)
         rgb_array = env.render()
-        
+
         # Extract current game state from environment
         unwrapped = getattr(env, "unwrapped", env)
         player_sum, dealer_card, usable_ace = None, None, None
-        
+
         if hasattr(unwrapped, 'player') and hasattr(unwrapped, 'dealer'):
             # Import helper functions from blackjack module
             try:
-                from gymnasium.envs.toy_text.blackjack import sum_hand, usable_ace as check_usable_ace
+                from gymnasium.envs.toy_text.blackjack import sum_hand
+                from gymnasium.envs.toy_text.blackjack import usable_ace as check_usable_ace
                 # Type checker doesn't know about BlackjackEnv's player/dealer attributes
                 player_hand = getattr(unwrapped, 'player')  # type: ignore[attr-defined]
                 dealer_hand = getattr(unwrapped, 'dealer')  # type: ignore[attr-defined]
@@ -1036,7 +1037,7 @@ class BlackjackAdapter(ToyTextAdapter):
                 usable_ace = check_usable_ace(player_hand)
             except (ImportError, AttributeError):
                 pass
-        
+
         # Build formatted state description for UI display
         state_lines = []
         if player_sum is not None:
@@ -1045,7 +1046,7 @@ class BlackjackAdapter(ToyTextAdapter):
             state_lines.append(f"Dealer Showing: {dealer_card}")
         if usable_ace is not None:
             state_lines.append(f"Usable Ace: {'Yes' if usable_ace else 'No'}")
-        
+
         payload = {
             "mode": RenderMode.RGB_ARRAY.value,
             "rgb": rgb_array,  # Use "rgb" key to match RgbRendererStrategy
@@ -1057,7 +1058,7 @@ class BlackjackAdapter(ToyTextAdapter):
             "truncated": self._last_truncated,
             "state_description": "\n".join(state_lines) if state_lines else None,
         }
-        
+
         return payload
 
 

@@ -5,8 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import List
 
-from gym_gui.validations.validations_ui import IntRangeValidator
 from gym_gui.constants import WORKER_ID_WIDTH
+from gym_gui.validations.validations_ui import IntRangeValidator
 
 
 @dataclass(frozen=True)

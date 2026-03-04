@@ -2,15 +2,25 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from datetime import datetime, timezone
-import logging
-from typing import Any, Callable, List, Mapping, Optional, Protocol, Tuple, TYPE_CHECKING, cast
+from typing import TYPE_CHECKING, Any, Callable, List, Mapping, Optional, Protocol, Tuple, cast
 
 from qtpy import QtCore, QtGui, QtWidgets
 
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.core.enums import ControlMode, GameId, RenderMode
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_UI_RENDER_TABS_DELETE_REQUESTED,
+    LOG_UI_RENDER_TABS_ERROR,
+    LOG_UI_RENDER_TABS_EVENT_FOR_DELETED_RUN,
+    LOG_UI_RENDER_TABS_INFO,
+    LOG_UI_RENDER_TABS_TAB_ADDED,
+    LOG_UI_RENDER_TABS_TRACE,
+    LOG_UI_RENDER_TABS_WARNING,
+)
 from gym_gui.rendering import (
     RendererContext,
     RendererRegistry,
@@ -19,24 +29,14 @@ from gym_gui.rendering import (
 )
 from gym_gui.rendering.strategies.board_game import BoardGameRendererStrategy
 from gym_gui.replays import EpisodeReplay, EpisodeReplayLoader
+from gym_gui.services.operator import OperatorConfig
 from gym_gui.services.service_locator import get_service_locator
 from gym_gui.services.telemetry import TelemetryService
-from gym_gui.ui.indicators.busy_indicator import modal_busy_indicator
 from gym_gui.ui.indicators import RunSummary, TabClosureChoice, TabClosureDialog
+from gym_gui.ui.indicators.busy_indicator import modal_busy_indicator
 from gym_gui.ui.widgets.live_telemetry_tab import LiveTelemetryTab
-from gym_gui.ui.widgets.multi_operator_render_view import MultiOperatorRenderView
-from gym_gui.services.operator import OperatorConfig
-from gym_gui.logging_config.helpers import LogConstantMixin
-from gym_gui.logging_config.log_constants import (
-    LOG_UI_RENDER_TABS_TRACE,
-    LOG_UI_RENDER_TABS_INFO,
-    LOG_UI_RENDER_TABS_WARNING,
-    LOG_UI_RENDER_TABS_ERROR,
-    LOG_UI_RENDER_TABS_DELETE_REQUESTED,
-    LOG_UI_RENDER_TABS_EVENT_FOR_DELETED_RUN,
-    LOG_UI_RENDER_TABS_TAB_ADDED,
-)
 from gym_gui.ui.widgets.mosaic_welcome_widget import MosaicWelcomeWidget
+from gym_gui.ui.widgets.multi_operator_render_view import MultiOperatorRenderView
 
 if TYPE_CHECKING:
     from gym_gui.services.trainer.run_manager import TrainingRunManager
@@ -187,12 +187,12 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
         self._agent_tabs[run_id][name] = widget
         idx = self.addTab(widget, name)
         self.setTabToolTip(idx, f"{name} - Live training telemetry")
-        
+
         # Add close button to the tab
         self._add_close_button_to_tab(idx, run_id, name)
-        
+
         self.setCurrentIndex(idx)
-    
+
     def _add_close_button_to_tab(self, tab_index: int, run_id: str, tab_name: str) -> None:
         """Add a close button to a dynamic tab."""
         close_button = QtWidgets.QPushButton(self)
@@ -220,7 +220,7 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
         tab_bar = self.tabBar()
         if tab_bar is not None:
             tab_bar.setTabButton(tab_index, QtWidgets.QTabBar.ButtonPosition.RightSide, close_button)
-    
+
     def _close_dynamic_tab(self, run_id: str, tab_name: str, tab_index: int) -> None:
         """Close a dynamic tab and cleanup resources."""
         try:

@@ -17,9 +17,9 @@ Grid environments differ from board games:
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import List, Tuple, Optional, Dict, Any, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
-from PyQt6 import QtWidgets, QtCore, QtGui
+from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QWidget
 

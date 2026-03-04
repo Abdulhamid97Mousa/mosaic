@@ -15,7 +15,6 @@ from qtpy import QtCore, QtWidgets
 from gym_gui.services.settings_service import SettingsService
 from gym_gui.ui.widgets.settings.settings_category_tab import SettingsCategoryTab
 
-
 _LOGGER = logging.getLogger(__name__)
 
 

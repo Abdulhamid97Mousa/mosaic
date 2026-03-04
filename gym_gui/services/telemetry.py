@@ -4,25 +4,25 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from dataclasses import replace
 from collections import deque
+from dataclasses import replace
 from pathlib import Path
-from typing import Any, Deque, Dict, Iterable, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Deque, Dict, Iterable, Optional
 
+from gym_gui.constants import TELEMETRY_SERVICE_HISTORY_LIMIT
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
-from gym_gui.storage.session import EpisodeRecord
+from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
     LOG_SERVICE_TELEMETRY_ASYNC_ERROR,
     LOG_SERVICE_TELEMETRY_STEP_REJECTED,
 )
-from gym_gui.logging_config.helpers import LogConstantMixin
-from gym_gui.constants import TELEMETRY_SERVICE_HISTORY_LIMIT
+from gym_gui.storage.session import EpisodeRecord
 
 if TYPE_CHECKING:  # pragma: no cover - type checking only
-    from gym_gui.services.storage import StorageRecorderService
-    from gym_gui.validations import ValidationService
-    from gym_gui.telemetry import TelemetrySQLiteStore
     from gym_gui.replay import FrameResolver
+    from gym_gui.services.storage import StorageRecorderService
+    from gym_gui.telemetry import TelemetrySQLiteStore
+    from gym_gui.validations import ValidationService
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -124,7 +124,7 @@ class TelemetryService(LogConstantMixin):
                     f"action={record.action} "
                     f"terminated={record.terminated} "
                     f"truncated={record.truncated}")
-        
+
         # Log field types to spot mismatches (DEBUG level)
         _LOGGER.debug(f"[TELEMETRY TYPES] episode_id={type(record.episode_id).__name__} "
                     f"step_index={type(record.step_index).__name__} "
@@ -132,7 +132,7 @@ class TelemetryService(LogConstantMixin):
                     f"action={type(record.action).__name__} "
                     f"terminated={type(record.terminated).__name__} "
                     f"truncated={type(record.truncated).__name__}")
-        
+
         # Validate step data if validation service is attached
         if self._validation_service:
             try:

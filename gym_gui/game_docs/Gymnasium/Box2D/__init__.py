@@ -5,7 +5,7 @@ LUNAR_LANDER_HTML = """
 <h2>LunarLander-v3</h2>
 
 <p style="background-color: #e3f2fd; padding: 8px; border-radius: 4px;">
-Part of the <strong>Gymnasium Box2D</strong> environment family. 
+Part of the <strong>Gymnasium Box2D</strong> environment family.
 <a href="https://gymnasium.farama.org/environments/box2d/">Box2D Overview</a>
 </p>
 
@@ -100,7 +100,7 @@ CAR_RACING_HTML = """
 <h2>CarRacing-v3</h2>
 
 <p style="background-color: #e3f2fd; padding: 8px; border-radius: 4px;">
-Part of the <strong>Gymnasium Box2D</strong> environment family. 
+Part of the <strong>Gymnasium Box2D</strong> environment family.
 <a href="https://gymnasium.farama.org/environments/box2d/">Box2D Overview</a>
 </p>
 
@@ -195,7 +195,7 @@ BIPEDAL_WALKER_HTML = """
 <h2>BipedalWalker-v3</h2>
 
 <p style="background-color: #e3f2fd; padding: 8px; border-radius: 4px;">
-Part of the <strong>Gymnasium Box2D</strong> environment family. 
+Part of the <strong>Gymnasium Box2D</strong> environment family.
 <a href="https://gymnasium.farama.org/environments/box2d/">Box2D Overview</a>
 </p>
 
@@ -231,7 +231,7 @@ Part of the <strong>Gymnasium Box2D</strong> environment family.
 </table>
 
 <p style="background-color: #fff3e0; padding: 8px; border-radius: 4px; border-left: 4px solid #ff9800;">
-<strong>Human Control Note:</strong> This environment requires continuous 4D torque actions (not discrete keyboard commands). 
+<strong>Human Control Note:</strong> This environment requires continuous 4D torque actions (not discrete keyboard commands).
 Manual keyboard control is not currently supported in the Qt shell. Use an automated agent or policy for this environment.
 </p>
 

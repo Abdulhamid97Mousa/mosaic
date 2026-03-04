@@ -6,9 +6,9 @@ schema definitions and validation logic.
 
 from __future__ import annotations
 
+import logging
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Set
-import logging
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -28,7 +28,7 @@ class AgentConfig(ABC):
     @abstractmethod
     def get_telemetry_schema(self) -> Dict[str, Any]:
         """Return expected telemetry schema fields with categories.
-        
+
         Returns dict mapping category names to lists of expected field names.
         Categories: core_metrics, agent_state, positions, environment, etc.
         """
@@ -37,7 +37,7 @@ class AgentConfig(ABC):
     @abstractmethod
     def get_required_fields(self) -> Set[str]:
         """Return set of required field names in telemetry records.
-        
+
         These fields MUST be present in every StepRecord/EpisodeRollup,
         or validation will fail with error logging.
         """
@@ -46,7 +46,7 @@ class AgentConfig(ABC):
     @abstractmethod
     def get_optional_fields(self) -> Set[str]:
         """Return set of optional field names in telemetry records.
-        
+
         These fields may or may not be present. Their absence is not an error,
         but presence will be logged for debugging.
         """
@@ -54,10 +54,10 @@ class AgentConfig(ABC):
 
     def validate_step_record(self, record: Dict[str, Any]) -> tuple[bool, list[str]]:
         """Validate step record matches schema.
-        
+
         Args:
             record: StepRecord dict to validate
-            
+
         Returns:
             Tuple of (is_valid, list_of_issues)
             is_valid=True means all required fields present
@@ -113,7 +113,7 @@ class AgentConfig(ABC):
 
     def validate_episode_rollup(self, record: Dict[str, Any]) -> tuple[bool, list[str]]:
         """Validate episode rollup record matches schema.
-        
+
         Episode rollups have similar but slightly different schema than step records.
         Default implementation reuses step validation; subclasses can override.
         """
@@ -209,7 +209,7 @@ def get_agent_config(agent_type: str) -> AgentConfig:
         return HeadlessAgentConfig()
     else:
         _LOGGER.warning(
-            f"Unknown agent type, defaulting to Headless",
+            "Unknown agent type, defaulting to Headless",
             extra={"agent_type": agent_type},
         )
         return HeadlessAgentConfig()

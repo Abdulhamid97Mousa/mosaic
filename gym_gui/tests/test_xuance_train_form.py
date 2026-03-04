@@ -5,7 +5,7 @@ from __future__ import annotations
 import os
 import tempfile
 from pathlib import Path
-from typing import Dict, Any
+from typing import Any, Dict
 
 import pytest
 from qtpy import QtWidgets

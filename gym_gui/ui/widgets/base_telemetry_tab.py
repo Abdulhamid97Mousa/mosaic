@@ -56,19 +56,19 @@ class BaseTelemetryTab(QtWidgets.QWidget):
         Subclasses should override this method to build their specific UI.
         """
         raise NotImplementedError("Subclasses must implement _build_ui()")
-    
+
     def _build_header(self) -> QtWidgets.QHBoxLayout:
         """Factory method for standard header layout.
-        
+
         Creates a consistent header showing run_id and agent_id across all tabs.
         The header includes:
         - Run ID (truncated to 12 chars)
         - Agent ID
         - Stretch space
-        
+
         Returns:
             QHBoxLayout containing the header widgets
-            
+
         Example:
             layout = QtWidgets.QVBoxLayout(self)
             layout.addLayout(self._build_header())
@@ -82,16 +82,16 @@ class BaseTelemetryTab(QtWidgets.QWidget):
         header.addWidget(self._agent_label)
         header.addStretch()
         return header
-    
+
     def _build_stats_group(self) -> tuple[QtWidgets.QGroupBox, QtWidgets.QGridLayout]:
         """Factory for standard stats group.
-        
+
         Creates a consistent stats group box with grid layout for displaying
         training statistics across all tabs.
-        
+
         Returns:
             Tuple of (QGroupBox, QGridLayout) for adding stats widgets
-            
+
         Example:
             stats_group, stats_layout = self._build_stats_group()
             stats_layout.addWidget(QtWidgets.QLabel("Episodes:"), 0, 0)
@@ -101,7 +101,7 @@ class BaseTelemetryTab(QtWidgets.QWidget):
         group = QtWidgets.QGroupBox("Training Statistics", self)
         layout = QtWidgets.QGridLayout(group)
         return group, layout
-    
+
     def on_step(
         self,
         step: Dict[str, Any],
@@ -109,10 +109,10 @@ class BaseTelemetryTab(QtWidgets.QWidget):
         metadata: Optional[Dict[str, Any]] = None
     ) -> None:
         """Called when new step data arrives.
-        
+
         Subclasses may override to handle step updates. Default implementation
         does nothing.
-        
+
         Args:
             step: Step data dict with keys like:
                 - reward: float
@@ -124,13 +124,13 @@ class BaseTelemetryTab(QtWidgets.QWidget):
             metadata: Optional metadata dict with run context
         """
         pass
-    
+
     def on_episode_end(self, summary: Dict[str, Any]) -> None:
         """Called when episode finishes.
-        
+
         Subclasses may override to handle episode completion. Default
         implementation does nothing.
-        
+
         Args:
             summary: Episode summary dict with keys like:
                 - total_reward: float
@@ -141,18 +141,18 @@ class BaseTelemetryTab(QtWidgets.QWidget):
                 - control_mode: Optional[str]
         """
         pass
-    
+
     def refresh(self) -> None:
         """Refresh display from current state.
-        
+
         Subclasses may override to refresh their display. Default
         implementation does nothing.
         """
         pass
-    
+
     def clear(self) -> None:
         """Clear all displayed data.
-        
+
         Subclasses may override to clear their data. Default implementation
         does nothing.
         """

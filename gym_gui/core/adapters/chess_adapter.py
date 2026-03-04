@@ -18,8 +18,8 @@ from typing import Any, Dict, List, Optional
 import numpy as np
 
 from gym_gui.logging_config.log_constants import (
-    LOG_UI_MULTI_AGENT_ENV_LOADED,
     LOG_UI_MULTI_AGENT_ENV_LOAD_ERROR,
+    LOG_UI_MULTI_AGENT_ENV_LOADED,
 )
 
 _LOG = logging.getLogger(__name__)
@@ -266,8 +266,8 @@ class ChessAdapter:
         Raises:
             ValueError: If move cannot be found in legal actions
         """
-        from pettingzoo.classic.chess import chess_utils
         import numpy as np
+        from pettingzoo.classic.chess import chess_utils
 
         # Get current observation with action mask
         obs, _, _, _, _ = self._aec_env.last()

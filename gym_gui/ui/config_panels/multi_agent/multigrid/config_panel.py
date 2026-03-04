@@ -18,10 +18,9 @@ from PyQt6 import QtWidgets
 from gym_gui.config.game_configs import MultiGridConfig
 from gym_gui.core.enums import GameId
 
-
 # All MultiGrid game IDs
 MULTIGRID_GAME_IDS: tuple[GameId, ...] = (
-    # MOSAIC multigrid 
+    # MOSAIC multigrid
     GameId.MOSAIC_MULTIGRID_SOCCER,      # 4 agents (2v2) - Deprecated
     GameId.MOSAIC_MULTIGRID_COLLECT,     # 3 agents - Deprecated
     GameId.MOSAIC_MULTIGRID_COLLECT2VS2,  # 4 agents (2v2) - Deprecated
@@ -55,7 +54,7 @@ MULTIGRID_GAME_IDS: tuple[GameId, ...] = (
     GameId.INI_MULTIGRID_RED_BLUE_DOORS_8X8,
 )
 
-# MOSAIC environments with agent counts 
+# MOSAIC environments with agent counts
 MOSAIC_AGENT_COUNTS: dict[GameId, int] = {
     GameId.MOSAIC_MULTIGRID_SOCCER: 4,   # 2v2 teams
     GameId.MOSAIC_MULTIGRID_COLLECT: 3,  # 3 collectors

@@ -1,12 +1,12 @@
 import json
 import os
-from pathlib import Path
 import tempfile
+from pathlib import Path
 
 import numpy as np
 
-from gym_gui.utils import json_serialization as js
 from gym_gui.storage.session import EpisodeRecord, SessionRecorder
+from gym_gui.utils import json_serialization as js
 
 
 def test_numpy_scalar_tuple_roundtrip() -> None:

@@ -21,19 +21,19 @@ and the action generation algorithm.
 
 from __future__ import annotations
 
+from typing import Dict, List, Set
+
 import pytest
-from typing import Dict, Set, List
 
 from gym_gui.controllers.human_input import (
-    INIMultiGridKeyCombinationResolver,
-    MultiGridKeyCombinationResolver,
-    MiniGridKeyCombinationResolver,
-    _KEY_W,
     _KEY_A,
     _KEY_D,
     _KEY_SPACE,
+    _KEY_W,
+    INIMultiGridKeyCombinationResolver,
+    MiniGridKeyCombinationResolver,
+    MultiGridKeyCombinationResolver,
 )
-
 
 # =============================================================================
 # Core Logic Tests: Multi-Agent Action Generation

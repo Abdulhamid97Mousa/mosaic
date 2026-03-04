@@ -1,9 +1,9 @@
 import pytest
 
 from gym_gui.controllers.interaction import (
+    AleInteractionController,
     Box2DInteractionController,
     TurnBasedInteractionController,
-    AleInteractionController,
 )
 
 

@@ -24,28 +24,28 @@ Both services implement the same interface and can be used with GoGameController
         controller.set_ai_action_provider(service.get_best_move)
 """
 
+from gym_gui.services.go_ai.gnugo_service import (
+    GNUGO_DIFFICULTY_DESCRIPTIONS,
+    GNUGO_DIFFICULTY_PRESETS,
+    GnuGoConfig,
+    GnuGoService,
+    create_gnugo_provider,
+)
 from gym_gui.services.go_ai.gtp_engine import (
     GTPEngine,
     GTPError,
     action_to_vertex,
-    vertex_to_action,
-    coords_to_vertex,
-    vertex_to_coords,
     board_to_gtp_moves,
+    coords_to_vertex,
+    vertex_to_action,
+    vertex_to_coords,
 )
 from gym_gui.services.go_ai.katago_service import (
+    KATAGO_DIFFICULTY_DESCRIPTIONS,
+    KATAGO_DIFFICULTY_PRESETS,
     KataGoConfig,
     KataGoService,
-    KATAGO_DIFFICULTY_PRESETS,
-    KATAGO_DIFFICULTY_DESCRIPTIONS,
     create_katago_provider,
-)
-from gym_gui.services.go_ai.gnugo_service import (
-    GnuGoConfig,
-    GnuGoService,
-    GNUGO_DIFFICULTY_PRESETS,
-    GNUGO_DIFFICULTY_DESCRIPTIONS,
-    create_gnugo_provider,
 )
 
 __all__ = [

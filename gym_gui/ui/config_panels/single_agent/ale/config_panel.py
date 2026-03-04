@@ -10,7 +10,6 @@ from PyQt6 import QtWidgets
 from gym_gui.config.game_configs import ALEConfig
 from gym_gui.core.enums import GameId
 
-
 ALE_GAME_IDS: tuple[GameId, ...] = (
     GameId.ADVENTURE_V4,
     GameId.ALE_ADVENTURE_V5,
@@ -155,7 +154,7 @@ def build_ale_controls(
         obs_default = "rgb"
     overrides["obs_type"] = obs_default
     obs_combo = QtWidgets.QComboBox(parent)
-    obs_combo.addItems(["rgb", "ram", "grayscale"]) 
+    obs_combo.addItems(["rgb", "ram", "grayscale"])
     index = obs_combo.findText(obs_default)
     obs_combo.setCurrentIndex(index if index >= 0 else 0)
     obs_combo.currentTextChanged.connect(lambda text: emit_change("obs_type", str(text)))

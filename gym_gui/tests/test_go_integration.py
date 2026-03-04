@@ -10,8 +10,9 @@ Tests cover:
 
 from __future__ import annotations
 
-import pytest
 from typing import TYPE_CHECKING
+
+import pytest
 
 if TYPE_CHECKING:
     from gym_gui.core.adapters.pettingzoo_classic import GoEnvironmentAdapter

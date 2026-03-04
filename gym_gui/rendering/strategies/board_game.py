@@ -13,13 +13,13 @@ from typing import Any, Dict, List, Mapping, Optional, Set
 from qtpy import QtCore, QtGui, QtWidgets
 
 from gym_gui.core.enums import GameId, RenderMode
-from gym_gui.rendering.interfaces import RendererContext, RendererStrategy
 from gym_gui.logging_config.helpers import log_constant
 from gym_gui.logging_config.log_constants import (
     LOG_CHECKERS_BOARD_CLICK,
     LOG_CHECKERS_BOARD_CLICK_IGNORED,
     LOG_CHECKERS_CELL_SIGNAL_EMITTED,
 )
+from gym_gui.rendering.interfaces import RendererContext, RendererStrategy
 
 _LOG = logging.getLogger(__name__)
 
@@ -347,7 +347,7 @@ class _BoardGameWidget(QtWidgets.QStackedWidget):
             sudoku_data = payload.get("sudoku", payload)
             renderer.update_from_payload(sudoku_data)
             self.setCurrentWidget(renderer)
-        elif game_id in (GameId.OPEN_SPIEL_CHECKERS, GameId.AMERICAN_CHECKERS, 
+        elif game_id in (GameId.OPEN_SPIEL_CHECKERS, GameId.AMERICAN_CHECKERS,
                           GameId.RUSSIAN_CHECKERS, GameId.INTERNATIONAL_DRAUGHTS):
             renderer = self._get_checkers_renderer()
             renderer.update_from_payload(payload)
@@ -2069,7 +2069,7 @@ class _CheckersBoardRenderer(QtWidgets.QWidget):
             self._board_size = board_size
             self._board = [[0] * self._board_size for _ in range(self._board_size)]
             self._update_minimum_size()
-        
+
         # Get board array
         board = payload.get("board")
         if isinstance(board, list):

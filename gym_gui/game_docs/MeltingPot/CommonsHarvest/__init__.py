@@ -1,7 +1,6 @@
 """Documentation for Melting Pot Commons Harvest substrate."""
 from __future__ import annotations
 
-
 COMMONS_HARVEST_HTML = """
 <h2>Melting Pot: Commons Harvest (Open)</h2>
 

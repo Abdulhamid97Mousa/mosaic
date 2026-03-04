@@ -25,8 +25,8 @@ from typing import Any, Dict, List, Optional, Tuple
 import numpy as np
 
 from gym_gui.logging_config.log_constants import (
-    LOG_UI_MULTI_AGENT_ENV_LOADED,
     LOG_UI_MULTI_AGENT_ENV_LOAD_ERROR,
+    LOG_UI_MULTI_AGENT_ENV_LOADED,
 )
 
 _LOG = logging.getLogger(__name__)

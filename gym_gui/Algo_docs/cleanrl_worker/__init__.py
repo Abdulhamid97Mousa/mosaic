@@ -4,13 +4,15 @@ from __future__ import annotations
 
 from typing import Dict
 
-from .ppo import ALGO_DOCS as PPO_DOCS, DEFAULT_PPO_DOC
-from .ppo_continuous_action import ALGO_DOCS as PPO_CONTINUOUS_DOCS
 from .ddpg import ALGO_DOCS as DDPG_DOCS
-from .td3 import ALGO_DOCS as TD3_DOCS
-from .sac import ALGO_DOCS as SAC_DOCS
+from .dqn import ALGO_DOCS as DQN_DOCS
+from .dqn import DEFAULT_DQN_DOC
+from .ppo import ALGO_DOCS as PPO_DOCS
+from .ppo import DEFAULT_PPO_DOC
+from .ppo_continuous_action import ALGO_DOCS as PPO_CONTINUOUS_DOCS
 from .rainbow import ALGO_DOCS as RAINBOW_DOCS
-from .dqn import ALGO_DOCS as DQN_DOCS, DEFAULT_DQN_DOC
+from .sac import ALGO_DOCS as SAC_DOCS
+from .td3 import ALGO_DOCS as TD3_DOCS
 
 ALGO_DOCS: Dict[str, str] = {}
 ALGO_DOCS.update(PPO_DOCS)

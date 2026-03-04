@@ -41,7 +41,6 @@ import pytest
 import torch
 import torch.nn as nn
 
-
 # =============================================================================
 # Helpers — thin stand-ins for MainWindow internals we want to test in
 # isolation without importing Qt.
@@ -306,7 +305,7 @@ class TestInteractiveRuntimePlayerIdRouting:
         """Build a minimal InteractiveRuntime without touching stdin/stdout."""
         import sys
         sys.path.insert(0, "3rd_party/xuance_worker")
-        from xuance_worker.runtime import InteractiveRuntime, InteractiveConfig
+        from xuance_worker.runtime import InteractiveConfig, InteractiveRuntime
 
         config = InteractiveConfig(
             run_id="test_run",
@@ -363,7 +362,7 @@ class TestInteractiveRuntimePlayerIdRouting:
 
     def test_init_agent_stores_player_id(self):
         runtime = self._make_runtime()
-        captured = self._capture_emit(runtime)
+        self._capture_emit(runtime)
         runtime._agent = self._mock_agent()
 
         runtime._handle_init_agent({
@@ -445,7 +444,7 @@ class TestInteractiveRuntimePlayerIdRouting:
     def test_mappo_agent_0_one_hot_is_10(self):
         """MAPPO: agent_0's one-hot in a 2-agent game must be [1, 0]."""
         runtime = self._make_runtime(method="mappo")
-        captured = self._capture_emit(runtime)
+        self._capture_emit(runtime)
         runtime._n_agents = 2
         runtime._agent = self._mock_agent(action=1, parameter_sharing=True)
         runtime._player_id = "agent_0"
@@ -465,7 +464,7 @@ class TestInteractiveRuntimePlayerIdRouting:
     def test_mappo_agent_1_one_hot_is_01(self):
         """MAPPO: agent_1's one-hot in a 2-agent game must be [0, 1]."""
         runtime = self._make_runtime(method="mappo")
-        captured = self._capture_emit(runtime)
+        self._capture_emit(runtime)
         runtime._n_agents = 2
         runtime._agent = self._mock_agent(action=2, parameter_sharing=True)
         runtime._player_id = "agent_1"

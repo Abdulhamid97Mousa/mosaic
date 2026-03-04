@@ -16,7 +16,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Mapping, Optional, Sequence, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Mapping, Optional, Sequence
 
 from gym_gui.core.enums import SteppingParadigm
 
@@ -429,7 +429,7 @@ class SequentialParadigmAdapter(ParadigmAdapter):
         else:
             self._all_done = True
             new_agent = current_agent
-            new_obs, new_reward, new_terminated, new_truncated, new_info = obs, reward, True, False, info
+            new_obs, _new_reward, _new_terminated, _new_truncated, _new_info = obs, reward, True, False, info
 
         return ParadigmStepResult(
             observations={new_agent: new_obs} if new_agent else {},

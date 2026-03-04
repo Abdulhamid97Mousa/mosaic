@@ -10,22 +10,22 @@ NOTE: This is separate from full NetHack (see game_docs/NetHack/).
 from __future__ import annotations
 
 from .controls import MINIHACK_CONTROLS_HTML
-from .navigation import (
-    MINIHACK_ROOM_HTML,
-    MINIHACK_CORRIDOR_HTML,
-    MINIHACK_MAZEWALK_HTML,
-    MINIHACK_RIVER_HTML,
-)
-from .skills import (
-    MINIHACK_SKILLS_SIMPLE_HTML,
-    MINIHACK_SKILLS_LAVA_HTML,
-    MINIHACK_SKILLS_WOD_HTML,
-    MINIHACK_SKILLS_QUEST_HTML,
-)
 from .exploration import (
     MINIHACK_EXPLORE_MAZE_HTML,
     MINIHACK_HIDENSEEK_HTML,
     MINIHACK_MEMENTO_HTML,
+)
+from .navigation import (
+    MINIHACK_CORRIDOR_HTML,
+    MINIHACK_MAZEWALK_HTML,
+    MINIHACK_RIVER_HTML,
+    MINIHACK_ROOM_HTML,
+)
+from .skills import (
+    MINIHACK_SKILLS_LAVA_HTML,
+    MINIHACK_SKILLS_QUEST_HTML,
+    MINIHACK_SKILLS_SIMPLE_HTML,
+    MINIHACK_SKILLS_WOD_HTML,
 )
 
 __all__ = [

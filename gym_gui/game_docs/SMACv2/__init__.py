@@ -10,8 +10,8 @@ Repository: https://github.com/oxwhirl/smacv2
 """
 from __future__ import annotations
 
-from .SMACv2_Terran import SMACV2_TERRAN_HTML, get_smacv2_terran_html
 from .SMACv2_Protoss import SMACV2_PROTOSS_HTML, get_smacv2_protoss_html
+from .SMACv2_Terran import SMACV2_TERRAN_HTML, get_smacv2_terran_html
 from .SMACv2_Zerg import SMACV2_ZERG_HTML, get_smacv2_zerg_html
 
 __all__ = [

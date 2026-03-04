@@ -11,19 +11,20 @@ from __future__ import annotations
 import os
 from pathlib import Path
 from typing import Optional
-from unittest.mock import Mock, patch, MagicMock
+from unittest.mock import MagicMock, Mock, patch
 
 import pytest
 
 # Check if LLM chat dependencies are available
 try:
-    from gym_gui.services.llm import (
-        HuggingFaceAuth,
-        ProxyConfig,
-        ModelDownloader,
-        LLM_CHAT_AVAILABLE,
-    )
     import huggingface_hub  # noqa: F401
+
+    from gym_gui.services.llm import (
+        LLM_CHAT_AVAILABLE,
+        HuggingFaceAuth,
+        ModelDownloader,
+        ProxyConfig,
+    )
     _HAS_HF_HUB = True
     SKIP_REASON = None
 except ImportError as e:
@@ -268,7 +269,7 @@ class TestModelDownloadWithProxy:
             progress_calls.append((percent, message))
 
         # Attempt download with progress callback
-        result = downloader.download_model(
+        downloader.download_model(
             "meta-llama/Llama-3.2-3B-Instruct",
             progress_callback=progress_callback
         )

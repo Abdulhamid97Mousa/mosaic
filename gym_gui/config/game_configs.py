@@ -6,15 +6,15 @@ These configs are separate from global application settings.
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
 from typing import Any, Dict, TypeAlias
 
 from gym_gui.constants.constants_game import (
+    BLACKJACK_DEFAULTS,
     CLIFF_WALKING_DEFAULTS,
     FROZEN_LAKE_DEFAULTS,
     FROZEN_LAKE_V2_DEFAULTS,
-    BLACKJACK_DEFAULTS,
 )
 from gym_gui.core.enums import GameId
 
@@ -26,42 +26,42 @@ def _clamp(value: float, low: float, high: float) -> float:
 @dataclass(frozen=True)
 class FrozenLakeConfig:
     """Configuration for FrozenLake environment."""
-    
+
     is_slippery: bool = True
     """If True, agent moves in intended direction with probability specified by success_rate,
     else moves in perpendicular directions with equal probability.
     If False, agent always moves in intended direction."""
-    
+
     success_rate: float = 1.0 / 3.0
     """Probability of moving in intended direction when is_slippery=True.
     For example, with success_rate=1/3:
     - P(intended direction) = 1/3
     - P(perpendicular direction 1) = 1/3
     - P(perpendicular direction 2) = 1/3"""
-    
+
     reward_schedule: tuple[float, float, float] = (1.0, 0.0, 0.0)
     """Reward amounts for reaching tiles: (Goal, Hole, Frozen).
     Default (1, 0, 0) gives +1 for goal, 0 for hole/frozen."""
-    
+
     grid_height: int = 4
     """Grid height (number of rows). Default is 4 for FrozenLake-v1, 8 for FrozenLake-v2."""
-    
+
     grid_width: int = 4
     """Grid width (number of columns). Default is 4 for FrozenLake-v1, 8 for FrozenLake-v2."""
-    
+
     start_position: tuple[int, int] | None = None
     """Starting position (row, col). If None, defaults to (0, 0)."""
-    
+
     goal_position: tuple[int, int] | None = None
     """Goal position (row, col). If None, defaults to bottom-right corner."""
-    
+
     hole_count: int | None = None
     """Number of holes. If None, uses Gymnasium default (4 for 4×4, 10 for 8×8)."""
-    
+
     random_holes: bool = False
     """If True, holes are placed randomly. If False, uses fixed Gymnasium default map patterns.
     Only applies to FrozenLake-v2 with standard 4×4 or 8×8 grids."""
-    
+
     def to_gym_kwargs(self) -> Dict[str, Any]:
         """Convert to Gymnasium environment kwargs.
 
@@ -89,23 +89,23 @@ class FrozenLakeConfig:
 @dataclass(frozen=True)
 class TaxiConfig:
     """Configuration for Taxi-v3 environment.
-    
+
     Note: Taxi-v3 in Gymnasium does not support is_raining or fickle_passenger
     parameters. These were present in older versions but removed in modern Gymnasium.
     The environment always uses deterministic movement.
     """
-    
+
     is_raining: bool = False
     """[NOT SUPPORTED] If True, the cab would move in intended direction with 80% probability.
     This parameter is kept for UI compatibility but has no effect."""
-    
+
     fickle_passenger: bool = False
     """[NOT SUPPORTED] If True, passenger would change destinations randomly.
     This parameter is kept for UI compatibility but has no effect."""
-    
+
     def to_gym_kwargs(self) -> Dict[str, Any]:
         """Convert to Gymnasium environment kwargs.
-        
+
         Note: Returns empty dict as Taxi-v3 doesn't accept custom parameters.
         """
         # Taxi-v3 doesn't support is_raining or fickle_passenger in current Gymnasium
@@ -115,12 +115,12 @@ class TaxiConfig:
 @dataclass(frozen=True)
 class CliffWalkingConfig:
     """Configuration for CliffWalking environment."""
-    
+
     is_slippery: bool = False
     """If True, the cliff can be slippery so the player may move perpendicular
     to the intended direction sometimes. If False (default), player always moves
     in intended direction."""
-    
+
     def to_gym_kwargs(self) -> Dict[str, Any]:
         """Convert to Gymnasium environment kwargs."""
         return {"is_slippery": self.is_slippery}
@@ -129,17 +129,17 @@ class CliffWalkingConfig:
 @dataclass(frozen=True)
 class BlackjackConfig:
     """Configuration for Blackjack environment."""
-    
+
     natural: bool = False
     """If True, give an additional reward for starting with a natural blackjack
     (ace and ten, sum is 21). Natural gives 1.5 reward instead of 1.0."""
-    
+
     sab: bool = False
     """If True, follow the exact rules from Sutton and Barto's book.
     When sab=True, the natural parameter is ignored. If the player achieves
     a natural blackjack and the dealer does not, the player wins (+1 reward).
     If both get a natural, it's a draw (0 reward)."""
-    
+
     def to_gym_kwargs(self) -> Dict[str, Any]:
         """Convert to Gymnasium environment kwargs."""
         return {"natural": self.natural, "sab": self.sab}

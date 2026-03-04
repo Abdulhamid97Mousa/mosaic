@@ -2,14 +2,14 @@ from __future__ import annotations
 
 """Trainer service primitives shared between the daemon and clients."""
 
-from .config import TrainRunConfig, TrainerRunMetadata, validate_train_run_config
 from .client import TrainerClient, TrainerClientConfig, TrainerClientConnectionError
 from .client_runner import TrainerClientRunner, TrainerWatchStopped, TrainerWatchSubscription
-from .registry import RunRecord, RunRegistry, RunStatus
-from .gpu import GPUAllocator, GPUReservation, GPUReservationError
+from .config import TrainerRunMetadata, TrainRunConfig, validate_train_run_config
 from .dispatcher import TrainerDispatcher, WorkerHandle
-from .signals import TrainerSignals, get_trainer_signals
+from .gpu import GPUAllocator, GPUReservation, GPUReservationError
+from .registry import RunRecord, RunRegistry, RunStatus
 from .run_manager import TrainingRunManager
+from .signals import TrainerSignals, get_trainer_signals
 
 __all__ = [
     "TrainRunConfig",

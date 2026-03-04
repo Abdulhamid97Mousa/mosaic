@@ -49,10 +49,10 @@ Planned:
 
 from .base import (
     BoardConfigDialog,
-    EditableBoardWidget,
-    PieceTrayWidget,
     BoardState,
+    EditableBoardWidget,
     GamePiece,
+    PieceTrayWidget,
 )
 from .factory import BoardConfigDialogFactory
 
@@ -61,16 +61,16 @@ from .factory import BoardConfigDialogFactory
 # The factory already handles lazy registration with try/except.
 
 try:
-    from .chess_editor import ChessConfigDialog, ChessBoardState
+    from .chess_editor import ChessBoardState, ChessConfigDialog
 except ImportError:
     pass
 
 try:
     from .base_checkers_editor import (
-        CheckersBoardState,
-        EditableCheckersBoard,
-        CheckersPieceTray,
         BaseCheckersConfigDialog,
+        CheckersBoardState,
+        CheckersPieceTray,
+        EditableCheckersBoard,
     )
 except ImportError:
     pass

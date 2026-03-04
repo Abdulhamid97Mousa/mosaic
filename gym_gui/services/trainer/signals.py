@@ -31,7 +31,7 @@ class TrainerSignals(QtCore.QObject):
 
     def emit_training_started(self, run_id: str, metadata: Dict[str, Any]) -> None:
         """Emit training_started signal.
-        
+
         Args:
             run_id: Unique identifier for the training run
             metadata: Dictionary containing run metadata (game_id, agent_id, etc.)
@@ -50,7 +50,7 @@ class TrainerSignals(QtCore.QObject):
         rollup: Dict[str, Any],
     ) -> None:
         """Emit episode_finalized signal.
-        
+
         Args:
             run_id: Unique identifier for the training run
             agent_id: Identifier for the agent
@@ -75,7 +75,7 @@ class TrainerSignals(QtCore.QObject):
         failure_reason: Optional[str] = None,
     ) -> None:
         """Emit training_finished signal.
-        
+
         Args:
             run_id: Unique identifier for the training run
             outcome: Terminal status ("succeeded", "failed", "canceled")
@@ -93,7 +93,7 @@ class TrainerSignals(QtCore.QObject):
 
     def emit_run_heartbeat(self, run_id: str, timestamp: str) -> None:
         """Emit run_heartbeat signal.
-        
+
         Args:
             run_id: Unique identifier for the training run
             timestamp: ISO-8601 timestamp of the heartbeat

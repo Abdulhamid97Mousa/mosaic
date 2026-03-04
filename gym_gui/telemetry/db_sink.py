@@ -17,15 +17,10 @@ import threading
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 import numpy as np
-from gym_gui.replay import ReplayWriter
 
-from gym_gui.core.data_model.telemetry_core import StepRecord, EpisodeRollup
-from gym_gui.telemetry.sqlite_store import TelemetrySQLiteStore
-from gym_gui.telemetry.events import Topic, TelemetryEvent
-from gym_gui.telemetry.run_bus import RunBus
 from gym_gui.constants import (
     DB_SINK_BATCH_SIZE,
     DB_SINK_CHECKPOINT_INTERVAL,
@@ -36,20 +31,25 @@ from gym_gui.constants.constants_telemetry import (
     TELEMETRY_KEY_TIME_STEP,
     TELEMETRY_KEY_VECTOR_METADATA,
 )
+from gym_gui.core.data_model.telemetry_core import EpisodeRollup, StepRecord
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
-    LOG_SERVICE_DB_SINK_INITIALIZED,
-    LOG_SERVICE_DB_SINK_STARTED,
     LOG_SERVICE_DB_SINK_ALREADY_RUNNING,
-    LOG_SERVICE_DB_SINK_STOPPED,
-    LOG_SERVICE_DB_SINK_STOP_TIMEOUT,
     LOG_SERVICE_DB_SINK_FATAL,
+    LOG_SERVICE_DB_SINK_FLUSH_LATENCY,
+    LOG_SERVICE_DB_SINK_FLUSH_STATS,
+    LOG_SERVICE_DB_SINK_INITIALIZED,
     LOG_SERVICE_DB_SINK_LOOP_EXITED,
     LOG_SERVICE_DB_SINK_QUEUE_DEPTH,
     LOG_SERVICE_DB_SINK_QUEUE_PRESSURE,
-    LOG_SERVICE_DB_SINK_FLUSH_STATS,
-    LOG_SERVICE_DB_SINK_FLUSH_LATENCY,
+    LOG_SERVICE_DB_SINK_STARTED,
+    LOG_SERVICE_DB_SINK_STOP_TIMEOUT,
+    LOG_SERVICE_DB_SINK_STOPPED,
 )
+from gym_gui.replay import ReplayWriter
+from gym_gui.telemetry.events import TelemetryEvent, Topic
+from gym_gui.telemetry.run_bus import RunBus
+from gym_gui.telemetry.sqlite_store import TelemetrySQLiteStore
 
 if TYPE_CHECKING:
     from gym_gui.replay import ReplayWriter
@@ -131,7 +131,7 @@ class TelemetryDBSink(LogConstantMixin):
         if self._thread is not None:
             self.log_constant(LOG_SERVICE_DB_SINK_ALREADY_RUNNING)
             return
-        
+
         self._stop_event.clear()
         self._thread = threading.Thread(
             target=self._run,
@@ -181,7 +181,7 @@ class TelemetryDBSink(LogConstantMixin):
                 "DB sink subscribed to RunBus topics",
                 extra={"writer_queue_size": self._writer_queue_size},
             )
-            
+
             while not self._stop_event.is_set():
                 try:
                     # Process step events (non-blocking)
@@ -221,7 +221,7 @@ class TelemetryDBSink(LogConstantMixin):
             return None
 
         if run_id not in self._replay_writers:
-            
+
 
             writer = ReplayWriter(run_id, self._replay_dir)
             writer.start()
@@ -451,7 +451,7 @@ class TelemetryDBSink(LogConstantMixin):
                     self._log_flush_stats("steps", batch_count, duration, force)
                 except Exception as e:
                     _LOGGER.exception("Failed to flush step batch", extra={"error": str(e)})
-        
+
         # Flush episodes
         if force or len(self._episode_batch) >= self._batch_size:
             if self._episode_batch:
@@ -466,7 +466,7 @@ class TelemetryDBSink(LogConstantMixin):
                     self._log_flush_stats("episodes", batch_count, duration, force)
                 except Exception as e:
                     _LOGGER.exception("Failed to flush episode batch", extra={"error": str(e)})
-        
+
         # Periodic WAL checkpoint
         if self._write_count >= self._checkpoint_interval:
             try:

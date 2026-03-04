@@ -8,18 +8,18 @@ Uses the python-chess library for board representation and validation.
 """
 
 import logging
-from typing import List, Tuple, Optional, Dict
+from typing import Dict, List, Optional, Tuple
 
 import chess
-from PyQt6 import QtWidgets, QtCore, QtGui
+from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import pyqtSignal
 
 from .base import (
     BoardConfigDialog,
-    EditableBoardWidget,
-    PieceTrayWidget,
     BoardState,
+    EditableBoardWidget,
     GamePiece,
+    PieceTrayWidget,
 )
 
 _LOGGER = logging.getLogger(__name__)

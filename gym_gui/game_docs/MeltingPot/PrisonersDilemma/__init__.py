@@ -1,7 +1,6 @@
 """Documentation for Melting Pot Prisoners Dilemma substrate."""
 from __future__ import annotations
 
-
 PRISONERS_DILEMMA_HTML = """
 <h2>Melting Pot: Prisoners Dilemma in the Matrix (Repeated)</h2>
 

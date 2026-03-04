@@ -14,44 +14,44 @@ allowing users to choose between:
 
 from __future__ import annotations
 
-import pytest
 from typing import Set
 from unittest.mock import MagicMock, patch
 
+import pytest
+
 # Import key resolvers and constants
 from gym_gui.controllers.human_input import (
-    ProcgenKeyCombinationResolver,
-    AleKeyCombinationResolver,
-    Box2DKeyCombinationResolver,
-    ViZDoomKeyCombinationResolver,
-    MeltingPotKeyCombinationResolver,
-    get_key_combination_resolver,
-    KeyCombinationResolver,
-    _KEYS_UP,
-    _KEYS_DOWN,
-    _KEYS_LEFT,
-    _KEYS_RIGHT,
-    _KEY_SPACE,
-    _KEY_UP,
-    _KEY_DOWN,
-    _KEY_LEFT,
-    _KEY_RIGHT,
-    _KEY_W,
-    _KEY_A,
-    _KEY_S,
-    _KEY_D,
-    _KEY_Q,
-    _KEY_E,
-    _KEY_G,
-    _KEY_Z,
-    _KEY_C,
-    _KEY_X,
     _KEY_1,
     _KEY_2,
     _KEY_3,
+    _KEY_A,
+    _KEY_C,
+    _KEY_D,
+    _KEY_DOWN,
+    _KEY_E,
+    _KEY_G,
+    _KEY_LEFT,
+    _KEY_Q,
+    _KEY_RIGHT,
+    _KEY_S,
+    _KEY_SPACE,
+    _KEY_UP,
+    _KEY_W,
+    _KEY_X,
+    _KEY_Z,
+    _KEYS_DOWN,
+    _KEYS_LEFT,
+    _KEYS_RIGHT,
+    _KEYS_UP,
+    AleKeyCombinationResolver,
+    Box2DKeyCombinationResolver,
+    KeyCombinationResolver,
+    MeltingPotKeyCombinationResolver,
+    ProcgenKeyCombinationResolver,
+    ViZDoomKeyCombinationResolver,
+    get_key_combination_resolver,
 )
-from gym_gui.core.enums import EnvironmentFamily, GameId, InputMode, INPUT_MODE_INFO
-
+from gym_gui.core.enums import INPUT_MODE_INFO, EnvironmentFamily, GameId, InputMode
 
 # =============================================================================
 # Test Fixtures

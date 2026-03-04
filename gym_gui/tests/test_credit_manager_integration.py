@@ -7,8 +7,9 @@ Tests validate that:
 4. Credits are properly tracked per (run_id, agent_id) pair
 """
 
-import pytest
 from unittest import mock
+
+import pytest
 
 from gym_gui.services.trainer.streams import TelemetryAsyncHub
 from gym_gui.telemetry.credit_manager import CreditManager, get_credit_manager, reset_credit_manager
@@ -36,9 +37,9 @@ class TestCreditManagerIntegration:
         """Test that hub uses the global CreditManager singleton."""
         hub1 = TelemetryAsyncHub()
         hub2 = TelemetryAsyncHub()
-        
+
         global_mgr = get_credit_manager()
-        
+
         # Both hubs should use the same global instance
         assert hub1._credit_mgr is global_mgr
         assert hub2._credit_mgr is global_mgr
@@ -49,10 +50,10 @@ class TestCreditManagerIntegration:
         hub = TelemetryAsyncHub()
         run_id = "run-1"
         agent_id = "agent-A"
-        
+
         # Stream not initialized yet
         assert hub._credit_mgr.get_credits(run_id, agent_id) == 0
-        
+
         # First consume should initialize stream
         result = hub._credit_mgr.consume_credit(run_id, agent_id)
         assert result is True, "First consume should succeed after auto-initialization"
@@ -63,14 +64,14 @@ class TestCreditManagerIntegration:
         hub = TelemetryAsyncHub()
         run_id = "run-1"
         agent_id = "agent-A"
-        
+
         mgr = hub._credit_mgr
-        initial = mgr.consume_credit(run_id, agent_id) and mgr.get_credits(run_id, agent_id)
-        
+        mgr.consume_credit(run_id, agent_id) and mgr.get_credits(run_id, agent_id)
+
         # Consume more credits
         mgr.consume_credit(run_id, agent_id)
         mgr.consume_credit(run_id, agent_id)
-        
+
         final = mgr.get_credits(run_id, agent_id)
         # Initial should be 199, final should be 197
         assert final == 197
@@ -80,14 +81,14 @@ class TestCreditManagerIntegration:
         hub = TelemetryAsyncHub()
         run_id = "run-1"
         agent_id = "agent-A"
-        
+
         mgr = hub._credit_mgr
-        
+
         # Deplete all credits
         for _ in range(200):
             if not mgr.consume_credit(run_id, agent_id):
                 break
-        
+
         # Attempt to consume when empty
         result = mgr.consume_credit(run_id, agent_id)
         assert result is False, "Should return False when no credits available"
@@ -99,17 +100,17 @@ class TestCreditManagerIntegration:
         run_id = "run-1"
         agent_a = "agent-A"
         agent_b = "agent-B"
-        
+
         mgr = hub._credit_mgr
-        
+
         # Consume from agent_a
         mgr.consume_credit(run_id, agent_a)
         mgr.consume_credit(run_id, agent_a)
         mgr.consume_credit(run_id, agent_a)
-        
+
         # Initialize agent_b so we can check its credits
         mgr.initialize_stream(run_id, agent_b)
-        
+
         # agent_a should have 197, agent_b should have 200
         assert mgr.get_credits(run_id, agent_a) == 197
         assert mgr.get_credits(run_id, agent_b) == 200
@@ -119,16 +120,16 @@ class TestCreditManagerIntegration:
         hub = TelemetryAsyncHub()
         run_id = "run-1"
         agent_id = "agent-A"
-        
+
         mgr = hub._credit_mgr
-        
+
         # Consume all credits
         for _ in range(200):
             if not mgr.consume_credit(run_id, agent_id):
                 break
-        
+
         assert mgr.get_credits(run_id, agent_id) == 0
-        
+
         # Grant new credits
         mgr.grant_credits(run_id, agent_id, 50)
         assert mgr.get_credits(run_id, agent_id) == 50
@@ -139,17 +140,17 @@ class TestCreditManagerIntegration:
         run_1 = "run-1"
         run_2 = "run-2"
         agent_id = "agent-A"
-        
+
         mgr = hub._credit_mgr
-        
+
         # Initialize both runs
         mgr.initialize_stream(run_1, agent_id)
         mgr.initialize_stream(run_2, agent_id)
-        
+
         # Consume from run_1 only
         mgr.consume_credit(run_1, agent_id)
         mgr.consume_credit(run_1, agent_id)
-        
+
         # run_1 should have 198 remaining, run_2 should stay at 200
         assert mgr.get_credits(run_1, agent_id) == 198
         assert mgr.get_credits(run_2, agent_id) == 200
@@ -159,14 +160,14 @@ class TestCreditManagerIntegration:
         hub1 = TelemetryAsyncHub()
         hub1._credit_mgr.consume_credit("run-1", "agent-A")
         hub1._credit_mgr.consume_credit("run-2", "agent-B")
-        
+
         # Verify credits were consumed
         assert hub1._credit_mgr.get_credits("run-1", "agent-A") == 199
         assert hub1._credit_mgr.get_credits("run-2", "agent-B") == 199
-        
+
         # Reset
         reset_credit_manager()
-        
+
         # Create new hub after reset
         hub2 = TelemetryAsyncHub()
         assert hub2._credit_mgr.get_credits("run-1", "agent-A") == 0  # Not initialized
@@ -175,7 +176,7 @@ class TestCreditManagerIntegration:
     def test_credit_initialization_with_custom_initial_credits(self):
         """Test that CreditManager can be created with custom initial credits."""
         custom_mgr = CreditManager(initial_credits=500)
-        
+
         # Initialize stream
         custom_mgr.initialize_stream("run-1", "agent-A")
         assert custom_mgr.get_credits("run-1", "agent-A") == 500
@@ -185,19 +186,19 @@ class TestCreditManagerIntegration:
         hub = TelemetryAsyncHub()
         run_id = "run-1"
         agent_id = "agent-A"
-        
+
         mgr = hub._credit_mgr
-        
+
         # Consume all credits
         for _ in range(200):
             mgr.consume_credit(run_id, agent_id)
-        
+
         # Attempt to consume more (should fail)
         attempts = 0
         while not mgr.consume_credit(run_id, agent_id):
             attempts += 1
             if attempts >= 5:
                 break
-        
+
         assert attempts == 5, "Multiple consume attempts should fail when exhausted"
         assert mgr.get_credits(run_id, agent_id) == 0

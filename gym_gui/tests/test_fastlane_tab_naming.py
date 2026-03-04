@@ -8,8 +8,9 @@ Ensures:
 - Grid dimension calculations are correct
 """
 
+from typing import Any, Dict, List, Tuple
+
 import pytest
-from typing import Dict, Any, List, Tuple
 
 
 class TestMetadataExtraction:

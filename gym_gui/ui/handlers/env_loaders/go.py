@@ -16,20 +16,21 @@ from qtpy import QtCore, QtWidgets
 
 if TYPE_CHECKING:
     from qtpy.QtWidgets import QStatusBar
-    from gym_gui.ui.widgets.render_tabs import RenderTabs
+
     from gym_gui.ui.widgets.control_panel import ControlPanelWidget
+    from gym_gui.ui.widgets.render_tabs import RenderTabs
 
 from gym_gui.controllers.go_controller import GoGameController
 from gym_gui.core.adapters.go_adapter import GoState
 from gym_gui.core.enums import GameId
 from gym_gui.rendering.strategies.board_game import BoardGameRendererStrategy
 from gym_gui.services.go_ai import (
-    KataGoService,
-    KataGoConfig,
-    KATAGO_DIFFICULTY_PRESETS,
-    GnuGoService,
-    GnuGoConfig,
     GNUGO_DIFFICULTY_PRESETS,
+    KATAGO_DIFFICULTY_PRESETS,
+    GnuGoConfig,
+    GnuGoService,
+    KataGoConfig,
+    KataGoService,
 )
 
 _LOG = logging.getLogger(__name__)

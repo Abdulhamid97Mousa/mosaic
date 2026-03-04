@@ -5,8 +5,9 @@ Linux keycode to Qt key translation table.
 Maps Linux input event keycodes (from /usr/include/linux/input-event-codes.h)
 to PyQt6 Qt.Key values for use with evdev keyboard monitoring.
 """
-from PyQt6.QtCore import Qt
 from typing import Dict
+
+from PyQt6.QtCore import Qt
 
 # Linux input keycodes to Qt Key mapping
 # Source: /usr/include/linux/input-event-codes.h

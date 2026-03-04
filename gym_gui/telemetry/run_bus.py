@@ -59,7 +59,7 @@ class RunBus:
         self._last_seq: Dict[Tuple[str, str], int] = {}  # (run_id, agent_id) -> last_seq_id
 
         _LOGGER.info(f"RunBus initialized with default max_queue={max_queue}")
-    
+
     def subscribe(self, topic: Topic, subscriber_id: SubscriberId) -> queue.Queue:
         """Subscribe to a topic with default queue size.
 
@@ -94,17 +94,17 @@ class RunBus:
             extra={"max_queue": max_queue},
         )
         return q
-    
+
     def unsubscribe(self, topic: Topic, subscriber_id: SubscriberId) -> None:
         """Unsubscribe from a topic.
-        
+
         Args:
             topic: Event topic to unsubscribe from
             subscriber_id: Subscriber identifier
         """
         self._queues.pop((topic, subscriber_id), None)
         _LOGGER.debug(f"Subscriber {subscriber_id} unsubscribed from {topic.name}")
-    
+
     def publish(self, evt: TelemetryEvent) -> None:
         """Publish an event to all subscribers (non-blocking).
 
@@ -123,7 +123,7 @@ class RunBus:
             gap = evt.seq_id - last_seq - 1
             if gap > 0:
                 _LOGGER.warning(
-                    f"Sequence gap detected in RunBus",
+                    "Sequence gap detected in RunBus",
                     extra={
                         "run_id": evt.run_id,
                         "agent_id": evt.agent_id,
@@ -159,10 +159,10 @@ class RunBus:
                     self._overflow[(topic, subscriber_id)] += 1
                 else:
                     raise
-    
+
     def overflow_stats(self) -> Dict[str, int]:
         """Get overflow statistics for all subscribers.
-        
+
         Returns:
             Dict mapping "TOPIC:subscriber_id" to overflow count
         """
@@ -171,12 +171,12 @@ class RunBus:
             for (t, sid), n in self._overflow.items()
             if n > 0
         }
-    
+
     def reset_overflow_stats(self) -> None:
         """Reset all overflow counters."""
         self._overflow.clear()
         _LOGGER.debug("Overflow stats reset")
-    
+
     def queue_sizes(self) -> Dict[str, int]:
         """Get current queue sizes for all subscribers.
 
@@ -206,7 +206,7 @@ _bus_instance: Optional[RunBus] = None
 
 def get_bus() -> RunBus:
     """Get or create the global RunBus singleton.
-    
+
     Returns:
         The global RunBus instance
     """

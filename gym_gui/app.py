@@ -4,10 +4,12 @@ from __future__ import annotations
 
 # CRITICAL: Set Qt API BEFORE any other imports that might use Qt
 import os
+
 os.environ.setdefault("QT_API", "PyQt6")
 
 # Suppress noisy deprecation warnings from 3rd party dependencies
 import warnings
+
 warnings.filterwarnings("ignore", message=".*Gym has been unmaintained.*")
 warnings.filterwarnings("ignore", message=".*pkg_resources is deprecated.*")
 warnings.filterwarnings("ignore", message=".*Matplotlib is not installed.*")
@@ -25,13 +27,14 @@ from functools import partial
 from typing import Any
 
 from gym_gui.config.settings import Settings, get_settings
-from gym_gui.logging_config.logger import configure_logging
 from gym_gui.logging_config.helpers import log_constant
 from gym_gui.logging_config.log_constants import (
     LOG_RUNTIME_APP_DEBUG,
     LOG_RUNTIME_APP_INFO,
     LOG_RUNTIME_APP_WARNING,
 )
+from gym_gui.logging_config.logger import configure_logging
+
 # NOTE: bootstrap_default_services and TrainerDaemonHandle are imported inside main()
 # to ensure Qt API is set before any Qt imports happen
 
@@ -135,6 +138,7 @@ def _format_settings(settings: Settings) -> str:
 def _get_system_info() -> dict[str, Any]:
     """Get system information (CPU, RAM)."""
     import platform
+
     import psutil
 
     info: dict[str, Any] = {}
@@ -318,6 +322,7 @@ def main() -> int:
 
     try:
         from qtpy.QtWidgets import QApplication, QMessageBox
+
         from gym_gui.ui.main_window import MainWindow
     except ImportError as exc:  # pragma: no cover - optional dependency
         print("[gym_gui] Qt bindings not available. Install qtpy and a Qt backend (PyQt5/PyQt6/PySide2/PySide6):", exc)
@@ -352,8 +357,9 @@ def main() -> int:
     app.setApplicationName("Gym GUI")
 
     # Set the MOSAIC logo as the taskbar icon (read via _NET_WM_ICON on X11).
-    from PyQt6.QtGui import QIcon
     from pathlib import Path
+
+    from PyQt6.QtGui import QIcon
     _logo = Path(__file__).parent / "assets" / "mosaic_logo.png"
     if _logo.exists():
         app.setWindowIcon(QIcon(str(_logo)))

@@ -8,9 +8,9 @@ Tests cover:
 - Button visibility based on operator type
 """
 
-import pytest
 from unittest.mock import patch
 
+import pytest
 from qtpy import QtWidgets
 
 from gym_gui.services.operator import OperatorConfig

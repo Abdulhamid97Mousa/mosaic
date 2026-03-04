@@ -13,9 +13,10 @@ This test verifies:
 
 from __future__ import annotations
 
-import pytest
-import numpy as np
 from typing import TYPE_CHECKING, Any, Optional
+
+import numpy as np
+import pytest
 
 # Skip if pettingzoo or chess not available
 pytest.importorskip("pettingzoo")
@@ -105,9 +106,9 @@ class TestPettingZooChessMoveSequence:
 
     def test_opening_sequence(self):
         """Play an opening sequence and verify board state."""
+        import chess
         from pettingzoo.classic import chess_v6
         from pettingzoo.classic.chess import chess_utils
-        import chess
 
         env = chess_v6.env()
         env.reset(seed=42)
@@ -157,9 +158,9 @@ class TestUCIToActionConversion:
 
     def test_convert_function_white_moves(self):
         """Test conversion for white's moves."""
+        import chess
         from pettingzoo.classic import chess_v6
         from pettingzoo.classic.chess import chess_utils
-        import chess
 
         env = chess_v6.env()
         env.reset(seed=42)
@@ -209,9 +210,9 @@ class TestUCIToActionConversion:
 
     def test_convert_function_black_moves(self):
         """Test conversion for black's moves (with mirroring)."""
+        import chess
         from pettingzoo.classic import chess_v6
         from pettingzoo.classic.chess import chess_utils
-        import chess
 
         env = chess_v6.env()
         env.reset(seed=42)
@@ -341,9 +342,9 @@ class TestGameTermination:
 
     def test_scholars_mate(self):
         """Test Scholar's Mate leads to checkmate."""
+        import chess
         from pettingzoo.classic import chess_v6
         from pettingzoo.classic.chess import chess_utils
-        import chess
 
         env = chess_v6.env()
         env.reset(seed=42)

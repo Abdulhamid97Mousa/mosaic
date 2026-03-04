@@ -2,22 +2,22 @@ from __future__ import annotations
 
 """Qt session controller that bridges Gym adapters to the GUI."""
 
-from dataclasses import dataclass, asdict, is_dataclass
 import hashlib
 import logging
+import time
+from dataclasses import asdict, dataclass, is_dataclass
 from datetime import datetime
 from typing import Any, Dict, Mapping, Optional, cast
 
 import gymnasium.spaces as spaces
 import numpy as np
-
 from PyQt6 import QtCore
 from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 
 from gym_gui.config.game_configs import (
-    CliffWalkingConfig,
-    CarRacingConfig,
     BipedalWalkerConfig,
+    CarRacingConfig,
+    CliffWalkingConfig,
     FrozenLakeConfig,
     GameConfig,
     LunarLanderConfig,
@@ -25,31 +25,32 @@ from gym_gui.config.game_configs import (
     TaxiConfig,
 )
 from gym_gui.config.settings import Settings
-from gym_gui.core.adapters.base import AdapterContext, AdapterStep, EnvironmentAdapter
-from gym_gui.core.data_model import EpisodeRollup, StepRecord
-from gym_gui.core.enums import ControlMode, GameId, EnvironmentFamily, ENVIRONMENT_FAMILY_BY_GAME
-from gym_gui.core.run_counter_manager import RunCounterManager
-from gym_gui.constants import format_episode_id, DEFAULT_RENDER_DELAY_MS
-from gym_gui.constants.constants_vector import SUPPORTED_AUTORESET_MODES
+from gym_gui.constants import DEFAULT_RENDER_DELAY_MS, format_episode_id
 from gym_gui.constants.constants_telemetry import (
     TELEMETRY_KEY_AUTORESET_MODE,
     TELEMETRY_KEY_SPACE_SIGNATURE,
     TELEMETRY_KEY_TIME_STEP,
     TELEMETRY_KEY_VECTOR_METADATA,
 )
-from gym_gui.core.spaces.vector_metadata import extract_vector_step_details
-from gym_gui.core.schema import schema_registry
-from gym_gui.core.factories.adapters import create_adapter, get_adapter_cls
+from gym_gui.constants.constants_vector import SUPPORTED_AUTORESET_MODES
 from gym_gui.controllers.interaction import (
-    InteractionController,
-    Box2DInteractionController,
-    TurnBasedInteractionController,
     AleInteractionController,
-    ViZDoomInteractionController,
-    ProcgenInteractionController,
+    Box2DInteractionController,
+    InteractionController,
     JumanjiArcadeInteractionController,
+    ProcgenInteractionController,
     SMACInteractionController,
+    TurnBasedInteractionController,
+    ViZDoomInteractionController,
 )
+from gym_gui.core.adapters.base import AdapterContext, AdapterStep, EnvironmentAdapter
+from gym_gui.core.data_model import EpisodeRollup, StepRecord
+from gym_gui.core.enums import ENVIRONMENT_FAMILY_BY_GAME, ControlMode, EnvironmentFamily, GameId
+from gym_gui.core.factories.adapters import create_adapter, get_adapter_cls
+from gym_gui.core.run_counter_manager import RunCounterManager
+from gym_gui.core.schema import schema_registry
+from gym_gui.core.spaces.vector_metadata import extract_vector_step_details
+from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
     LOG_NORMALIZATION_STATS_DROPPED,
     LOG_SCHEMA_MISMATCH,
@@ -60,17 +61,14 @@ from gym_gui.logging_config.log_constants import (
     LOG_SPACE_DESCRIPTOR_MISSING,
     LOG_VECTOR_AUTORESET_MODE,
 )
-from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.services.actor import ActorService, EpisodeSummary, StepSnapshot
 from gym_gui.services.policy_mapping import PolicyMappingService
-from gym_gui.services.storage import StorageRecorderService
 from gym_gui.services.service_locator import get_service_locator
+from gym_gui.services.storage import StorageRecorderService
 from gym_gui.services.telemetry import TelemetryService
+from gym_gui.utils.fps_counter import FpsCounter
 from gym_gui.utils.seeding import SessionSeedManager
 from gym_gui.utils.timekeeping import SessionTimers
-from gym_gui.utils.fps_counter import FpsCounter
-import time
-
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -710,7 +708,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         worker_id: str | None = None,
     ) -> None:
         """Set the run context for this session (e.g., when launched from trainer).
-        
+
         Args:
             run_id: ULID or unique run identifier
             max_episodes: Max episodes per run (default: 1M)
@@ -740,7 +738,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
 
     def _begin_episode(self, game_id: GameId | None, control_mode: ControlMode) -> None:
         """Begin a new episode with counter-based episode ID.
-        
+
         Episode ID format:
         - With run context: f"{run_id}-ep{ep_index:06d}"
         - Without run context: f"{game_id.value}-ep{ep_index:06d}"
@@ -1422,10 +1420,10 @@ class SessionController(QtCore.QObject, LogConstantMixin):
 
         # Build configuration context string
         config_info = self._build_config_context()
-        
+
         # Detect slippage for discrete action games (FrozenLake, CliffWalking)
         slippage_info = self._detect_slippage(action, delta)
-        
+
         # Construct log message with configuration and slippage context
         log_parts = [
             f"Step {self._step_index}",
@@ -1437,22 +1435,22 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             f"position={new_position}",
             f"delta={delta}",
         ]
-        
+
         if config_info:
             log_parts.append(config_info)
-        
+
         if slippage_info:
             log_parts.append(slippage_info)
-        
+
         _LOGGER.debug(" ".join(log_parts))
 
     def _build_config_context(self) -> str:
         """Build a configuration context string for logging."""
         if self._game_config is None or self._game_id is None:
             return ""
-        
+
         config_parts = []
-        
+
         if isinstance(self._game_config, FrozenLakeConfig):
             config_parts.append(f"is_slippery={self._game_config.is_slippery}")
         elif isinstance(self._game_config, CliffWalkingConfig):
@@ -1469,11 +1467,11 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             config_parts.append(f"domain_randomize={self._game_config.domain_randomize}")
         elif isinstance(self._game_config, BipedalWalkerConfig):
             config_parts.append(f"hardcore={self._game_config.hardcore}")
-        
+
         if config_parts:
             return f"config=[{', '.join(config_parts)}]"
         return ""
-    
+
     def _detect_slippage(self, action: int | list[int] | None, delta: tuple[int, int] | None) -> str:
         """Detect if movement differs from intended action (slippage)."""
         if delta is None or self._game_id is None:
@@ -1486,7 +1484,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         # Skip slippage detection for multi-agent actions (list) or None
         if not isinstance(action, int):
             return ""
-        
+
         # Map actions to expected deltas for toy-text games
         # 0=Left, 1=Down, 2=Right, 3=Up
         expected_deltas = {
@@ -1495,15 +1493,15 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             2: (0, 1),   # Right
             3: (-1, 0),  # Up
         }
-        
+
         expected = expected_deltas.get(action)
         if expected is None:
             return ""
-        
+
         if delta != expected:
             action_names = {0: "Left", 1: "Down", 2: "Right", 3: "Up"}
             intended = action_names.get(action, f"action{action}")
-            
+
             # Determine observed direction from delta
             observed_dir = "no_movement"
             if delta == (0, -1):
@@ -1516,9 +1514,9 @@ class SessionController(QtCore.QObject, LogConstantMixin):
                 observed_dir = "Up"
             elif delta == (0, 0):
                 observed_dir = "stayed_in_place"
-            
+
             return f"slippage_detected[intended={intended}, observed={observed_dir}]"
-        
+
         return ""
 
     def _update_status(self, step: AdapterStep, *, prefix: str | None = None) -> None:

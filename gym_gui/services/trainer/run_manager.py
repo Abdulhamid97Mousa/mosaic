@@ -17,8 +17,8 @@ from gym_gui.config.paths import VAR_TRAINER_DIR
 from gym_gui.services.trainer.registry import RunRecord, RunRegistry, RunStatus
 
 if TYPE_CHECKING:
-    from gym_gui.services.trainer.client_runner import TrainerClientRunner
     from gym_gui.services.telemetry import TelemetryService
+    from gym_gui.services.trainer.client_runner import TrainerClientRunner
 
 
 _LOGGER = logging.getLogger(__name__)

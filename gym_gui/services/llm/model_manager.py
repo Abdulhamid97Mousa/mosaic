@@ -328,7 +328,7 @@ class ModelDownloader:
 
         # Also check standard HF cache
         try:
-            from huggingface_hub import try_to_load_from_cache, scan_cache_dir
+            from huggingface_hub import scan_cache_dir, try_to_load_from_cache
 
             # Check if model exists in any cache
             cache_info = scan_cache_dir()
@@ -366,7 +366,7 @@ class ModelDownloader:
             RuntimeError: If download fails
         """
         try:
-            from huggingface_hub import snapshot_download, HfApi
+            from huggingface_hub import HfApi, snapshot_download
         except ImportError:
             raise RuntimeError(
                 "huggingface_hub is required for model download. "

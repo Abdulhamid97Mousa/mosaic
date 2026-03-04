@@ -207,7 +207,7 @@ class TestCheckersMoveExecution:
 
     def test_player_changes_after_move(self, adapter: "CheckersEnvironmentAdapter") -> None:
         """Test that current player changes after a move."""
-        initial_player = adapter.current_agent()
+        adapter.current_agent()
 
         legal_moves = adapter.get_legal_moves()
         if legal_moves:
@@ -461,7 +461,8 @@ class TestCheckersSignalChain:
         """Test that board renderer emits cell_clicked signal."""
         pytest.importorskip("qtpy")
 
-        from qtpy import QtWidgets, QtCore
+        from qtpy import QtCore, QtWidgets
+
         from gym_gui.rendering.strategies.board_game import _CheckersBoardRenderer
 
         # Need QApplication for Qt widgets
@@ -486,7 +487,8 @@ class TestCheckersSignalChain:
         pytest.importorskip("qtpy")
 
         from qtpy import QtWidgets
-        from gym_gui.rendering.strategies.board_game import _BoardGameWidget, GameId
+
+        from gym_gui.rendering.strategies.board_game import GameId, _BoardGameWidget
 
         app = QtWidgets.QApplication.instance()
         if app is None:

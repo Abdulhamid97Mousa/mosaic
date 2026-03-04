@@ -8,8 +8,9 @@ Tests that:
 
 from __future__ import annotations
 
-import pytest
 from typing import TYPE_CHECKING
+
+import pytest
 
 if TYPE_CHECKING:
     from gym_gui.core.adapters.meltingpot import MeltingPotAdapter
@@ -58,9 +59,9 @@ class TestMeltingPotAdapterFactory:
 
     def test_adapter_with_config(self) -> None:
         """Can create adapter with custom config."""
+        from gym_gui.config.game_configs import MeltingPotConfig
         from gym_gui.core.enums import GameId
         from gym_gui.core.factories.adapters import create_adapter
-        from gym_gui.config.game_configs import MeltingPotConfig
 
         config = MeltingPotConfig(
             substrate_name="territory__rooms",
@@ -95,8 +96,8 @@ class TestMeltingPotAdapterBasics:
     @pytest.fixture
     def adapter(self) -> "MeltingPotAdapter":
         """Create a Melting Pot adapter for testing."""
-        from gym_gui.core.adapters.meltingpot import MeltingPotAdapter
         from gym_gui.config.game_configs import MeltingPotConfig
+        from gym_gui.core.adapters.meltingpot import MeltingPotAdapter
 
         config = MeltingPotConfig(substrate_name="collaborative_cooking__circuit")
         adapter = MeltingPotAdapter(config=config)
@@ -179,8 +180,8 @@ class TestMeltingPotAdapterCapabilities:
 
     def test_action_meanings(self) -> None:
         """Adapter provides action meanings."""
-        from gym_gui.core.adapters.meltingpot import MeltingPotAdapter, MELTINGPOT_ACTION_NAMES
         from gym_gui.config.game_configs import MeltingPotConfig
+        from gym_gui.core.adapters.meltingpot import MELTINGPOT_ACTION_NAMES, MeltingPotAdapter
 
         config = MeltingPotConfig(substrate_name="collaborative_cooking__circuit")
         adapter = MeltingPotAdapter(config=config)
@@ -197,8 +198,8 @@ class TestMeltingPotAdapterCapabilities:
     )
     def test_sample_actions(self) -> None:
         """Adapter can sample actions."""
-        from gym_gui.core.adapters.meltingpot import MeltingPotAdapter
         from gym_gui.config.game_configs import MeltingPotConfig
+        from gym_gui.core.adapters.meltingpot import MeltingPotAdapter
 
         config = MeltingPotConfig(substrate_name="collaborative_cooking__circuit")
         adapter = MeltingPotAdapter(config=config)

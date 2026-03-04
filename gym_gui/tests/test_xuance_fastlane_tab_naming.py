@@ -7,9 +7,10 @@ Ensures:
 - Multi-agent XuanCe runs (MAPPO, QMIX, etc.) are handled correctly
 """
 
-import pytest
-from typing import Dict, Any
+from typing import Any, Dict
 from unittest.mock import MagicMock
+
+import pytest
 
 
 class TestXuanCeMetadataSupport:
@@ -131,9 +132,7 @@ class TestXuanCeTabTitle:
     def test_xuance_live_tab_title_with_env_id(self):
         """XuanCe live training uses XuanCe-Live-{env_id}."""
         # Build expected title using the helper logic
-        worker_id = "xuance_worker"
         env_id = "Humanoid-v4"
-        run_mode = "training"
         agent_id = ""
 
         # Mirror handler logic
@@ -146,9 +145,7 @@ class TestXuanCeTabTitle:
 
     def test_xuance_eval_tab_title(self):
         """XuanCe policy eval uses XuanCe-Eval-{env_id}."""
-        worker_id = "xuance_worker"
         env_id = "CartPole-v1"
-        run_mode = "policy_eval"
         agent_id = ""
 
         prefix = "XuanCe"
@@ -160,9 +157,7 @@ class TestXuanCeTabTitle:
 
     def test_xuance_tab_title_fallback_to_default(self):
         """XuanCe with no env_id or agent_id uses 'default'."""
-        worker_id = "xuance_worker"
         env_id = ""
-        run_mode = "training"
         agent_id = ""
 
         prefix = "XuanCe"

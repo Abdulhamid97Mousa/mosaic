@@ -6,17 +6,17 @@ import asyncio
 import errno
 import logging
 import threading
-from queue import Queue, Empty
+from queue import Empty, Queue
 from typing import Any, Iterable, Optional, Sequence
 
-from gym_gui.services.trainer.client import TrainerClient, TrainerClientConfig
-from gym_gui.services.trainer.registry import RunStatus
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
-    LOG_TRAINER_CLIENT_LOOP_NONFATAL,
     LOG_TRAINER_CLIENT_LOOP_ERROR,
+    LOG_TRAINER_CLIENT_LOOP_NONFATAL,
     LOG_TRAINER_CLIENT_SHUTDOWN_WARNING,
 )
+from gym_gui.services.trainer.client import TrainerClient, TrainerClientConfig
+from gym_gui.services.trainer.registry import RunStatus
 
 
 class TrainerClientRunner(LogConstantMixin):

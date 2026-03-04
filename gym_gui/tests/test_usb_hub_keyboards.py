@@ -7,13 +7,14 @@ No special libraries needed - uses built-in Python only.
 
 NOTE: This is a standalone diagnostic script, not a pytest test module.
 """
-import os
 import glob
-import struct
+import os
 import select
+import struct
 import sys
 
 import pytest
+
 pytestmark = pytest.mark.skip(reason="Standalone hardware diagnostic script, not a pytest test")
 
 
@@ -60,7 +61,7 @@ def test_keyboard_access(keyboards):
         except PermissionError:
             print(f"✗ PERMISSION DENIED: {name}")
             print(f"  Fix: sudo usermod -a -G input {os.getenv('USER')}")
-            print(f"  Then: Log out and log back in")
+            print("  Then: Log out and log back in")
         except Exception as e:
             print(f"✗ ERROR: {name} - {e}")
         print()
