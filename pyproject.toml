@@ -507,8 +507,6 @@ ignore = [
     "E741",   # Ambiguous variable name
     "F401",   # Imported but unused (handled by pyright)
     "F403",   # Unable to detect undefined names
-    "W503",   # Line break before binary operator
-    "W504",   # Line break after binary operator
     "W605",   # Invalid escape sequence
 ]
 
