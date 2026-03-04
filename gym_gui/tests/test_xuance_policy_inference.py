@@ -156,6 +156,7 @@ def env():
     import gymnasium as gym
 
     # Register mosaic_multigrid environments
+    pytest.importorskip("mosaic_multigrid", reason="mosaic_multigrid not installed")
     import mosaic_multigrid.envs  # noqa: F401
 
     e = gym.make(ENV_ID, render_mode=None)

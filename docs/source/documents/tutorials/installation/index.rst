@@ -330,6 +330,9 @@ Each file includes ``-r base.txt`` to pull in shared dependencies:
    ├── balrog_worker.txt      # BALROG LLM evaluation benchmark
    ├── llm_worker.txt         # MOSAIC native LLM worker
    ├── mosaic_llm_worker.txt  # Full LLM worker stack
+   ├── mosaic_vlm_worker.txt  # MOSAIC VLM worker (vision-language)
+   ├── mosaic_random_worker.txt # MOSAIC Random baseline worker
+   ├── mosaic_passive_worker.txt # MOSAIC Passive baseline worker
    ├── chat.txt               # Chat UI (OpenRouter + vLLM)
    └── mujoco_mpc_worker.txt  # MuJoCo MPC controller
 
@@ -721,7 +724,7 @@ Both SMAC and SMACv2 require the StarCraft II game binary.
 Special Setup: Local 3rd-Party Packages
 ---------------------------------------
 
-Some environment families install from local source in ``3rd_party/``
+Some environment families and workers install from local source in ``3rd_party/``
 rather than PyPI:
 
 .. code-block:: bash
@@ -737,6 +740,13 @@ rather than PyPI:
 
    # RWARE (warehouse delivery)
    pip install -e 3rd_party/robotic-warehouse/
+
+   # MOSAIC Native Workers (see "MOSAIC Native Workers" section above)
+   pip install -e 3rd_party/mosaic/human_worker/
+   pip install -r requirements/mosaic_llm_worker.txt && pip install -e 3rd_party/mosaic/llm_worker/
+   pip install -r requirements/mosaic_vlm_worker.txt && pip install -e 3rd_party/mosaic/vlm_worker/
+   pip install -r requirements/mosaic_random_worker.txt && pip install -e 3rd_party/mosaic/random_worker/
+   pip install -r requirements/mosaic_passive_worker.txt && pip install -e 3rd_party/mosaic/passive_worker/
 
 .. note::
 

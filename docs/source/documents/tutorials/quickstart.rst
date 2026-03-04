@@ -79,6 +79,12 @@ Running a Multi-Agent Environment
    - Player 0: Human Keyboard
    - Player 1: Random Policy
 
+   .. tip::
+
+      MOSAIC native workers (LLM, VLM, Random, Passive, Human) can also be
+      assigned as agents. Install them from ``3rd_party/mosaic/`` — see the
+      :doc:`installation/index` guide for details.
+
 5. Click **Play**
 
 Project Structure

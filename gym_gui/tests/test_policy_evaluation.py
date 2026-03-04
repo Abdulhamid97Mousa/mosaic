@@ -251,8 +251,8 @@ class TestLoadPolicyDialog:
 
 
 @pytest.mark.skipif(
-    not importlib.util.find_spec("ray_worker"),
-    reason="ray_worker not installed",
+    not importlib.util.find_spec("ray_worker") or not importlib.util.find_spec("ray"),
+    reason="ray_worker or ray not installed",
 )
 class TestPolicyEvaluator:
     """Tests for PolicyEvaluator."""

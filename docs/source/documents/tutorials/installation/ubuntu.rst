@@ -192,15 +192,19 @@ paradigms:
    pip install -e 3rd_party/mosaic/human_worker/
 
    # LLM Worker (multi-agent LLM coordination with Theory of Mind)
+   pip install -r requirements/mosaic_llm_worker.txt
    pip install -e 3rd_party/mosaic/llm_worker/
 
    # VLM Worker (vision-language model agents with image observations)
+   pip install -r requirements/mosaic_vlm_worker.txt
    pip install -e 3rd_party/mosaic/vlm_worker/
 
    # Random Worker (uniform random action baseline)
+   pip install -r requirements/mosaic_random_worker.txt
    pip install -e 3rd_party/mosaic/random_worker/
 
    # Passive Worker (deterministic noop/still baseline)
+   pip install -r requirements/mosaic_passive_worker.txt
    pip install -e 3rd_party/mosaic/passive_worker/
 
 .. list-table::
