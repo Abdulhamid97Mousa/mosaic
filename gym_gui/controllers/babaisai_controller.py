@@ -16,7 +16,7 @@ from typing import Any, Callable, Dict, List, Optional
 from qtpy import QtCore
 from qtpy.QtCore import Signal as pyqtSignal
 
-from gym_gui.core.adapters.babaisai import BabaIsAIAdapter, BabaIsAIConfig, BABAISAI_ACTIONS
+from gym_gui.core.adapters.babaisai import BABAISAI_ACTIONS, BabaIsAIAdapter, BabaIsAIConfig
 
 _LOG = logging.getLogger(__name__)
 

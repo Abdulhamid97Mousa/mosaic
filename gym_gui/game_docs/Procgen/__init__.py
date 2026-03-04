@@ -17,9 +17,6 @@ Reference:
 from __future__ import annotations
 
 from .ProcgenEnv import (
-    get_procgen_html,
-    PROCGEN_ENV_DESCRIPTIONS,
-    PROCGEN_HTML_MAP,
     PROCGEN_BIGFISH_HTML,
     PROCGEN_BOSSFIGHT_HTML,
     PROCGEN_CAVEFLYER_HTML,
@@ -27,8 +24,10 @@ from .ProcgenEnv import (
     PROCGEN_CLIMBER_HTML,
     PROCGEN_COINRUN_HTML,
     PROCGEN_DODGEBALL_HTML,
+    PROCGEN_ENV_DESCRIPTIONS,
     PROCGEN_FRUITBOT_HTML,
     PROCGEN_HEIST_HTML,
+    PROCGEN_HTML_MAP,
     PROCGEN_JUMPER_HTML,
     PROCGEN_LEAPER_HTML,
     PROCGEN_MAZE_HTML,
@@ -36,6 +35,7 @@ from .ProcgenEnv import (
     PROCGEN_NINJA_HTML,
     PROCGEN_PLUNDER_HTML,
     PROCGEN_STARPILOT_HTML,
+    get_procgen_html,
 )
 
 __all__ = [

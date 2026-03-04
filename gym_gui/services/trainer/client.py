@@ -12,15 +12,16 @@ from weakref import WeakKeyDictionary
 import grpc
 
 from gym_gui.constants import TRAINER_DEFAULTS
-from .registry import RunStatus
-from gym_gui.services.trainer.proto import trainer_pb2 as trainer_pb2_module
-from gym_gui.services.trainer.proto import trainer_pb2_grpc
 from gym_gui.logging_config.helpers import LogConstantMixin, log_constant
 from gym_gui.logging_config.log_constants import (
-    LOG_TRAINER_CLIENT_CONNECTING,
     LOG_TRAINER_CLIENT_CONNECTED,
+    LOG_TRAINER_CLIENT_CONNECTING,
     LOG_TRAINER_CLIENT_CONNECTION_TIMEOUT,
 )
+from gym_gui.services.trainer.proto import trainer_pb2 as trainer_pb2_module
+from gym_gui.services.trainer.proto import trainer_pb2_grpc
+
+from .registry import RunStatus
 
 trainer_pb2 = cast(Any, trainer_pb2_module)
 

@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from enum import Enum
-import logging
 from typing import Optional
 
 from PyQt6 import QtCore, QtGui, QtWidgets
@@ -12,9 +12,9 @@ from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
-    LOG_UI_TAB_CLOSURE_DIALOG_OPENED,
-    LOG_UI_TAB_CLOSURE_CHOICE_SELECTED,
     LOG_UI_TAB_CLOSURE_CHOICE_CANCELLED,
+    LOG_UI_TAB_CLOSURE_CHOICE_SELECTED,
+    LOG_UI_TAB_CLOSURE_DIALOG_OPENED,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -71,7 +71,7 @@ class TabClosureDialog(QtWidgets.QDialog, LogConstantMixin):
 
         self._init_ui()
         self._apply_styling()
-        
+
         # Initialize selected choice to KEEP (default radio button)
         self._update_selected_choice()
 
@@ -118,7 +118,7 @@ class TabClosureDialog(QtWidgets.QDialog, LogConstantMixin):
         # Radio buttons for choices - use button group to ensure mutual exclusivity
         self._choice_group = QtWidgets.QGroupBox("Data Retention")
         choice_layout = QtWidgets.QVBoxLayout()
-        
+
         # Create a button group to manage radio buttons
         self._button_group = QtWidgets.QButtonGroup()
 

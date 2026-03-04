@@ -7,7 +7,11 @@ This package contains:
 
 from gym_gui.policy_discovery.cleanrl_policy_metadata import (
     CleanRlCheckpoint,
+)
+from gym_gui.policy_discovery.cleanrl_policy_metadata import (
     discover_policies as discover_cleanrl_policies,
+)
+from gym_gui.policy_discovery.cleanrl_policy_metadata import (
     load_metadata_for_policy as load_cleanrl_metadata,
 )
 from gym_gui.policy_discovery.ray_policy_metadata import (
@@ -17,6 +21,8 @@ from gym_gui.policy_discovery.ray_policy_metadata import (
     discover_ray_policies,
     get_checkpoints_for_env,
     get_latest_checkpoint,
+)
+from gym_gui.policy_discovery.ray_policy_metadata import (
     load_checkpoint_metadata as load_ray_checkpoint_metadata,
 )
 

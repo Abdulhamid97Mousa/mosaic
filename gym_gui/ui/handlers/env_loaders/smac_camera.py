@@ -14,10 +14,10 @@ import logging
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
-    from gym_gui.ui.widgets.render_tabs import RenderTabs
     from gym_gui.controllers.session import SessionController
+    from gym_gui.ui.widgets.render_tabs import RenderTabs
 
-from gym_gui.core.enums import EnvironmentFamily, ENVIRONMENT_FAMILY_BY_GAME
+from gym_gui.core.enums import ENVIRONMENT_FAMILY_BY_GAME, EnvironmentFamily
 
 _LOG = logging.getLogger(__name__)
 

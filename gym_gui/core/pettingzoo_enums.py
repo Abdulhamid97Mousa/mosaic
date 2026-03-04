@@ -5,7 +5,7 @@ from __future__ import annotations
 from enum import auto
 from typing import Dict, List, Tuple
 
-from gym_gui.core.enums import StrEnum, ControlMode, RenderMode
+from gym_gui.core.enums import ControlMode, RenderMode, StrEnum
 
 
 class PettingZooFamily(StrEnum):

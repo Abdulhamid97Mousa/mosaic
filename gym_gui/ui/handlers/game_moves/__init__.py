@@ -11,11 +11,11 @@ Available handlers:
 - CheckersHandler: Checkers move handling (OpenSpiel via Shimmy)
 """
 
-from gym_gui.ui.handlers.game_moves.chess import ChessHandler
-from gym_gui.ui.handlers.game_moves.go import GoHandler
-from gym_gui.ui.handlers.game_moves.connect_four import ConnectFourHandler
-from gym_gui.ui.handlers.game_moves.sudoku import SudokuHandler
 from gym_gui.ui.handlers.game_moves.checkers import CheckersHandler
+from gym_gui.ui.handlers.game_moves.chess import ChessHandler
+from gym_gui.ui.handlers.game_moves.connect_four import ConnectFourHandler
+from gym_gui.ui.handlers.game_moves.go import GoHandler
+from gym_gui.ui.handlers.game_moves.sudoku import SudokuHandler
 
 __all__ = [
     "ChessHandler",

@@ -1,7 +1,7 @@
 """Test RGB renderer backward compatibility with legacy 'frame' key."""
 
-import pytest
 import numpy as np
+import pytest
 from qtpy import QtWidgets
 
 from gym_gui.rendering.strategies.rgb import RgbRendererStrategy
@@ -75,14 +75,14 @@ class TestRgbRendererBackwardCompatibility:
         """Test: When both keys present, 'rgb' is preferred."""
         rgb_array = np.ones((100, 100, 3), dtype=np.uint8) * 255  # White
         frame_array = np.zeros((100, 100, 3), dtype=np.uint8)  # Black
-        
+
         payload = {
             "mode": "rgb_array",
             "rgb": rgb_array,
             "frame": frame_array,  # Should be ignored
             "game_id": "Test"
         }
-        
+
         # Should not raise exception and should use 'rgb' key
         rgb_renderer.render(payload)
 

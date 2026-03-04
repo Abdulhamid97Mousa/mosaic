@@ -1,7 +1,6 @@
 """Documentation for Melting Pot Clean Up substrate."""
 from __future__ import annotations
 
-
 CLEAN_UP_HTML = """
 <h2>Melting Pot: Clean Up (Repeated)</h2>
 

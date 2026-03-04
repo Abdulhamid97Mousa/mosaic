@@ -6,17 +6,17 @@ from typing import Any, Dict, Optional
 
 from pydantic import ValidationError
 
+from gym_gui.core.schema import schema_registry
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
     LOG_SERVICE_VALIDATION_DEBUG,
-    LOG_SERVICE_VALIDATION_WARNING,
     LOG_SERVICE_VALIDATION_ERROR,
+    LOG_SERVICE_VALIDATION_WARNING,
 )
-from gym_gui.core.schema import schema_registry
 from gym_gui.validations.validations_pydantic import (
     TelemetryEventBase,
-    TrainingConfig,
     TrainerControlUpdate,
+    TrainingConfig,
     validate_telemetry_event,
 )
 

@@ -2,21 +2,21 @@ from __future__ import annotations
 
 from typing import Any
 
+from gym_gui.controllers.interaction import (
+    AleInteractionController,
+    Box2DInteractionController,
+    TurnBasedInteractionController,
+)
 from gym_gui.core.enums import (
+    DEFAULT_RENDER_MODES,
     ENVIRONMENT_FAMILY_BY_GAME,
     EnvironmentFamily,
     GameId,
     RenderMode,
-    DEFAULT_RENDER_MODES,
-)
-from gym_gui.rendering import RendererRegistry
-from gym_gui.controllers.interaction import (
-    Box2DInteractionController,
-    TurnBasedInteractionController,
-    AleInteractionController,
 )
 from gym_gui.core.factories.adapters import create_adapter
 from gym_gui.core.session_components import SessionComponents
+from gym_gui.rendering import RendererRegistry
 
 
 def create_session(game_id: GameId, context: Any, *, game_config: Any | None, renderer_registry: RendererRegistry, owner: Any) -> SessionComponents:

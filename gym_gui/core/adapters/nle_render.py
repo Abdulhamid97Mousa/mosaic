@@ -12,7 +12,6 @@ from __future__ import annotations
 import numpy as np
 from PIL import Image, ImageDraw, ImageFont
 
-
 # NetHack ANSI color palette (16 colors)
 NLE_COLORS = [
     "#000000",  # 0: Black

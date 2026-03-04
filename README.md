@@ -124,10 +124,10 @@ Heterogeneous decision-making enables a systematic ablation matrix for cross-par
 | $\rho$ | Uniform random baseline policy |
 | $\nu$ | No-op baseline policy (null action at every step) |
 | **Agent Populations and Sizes** | |
-| $\Pi^{\text{RL}} = \{\pi^{\text{RL}}_i\}_{i=1}^{n_{\text{RL}}}$ | Population of RL policies of size $n_{\text{RL}}$ |
-| $\Lambda^{\text{LLM}} = \{\lambda^{\text{LLM}}_j\}_{j=1}^{n_{\text{LLM}}}$ | Population of LLM agents of size $n_{\text{LLM}}$ |
-| $\Psi^{\text{VLM}} = \{\psi^{\text{VLM}}_k\}_{k=1}^{n_{\text{VLM}}}$ | Population of VLM agents of size $n_{\text{VLM}}$ |
-| $\mathcal{H} = \{h_m\}_{m=1}^{n_{\text{H}}}$ | Population of human operators of size $n_{\text{H}}$ |
+| $\Pi^{\text{RL}}$ | Population of RL policies, $|\Pi^{\text{RL}}| = n_{\text{RL}}$ |
+| $\Lambda^{\text{LLM}}$ | Population of LLM agents, $|\Lambda^{\text{LLM}}| = n_{\text{LLM}}$ |
+| $\Psi^{\text{VLM}}$ | Population of VLM agents, $|\Psi^{\text{VLM}}| = n_{\text{VLM}}$ |
+| $\mathcal{H}$ | Population of human operators, $|\mathcal{H}| = n_{\text{H}}$ |
 | $N = n_{\text{RL}} + n_{\text{LLM}} + n_{\text{VLM}} + n_{\text{H}}$ | Total number of agents in the system |
 | **Team Partitions** | |
 | $\mathcal{T}_A, \mathcal{T}_B$ | Disjoint team partitions: $\mathcal{T}_A \cap \mathcal{T}_B = \emptyset$, $\mathcal{T}_A \cup \mathcal{T}_B = \{1,\ldots,N\}$ |
@@ -160,7 +160,7 @@ Heterogeneous decision-making enables a systematic ablation matrix for cross-par
 
 The first set of configurations establishes single-paradigm baselines before introducing cross-paradigm matchups to measure relative performance.
 Let $\mathcal{T}_A$ and $\mathcal{T}_B$ denote disjoint team partitions with $|\mathcal{T}_A| = n_A$ and $|\mathcal{T}_B| = n_B$.
-For each team $\mathcal{T}_k$ ($k \in \{A,B\}$), we define its paradigm composition as $(\Pi^{\text{RL}}_k, \Lambda^{\text{LLM}}_k, \Psi^{\text{VLM}}_k, \mathcal{H}_k)$ where $\Pi^{\text{RL}}_k + \Lambda^{\text{LLM}}_k + \Psi^{\text{VLM}}_k + \mathcal{H}_k = n_k$.
+For each team $\mathcal{T}_k$ ($k \in A,B$), we define its paradigm composition as $(\Pi^{\text{RL}}_k, \Lambda^{\text{LLM}}_k, \Psi^{\text{VLM}}_k, \mathcal{H}_k)$ where $\Pi^{\text{RL}}_k + \Lambda^{\text{LLM}}_k + \Psi^{\text{VLM}}_k + \mathcal{H}_k = n_k$.
 
 | Config | Team A Composition | Team B Composition | Purpose |
 | :--- | :--- | :--- | :--- |

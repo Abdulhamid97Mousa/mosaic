@@ -9,11 +9,11 @@ This loader handles:
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Optional, Callable
+from typing import TYPE_CHECKING, Callable, Optional
 
 if TYPE_CHECKING:
-    from gym_gui.ui.widgets.render_tabs import RenderTabs
     from gym_gui.controllers.session import SessionController
+    from gym_gui.ui.widgets.render_tabs import RenderTabs
 
 from gym_gui.controllers.human_input import get_vizdoom_mouse_turn_actions
 

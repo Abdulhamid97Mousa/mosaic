@@ -9,7 +9,7 @@ This widget provides three game modes for multi-agent environments:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Dict, List, Optional
 
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import pyqtSignal
@@ -30,14 +30,14 @@ from gym_gui.core.pettingzoo_enums import (
     get_human_vs_agent_envs,
     is_aec_env,
 )
-from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
 from gym_gui.ui.widgets.human_vs_agent_config_form import (
-    HumanVsAgentConfigForm,
-    HumanVsAgentConfig,
     DIFFICULTY_PRESETS,
+    HumanVsAgentConfig,
+    HumanVsAgentConfigForm,
 )
-from gym_gui.ui.widgets.policy_assignment_panel import PolicyAssignmentPanel
 from gym_gui.ui.widgets.load_policy_dialog import LoadPolicyDialog
+from gym_gui.ui.widgets.policy_assignment_panel import PolicyAssignmentPanel
+from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -272,9 +272,9 @@ class HumanVsAgentTab(QtWidgets.QWidget):
             self._selected_env = None  # Not a PettingZooEnvId
             self._selected_env_value = "checkers"
             self._env_info.setText(
-                f"<b>Checkers (OpenSpiel)</b><br/>"
-                f"Classic checkers/draughts board game via OpenSpiel<br/>"
-                f"<i>API: AEC (Turn-based)</i>"
+                "<b>Checkers (OpenSpiel)</b><br/>"
+                "Classic checkers/draughts board game via OpenSpiel<br/>"
+                "<i>API: AEC (Turn-based)</i>"
             )
             # Reset loaded state when environment changes
             self._environment_loaded = False
@@ -539,7 +539,7 @@ class HumanVsAgentTab(QtWidgets.QWidget):
                 "Makes random legal moves (for testing)."
             )
         elif config.opponent_type == "stockfish":
-            preset = DIFFICULTY_PRESETS.get(config.difficulty)
+            DIFFICULTY_PRESETS.get(config.difficulty)
             summary = (
                 f"<b>AI Opponent:</b> Stockfish ({config.difficulty.capitalize()})<br>"
                 f"Skill: {config.stockfish.skill_level}, "
@@ -795,7 +795,8 @@ class MultiAgentCooperationTab(QtWidgets.QWidget):
         try:
             # Try to create environment and get agents
             from gym_gui.core.adapters.pettingzoo import PettingZooAdapter, PettingZooConfig
-            from gym_gui.core.pettingzoo_enums import PettingZooEnvId, PettingZooFamily as PZFamily
+            from gym_gui.core.pettingzoo_enums import PettingZooEnvId
+            from gym_gui.core.pettingzoo_enums import PettingZooFamily as PZFamily
 
             # Create config for the environment
             try:
@@ -1090,7 +1091,8 @@ class MultiAgentCompetitionTab(QtWidgets.QWidget):
 
         try:
             from gym_gui.core.adapters.pettingzoo import PettingZooAdapter, PettingZooConfig
-            from gym_gui.core.pettingzoo_enums import PettingZooEnvId, PettingZooFamily as PZFamily
+            from gym_gui.core.pettingzoo_enums import PettingZooEnvId
+            from gym_gui.core.pettingzoo_enums import PettingZooFamily as PZFamily
 
             # Create config for the environment
             try:

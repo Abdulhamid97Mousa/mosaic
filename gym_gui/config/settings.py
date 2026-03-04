@@ -2,16 +2,14 @@ from __future__ import annotations
 
 """Runtime configuration management for the Gym GUI project."""
 
-from dataclasses import dataclass
 import os
+from dataclasses import dataclass
 from pathlib import Path
+
 import yaml  # type: ignore[import-not-found]
-
-
 from dotenv import load_dotenv
 
 from gym_gui.cache.memory import memoize
-
 from gym_gui.core.enums import ControlMode
 
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent

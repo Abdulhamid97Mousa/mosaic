@@ -10,8 +10,9 @@ Tests that the Chess adapter:
 
 from __future__ import annotations
 
-import pytest
 from typing import TYPE_CHECKING, Any, Dict
+
+import pytest
 
 if TYPE_CHECKING:
     from gym_gui.core.adapters.pettingzoo_classic import ChessEnvironmentAdapter
@@ -317,9 +318,9 @@ class TestChessFactoryRegistration:
     def test_chess_in_pettingzoo_classic_family(self) -> None:
         """Chess is in PETTINGZOO_CLASSIC environment family."""
         from gym_gui.core.enums import (
+            ENVIRONMENT_FAMILY_BY_GAME,
             EnvironmentFamily,
             GameId,
-            ENVIRONMENT_FAMILY_BY_GAME,
         )
 
         assert GameId.CHESS in ENVIRONMENT_FAMILY_BY_GAME
@@ -349,7 +350,7 @@ class TestScholarsMate:
         ]
 
         for i, move in enumerate(moves):
-            step = adapter.step_uci(move)
+            adapter.step_uci(move)
 
             # Last move should be checkmate
             if i == len(moves) - 1:

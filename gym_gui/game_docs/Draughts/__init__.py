@@ -15,7 +15,6 @@ References:
 
 from __future__ import annotations
 
-
 AMERICAN_CHECKERS_HTML = """
 <h2>American Checkers (English Draughts)</h2>
 

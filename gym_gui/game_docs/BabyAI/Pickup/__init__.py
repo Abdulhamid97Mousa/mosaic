@@ -8,7 +8,7 @@ def get_pickup_html(env_id: str = "BabyAI-Pickup-v0") -> str:
 <h2>{env_id}</h2>
 
 <p style="background-color: #e8f5e9; padding: 8px; border-radius: 4px;">
-Part of the <strong>BabyAI</strong> environment family. 
+Part of the <strong>BabyAI</strong> environment family.
 <a href="https://minigrid.farama.org/environments/babyai/">BabyAI Overview</a>
 </p>
 

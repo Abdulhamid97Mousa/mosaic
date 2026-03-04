@@ -2,30 +2,30 @@ from __future__ import annotations
 
 """Async dispatcher that orchestrates trainer worker lifecycle."""
 
-import sys
 import asyncio
-from collections import deque
-from datetime import datetime, timedelta, timezone
+import contextlib
+import importlib.util
+import json
 import logging
 import os
-import json
-import contextlib
-from pathlib import Path
-import signal
 import re
+import signal
+import sys
+from collections import deque
+from datetime import datetime, timedelta, timezone
+from pathlib import Path
 from typing import Any, Callable, Optional
-import importlib.util
 
-from gym_gui.services.trainer import RunRecord, RunRegistry, RunStatus
 from gym_gui.config.paths import VAR_TRAINER_DIR
-from gym_gui.services.trainer.gpu import GPUAllocator
-from gym_gui.core.subprocess_validation import validated_create_subprocess_exec
 from gym_gui.core.agent_config import get_agent_config
+from gym_gui.core.subprocess_validation import validated_create_subprocess_exec
 from gym_gui.logging_config.helpers import log_constant
 from gym_gui.logging_config.log_constants import (
-    get_constant_by_code,
     LOG_TRAINER_WORKER_IMPORT_ERROR,
+    get_constant_by_code,
 )
+from .registry import RunRecord, RunRegistry, RunStatus
+from gym_gui.services.trainer.gpu import GPUAllocator
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -53,25 +53,25 @@ _LOG_CODE_PATTERN = re.compile(
 
 def _parse_structured_log_line(line: str) -> tuple[str | None, dict[str, Any] | None]:
     """Parse a structured log line from worker output.
-    
+
     Expected format: "LOG_CODE | message | extra={...}"
-    
+
     Returns:
         Tuple of (log_code, extra_dict) if parseable, else (None, None).
     """
     match = _LOG_CODE_PATTERN.match(line.strip())
     if not match:
         return None, None
-    
+
     code = match.group('code')
-    message = match.group('message')
+    match.group('message')
     extra_str = match.group('extra')
-    
+
     try:
         extra = json.loads(extra_str)
     except json.JSONDecodeError:
         return None, None
-    
+
     return code, extra
 
 
@@ -84,7 +84,7 @@ def _re_emit_worker_log(
     worker_type: str = "",
 ) -> None:
     """Re-emit a worker log as a structured log constant.
-    
+
     Looks up the LOG_CODE, extracts component/subcomponent, and calls log_constant.
     Falls back gracefully if the code is not recognized.
     """
@@ -95,7 +95,7 @@ def _re_emit_worker_log(
             extra={"run_id": run_id, "code": code, "worker_extra": extra}
         )
         return
-    
+
     # Ensure component and subcomponent are present in extra dict
     worker_extra = dict(extra)
     worker_extra.setdefault('component', constant.component)
@@ -104,7 +104,7 @@ def _re_emit_worker_log(
         worker_extra.setdefault('worker_id', worker_id)
     if worker_type:
         worker_extra.setdefault('worker_type', worker_type)
-    
+
     try:
         log_constant(_LOGGER, constant, extra=worker_extra)
     except Exception as e:
@@ -351,7 +351,7 @@ class TrainerDispatcher:
     def _build_worker_command(self, run: RunRecord) -> list[str]:
         """Build the subprocess command for the trainer worker."""
 
-        
+
         config_payload = self._registry.get_run_config_json(run.run_id)
         worker_cmd: list[str] | None = None
         config_path: Optional[Path] = None

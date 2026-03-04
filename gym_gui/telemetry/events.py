@@ -24,7 +24,7 @@ class Topic(Enum):
 @dataclass(slots=True)
 class TelemetryEvent:
     """Immutable telemetry event for Pub/Sub distribution.
-    
+
     Attributes:
         topic: Event topic (RUN_STARTED, STEP_APPENDED, etc.)
         run_id: Training run identifier
@@ -33,14 +33,14 @@ class TelemetryEvent:
         ts_iso: ISO-8601 timestamp from producer
         payload: Event-specific data (step, episode, run metadata)
     """
-    
+
     topic: Topic
     run_id: str
     agent_id: Optional[str]
     seq_id: int                    # Strictly increasing per stream
     ts_iso: str                    # Producer timestamp (ISO-8601)
     payload: Dict[str, Any]        # step|episode|run metadata
-    
+
     def __repr__(self) -> str:
         """Compact representation for logging."""
         return (

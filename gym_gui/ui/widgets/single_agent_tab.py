@@ -11,13 +11,13 @@ Single-Agent Mode now focuses on training via Workers.
 from __future__ import annotations
 
 import logging
-from typing import Optional, List
+from typing import List, Optional
 
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtCore import pyqtSignal
 
-from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
 from gym_gui.ui.forms.factory import get_worker_form_factory
+from gym_gui.ui.worker_catalog import WorkerDefinition, get_worker_catalog
 
 _LOGGER = logging.getLogger("gym_gui.ui.single_agent_tab")
 

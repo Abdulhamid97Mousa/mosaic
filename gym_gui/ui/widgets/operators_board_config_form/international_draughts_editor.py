@@ -9,12 +9,11 @@ This editor is for the International Draughts variant:
 Game ID: draughts/international_draughts
 """
 
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 from PyQt6 import QtWidgets
 
 from .base_checkers_editor import BaseCheckersConfigDialog
-
 
 # Standard 10x10 draughts positions (50 dark squares)
 # 20 pieces per side, 10 empty squares in middle

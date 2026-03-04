@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING, Dict, List, Set
 
 if TYPE_CHECKING:
     from qtpy.QtWidgets import QComboBox, QPlainTextEdit
+
     from gym_gui.ui.logging_bridge import LogRecordPayload
 
 

@@ -32,7 +32,7 @@ def run_demo(
 ) -> None:
     """
     Run a simple demo training loop that emits telemetry.
-    
+
     Args:
         run_id: Run identifier for correlation
         agent_id: Agent identifier for correlation
@@ -46,7 +46,7 @@ def run_demo(
 
     for episode_idx in range(num_episodes):
         total_reward = 0.0
-        
+
         for step_idx in range(steps_per_episode):
             # Simulate observations and actions
             observation = {
@@ -56,9 +56,9 @@ def run_demo(
             action = random.randint(0, 3)
             reward = random.choice([0.0, 0.0, 0.0, 1.0])  # Sparse rewards
             total_reward += reward
-            
+
             terminated = (step_idx == steps_per_episode - 1)
-            
+
             # Emit step event as JSONL
             step_event = {
                 "type": "step",
@@ -76,10 +76,10 @@ def run_demo(
                 "ts_unix_ns": int(time.time_ns()),
             }
             emit_jsonl(step_event)
-            
+
             # Simulate step delay
             time.sleep(step_delay)
-        
+
         # Emit episode summary event with rich metadata
         episode_event = {
             "type": "episode",
@@ -104,13 +104,13 @@ def run_demo(
             "ts_unix_ns": int(time.time_ns()),
         }
         emit_jsonl(episode_event)
-        
+
         sys.stderr.write(
             f"[demo_worker] Episode {episode_idx} complete: "
             f"reward={total_reward:.2f}, steps={steps_per_episode}\n"
         )
         sys.stderr.flush()
-    
+
     sys.stderr.write(f"[demo_worker] All {num_episodes} episodes complete\n")
     sys.stderr.flush()
 
@@ -123,9 +123,9 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--episodes", type=int, default=3, help="Number of episodes")
     parser.add_argument("--steps", type=int, default=15, help="Steps per episode")
     parser.add_argument("--delay", type=float, default=0.03, help="Delay between steps")
-    
+
     args = parser.parse_args(argv)
-    
+
     try:
         run_demo(
             run_id=args.run_id,

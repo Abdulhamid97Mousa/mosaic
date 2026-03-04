@@ -5,12 +5,12 @@ from __future__ import annotations
 import argparse
 import asyncio
 import contextlib
-from datetime import datetime, timezone
 import logging
 import os
-from pathlib import Path
 import signal
-from typing import Any, Optional, TYPE_CHECKING
+from datetime import datetime, timezone
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Optional
 
 # Initialize platform-specific modules to None
 fcntl = None  # type: ignore[assignment]
@@ -30,23 +30,22 @@ except ImportError:  # pragma: no cover
 
 import grpc
 from google.protobuf import __version__ as protobuf_version
+from google.protobuf.timestamp_pb2 import Timestamp
 from packaging.version import Version
 
 from gym_gui.config.paths import (
     VAR_TELEMETRY_DIR,
-    VAR_TRAINER_DIR,
     VAR_TRAINER_DB,
+    VAR_TRAINER_DIR,
     ensure_var_directories,
 )
+from gym_gui.constants import TRAINER_DEFAULTS
 from gym_gui.logging_config.log_constants import LOG_DAEMON_START
 from gym_gui.logging_config.logger import configure_logging
 from gym_gui.services.trainer import GPUAllocator, RunRegistry, RunStatus, TrainerDispatcher
-from gym_gui.constants import TRAINER_DEFAULTS
-from gym_gui.services.trainer.service import _record_to_proto
-from google.protobuf.timestamp_pb2 import Timestamp
-
 from gym_gui.services.trainer.proto import trainer_pb2, trainer_pb2_grpc
 from gym_gui.services.trainer.registry import WALCheckpointStats
+from gym_gui.services.trainer.service import _record_to_proto
 from gym_gui.telemetry import TelemetrySQLiteStore
 from gym_gui.telemetry.db_sink import TelemetryDBSink
 from gym_gui.telemetry.run_bus import get_bus
@@ -226,14 +225,14 @@ class TrainerDaemon:
                 "Trainer daemon gRPC endpoint is configured without TLS",
                 extra={"listen": self._listen, "mode": "development-only"},
             )
-        
+
         # Create dispatcher with broadcaster callback
         async def broadcast_callback(run_id: str) -> None:
             record = self._registry.get_run(run_id)
             if record:
-                
+
                 await self._broadcaster.publish(_record_to_proto(record))
-        
+
         self._dispatcher = TrainerDispatcher(
             self._registry,
             self._gpu_allocator,

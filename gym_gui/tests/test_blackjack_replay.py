@@ -9,18 +9,19 @@ This test verifies that:
 
 from __future__ import annotations
 
-import pytest
 import tempfile
-from pathlib import Path
 from datetime import datetime, timezone
+from pathlib import Path
 
-from gym_gui.core.enums import GameId, ControlMode
-from gym_gui.core.adapters.toy_text import BlackjackAdapter
+import pytest
+
 from gym_gui.config.game_configs import DEFAULT_BLACKJACK_CONFIG
+from gym_gui.core.adapters.toy_text import BlackjackAdapter
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
+from gym_gui.core.enums import ControlMode, GameId
 from gym_gui.replays.loader import EpisodeReplayLoader
-from gym_gui.telemetry.sqlite_store import TelemetrySQLiteStore
 from gym_gui.services.telemetry import TelemetryService
+from gym_gui.telemetry.sqlite_store import TelemetrySQLiteStore
 
 
 class TestBlackjackReplay:
@@ -51,7 +52,7 @@ class TestBlackjackReplay:
         """Test that Blackjack episodes are recorded with control_mode metadata."""
         adapter = BlackjackAdapter(game_config=DEFAULT_BLACKJACK_CONFIG)
         adapter.load()
-        
+
         # Simulate human-controlled episode
         episode_id = "blackjack-test-001"
         episode_metadata = {
@@ -60,7 +61,7 @@ class TestBlackjackReplay:
             "seed": 42,
             "episode_index": 0,
         }
-        
+
         # Record initial step
         initial_step = adapter.reset(seed=42)
         step_record = StepRecord(
@@ -77,7 +78,7 @@ class TestBlackjackReplay:
             timestamp=datetime.now(timezone.utc),
         )
         telemetry_service.record_step(step_record)
-        
+
         # Record a game step (Stick action)
         step_result = adapter.step(0)  # Stick
         step_record = StepRecord(
@@ -94,7 +95,7 @@ class TestBlackjackReplay:
             timestamp=datetime.now(timezone.utc),
         )
         telemetry_service.record_step(step_record)
-        
+
         # Complete episode
         rollup = EpisodeRollup(
             episode_id=episode_id,
@@ -108,7 +109,7 @@ class TestBlackjackReplay:
             game_id=GameId.BLACKJACK.value,
         )
         telemetry_service.complete_episode(rollup)
-        
+
         # Verify episode was recorded
         episodes = list(telemetry_service.recent_episodes())
         assert len(episodes) == 1
@@ -119,14 +120,14 @@ class TestBlackjackReplay:
         """Test that replay loader can load Blackjack episodes."""
         adapter = BlackjackAdapter(game_config=DEFAULT_BLACKJACK_CONFIG)
         adapter.load()
-        
+
         episode_id = "blackjack-test-002"
         episode_metadata = {
             "game_id": GameId.BLACKJACK.value,
             "control_mode": ControlMode.HUMAN_ONLY.value,
             "seed": 123,
         }
-        
+
         # Record multiple steps
         initial_step = adapter.reset(seed=123)
         telemetry_service.record_step(StepRecord(
@@ -142,7 +143,7 @@ class TestBlackjackReplay:
             agent_id="human",
             timestamp=datetime.now(timezone.utc),
         ))
-        
+
         # Hit action
         step1 = adapter.step(1)
         telemetry_service.record_step(StepRecord(
@@ -158,7 +159,7 @@ class TestBlackjackReplay:
             agent_id="human",
             timestamp=datetime.now(timezone.utc),
         ))
-        
+
         # Stick action
         step2 = adapter.step(0)
         telemetry_service.record_step(StepRecord(
@@ -174,7 +175,7 @@ class TestBlackjackReplay:
             agent_id="human",
             timestamp=datetime.now(timezone.utc),
         ))
-        
+
         telemetry_service.complete_episode(EpisodeRollup(
             episode_id=episode_id,
             total_reward=step2.reward,
@@ -186,10 +187,10 @@ class TestBlackjackReplay:
             agent_id="human",
             game_id=GameId.BLACKJACK.value,
         ))
-        
+
         # Load episode via replay loader
         replay = replay_loader.load_episode(episode_id)
-        
+
         assert replay is not None
         assert replay.episode_id == episode_id
         assert len(replay.steps) == 3
@@ -199,7 +200,7 @@ class TestBlackjackReplay:
         """Test that human episode filtering works for Blackjack."""
         adapter = BlackjackAdapter(game_config=DEFAULT_BLACKJACK_CONFIG)
         adapter.load()
-        
+
         # Create human episode
         human_episode_id = "blackjack-human-001"
         human_metadata = {
@@ -232,7 +233,7 @@ class TestBlackjackReplay:
             agent_id="human",
             game_id=GameId.BLACKJACK.value,
         ))
-        
+
         # Create agent episode
         agent_episode_id = "blackjack-agent-001"
         agent_metadata = {
@@ -265,17 +266,17 @@ class TestBlackjackReplay:
             agent_id="agent",
             game_id=GameId.BLACKJACK.value,
         ))
-        
+
         # Get all episodes
         all_episodes = list(telemetry_service.recent_episodes())
         assert len(all_episodes) == 2
-        
+
         # Import the filtering function from render_tabs
         from gym_gui.ui.widgets.render_tabs import _ReplayTab
-        
+
         # Filter for human episodes only
         human_episodes = [ep for ep in all_episodes if _ReplayTab._is_human_episode(ep)]
-        
+
         assert len(human_episodes) == 1
         assert human_episodes[0].episode_id == human_episode_id
 
@@ -284,9 +285,9 @@ class TestBlackjackReplay:
         adapter = BlackjackAdapter(game_config=DEFAULT_BLACKJACK_CONFIG)
         adapter.load()
         adapter.reset(seed=42)
-        
+
         payload = adapter.render()
-        
+
         assert "game_id" in payload
         assert payload["game_id"] == GameId.BLACKJACK.value
 
@@ -294,13 +295,13 @@ class TestBlackjackReplay:
         """Test that episode rollup correctly extracts game_id from metadata."""
         adapter = BlackjackAdapter(game_config=DEFAULT_BLACKJACK_CONFIG)
         adapter.load()
-        
+
         episode_id = "blackjack-test-003"
         episode_metadata = {
             "game_id": GameId.BLACKJACK.value,
             "control_mode": ControlMode.HUMAN_ONLY.value,
         }
-        
+
         initial_step = adapter.reset(seed=42)
         telemetry_service.record_step(StepRecord(
             episode_id=episode_id,
@@ -326,11 +327,11 @@ class TestBlackjackReplay:
             agent_id="human",
             game_id=GameId.BLACKJACK.value,
         ))
-        
+
         episodes = list(telemetry_service.recent_episodes())
         assert len(episodes) == 1
         episode = episodes[0]
-        
+
         # Verify game_id is in metadata
         assert "game_id" in episode.metadata
         assert episode.metadata["game_id"] == GameId.BLACKJACK.value

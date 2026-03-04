@@ -15,14 +15,12 @@ import asyncio
 import json
 from typing import Any, Awaitable, Callable, List, Optional
 
-import pytest
-
 import grpc
-
+import pytest
 from PyQt6 import QtWidgets
 
-from gym_gui.services.trainer.proto import trainer_pb2, trainer_pb2_grpc
 from gym_gui.services.trainer import trainer_telemetry_proxy
+from gym_gui.services.trainer.proto import trainer_pb2, trainer_pb2_grpc
 from gym_gui.ui.panels.analytics_tabs import AnalyticsTabManager
 
 

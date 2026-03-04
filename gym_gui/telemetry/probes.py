@@ -37,10 +37,10 @@ class TelemetryProbes:
     @staticmethod
     def probe_telemetry_schema(db_path: Path) -> ProbeResult:
         """Verify telemetry database schema is correct.
-        
+
         Args:
             db_path: Path to telemetry SQLite database
-            
+
         Returns:
             ProbeResult indicating schema correctness
         """
@@ -101,10 +101,10 @@ class TelemetryProbes:
     @staticmethod
     def probe_telemetry_data(db_path: Path) -> ProbeResult:
         """Verify telemetry data consistency.
-        
+
         Args:
             db_path: Path to telemetry SQLite database
-            
+
         Returns:
             ProbeResult indicating data consistency
         """
@@ -180,10 +180,10 @@ class TelemetryProbes:
     @staticmethod
     def probe_trainer_schema(db_path: Path) -> ProbeResult:
         """Verify trainer database schema is correct.
-        
+
         Args:
             db_path: Path to trainer SQLite database
-            
+
         Returns:
             ProbeResult indicating schema correctness
         """

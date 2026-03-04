@@ -16,7 +16,7 @@ from gym_gui.config.game_configs import (
     SMACConfig,
     TaxiConfig,
 )
-from gym_gui.core.enums import GameId, EnvironmentFamily, ENVIRONMENT_FAMILY_BY_GAME
+from gym_gui.core.enums import ENVIRONMENT_FAMILY_BY_GAME, EnvironmentFamily, GameId
 
 try:
     from gym_gui.core.adapters.vizdoom import ViZDoomConfig
@@ -51,65 +51,65 @@ class GameConfigBuilder:
             is_slippery = bool(overrides.get("is_slippery", True))
             success_rate = float(overrides.get("success_rate", 1.0 / 3.0))
             reward_schedule = overrides.get("reward_schedule", (1.0, 0.0, 0.0))
-            
+
             # Ensure reward_schedule is a tuple of 3 floats
             if not isinstance(reward_schedule, tuple) or len(reward_schedule) != 3:
                 reward_schedule = (1.0, 0.0, 0.0)
-            
+
             return FrozenLakeConfig(
                 is_slippery=is_slippery,
                 success_rate=success_rate,
                 reward_schedule=reward_schedule,
             )
-        
+
         elif game_id == GameId.FROZEN_LAKE_V2:
             is_slippery = bool(overrides.get("is_slippery", True))
             success_rate = float(overrides.get("success_rate", 1.0 / 3.0))
             reward_schedule = overrides.get("reward_schedule", (1.0, 0.0, 0.0))
-            
+
             # Ensure reward_schedule is a tuple of 3 floats
             if not isinstance(reward_schedule, tuple) or len(reward_schedule) != 3:
                 reward_schedule = (1.0, 0.0, 0.0)
-            
+
             # Extract grid dimensions
             grid_height = overrides.get("grid_height", 8)
             grid_width = overrides.get("grid_width", 8)
-            
+
             # Sanitize dimensions
             if isinstance(grid_height, (int, float)):
                 grid_height = max(4, min(20, int(grid_height)))
             else:
                 grid_height = 8
-                
+
             if isinstance(grid_width, (int, float)):
                 grid_width = max(4, min(20, int(grid_width)))
             else:
                 grid_width = 8
-            
+
             # Extract positions
             start_position = overrides.get("start_position", (0, 0))
             goal_position = overrides.get("goal_position", (grid_height - 1, grid_width - 1))
-            
+
             # Extract hole count
             hole_count = overrides.get("hole_count", 19)
             if isinstance(hole_count, (int, float)):
                 hole_count = int(hole_count)
             else:
                 hole_count = 10
-            
+
             # Extract random_holes flag
             random_holes = bool(overrides.get("random_holes", False))
-            
+
             # Validate start_position
             if not isinstance(start_position, tuple) or len(start_position) != 2:
                 start_position = (0, 0)
-            
+
             # Validate goal_position
             if goal_position is None:
                 goal_position = (grid_height - 1, grid_width - 1)
             elif not isinstance(goal_position, tuple) or len(goal_position) != 2:
                 goal_position = (grid_height - 1, grid_width - 1)
-            
+
             return FrozenLakeConfig(
                 is_slippery=is_slippery,
                 success_rate=success_rate,
@@ -121,16 +121,16 @@ class GameConfigBuilder:
                 hole_count=hole_count,
                 random_holes=random_holes,
             )
-        
+
         elif game_id == GameId.TAXI:
             is_raining = bool(overrides.get("is_raining", False))
             fickle_passenger = bool(overrides.get("fickle_passenger", False))
             return TaxiConfig(is_raining=is_raining, fickle_passenger=fickle_passenger)
-        
+
         elif game_id == GameId.CLIFF_WALKING:
             is_slippery = bool(overrides.get("is_slippery", False))
             return CliffWalkingConfig(is_slippery=is_slippery)
-        
+
         elif game_id == GameId.LUNAR_LANDER:
             continuous = bool(overrides.get("continuous", False))
             gravity = overrides.get("gravity", -10.0)
@@ -161,7 +161,7 @@ class GameConfigBuilder:
                 turbulence_power=turbulence_value,
                 max_episode_steps=max_steps,
             )
-        
+
         elif game_id == GameId.CAR_RACING:
             continuous = bool(overrides.get("continuous", False))
             domain_randomize = bool(overrides.get("domain_randomize", False))
@@ -185,7 +185,7 @@ class GameConfigBuilder:
                 max_episode_steps=max_steps,
                 max_episode_seconds=max_seconds,
             )
-        
+
         elif game_id == GameId.BIPEDAL_WALKER:
             hardcore = bool(overrides.get("hardcore", False))
             steps_override = overrides.get("max_episode_steps")

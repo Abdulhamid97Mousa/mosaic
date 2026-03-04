@@ -20,7 +20,7 @@ import json
 import tempfile
 from pathlib import Path
 from typing import Any, Dict
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, PropertyMock, patch
 
 import pytest
 
@@ -181,9 +181,9 @@ class TestPolicyEvaluatorSummary:
     def test_get_summary_with_metrics(self):
         """Test get_summary with recorded metrics."""
         from ray_worker.policy_evaluator import (
+            EpisodeMetrics,
             EvaluationConfig,
             PolicyEvaluator,
-            EpisodeMetrics,
         )
 
         config = EvaluationConfig(
@@ -403,15 +403,15 @@ class TestLogConstants:
     def test_ray_eval_constants_exist(self):
         """Test that Ray evaluation log constants are defined."""
         from gym_gui.logging_config.log_constants import (
-            LOG_RAY_EVAL_REQUESTED,
-            LOG_RAY_EVAL_SETUP_STARTED,
-            LOG_RAY_EVAL_SETUP_COMPLETED,
-            LOG_RAY_EVAL_EPISODE_STARTED,
             LOG_RAY_EVAL_EPISODE_COMPLETED,
-            LOG_RAY_EVAL_RUN_COMPLETED,
+            LOG_RAY_EVAL_EPISODE_STARTED,
             LOG_RAY_EVAL_ERROR,
             LOG_RAY_EVAL_FASTLANE_CONNECTED,
             LOG_RAY_EVAL_POLICY_LOADED,
+            LOG_RAY_EVAL_REQUESTED,
+            LOG_RAY_EVAL_RUN_COMPLETED,
+            LOG_RAY_EVAL_SETUP_COMPLETED,
+            LOG_RAY_EVAL_SETUP_STARTED,
             LOG_RAY_EVAL_TAB_CREATED,
         )
 
@@ -443,8 +443,9 @@ class TestRunEvaluationFunction:
 
     def test_function_signature(self):
         """Test run_evaluation has expected parameters."""
-        from ray_worker.policy_evaluator import run_evaluation
         import inspect
+
+        from ray_worker.policy_evaluator import run_evaluation
 
         sig = inspect.signature(run_evaluation)
         params = list(sig.parameters.keys())
@@ -522,8 +523,9 @@ class TestPolicyAssignmentPanelConfig:
 def qapp():
     """Create QApplication for GUI tests."""
     try:
-        from qtpy import QtWidgets
         import os
+
+        from qtpy import QtWidgets
         if not os.environ.get("DISPLAY") and not os.environ.get("QT_QPA_PLATFORM"):
             os.environ["QT_QPA_PLATFORM"] = "offscreen"
 

@@ -19,7 +19,7 @@ class Migration:
 
     def __init__(self, name: str, sql: str) -> None:
         """Initialize a migration.
-        
+
         Args:
             name: Unique identifier for the migration
             sql: SQL statement to execute (should be idempotent)
@@ -29,10 +29,10 @@ class Migration:
 
     def apply(self, conn: sqlite3.Connection) -> bool:
         """Apply the migration to a database connection.
-        
+
         Args:
             conn: SQLite connection
-            
+
         Returns:
             True if migration was applied, False if already applied
         """
@@ -188,7 +188,7 @@ class MigrationRunner:
     @staticmethod
     def run_telemetry_migrations(db_path: Path) -> None:
         """Run all telemetry database migrations.
-        
+
         Args:
             db_path: Path to telemetry SQLite database
         """
@@ -197,7 +197,7 @@ class MigrationRunner:
     @staticmethod
     def run_trainer_migrations(db_path: Path) -> None:
         """Run all trainer database migrations.
-        
+
         Args:
             db_path: Path to trainer SQLite database
         """
@@ -206,7 +206,7 @@ class MigrationRunner:
     @staticmethod
     def _run_migrations(db_path: Path, migrations: List[Migration]) -> None:
         """Run a list of migrations on a database.
-        
+
         Args:
             db_path: Path to SQLite database
             migrations: List of Migration objects to apply
@@ -218,7 +218,7 @@ class MigrationRunner:
         try:
             conn = sqlite3.connect(db_path)
             conn.execute("PRAGMA journal_mode=WAL")
-            
+
             for migration in migrations:
                 try:
                     migration.apply(conn)
@@ -227,7 +227,7 @@ class MigrationRunner:
                         f"Failed to apply migration {migration.name}: {e}",
                         extra={"migration": migration.name, "error": str(e)},
                     )
-            
+
             conn.close()
             _LOGGER.info(
                 f"Completed migrations for {db_path}",
@@ -246,26 +246,26 @@ class WALConfiguration:
     @staticmethod
     def configure_wal(conn: sqlite3.Connection) -> None:
         """Configure WAL mode for a database connection.
-        
+
         Args:
             conn: SQLite connection
         """
         try:
             # Enable WAL mode
             conn.execute("PRAGMA journal_mode=WAL")
-            
+
             # Synchronous mode: NORMAL is faster than FULL but still safe
             conn.execute("PRAGMA synchronous=NORMAL")
-            
+
             # WAL autocheckpoint: checkpoint after 1000 pages
             conn.execute("PRAGMA wal_autocheckpoint=1000")
-            
+
             # Cache size: use more memory for better performance
             conn.execute("PRAGMA cache_size=-64000")  # 64MB
-            
+
             # Temp store: use memory for temporary tables
             conn.execute("PRAGMA temp_store=MEMORY")
-            
+
             _LOGGER.debug("WAL configuration applied")
         except Exception as e:
             _LOGGER.warning(f"Failed to configure WAL: {e}")

@@ -4,28 +4,21 @@ from __future__ import annotations
 
 def get_empty_html(env_id: str) -> str:
     """Generate Empty Room HTML documentation for a specific variant."""
-    size = "8×8"
-    start_type = "fixed start"
-    
+
     if "5x5" in env_id:
-        size = "5×5"
         desc = "Tiny room"
     elif "6x6" in env_id:
-        size = "6×6"
         desc = "Small room"
     elif "16x16" in env_id:
-        size = "16×16"
         desc = "Large room for exploration experiments"
     else:  # 8x8
-        size = "8×8"
         desc = "Medium room"
-    
+
     if "Random" in env_id:
-        start_type = "random start"
         desc += " with randomized agent starting position each episode"
     else:
         desc += " with fixed starting position"
-    
+
     return f"""
 <h2>{env_id}</h2>
 

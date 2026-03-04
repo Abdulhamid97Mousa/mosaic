@@ -2,36 +2,34 @@
 
 from __future__ import annotations
 
-from collections import deque
 import json
 import logging
+from collections import deque
 from typing import Any, Deque, Optional
 
-from qtpy import QtCore, QtWidgets
-
 from PyQt6.QtCore import pyqtSlot  # type: ignore[attr-defined]
+from qtpy import QtCore, QtWidgets
 
 _QUEUED_CONNECTION = QtCore.Qt.ConnectionType.QueuedConnection  # type: ignore[attr-defined]
 
 
-from gym_gui.logging_config.helpers import LogConstantMixin
-from gym_gui.logging_config.log_constants import (
-    LOG_UI_LIVE_TAB_TRACE,
-    LOG_UI_LIVE_TAB_INFO,
-    LOG_UI_LIVE_TAB_WARNING,
-    LOG_UI_LIVE_TAB_ERROR,
-)
-from gym_gui.ui.widgets.base_telemetry_tab import BaseTelemetryTab
-from gym_gui.rendering import RendererRegistry, create_default_renderer_registry, RendererContext
-from gym_gui.core.enums import GameId, RenderMode
-from gym_gui.telemetry.rendering_speed_regulator import RenderingSpeedRegulator
 from gym_gui.constants import (
+    DEFAULT_EPISODE_BUFFER_SIZE,
     DEFAULT_RENDER_DELAY_MS,
     DEFAULT_TELEMETRY_BUFFER_SIZE,
-    DEFAULT_EPISODE_BUFFER_SIZE,
     UI_RENDERING_THROTTLE_MIN,
 )
-
+from gym_gui.core.enums import GameId, RenderMode
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_UI_LIVE_TAB_ERROR,
+    LOG_UI_LIVE_TAB_INFO,
+    LOG_UI_LIVE_TAB_TRACE,
+    LOG_UI_LIVE_TAB_WARNING,
+)
+from gym_gui.rendering import RendererContext, RendererRegistry, create_default_renderer_registry
+from gym_gui.telemetry.rendering_speed_regulator import RenderingSpeedRegulator
+from gym_gui.ui.widgets.base_telemetry_tab import BaseTelemetryTab
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -69,7 +67,7 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
         # Store buffer sizes for dynamic table limits
         self._buffer_size = buffer_size
         self._episode_buffer_size = episode_buffer_size
-        
+
         self._step_buffer: Deque[Any] = deque(maxlen=buffer_size)
         self._episode_buffer: Deque[Any] = deque(maxlen=episode_buffer_size)
         self._dropped_steps = 0
@@ -82,7 +80,7 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
         self._last_render_payload: Optional[dict[str, Any]] = None
         self._is_destroyed = False  # Track if widget is being destroyed
         self._pending_render_timer_id: Optional[int] = None  # Track pending QTimer for cleanup
-        
+
         # COUNTER TRACKING: Independent metrics display (not based on buffer size)
         self._current_episode_index: int = 0  # Actual episode being trained
         self._current_step_in_episode: int = 0  # Step within current episode
@@ -264,20 +262,20 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
             # This is separate from buffer size tracking
             episode_index_raw = payload.get("episode_index", 0) if isinstance(payload, dict) else getattr(payload, "episode_index", 0)
             step_index_raw = payload.get("step_index", 0) if isinstance(payload, dict) else getattr(payload, "step_index", 0)
-            
+
             try:
                 episode_idx = int(episode_index_raw) if episode_index_raw is not None else 0
                 step_idx = int(step_index_raw) if step_index_raw is not None else 0
             except (TypeError, ValueError):
                 episode_idx = 0
                 step_idx = 0
-            
+
             # Detect episode boundary: when episode_index changes from previous
             if episode_idx != self._previous_episode_index:
                 self._current_step_in_episode = 0  # Reset step counter at episode boundary
                 self._previous_episode_index = episode_idx
                 self.log_constant(LOG_UI_LIVE_TAB_INFO, message=f"add_step: Episode boundary detected (episode {episode_idx}), resetting step counter")
-            
+
             # Update current metrics
             self._current_episode_index = episode_idx
             self._current_step_in_episode = step_idx
@@ -301,7 +299,7 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
                     try:
                         payload_dict = dict(payload) if hasattr(payload, '__dict__') else {"payload": payload}
                         self._render_regulator.submit_payload(payload_dict)
-                        self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"add_step: Object payload converted and submitted to regulator")
+                        self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="add_step: Object payload converted and submitted to regulator")
                     except Exception as e:
                         self.log_constant(
                             LOG_UI_LIVE_TAB_WARNING,
@@ -319,16 +317,16 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
         This prevents segfaults when QTimer callbacks try to access a deleted widget.
         """
         try:
-            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_safe_process_deferred_render: START")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_safe_process_deferred_render: START")
             # Check if widget is being destroyed BEFORE accessing any attributes
             if not hasattr(self, '_is_destroyed') or self._is_destroyed:
-                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_safe_process_deferred_render: Widget is destroyed, skipping")
+                self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_safe_process_deferred_render: Widget is destroyed, skipping")
                 return
 
             # Now safe to call the actual render method
-            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_safe_process_deferred_render: Calling _process_deferred_render")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_safe_process_deferred_render: Calling _process_deferred_render")
             self._process_deferred_render()
-            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"_safe_process_deferred_render: COMPLETE")
+            self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_safe_process_deferred_render: COMPLETE")
         except Exception as e:
             # Log errors during deferred render
             self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=f"_safe_process_deferred_render: ERROR - {e}", exc_info=e)
@@ -398,7 +396,7 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
             reward = float(reward_raw) if reward_raw is not None else 0.0
         except (TypeError, ValueError):
             reward = 0.0
-        
+
         terminated = _get_field(payload, "terminated", default=False)
         truncated = _get_field(payload, "truncated", default=False)
 
@@ -497,7 +495,7 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
 
         # Populate row with new column layout:
         self._steps_table.setItem(row, 0, QtWidgets.QTableWidgetItem(ts_display))
-        self._steps_table.setItem(row, 1, QtWidgets.QTableWidgetItem(agent_display))  
+        self._steps_table.setItem(row, 1, QtWidgets.QTableWidgetItem(agent_display))
         self._steps_table.setItem(row, 2, QtWidgets.QTableWidgetItem(str(display_episode)))
         self._steps_table.setItem(row, 3, QtWidgets.QTableWidgetItem(str(int(step_index))))
         self._steps_table.setItem(row, 4, QtWidgets.QTableWidgetItem(str(episode_seed)))
@@ -557,7 +555,7 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
                         )
                         self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="_try_render_visual: Renderer widget size policy set to Expanding/Expanding")
                         self._render_layout.addWidget(widget)
-                        self.log_constant(LOG_UI_LIVE_TAB_INFO, message=f"_try_render_visual: Renderer widget successfully added to layout")
+                        self.log_constant(LOG_UI_LIVE_TAB_INFO, message="_try_render_visual: Renderer widget successfully added to layout")
                 except Exception as e:
                     self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=
                         f"_try_render_visual: Failed to initialize renderer: {e}",
@@ -625,7 +623,7 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
                 self._renderer_strategy.render(render_payload, context=context)
                 self.log_constant(LOG_UI_LIVE_TAB_INFO, message=f"_try_render_visual: Grid rendered successfully (grid size={len(render_payload.get('grid', []))}x{len(render_payload.get('grid', [[]])[0]) if render_payload.get('grid') else 0})")
             else:
-                self.log_constant(LOG_UI_LIVE_TAB_WARNING, message=f"_try_render_visual: Renderer does not support payload or is None")
+                self.log_constant(LOG_UI_LIVE_TAB_WARNING, message="_try_render_visual: Renderer does not support payload or is None")
                 self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"  - _renderer_strategy: {self._renderer_strategy}")
                 self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"  - supports(): {self._renderer_strategy.supports(render_payload) if self._renderer_strategy else 'N/A'}")
                 self.log_constant(LOG_UI_LIVE_TAB_TRACE, message=f"  - payload keys: {list(render_payload.keys())}")
@@ -653,8 +651,8 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
             self.log_constant(LOG_UI_LIVE_TAB_TRACE, message="add_episode: COMPLETE")
         except Exception as e:
             self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=f"add_episode: ERROR - {e}", exc_info=e)
-    
-    
+
+
     def _schedule_step_render(self, payload: Any) -> None:
         """Schedule step rendering on the GUI thread using QMetaObject.invokeMethod.
 
@@ -693,7 +691,7 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
             )
         except Exception as e:
             self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=f"_schedule_episode_render: ERROR - {e}", exc_info=e)
-            
+
     @pyqtSlot()
     def _render_latest_step_from_pending(self) -> None:
         """Wrapper to render the pending step payload. Called via QMetaObject.invokeMethod."""
@@ -704,7 +702,7 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
                 self._render_latest_step(payload)
         except Exception as e:
             self.log_constant(LOG_UI_LIVE_TAB_ERROR, message=f"_render_latest_step_from_pending: ERROR - {e}", exc_info=e)
-            
+
     @pyqtSlot()
     def _render_episode_row_from_pending(self) -> None:
         """Wrapper to render the pending episode payload. Called via QMetaObject.invokeMethod."""
@@ -769,7 +767,8 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
             if timestamp:
                 if hasattr(timestamp, 'seconds'):
                     # Protobuf Timestamp
-                    from datetime import datetime, timezone as tz
+                    from datetime import datetime
+                    from datetime import timezone as tz
                     dt = datetime.fromtimestamp(timestamp.seconds + timestamp.nanos / 1e9, tz=tz.utc)
                     ts_display = dt.strftime("%Y-%m-%d %H:%M:%S")
                 elif isinstance(timestamp, str):
@@ -845,12 +844,12 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
 
             row = self._episodes_table.rowCount()
             self._episodes_table.insertRow(row)
-            
+
             # Keep table size consistent with configured episode buffer size
             if row >= self._episode_buffer_size:
                 self._episodes_table.removeRow(0)
                 row = self._episodes_table.rowCount() - 1
-            
+
             # Column 0: Timestamp
             self._episodes_table.setItem(row, 0, QtWidgets.QTableWidgetItem(ts_display))
             self._episodes_table.setItem(row, 1, QtWidgets.QTableWidgetItem(str(worker_display)))
@@ -911,13 +910,13 @@ class LiveTelemetryTab(BaseTelemetryTab, LogConstantMixin):
 
     def _update_stats(self) -> None:
         """Refresh step/episode counters.
-        
+
         CRITICAL FIX: Display current episode/step indices, NOT buffer sizes.
         This ensures counter resets at episode boundaries and shows actual training progress.
         """
         # OLD (BROKEN): f"Steps: {len(self._step_buffer)} | Episodes: {len(self._episode_buffer)}"
         # Problem: Buffer maxes at 100, so counter gets stuck showing "100" for multiple episodes
-        
+
         has_steps = len(self._step_buffer) > 0 or self._current_step_in_episode > 0
         if has_steps:
             episode_display = max(0, self._current_episode_index) + 1

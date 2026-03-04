@@ -28,11 +28,11 @@ from gym_gui.core.enums import (
     SteppingParadigm,
 )
 from gym_gui.logging_config.log_constants import (
+    LOG_RWARE_ENV_CLOSED,
     LOG_RWARE_ENV_CREATED,
     LOG_RWARE_ENV_RESET,
-    LOG_RWARE_STEP_SUMMARY,
-    LOG_RWARE_ENV_CLOSED,
     LOG_RWARE_RENDER_ERROR,
+    LOG_RWARE_STEP_SUMMARY,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -93,14 +93,16 @@ class RWAREAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
     def action_space(self) -> gym.Space[Any]:
         if self._rware_env is None:
             # Before load, return a placeholder
-            from gymnasium.spaces import Discrete, Tuple as GymTuple
+            from gymnasium.spaces import Discrete
+            from gymnasium.spaces import Tuple as GymTuple
             return GymTuple(tuple(Discrete(5) for _ in range(self._default_n_agents)))
         return self._rware_env.action_space
 
     @property
     def observation_space(self) -> gym.Space[Any]:
         if self._rware_env is None:
-            from gymnasium.spaces import Box, Tuple as GymTuple
+            from gymnasium.spaces import Box
+            from gymnasium.spaces import Tuple as GymTuple
             return GymTuple(tuple(
                 Box(low=-np.inf, high=np.inf, shape=(1,), dtype=np.float32)
                 for _ in range(self._default_n_agents)

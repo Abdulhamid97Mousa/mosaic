@@ -176,7 +176,7 @@ class CheckersGameController(QtCore.QObject):
 
         # Validate move
         if not self._adapter.is_move_legal(action):
-            self.status_message.emit(f"Invalid move!")
+            self.status_message.emit("Invalid move!")
             return False
 
         return self._execute_move(action)

@@ -11,10 +11,9 @@ import math
 from pathlib import Path
 from typing import List, Tuple
 
-from PyQt6 import QtCore, QtWidgets, QtQuickWidgets, QtGui
+from PyQt6 import QtCore, QtGui, QtQuickWidgets, QtWidgets
 
 from gym_gui.ui.fastlane_consumer import FastLaneConsumer, FastLaneFrameEvent
-
 
 _LOGGER = logging.getLogger(__name__)
 

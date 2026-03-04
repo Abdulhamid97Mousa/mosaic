@@ -2,9 +2,9 @@
 from __future__ import annotations
 
 from gym_gui.game_docs.SMAC._shared import (
+    SMAC_ACTIONS_HTML,
     SMAC_CTDE_HTML,
     SMAC_OBS_HTML,
-    SMAC_ACTIONS_HTML,
     SMAC_REWARD_HTML,
 )
 

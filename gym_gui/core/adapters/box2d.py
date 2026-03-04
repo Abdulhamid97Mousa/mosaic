@@ -6,16 +6,16 @@ from datetime import datetime
 from typing import Any, Mapping
 
 import gymnasium as gym
-import numpy as np
 import gymnasium.spaces as spaces
-from gym_gui.core.wrappers.time_limits import EpisodeTimeLimitSeconds, configure_step_limit
+import numpy as np
 
 from gym_gui.config.game_configs import BipedalWalkerConfig, CarRacingConfig, LunarLanderConfig
 from gym_gui.core.adapters.base import AdapterContext, AdapterStep, EnvironmentAdapter, StepState
 from gym_gui.core.enums import ControlMode, GameId, RenderMode
+from gym_gui.core.wrappers.time_limits import EpisodeTimeLimitSeconds, configure_step_limit
+from gym_gui.logging_config.log_constants import LOG_ADAPTER_STEP_SUMMARY
 from gym_gui.services.action_mapping import ContinuousActionMapper
 from gym_gui.services.service_locator import get_service_locator
-from gym_gui.logging_config.log_constants import LOG_ADAPTER_STEP_SUMMARY
 
 
 class Box2DAdapter(EnvironmentAdapter[np.ndarray, Any]):

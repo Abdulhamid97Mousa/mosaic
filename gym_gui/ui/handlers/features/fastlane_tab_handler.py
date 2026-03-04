@@ -7,12 +7,12 @@ Handles both Ray multi-worker tabs and single CleanRL tabs.
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, Optional, Set, Tuple, TYPE_CHECKING, Union
+from typing import TYPE_CHECKING, Any, Callable, Dict, Optional, Set, Tuple, Union
 
 if TYPE_CHECKING:
-    from gym_gui.ui.widgets.render_tabs import RenderTabs
-    from gym_gui.logging_config.helpers import LogConstantMixin
     from gym_gui.core.enums import GameId
+    from gym_gui.logging_config.helpers import LogConstantMixin
+    from gym_gui.ui.widgets.render_tabs import RenderTabs
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -210,8 +210,8 @@ class FastLaneTabHandler:
         mode_prefix: str,
     ) -> None:
         """Open a board game FastLane tab with interactive rendering."""
-        from gym_gui.ui.widgets.board_game_fastlane_tab import BoardGameFastLaneTab
         from gym_gui.core.enums import GameId
+        from gym_gui.ui.widgets.board_game_fastlane_tab import BoardGameFastLaneTab
 
         # Map env_id to GameId
         game_id = self._env_id_to_game_id(env_id)

@@ -11,9 +11,9 @@ These tests verify:
 
 from __future__ import annotations
 
-import pytest
 from unittest.mock import MagicMock, patch
 
+import pytest
 
 # Skip all tests if Ray is not available
 pytest.importorskip("ray")
@@ -169,7 +169,7 @@ class TestPettingZooAdapterSISL:
 
     def test_sisl_enums_defined(self):
         """Test SISL environments are defined in enums."""
-        from gym_gui.core.pettingzoo_enums import PettingZooFamily, PettingZooEnvId
+        from gym_gui.core.pettingzoo_enums import PettingZooEnvId, PettingZooFamily
 
         # Test family
         assert PettingZooFamily.SISL.value == "sisl"
@@ -199,9 +199,9 @@ class TestPettingZooAdapterSISL:
     def test_get_envs_by_sisl_family(self):
         """Test getting SISL environments by family."""
         from gym_gui.core.pettingzoo_enums import (
-            get_envs_by_family,
-            PettingZooFamily,
             PettingZooEnvId,
+            PettingZooFamily,
+            get_envs_by_family,
         )
 
         sisl_envs = get_envs_by_family(PettingZooFamily.SISL)
@@ -216,7 +216,7 @@ class TestRayWorkerConfigIntegration:
 
     def test_config_uses_var_trainer_dir(self):
         """Test config resolves to var/trainer directory."""
-        from ray_worker.config import RayWorkerConfig, EnvironmentConfig
+        from ray_worker.config import EnvironmentConfig, RayWorkerConfig
 
         config = RayWorkerConfig(
             run_id="test_integration_001",
@@ -231,7 +231,7 @@ class TestRayWorkerConfigIntegration:
 
     def test_config_tensorboard_path(self):
         """Test tensorboard path is correctly resolved."""
-        from ray_worker.config import RayWorkerConfig, EnvironmentConfig
+        from ray_worker.config import EnvironmentConfig, RayWorkerConfig
 
         config = RayWorkerConfig(
             run_id="test_tb_001",
@@ -253,11 +253,11 @@ class TestLogConstants:
     def test_ray_log_constants_exist(self):
         """Test Ray worker log constants are defined."""
         from gym_gui.logging_config.log_constants import (
+            LOG_RAY_WORKER_CHECKPOINT_SAVED,
             LOG_RAY_WORKER_RUNTIME_STARTED,
             LOG_RAY_WORKER_RUNTIME_STOPPED,
-            LOG_RAY_WORKER_TRAINING_STARTED,
             LOG_RAY_WORKER_TRAINING_COMPLETED,
-            LOG_RAY_WORKER_CHECKPOINT_SAVED,
+            LOG_RAY_WORKER_TRAINING_STARTED,
         )
 
         assert LOG_RAY_WORKER_RUNTIME_STARTED.code == "LOG970"
@@ -310,8 +310,9 @@ class TestTrainFormConfiguration:
 def qapp():
     """Create QApplication for GUI tests."""
     try:
-        from qtpy import QtWidgets
         import os
+
+        from qtpy import QtWidgets
         if not os.environ.get("DISPLAY") and not os.environ.get("QT_QPA_PLATFORM"):
             os.environ["QT_QPA_PLATFORM"] = "offscreen"
 

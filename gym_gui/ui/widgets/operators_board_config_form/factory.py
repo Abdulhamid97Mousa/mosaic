@@ -20,7 +20,7 @@ Example:
 
 import logging
 from functools import partial
-from typing import Dict, Type, Optional, List
+from typing import Dict, List, Optional, Type
 
 from PyQt6 import QtWidgets
 
@@ -29,6 +29,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_UI_BOARD_CONFIG_FACTORY_CREATE,
     LOG_UI_BOARD_CONFIG_UNSUPPORTED_GAME,
 )
+
 from .base import BoardConfigDialog
 
 _LOGGER = logging.getLogger(__name__)

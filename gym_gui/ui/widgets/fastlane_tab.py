@@ -4,7 +4,7 @@ import json
 import logging
 from pathlib import Path
 
-from PyQt6 import QtCore, QtWidgets, QtQuickWidgets, QtGui
+from PyQt6 import QtCore, QtGui, QtQuickWidgets, QtWidgets
 
 from gym_gui.config.paths import VAR_TRAINER_DIR
 from gym_gui.logging_config.helpers import log_constant
@@ -14,7 +14,6 @@ from gym_gui.logging_config.log_constants import (
 )
 from gym_gui.ui.fastlane_consumer import FastLaneConsumer, FastLaneFrameEvent
 from gym_gui.ui.qml.fastlane_item import FastLaneItem  # ensures type registered
-
 
 _LOGGER = logging.getLogger(__name__)
 

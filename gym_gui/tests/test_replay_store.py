@@ -8,10 +8,10 @@ import numpy as np
 import pytest
 
 from gym_gui.replay import (
-    ReplayWriter,
-    ReplayReader,
     FrameRef,
     FrameResolver,
+    ReplayReader,
+    ReplayWriter,
     make_frame_ref,
 )
 

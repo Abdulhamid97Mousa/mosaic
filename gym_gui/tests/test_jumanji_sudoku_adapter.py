@@ -29,12 +29,12 @@ import pytest
 # Skip entire module if jumanji is not installed
 jumanji = pytest.importorskip("jumanji")
 
+from gym_gui.config.game_configs import JumanjiConfig
 from gym_gui.core.adapters.base import AdapterContext
 from gym_gui.core.adapters.jumanji import (
-    JumanjiSudokuAdapter,
     JUMANJI_ADAPTERS,
+    JumanjiSudokuAdapter,
 )
-from gym_gui.config.game_configs import JumanjiConfig
 from gym_gui.core.enums import ControlMode, GameId, RenderMode
 
 
@@ -115,10 +115,10 @@ class TestJumanjiSudokuAdapterReset:
         """Test that reset with same seed produces same puzzle."""
         adapter = _make_sudoku_adapter()
         try:
-            first = adapter.reset(seed=12345)
+            adapter.reset(seed=12345)
             first_board = adapter._initial_board.copy()
 
-            second = adapter.reset(seed=12345)
+            adapter.reset(seed=12345)
             second_board = adapter._initial_board.copy()
 
             np.testing.assert_array_equal(first_board, second_board)

@@ -28,19 +28,21 @@ def ensure_all_forms_registered() -> None:
     at package-import time, so that importing the ``forms`` package does
     not eagerly pull in heavy transitive dependencies (ray -> wandb, etc.).
     """
-    from gym_gui.ui.widgets.cleanrl_train_form import CleanRlTrainForm  # noqa: F401
-    from gym_gui.ui.widgets import cleanrl_policy_form  # noqa: F401
+    from gym_gui.ui.widgets import (
+        cleanrl_policy_form,  # noqa: F401
+        pettingzoo_policy_form,  # noqa: F401
+        ray_policy_form,  # noqa: F401
+    )
     from gym_gui.ui.widgets.cleanrl_resume_form import CleanRlResumeForm  # noqa: F401
-    from gym_gui.ui.widgets.pettingzoo_train_form import PettingZooTrainForm  # noqa: F401
-    from gym_gui.ui.widgets import pettingzoo_policy_form  # noqa: F401
-    from gym_gui.ui.widgets.ray_train_form import RayRLlibTrainForm  # noqa: F401
-    from gym_gui.ui.widgets import ray_policy_form  # noqa: F401
-    from gym_gui.ui.widgets.ray_evaluation_form import RayEvaluationForm  # noqa: F401
-    from gym_gui.ui.widgets.xuance_train_form import XuanCeTrainForm  # noqa: F401
-    from gym_gui.ui.widgets.mctx_train_form import MCTXTrainForm  # noqa: F401
-    from gym_gui.ui.widgets.marllib_train_form import MARLlibTrainForm  # noqa: F401
     from gym_gui.ui.widgets.cleanrl_script_form import CleanRlScriptForm  # noqa: F401
+    from gym_gui.ui.widgets.cleanrl_train_form import CleanRlTrainForm  # noqa: F401
+    from gym_gui.ui.widgets.marllib_train_form import MARLlibTrainForm  # noqa: F401
+    from gym_gui.ui.widgets.mctx_train_form import MCTXTrainForm  # noqa: F401
+    from gym_gui.ui.widgets.pettingzoo_train_form import PettingZooTrainForm  # noqa: F401
+    from gym_gui.ui.widgets.ray_evaluation_form import RayEvaluationForm  # noqa: F401
+    from gym_gui.ui.widgets.ray_train_form import RayRLlibTrainForm  # noqa: F401
     from gym_gui.ui.widgets.xuance_script_form import XuanCeScriptForm  # noqa: F401
+    from gym_gui.ui.widgets.xuance_train_form import XuanCeTrainForm  # noqa: F401
 
 
 __all__ = [

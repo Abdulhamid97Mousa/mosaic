@@ -10,15 +10,15 @@ import json
 import logging
 import threading
 from pathlib import Path
-from typing import Any, Callable, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional, Set
 
 from PyQt6.QtCore import QObject, pyqtSignal, pyqtSlot
 from qtpy import QtCore
 
 if TYPE_CHECKING:
-    from gym_gui.services.trainer import TrainerClientRunner, RunStatus
-    from gym_gui.services.trainer.client_runner import TrainerWatchStopped
     from gym_gui.controllers.live_telemetry_controllers import LiveTelemetryController
+    from gym_gui.services.trainer import RunStatus, TrainerClientRunner
+    from gym_gui.services.trainer.client_runner import TrainerWatchStopped
     from gym_gui.ui.panels.analytics_tabs import AnalyticsTabManager
     from gym_gui.ui.widgets.render_tabs import RenderTabs
 
@@ -115,7 +115,7 @@ class TrainingMonitorHandler(QObject):
     def poll_for_new_runs(self) -> None:
         """Poll daemon for new training runs and auto-subscribe to their telemetry."""
         from gym_gui.services.service_locator import get_service_locator
-        from gym_gui.services.trainer import TrainerClientRunner, RunStatus
+        from gym_gui.services.trainer import RunStatus, TrainerClientRunner
 
         try:
             locator = get_service_locator()
@@ -289,7 +289,7 @@ class TrainingMonitorHandler(QObject):
     def start_run_watch(self) -> None:
         """Start watching for run status updates from the trainer daemon."""
         from gym_gui.services.service_locator import get_service_locator
-        from gym_gui.services.trainer import TrainerClientRunner, RunStatus
+        from gym_gui.services.trainer import RunStatus, TrainerClientRunner
         from gym_gui.services.trainer.client_runner import TrainerWatchStopped
 
         locator = get_service_locator()

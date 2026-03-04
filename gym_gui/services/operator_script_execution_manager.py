@@ -24,13 +24,12 @@ Separation from Manual Mode:
 from __future__ import annotations
 
 import logging
-from typing import Optional, Dict, Any, List
+from typing import Any, Dict, List, Optional
 
 from PyQt6 import QtCore
-from PyQt6.QtCore import pyqtSignal, QTimer
+from PyQt6.QtCore import QTimer, pyqtSignal
 
 from gym_gui.services.operator import OperatorConfig
-
 
 _LOGGER = logging.getLogger(__name__)
 

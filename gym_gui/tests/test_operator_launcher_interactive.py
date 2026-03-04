@@ -5,7 +5,7 @@ import subprocess
 import tempfile
 import unittest
 from pathlib import Path
-from unittest.mock import MagicMock, patch, PropertyMock
+from unittest.mock import MagicMock, PropertyMock, patch
 
 
 def _has_pyqt6() -> bool:
@@ -35,8 +35,8 @@ else:
     from gym_gui.services.operator import OperatorConfig
     from gym_gui.services.operator_launcher import (
         OperatorLauncher,
-        OperatorProcessHandle,
         OperatorLaunchError,
+        OperatorProcessHandle,
     )
 
 

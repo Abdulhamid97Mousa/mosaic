@@ -309,7 +309,7 @@ class BabaIsAIAdapter(EnvironmentAdapter[Dict[str, Any], str]):
         # Build full text prompt
         prompt_parts = []
         if self._config.add_ruleset and self._current_rules:
-            prompt_parts.append(f"Active rules:\n" + "\n".join(self._current_rules))
+            prompt_parts.append("Active rules:\n" + "\n".join(self._current_rules))
         if text_obs:
             prompt_parts.append(f"Objects on the map:\n{text_obs}")
 

@@ -45,6 +45,7 @@ Usage:
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Dict, List, Mapping, Optional
 
 import numpy as np
@@ -65,13 +66,11 @@ from gym_gui.logging_config.log_constants import (
     LOG_ADAPTER_ENV_RESET,
     LOG_ADAPTER_STEP_SUMMARY,
     LOG_MOSAIC_MULTIGRID_GOAL_SCORED,
+    LOG_MOSAIC_MULTIGRID_OBSERVATION,
     LOG_MOSAIC_MULTIGRID_PASS_COMPLETED,
     LOG_MOSAIC_MULTIGRID_STEAL_COMPLETED,
     LOG_MOSAIC_MULTIGRID_VISIBILITY,
-    LOG_MOSAIC_MULTIGRID_OBSERVATION,
 )
-
-import logging
 
 _log = logging.getLogger(__name__)
 

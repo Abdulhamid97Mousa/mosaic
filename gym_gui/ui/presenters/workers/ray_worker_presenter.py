@@ -158,8 +158,8 @@ class RayWorkerPresenter:
         try:
             if is_board_game:
                 # Use BoardGameFastLaneTab for interactive chess/board visualization
-                from gym_gui.ui.widgets.board_game_fastlane_tab import BoardGameFastLaneTab
                 from gym_gui.core.enums import GameId
+                from gym_gui.ui.widgets.board_game_fastlane_tab import BoardGameFastLaneTab
 
                 # Map env_id to GameId
                 game_id = self._env_to_game_id(env_id)

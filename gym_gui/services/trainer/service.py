@@ -3,22 +3,19 @@ from __future__ import annotations
 """gRPC service implementation for the trainer daemon."""
 
 import asyncio
+import json
+import logging
+import secrets
+import sqlite3
 from collections import defaultdict, deque
 from datetime import datetime, timezone
-import json
-import secrets
-import logging
-import sqlite3
 from typing import Any, AsyncIterator, Callable, Deque, Iterable, Mapping, Optional, cast
 
-from google.protobuf.timestamp_pb2 import Timestamp
 import grpc
+from google.protobuf.timestamp_pb2 import Timestamp
 
-from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.constants import format_episode_id
-from gym_gui.telemetry import TelemetrySQLiteStore
-from gym_gui.telemetry.events import Topic, TelemetryEvent
-from gym_gui.telemetry.run_bus import get_bus
+from gym_gui.core.data_model import EpisodeRollup, StepRecord
 from gym_gui.services.trainer import (
     GPUAllocator,
     GPUReservationError,
@@ -27,7 +24,11 @@ from gym_gui.services.trainer import (
     RunStatus,
     validate_train_run_config,
 )
-from gym_gui.services.trainer.proto import trainer_pb2 as trainer_pb2_module, trainer_pb2_grpc
+from gym_gui.services.trainer.proto import trainer_pb2 as trainer_pb2_module
+from gym_gui.services.trainer.proto import trainer_pb2_grpc
+from gym_gui.telemetry import TelemetrySQLiteStore
+from gym_gui.telemetry.events import TelemetryEvent, Topic
+from gym_gui.telemetry.run_bus import get_bus
 
 trainer_pb2 = cast(Any, trainer_pb2_module)
 
@@ -375,7 +376,7 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
         resolved_run_id = self._registry.register_run(
             config.metadata.run_id, config.to_json(), config.metadata.digest
         )
-        
+
         # If digest already exists, return the existing run
         if resolved_run_id != config.metadata.run_id:
             _LOGGER.info(
@@ -540,7 +541,7 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
                             episode_index = int(parts[1]) if parts[1].isdigit() else 0
                         except (ValueError, IndexError):
                             episode_index = 0
-                        
+
                         # Convert StepRecord to RunStep proto
                         action_json = ''
                         if step.action is not None:
@@ -548,21 +549,21 @@ class TrainerService(trainer_pb2_grpc.TrainerServiceServicer):
                                 action_json = json.dumps(step.action)
                             except (TypeError, ValueError):
                                 action_json = str(step.action)
-                        
+
                         observation_json = ''
                         if step.observation is not None:
                             try:
                                 observation_json = json.dumps(step.observation)
                             except (TypeError, ValueError):
                                 observation_json = str(step.observation)
-                        
+
                         render_hint_json = ''
                         if step.render_hint:
                             try:
                                 render_hint_json = json.dumps(step.render_hint)
                             except (TypeError, ValueError):
                                 render_hint_json = str(step.render_hint)
-                        
+
                         payload = trainer_pb2.RunStep(
                             run_id=request.run_id,
                             episode_index=episode_index,

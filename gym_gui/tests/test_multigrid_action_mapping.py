@@ -18,30 +18,30 @@ The fix creates separate resolvers for MiniGrid and MultiGrid.
 
 from __future__ import annotations
 
-import pytest
 from typing import Set
 
+import pytest
+
 from gym_gui.controllers.human_input import (
+    _KEY_A,
+    _KEY_D,
+    _KEY_DOWN,
+    _KEY_E,
+    _KEY_G,
+    _KEY_H,
+    _KEY_LEFT,
+    _KEY_Q,
+    _KEY_RETURN,
+    _KEY_RIGHT,
+    _KEY_S,
+    _KEY_SPACE,
+    _KEY_UP,
+    _KEY_W,
     MiniGridKeyCombinationResolver,
     MultiGridKeyCombinationResolver,
     get_key_combination_resolver,
-    _KEY_W,
-    _KEY_A,
-    _KEY_S,
-    _KEY_D,
-    _KEY_UP,
-    _KEY_DOWN,
-    _KEY_LEFT,
-    _KEY_RIGHT,
-    _KEY_SPACE,
-    _KEY_G,
-    _KEY_H,
-    _KEY_E,
-    _KEY_Q,
-    _KEY_RETURN,
 )
 from gym_gui.core.enums import GameId
-
 
 # =============================================================================
 # MultiGrid Resolver Tests

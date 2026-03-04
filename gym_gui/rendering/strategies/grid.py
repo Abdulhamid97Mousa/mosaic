@@ -10,8 +10,8 @@ from qtpy import QtCore, QtGui, QtWidgets
 from gym_gui.core.enums import GameId, RenderMode
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
-    LOG_UI_RENDER_TABS_TRACE,
     LOG_UI_RENDER_TABS_INFO,
+    LOG_UI_RENDER_TABS_TRACE,
     LOG_UI_RENDER_TABS_WARNING,
 )
 from gym_gui.rendering.assets import (
@@ -200,7 +200,7 @@ class _GridRenderer(LogConstantMixin):
         self._current_grid = grid
         rows = len(grid)
         cols = len(grid[0]) if rows > 0 else 0
-        
+
         # Log at WARNING level to ensure visibility
         self._logger.warning(f"_GridRenderer.render() CALLED: game_id={game_id}, grid_size={rows}x{cols}, agent_pos={agent_position}, has_taxi_state={taxi_state is not None}")
         self.log_constant(

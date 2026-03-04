@@ -38,32 +38,32 @@ Reference:
 
 from __future__ import annotations
 
-# Phase 1: Logic
-from .Game2048 import GAME2048_HTML, get_game2048_html
-from .Minesweeper import MINESWEEPER_HTML, get_minesweeper_html
-from .RubiksCube import RUBIKS_CUBE_HTML, get_rubiks_cube_html
-from .SlidingPuzzle import SLIDING_PUZZLE_HTML, get_sliding_puzzle_html
-from .Sudoku import SUDOKU_HTML, get_sudoku_html
-from .GraphColoring import GRAPH_COLORING_HTML, get_graph_coloring_html
-
 # Phase 2: Packing
 from .BinPack import BINPACK_HTML, get_binpack_html
-from .FlatPack import FLATPACK_HTML, get_flatpack_html
-from .JobShop import JOBSHOP_HTML, get_jobshop_html
-from .Knapsack import KNAPSACK_HTML, get_knapsack_html
-from .Tetris import TETRIS_HTML, get_tetris_html
 
 # Phase 3: Routing
 from .Cleaner import CLEANER_HTML, get_cleaner_html
 from .Connector import CONNECTOR_HTML, get_connector_html
 from .CVRP import CVRP_HTML, get_cvrp_html
+from .FlatPack import FLATPACK_HTML, get_flatpack_html
+
+# Phase 1: Logic
+from .Game2048 import GAME2048_HTML, get_game2048_html
+from .GraphColoring import GRAPH_COLORING_HTML, get_graph_coloring_html
+from .JobShop import JOBSHOP_HTML, get_jobshop_html
+from .Knapsack import KNAPSACK_HTML, get_knapsack_html
 from .Maze import MAZE_HTML, get_maze_html
+from .Minesweeper import MINESWEEPER_HTML, get_minesweeper_html
 from .MMST import MMST_HTML, get_mmst_html
 from .MultiCVRP import MULTI_CVRP_HTML, get_multi_cvrp_html
 from .PacMan import PACMAN_HTML, get_pacman_html
 from .RobotWarehouse import ROBOT_WAREHOUSE_HTML, get_robot_warehouse_html
+from .RubiksCube import RUBIKS_CUBE_HTML, get_rubiks_cube_html
+from .SlidingPuzzle import SLIDING_PUZZLE_HTML, get_sliding_puzzle_html
 from .Snake import SNAKE_HTML, get_snake_html
 from .Sokoban import SOKOBAN_HTML, get_sokoban_html
+from .Sudoku import SUDOKU_HTML, get_sudoku_html
+from .Tetris import TETRIS_HTML, get_tetris_html
 from .TSP import TSP_HTML, get_tsp_html
 
 __all__ = [

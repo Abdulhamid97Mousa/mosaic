@@ -11,9 +11,9 @@ Design Patterns:
 
 from abc import ABC, ABCMeta, abstractmethod
 from dataclasses import dataclass
-from typing import List, Tuple, Optional, Dict, Any
+from typing import Any, Dict, List, Optional, Tuple
 
-from PyQt6 import QtWidgets, QtCore, QtGui
+from PyQt6 import QtCore, QtGui, QtWidgets
 from PyQt6.QtCore import pyqtSignal
 from PyQt6.QtWidgets import QWidget
 
@@ -549,6 +549,6 @@ class BoardConfigDialog(QtWidgets.QDialog, metaclass=QtABCMeta):
             self._board_widget.set_state(state)
             self._notation_field.setText(notation)
             self._notation_field.setStyleSheet("")
-        except Exception as e:
+        except Exception:
             # Invalid notation - show error styling
             self._notation_field.setStyleSheet("border: 2px solid red;")

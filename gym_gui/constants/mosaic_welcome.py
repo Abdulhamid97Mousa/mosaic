@@ -6,7 +6,6 @@ All configurable values for the interactive space animation.
 from dataclasses import dataclass, field
 from typing import List, Tuple
 
-
 # =============================================================================
 # Animation Settings
 # =============================================================================

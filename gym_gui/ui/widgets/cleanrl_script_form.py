@@ -25,17 +25,16 @@ from typing import Any, Dict, Optional
 
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtWidgets import QFileDialog
-
 from ulid import ULID
 
 from gym_gui.config.paths import CLEANRL_SCRIPTS_DIR, VAR_CUSTOM_SCRIPTS_DIR
 from gym_gui.fastlane.worker_helpers import apply_fastlane_environment
 from gym_gui.logging_config.helpers import log_constant
 from gym_gui.logging_config.log_constants import (
+    LOG_UI_TRAIN_FORM_ERROR,
     LOG_UI_TRAIN_FORM_INFO,
     LOG_UI_TRAIN_FORM_TRACE,
     LOG_UI_TRAIN_FORM_WARNING,
-    LOG_UI_TRAIN_FORM_ERROR,
 )
 from gym_gui.telemetry.semconv import VideoModes
 
@@ -377,7 +376,7 @@ class CleanRlScriptForm(QtWidgets.QDialog):
                 parts.append(f"  - {w}")
 
         # Dry-run: preview artifact paths
-        preview_id = str(ULID())[:8] + "..."
+        str(ULID())[:8] + "..."
         preview_dir = VAR_CUSTOM_SCRIPTS_DIR / "<ULID>"
         parts.append("\n--- Dry-Run Preview ---")
         parts.append(f"Run Dir:     {preview_dir}")

@@ -6,8 +6,8 @@ import logging
 import os
 from typing import Optional
 
-from qtpy import QtCore, QtGui, QtWidgets  # type: ignore[import]
 from PyQt6.QtCore import pyqtSignal
+from qtpy import QtCore, QtGui, QtWidgets  # type: ignore[import]
 
 try:  # Optional dependency for embedded browser support
     from qtpy.QtWebEngineWidgets import QWebEngineView  # type: ignore[attr-defined]
@@ -33,10 +33,10 @@ from gym_gui.constants.constants_wandb import DEFAULT_WANDB, WandbDefaults, buil
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
     LOG_UI_RENDER_TABS_WANDB_ERROR,
-    LOG_UI_RENDER_TABS_WANDB_STATUS,
-    LOG_UI_RENDER_TABS_WANDB_WARNING,
     LOG_UI_RENDER_TABS_WANDB_PROXY_APPLIED,
     LOG_UI_RENDER_TABS_WANDB_PROXY_SKIPPED,
+    LOG_UI_RENDER_TABS_WANDB_STATUS,
+    LOG_UI_RENDER_TABS_WANDB_WARNING,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -580,7 +580,7 @@ class WandbArtifactTab(QtWidgets.QWidget, LogConstantMixin):
             self._emit_status("embedded_failed", success=False)
         else:
             self._emit_status("embedded_auto_opened" if auto else "embedded_opened", success=True)
-    
+
     def _on_load_finished(self, success: bool) -> None:  # pragma: no cover - Qt signal
         """Handle page load completion."""
         self._update_nav_buttons()

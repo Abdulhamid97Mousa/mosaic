@@ -1,7 +1,6 @@
 """Documentation for Melting Pot Territory substrate."""
 from __future__ import annotations
 
-
 TERRITORY_HTML = """
 <h2>Melting Pot: Territory (Rooms)</h2>
 

@@ -7,10 +7,10 @@ the same algorithm parameters as the Train Agent form.
 from __future__ import annotations
 
 import logging
+import sys
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any, Dict, Optional
-import sys
 
 from qtpy import QtCore, QtWidgets
 
@@ -21,14 +21,13 @@ from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
     LOG_UI_POLICY_FORM_INFO,
 )
-from gym_gui.telemetry.semconv import VideoModes, VIDEO_MODE_DESCRIPTORS
-from gym_gui.ui.widgets.cleanrl_train_form import _generate_run_id as generate_run_id
 from gym_gui.policy_discovery.cleanrl_policy_metadata import (
     CleanRlCheckpoint,
     discover_policies,
     load_metadata_for_policy,
 )
-
+from gym_gui.telemetry.semconv import VIDEO_MODE_DESCRIPTORS, VideoModes
+from gym_gui.ui.widgets.cleanrl_train_form import _generate_run_id as generate_run_id
 
 _LOGGER = logging.getLogger(__name__)
 

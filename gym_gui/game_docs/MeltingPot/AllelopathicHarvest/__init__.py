@@ -1,7 +1,6 @@
 """Documentation for Melting Pot Allelopathic Harvest substrate."""
 from __future__ import annotations
 
-
 ALLELOPATHIC_HARVEST_HTML = """
 <h2>Melting Pot: Allelopathic Harvest (Open)</h2>
 

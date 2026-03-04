@@ -8,9 +8,10 @@ Ensures:
 - render_mode logic for multi-agent composite view
 """
 
-import pytest
-from typing import Dict, Any
 import json
+from typing import Any, Dict
+
+import pytest
 
 
 class TestRayTrainFormConfigStructure:
@@ -167,7 +168,7 @@ class TestRayWorkerConfigParsing:
 
     def test_config_from_dict_parses_environment(self):
         """RayWorkerConfig.from_dict parses environment correctly."""
-        from ray_worker.config import RayWorkerConfig, PettingZooAPIType
+        from ray_worker.config import PettingZooAPIType, RayWorkerConfig
 
         config_data = {
             "run_id": "test-run-123",
@@ -201,9 +202,10 @@ class TestRayWorkerConfigParsing:
 
     def test_config_from_dict_with_nested_metadata(self):
         """RayWorkerConfig.from_dict handles metadata.worker.config structure."""
-        from ray_worker.config import load_worker_config
-        import tempfile
         import os
+        import tempfile
+
+        from ray_worker.config import load_worker_config
 
         # Create temp config file with nested structure (as UI generates)
         config_data = {

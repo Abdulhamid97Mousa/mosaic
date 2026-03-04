@@ -16,8 +16,9 @@ from qtpy import QtCore, QtWidgets
 
 if TYPE_CHECKING:
     from qtpy.QtWidgets import QStatusBar
-    from gym_gui.ui.widgets.render_tabs import RenderTabs
+
     from gym_gui.ui.widgets.control_panel import ControlPanelWidget
+    from gym_gui.ui.widgets.render_tabs import RenderTabs
 
 from gym_gui.controllers.tictactoe_controller import TicTacToeGameController
 from gym_gui.core.adapters.tictactoe_adapter import TicTacToeState

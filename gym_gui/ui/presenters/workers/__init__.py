@@ -18,15 +18,14 @@ Included presenters:
 The registry is auto-populated at module load to support service discovery.
 """
 
-from .registry import WorkerPresenter, WorkerPresenterRegistry
 from .chess_worker_presenter import ChessWorkerPresenter
 from .cleanrl_worker_presenter import CleanRlWorkerPresenter
 from .human_worker_presenter import HumanWorkerPresenter
 from .mctx_worker_presenter import MctxWorkerPresenter
 from .pettingzoo_worker_presenter import PettingZooWorkerPresenter
 from .ray_worker_presenter import RayWorkerPresenter
+from .registry import WorkerPresenter, WorkerPresenterRegistry
 from .xuance_worker_presenter import XuanCeWorkerPresenter
-
 
 # Create and auto-register default presenters
 _registry = WorkerPresenterRegistry()

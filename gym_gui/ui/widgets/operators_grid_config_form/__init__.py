@@ -43,16 +43,16 @@ Planned:
     - Crafter : Crafting/survival grid environment
 """
 
+from .babyai_editor import BabyAIConfigDialog, BabyAIState
 from .base import (
+    GridCell,
     GridConfigDialog,
     GridEditorWidget,
+    GridObject,
     GridObjectTray,
     GridState,
-    GridCell,
-    GridObject,
 )
 from .factory import GridConfigDialogFactory
-from .babyai_editor import BabyAIConfigDialog, BabyAIState
 
 __all__ = [
     # Base classes (for extending)

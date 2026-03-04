@@ -1,16 +1,15 @@
 import pytest
-
 from PyQt6 import QtCore
 
 from gym_gui.config.settings import Settings
-from gym_gui.controllers.session import SessionController
 from gym_gui.controllers.interaction import (
     AleInteractionController,
     Box2DInteractionController,
     TurnBasedInteractionController,
 )
+from gym_gui.controllers.session import SessionController
 from gym_gui.core.adapters.base import AdapterStep
-from gym_gui.core.enums import EnvironmentFamily, GameId, ControlMode
+from gym_gui.core.enums import ControlMode, EnvironmentFamily, GameId
 
 
 @pytest.fixture(scope="module", autouse=True)

@@ -36,11 +36,11 @@ _HAS_ALGO_PARAMS = False
 
 try:
     from ray_worker.algo_params import (  # type: ignore[import-not-found]
-        get_available_algorithms,
-        get_algorithm_info,
-        get_algorithm_fields,
-        get_default_params,
         filter_params_for_algorithm,
+        get_algorithm_fields,
+        get_algorithm_info,
+        get_available_algorithms,
+        get_default_params,
     )
     _HAS_ALGO_PARAMS = True
 except ImportError:
@@ -1217,7 +1217,7 @@ class RayRLlibTrainForm(QtWidgets.QDialog):
 
         try:
             # Build the config
-            config = self._build_config()
+            self._build_config()
 
             # For now, do basic validation checks
             env_id = self._env_combo.currentData()

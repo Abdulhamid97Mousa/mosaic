@@ -8,12 +8,11 @@ This editor is for the Russian Checkers variant (Shashki):
 Game ID: draughts/russian_checkers
 """
 
-from typing import List, Tuple, Optional
+from typing import List, Optional, Tuple
 
 from PyQt6 import QtWidgets
 
 from .base_checkers_editor import BaseCheckersConfigDialog
-
 
 # Standard 8x8 checkers positions (32 dark squares)
 STANDARD_8X8 = "bbbbbbbbbbbb........wwwwwwwwwwww"

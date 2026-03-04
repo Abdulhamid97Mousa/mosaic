@@ -8,10 +8,10 @@ Workers are discovered automatically via setuptools entry points, and can also
 be registered manually for backwards compatibility.
 """
 
-from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 import logging
+from typing import Any, Dict, List, Optional, Protocol, runtime_checkable
 
-from gym_gui.core.worker import WorkerDiscovery, DiscoveredWorker
+from gym_gui.core.worker import DiscoveredWorker, WorkerDiscovery
 
 logger = logging.getLogger(__name__)
 

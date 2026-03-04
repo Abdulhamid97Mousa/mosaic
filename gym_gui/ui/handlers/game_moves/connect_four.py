@@ -11,9 +11,10 @@ from typing import TYPE_CHECKING, cast
 
 if TYPE_CHECKING:
     from qtpy.QtWidgets import QStatusBar
+
     from gym_gui.controllers.session import SessionController
-    from gym_gui.ui.widgets.render_tabs import RenderTabs
     from gym_gui.core.adapters.pettingzoo_classic import ConnectFourEnvironmentAdapter
+    from gym_gui.ui.widgets.render_tabs import RenderTabs
 
 _LOG = logging.getLogger(__name__)
 

@@ -24,14 +24,14 @@ Author: Claude (AI Assistant)
 Date: 2026-01-01
 """
 
+from typing import Any, Dict
+
 import pytest
-from typing import Dict, Any
 
 from gym_gui.services.operator import (
     OperatorConfig,
     WorkerAssignment,
 )
-
 
 # =============================================================================
 # WorkerAssignment Tests

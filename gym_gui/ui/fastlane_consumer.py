@@ -1,18 +1,18 @@
 from __future__ import annotations
 
+import logging
 from dataclasses import dataclass
 from typing import Optional
-import logging
 
 from PyQt6 import QtCore, QtGui
 
-from gym_gui.fastlane import FastLaneReader, FastLaneFrame
+from gym_gui.fastlane import FastLaneFrame, FastLaneReader
 from gym_gui.logging_config.helpers import log_constant
 from gym_gui.logging_config.log_constants import (
     LOG_FASTLANE_CONNECTED,
-    LOG_FASTLANE_UNAVAILABLE,
-    LOG_FASTLANE_HEADER_INVALID,
     LOG_FASTLANE_FRAME_READ_ERROR,
+    LOG_FASTLANE_HEADER_INVALID,
+    LOG_FASTLANE_UNAVAILABLE,
 )
 
 

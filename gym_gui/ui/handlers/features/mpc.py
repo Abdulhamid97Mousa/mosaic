@@ -19,6 +19,7 @@ from gym_gui.logging_config.log_constants import (
 
 if TYPE_CHECKING:
     from qtpy.QtWidgets import QStatusBar
+
     from gym_gui.ui.widgets.control_panel import ControlPanelWidget
     from gym_gui.ui.widgets.render_tabs import RenderTabs
 

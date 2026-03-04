@@ -1,7 +1,6 @@
 """Documentation for Melting Pot King of the Hill substrate."""
 from __future__ import annotations
 
-
 KING_OF_THE_HILL_HTML = """
 <h2>Melting Pot: King of the Hill (Repeated)</h2>
 

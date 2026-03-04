@@ -11,7 +11,7 @@ import logging
 from pathlib import Path
 from typing import Optional
 
-from PyQt6 import QtCore, QtWidgets, QtGui
+from PyQt6 import QtCore, QtGui, QtWidgets
 
 from gym_gui.config.paths import VAR_TRAINER_DIR
 from gym_gui.core.enums import GameId
@@ -20,10 +20,9 @@ from gym_gui.logging_config.log_constants import (
     LOG_UI_FASTLANE_EVAL_SUMMARY_UPDATE,
     LOG_UI_FASTLANE_EVAL_SUMMARY_WARNING,
 )
-from gym_gui.rendering.strategies.board_game import BoardGameRendererStrategy
 from gym_gui.rendering.interfaces import RendererContext
+from gym_gui.rendering.strategies.board_game import BoardGameRendererStrategy
 from gym_gui.ui.fastlane_consumer import FastLaneConsumer, FastLaneFrameEvent
-
 
 _LOGGER = logging.getLogger(__name__)
 

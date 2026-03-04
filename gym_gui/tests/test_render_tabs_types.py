@@ -134,12 +134,12 @@ class TestManagementTabTyping:
 
     def test_render_tabs_management_tab_attribute_optional(self) -> None:
         """Verify _management_tab is properly typed as Optional."""
-        from gym_gui.ui.widgets.render_tabs import RenderTabs
-
         # Verify the class is defined correctly
         # We can't use get_type_hints because of forward references in TYPE_CHECKING
         # Instead, check the annotation directly from the source
         import inspect
+
+        from gym_gui.ui.widgets.render_tabs import RenderTabs
 
         source = inspect.getsource(RenderTabs.__init__)
         assert "_management_tab" in source

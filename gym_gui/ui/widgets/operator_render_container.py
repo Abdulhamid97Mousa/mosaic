@@ -15,32 +15,32 @@ from typing import Any, Dict, Optional
 from PyQt6.QtCore import pyqtSignal  # type: ignore[attr-defined]
 from qtpy import QtCore, QtGui, QtWidgets
 
-from gym_gui.services.operator import OperatorConfig
-from gym_gui.rendering import RendererRegistry, create_default_renderer_registry, RendererContext
-from gym_gui.rendering.strategies.board_game import BoardGameRendererStrategy
-from gym_gui.core.enums import GameId, RenderMode
 from gym_gui.controllers.human_input import (
-    _TOY_TEXT_MAPPINGS,
-    _MINIG_GRID_MAPPINGS,
+    _ALE_MAPPINGS,
+    _BABAISAI_MAPPINGS,
     _BOX_2D_MAPPINGS,
-    _VIZDOOM_MAPPINGS,
+    _CRAFTER_MAPPINGS,
+    _JUMANJI_MAPPINGS,
+    _MINIG_GRID_MAPPINGS,
     _MINIHACK_MAPPINGS,
     _NETHACK_MAPPINGS,
-    _CRAFTER_MAPPINGS,
-    _BABAISAI_MAPPINGS,
     _PROCGEN_MAPPINGS,
-    _JUMANJI_MAPPINGS,
-    _ALE_MAPPINGS,
+    _TOY_TEXT_MAPPINGS,
+    _VIZDOOM_MAPPINGS,
 )
-from gym_gui.ui.widgets.multi_agent_action_panel import (
-    COLOR_PALETTE,
-    DEFAULT_AGENT_COLOR_NAMES,
-)
+from gym_gui.core.enums import GameId, RenderMode
+from gym_gui.logging_config.helpers import log_constant
 from gym_gui.logging_config.log_constants import (
     LOG_HUMAN_ACTION_BUTTON_CLICKED,
     LOG_HUMAN_ACTION_SIGNAL_EMITTED,
 )
-from gym_gui.logging_config.helpers import log_constant
+from gym_gui.rendering import RendererContext, RendererRegistry, create_default_renderer_registry
+from gym_gui.rendering.strategies.board_game import BoardGameRendererStrategy
+from gym_gui.services.operator import OperatorConfig
+from gym_gui.ui.widgets.multi_agent_action_panel import (
+    COLOR_PALETTE,
+    DEFAULT_AGENT_COLOR_NAMES,
+)
 
 # Use operators namespace for dedicated operators.log routing
 _LOGGER = logging.getLogger("gym_gui.operators.render_container")

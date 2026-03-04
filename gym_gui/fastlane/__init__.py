@@ -2,10 +2,10 @@
 
 from .buffer import (
     FastLaneConfig,
-    FastLaneMetrics,
     FastLaneFrame,
-    FastLaneWriter,
+    FastLaneMetrics,
     FastLaneReader,
+    FastLaneWriter,
     create_fastlane_name,
 )
 

@@ -5,8 +5,8 @@ Uses pytest-qt for idiomatic Qt signal testing (qtbot.waitSignal).
 
 import pytest
 
-from gym_gui.services.operator_script_execution_manager import OperatorScriptExecutionManager
 from gym_gui.services.operator import OperatorConfig
+from gym_gui.services.operator_script_execution_manager import OperatorScriptExecutionManager
 
 
 @pytest.fixture

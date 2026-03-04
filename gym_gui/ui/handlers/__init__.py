@@ -44,31 +44,9 @@ Usage:
 
 from __future__ import annotations
 
-# Game move handlers (Human Control Mode)
-from gym_gui.ui.handlers.game_moves import (
-    ChessHandler,
-    GoHandler,
-    ConnectFourHandler,
-    SudokuHandler,
-    CheckersHandler,
-)
-
-# Feature handlers (cross-cutting concerns)
-from gym_gui.ui.handlers.features import (
-    GameConfigHandler,
-    MPCHandler,
-    GodotHandler,
-    LogHandler,
-    HumanVsAgentHandler,
-    PolicyEvaluationHandler,
-    FastLaneTabHandler,
-    TrainingMonitorHandler,
-    TrainingFormHandler,
-    MultiAgentGameHandler,
-)
-
 # Environment loaders
 from gym_gui.ui.handlers.env_loaders import (
+    CheckersEnvLoader,
     ChessEnvLoader,
     ConnectFourEnvLoader,
     GoEnvLoader,
@@ -76,7 +54,29 @@ from gym_gui.ui.handlers.env_loaders import (
     SmacCameraLoader,
     TicTacToeEnvLoader,
     VizdoomEnvLoader,
-    CheckersEnvLoader,
+)
+
+# Feature handlers (cross-cutting concerns)
+from gym_gui.ui.handlers.features import (
+    FastLaneTabHandler,
+    GameConfigHandler,
+    GodotHandler,
+    HumanVsAgentHandler,
+    LogHandler,
+    MPCHandler,
+    MultiAgentGameHandler,
+    PolicyEvaluationHandler,
+    TrainingFormHandler,
+    TrainingMonitorHandler,
+)
+
+# Game move handlers (Human Control Mode)
+from gym_gui.ui.handlers.game_moves import (
+    CheckersHandler,
+    ChessHandler,
+    ConnectFourHandler,
+    GoHandler,
+    SudokuHandler,
 )
 
 __all__ = [

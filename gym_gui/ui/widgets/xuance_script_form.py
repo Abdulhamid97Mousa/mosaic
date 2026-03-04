@@ -26,17 +26,16 @@ from typing import Any, Dict, Optional
 
 from PyQt6 import QtCore, QtWidgets
 from PyQt6.QtWidgets import QFileDialog
-
 from ulid import ULID
 
-from gym_gui.config.paths import XUANCE_SCRIPTS_DIR, VAR_CUSTOM_SCRIPTS_DIR
+from gym_gui.config.paths import VAR_CUSTOM_SCRIPTS_DIR, XUANCE_SCRIPTS_DIR
 from gym_gui.fastlane.worker_helpers import apply_fastlane_environment
 from gym_gui.logging_config.helpers import log_constant
 from gym_gui.logging_config.log_constants import (
+    LOG_UI_TRAIN_FORM_ERROR,
     LOG_UI_TRAIN_FORM_INFO,
     LOG_UI_TRAIN_FORM_TRACE,
     LOG_UI_TRAIN_FORM_WARNING,
-    LOG_UI_TRAIN_FORM_ERROR,
 )
 from gym_gui.telemetry.semconv import VideoModes
 

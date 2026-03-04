@@ -3,8 +3,8 @@ from dataclasses import dataclass
 from typing import Any, Protocol, cast
 
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
-from gym_gui.storage.session import EpisodeRecord
 from gym_gui.services.telemetry import TelemetryService
+from gym_gui.storage.session import EpisodeRecord
 
 
 @dataclass

@@ -16,8 +16,8 @@ from qtpy import QtWidgets
 
 from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
-    LOG_KEYBOARD_DETECTED,
     LOG_KEYBOARD_ASSIGNED,
+    LOG_KEYBOARD_DETECTED,
     LOG_KEYBOARD_DETECTION_ERROR,
 )
 
@@ -191,7 +191,7 @@ class KeyboardAssignmentWidget(LogConstantMixin, QtWidgets.QGroupBox):
 
             self.log_constant(LOG_KEYBOARD_DETECTED, extra={"count": count})
 
-        except PermissionError as e:
+        except PermissionError:
             error_msg = (
                 "Permission denied: Cannot access keyboard devices.\n"
                 f"Fix: sudo usermod -a -G input {os.getenv('USER', 'your_username')}\n"

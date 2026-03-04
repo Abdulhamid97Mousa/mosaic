@@ -14,7 +14,6 @@ from PyQt6 import QtWidgets
 from gym_gui.config.game_configs import CrafterConfig
 from gym_gui.core.enums import GameId
 
-
 CRAFTER_GAME_IDS: tuple[GameId, ...] = (
     GameId.CRAFTER_REWARD,
     GameId.CRAFTER_NO_REWARD,

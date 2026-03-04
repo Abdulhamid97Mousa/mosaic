@@ -2,9 +2,9 @@
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
 import os
+from dataclasses import dataclass
 from typing import Any, Mapping, Sequence
 
 import numpy as np
@@ -328,7 +328,6 @@ class ViZDoomAdapter(EnvironmentAdapter[np.ndarray, Sequence[int]]):
                 )
 
     def _configure_mode(self, vzd: Any) -> None:
-        control_mode = self._context.control_mode if self._context else ControlMode.AGENT_ONLY
         # Always use PLAYER mode - human input comes via Qt shortcuts, not native window
         # SPECTATOR mode opens a native window that captures mouse (problematic)
         self._game.set_mode(vzd.Mode.PLAYER)

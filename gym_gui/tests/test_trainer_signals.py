@@ -3,8 +3,8 @@
 from __future__ import annotations
 
 import os
-import pytest
 
+import pytest
 from PyQt6 import QtWidgets
 
 from gym_gui.services.trainer.signals import get_trainer_signals

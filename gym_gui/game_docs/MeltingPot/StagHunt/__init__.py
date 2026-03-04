@@ -1,7 +1,6 @@
 """Documentation for Melting Pot Stag Hunt substrate."""
 from __future__ import annotations
 
-
 STAG_HUNT_HTML = """
 <h2>Melting Pot: Stag Hunt in the Matrix (Repeated)</h2>
 

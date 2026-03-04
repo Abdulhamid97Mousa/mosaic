@@ -21,15 +21,14 @@ NOTE: Linux/macOS only (Windows NOT supported)
 
 from __future__ import annotations
 
-from gym_gui.game_docs.MeltingPot.CollaborativeCooking import COLLABORATIVE_COOKING_HTML
+from gym_gui.game_docs.MeltingPot.AllelopathicHarvest import ALLELOPATHIC_HARVEST_HTML
 from gym_gui.game_docs.MeltingPot.CleanUp import CLEAN_UP_HTML
+from gym_gui.game_docs.MeltingPot.CollaborativeCooking import COLLABORATIVE_COOKING_HTML
 from gym_gui.game_docs.MeltingPot.CommonsHarvest import COMMONS_HARVEST_HTML
-from gym_gui.game_docs.MeltingPot.Territory import TERRITORY_HTML
 from gym_gui.game_docs.MeltingPot.KingOfTheHill import KING_OF_THE_HILL_HTML
 from gym_gui.game_docs.MeltingPot.PrisonersDilemma import PRISONERS_DILEMMA_HTML
 from gym_gui.game_docs.MeltingPot.StagHunt import STAG_HUNT_HTML
-from gym_gui.game_docs.MeltingPot.AllelopathicHarvest import ALLELOPATHIC_HARVEST_HTML
-
+from gym_gui.game_docs.MeltingPot.Territory import TERRITORY_HTML
 
 # Export individual substrate documentation
 MELTINGPOT_COLLABORATIVE_COOKING_HTML = COLLABORATIVE_COOKING_HTML

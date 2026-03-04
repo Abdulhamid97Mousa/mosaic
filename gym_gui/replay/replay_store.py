@@ -15,15 +15,15 @@ import queue
 import threading
 from datetime import datetime
 from pathlib import Path
-from typing import Iterator, Optional, Any
+from typing import Any, Iterator, Optional
 
 import numpy as np
 
 from gym_gui.constants import (
-    REPLAY_DEFAULTS,
-    FRAME_REF_SCHEME,
     FRAME_REF_FRAMES_DATASET,
     FRAME_REF_OBS_DATASET,
+    FRAME_REF_SCHEME,
+    REPLAY_DEFAULTS,
 )
 
 _LOGGER = logging.getLogger(__name__)

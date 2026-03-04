@@ -699,8 +699,9 @@ class HumanVsAgentConfigForm(QtWidgets.QDialog):
 
     def _check_katago(self) -> bool:
         """Check if KataGo is available."""
-        import shutil
         import os
+        import shutil
+
         from gym_gui.config.paths import VAR_BIN_DIR, VAR_MODELS_KATAGO_DIR
 
         # Check binary

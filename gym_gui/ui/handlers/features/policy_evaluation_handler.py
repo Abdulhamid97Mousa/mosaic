@@ -7,7 +7,7 @@ Manages the EvaluationWorker QThread and result dialogs.
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, Dict, List, Optional, TYPE_CHECKING
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 
 from PyQt6.QtCore import QThread, pyqtSignal
 from PyQt6.QtWidgets import QMessageBox, QStatusBar, QWidget
@@ -42,8 +42,8 @@ class EvaluationWorker(QThread):
             # Try to import the policy evaluator - it may not be available
             try:
                 from ray_worker.policy_evaluator import (
-                    PolicyEvaluator,
                     EvaluationConfig,
+                    PolicyEvaluator,
                 )
             except ImportError:
                 _LOGGER.warning(

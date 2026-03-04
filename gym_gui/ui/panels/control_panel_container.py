@@ -7,20 +7,20 @@ from typing import TYPE_CHECKING
 from qtpy import QtWidgets
 
 from gym_gui.config.game_configs import (
-    CliffWalkingConfig,
-    CarRacingConfig,
+    DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG,
     BipedalWalkerConfig,
-    FrozenLakeConfig,
-    LunarLanderConfig,
-    TaxiConfig,
-    DEFAULT_MINIGRID_EMPTY_5x5_CONFIG,
+    CarRacingConfig,
+    CliffWalkingConfig,
     DEFAULT_MINIGRID_DOORKEY_5x5_CONFIG,
     DEFAULT_MINIGRID_DOORKEY_6x6_CONFIG,
     DEFAULT_MINIGRID_DOORKEY_8x8_CONFIG,
     DEFAULT_MINIGRID_DOORKEY_16x16_CONFIG,
-    DEFAULT_MINIGRID_LAVAGAP_S7_CONFIG,
+    DEFAULT_MINIGRID_EMPTY_5x5_CONFIG,
     DEFAULT_MINIGRID_REDBLUE_DOORS_6x6_CONFIG,
     DEFAULT_MINIGRID_REDBLUE_DOORS_8x8_CONFIG,
+    FrozenLakeConfig,
+    LunarLanderConfig,
+    TaxiConfig,
 )
 from gym_gui.core.factories.adapters import available_games
 from gym_gui.services.operator import OperatorDescriptor

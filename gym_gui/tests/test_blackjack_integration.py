@@ -11,17 +11,18 @@ Tests the complete Blackjack integration including:
 
 from __future__ import annotations
 
-import pytest
-import numpy as np
 from typing import TYPE_CHECKING
 
-from gym_gui.core.enums import GameId, RenderMode, ControlMode
+import numpy as np
+import pytest
+
+from gym_gui.config.game_configs import DEFAULT_BLACKJACK_CONFIG, BlackjackConfig
+from gym_gui.controllers.human_input import _TOY_TEXT_MAPPINGS
 from gym_gui.core.adapters.toy_text import BlackjackAdapter
-from gym_gui.config.game_configs import BlackjackConfig, DEFAULT_BLACKJACK_CONFIG
+from gym_gui.core.enums import ControlMode, GameId, RenderMode
 from gym_gui.core.factories.adapters import create_adapter
 from gym_gui.game_docs import get_game_info
 from gym_gui.utils import json_serialization
-from gym_gui.controllers.human_input import _TOY_TEXT_MAPPINGS
 
 if TYPE_CHECKING:
     from gym_gui.core.adapters.base import AdapterStep
@@ -55,7 +56,7 @@ class TestBlackjackAdapterBasics:
         adapter = create_adapter(GameId.BLACKJACK)
         adapter.load()
         result = adapter.reset(seed=42)
-        
+
         assert result is not None
         assert result.observation is not None
         # Observation is a tuple: (player_sum, dealer_card, usable_ace)
@@ -70,7 +71,7 @@ class TestBlackjackAdapterBasics:
         adapter = create_adapter(GameId.BLACKJACK)
         adapter.load()
         adapter.reset(seed=42)
-        
+
         # Action 0 = Stick (stop taking cards)
         result = adapter.step(0)
         assert result is not None
@@ -83,7 +84,7 @@ class TestBlackjackAdapterBasics:
         adapter = create_adapter(GameId.BLACKJACK)
         adapter.load()
         adapter.reset(seed=42)
-        
+
         # Action 1 = Hit (take another card)
         result = adapter.step(1)
         assert result is not None
@@ -138,7 +139,7 @@ class TestBlackjackRendering:
         adapter = create_adapter(GameId.BLACKJACK)
         adapter.load()
         adapter.reset(seed=42)
-        
+
         payload = adapter.render()
         assert isinstance(payload, dict)
         assert "mode" in payload
@@ -152,10 +153,10 @@ class TestBlackjackRendering:
         adapter = create_adapter(GameId.BLACKJACK)
         adapter.load()
         adapter.reset(seed=42)
-        
+
         payload = adapter.render()
         rgb = payload["rgb"]
-        
+
         assert isinstance(rgb, np.ndarray)
         assert rgb.ndim == 3
         assert rgb.shape == (500, 600, 3)  # Height, Width, Channels
@@ -166,14 +167,14 @@ class TestBlackjackRendering:
         adapter = create_adapter(GameId.BLACKJACK)
         adapter.load()
         adapter.reset(seed=42)
-        
+
         payload = adapter.render()
         assert "player_sum" in payload
         assert "dealer_card" in payload
         assert "usable_ace" in payload
         assert "terminated" in payload
         assert "truncated" in payload
-        
+
         # Validate types
         assert isinstance(payload["player_sum"], int)
         assert isinstance(payload["dealer_card"], int)
@@ -186,7 +187,7 @@ class TestBlackjackRendering:
         adapter = create_adapter(GameId.BLACKJACK)
         adapter.load()
         adapter.reset(seed=42)
-        
+
         payload = adapter.render()
         assert "rgb" in payload
         assert "frame" not in payload  # Should NOT use 'frame'
@@ -200,9 +201,9 @@ class TestBlackjackPayloadSerialization:
         adapter = create_adapter(GameId.BLACKJACK)
         adapter.load()
         adapter.reset(seed=42)
-        
+
         payload = adapter.render()
-        
+
         # Test serialization
         serialized = json_serialization.dumps(payload)
         assert serialized is not None
@@ -214,20 +215,20 @@ class TestBlackjackPayloadSerialization:
         adapter = create_adapter(GameId.BLACKJACK)
         adapter.load()
         adapter.reset(seed=42)
-        
+
         original_payload = adapter.render()
         original_rgb = original_payload["rgb"]
-        
+
         # Serialize and deserialize
         serialized = json_serialization.dumps(original_payload)
         deserialized = json_serialization.loads(serialized)
-        
+
         # Verify structure
         assert isinstance(deserialized, dict)
         assert "rgb" in deserialized
         assert "mode" in deserialized
         assert deserialized["mode"] == RenderMode.RGB_ARRAY.value
-        
+
         # Verify RGB array
         recovered_rgb = deserialized["rgb"]
         assert isinstance(recovered_rgb, np.ndarray)
@@ -240,11 +241,11 @@ class TestBlackjackPayloadSerialization:
         adapter = create_adapter(GameId.BLACKJACK)
         adapter.load()
         adapter.reset(seed=42)
-        
+
         original = adapter.render()
         serialized = json_serialization.dumps(original)
         recovered = json_serialization.loads(serialized)
-        
+
         # Check metadata preservation
         assert recovered["player_sum"] == original["player_sum"]
         assert recovered["dealer_card"] == original["dealer_card"]
@@ -332,23 +333,23 @@ class TestBlackjackEndToEndScenario:
         """Play a complete episode by sticking immediately."""
         adapter = create_adapter(GameId.BLACKJACK)
         adapter.load()
-        
+
         # Reset
         reset_result = adapter.reset(seed=42)
         assert not reset_result.terminated
-        
+
         # Render initial state
         initial_render = adapter.render()
         assert initial_render["rgb"] is not None
-        
+
         # Action 0 = Stick
         step_result = adapter.step(0)
-        
+
         # Episode should terminate
         assert step_result.terminated
         # Reward should be +1, -1, or 0
         assert step_result.reward in [-1, 0, 1, 1.5]
-        
+
         # Render final state
         final_render = adapter.render()
         assert final_render["terminated"] is True
@@ -358,22 +359,22 @@ class TestBlackjackEndToEndScenario:
         adapter = create_adapter(GameId.BLACKJACK)
         adapter.load()
         adapter.reset(seed=123)
-        
+
         # Hit multiple times until episode ends
         max_steps = 10
         step_count = 0
         terminated = False
-        
+
         while not terminated and step_count < max_steps:
             result = adapter.step(1)  # Action 1 = Hit
             step_count += 1
             terminated = result.terminated or result.truncated
-            
+
             # Verify we can render at each step
             payload = adapter.render()
             assert payload["rgb"] is not None
             assert "player_sum" in payload
-        
+
         # Episode should have ended (either bust or reached goal)
         assert terminated
 
@@ -382,23 +383,23 @@ class TestBlackjackEndToEndScenario:
         adapter = create_adapter(GameId.BLACKJACK)
         adapter.load()
         adapter.reset(seed=42)
-        
+
         # Collect payloads from a few steps
         payloads = []
         payloads.append(adapter.render())
-        
+
         # Take 2 hit actions
         adapter.step(1)
         payloads.append(adapter.render())
-        
+
         adapter.step(1)
         payloads.append(adapter.render())
-        
+
         # Verify all payloads can be serialized
         for i, payload in enumerate(payloads):
             serialized = json_serialization.dumps(payload)
             assert serialized is not None, f"Failed to serialize payload {i}"
-            
+
             # Verify deserialization
             recovered = json_serialization.loads(serialized)
             assert recovered["mode"] == RenderMode.RGB_ARRAY.value

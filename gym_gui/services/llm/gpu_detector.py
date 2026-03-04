@@ -7,8 +7,8 @@ for model compatibility checking.
 from __future__ import annotations
 
 import logging
-import subprocess
 import re
+import subprocess
 from dataclasses import dataclass
 from typing import List, Optional
 

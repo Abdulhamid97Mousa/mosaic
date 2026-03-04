@@ -17,22 +17,13 @@ import logging
 import os
 import sys
 import uuid
+from collections import defaultdict
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 from qtpy import QtCore, QtGui, QtWidgets
-
-from gym_gui.config.paths import VAR_TRAINER_DIR, VAR_CUSTOM_SCRIPTS_DIR, XUANCE_SCRIPTS_DIR
-from gym_gui.logging_config.helpers import LogConstantMixin
-from gym_gui.logging_config.log_constants import (
-    LOG_UI_TRAIN_FORM_TRACE,
-    LOG_UI_TRAIN_FORM_INFO,
-    LOG_UI_TRAIN_FORM_WARNING,
-    LOG_UI_TRAIN_FORM_ERROR,
-)
-
 from xuance_worker import (
     Backend,
     Paradigm,
@@ -41,12 +32,18 @@ from xuance_worker import (
     get_backend_summary,
 )
 
-from gym_gui.telemetry.semconv import VIDEO_MODE_DESCRIPTORS, VideoModes
+from gym_gui.config.paths import VAR_CUSTOM_SCRIPTS_DIR, VAR_TRAINER_DIR, XUANCE_SCRIPTS_DIR
+from gym_gui.core.enums import ENVIRONMENT_FAMILY_BY_GAME, EnvironmentFamily, GameId
 from gym_gui.fastlane.worker_helpers import apply_fastlane_environment
+from gym_gui.logging_config.helpers import LogConstantMixin
+from gym_gui.logging_config.log_constants import (
+    LOG_UI_TRAIN_FORM_ERROR,
+    LOG_UI_TRAIN_FORM_INFO,
+    LOG_UI_TRAIN_FORM_TRACE,
+    LOG_UI_TRAIN_FORM_WARNING,
+)
+from gym_gui.telemetry.semconv import VIDEO_MODE_DESCRIPTORS, VideoModes
 from gym_gui.validations.validation_xuance_worker_form import run_xuance_dry_run
-from gym_gui.core.enums import GameId, EnvironmentFamily, ENVIRONMENT_FAMILY_BY_GAME
-from collections import defaultdict
-
 
 _LOGGER = logging.getLogger("gym_gui.ui.xuance_train_form")
 REPO_ROOT = Path(__file__).resolve().parents[3]
@@ -1034,8 +1031,8 @@ class XuanCeTrainForm(QtWidgets.QDialog, LogConstantMixin):
             self._wandb_run_name_input,
             self._wandb_api_key_input,
         )
-        for field in base_fields:
-            field.setEnabled(wandb_enabled)
+        for widget in base_fields:
+            widget.setEnabled(wandb_enabled)
 
         # VPN checkbox
         self._wandb_use_vpn_checkbox.setEnabled(wandb_enabled)

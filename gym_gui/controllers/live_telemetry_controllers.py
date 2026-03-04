@@ -14,52 +14,51 @@ import logging
 import queue
 import threading
 from collections import deque
-from typing import TYPE_CHECKING, Optional, Dict
+from typing import TYPE_CHECKING, Dict, Optional
 
 from PyQt6 import QtCore
 from PyQt6.QtCore import pyqtSignal, pyqtSlot  # type: ignore[attr-defined]
 
+from gym_gui.constants import (
+    DEFAULT_EPISODE_BUFFER_SIZE,
+    DEFAULT_RENDER_DELAY_MS,
+    DEFAULT_TELEMETRY_BUFFER_SIZE,
+    EPISODE_BUFFER_MIN,
+    EPISODE_BUFFER_SIZE,
+    LIVE_CONTROL_QUEUE_SIZE,
+    LIVE_EPISODE_QUEUE_SIZE,
+    LIVE_STEP_QUEUE_SIZE,
+    STEP_BUFFER_SIZE,
+    TELEMETRY_BUFFER_MIN,
+    UI_RENDERING_THROTTLE_MIN,
+)
+from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
     LOG_BUFFER_DROP,
     LOG_CREDIT_RESUMED,
     LOG_CREDIT_STARVED,
     LOG_LIVE_CONTROLLER_ALREADY_RUNNING,
+    LOG_LIVE_CONTROLLER_BUFFER_EPISODES_FLUSHED,
+    LOG_LIVE_CONTROLLER_BUFFER_STEPS_FLUSHED,
     LOG_LIVE_CONTROLLER_INITIALIZED,
+    LOG_LIVE_CONTROLLER_LOOP_EXITED,
+    LOG_LIVE_CONTROLLER_QUEUE_OVERFLOW,
     LOG_LIVE_CONTROLLER_RUN_ALREADY_SUBSCRIBED,
+    LOG_LIVE_CONTROLLER_RUN_COMPLETED,
     LOG_LIVE_CONTROLLER_RUN_SUBSCRIBED,
     LOG_LIVE_CONTROLLER_RUN_UNSUBSCRIBED,
+    LOG_LIVE_CONTROLLER_RUNBUS_SUBSCRIBED,
+    LOG_LIVE_CONTROLLER_SIGNAL_EMIT_FAILED,
+    LOG_LIVE_CONTROLLER_TAB_ADD_FAILED,
     LOG_LIVE_CONTROLLER_THREAD_STARTED,
-    LOG_LIVE_CONTROLLER_THREAD_STOPPED,
     LOG_LIVE_CONTROLLER_THREAD_STOP_TIMEOUT,
+    LOG_LIVE_CONTROLLER_THREAD_STOPPED,
     LOG_TELEMETRY_CONTROLLER_THREAD_ERROR,
     LOG_TELEMETRY_SUBSCRIBE_ERROR,
-    LOG_LIVE_CONTROLLER_LOOP_EXITED,
-    LOG_LIVE_CONTROLLER_BUFFER_STEPS_FLUSHED,
-    LOG_LIVE_CONTROLLER_BUFFER_EPISODES_FLUSHED,
-    LOG_LIVE_CONTROLLER_QUEUE_OVERFLOW,
-    LOG_LIVE_CONTROLLER_RUN_COMPLETED,
-    LOG_LIVE_CONTROLLER_RUNBUS_SUBSCRIBED,
-    LOG_LIVE_CONTROLLER_TAB_ADD_FAILED,
-    LOG_LIVE_CONTROLLER_SIGNAL_EMIT_FAILED,
 )
-from gym_gui.logging_config.helpers import LogConstantMixin
-
-from gym_gui.telemetry.run_bus import get_bus
-from gym_gui.telemetry.events import Topic, TelemetryEvent
 from gym_gui.telemetry.credit_manager import get_credit_manager
-from gym_gui.constants import (
-    STEP_BUFFER_SIZE,
-    EPISODE_BUFFER_SIZE,
-    LIVE_STEP_QUEUE_SIZE,
-    LIVE_EPISODE_QUEUE_SIZE,
-    LIVE_CONTROL_QUEUE_SIZE,
-    DEFAULT_RENDER_DELAY_MS,
-    DEFAULT_TELEMETRY_BUFFER_SIZE,
-    DEFAULT_EPISODE_BUFFER_SIZE,
-    TELEMETRY_BUFFER_MIN,
-    EPISODE_BUFFER_MIN,
-    UI_RENDERING_THROTTLE_MIN,
-)
+from gym_gui.telemetry.events import TelemetryEvent, Topic
+from gym_gui.telemetry.run_bus import get_bus
 
 if TYPE_CHECKING:
     from gym_gui.services.trainer import TrainerClient
@@ -280,7 +279,7 @@ class LiveTelemetryController(QtCore.QObject, LogConstantMixin):
         self._render_enabled_per_run[run_id] = enabled
         self.log_constant(
             LOG_LIVE_CONTROLLER_INITIALIZED,
-            message=f"Set live_render_enabled_for_run",
+            message="Set live_render_enabled_for_run",
             extra={"run_id": run_id, "enabled": enabled},
         )
 
@@ -288,7 +287,7 @@ class LiveTelemetryController(QtCore.QObject, LogConstantMixin):
         value = self._render_enabled_per_run.get(run_id, True)
         self.log_constant(
             LOG_LIVE_CONTROLLER_INITIALIZED,
-            message=f"is_live_render_enabled check",
+            message="is_live_render_enabled check",
             extra={"run_id": run_id, "value": value, "has_key": run_id in self._render_enabled_per_run},
         )
         return value

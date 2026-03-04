@@ -23,7 +23,6 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # _StructuredLogFormatter tests
 # ---------------------------------------------------------------------------
@@ -225,8 +224,8 @@ class TestLogConstantsRegistry:
 
     def test_new_constants_have_correct_metadata(self):
         from gym_gui.logging_config.log_constants import (
-            LOG_WORKER_RAY_LOG_FILE_CREATED,
             LOG_WORKER_RAY_ALGORITHM_BUILT,
+            LOG_WORKER_RAY_LOG_FILE_CREATED,
         )
 
         assert LOG_WORKER_RAY_LOG_FILE_CREATED.code == "LOG461"
@@ -249,9 +248,9 @@ class TestDifficultyFormFix:
     def test_on_difficulty_changed_calls_apply_preset(self):
         """The fix: _on_difficulty_changed must call _apply_difficulty_preset
         instead of directly accessing self._skill_spin which may not exist."""
-        from gym_gui.ui.widgets.human_vs_agent_config_form import HumanVsAgentConfigForm
-
         import inspect
+
+        from gym_gui.ui.widgets.human_vs_agent_config_form import HumanVsAgentConfigForm
         source = inspect.getsource(HumanVsAgentConfigForm._on_difficulty_changed)
         # Must NOT contain direct _skill_spin access
         assert "_skill_spin" not in source, (
@@ -271,9 +270,9 @@ class TestDispatcherLogFiles:
 
     def test_maybe_open_log_files_source_has_no_script_guard(self):
         """The fix: _maybe_open_log_files must NOT skip module-based workers."""
-        from gym_gui.services.trainer.dispatcher import TrainerDispatcher
-
         import inspect
+
+        from gym_gui.services.trainer.dispatcher import TrainerDispatcher
         source = inspect.getsource(TrainerDispatcher._maybe_open_log_files)
         # Must NOT contain the old guard that skipped module workers
         assert 'wmeta.get("script")' not in source, (

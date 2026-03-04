@@ -13,46 +13,46 @@ These tests verify the fixes for:
 
 from __future__ import annotations
 
-import pytest
 from typing import Set
 from unittest.mock import MagicMock, patch
 
-# Import from keycode_translation
-from gym_gui.controllers.keycode_translation import (
-    linux_keycode_to_qt_key,
-    qt_key_to_linux_keycode,
-    LINUX_TO_QT_KEYCODE,
-    get_keycode_name,
-)
-
-# Import key resolvers and constants from human_input
-from gym_gui.controllers.human_input import (
-    INIMultiGridKeyCombinationResolver,
-    MultiGridKeyCombinationResolver,
-    MiniGridKeyCombinationResolver,
-    _KEYS_UP,
-    _KEYS_DOWN,
-    _KEYS_LEFT,
-    _KEYS_RIGHT,
-    _KEY_UP,
-    _KEY_DOWN,
-    _KEY_LEFT,
-    _KEY_RIGHT,
-    _KEY_W,
-    _KEY_A,
-    _KEY_S,
-    _KEY_D,
-    _KEY_SPACE,
-    _KEY_Q,
-    _KEY_E,
-    _KEY_G,
-    _KEY_H,
-    _KEY_RETURN,
-)
+import pytest
 
 # Qt imports for verification
 from qtpy.QtCore import Qt
 
+# Import key resolvers and constants from human_input
+from gym_gui.controllers.human_input import (
+    _KEY_A,
+    _KEY_D,
+    _KEY_DOWN,
+    _KEY_E,
+    _KEY_G,
+    _KEY_H,
+    _KEY_LEFT,
+    _KEY_Q,
+    _KEY_RETURN,
+    _KEY_RIGHT,
+    _KEY_S,
+    _KEY_SPACE,
+    _KEY_UP,
+    _KEY_W,
+    _KEYS_DOWN,
+    _KEYS_LEFT,
+    _KEYS_RIGHT,
+    _KEYS_UP,
+    INIMultiGridKeyCombinationResolver,
+    MiniGridKeyCombinationResolver,
+    MultiGridKeyCombinationResolver,
+)
+
+# Import from keycode_translation
+from gym_gui.controllers.keycode_translation import (
+    LINUX_TO_QT_KEYCODE,
+    get_keycode_name,
+    linux_keycode_to_qt_key,
+    qt_key_to_linux_keycode,
+)
 
 # =============================================================================
 # Linux Keycode Constants (from /usr/include/linux/input-event-codes.h)
@@ -160,8 +160,6 @@ class TestQtKeyTypeConversion:
 
         # But set intersection with enum vs int may fail!
         # This is the bug we fixed
-        enum_set = {qt_key_enum}
-        int_set = {_KEY_W}
 
         # The sets don't intersect properly with enum values
         # (This behavior can vary by Python/Qt version, but we don't rely on it)

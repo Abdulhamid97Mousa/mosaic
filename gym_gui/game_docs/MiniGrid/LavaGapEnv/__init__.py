@@ -6,7 +6,7 @@ def get_lavagap_html(env_id: str) -> str:
     """Generate Lava Gap HTML documentation for a specific variant."""
     size = "7×7"
     desc = "standard benchmark"
-    
+
     if "S5" in env_id:
         size = "5×5"
         desc = "compact challenge"
@@ -16,7 +16,7 @@ def get_lavagap_html(env_id: str) -> str:
     else:  # S7
         size = "7×7"
         desc = "standard benchmark"
-    
+
     return f"""
 <h2>{env_id}</h2>
 

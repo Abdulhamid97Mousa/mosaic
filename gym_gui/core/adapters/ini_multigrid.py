@@ -58,8 +58,8 @@ except ImportError:  # pragma: no cover
 
 # Try importing INI multigrid environments (local package)
 try:  # pragma: no cover - import guard
-    import sys
     import os
+    import sys
     # Add INI multigrid to path if available
     ini_multigrid_path = os.path.join(
         os.path.dirname(__file__), "..", "..", "..", "3rd_party", "multigrid-ini"

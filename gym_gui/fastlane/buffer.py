@@ -9,9 +9,9 @@ See Also:
 """
 from __future__ import annotations
 
+import struct
 from dataclasses import dataclass
 from multiprocessing import shared_memory
-import struct
 from typing import Iterable, Optional
 
 try:  # NumPy is optional here; we tolerate absence for headless tests

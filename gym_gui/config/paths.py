@@ -4,7 +4,6 @@ from __future__ import annotations
 
 from pathlib import Path
 
-
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 _REPO_ROOT = _PACKAGE_ROOT.parent
 _3RD_PARTY_ROOT = _REPO_ROOT / "3rd_party"

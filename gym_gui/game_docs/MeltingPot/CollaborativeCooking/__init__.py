@@ -1,7 +1,6 @@
 """Documentation for Melting Pot Collaborative Cooking substrate."""
 from __future__ import annotations
 
-
 COLLABORATIVE_COOKING_HTML = """
 <h2>Melting Pot: Collaborative Cooking (Circuit)</h2>
 

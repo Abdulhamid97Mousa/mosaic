@@ -9,13 +9,12 @@ import pytest
 from qtpy import QtWidgets
 
 from gym_gui.core.enums import EnvironmentFamily, GameId
-from gym_gui.telemetry.semconv import VideoModes
 from gym_gui.policy_discovery.cleanrl_policy_metadata import (
     CleanRlCheckpoint,
     discover_policies,
     load_metadata_for_policy,
 )
-
+from gym_gui.telemetry.semconv import VideoModes
 
 os_env = __import__("os").environ
 os_env.setdefault("QT_QPA_PLATFORM", "offscreen")

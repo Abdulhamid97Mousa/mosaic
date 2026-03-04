@@ -10,8 +10,9 @@ Tests the extensible board configuration system including:
 
 from __future__ import annotations
 
-import pytest
 from typing import TYPE_CHECKING, Optional
+
+import pytest
 
 if TYPE_CHECKING:
     pass
@@ -57,8 +58,8 @@ class TestBoardConfigDialogFactory:
     def test_factory_register_new_game(self) -> None:
         """Factory allows registering new games dynamically."""
         from gym_gui.ui.widgets.operators_board_config_form import (
-            BoardConfigDialogFactory,
             BoardConfigDialog,
+            BoardConfigDialogFactory,
         )
 
         # Create a mock dialog class
@@ -152,8 +153,8 @@ class TestChessBoardState:
     def test_state_set_piece(self) -> None:
         """ChessBoardState.set_piece modifies board correctly."""
         from gym_gui.ui.widgets.operators_board_config_form.chess_editor import (
-            ChessBoardState,
             CHESS_PIECES,
+            ChessBoardState,
         )
 
         state = ChessBoardState()
@@ -448,8 +449,9 @@ class TestPresetFENs:
 
     def test_standard_fen_is_valid(self) -> None:
         """Standard FEN position is valid."""
-        from gym_gui.ui.widgets.operators_board_config_form.chess_editor import STANDARD_FEN
         import chess
+
+        from gym_gui.ui.widgets.operators_board_config_form.chess_editor import STANDARD_FEN
 
         board = chess.Board(STANDARD_FEN)
         assert board.is_valid()
@@ -463,8 +465,9 @@ class TestPresetFENs:
 
     def test_endgame_kr_k_is_valid(self) -> None:
         """K+R vs K endgame FEN is valid."""
-        from gym_gui.ui.widgets.operators_board_config_form.chess_editor import ENDGAME_KR_K
         import chess
+
+        from gym_gui.ui.widgets.operators_board_config_form.chess_editor import ENDGAME_KR_K
 
         board = chess.Board(ENDGAME_KR_K)
         # Should have exactly 3 pieces: 2 kings + 1 rook
@@ -473,8 +476,9 @@ class TestPresetFENs:
 
     def test_endgame_kq_k_is_valid(self) -> None:
         """K+Q vs K endgame FEN is valid."""
-        from gym_gui.ui.widgets.operators_board_config_form.chess_editor import ENDGAME_KQ_K
         import chess
+
+        from gym_gui.ui.widgets.operators_board_config_form.chess_editor import ENDGAME_KQ_K
 
         board = chess.Board(ENDGAME_KQ_K)
         # Should have exactly 3 pieces: 2 kings + 1 queen

@@ -4,9 +4,9 @@ This module ensures Qt API is set before any imports happen.
 """
 
 # CRITICAL: Set warning filters FIRST, before any imports
-import warnings
 import os
 import sys
+import warnings
 
 # Suppress NumPy compatibility warning from Keras/TensorFlow (overcooked_ai dependency)
 # The warning is raised by NumPy when keras accesses deprecated np.object attribute

@@ -2,7 +2,7 @@
 
 import pytest
 
-from gym_gui.telemetry.events import Topic, TelemetryEvent
+from gym_gui.telemetry.events import TelemetryEvent, Topic
 from gym_gui.telemetry.run_bus import RunBus, reset_bus
 
 
@@ -25,7 +25,7 @@ class TestSequenceTracking:
     def test_sequence_tracking_per_run_agent(self, bus):
         """Test that sequence numbers are tracked per (run_id, agent_id)."""
         bus.subscribe(Topic.STEP_APPENDED, "subscriber-1")
-        
+
         # Publish events for run1/agent1
         evt1 = TelemetryEvent(
             topic=Topic.STEP_APPENDED,
@@ -36,7 +36,7 @@ class TestSequenceTracking:
             payload={"step_index": 0},
         )
         bus.publish(evt1)
-        
+
         # Publish events for run1/agent2
         evt2 = TelemetryEvent(
             topic=Topic.STEP_APPENDED,
@@ -47,7 +47,7 @@ class TestSequenceTracking:
             payload={"step_index": 0},
         )
         bus.publish(evt2)
-        
+
         stats = bus.sequence_stats()
         assert "run1:agent1" in stats
         assert "run1:agent2" in stats
@@ -57,7 +57,7 @@ class TestSequenceTracking:
     def test_sequence_tracking_increments(self, bus):
         """Test that sequence numbers increment correctly."""
         bus.subscribe(Topic.STEP_APPENDED, "subscriber-1")
-        
+
         for seq_id in range(5):
             evt = TelemetryEvent(
                 topic=Topic.STEP_APPENDED,
@@ -68,14 +68,14 @@ class TestSequenceTracking:
                 payload={"step_index": seq_id},
             )
             bus.publish(evt)
-        
+
         stats = bus.sequence_stats()
         assert stats["run1:agent1"] == 4
 
     def test_gap_detection_logs_warning(self, bus, caplog):
         """Test that gaps in sequence numbers are detected and logged."""
         bus.subscribe(Topic.STEP_APPENDED, "subscriber-1")
-        
+
         # Publish seq 0
         evt0 = TelemetryEvent(
             topic=Topic.STEP_APPENDED,
@@ -86,7 +86,7 @@ class TestSequenceTracking:
             payload={"step_index": 0},
         )
         bus.publish(evt0)
-        
+
         # Publish seq 3 (gap of 2)
         evt3 = TelemetryEvent(
             topic=Topic.STEP_APPENDED,
@@ -97,7 +97,7 @@ class TestSequenceTracking:
             payload={"step_index": 3},
         )
         bus.publish(evt3)
-        
+
         # Check that gap was logged
         assert "Sequence gap detected" in caplog.text
         assert "gap" in caplog.text.lower()
@@ -105,7 +105,7 @@ class TestSequenceTracking:
     def test_no_gap_for_first_event(self, bus, caplog):
         """Test that first event doesn't trigger gap warning."""
         bus.subscribe(Topic.STEP_APPENDED, "subscriber-1")
-        
+
         evt = TelemetryEvent(
             topic=Topic.STEP_APPENDED,
             run_id="run1",
@@ -115,7 +115,7 @@ class TestSequenceTracking:
             payload={"step_index": 0},
         )
         bus.publish(evt)
-        
+
         # Should not have gap warning
         assert "Sequence gap detected" not in caplog.text
 
@@ -157,7 +157,7 @@ class TestSequenceTracking:
     def test_sequence_stats_multiple_agents(self, bus):
         """Test sequence stats with multiple agents."""
         bus.subscribe(Topic.STEP_APPENDED, "subscriber-1")
-        
+
         # Agent 1: seq 0-4
         for seq_id in range(5):
             evt = TelemetryEvent(
@@ -169,7 +169,7 @@ class TestSequenceTracking:
                 payload={"step_index": seq_id},
             )
             bus.publish(evt)
-        
+
         # Agent 2: seq 0-9
         for seq_id in range(10):
             evt = TelemetryEvent(
@@ -181,7 +181,7 @@ class TestSequenceTracking:
                 payload={"step_index": seq_id},
             )
             bus.publish(evt)
-        
+
         stats = bus.sequence_stats()
         assert stats["run1:agent1"] == 4
         assert stats["run1:agent2"] == 9
@@ -189,7 +189,7 @@ class TestSequenceTracking:
     def test_sequence_tracking_with_default_agent(self, bus):
         """Test sequence tracking when agent_id is None."""
         bus.subscribe(Topic.STEP_APPENDED, "subscriber-1")
-        
+
         evt = TelemetryEvent(
             topic=Topic.STEP_APPENDED,
             run_id="run1",
@@ -199,7 +199,7 @@ class TestSequenceTracking:
             payload={"step_index": 0},
         )
         bus.publish(evt)
-        
+
         stats = bus.sequence_stats()
         assert "run1:default" in stats
         assert stats["run1:default"] == 0

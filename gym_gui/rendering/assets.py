@@ -7,6 +7,7 @@ from typing import Dict, Optional
 
 from qtpy import QtGui
 
+
 # Use local asset directory for version control and independence
 def _get_local_img_path() -> Path:
     """Get the local toy_text img directory."""
@@ -133,13 +134,13 @@ class TaxiAssets:
 
     # Background
     BACKGROUND = "taxi_background.png"
-    
+
     # Passenger
     PASSENGER = "passenger.png"
-    
+
     # Hotel (destination marker)
     HOTEL = "hotel.png"
-    
+
     # Gridworld medians (walls/grass borders)
     MEDIAN_LEFT = "gridworld_median_left.png"
     MEDIAN_RIGHT = "gridworld_median_right.png"
@@ -168,27 +169,27 @@ class TaxiAssets:
             "up": TaxiAssets.CAB_REAR,
         }
         return mapping.get(direction.lower(), TaxiAssets.CAB_FRONT)
-    
+
     @staticmethod
     def get_tile_asset(cell_value: str, row: int = 0, col: int = 0, grid: list | None = None) -> str:
         """
         Get the tile asset for a Taxi grid cell with context-aware edge detection.
-        
+
         Taxi ANSI grid (7×11) structure:
         Row 0: +---------+  (top border)
         Rows 1-5: |..data..|  (data rows with vertical walls)
         Row 6: +---------+  (bottom border)
-        
+
         Segments need edge caps:
         - Vertical '|': top cap, middle pieces, bottom cap
         - Horizontal '-': left cap, middle pieces, right cap
-        
+
         Args:
             cell_value: The character in the grid
             row: Row index in grid
             col: Column index in grid
             grid: Full grid for context (list of lists)
-            
+
         Returns:
             Asset filename for the tile
         """
@@ -197,7 +198,7 @@ class TaxiAssets:
             if grid and row < len(grid):
                 above = grid[row - 1][col] if row > 0 else ''
                 below = grid[row + 1][col] if row < len(grid) - 1 else ''
-                
+
                 # Top cap: '+' or '-' above (border connection)
                 if above in ('+', '-'):
                     return TaxiAssets.MEDIAN_TOP
@@ -217,13 +218,13 @@ class TaxiAssets:
                     return TaxiAssets.MEDIAN_TOP
             # Default to middle piece
             return TaxiAssets.MEDIAN_VERT
-        
+
         # Horizontal border '-'
         elif cell_value == '-':
             if grid and row < len(grid):
                 left = grid[row][col - 1] if col > 0 else ''
                 right = grid[row][col + 1] if col < len(grid[row]) - 1 else ''
-                
+
                 # Left cap: '+' on left (first '-' after corner)
                 if left == '+':
                     return TaxiAssets.MEDIAN_LEFT
@@ -232,11 +233,11 @@ class TaxiAssets:
                     return TaxiAssets.MEDIAN_RIGHT
             # Middle piece
             return TaxiAssets.MEDIAN_HORIZ
-        
+
         # Corners use background
         elif cell_value == '+':
             return TaxiAssets.BACKGROUND
-        
+
         # All other characters (depot letters, colons, spaces) use background
         # Depot overlays (hotel.png) are added by GridRenderer separately
         return TaxiAssets.BACKGROUND

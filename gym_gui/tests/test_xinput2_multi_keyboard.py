@@ -5,9 +5,10 @@ Proof-of-concept: Can we get individual keyboard device IDs using XInput2 in PyQ
 This test intercepts raw X11 events to extract keyboard device IDs.
 If successful, we can use this approach for multi-keyboard support.
 """
-import sys
 import ctypes
-from PyQt6 import QtWidgets, QtCore
+import sys
+
+from PyQt6 import QtCore, QtWidgets
 
 # Try to import xcffib for XCB event parsing
 try:
@@ -39,7 +40,7 @@ class XInput2EventFilter(QtCore.QAbstractNativeEventFilter):
                 self.widget.append_event("DEBUG: Connected to X11")
 
                 # Query for XInput extension
-                setup = self.conn.get_setup()
+                self.conn.get_setup()
                 xinput_ext = self.conn.core.QueryExtension(len("XInputExtension"), "XInputExtension").reply()
 
                 if not xinput_ext.present:
@@ -105,14 +106,14 @@ class XInput2EventFilter(QtCore.QAbstractNativeEventFilter):
             self.conn.flush()
 
             self.widget.append_event(f"✓ XISelectEvents called for window {window_id:#x}")
-            self.widget.append_event(f"✓ Requesting KeyPress/KeyRelease + RawKeyPress/RawKeyRelease")
+            self.widget.append_event("✓ Requesting KeyPress/KeyRelease + RawKeyPress/RawKeyRelease")
             self.widget.append_event(f"✓ Event mask: regular={event_mask}, raw={raw_mask}, combined={combined_mask}")
 
         except Exception as e:
             self.widget.append_event(f"✗ Failed to select XInput2 events: {e}")
             import traceback
             traceback.print_exc()
-    
+
     def nativeEventFilter(self, eventType, message):
         """Intercept native X11 events before Qt processes them.
 
@@ -129,7 +130,7 @@ class XInput2EventFilter(QtCore.QAbstractNativeEventFilter):
         # On X11, eventType is "xcb_generic_event_t"
         if eventType != b"xcb_generic_event_t":
             return False, 0
-        
+
         try:
             # Convert Qt's message pointer to bytes
             # XCB events are 32 bytes (standard) or larger (with extension data)
@@ -194,31 +195,31 @@ class XInput2EventFilter(QtCore.QAbstractNativeEventFilter):
                     else:
                         # Don't spam the log with non-keyboard events
                         pass
-            
+
             # Standard X11 KeyPress/KeyRelease (no device info available)
             elif response_type in [2, 3]:
                 event_name = "KeyPress" if response_type == 2 else "KeyRelease"
                 # Standard events don't have device ID in the structure
                 self.widget.append_event(f"Standard X11 {event_name} (no device ID)")
-                
+
         except Exception as e:
             print(f"Error parsing event: {e}")
             import traceback
             traceback.print_exc()
-        
+
         return False, 0  # Don't consume events
 
 
 class XInput2TestWindow(QtWidgets.QWidget):
     """Test window for XInput2 multi-keyboard detection."""
-    
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("XInput2 Multi-Keyboard Test - MOSAIC")
         self.resize(800, 600)
-        
+
         layout = QtWidgets.QVBoxLayout()
-        
+
         # Status header
         if HAS_XCFFIB:
             status = QtWidgets.QLabel("✓ python-xcffib installed - Testing XInput2 events")
@@ -230,7 +231,7 @@ class XInput2TestWindow(QtWidgets.QWidget):
             )
             status.setStyleSheet("color: red; font-weight: bold; font-size: 14px;")
         layout.addWidget(status)
-        
+
         # Instructions
         instructions = QtWidgets.QLabel(
             "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━\n"
@@ -245,20 +246,20 @@ class XInput2TestWindow(QtWidgets.QWidget):
         )
         instructions.setStyleSheet("font-family: monospace;")
         layout.addWidget(instructions)
-        
+
         # Event log
         self.log = QtWidgets.QTextEdit()
         self.log.setReadOnly(True)
         self.log.setStyleSheet("font-family: monospace; font-size: 12px;")
         layout.addWidget(self.log)
-        
+
         # Summary label
         self.summary = QtWidgets.QLabel("")
         self.summary.setStyleSheet("font-weight: bold; font-size: 13px; padding: 10px;")
         layout.addWidget(self.summary)
-        
+
         self.setLayout(layout)
-        
+
         # Install native event filter
         if HAS_XCFFIB:
             self.event_filter = XInput2EventFilter(self)
@@ -284,21 +285,21 @@ class XInput2TestWindow(QtWidgets.QWidget):
                 self.event_filter.select_xinput2_events(int(window_id))
             else:
                 self.log.append("✗ Could not get window ID")
-    
+
     def append_event(self, text):
         """Thread-safe append to log."""
         QtCore.QMetaObject.invokeMethod(
             self.log, "append", QtCore.Qt.ConnectionType.QueuedConnection,
             QtCore.Q_ARG(str, text)
         )
-        
+
         # Extract device ID and update summary
         if "Device ID=" in text:
             try:
                 device_id_str = text.split("Device ID=")[1].split(",")[0]
                 device_id = int(device_id_str)
                 self.device_ids.add(device_id)
-                
+
                 if len(self.device_ids) == 1:
                     self.summary.setText(f"📍 Detected 1 device: ID {device_id}")
                     self.summary.setStyleSheet("color: orange; font-weight: bold;")

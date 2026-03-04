@@ -53,8 +53,8 @@ Configuration:
     - FRAME_REF_SCHEME: URI scheme ("h5")
 """
 
-from gym_gui.replay.replay_store import ReplayWriter, ReplayReader
 from gym_gui.replay.frame_resolver import FrameRef, FrameResolver, make_frame_ref
+from gym_gui.replay.replay_store import ReplayReader, ReplayWriter
 
 __all__ = [
     # Writer/Reader

@@ -9,9 +9,9 @@ The GUI reads this manifest to display analytics tabs and artifact links.
 from __future__ import annotations
 
 import json
-from dataclasses import dataclass, asdict, field
+from dataclasses import asdict, dataclass, field
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
 
 
 @dataclass(frozen=True)

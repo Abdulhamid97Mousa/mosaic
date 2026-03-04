@@ -16,13 +16,15 @@ from typing import Any, Dict, List, Optional, Union
 from PyQt6.QtCore import pyqtSignal
 from qtpy import QtCore, QtWidgets
 
+from gym_gui.policy_discovery.cleanrl_policy_metadata import (
+    CleanRlCheckpoint,
+)
+from gym_gui.policy_discovery.cleanrl_policy_metadata import (
+    discover_policies as discover_cleanrl_policies,
+)
 from gym_gui.policy_discovery.ray_policy_metadata import (
     RayRLlibCheckpoint,
     discover_ray_checkpoints,
-)
-from gym_gui.policy_discovery.cleanrl_policy_metadata import (
-    CleanRlCheckpoint,
-    discover_policies as discover_cleanrl_policies,
 )
 
 _LOGGER = logging.getLogger(__name__)

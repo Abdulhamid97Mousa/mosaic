@@ -11,8 +11,8 @@ import urllib.request
 from pathlib import Path
 from typing import Iterable
 
+from PyQt6.QtCore import pyqtSignal, pyqtSlot
 from qtpy import QtCore, QtGui, QtWidgets  # type: ignore[import]
-from PyQt6.QtCore import pyqtSlot, pyqtSignal
 
 try:  # Optional dependency for embedded browser support
     from qtpy.QtWebEngineWidgets import QWebEngineView  # type: ignore[attr-defined]
@@ -31,13 +31,12 @@ from gym_gui.logging_config.helpers import LogConstantMixin
 from gym_gui.logging_config.log_constants import (
     LOG_UI_RENDER_TABS_ERROR,
     LOG_UI_RENDER_TABS_INFO,
+    LOG_UI_RENDER_TABS_TENSORBOARD_STATUS,
+    LOG_UI_RENDER_TABS_TENSORBOARD_WAITING,
     LOG_UI_RENDER_TABS_TRACE,
     LOG_UI_RENDER_TABS_WARNING,
-    LOG_UI_RENDER_TABS_TENSORBOARD_STATUS,
     LOG_UI_TENSORBOARD_KILL_WARNING,
-    LOG_UI_RENDER_TABS_TENSORBOARD_WAITING,
 )
-
 
 _LOGGER = logging.getLogger(__name__)
 

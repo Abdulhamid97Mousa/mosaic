@@ -12,9 +12,9 @@ from typing import Any, Dict, Optional
 
 from qtpy import QtWidgets
 
+from gym_gui.policy_discovery.ray_policy_metadata import RayRLlibCheckpoint
 from gym_gui.ui.forms.factory import get_worker_form_factory
 from gym_gui.ui.widgets.load_policy_dialog import LoadPolicyDialog
-from gym_gui.policy_discovery.ray_policy_metadata import RayRLlibCheckpoint
 
 _LOGGER = logging.getLogger(__name__)
 

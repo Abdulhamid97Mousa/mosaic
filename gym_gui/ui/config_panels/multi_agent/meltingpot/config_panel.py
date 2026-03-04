@@ -10,7 +10,6 @@ from PyQt6 import QtWidgets
 from gym_gui.config.game_configs import MeltingPotConfig
 from gym_gui.core.enums import GameId
 
-
 MELTINGPOT_GAME_IDS: tuple[GameId, ...] = (
     # All 49 MeltingPot substrates
     GameId.MELTINGPOT_ALLELOPATHIC_HARVEST__OPEN,

@@ -21,7 +21,7 @@ Example:
 import logging
 import re
 from functools import partial
-from typing import Dict, Type, Optional, List, Tuple, Callable
+from typing import Callable, Dict, List, Optional, Tuple, Type
 
 from PyQt6 import QtWidgets
 
@@ -30,6 +30,7 @@ from gym_gui.logging_config.log_constants import (
     LOG_OP_GRID_CONFIG_FACTORY_CREATE,
     LOG_OP_GRID_CONFIG_UNSUPPORTED_ENV,
 )
+
 from .base import GridConfigDialog
 
 _LOGGER = logging.getLogger(__name__)

@@ -10,8 +10,8 @@ Tests that RWARE environments:
 
 from __future__ import annotations
 
-import pytest
 import numpy as np
+import pytest
 
 
 # ---------------------------------------------------------------------------
@@ -48,9 +48,9 @@ class TestRWAREEnumRegistration:
 
     def test_rware_in_family_mapping(self) -> None:
         from gym_gui.core.enums import (
+            ENVIRONMENT_FAMILY_BY_GAME,
             EnvironmentFamily,
             GameId,
-            ENVIRONMENT_FAMILY_BY_GAME,
         )
 
         rware_ids = [
@@ -73,9 +73,9 @@ class TestRWAREEnumRegistration:
 
     def test_rware_stepping_paradigm(self) -> None:
         from gym_gui.core.enums import (
+            DEFAULT_PARADIGM_BY_FAMILY,
             EnvironmentFamily,
             SteppingParadigm,
-            DEFAULT_PARADIGM_BY_FAMILY,
         )
 
         assert EnvironmentFamily.RWARE in DEFAULT_PARADIGM_BY_FAMILY
@@ -164,8 +164,8 @@ class TestRWAREAdapterFactory:
 
     def test_create_adapter_with_context(self) -> None:
         """Adapter works when created via factory with context (the runtime path)."""
-        from gym_gui.core.enums import ControlMode, GameId
         from gym_gui.core.adapters.base import AdapterContext
+        from gym_gui.core.enums import ControlMode, GameId
         from gym_gui.core.factories.adapters import create_adapter
 
         context = AdapterContext(settings=None, control_mode=ControlMode.AGENT_ONLY)
@@ -250,11 +250,11 @@ class TestRWAREKeyboardResolver:
         assert resolver is not None
 
     def test_resolver_registered_for_family(self) -> None:
-        from gym_gui.core.enums import GameId
         from gym_gui.controllers.human_input import (
-            get_key_combination_resolver,
             RWAREKeyCombinationResolver,
+            get_key_combination_resolver,
         )
+        from gym_gui.core.enums import GameId
 
         resolver = get_key_combination_resolver(GameId.RWARE_TINY_2AG)
         assert isinstance(resolver, RWAREKeyCombinationResolver)
@@ -267,6 +267,7 @@ class TestRWAREKeyboardResolver:
 
     def test_forward_key(self) -> None:
         from PyQt6.QtCore import Qt
+
         from gym_gui.controllers.human_input import RWAREKeyCombinationResolver
 
         resolver = RWAREKeyCombinationResolver()
@@ -275,6 +276,7 @@ class TestRWAREKeyboardResolver:
 
     def test_left_key(self) -> None:
         from PyQt6.QtCore import Qt
+
         from gym_gui.controllers.human_input import RWAREKeyCombinationResolver
 
         resolver = RWAREKeyCombinationResolver()
@@ -283,6 +285,7 @@ class TestRWAREKeyboardResolver:
 
     def test_right_key(self) -> None:
         from PyQt6.QtCore import Qt
+
         from gym_gui.controllers.human_input import RWAREKeyCombinationResolver
 
         resolver = RWAREKeyCombinationResolver()
@@ -291,6 +294,7 @@ class TestRWAREKeyboardResolver:
 
     def test_toggle_load_key(self) -> None:
         from PyQt6.QtCore import Qt
+
         from gym_gui.controllers.human_input import RWAREKeyCombinationResolver
 
         resolver = RWAREKeyCombinationResolver()
@@ -300,6 +304,7 @@ class TestRWAREKeyboardResolver:
     def test_toggle_load_priority_over_movement(self) -> None:
         """Action buttons should have priority over movement keys."""
         from PyQt6.QtCore import Qt
+
         from gym_gui.controllers.human_input import RWAREKeyCombinationResolver
 
         resolver = RWAREKeyCombinationResolver()
@@ -325,7 +330,7 @@ class TestRWAREConfigPanel:
         assert callable(build_rware_controls)
 
     def test_all_game_ids_consistent_with_enums(self) -> None:
-        from gym_gui.core.enums import GameId, ENVIRONMENT_FAMILY_BY_GAME, EnvironmentFamily
+        from gym_gui.core.enums import ENVIRONMENT_FAMILY_BY_GAME, EnvironmentFamily, GameId
         from gym_gui.ui.config_panels.multi_agent.rware import ALL_RWARE_GAME_IDS
 
         for gid in ALL_RWARE_GAME_IDS:

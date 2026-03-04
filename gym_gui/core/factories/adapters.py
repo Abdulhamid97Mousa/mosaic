@@ -6,28 +6,28 @@ from typing import Any, Iterable, Mapping, TypeVar
 
 from gym_gui.cache.memory import memoize
 from gym_gui.config.game_configs import (
-    CliffWalkingConfig,
-    CarRacingConfig,
-    BipedalWalkerConfig,
-    FrozenLakeConfig,
-    LunarLanderConfig,
-    MiniGridConfig,
     ALEConfig,
-    TaxiConfig,
+    BipedalWalkerConfig,
     BlackjackConfig,
-    MultiGridConfig,
-    MeltingPotConfig,
-    OvercookedConfig,
-    SMACConfig,
-    RWAREConfig,
+    CarRacingConfig,
+    CliffWalkingConfig,
+    FrozenLakeConfig,
     GameConfig,
+    LunarLanderConfig,
+    MeltingPotConfig,
+    MiniGridConfig,
+    MultiGridConfig,
+    OvercookedConfig,
+    RWAREConfig,
+    SMACConfig,
+    TaxiConfig,
 )
+from gym_gui.core.adapters.ale import ALE_ADAPTERS, ALEAdapter
+from gym_gui.core.adapters.babyai import BABYAI_ADAPTERS
 from gym_gui.core.adapters.base import AdapterContext, EnvironmentAdapter
-from gym_gui.core.adapters.toy_text import TOY_TEXT_ADAPTERS
 from gym_gui.core.adapters.box2d import BOX2D_ADAPTERS
 from gym_gui.core.adapters.minigrid import MINIGRID_ADAPTERS
-from gym_gui.core.adapters.babyai import BABYAI_ADAPTERS
-from gym_gui.core.adapters.ale import ALE_ADAPTERS, ALEAdapter
+from gym_gui.core.adapters.toy_text import TOY_TEXT_ADAPTERS
 
 # TYPE_CHECKING imports removed - using GameConfig type alias instead
 
@@ -72,44 +72,44 @@ except Exception:  # pragma: no cover - nethack optional
     NetHackConfig = None  # type: ignore[misc, assignment]
 
 try:  # Optional dependency - Crafter (open world survival benchmark)
+    from gym_gui.config.game_configs import CrafterConfig
     from gym_gui.core.adapters.crafter import (  # pragma: no cover - optional
         CRAFTER_ADAPTERS,
         CrafterAdapter,
     )
-    from gym_gui.config.game_configs import CrafterConfig
 except Exception:  # pragma: no cover - crafter optional
     CRAFTER_ADAPTERS: dict[Any, Any] = {}
     CrafterAdapter = None  # type: ignore[misc, assignment]
     CrafterConfig = None  # type: ignore[misc, assignment]
 
 try:  # Optional dependency - Procgen (procedurally generated benchmark)
+    from gym_gui.config.game_configs import ProcgenConfig
     from gym_gui.core.adapters.procgen import (  # pragma: no cover - optional
         PROCGEN_ADAPTERS,
         ProcgenAdapter,
     )
-    from gym_gui.config.game_configs import ProcgenConfig
 except Exception:  # pragma: no cover - procgen optional
     PROCGEN_ADAPTERS: dict[Any, Any] = {}
     ProcgenAdapter = None  # type: ignore[misc, assignment]
     ProcgenConfig = None  # type: ignore[misc, assignment]
 
 try:  # Optional dependency - TextWorld (text-based game environments)
+    from gym_gui.config.game_configs import TextWorldConfig
     from gym_gui.core.adapters.textworld import (  # pragma: no cover - optional
         TEXTWORLD_ADAPTERS,
         TextWorldAdapter,
     )
-    from gym_gui.config.game_configs import TextWorldConfig
 except Exception:  # pragma: no cover - textworld optional
     TEXTWORLD_ADAPTERS: dict[Any, Any] = {}
     TextWorldAdapter = None  # type: ignore[misc, assignment]
     TextWorldConfig = None  # type: ignore[misc, assignment]
 
 try:  # Optional dependency - Jumanji (JAX-based logic puzzle environments)
+    from gym_gui.config.game_configs import JumanjiConfig
     from gym_gui.core.adapters.jumanji import (  # pragma: no cover - optional
         JUMANJI_ADAPTERS,
         JumanjiAdapter,
     )
-    from gym_gui.config.game_configs import JumanjiConfig
 except Exception:  # pragma: no cover - jumanji optional
     JUMANJI_ADAPTERS: dict[Any, Any] = {}
     JumanjiAdapter = None  # type: ignore[misc, assignment]
@@ -139,8 +139,8 @@ try:  # Draughts/Checkers variants with proper rule implementations
     from gym_gui.core.adapters.draughts import (  # pragma: no cover - draughts
         DRAUGHTS_ADAPTERS,
         AmericanCheckersAdapter,
-        RussianCheckersAdapter,
         InternationalDraughtsAdapter,
+        RussianCheckersAdapter,
     )
 except Exception:  # pragma: no cover - draughts adapters
     DRAUGHTS_ADAPTERS: dict[Any, Any] = {}
@@ -162,6 +162,8 @@ except Exception:  # pragma: no cover - babaisai optional
 try:  # Optional dependency - MOSAIC MultiGrid (competitive team-based PyPI package)
     from gym_gui.core.adapters.mosaic_multigrid import (  # pragma: no cover - optional
         MOSAIC_MULTIGRID_ADAPTERS,
+    )
+    from gym_gui.core.adapters.mosaic_multigrid import (
         MultiGridAdapter as MosaicMultiGridAdapter,
     )
 except Exception:  # pragma: no cover - mosaic_multigrid optional
@@ -171,6 +173,8 @@ except Exception:  # pragma: no cover - mosaic_multigrid optional
 try:  # Optional dependency - INI MultiGrid (cooperative exploration local package)
     from gym_gui.core.adapters.ini_multigrid import (  # pragma: no cover - optional
         INI_MULTIGRID_ADAPTERS,
+    )
+    from gym_gui.core.adapters.ini_multigrid import (
         MultiGridAdapter as INIMultiGridAdapter,
     )
 except Exception:  # pragma: no cover - ini_multigrid optional
@@ -293,37 +297,37 @@ def create_adapter(
     adapter_cls = get_adapter_cls(game_id)
 
     # Import adapter classes to check if game_config is supported
-    from gym_gui.core.adapters.toy_text import (
-        CliffWalkingAdapter,
-        FrozenLakeAdapter,
-        FrozenLakeV2Adapter,
-        TaxiAdapter,
-        BlackjackAdapter,
-    )
-    from gym_gui.core.adapters.minigrid import (
-        MiniGridAdapter,
-        MiniGridEmpty5x5Adapter,
-        MiniGridEmptyRandom5x5Adapter,
-        MiniGridEmpty6x6Adapter,
-        MiniGridEmptyRandom6x6Adapter,
-        MiniGridEmpty8x8Adapter,
-        MiniGridEmpty16x16Adapter,
-        MiniGridDoorKey5x5Adapter,
-        MiniGridDoorKey6x6Adapter,
-        MiniGridDoorKey8x8Adapter,
-        MiniGridDoorKey16x16Adapter,
-        MiniGridLavaGapS5Adapter,
-        MiniGridLavaGapS6Adapter,
-        MiniGridLavaGapS7Adapter,
+    from gym_gui.core.adapters.ale import (
+        AdventureV4Adapter,
+        AdventureV5Adapter,
     )
     from gym_gui.core.adapters.box2d import (
         BipedalWalkerAdapter,
         CarRacingAdapter,
         LunarLanderAdapter,
     )
-    from gym_gui.core.adapters.ale import (
-        AdventureV4Adapter,
-        AdventureV5Adapter,
+    from gym_gui.core.adapters.minigrid import (
+        MiniGridAdapter,
+        MiniGridDoorKey5x5Adapter,
+        MiniGridDoorKey6x6Adapter,
+        MiniGridDoorKey8x8Adapter,
+        MiniGridDoorKey16x16Adapter,
+        MiniGridEmpty5x5Adapter,
+        MiniGridEmpty6x6Adapter,
+        MiniGridEmpty8x8Adapter,
+        MiniGridEmpty16x16Adapter,
+        MiniGridEmptyRandom5x5Adapter,
+        MiniGridEmptyRandom6x6Adapter,
+        MiniGridLavaGapS5Adapter,
+        MiniGridLavaGapS6Adapter,
+        MiniGridLavaGapS7Adapter,
+    )
+    from gym_gui.core.adapters.toy_text import (
+        BlackjackAdapter,
+        CliffWalkingAdapter,
+        FrozenLakeAdapter,
+        FrozenLakeV2Adapter,
+        TaxiAdapter,
     )
 
     # Pass game config to appropriate adapter constructor

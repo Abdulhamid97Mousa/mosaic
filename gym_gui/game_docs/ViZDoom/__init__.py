@@ -1,22 +1,22 @@
 """Public exports for ViZDoom HTML snippets."""
 
-from .controls import VIZDOOM_CONTROLS_HTML
 from .basic import (
     VIZDOOM_BASIC_HTML,
     VIZDOOM_PREDICT_POSITION_HTML,
     VIZDOOM_TAKE_COVER_HTML,
 )
 from .combat import (
+    VIZDOOM_DEADLY_CORRIDOR_HTML,
     VIZDOOM_DEFEND_THE_CENTER_HTML,
     VIZDOOM_DEFEND_THE_LINE_HTML,
-    VIZDOOM_DEADLY_CORRIDOR_HTML,
 )
+from .controls import VIZDOOM_CONTROLS_HTML
+from .multiplayer import VIZDOOM_DEATHMATCH_HTML
 from .navigation import (
     VIZDOOM_HEALTH_GATHERING_HTML,
     VIZDOOM_HEALTH_GATHERING_SUPREME_HTML,
     VIZDOOM_MY_WAY_HOME_HTML,
 )
-from .multiplayer import VIZDOOM_DEATHMATCH_HTML
 
 __all__ = [
     "VIZDOOM_CONTROLS_HTML",

@@ -10,9 +10,10 @@ Tests that Melting Pot environments:
 
 from __future__ import annotations
 
-import pytest
+from typing import Any
+
 import numpy as np
-from typing import Any, Dict
+import pytest
 
 
 class TestMeltingPotEnvironmentLoads:
@@ -261,9 +262,9 @@ class TestMeltingPotGameIds:
     def test_meltingpot_in_family_mapping(self) -> None:
         """Melting Pot games are mapped to MELTINGPOT family."""
         from gym_gui.core.enums import (
+            ENVIRONMENT_FAMILY_BY_GAME,
             EnvironmentFamily,
             GameId,
-            ENVIRONMENT_FAMILY_BY_GAME,
         )
 
         meltingpot_game_ids = [
@@ -284,9 +285,9 @@ class TestMeltingPotGameIds:
     def test_meltingpot_stepping_paradigm(self) -> None:
         """Melting Pot uses SIMULTANEOUS stepping paradigm."""
         from gym_gui.core.enums import (
+            DEFAULT_PARADIGM_BY_FAMILY,
             EnvironmentFamily,
             SteppingParadigm,
-            DEFAULT_PARADIGM_BY_FAMILY,
         )
 
         assert EnvironmentFamily.MELTINGPOT in DEFAULT_PARADIGM_BY_FAMILY

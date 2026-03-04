@@ -10,8 +10,9 @@ Tests that the Connect Four adapter:
 
 from __future__ import annotations
 
-import pytest
 from typing import TYPE_CHECKING, Any, Dict, List
+
+import pytest
 
 if TYPE_CHECKING:
     from gym_gui.core.adapters.pettingzoo_classic import ConnectFourEnvironmentAdapter
@@ -325,9 +326,9 @@ class TestConnectFourFactoryRegistration:
     def test_connect_four_in_pettingzoo_classic_family(self) -> None:
         """Connect Four is in PETTINGZOO_CLASSIC environment family."""
         from gym_gui.core.enums import (
+            ENVIRONMENT_FAMILY_BY_GAME,
             EnvironmentFamily,
             GameId,
-            ENVIRONMENT_FAMILY_BY_GAME,
         )
 
         assert GameId.CONNECT_FOUR in ENVIRONMENT_FAMILY_BY_GAME
@@ -354,7 +355,7 @@ class TestConnectFourWinDetection:
         moves = [0, 4, 1, 5, 2, 6, 3]  # Player 0 wins with horizontal on bottom row
 
         for i, col in enumerate(moves):
-            step = connect_four_adapter.step(col)
+            connect_four_adapter.step(col)
             if i == len(moves) - 1:
                 state = connect_four_adapter.get_connect_four_state()
                 assert state.is_game_over is True
@@ -366,7 +367,7 @@ class TestConnectFourWinDetection:
         moves = [0, 1, 0, 1, 0, 1, 0]  # Player 0 wins with vertical in column 0
 
         for i, col in enumerate(moves):
-            step = connect_four_adapter.step(col)
+            connect_four_adapter.step(col)
             if i == len(moves) - 1:
                 state = connect_four_adapter.get_connect_four_state()
                 assert state.is_game_over is True
@@ -381,7 +382,7 @@ class TestConnectFourWinDetection:
 
         game_over = False
         for col in moves:
-            step = connect_four_adapter.step(col)
+            connect_four_adapter.step(col)
             state = connect_four_adapter.get_connect_four_state()
             if state.is_game_over:
                 game_over = True

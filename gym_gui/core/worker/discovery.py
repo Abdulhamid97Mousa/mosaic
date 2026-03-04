@@ -19,7 +19,7 @@ import logging
 from dataclasses import dataclass, field
 from typing import Callable, Optional
 
-from .protocol import WorkerMetadata, WorkerCapabilities
+from .protocol import WorkerCapabilities, WorkerMetadata
 
 # Entry point group for MOSAIC workers
 WORKER_ENTRY_POINT_GROUP = "mosaic.workers"

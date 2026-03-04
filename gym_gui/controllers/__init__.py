@@ -23,9 +23,9 @@ if sys.platform.startswith('linux'):
             KeyboardDevice,
         )
         from gym_gui.controllers.keycode_translation import (
+            get_keycode_name,
             linux_keycode_to_qt_key,
             qt_key_to_linux_keycode,
-            get_keycode_name,
         )
         __all__.extend([
             "EvdevKeyboardMonitor",

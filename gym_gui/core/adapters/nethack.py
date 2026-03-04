@@ -10,15 +10,15 @@ See: https://github.com/facebookresearch/nle
 
 from __future__ import annotations
 
-from dataclasses import dataclass
 import logging
+from dataclasses import dataclass
 from typing import Any, Mapping
 
 import numpy as np
 from gymnasium import spaces
 
 from gym_gui.core.adapters.base import AdapterContext, AdapterStep, EnvironmentAdapter, StepState
-from gym_gui.core.adapters.nle_render import render_tty_to_rgb, render_chars_to_rgb
+from gym_gui.core.adapters.nle_render import render_chars_to_rgb, render_tty_to_rgb
 from gym_gui.core.enums import ControlMode, GameId, RenderMode
 
 _LOGGER = logging.getLogger(__name__)
@@ -115,7 +115,7 @@ class NetHackAdapter(EnvironmentAdapter[dict, int]):
     def load(self) -> None:
         """Initialize the NetHack environment."""
         import gymnasium as gym
-        nle = _ensure_nle()
+        _ensure_nle()
 
         # Build kwargs based on environment type
         kwargs: dict[str, Any] = {

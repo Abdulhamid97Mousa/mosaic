@@ -14,16 +14,16 @@ import pytest
 # Skip entire module if crafter is not installed
 pytest.importorskip("crafter")
 
+from gym_gui.config.game_configs import CrafterConfig
 from gym_gui.core.adapters.base import AdapterContext
 from gym_gui.core.adapters.crafter import (
-    CrafterAdapter,
-    CrafterRewardAdapter,
-    CrafterNoRewardAdapter,
-    CRAFTER_ADAPTERS,
     CRAFTER_ACHIEVEMENTS,
     CRAFTER_ACTIONS,
+    CRAFTER_ADAPTERS,
+    CrafterAdapter,
+    CrafterNoRewardAdapter,
+    CrafterRewardAdapter,
 )
-from gym_gui.config.game_configs import CrafterConfig
 from gym_gui.core.enums import ControlMode, GameId, RenderMode
 from gym_gui.logging_config.log_constants import (
     LOG_ENV_CRAFTER_BOOT,
@@ -199,7 +199,7 @@ class TestCrafterAdapterStep:
         try:
             _ = adapter.reset(seed=42)
             # Step log happens on step 1, 101, 201, etc.
-            step = adapter.step(0)
+            adapter.step(0)
             step_codes = [getattr(record, "log_code", None) for record in caplog.records]
             step_codes = [c for c in step_codes if c is not None]
             assert LOG_ENV_CRAFTER_STEP.code in step_codes

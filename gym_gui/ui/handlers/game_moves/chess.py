@@ -11,9 +11,10 @@ from typing import TYPE_CHECKING, Any, Mapping, Optional, cast
 
 if TYPE_CHECKING:
     from qtpy.QtWidgets import QStatusBar
+
     from gym_gui.controllers.session import SessionController
-    from gym_gui.ui.widgets.render_tabs import RenderTabs
     from gym_gui.core.adapters.pettingzoo_classic import ChessEnvironmentAdapter
+    from gym_gui.ui.widgets.render_tabs import RenderTabs
 
 _LOG = logging.getLogger(__name__)
 
@@ -102,7 +103,7 @@ class ChessHandler:
             UCI move string, possibly with promotion suffix.
         """
         try:
-            from_row = int(from_sq[1])
+            int(from_sq[1])
             to_row = int(to_sq[1])
             # Get piece at from_sq
             chess_state = adapter.get_chess_state()

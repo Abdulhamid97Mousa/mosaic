@@ -15,7 +15,7 @@ import logging
 import numpy as np
 import pytest
 
-from gym_gui.core.enums import ControlMode, GameId, RenderMode, EnvironmentFamily
+from gym_gui.core.enums import ControlMode, EnvironmentFamily, GameId, RenderMode
 
 # Check if OpenSpiel and Shimmy are available
 try:
@@ -29,11 +29,11 @@ except ImportError:
 if OPENSPIEL_AVAILABLE:
     from gym_gui.core.adapters.base import AdapterContext
     from gym_gui.core.adapters.open_spiel import (
+        OPENSPIEL_ADAPTERS,
         CheckersEnvironmentAdapter,
         CheckersRenderPayload,
-        OPENSPIEL_ADAPTERS,
     )
-    from gym_gui.core.factories.adapters import get_adapter_cls, create_adapter
+    from gym_gui.core.factories.adapters import create_adapter, get_adapter_cls
 
 
 # Helper function only available when package is installed
