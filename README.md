@@ -61,6 +61,52 @@ Today's AI landscape offers powerful but **fragmented** tools: RL frameworks ([C
 <video src="https://private-user-images.githubusercontent.com/80536675/553916417-2ae1665b-3a57-44be-98a3-4e7223b37628.mp4?jwt=eyJ0eXAiOiJKV1QiLCJhbGciOiJIUzI1NiJ9.eyJpc3MiOiJnaXRodWIuY29tIiwiYXVkIjoicmF3LmdpdGh1YnVzZXJjb250ZW50LmNvbSIsImtleSI6ImtleTUiLCJleHAiOjE3NzIxNjgzMzQsIm5iZiI6MTc3MjE2ODAzNCwicGF0aCI6Ii84MDUzNjY3NS81NTM5MTY0MTctMmFlMTY2NWItM2E1Ny00NGJlLTk4YTMtNGU3MjIzYjM3NjI4Lm1wND9YLUFtei1BbGdvcml0aG09QVdTNC1ITUFDLVNIQTI1NiZYLUFtei1DcmVkZW50aWFsPUFLSUFWQ09EWUxTQTUzUFFLNFpBJTJGMjAyNjAyMjclMkZ1cy1lYXN0LTElMkZzMyUyRmF3czRfcmVxdWVzdCZYLUFtei1EYXRlPTIwMjYwMjI3VDA0NTM1NFomWC1BbXotRXhwaXJlcz0zMDAmWC1BbXotU2lnbmF0dXJlPTIyYzllNjc4OTYwNzg5MGFkZDA5N2Q4ZTZmMzk4Yzg0ZTYzOGNmYTgxNGZkYTU2OWYzMGZiNDk2NmJjY2FiYjMmWC1BbXotU2lnbmVkSGVhZGVycz1ob3N0In0.FK9hfbmCA1GOl80CJkenINfr5iD5CckeipYVYfFy3_Y" controls autoplay muted loop style="width:100%; max-width:100%; height:auto; border-radius:8px;"></video>
 <p align="center"><b>Homogeneous Teams: Random vs LLM:</b> Two homogeneous teams (all-Random vs all-LLM) competing in the same multi-agent environment.</p>
 
+## Comparison with Existing Frameworks
+
+Existing frameworks are paradigm-siloed. No prior framework allowed fair, reproducible, head-to-head comparison between RL agents and LLM agents in the same multi-agent environment.
+
+**Column Definitions:**
+
+1. **Agent-mixing**: infrastructure for deploying heterogeneous agents from different paradigms in the same environment
+
+2. **Platform GUI**: real-time visualization during execution
+
+3. **Cross-Paradigm**: infrastructure for comparing different agent types (e.g., RL vs. LLM) on identical environment instances with shared random seeds for reproducible head-to-head evaluation
+
+**Legend:** ✔️ Supported | ❌ Not supported | 🔵 Partial
+
+| System | RL | LLM | VLM | Human | Agent-mixing | Framework | Platform GUI | Cross-Paradigm |
+|--------|:--:|:---:|:---:|:-----:|:-------------------:|:---------:|:------------:|:--------------:|
+| RLlib <a href="#ref1">[1]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| CleanRL <a href="#ref2">[2]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| Tianshou <a href="#ref3">[3]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| Acme <a href="#ref4">[4]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| XuanCe <a href="#ref5">[5]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| OpenRL <a href="#ref6">[6]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| Stable-Baselines3 <a href="#ref7">[7]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| Coach <a href="#ref8">[8]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ✔️ | ❌ |
+| BenchMARL <a href="#ref15">[15]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| HeMAC <a href="#ref25">[25]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| Overcooked-AI <a href="#ref26">[26]</a> | ✔️ | ❌ | ❌ | ✔️ | ❌ | ✔️ | ❌ | ❌ |
+| BALROG <a href="#ref9">[9]</a> | ❌ | ✔️ | ✔️ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| TextArena <a href="#ref10">[10]</a> | ❌ | ✔️ | ❌ | ✔️ | ❌ | ✔️ | ❌ | ❌ |
+| GameBench <a href="#ref11">[11]</a> | ❌ | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| lmgame-Bench <a href="#ref12">[12]</a> | ❌ | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| LLM Chess <a href="#ref13">[13]</a> | ✔️ | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| LLM-Game-Bench <a href="#ref14">[14]</a> | ❌ | ✔️ | ❌ | ❌ | ❌ | ✔️ | 🔵 | ❌ |
+| AgentBench <a href="#ref16">[16]</a> | ❌ | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| MultiAgentBench <a href="#ref17">[17]</a> | ❌ | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| GAMEBoT <a href="#ref18">[18]</a> | ❌ | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| Collab-Overcooked <a href="#ref19">[19]</a> | 🔵 | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| BotzoneBench <a href="#ref20">[20]</a> | ❌ | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| AgentGym <a href="#ref21">[21]</a> | ❌ | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| Game Reasoning Arena <a href="#ref22">[22]</a> | ✔️ | ✔️ | 🔵 | 🔵 | ❌ | ✔️ | ❌ | ❌ |
+| CREW <a href="#ref23">[23]</a> | ✔️ | ❌ | ❌ | ✔️ | ❌ | ✔️ | ❌ | ❌ |
+| LLM-PySC2 <a href="#ref24">[24]</a> | ✔️ | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| **MOSAIC (Ours)** | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
+
+**MOSAIC introduces an agent-level interface enabling agent-mixing across fundamentally different decision-making paradigms.**
+
 ## Experimental Configurations
 
 Heterogeneous decision-making enables a systematic ablation matrix for cross-paradigm research. The following configurations illustrate the design using [MOSAIC MultiGrid](documents/environments/mosaic_multigrid/index.html).
@@ -159,7 +205,6 @@ All RL policies are trained solo ($N=1$) and frozen before deployment; LLM/VLM a
 
 ## Supported Environment Families (26)
 
-MOSAIC supports **26 environment families** spanning single-agent, multi-agent, and cooperative/competitive paradigms. See the full [Environment Families](https://mosaic-agent-level-interface.readthedocs.io/en/latest/documents/environments/index.html) reference for installation instructions, environment lists, and academic citations.
 
 | Family | Description | Example |
 |--------|-------------|---------|
@@ -265,3 +310,32 @@ MOSAIC is released under the [MIT License](https://github.com/Abdulhamid97Mousa/
 - [BALROG](https://github.com/balrog-ai/BALROG): LLM/VLM agent benchmark
 - [llm_chess](https://github.com/maxim-saplin/llm_chess): LLM chess evaluation
 - [PyQt6](https://www.riverbankcomputing.com/software/pyqt/): GUI framework
+
+## References
+
+<span id="ref1">[1]</span> E. Liang et al., "RLlib: Abstractions for Distributed Reinforcement Learning," ICML, 2018.
+<span id="ref2">[2]</span> S. Huang et al., "CleanRL: High-quality Single-file Implementations of Deep RL Algorithms," JMLR, 2022.
+<span id="ref3">[3]</span> J. Weng et al., "Tianshou: A Highly Modularized Deep RL Library," JMLR, 2022.
+<span id="ref4">[4]</span> M. Hoffman et al., "Acme: A Research Framework for Distributed RL," arXiv:2006.00979, 2020.
+<span id="ref5">[5]</span> W. Liu et al., "XuanCe: A Comprehensive and Unified Deep RL Library," arXiv:2312.16248, 2023.
+<span id="ref6">[6]</span> S. Huang et al., "OpenRL: A Unified Reinforcement Learning Framework," arXiv:2312.16189, 2023.
+<span id="ref7">[7]</span> A. Raffin et al., "Stable-Baselines3: Reliable RL Implementations," JMLR, 2021.
+<span id="ref8">[8]</span> I. Caspi et al., "Reinforcement Learning Coach," 2017.
+<span id="ref9">[9]</span> D. Paglieri et al., "BALROG: Benchmarking Agentic LLM and VLM Reasoning On Games," arXiv:2411.13543, 2024.
+<span id="ref10">[10]</span> G. De Magistris et al., "TextArena," 2025.
+<span id="ref11">[11]</span> D. Costarelli et al., "GameBench: Evaluating Strategic Reasoning Abilities of LLM Agents," arXiv:2406.06613, 2024.
+<span id="ref12">[12]</span> Y. Huang et al., "lmgame-Bench: Evaluating LLMs on Game-Theoretic Decision-Making," 2025.
+<span id="ref13">[13]</span> M. Saplin, "LLM Chess," 2025.
+<span id="ref14">[14]</span> J. Guo et al., "LLM-Game-Bench: Evaluating LLM Reasoning through Game-Playing," 2024.
+<span id="ref15">[15]</span> M. Bettini et al., "BenchMARL: Benchmarking Multi-Agent Reinforcement Learning," JMLR, 2024.
+<span id="ref16">[16]</span> X. Liu et al., "AgentBench: Evaluating LLMs as Agents," ICLR, 2024.
+<span id="ref17">[17]</span> K. Zhu et al., "MultiAgentBench: Evaluating the Collaboration and Competition of LLM Agents," ACL, 2025.
+<span id="ref18">[18]</span> Y. Lin et al., "GAMEBoT: Transparent Assessment of LLM Reasoning in Games," ACL, 2025.
+<span id="ref19">[19]</span> H. Sun et al., "Collab-Overcooked: Benchmarking and Evaluating Large Language Models as Collaborative Agents," EMNLP, 2025.
+<span id="ref20">[20]</span> L. Li et al., "BotzoneBench: Scalable LLM Evaluation via Graded AI Anchors," arXiv:2602.13214, 2026.
+<span id="ref21">[21]</span> Z. Xi et al., "AgentGym: Evolving Large Language Model-based Agents across Diverse Environments," ACL, 2025.
+<span id="ref22">[22]</span> Cipolina et al., "Game Reasoning Arena: A Comprehensive Evaluation Framework for Large Language Models," arXiv:2501.00363, 2025.
+<span id="ref23">[23]</span> Y. Wang et al., "CREW: A Benchmark for Collaborative Multi-Step Reasoning and Planning," NeurIPS, 2024.
+<span id="ref24">[24]</span> X. Ma et al., "LLM-PySC2: A Benchmark for Large Language Models in StarCraft II," arXiv:2412.19668, 2024.
+<span id="ref25">[25]</span> C. Dansereau et al., "The Heterogeneous Multi-Agent Challenge," arXiv:2509.19512, 2025.
+<span id="ref26">[26]</span> M. Carroll et al., "On the Utility of Learning about Humans for Human-AI Coordination," NeurIPS, 2019.
