@@ -528,4 +528,4 @@ if _game_exports:  # pragma: no cover
 from gym_gui.constants import mosaic_welcome
 
 # Clean up temporary variables
-del _constants_game, _game_exports, _name
+del _constants_game, _game_exports

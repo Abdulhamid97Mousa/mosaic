@@ -350,7 +350,7 @@ class GoGameController(QtCore.QObject):
             # Filter out pass if there are other moves
             non_pass_moves = [
                 m for m in self._current_state.legal_moves
-                if m < self._adapter.pass_action
+                if self._adapter.pass_action is None or m < self._adapter.pass_action
             ]
             if non_pass_moves:
                 return random.choice(non_pass_moves)

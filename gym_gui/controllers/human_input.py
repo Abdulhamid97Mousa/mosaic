@@ -15,7 +15,7 @@ For multi-keyboard support on Linux, uses evdev to bypass X11 keyboard merging.
 import logging
 import sys
 from dataclasses import dataclass
-from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple
+from typing import Callable, Dict, Iterable, List, Optional, Set, Tuple, cast
 
 import gymnasium.spaces as spaces
 from qtpy import QtCore, QtWidgets
