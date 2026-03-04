@@ -24,9 +24,9 @@ jobs:
         with:
           python-version: "3.11"
 
-      - name: Install dev dependencies
+      - name: Install package with dev dependencies
         run: |
-          pip install ruff pyright
+          pip install -e ".[dev]"
 
       - name: Run Ruff linter
         run: ruff check gym_gui
