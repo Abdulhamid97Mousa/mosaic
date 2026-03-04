@@ -5,6 +5,8 @@
 ---
 
 [![arXiv](https://img.shields.io/badge/arXiv-2603.01260-b31b1b.svg)](https://arxiv.org/abs/2603.01260)
+[![CI](https://github.com/Abdulhamid97Mousa/mosaic/workflows/ci.yml/badge.svg)](https://github.com/Abdulhamid97Mousa/mosaic/actions)
+[![codecov](https://codecov.io/gh/Abdulhamid97Mousa/mosaic/branch/main/graph/badge.svg)](https://codecov.io/gh/Abdulhamid97Mousa/mosaic)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-%3E%3D2.0.0-red)](https://pytorch.org/get-started/locally/)
 [![Gymnasium](https://img.shields.io/badge/gymnasium-%3E%3D0.28.1-blue)](https://gymnasium.farama.org/)
@@ -75,34 +77,34 @@ Existing frameworks are paradigm-siloed. No prior framework allowed fair, reprod
 
 **Legend:** ✔️ Supported | ❌ Not supported | 🔵 Partial
 
-| System | RL | LLM | VLM | Human | Agent-mixing | Framework | Platform GUI | Cross-Paradigm |
-|--------|:--:|:---:|:---:|:-----:|:-------------------:|:---------:|:------------:|:--------------:|
-| RLlib <a href="#ref1">[1]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| CleanRL <a href="#ref2">[2]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| Tianshou <a href="#ref3">[3]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| Acme <a href="#ref4">[4]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| XuanCe <a href="#ref5">[5]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| OpenRL <a href="#ref6">[6]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| Stable-Baselines3 <a href="#ref7">[7]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| Coach <a href="#ref8">[8]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ✔️ | ❌ |
-| BenchMARL <a href="#ref15">[15]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| HeMAC <a href="#ref25">[25]</a> | ✔️ | ❌ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| Overcooked-AI <a href="#ref26">[26]</a> | ✔️ | ❌ | ❌ | ✔️ | ❌ | ✔️ | ❌ | ❌ |
-| BALROG <a href="#ref9">[9]</a> | ❌ | ✔️ | ✔️ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| TextArena <a href="#ref10">[10]</a> | ❌ | ✔️ | ❌ | ✔️ | ❌ | ✔️ | ❌ | ❌ |
-| GameBench <a href="#ref11">[11]</a> | ❌ | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| lmgame-Bench <a href="#ref12">[12]</a> | ❌ | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| LLM Chess <a href="#ref13">[13]</a> | ✔️ | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| LLM-Game-Bench <a href="#ref14">[14]</a> | ❌ | ✔️ | ❌ | ❌ | ❌ | ✔️ | 🔵 | ❌ |
-| AgentBench <a href="#ref16">[16]</a> | ❌ | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| MultiAgentBench <a href="#ref17">[17]</a> | ❌ | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| GAMEBoT <a href="#ref18">[18]</a> | ❌ | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| Collab-Overcooked <a href="#ref19">[19]</a> | 🔵 | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| BotzoneBench <a href="#ref20">[20]</a> | ❌ | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| AgentGym <a href="#ref21">[21]</a> | ❌ | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
-| Game Reasoning Arena <a href="#ref22">[22]</a> | ✔️ | ✔️ | 🔵 | 🔵 | ❌ | ✔️ | ❌ | ❌ |
-| CREW <a href="#ref23">[23]</a> | ✔️ | ❌ | ❌ | ✔️ | ❌ | ✔️ | ❌ | ❌ |
-| LLM-PySC2 <a href="#ref24">[24]</a> | ✔️ | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ |
+| System | RL | LLM | VLM | Human | Framework | Platform GUI | Cross-Paradigm | Agent-mixing |
+|--------|:--:|:---:|:---:|:-----:|:---------:|:------------:|:--------------:|:-------------------:|
+| RLlib <a href="#ref1">[1]</a> | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| CleanRL <a href="#ref2">[2]</a> | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| Tianshou <a href="#ref3">[3]</a> | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| Acme <a href="#ref4">[4]</a> | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| XuanCe <a href="#ref5">[5]</a> | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| OpenRL <a href="#ref6">[6]</a> | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| Stable-Baselines3 <a href="#ref7">[7]</a> | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| Coach <a href="#ref8">[8]</a> | ✔️ | ❌ | ❌ | ❌ | ✔️ | ✔️ | ❌ | ❌ |
+| BenchMARL <a href="#ref15">[15]</a> | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| HeMAC <a href="#ref25">[25]</a> | ✔️ | ❌ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| Overcooked-AI <a href="#ref26">[26]</a> | ✔️ | ❌ | ❌ | ✔️ | ✔️ | ❌ | ❌ | ❌ |
+| BALROG <a href="#ref9">[9]</a> | ❌ | ✔️ | ✔️ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| TextArena <a href="#ref10">[10]</a> | ❌ | ✔️ | ❌ | ✔️ | ✔️ | ❌ | ❌ | ❌ |
+| GameBench <a href="#ref11">[11]</a> | ❌ | ✔️ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| lmgame-Bench <a href="#ref12">[12]</a> | ❌ | ✔️ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| LLM Chess <a href="#ref13">[13]</a> | ✔️ | ✔️ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| LLM-Game-Bench <a href="#ref14">[14]</a> | ❌ | ✔️ | ❌ | ❌ | ✔️ | 🔵 | ❌ | ❌ |
+| AgentBench <a href="#ref16">[16]</a> | ❌ | ✔️ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| MultiAgentBench <a href="#ref17">[17]</a> | ❌ | ✔️ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| GAMEBoT <a href="#ref18">[18]</a> | ❌ | ✔️ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| Collab-Overcooked <a href="#ref19">[19]</a> | 🔵 | ✔️ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| BotzoneBench <a href="#ref20">[20]</a> | ❌ | ✔️ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| AgentGym <a href="#ref21">[21]</a> | ❌ | ✔️ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
+| Game Reasoning Arena <a href="#ref22">[22]</a> | ✔️ | ✔️ | 🔵 | 🔵 | ✔️ | ❌ | ❌ | ❌ |
+| CREW <a href="#ref23">[23]</a> | ✔️ | ❌ | ❌ | ✔️ | ✔️ | ❌ | ❌ | ❌ |
+| LLM-PySC2 <a href="#ref24">[24]</a> | ✔️ | ✔️ | ❌ | ❌ | ✔️ | ❌ | ❌ | ❌ |
 | **MOSAIC (Ours)** | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ | ✔️ |
 
 **MOSAIC introduces an agent-level interface enabling agent-mixing across fundamentally different decision-making paradigms.**

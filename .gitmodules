@@ -55,7 +55,7 @@
   url = https://github.com/maxim-saplin/llm_chess.git
 
 [submodule "jumanji"]
-  path = 3rd_party/jumanji
+  path = 3rd_party/jumanji_worker/jumanji
   url = https://github.com/instadeepai/jumanji.git
 
 [submodule "MARLlib"]

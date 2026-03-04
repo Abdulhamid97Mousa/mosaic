@@ -24,13 +24,15 @@ from gym_gui.logging_config.log_constants import (
     LOG_TRAINER_WORKER_IMPORT_ERROR,
     get_constant_by_code,
 )
-from .registry import RunRecord, RunRegistry, RunStatus
 from gym_gui.services.trainer.gpu import GPUAllocator
+
+from .registry import RunRecord, RunRegistry, RunStatus
 
 _LOGGER = logging.getLogger(__name__)
 
 # Import signals for lifecycle events (lazy initialization)
 _signals = None
+
 
 def _get_signals():
     """Get or initialize TrainerSignals lazily."""
@@ -38,6 +40,7 @@ def _get_signals():
     if _signals is None:
         try:
             from gym_gui.services.trainer.signals import get_trainer_signals
+
             _signals = get_trainer_signals()
         except Exception as e:
             _LOGGER.warning(f"Failed to initialize TrainerSignals: {e}")
@@ -46,9 +49,7 @@ def _get_signals():
 
 
 # Pattern to recognize LOG_CODE from worker output: "LOG_XXX | message | extra={...}"
-_LOG_CODE_PATTERN = re.compile(
-    r'^(?P<code>LOG\d+)\s+\|\s+(?P<message>.+?)\s+\|\s+extra=(?P<extra>.*)$'
-)
+_LOG_CODE_PATTERN = re.compile(r"^(?P<code>LOG\d+)\s+\|\s+(?P<message>.+?)\s+\|\s+extra=(?P<extra>.*)$")
 
 
 def _parse_structured_log_line(line: str) -> tuple[str | None, dict[str, Any] | None]:
@@ -63,9 +64,9 @@ def _parse_structured_log_line(line: str) -> tuple[str | None, dict[str, Any] | 
     if not match:
         return None, None
 
-    code = match.group('code')
-    match.group('message')
-    extra_str = match.group('extra')
+    code = match.group("code")
+    match.group("message")
+    extra_str = match.group("extra")
 
     try:
         extra = json.loads(extra_str)
@@ -91,27 +92,23 @@ def _re_emit_worker_log(
     constant = get_constant_by_code(code)
     if not constant:
         _LOGGER.debug(
-            f"Unknown LOG_CODE from worker: {code}",
-            extra={"run_id": run_id, "code": code, "worker_extra": extra}
+            f"Unknown LOG_CODE from worker: {code}", extra={"run_id": run_id, "code": code, "worker_extra": extra}
         )
         return
 
     # Ensure component and subcomponent are present in extra dict
     worker_extra = dict(extra)
-    worker_extra.setdefault('component', constant.component)
-    worker_extra.setdefault('subcomponent', constant.subcomponent)
+    worker_extra.setdefault("component", constant.component)
+    worker_extra.setdefault("subcomponent", constant.subcomponent)
     if worker_id:
-        worker_extra.setdefault('worker_id', worker_id)
+        worker_extra.setdefault("worker_id", worker_id)
     if worker_type:
-        worker_extra.setdefault('worker_type', worker_type)
+        worker_extra.setdefault("worker_type", worker_type)
 
     try:
         log_constant(_LOGGER, constant, extra=worker_extra)
     except Exception as e:
-        _LOGGER.debug(
-            f"Failed to re-emit worker log: {e}",
-            extra={"run_id": run_id, "code": code, "error": str(e)}
-        )
+        _LOGGER.debug(f"Failed to re-emit worker log: {e}", extra={"run_id": run_id, "code": code, "error": str(e)})
 
 
 _STDERR_TAIL_LINES = 20
@@ -177,11 +174,7 @@ class TrainerDispatcher:
     async def stop(self) -> None:
         """Stop all dispatcher tasks and terminate active workers."""
         self._stop_event.set()
-        tasks = [
-            task
-            for task in (self._dispatch_task, self._monitor_task, self._heartbeat_task)
-            if task
-        ]
+        tasks = [task for task in (self._dispatch_task, self._monitor_task, self._heartbeat_task) if task]
         if tasks:
             await asyncio.gather(*tasks, return_exceptions=True)
         self._dispatch_task = None
@@ -205,9 +198,7 @@ class TrainerDispatcher:
         try:
             while not self._stop_event.is_set():
                 try:
-                    await asyncio.wait_for(
-                        self._stop_event.wait(), timeout=self._dispatch_interval
-                    )
+                    await asyncio.wait_for(self._stop_event.wait(), timeout=self._dispatch_interval)
                     break
                 except asyncio.TimeoutError:
                     _LOGGER.debug("Dispatch loop tick")
@@ -264,8 +255,10 @@ class TrainerDispatcher:
         except Exception:
             pass
 
-        _LOGGER.info("Spawning worker", extra={"run_id": run.run_id, "cmd": cmd,
-                                                "worker_id": worker_id, "worker_type": worker_type})
+        _LOGGER.info(
+            "Spawning worker",
+            extra={"run_id": run.run_id, "cmd": cmd, "worker_id": worker_id, "worker_type": worker_type},
+        )
 
         # nosemgrep: python.lang.security.audit.dangerous-asyncio-create-subprocess.dangerous-asyncio-create-subprocess
         # Safe: Command validated via validated_create_subprocess_exec wrapper which:
@@ -316,9 +309,7 @@ class TrainerDispatcher:
         asyncio.create_task(self._stream_stdout(handle), name=f"stdout-{run.run_id}")
         asyncio.create_task(self._stream_stderr(handle), name=f"stderr-{run.run_id}")
 
-    def _maybe_open_log_files(
-        self, handle: WorkerHandle, env: dict[str, str]
-    ) -> None:
+    def _maybe_open_log_files(self, handle: WorkerHandle, env: dict[str, str]) -> None:
         """Open dispatcher-side log files for worker stdout/stderr.
 
         For **all** worker types the dispatcher tees captured stdout/stderr
@@ -350,7 +341,6 @@ class TrainerDispatcher:
 
     def _build_worker_command(self, run: RunRecord) -> list[str]:
         """Build the subprocess command for the trainer worker."""
-
 
         config_payload = self._registry.get_run_config_json(run.run_id)
         worker_cmd: list[str] | None = None
@@ -451,21 +441,33 @@ class TrainerDispatcher:
             worker_entry = os.environ.get("GYM_GUI_WORKER_CMD")
             if not worker_entry:
                 worker_cmd = [
-                    sys.executable, "-m", "gym_gui.workers.demo_worker",
-                    "--run-id", run.run_id,
-                    "--agent-id", agent_id,
-                    "--episodes", "3",
-                    "--steps", "15",
-                    "--delay", "0.03",
+                    sys.executable,
+                    "-m",
+                    "gym_gui.workers.demo_worker",
+                    "--run-id",
+                    run.run_id,
+                    "--agent-id",
+                    agent_id,
+                    "--episodes",
+                    "3",
+                    "--steps",
+                    "15",
+                    "--delay",
+                    "0.03",
                 ]
             else:
                 worker_cmd = worker_entry.split()
 
             proxy_cmd = [
-                sys.executable, "-m", "gym_gui.services.trainer.trainer_telemetry_proxy",
-                "--target", grpc_target,
-                "--run-id", run.run_id,
-                "--agent-id", agent_id,
+                sys.executable,
+                "-m",
+                "gym_gui.services.trainer.trainer_telemetry_proxy",
+                "--target",
+                grpc_target,
+                "--run-id",
+                run.run_id,
+                "--agent-id",
+                agent_id,
             ]
             if worker_id:
                 proxy_cmd.extend(["--worker-id", worker_id])
@@ -473,10 +475,15 @@ class TrainerDispatcher:
             return proxy_cmd + worker_cmd
 
         proxy_cmd = [
-            sys.executable, "-m", "gym_gui.services.trainer.trainer_telemetry_proxy",
-            "--target", worker_meta.get("grpc_target", "127.0.0.1:50055"),
-            "--run-id", run.run_id,
-            "--agent-id", worker_meta.get("agent_id", f"agent_{run.run_id[:8]}"),
+            sys.executable,
+            "-m",
+            "gym_gui.services.trainer.trainer_telemetry_proxy",
+            "--target",
+            worker_meta.get("grpc_target", "127.0.0.1:50055"),
+            "--run-id",
+            run.run_id,
+            "--agent-id",
+            worker_meta.get("agent_id", f"agent_{run.run_id[:8]}"),
         ]
         if worker_id:
             proxy_cmd.extend(["--worker-id", worker_id])
@@ -517,10 +524,7 @@ class TrainerDispatcher:
             "pythonpath": os.environ.get("PYTHONPATH", ""),
         }
         log_constant(_LOGGER, LOG_TRAINER_WORKER_IMPORT_ERROR, extra=extra)
-        raise RuntimeError(
-            "xuance_worker module not importable. Install with: "
-            "pip install -e 3rd_party/xuance_worker"
-        )
+        raise RuntimeError("xuance_worker module not importable. Install with: pip install -e 3rd_party/xuance_worker")
 
     def _build_worker_env(self, run: RunRecord) -> dict[str, str]:
         """Build environment variables for the worker subprocess."""
@@ -604,7 +608,9 @@ class TrainerDispatcher:
                 code, extra = _parse_structured_log_line(decoded)
                 if code is not None and extra is not None:
                     _re_emit_worker_log(
-                        handle.run_id, code, extra,
+                        handle.run_id,
+                        code,
+                        extra,
                         worker_id=handle.worker_id,
                         worker_type=handle.worker_type,
                     )
@@ -612,10 +618,14 @@ class TrainerDispatcher:
                     # Fallback: log as plain DEBUG message tagged as Worker component
                     _LOGGER.debug(
                         "Worker stdout",
-                        extra={"run_id": handle.run_id, "line": decoded,
-                               "component": "Worker", "subcomponent": "stdout",
-                               "worker_id": handle.worker_id,
-                               "worker_type": handle.worker_type}
+                        extra={
+                            "run_id": handle.run_id,
+                            "line": decoded,
+                            "component": "Worker",
+                            "subcomponent": "stdout",
+                            "worker_id": handle.worker_id,
+                            "worker_type": handle.worker_type,
+                        },
                     )
         except asyncio.CancelledError:
             pass
@@ -644,10 +654,14 @@ class TrainerDispatcher:
 
                 _LOGGER.warning(
                     "Worker stderr",
-                    extra={"run_id": handle.run_id, "line": decoded,
-                           "component": "Worker", "subcomponent": "stderr",
-                           "worker_id": handle.worker_id,
-                           "worker_type": handle.worker_type},
+                    extra={
+                        "run_id": handle.run_id,
+                        "line": decoded,
+                        "component": "Worker",
+                        "subcomponent": "stderr",
+                        "worker_id": handle.worker_id,
+                        "worker_type": handle.worker_type,
+                    },
                 )
         except asyncio.CancelledError:
             pass
@@ -791,9 +805,7 @@ class TrainerDispatcher:
                     "Worker heartbeat timeout",
                     extra={"run_id": run.run_id, "last_heartbeat": run.last_heartbeat.isoformat()},
                 )
-                self._registry.update_status(
-                    run.run_id, RunStatus.FAULTED, failure_reason="worker_timeout"
-                )
+                self._registry.update_status(run.run_id, RunStatus.FAULTED, failure_reason="worker_timeout")
                 self._gpu_allocator.release_many([run.run_id])
                 self._registry.update_gpu_slots(run.run_id, [])
                 await self._broadcast_update(run.run_id)
