@@ -15,6 +15,7 @@ from typing import Any
 import numpy as np
 import pytest
 
+shimmy = pytest.importorskip("shimmy", reason="meltingpot tests require shimmy")
 
 class TestMeltingPotEnvironmentLoads:
     """Test that Melting Pot environments can be created via Shimmy."""

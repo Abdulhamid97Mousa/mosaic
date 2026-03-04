@@ -16,6 +16,8 @@ from typing import TYPE_CHECKING
 import numpy as np
 import pytest
 
+pygame = pytest.importorskip("pygame", reason="gymnasium[toy-text] requires pygame")
+
 from gym_gui.config.game_configs import DEFAULT_BLACKJACK_CONFIG, BlackjackConfig
 from gym_gui.controllers.human_input import _TOY_TEXT_MAPPINGS
 from gym_gui.core.adapters.toy_text import BlackjackAdapter

@@ -11,6 +11,7 @@ These tests verify:
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import tempfile
 from pathlib import Path
@@ -249,6 +250,10 @@ class TestLoadPolicyDialog:
         assert QuickLoadPolicyWidget is not None
 
 
+@pytest.mark.skipif(
+    not importlib.util.find_spec("ray_worker") or not importlib.util.find_spec("ray"),
+    reason="ray_worker or ray not installed",
+)
 class TestPolicyEvaluator:
     """Tests for PolicyEvaluator."""
 

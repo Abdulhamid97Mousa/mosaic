@@ -14,8 +14,9 @@ This test will determine:
 3. Or same layout (bad - leads to memorization)?
 """
 
+import pytest
 import gymnasium as gym
-import minigrid
+minigrid = pytest.importorskip("minigrid")
 
 # Register MiniGrid environments
 minigrid.register_minigrid_envs()

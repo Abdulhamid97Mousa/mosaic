@@ -15,10 +15,11 @@ import tempfile
 from pathlib import Path
 
 import gymnasium as gym
-import minigrid  # noqa: F401 — registers MiniGrid envs
 import numpy as np
 import pytest
 import torch
+
+minigrid = pytest.importorskip("minigrid")  # registers MiniGrid envs
 
 from cleanrl_worker.agents.mlp import MLPAgent
 from cleanrl_worker.agents.minigrid import MinigridAgent

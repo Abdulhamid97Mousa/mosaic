@@ -15,6 +15,8 @@ from pathlib import Path
 
 import pytest
 
+pygame = pytest.importorskip("pygame", reason="gymnasium[toy-text] requires pygame")
+
 from gym_gui.config.game_configs import DEFAULT_BLACKJACK_CONFIG
 from gym_gui.core.adapters.toy_text import BlackjackAdapter
 from gym_gui.core.data_model import EpisodeRollup, StepRecord

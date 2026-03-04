@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Any, Dict
 
 import pytest
 
+pettingzoo = pytest.importorskip("pettingzoo", reason="chess integration requires pettingzoo[classic]")
+
 if TYPE_CHECKING:
     from gym_gui.core.adapters.pettingzoo_classic import ChessEnvironmentAdapter
 

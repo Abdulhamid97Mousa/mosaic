@@ -7,8 +7,9 @@ This test will answer:
 3. Are episodes truly different or identical?
 """
 
+import pytest
 import gymnasium as gym
-import minigrid
+minigrid = pytest.importorskip("minigrid")
 import numpy as np
 
 # Register MiniGrid environments

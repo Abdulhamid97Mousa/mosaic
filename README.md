@@ -5,7 +5,7 @@
 ---
 
 [![arXiv](https://img.shields.io/badge/arXiv-2603.01260-b31b1b.svg)](https://arxiv.org/abs/2603.01260)
-[![CI](https://github.com/Abdulhamid97Mousa/mosaic/workflows/ci.yml/badge.svg)](https://github.com/Abdulhamid97Mousa/mosaic/actions)
+[![CI](https://github.com/Abdulhamid97Mousa/mosaic/actions/workflows/ci.yml/badge.svg)](https://github.com/Abdulhamid97Mousa/mosaic/actions/workflows/ci.yml)
 [![codecov](https://codecov.io/gh/Abdulhamid97Mousa/mosaic/branch/main/graph/badge.svg)](https://codecov.io/gh/Abdulhamid97Mousa/mosaic)
 [![Python](https://img.shields.io/badge/python-3.10+-blue.svg)](https://www.python.org/downloads/)
 [![PyTorch](https://img.shields.io/badge/PyTorch-%3E%3D2.0.0-red)](https://pytorch.org/get-started/locally/)

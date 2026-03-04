@@ -12,7 +12,9 @@ import os
 import sys
 from pathlib import Path
 
-import requests
+import pytest
+
+requests = pytest.importorskip("requests")
 
 # Add paths
 sys.path.insert(0, str(Path(__file__).parent.parent))

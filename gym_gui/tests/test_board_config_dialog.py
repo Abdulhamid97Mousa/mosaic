@@ -14,6 +14,8 @@ from typing import TYPE_CHECKING, Optional
 
 import pytest
 
+chess = pytest.importorskip("chess", reason="chess board tests require python-chess")
+
 if TYPE_CHECKING:
     pass
 
