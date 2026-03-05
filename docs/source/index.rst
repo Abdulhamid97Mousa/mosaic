@@ -27,27 +27,6 @@ MOSAIC
 
 .. raw:: html
 
-   <br><br>
-
-Interactive 3D Demo: Agent Mixing
----------------------------------
-
-.. raw:: html
-
-   <div id="root" style="width:100%; height:500px; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15); margin:1em 0;"></div>
-   <script src="https://unpkg.com/@icraft/player@latest/dist/umd/icraft-player.min.js"></script>
-   <script>
-     const player = new ICraftPlayer({
-       src: '_static/MOSAIC_AGENT_MIXING.iplayer',
-       container: document.getElementById('root'),
-     });
-   </script>
-   <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
-     <strong>MOSAIC Agent Mixing:</strong> Interactive 3D visualization of heterogeneous agents (RL, LLM, VLM, Human) collaborating in the same environment.
-   </p>
-
-.. raw:: html
-
    <br>
 
 **A Unified Platform for Cross-Paradigm Comparison and Evaluation of Homogeneous and Heterogeneous Multi-Agent RL, LLM, VLM, and Human Decision-Makers**
