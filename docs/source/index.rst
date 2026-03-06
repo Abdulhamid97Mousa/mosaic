@@ -256,162 +256,162 @@ reproducible head-to-head evaluation.
        <tr>
          <td>RLlib <a href="#ref1">[1]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>CleanRL <a href="#ref2">[2]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>Tianshou <a href="#ref3">[3]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>Acme <a href="#ref4">[4]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>XuanCe <a href="#ref5">[5]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>OpenRL <a href="#ref6">[6]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>Stable-Baselines3 <a href="#ref7">[7]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>Coach <a href="#ref8">[8]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>BenchMARL <a href="#ref15">[15]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>HeMAC <a href="#ref25">[25]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>Overcooked-AI <a href="#ref26">[26]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
 
        <tr class="section-row"><td colspan="9"><strong>LLM/VLM Benchmarks</strong></td></tr>
        <tr>
          <td>BALROG <a href="#ref9">[9]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>TextArena <a href="#ref10">[10]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>GameBench <a href="#ref11">[11]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>lmgame-Bench <a href="#ref12">[12]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>LLM Chess <a href="#ref13">[13]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>LLM-Game-Bench <a href="#ref14">[14]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-part">&#9673;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-part">&#9673;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>AgentBench <a href="#ref16">[16]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>MultiAgentBench <a href="#ref17">[17]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>GAMEBoT <a href="#ref18">[18]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>Collab-Overcooked <a href="#ref19">[19]</a></td>
          <td><span class="cmp-part">&#9673;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>BotzoneBench <a href="#ref20">[20]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>AgentGym <a href="#ref21">[21]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
 
        <tr class="section-row"><td colspan="9"><strong>Cross-Paradigm Frameworks</strong></td></tr>
        <tr>
          <td>Game Reasoning Arena <a href="#ref22">[22]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-part">&#9673;</span></td><td><span class="cmp-part">&#9673;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>CREW <a href="#ref23">[23]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>LLM-PySC2 <a href="#ref24">[24]</a></td>
          <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td>
-         <td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-yes">&#10003;</span></td>
+         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
 
        <tr class="mosaic-row">
