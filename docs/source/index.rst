@@ -203,6 +203,65 @@ for the research gap and design rationale, and
 :doc:`IPC Architecture <documents/architecture/operators/architecture>` for
 Manual Mode and Script Mode implementation details.
 
+Policy Mappings for Heterogeneous Multi-Agent Systems
+------------------------------------------------------
+
+When mixing different decision-making paradigms (RL, LLM, Human, Random) in
+the same environment, each agent must be configured **independently** while
+maintaining the ability to share resources where appropriate. MOSAIC solves
+this with **flexible policy mappings** that enable both independent
+configuration (one-to-one) and resource sharing (one-to-many).
+
+.. mermaid::
+
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
+   graph LR
+       subgraph ONE["One-to-One (Default)"]
+           direction TB
+           A0["agent_0<br/>ppo.pth"]
+           A1["agent_1<br/>dqn.pth"]
+       end
+
+       subgraph MANY["One-to-Many (Link Groups)"]
+           direction TB
+           CHECKPOINT["mappo_team.pth"]
+           B0["agent_0<br/>(Primary)"]
+           B1["agent_1<br/>(Linked)"]
+           B2["agent_2<br/>(Linked)"]
+
+           CHECKPOINT -->|"Shared"| B0
+           CHECKPOINT -->|"Shared"| B1
+           CHECKPOINT -->|"Shared"| B2
+       end
+
+       style ONE fill:#e8f5e9,stroke:#2e8b57,color:#333
+       style MANY fill:#f3e5f5,stroke:#9c27b0,color:#333
+       style A0 fill:#50c878,stroke:#2e8b57,color:#fff
+       style A1 fill:#4a90d9,stroke:#2e5a87,color:#fff
+       style CHECKPOINT fill:#ff7f50,stroke:#cc5500,color:#fff
+       style B0 fill:#9370db,stroke:#6a0dad,color:#fff
+       style B1 fill:#ba68c8,stroke:#8e24aa,color:#fff
+       style B2 fill:#ba68c8,stroke:#8e24aa,color:#fff
+
+**One-to-one mapping (default):**
+   Each agent has its own independent policy checkpoint. Agents are
+   configured individually with separate policy paths.
+
+**One-to-many mapping (via link groups):**
+   Multiple agents share a single policy checkpoint. The primary
+   agent's policy path is automatically synced to all linked agents.
+
+This combination is what makes heterogeneous multi-agent systems
+**practical and configurable**. Without flexible policy mappings, you
+would be forced to choose between manual copy-paste errors (configuring
+each agent independently) or no heterogeneity (forcing all agents to use
+the same worker type). With flexible policy mappings, you can configure
+each agent slot independently (RL, LLM, Human, Random) while sharing
+resources where appropriate (link groups for RL agents).
+
+See :doc:`documents/architecture/operators/policy_mappings` for complete
+documentation on policy mappings and link groups.
+
 Comparison with Existing Frameworks
 ------------------------------------
 

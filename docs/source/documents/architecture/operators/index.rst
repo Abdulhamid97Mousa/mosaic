@@ -159,6 +159,17 @@ Available Operators
    in the same multi-agent environment.  See :doc:`concept` for the
    full motivation and diagrams.
 
+.. note::
+
+   **Policy Mappings for Multi-Agent RL:** When deploying RL policies
+   in multi-agent scenarios, MOSAIC supports flexible policy-to-agent
+   mappings through link groups. This enables **one-to-one** mappings
+   (each agent has its own policy) and **one-to-many** mappings
+   (multiple agents share a single policy checkpoint). Link groups are
+   essential for MAPPO/IPPO evaluation because these algorithms store
+   all agents' policies in a single checkpoint file. See
+   :doc:`../policy_mapping` for complete documentation.
+
 
 .. toctree::
    :hidden:
@@ -167,6 +178,7 @@ Available Operators
    concept
    homogenous_decision_makers/index
    heterogeneous_decision_maker/index
+   policy_mappings
    architecture
    lifecycle
    development

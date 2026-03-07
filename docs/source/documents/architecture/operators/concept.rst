@@ -197,6 +197,96 @@ This is what makes heterogeneous teams possible -- each agent slot is
 independently configured, yet they all plug into the same environment
 through a single protocol.
 
+Policy Mappings for Multi-Agent RL
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+When deploying RL policies in multi-agent scenarios, MOSAIC supports
+flexible policy-to-agent mappings through **link groups**. This is
+essential because MAPPO/IPPO checkpoints store all agents' policies in
+a single file.
+
+.. mermaid::
+
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
+   graph LR
+       subgraph ONE["One-to-One (Default)"]
+           direction TB
+           A0["agent_0<br/>ppo.pth"]
+           A1["agent_1<br/>dqn.pth"]
+       end
+
+       subgraph MANY["One-to-Many (Link Groups)"]
+           direction TB
+           CHECKPOINT["mappo_team.pth"]
+           B0["agent_0<br/>(Primary)"]
+           B1["agent_1<br/>(Linked)"]
+           B2["agent_2<br/>(Linked)"]
+
+           CHECKPOINT -->|"Shared"| B0
+           CHECKPOINT -->|"Shared"| B1
+           CHECKPOINT -->|"Shared"| B2
+       end
+
+       style ONE fill:#e8f5e9,stroke:#2e8b57,color:#333
+       style MANY fill:#f3e5f5,stroke:#9c27b0,color:#333
+       style A0 fill:#50c878,stroke:#2e8b57,color:#fff
+       style A1 fill:#4a90d9,stroke:#2e5a87,color:#fff
+       style CHECKPOINT fill:#ff7f50,stroke:#cc5500,color:#fff
+       style B0 fill:#9370db,stroke:#6a0dad,color:#fff
+       style B1 fill:#ba68c8,stroke:#8e24aa,color:#fff
+       style B2 fill:#ba68c8,stroke:#8e24aa,color:#fff
+
+**One-to-one mapping (default):**
+   Each agent has its own independent policy checkpoint. Agents are
+   configured individually with separate policy paths.
+
+**One-to-many mapping (via link groups):**
+   Multiple agents share a single policy checkpoint. The primary
+   agent's policy path is automatically synced to all linked agents.
+
+Link groups prevent manual copy-paste errors, ensure consistency across
+agents, and enable complex team configurations (e.g., two independent
+teams with different policies). They are created manually via the "Link
+Agents" button in the GUI.
+
+**Example: All agents trained together**
+
+.. code-block:: python
+
+   # All 4 agents share the same MAPPO checkpoint
+   LinkGroup(
+       group_id="link_0",
+       primary_agent="agent_0",
+       linked_agents=["agent_1", "agent_2", "agent_3"],
+       policy_path="/path/to/checkpoint/final_train_model.pth",
+       algorithm="mappo",
+   )
+
+**Example: Two independent teams**
+
+.. code-block:: python
+
+   # Offense team (agents 0 and 2)
+   LinkGroup(
+       group_id="link_0",
+       primary_agent="agent_0",
+       linked_agents=["agent_2"],
+       policy_path="/path/to/offense_mappo.pth",
+       algorithm="mappo",
+   )
+
+   # Defense team (agents 1 and 3)
+   LinkGroup(
+       group_id="link_1",
+       primary_agent="agent_1",
+       linked_agents=["agent_3"],
+       policy_path="/path/to/defense_mappo.pth",
+       algorithm="mappo",
+   )
+
+See :doc:`../policy_mapping` for complete documentation on link groups
+and policy mappings.
+
 Player Assignment (the GUI for the Agent-Level Interface)
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
 
@@ -238,11 +328,11 @@ by selecting a **Type** and a **Worker**.
 
 Each ``PlayerAssignmentRow`` exposes:
 
-- **Type dropdown** -- ``LLM``, ``RL``, ``Human``, or ``Random``.
+- **Type dropdown:** ``LLM``, ``RL``, ``Human``, or ``Random``.
   Controls which configuration fields are visible.
-- **Worker dropdown** -- populated based on the selected type.  Hidden
+- **Worker dropdown:** populated based on the selected type.  Hidden
   for Human and Random (single worker each).
-- **Type-specific settings** -- LLM shows provider/model/API-key fields;
+- **Type-specific settings:** LLM shows provider/model/API-key fields;
   RL shows policy path and algorithm; Human and Random show nothing
   extra.
 

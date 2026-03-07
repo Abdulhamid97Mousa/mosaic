@@ -105,7 +105,7 @@ Service Layer
 
 Services provide business logic independent of the UI:
 
-- **PolicyMappingService**: Per-agent policy binding with paradigm awareness
+- **PolicyMappingService**: Per-agent policy binding with paradigm awareness and link groups for one-to-one and one-to-many policy mappings in multi-agent RL
 - **ActorService**: Actor registration and action selection
 - **TelemetryService**: Aggregates telemetry events and forwards to storage backends
 - **OperatorService**: Multi-agent environment orchestration during evaluation

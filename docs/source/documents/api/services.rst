@@ -19,6 +19,14 @@ WorkerAssignment
    :undoc-members:
    :no-index:
 
+LinkGroup
+---------
+
+.. autoclass:: gym_gui.services.operator.LinkGroup
+   :members:
+   :undoc-members:
+   :no-index:
+
 OperatorLauncher
 ----------------
 

@@ -327,17 +327,72 @@ method:
        },
    )
 
-   # RL operator with trained policy
+   # RL operator with trained policy (single-agent)
    config = OperatorConfig.single_agent(
        operator_id="rl_1",
-       display_name="PPO on CartPole",
+       display_name="PPO on MiniGrid",
        worker_id="cleanrl_worker",
        worker_type="rl",
-       env_name="gymnasium",
-       task="CartPole-v1",
+       env_name="minigrid",
+       task="MiniGrid-DoorKey-8x8-v0",
        settings={
            "algorithm": "ppo",
-           "checkpoint": "runs/ppo_cartpole/model.pt",
+           "policy_path": "runs/ppo_minigrid/model.pt",
+       },
+   )
+
+   # RL operator with trained policy (multi-agent with one-to-many mapping)
+   # Note: All agents share the same MAPPO checkpoint via link groups
+   config = OperatorConfig.multi_agent(
+       operator_id="rl_team",
+       display_name="MAPPO Team on Soccer 2v2",
+       env_name="mosaic_multigrid",
+       task="MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0",
+       player_workers={
+           "agent_0": WorkerAssignment(
+               worker_id="xuance_worker",
+               worker_type="rl",
+               settings={
+                   "algorithm": "mappo",
+                   "policy_path": "/path/to/mappo_2v2_checkpoint.pth",
+               },
+           ),
+           "agent_1": WorkerAssignment(
+               worker_id="xuance_worker",
+               worker_type="rl",
+               settings={
+                   "algorithm": "mappo",
+                   "policy_path": "/path/to/mappo_2v2_checkpoint.pth",
+               },
+           ),
+           "agent_2": WorkerAssignment(
+               worker_id="xuance_worker",
+               worker_type="rl",
+               settings={
+                   "algorithm": "mappo",
+                   "policy_path": "/path/to/mappo_2v2_checkpoint.pth",
+               },
+           ),
+           "agent_3": WorkerAssignment(
+               worker_id="xuance_worker",
+               worker_type="rl",
+               settings={
+                   "algorithm": "mappo",
+                   "policy_path": "/path/to/mappo_2v2_checkpoint.pth",
+               },
+           ),
+       },
+       # Link groups enable one-to-many policy mapping
+       # (all agents share the same checkpoint, preventing manual copy-paste errors)
+       link_groups={
+           "link_0": LinkGroup(
+               group_id="link_0",
+               primary_agent="agent_0",
+               linked_agents=["agent_1", "agent_2", "agent_3"],
+               policy_path="/path/to/mappo_2v2_checkpoint.pth",
+               algorithm="mappo",
+               worker_type="rl",
+           ),
        },
    )
 
@@ -426,7 +481,8 @@ fields for each type:
 The ``OperatorRenderContainer`` also adapts its header to show a
 color-coded type badge:
 
-- **LLM** -- blue badge
-- **RL** -- purple badge
-- **Human** -- orange badge
-- **Baseline** -- gray badge
+- **LLM:** blue badge
+- **RL:** purple badge
+- **Human:** orange badge
+- **Random:** gray badge
+- **Passive:** gray badge
