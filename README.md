@@ -11,8 +11,13 @@
 [![PyTorch](https://img.shields.io/badge/PyTorch-%3E%3D2.0.0-red)](https://pytorch.org/get-started/locally/)
 [![Gymnasium](https://img.shields.io/badge/gymnasium-%3E%3D0.28.1-blue)](https://gymnasium.farama.org/)
 [![PettingZoo](https://img.shields.io/badge/PettingZoo-%3E%3D1.24.0-blue)](https://pettingzoo.farama.org/)
+[![Platform](https://img.shields.io/badge/Platform-Linux%20%7C%20Windows-blue)](https://github.com/Abdulhamid97Mousa/mosaic)
 [![GitHub license](https://img.shields.io/badge/license-MIT-green.svg)](https://github.com/Abdulhamid97Mousa/mosaic/blob/main/LICENSE)
 [![Documentation](https://img.shields.io/badge/docs-ReadTheDocs-blue.svg)](https://mosaic-agent-level-interface.readthedocs.io/en/latest/)
+[![Contributors](https://img.shields.io/github/contributors/Abdulhamid97Mousa/mosaic)](https://github.com/Abdulhamid97Mousa/mosaic/graphs/contributors)
+[![Issues](https://img.shields.io/github/issues/Abdulhamid97Mousa/mosaic)](https://github.com/Abdulhamid97Mousa/mosaic/issues)
+[![GitHub stars](https://img.shields.io/github/stars/Abdulhamid97Mousa/mosaic?style=social)](https://github.com/Abdulhamid97Mousa/mosaic/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/Abdulhamid97Mousa/mosaic?style=social)](https://github.com/Abdulhamid97Mousa/mosaic/network/members)
 
 # MOSAIC
 
@@ -86,35 +91,35 @@ Existing frameworks are paradigm-siloed. No prior framework allowed fair, reprod
 **Legend:** ✔️ Supported | ❌ Not supported | 🔵 Partial
 
 
-| System                              | RL  | LLM | VLM | Human | Framework | Platform GUI | Cross-Paradigm | Agent-mixing |
-| ----------------------------------- | --- | --- | --- | ----- | --------- | ------------ | -------------- | ------------ |
-| RLlib [[1]](#ref1)                  | ✔️  | ❌   | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| CleanRL [[2]](#ref2)                | ✔️  | ❌   | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| Tianshou [[3]](#ref3)               | ✔️  | ❌   | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| Acme [[4]](#ref4)                   | ✔️  | ❌   | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| XuanCe [[5]](#ref5)                 | ✔️  | ❌   | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| OpenRL [[6]](#ref6)                 | ✔️  | ❌   | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| Stable-Baselines3 [[7]](#ref7)      | ✔️  | ❌   | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| Coach [[8]](#ref8)                  | ✔️  | ❌   | ❌   | ❌     | ✔️        | ✔️           | ❌              | ❌            |
-| BenchMARL [[15]](#ref15)            | ✔️  | ❌   | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| HeMAC [[25]](#ref25)                | ✔️  | ❌   | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| Overcooked-AI [[26]](#ref26)        | ✔️  | ❌   | ❌   | ✔️    | ✔️        | ❌            | ❌              | ❌            |
-| BALROG [[9]](#ref9)                 | ❌   | ✔️  | ✔️  | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| TextArena [[10]](#ref10)            | ❌   | ✔️  | ❌   | ✔️    | ✔️        | ❌            | ❌              | ❌            |
-| GameBench [[11]](#ref11)            | ❌   | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| lmgame-Bench [[12]](#ref12)         | ❌   | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| LLM Chess [[13]](#ref13)            | ✔️  | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| LLM-Game-Bench [[14]](#ref14)       | ❌   | ✔️  | ❌   | ❌     | ✔️        | 🔵           | ❌              | ❌            |
-| AgentBench [[16]](#ref16)           | ❌   | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| MultiAgentBench [[17]](#ref17)      | ❌   | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| GAMEBoT [[18]](#ref18)              | ❌   | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| Collab-Overcooked [[19]](#ref19)    | 🔵  | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| BotzoneBench [[20]](#ref20)         | ❌   | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| AgentGym [[21]](#ref21)             | ❌   | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| Game Reasoning Arena [[22]](#ref22) | ✔️  | ✔️  | 🔵  | 🔵    | ✔️        | ❌            | ❌              | ❌            |
-| CREW [[23]](#ref23)                 | ✔️  | ❌   | ❌   | ✔️    | ✔️        | ❌            | ❌              | ❌            |
-| LLM-PySC2 [[24]](#ref24)            | ✔️  | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
-| **MOSAIC (Ours)**                   | ✔️  | ✔️  | ✔️  | ✔️    | ✔️        | ✔️           | ✔️             | ✔️           |
+| System                   | RL  | LLM | VLM | Human | Framework | Platform GUI | Cross-Paradigm | Agent-mixing |
+| ------------------------ | --- | --- | --- | ----- | --------- | ------------ | -------------- | ------------ |
+| RLlib                    | ✔️  | ❌   | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| CleanRL                  | ✔️  | ❌   | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| Tianshou                 | ✔️  | ❌   | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| Acme                     | ✔️  | ❌   | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| XuanCe                   | ✔️  | ❌   | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| OpenRL                   | ✔️  | ❌   | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| Stable-Baselines3        | ✔️  | ❌   | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| Coach                    | ✔️  | ❌   | ❌   | ❌     | ✔️        | ✔️           | ❌              | ❌            |
+| BenchMARL                | ✔️  | ❌   | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| HeMAC                    | ✔️  | ❌   | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| Overcooked-AI            | ✔️  | ❌   | ❌   | ✔️    | ✔️        | ❌            | ❌              | ❌            |
+| BALROG                   | ❌   | ✔️  | ✔️  | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| TextArena                | ❌   | ✔️  | ❌   | ✔️    | ✔️        | ❌            | ❌              | ❌            |
+| GameBench                | ❌   | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| lmgame-Bench             | ❌   | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| LLM Chess                | ✔️  | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| LLM-Game-Bench           | ❌   | ✔️  | ❌   | ❌     | ✔️        | 🔵           | ❌              | ❌            |
+| AgentBench               | ❌   | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| MultiAgentBench          | ❌   | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| GAMEBoT                  | ❌   | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| Collab-Overcooked        | 🔵  | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| BotzoneBench             | ❌   | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| AgentGym                 | ❌   | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| Game Reasoning Arena     | ✔️  | ✔️  | 🔵  | 🔵    | ✔️        | ❌            | ❌              | ❌            |
+| CREW                     | ✔️  | ❌   | ❌   | ✔️    | ✔️        | ❌            | ❌              | ❌            |
+| LLM-PySC2                | ✔️  | ✔️  | ❌   | ❌     | ✔️        | ❌            | ❌              | ❌            |
+| **MOSAIC (Ours)**        | ✔️  | ✔️  | ✔️  | ✔️    | ✔️        | ✔️           | ✔️             | ✔️           |
 
 
 **MOSAIC introduces an agent-level interface enabling agent-mixing across fundamentally different decision-making paradigms.**
@@ -338,58 +343,4 @@ MOSAIC is released under the [MIT License](https://github.com/Abdulhamid97Mousa/
 - [Ray RLlib](https://docs.ray.io/en/latest/rllib/): Distributed RL training
 - [BALROG](https://github.com/balrog-ai/BALROG): LLM/VLM agent benchmark
 - [llm_chess](https://github.com/maxim-saplin/llm_chess): LLM chess evaluation
-- [PyQt6](https://www.riverbankcomputing.com/software/pyqt/): GUI framework
-
-## References
-
-[1] E. Liang et al., "RLlib: Abstractions for Distributed Reinforcement Learning," ICML, 2018.  
-
-[2] S. Huang et al., "CleanRL: High-quality Single-file Implementations of Deep RL Algorithms," JMLR, 2022.  
-
-[3] J. Weng et al., "Tianshou: A Highly Modularized Deep RL Library," JMLR, 2022.  
-
-[4] M. Hoffman et al., "Acme: A Research Framework for Distributed RL," arXiv:2006.00979, 2020.  
-
-[5] W. Liu et al., "XuanCe: A Comprehensive and Unified Deep RL Library," arXiv:2312.16248, 2023.  
-
-[6] S. Huang et al., "OpenRL: A Unified Reinforcement Learning Framework," arXiv:2312.16189, 2023.  
-
-[7] A. Raffin et al., "Stable-Baselines3: Reliable RL Implementations," JMLR, 2021.  
-
-[8] I. Caspi et al., "Reinforcement Learning Coach," 2017.  
-
-[9] D. Paglieri et al., "BALROG: Benchmarking Agentic LLM and VLM Reasoning On Games," arXiv:2411.13543, 2024.  
-
-[10] G. De Magistris et al., "TextArena," 2025.  
-
-[11] D. Costarelli et al., "GameBench: Evaluating Strategic Reasoning Abilities of LLM Agents," arXiv:2406.06613, 2024.  
-
-[12] Y. Huang et al., "lmgame-Bench: Evaluating LLMs on Game-Theoretic Decision-Making," 2025.  
-
-[13] M. Saplin, "LLM Chess," 2025.  
-
-[14] J. Guo et al., "LLM-Game-Bench: Evaluating LLM Reasoning through Game-Playing," 2024.  
-
-[15] M. Bettini et al., "BenchMARL: Benchmarking Multi-Agent Reinforcement Learning," JMLR, 2024.  
-
-[16] X. Liu et al., "AgentBench: Evaluating LLMs as Agents," ICLR, 2024.  
-
-[17] K. Zhu et al., "MultiAgentBench: Evaluating the Collaboration and Competition of LLM Agents," ACL, 2025.  
-
-[18] Y. Lin et al., "GAMEBoT: Transparent Assessment of LLM Reasoning in Games," ACL, 2025.  
-
-[19] H. Sun et al., "Collab-Overcooked: Benchmarking and Evaluating Large Language Models as Collaborative Agents," EMNLP, 2025.  
-
-[20] L. Li et al., "BotzoneBench: Scalable LLM Evaluation via Graded AI Anchors," arXiv:2602.13214, 2026.  
-
-[21] Z. Xi et al., "AgentGym: Evolving Large Language Model-based Agents across Diverse Environments," ACL, 2025.  
-
-[22] Cipolina et al., "Game Reasoning Arena: A Comprehensive Evaluation Framework for Large Language Models," arXiv:2501.00363, 2025.  
-
-[23] Y. Wang et al., "CREW: A Benchmark for Collaborative Multi-Step Reasoning and Planning," NeurIPS, 2024.  
-
-[24] X. Ma et al., "LLM-PySC2: A Benchmark for Large Language Models in StarCraft II," arXiv:2412.19668, 2024.  
-
-[25] C. Dansereau et al., "The Heterogeneous Multi-Agent Challenge," arXiv:2509.19512, 2025.  
-
-[26] M. Carroll et al., "On the Utility of Learning about Humans for Human-AI Coordination," NeurIPS, 2019.  
+- [PyQt6](https://www.riverbankcomputing.com/software/pyqt/): GUI framework  
