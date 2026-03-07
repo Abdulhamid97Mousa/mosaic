@@ -226,6 +226,30 @@ rware = [
     "networkx>=2.8.0",
 ]
 
+# Griddly - C++ backend, high-performance grid world platform
+# Paper: Bamford et al. (2021). "Griddly: A Platform for AI Research in Games"
+# Repository: https://github.com/Bam4d/Griddly
+# NOTE: Requires Vulkan drivers. On headless servers: apt install libvulkan1 mesa-vulkan-drivers
+griddly = [
+    "griddly>=1.4.2",
+    "gymnasium>=1.1.0",
+]
+
+# HeMAC (Heterogeneous Multi-Agent Challenge) - ThalesGroup ECAI 2025
+# Paper: Dansereau et al. (2025). "The Heterogeneous Multi-Agent Challenge"
+# Repository: https://github.com/ThalesGroup/hemac
+# Includes: Simple Fleet, Fleet, Complex Fleet scenarios with Quadcopters, Observers, Provisioners
+hemac = [
+    "coloredlogs>=15.0.1",
+    "geopy>=2.4.1",
+    "gymnasium>=1.1.0",
+    "numpy>=1.26.4",
+    "pettingzoo>=1.24.3",
+    "pygame>=2.3.0",
+    "pymap3d>=3.1.0",
+    "shapely>=2.0.5",
+]
+
 # Jumanji JAX-based RL environments (Google DeepMind)
 # Paper: Bonnet et al. (2024). "Jumanji: Industry-Driven Hardware-Accelerated RL Environments"
 # Repository: https://github.com/google-deepmind/jumanji
@@ -417,7 +441,7 @@ all-gymnasium = [
 
 # All environment families (single + multi-agent)
 all-envs = [
-    "mosaic[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom,nethack,crafter,procgen,textworld,babaisai,mosaic_multigrid,multigrid_ini,jumanji,pybullet-drones,openspiel,meltingpot,overcooked,smac,smacv2,rware]",
+    "mosaic[box2d,mujoco,atari,minigrid,pettingzoo,vizdoom,nethack,crafter,procgen,textworld,babaisai,mosaic_multigrid,multigrid_ini,jumanji,pybullet-drones,openspiel,meltingpot,overcooked,smac,smacv2,rware,griddly,hemac]",
 ]
 
 # Full development setup

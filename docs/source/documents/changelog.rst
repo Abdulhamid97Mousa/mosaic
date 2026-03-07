@@ -24,5 +24,6 @@ Added
 - **Visual-First GUI**: PyQt6 interface for experiment configuration, rendering, and telemetry
 - **Resource Management**: GPU allocation, queue limits, health monitoring
 - **Per-Agent Policy Binding**: ``PolicyMappingService`` for routing agents to workers
+- **Link Groups for Multi-Agent RL**: Flexible one-to-one and one-to-many policy mappings for MAPPO/IPPO evaluation. Link groups prevent manual copy-paste errors, ensure automatic policy path updates, and enable complex team configurations with multiple independent policy groups
 - **Runtime Logging**: JSONL telemetry per step and episode
 - **Sphinx Documentation**: Full docs with video demos, architecture diagrams, and API reference

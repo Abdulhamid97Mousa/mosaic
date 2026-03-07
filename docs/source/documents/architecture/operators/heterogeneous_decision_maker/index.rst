@@ -118,19 +118,24 @@ across agent slots:
 .. code-block:: python
 
    # Heterogeneous team: RL + LLM in 2v2 soccer
+   # Note: All RL agents use one-to-many policy mapping via link groups
+   # (all agents share the same MAPPO checkpoint with agent-specific weights)
    config = OperatorConfig.multi_agent(
        operator_id="heterogeneous_team",
        display_name="RL + LLM Heterogeneous vs RL + Random",
-       env_name="multigrid",
+       env_name="mosaic_multigrid",
        task="MosaicMultiGrid-Soccer-2vs2-IndAgObs-v0",
        player_workers={
            # Green team: heterogeneous (RL + LLM)
-           "green_0": WorkerAssignment(
-               worker_id="cleanrl_worker",
+           "agent_0": WorkerAssignment(
+               worker_id="xuance_worker",
                worker_type="rl",
-               settings={"algorithm": "ppo", "checkpoint": "mappo_1v1.pt"},
+               settings={
+                   "algorithm": "mappo", # this green agent_0 was trained with this blue agent_1 in adversial setting
+                   "policy_path": "/path/to/mappo_agent_0_green_VS_agent_1_blue_checkpoint.pth", 
+               },
            ),
-           "green_1": WorkerAssignment(
+           "agent_1": WorkerAssignment(
                worker_id="mosaic_llm_worker",
                worker_type="llm",
                settings={
@@ -142,14 +147,30 @@ across agent slots:
                },
            ),
            # Blue team: RL + Random
-           "blue_0": WorkerAssignment(
-               worker_id="cleanrl_worker",
+           "agent_2": WorkerAssignment(
+               worker_id="xuance_worker",
                worker_type="rl",
-               settings={"algorithm": "ppo", "checkpoint": "mappo_1v1.pt"},
+               settings={
+                   "algorithm": "mappo", # But then we can decide to link and deploy agent_0 with agent_3 or agent_2
+                   # to keep the same observation dimension 
+                   "policy_path": "/path/to/mappo_agent_0_green_VS_agent_1_blue_checkpoint.pth",
+               },
            ),
-           "blue_1": WorkerAssignment(
+           "agent_3": WorkerAssignment(
                worker_id="random_worker",
                worker_type="random",
+           ),
+       },
+       # Link groups for one-to-many policy mapping
+       # (agents 0 and 2 share the same MAPPO checkpoint)
+       link_groups={
+           "link_0": LinkGroup(
+               group_id="link_0",
+               primary_agent="agent_0",
+               linked_agents=["agent_2"],
+               policy_path="/path/to/mappo_agent_0_green_VS_agent_1_blue_checkpoint.pth",
+               algorithm="mappo",
+               worker_type="rl",
            ),
        },
    )
