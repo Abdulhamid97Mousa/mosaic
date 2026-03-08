@@ -509,7 +509,7 @@ class TrainerDispatcher:
         log_constant(_LOGGER, LOG_TRAINER_WORKER_IMPORT_ERROR, extra=extra)
         raise RuntimeError(
             "cleanrl_worker module not importable. Ensure PYTHONPATH includes "
-            "3rd_party/cleanrl_worker before launching the trainer."
+            "3rd_party/workers/cleanrl_worker before launching the trainer."
         )
 
     def _ensure_xuance_worker_available(self, run_id: str, module: str) -> None:
@@ -524,7 +524,7 @@ class TrainerDispatcher:
             "pythonpath": os.environ.get("PYTHONPATH", ""),
         }
         log_constant(_LOGGER, LOG_TRAINER_WORKER_IMPORT_ERROR, extra=extra)
-        raise RuntimeError("xuance_worker module not importable. Install with: pip install -e 3rd_party/xuance_worker")
+        raise RuntimeError("xuance_worker module not importable. Install with: pip install -e 3rd_party/workers/xuance_worker")
 
     def _build_worker_env(self, run: RunRecord) -> dict[str, str]:
         """Build environment variables for the worker subprocess."""

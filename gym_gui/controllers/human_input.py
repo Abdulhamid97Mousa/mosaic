@@ -297,6 +297,33 @@ class RWAREKeyCombinationResolver(KeyCombinationResolver):
         return None  # No action - caller should use NOOP (action 0)
 
 
+class GriddlyKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for Griddly single-agent grid world environments.
+
+    IMPORTANT: Griddly's ACTUAL action space differs from its documentation!
+    The documentation claims: 0=NOOP, 1=UP, 2=DOWN, 3=LEFT, 4=RIGHT
+    But the ACTUAL action space is: 0=NOOP, 1=LEFT, 2=UP, 3=RIGHT, 4=DOWN
+
+    Key mappings (corrected for actual Griddly behavior):
+    - Arrow Up  / W -> action 2 (UP)
+    - Arrow Down / S -> action 4 (DOWN)
+    - Arrow Left / A -> action 1 (LEFT)
+    - Arrow Right / D -> action 3 (RIGHT)
+    - No keys       -> None   (caller uses NOOP)
+    """
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        if pressed_keys & _KEYS_UP:
+            return 2  # UP (actual Griddly action for moving up)
+        if pressed_keys & _KEYS_DOWN:
+            return 4  # DOWN (actual Griddly action for moving down)
+        if pressed_keys & _KEYS_LEFT:
+            return 1  # LEFT (actual Griddly action for moving left)
+        if pressed_keys & _KEYS_RIGHT:
+            return 3  # RIGHT (actual Griddly action for moving right)
+        return None  # No action - caller should use NOOP (action 0)
+
+
 class MeltingPotKeyCombinationResolver(KeyCombinationResolver):
     """Resolve key combinations for Melting Pot multi-agent environments.
 
@@ -597,6 +624,228 @@ class BipedalWalkerKeyCombinationResolver(KeyCombinationResolver):
         return None
 
 
+class PistonballKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for Pistonball (PettingZoo Butterfly) environment.
+
+    Pistonball action space (Discrete(3) for discrete mode):
+    0: move left  - Move piston left
+    1: stay       - Keep piston stationary
+    2: move right - Move piston right
+
+    Key mappings:
+    - Arrow Left / A  -> move left (0)
+    - Arrow Right / D -> move right (2)
+    - No keys         -> stay (1)
+    """
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        left = bool(pressed_keys & _KEYS_LEFT)
+        right = bool(pressed_keys & _KEYS_RIGHT)
+
+        # Cancel opposing directions
+        if left and right:
+            return 1  # stay
+
+        if left:
+            return 0  # move left
+        if right:
+            return 2  # move right
+
+        return 1  # stay (default action)
+
+
+class KnightsArchersZombiesKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for Knights Archers Zombies (PettingZoo Butterfly) environment.
+
+    Knights Archers Zombies action space (Discrete(6)):
+    0: noop          - Do nothing
+    1: move forward  - Move forward
+    2: move backward - Move backward
+    3: move left     - Move left (strafe)
+    4: move right    - Move right (strafe)
+    5: attack/shoot  - Attack or shoot arrow
+
+    Key mappings:
+    - Arrow Up / W       -> move forward (1)
+    - Arrow Down / S     -> move backward (2)
+    - Arrow Left / A     -> move left (3)
+    - Arrow Right / D    -> move right (4)
+    - Space / E          -> attack/shoot (5)
+    - No keys            -> None (caller uses noop)
+    """
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        up = bool(pressed_keys & _KEYS_UP)
+        down = bool(pressed_keys & _KEYS_DOWN)
+        left = bool(pressed_keys & _KEYS_LEFT)
+        right = bool(pressed_keys & _KEYS_RIGHT)
+
+        # Attack button (highest priority)
+        if _KEY_SPACE in pressed_keys or _KEY_E in pressed_keys:
+            return 5  # attack/shoot
+
+        # Movement (cancel opposing directions)
+        if up and down:
+            up = down = False
+        if left and right:
+            left = right = False
+
+        if up:
+            return 1  # move forward
+        if down:
+            return 2  # move backward
+        if left:
+            return 3  # move left
+        if right:
+            return 4  # move right
+
+        return None  # No action - caller should use noop (action 0)
+
+
+class CooperativePongKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for Cooperative Pong (PettingZoo Butterfly) environment.
+
+    Cooperative Pong action space (Discrete(3)):
+    0: stay      - Keep paddle stationary
+    1: move up   - Move paddle up
+    2: move down - Move paddle down
+
+    Key mappings:
+    - Arrow Up / W    -> move up (1)
+    - Arrow Down / S  -> move down (2)
+    - No keys         -> stay (0)
+    """
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        up = bool(pressed_keys & _KEYS_UP)
+        down = bool(pressed_keys & _KEYS_DOWN)
+
+        # Cancel opposing directions
+        if up and down:
+            return 0  # stay
+
+        if up:
+            return 1  # move up
+        if down:
+            return 2  # move down
+
+        return 0  # stay (default action)
+
+
+class RPSKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for Rock Paper Scissors (PettingZoo Classic) environment.
+
+    RPS action space (Discrete(3)):
+    0: rock
+    1: paper
+    2: scissors
+
+    Key mappings:
+    - 1 or R -> rock (0)
+    - 2 or P -> paper (1)
+    - 3 or S -> scissors (2)
+    """
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        _KEY_R = _get_qt_key("Key_R")
+        _KEY_P = _get_qt_key("Key_P")
+        _KEY_S = _get_qt_key("Key_S")
+
+        if _KEY_1 in pressed_keys or _KEY_R in pressed_keys:
+            return 0  # rock
+        if _KEY_2 in pressed_keys or _KEY_P in pressed_keys:
+            return 1  # paper
+        if _KEY_3 in pressed_keys or _KEY_S in pressed_keys:
+            return 2  # scissors
+
+        return None  # No action
+
+
+class PokerKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for poker games (Leduc Hold'em, Texas Hold'em).
+
+    Poker action space (Discrete(4)):
+    0: fold
+    1: call
+    2: raise
+    3: check
+
+    Key mappings:
+    - F -> fold (0)
+    - C -> call (1)
+    - R -> raise (2)
+    - Space/Enter -> check (3)
+    """
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        _KEY_F = _get_qt_key("Key_F")
+        _KEY_C = _get_qt_key("Key_C")
+        _KEY_R = _get_qt_key("Key_R")
+
+        if _KEY_F in pressed_keys:
+            return 0  # fold
+        if _KEY_C in pressed_keys:
+            return 1  # call
+        if _KEY_R in pressed_keys:
+            return 2  # raise
+        if _KEY_SPACE in pressed_keys or _KEY_RETURN in pressed_keys:
+            return 3  # check
+
+        return None  # No action
+
+
+class HanabiKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for Hanabi (PettingZoo Classic) environment.
+
+    Hanabi action space (Discrete(variable)):
+    0-4: play card from hand position 0-4
+    5-9: discard card from hand position 0-4
+    10+: give hint actions (color/rank hints to other players)
+
+    Key mappings:
+    - 1-5 -> play card from position 0-4
+    - Q, W, E, R, T -> discard card from position 0-4
+    - H -> give hint (action 10, first hint action)
+    """
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        _KEY_4 = _get_qt_key("Key_4")
+        _KEY_5 = _get_qt_key("Key_5")
+        _KEY_T = _get_qt_key("Key_T")
+        _KEY_W = _get_qt_key("Key_W")
+        _KEY_R = _get_qt_key("Key_R")
+
+        # Play card actions (0-4)
+        if _KEY_1 in pressed_keys:
+            return 0  # play card from position 0
+        if _KEY_2 in pressed_keys:
+            return 1  # play card from position 1
+        if _KEY_3 in pressed_keys:
+            return 2  # play card from position 2
+        if _KEY_4 in pressed_keys:
+            return 3  # play card from position 3
+        if _KEY_5 in pressed_keys:
+            return 4  # play card from position 4
+
+        # Discard card actions (5-9)
+        if _KEY_Q in pressed_keys:
+            return 5  # discard card from position 0
+        if _KEY_W in pressed_keys:
+            return 6  # discard card from position 1
+        if _KEY_E in pressed_keys:
+            return 7  # discard card from position 2
+        if _KEY_R in pressed_keys:
+            return 8  # discard card from position 3
+        if _KEY_T in pressed_keys:
+            return 9  # discard card from position 4
+
+        # Give hint action (10+)
+        if _KEY_H in pressed_keys:
+            return 10  # give hint (first hint action)
+
+        return None  # No action
+
+
 class ViZDoomKeyCombinationResolver(KeyCombinationResolver):
     """Resolve key combinations for ViZDoom environments.
 
@@ -664,6 +913,16 @@ def get_key_combination_resolver(
     if game_id == GameId.BIPEDAL_WALKER:
         return BipedalWalkerKeyCombinationResolver()
 
+    # Game-specific resolvers for PettingZoo Classic card/poker games
+    if game_id == GameId.RPS:
+        return RPSKeyCombinationResolver()
+    if game_id == GameId.LEDUC_HOLDEM:
+        return PokerKeyCombinationResolver()
+    if game_id == GameId.TEXAS_HOLDEM:
+        return PokerKeyCombinationResolver()
+    if game_id == GameId.HANABI:
+        return HanabiKeyCombinationResolver()
+
     # First, try to get the family from the mapping
     family = ENVIRONMENT_FAMILY_BY_GAME.get(game_id)
 
@@ -685,9 +944,20 @@ def get_key_combination_resolver(
     if family == EnvironmentFamily.RWARE:
         # RWARE environments (5 actions: NOOP, FORWARD, LEFT, RIGHT, TOGGLE_LOAD)
         return RWAREKeyCombinationResolver()
+    if family == EnvironmentFamily.GRIDDLY:
+        # Griddly environments (5 actions: NOOP, UP, DOWN, LEFT, RIGHT)
+        return GriddlyKeyCombinationResolver()
 
     # Fallback: check by game ID prefix/name for games not in the mapping
     game_name = game_id.value if hasattr(game_id, 'value') else str(game_id)
+
+    # PettingZoo Butterfly environments
+    if "pistonball" in game_name.lower():
+        return PistonballKeyCombinationResolver()
+    if "knights_archers_zombies" in game_name.lower():
+        return KnightsArchersZombiesKeyCombinationResolver()
+    if "cooperative_pong" in game_name.lower():
+        return CooperativePongKeyCombinationResolver()
 
     # MOSAIC MultiGrid environments (8 actions - PyPI package mosaic-multigrid v6.0.0)
     # noop=0, left=1, right=2, forward=3, pickup=4, drop=5, toggle=6, done=7
@@ -2069,9 +2339,11 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
         if overrides:
             input_mode = overrides.get("input_mode", InputMode.SHORTCUT_BASED.value)
 
-        # CRITICAL: Force state-based mode for multi-agent environments
-        # Shortcut-based mode conflicts with evdev multi-keyboard monitoring
-        from gym_gui.core.enums import ENVIRONMENT_FAMILY_BY_GAME, EnvironmentFamily
+        # CRITICAL: Force state-based mode for environments that require it
+        # Multi-agent: shortcut-based mode conflicts with evdev multi-keyboard monitoring
+        # Griddly: ALL Griddly games need state-based mode to use GriddlyKeyCombinationResolver
+        #          (no shortcuts are registered for Griddly in shortcut-based mode)
+        from gym_gui.core.enums import CONTINUOUS_GRIDDLY_GAMES, ENVIRONMENT_FAMILY_BY_GAME, EnvironmentFamily
         env_family = ENVIRONMENT_FAMILY_BY_GAME.get(game_id)
         is_multi_agent = env_family in (
             EnvironmentFamily.MOSAIC_MULTIGRID,
@@ -2080,13 +2352,16 @@ class HumanInputController(QtCore.QObject, LogConstantMixin):
             EnvironmentFamily.OVERCOOKED,
             EnvironmentFamily.RWARE,
         )
+        is_griddly = env_family == EnvironmentFamily.GRIDDLY
+        requires_state_based = is_multi_agent or is_griddly
 
-        if is_multi_agent and input_mode != InputMode.STATE_BASED.value:
+        if requires_state_based and input_mode != InputMode.STATE_BASED.value:
+            reason = "multi-agent" if is_multi_agent else "Griddly (needs GriddlyKeyCombinationResolver)"
             _LOGGER.warning(
-                "Multi-agent environment %s REQUIRES state-based input mode "
-                "(shortcut-based mode conflicts with multi-keyboard evdev monitoring). "
+                "Environment %s (%s) REQUIRES state-based input mode. "
                 "Forcing input_mode to 'state_based'.",
                 game_id.value if hasattr(game_id, 'value') else game_id,
+                reason,
             )
             input_mode = InputMode.STATE_BASED.value
             # Update overrides to reflect the forced mode

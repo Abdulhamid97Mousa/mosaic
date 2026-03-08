@@ -447,6 +447,7 @@ async def run_proxy(
             line = raw.decode("utf-8", errors="replace").rstrip()
             # Surface stderr to our own stderr so daemon logs show issues
             sys.stderr.write(f"[worker stderr] {line}\n")
+            sys.stderr.flush()
 
     # Drive everything until worker exits
     reader = asyncio.create_task(read_worker(), name="read-worker")

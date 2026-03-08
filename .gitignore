@@ -85,7 +85,6 @@ coverage.xml
 .dmypy.json
 dmypy.json
 .pytype/
-pyrightconfig.json
 
 # =============================================================================
 # Project Runtime Artifacts

@@ -309,6 +309,53 @@ class MultiAgentStepState:
 
 
 @dataclass
+class LinkGroup:
+    """Configuration for a group of linked agents sharing the same policy.
+
+    In multi-agent RL (MAPPO/IPPO), multiple agents can share the same policy
+    checkpoint file. This dataclass tracks which agents are linked together
+    and ensures they all use the same policy path.
+
+    Attributes:
+        group_id: Unique identifier for this link group, scoped to the parent
+            operator (e.g., "operator_0_link_0").
+        primary_agent: The primary agent whose policy path is shared (e.g., "agent_0").
+        linked_agents: List of agents linked to the primary (e.g., ["agent_1", "agent_2"]).
+        policy_path: Shared policy checkpoint path.
+        algorithm: Shared algorithm (e.g., "IPPO", "MAPPO").
+        worker_type: Shared worker type (e.g., "rl").
+        color: Background color for visual indication in UI (e.g., "#E3F2FD").
+    """
+
+    group_id: str
+    primary_agent: str
+    linked_agents: list[str] = field(default_factory=list)
+    policy_path: str = ""
+    algorithm: str = ""
+    worker_type: str = "rl"
+    color: str = "#E3F2FD"  # Light blue background
+
+    def all_agents(self) -> list[str]:
+        """Get all agents in this group (primary + linked).
+
+        Returns:
+            List of all agent names in the group.
+        """
+        return [self.primary_agent] + self.linked_agents
+
+    def contains_agent(self, agent_name: str) -> bool:
+        """Check if an agent is part of this group.
+
+        Args:
+            agent_name: The agent name to check.
+
+        Returns:
+            True if the agent is in this group.
+        """
+        return agent_name == self.primary_agent or agent_name in self.linked_agents
+
+
+@dataclass
 class OperatorConfig:
     """Configuration for a single operator instance in multi-operator mode.
 
@@ -351,6 +398,9 @@ class OperatorConfig:
     observation_mode: str = "visible_teammates"  # "egocentric" or "visible_teammates"
     coordination_level: int = 1  # 1=Emergent, 2=Basic Hints, 3=Role-Based
     view_size: int | None = None  # Agent view size for MOSAIC (None = env default of 3)
+
+    # Agent linking for multi-agent RL (MAPPO/IPPO)
+    link_groups: Dict[str, LinkGroup] = field(default_factory=dict)  # group_id -> LinkGroup
 
     def __post_init__(self) -> None:
         """Validate configuration and ensure workers dict is populated."""
@@ -480,6 +530,7 @@ class OperatorConfig:
         task: str = "BabyAI-GoToRedBall-v0",
         settings: Dict[str, Any] | None = None,
         max_steps: int | None = None,
+        view_size: int | None = None,
     ) -> "OperatorConfig":
         """Create a single-agent operator config.
 
@@ -492,6 +543,7 @@ class OperatorConfig:
             task: Specific task/level.
             settings: Worker-specific settings.
             max_steps: Maximum steps per episode before truncation.
+            view_size: Agent view size for MOSAIC MultiGrid (None = env default).
 
         Returns:
             OperatorConfig with single worker assigned to "agent".
@@ -502,6 +554,7 @@ class OperatorConfig:
             env_name=env_name,
             task=task,
             max_steps=max_steps,
+            view_size=view_size,
             workers={
                 "agent": WorkerAssignment(
                     worker_id=worker_id,
@@ -524,6 +577,7 @@ class OperatorConfig:
         coordination_level: int = 1,
         max_steps: int | None = None,
         view_size: int | None = None,
+        link_groups: Dict[str, "LinkGroup"] | None = None,
     ) -> "OperatorConfig":
         """Create a multi-agent operator config.
 
@@ -538,6 +592,7 @@ class OperatorConfig:
             coordination_level: Coordination strategy level (1=Emergent, 2=Basic Hints, 3=Role-Based).
             max_steps: Maximum steps per episode before truncation.
             view_size: Agent view size for MOSAIC (None = env default of 3).
+            link_groups: Optional dict of link groups for multi-agent RL policy sharing.
 
         Returns:
             OperatorConfig with multiple workers for multi-agent env.
@@ -553,6 +608,7 @@ class OperatorConfig:
             observation_mode=observation_mode,
             coordination_level=coordination_level,
             view_size=view_size,
+            link_groups=link_groups or {},
         )
 
     def with_run_id(self, run_id: str) -> "OperatorConfig":
@@ -1045,6 +1101,7 @@ __all__ = [
     "OperatorDescriptor",
     "OperatorConfig",
     "WorkerAssignment",
+    "LinkGroup",
     "MultiAgentStepState",
     "MultiOperatorService",
     "HumanOperator",

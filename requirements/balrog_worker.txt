@@ -51,7 +51,7 @@ google-genai>=1.0.0
 # ═══════════════════════════════════════════════════════════════
 #
 # 1. Install the worker:
-#    pip install -e 3rd_party/balrog_worker
+#    pip install -e 3rd_party/workers/balrog_worker
 #
 # 2. Set your API key in .env:
 #    OPENAI_API_KEY=sk-...

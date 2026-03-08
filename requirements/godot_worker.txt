@@ -16,10 +16,10 @@
 # sb3-contrib>=2.0.0
 
 # Note: The Godot binary lives at:
-#   3rd_party/godot_worker/bin/godot
+#   3rd_party/workers/godot_worker/bin/godot
 #
 # Usage:
-#   pip install -e 3rd_party/godot_worker
+#   pip install -e 3rd_party/workers/godot_worker
 #   godot-worker --help
 #   godot-worker --editor --project /path/to/project
 #   godot-worker --headless --project /path/to/project --port 8080

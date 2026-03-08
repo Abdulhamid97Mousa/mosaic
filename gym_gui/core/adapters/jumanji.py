@@ -64,7 +64,7 @@ def _ensure_jumanji() -> None:
             "Jumanji worker is not available. Install via:\n"
             "  pip install jax jaxlib jumanji\n"
             "or:\n"
-            "  pip install -e '3rd_party/jumanji_worker[jax]'\n"
+            "  pip install -e '3rd_party/workers/jumanji_worker[jax]'\n"
             "Note: Requires JAX with compatible hardware backend."
         )
 

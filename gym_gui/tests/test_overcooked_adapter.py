@@ -1,7 +1,7 @@
 """Tests for Overcooked-AI adapter integration.
 
 NOTE: These tests require the overcooked_ai package to be installed:
-    pip install -e 3rd_party/overcooked_ai/
+    pip install -e 3rd_party/environments/overcooked_ai/
 """
 
 import numpy as np

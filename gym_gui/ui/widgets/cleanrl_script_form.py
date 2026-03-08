@@ -146,7 +146,7 @@ class CleanRlScriptForm(QtWidgets.QDialog):
         fl_layout = QtWidgets.QFormLayout(fastlane_group)
 
         self._fastlane_only_cb = QtWidgets.QCheckBox("FastLane Only")
-        self._fastlane_only_cb.setChecked(True)
+        self._fastlane_only_cb.setChecked(False)
         self._fastlane_only_cb.setToolTip("Skip durable telemetry; stream frames only via Fast Lane.")
         fl_layout.addRow(self._fastlane_only_cb)
 

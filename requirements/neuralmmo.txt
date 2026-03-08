@@ -7,7 +7,7 @@
 # If using Python 3.11+, you may encounter compatibility issues
 
 # Installation from local 3rd_party directory
-# Run: pip install -e 3rd_party/environment
+# Run: pip install -e 3rd_party/environments/neural-mmo
 
 # Core dependencies (from Neural MMO setup.py)
 cython>=3.0.0
@@ -28,4 +28,4 @@ dill>=0.3.0
 # sudo apt-get install build-essential python3-dev
 
 # Baselines (optional - for training examples)
-# Run: pip install -e 3rd_party/baselines
+# Run: pip install -e 3rd_party/environments/neural-mmo/baselines

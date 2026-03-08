@@ -951,7 +951,7 @@ class RWAREConfig:
 
     Paper: Papoudakis et al. (2021). "Benchmarking Multi-Agent Deep RL
            Algorithms in Cooperative Tasks"
-    Source: 3rd_party/robotic-warehouse/
+    Source: 3rd_party/environments/robotic-warehouse/
     """
 
     observation_type: str = "flattened"
@@ -970,6 +970,30 @@ class RWAREConfig:
 
     max_steps: int = 500
     """Maximum steps per episode."""
+
+    seed: int | None = None
+    """Random seed for reproducibility (None = random)."""
+
+    render_mode: str = "rgb_array"
+    """Render mode for MOSAIC display."""
+
+
+@dataclass
+class GriddlyConfig:
+    """Configuration for Griddly grid world environments.
+
+    Griddly provides a C++ backend with Vulkan rendering for high-throughput
+    grid world research (30 000+ FPS headless).
+
+    Paper: Bamford et al. (2021). "Griddly: A Platform for AI Research in Games"
+    Repo:  https://github.com/Bam4d/Griddly
+    """
+
+    level: int = 0
+    """Level index within the game (0 = default level)."""
+
+    max_steps: int = 1000
+    """Maximum steps per episode before truncation."""
 
     seed: int | None = None
     """Random seed for reproducibility (None = random)."""
@@ -998,6 +1022,7 @@ GameConfig: TypeAlias = (
     | OvercookedConfig
     | SMACConfig
     | RWAREConfig
+    | GriddlyConfig
 )
 
 

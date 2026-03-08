@@ -4342,7 +4342,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
             elif env_name == "ini_multigrid":
                 # ini_multigrid: cooperative exploration environments
-                # Uses INI multigrid from 3rd_party/multigrid-ini (gymnasium API)
+                # Uses INI multigrid from 3rd_party/environments/multigrid-ini (gymnasium API)
                 try:
                     import os
                     import sys

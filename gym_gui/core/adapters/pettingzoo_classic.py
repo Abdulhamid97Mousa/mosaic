@@ -1083,11 +1083,389 @@ class GoEnvironmentAdapter(EnvironmentAdapter[Dict[str, Any], int]):
         return self.default_render_mode
 
 
+@dataclass(slots=True)
+class CardGameRenderPayload:
+    """Render payload for card/poker games (Hanabi, Leduc Hold'em, RPS, Texas Hold'em)."""
+
+    game_type: str  # "hanabi", "leduc_holdem", "rps", "texas_holdem"
+    current_player: str
+    legal_actions: List[int]
+    last_action: Optional[int] = None
+    is_game_over: bool = False
+    winner: Optional[str] = None
+    move_count: int = 0
+    game_state: Dict[str, Any] = field(default_factory=dict)  # Game-specific state
+
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "game_type": self.game_type,
+            "current_player": self.current_player,
+            "legal_actions": self.legal_actions,
+            "last_action": self.last_action,
+            "is_game_over": self.is_game_over,
+            "winner": self.winner,
+            "move_count": self.move_count,
+            "game_state": self.game_state,
+        }
+
+
+class RPSEnvironmentAdapter(EnvironmentAdapter[Dict[str, Any], int]):
+    """Adapter for PettingZoo Rock Paper Scissors environment."""
+
+    id = GameId.RPS.value
+    supported_control_modes = (ControlMode.HUMAN_ONLY,)
+    supported_render_modes = (RenderMode.RGB_ARRAY,)
+    default_render_mode = RenderMode.RGB_ARRAY
+
+    def __init__(self, context: AdapterContext | None = None) -> None:
+        super().__init__(context)
+        self._aec_env: Any = None
+        self._last_action: Optional[int] = None
+        self._move_count: int = 0
+        self._current_player: str = "player_0"
+
+    def load(self) -> None:
+        try:
+            from pettingzoo.classic import rps_v2
+            self._aec_env = rps_v2.env(render_mode="rgb_array")
+            self.log_constant(LOG_ADAPTER_ENV_CREATED, extra={"env_id": self.id, "render_mode": "rgb_array"})
+        except ImportError as e:
+            raise ImportError("PettingZoo Classic required: pip install 'pettingzoo[classic]'") from e
+
+    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None) -> AdapterStep[Dict[str, Any]]:
+        if self._aec_env is None:
+            raise RuntimeError("Environment not loaded. Call load() first.")
+        self._aec_env.reset(seed=seed)
+        self._last_action = None
+        self._move_count = 0
+        self._episode_step = 0
+        self._episode_return = 0.0
+        self._current_player = "player_0"
+        self.log_constant(LOG_ADAPTER_ENV_RESET, extra={"env_id": self.id, "seed": seed if seed is not None else "None"})
+        obs, _, _, _, info = self._aec_env.last()
+        return self._package_step(obs, 0.0, False, False, dict(info))
+
+    def step(self, action: int) -> AdapterStep[Dict[str, Any]]:
+        if self._aec_env is None:
+            raise RuntimeError("Environment not loaded. Call load() first.")
+        self._last_action = action
+        self._move_count += 1
+        self._episode_step += 1
+        self._aec_env.step(action)
+        obs, reward, terminated, truncated, info = self._aec_env.last()
+        self._current_player = self._aec_env.agent_selection
+        self._episode_return += reward
+        self.log_constant(LOG_ADAPTER_STEP_SUMMARY, extra={"env_id": self.id, "episode_step": self._episode_step, "reward": reward})
+        return self._package_step(obs, reward, terminated, truncated, dict(info))
+
+    def close(self) -> None:
+        if self._aec_env is not None:
+            try:
+                self._aec_env.close()
+            except Exception:
+                pass
+        self._aec_env = None
+
+    def render(self) -> np.ndarray | None:
+        if self._aec_env is None:
+            return None
+        try:
+            return self._aec_env.render()
+        except Exception:
+            return None
+
+    def _package_step(self, observation: Dict[str, Any], reward: float, terminated: bool, truncated: bool, info: Mapping[str, Any]) -> AdapterStep[Dict[str, Any]]:
+        obs_data = observation.get("observation", observation)
+        action_mask = observation.get("action_mask", [1, 1, 1])
+        legal_actions = [i for i in range(len(action_mask)) if action_mask[i] == 1]
+
+        render_payload = CardGameRenderPayload(
+            game_type="rps",
+            current_player=self._current_player,
+            legal_actions=legal_actions,
+            last_action=self._last_action,
+            is_game_over=terminated,
+            move_count=self._move_count,
+        ).to_dict()
+
+        state = StepState(
+            active_agent=self._current_player,
+            agents=[AgentSnapshot(name="player_0", role="player"), AgentSnapshot(name="player_1", role="player")],
+            metrics={"move_count": self._move_count},
+            environment={"game": "rps"},
+        )
+
+        return AdapterStep(observation=observation, reward=reward, terminated=terminated, truncated=truncated, info=info,
+                          render_payload=render_payload, render_hint={"type": "card_game", "use_qt_widget": True},
+                          agent_id=self._current_player, state=state)
+
+    def gym_kwargs(self) -> dict[str, Any]:
+        return {}
+
+    def apply_wrappers(self, env: Any) -> Any:
+        return env
+
+    def _require_env(self) -> Any:
+        if self._aec_env is None:
+            raise RuntimeError("Environment not loaded.")
+        return self._aec_env
+
+    def _set_env(self, env: Any) -> None:
+        self._aec_env = env
+
+    def _resolve_default_render_mode(self) -> RenderMode:
+        return self.default_render_mode
+
+
+class PokerEnvironmentAdapter(EnvironmentAdapter[Dict[str, Any], int]):
+    """Adapter for PettingZoo poker games (Leduc Hold'em, Texas Hold'em)."""
+
+    def __init__(self, context: AdapterContext | None = None, game_type: str = "leduc_holdem") -> None:
+        super().__init__(context)
+        self._aec_env: Any = None
+        self._game_type = game_type
+        self._last_action: Optional[int] = None
+        self._move_count: int = 0
+        self._current_player: str = "player_0"
+
+    @property
+    def id(self) -> str:
+        return f"{self._game_type}_v4"
+
+    supported_control_modes = (ControlMode.HUMAN_ONLY,)
+    supported_render_modes = (RenderMode.RGB_ARRAY,)
+    default_render_mode = RenderMode.RGB_ARRAY
+
+    def load(self) -> None:
+        try:
+            if self._game_type == "leduc_holdem":
+                from pettingzoo.classic import leduc_holdem_v4
+                self._aec_env = leduc_holdem_v4.env(render_mode="rgb_array")
+            else:  # texas_holdem
+                from pettingzoo.classic import texas_holdem_v4
+                self._aec_env = texas_holdem_v4.env(render_mode="rgb_array")
+            self.log_constant(LOG_ADAPTER_ENV_CREATED, extra={"env_id": self.id, "render_mode": "rgb_array"})
+        except ImportError as e:
+            raise ImportError("PettingZoo Classic required: pip install 'pettingzoo[classic]'") from e
+
+    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None) -> AdapterStep[Dict[str, Any]]:
+        if self._aec_env is None:
+            raise RuntimeError("Environment not loaded. Call load() first.")
+        self._aec_env.reset(seed=seed)
+        self._last_action = None
+        self._move_count = 0
+        self._episode_step = 0
+        self._episode_return = 0.0
+        self._current_player = "player_0"
+        self.log_constant(LOG_ADAPTER_ENV_RESET, extra={"env_id": self.id, "seed": seed if seed is not None else "None"})
+        obs, _, _, _, info = self._aec_env.last()
+        return self._package_step(obs, 0.0, False, False, dict(info))
+
+    def step(self, action: int) -> AdapterStep[Dict[str, Any]]:
+        if self._aec_env is None:
+            raise RuntimeError("Environment not loaded. Call load() first.")
+        self._last_action = action
+        self._move_count += 1
+        self._episode_step += 1
+        self._aec_env.step(action)
+        obs, reward, terminated, truncated, info = self._aec_env.last()
+        self._current_player = self._aec_env.agent_selection
+        self._episode_return += reward
+        self.log_constant(LOG_ADAPTER_STEP_SUMMARY, extra={"env_id": self.id, "episode_step": self._episode_step, "reward": reward})
+        return self._package_step(obs, reward, terminated, truncated, dict(info))
+
+    def close(self) -> None:
+        if self._aec_env is not None:
+            try:
+                self._aec_env.close()
+            except Exception:
+                pass
+        self._aec_env = None
+
+    def render(self) -> np.ndarray | None:
+        if self._aec_env is None:
+            return None
+        try:
+            return self._aec_env.render()
+        except Exception:
+            return None
+
+    def _package_step(self, observation: Dict[str, Any], reward: float, terminated: bool, truncated: bool, info: Mapping[str, Any]) -> AdapterStep[Dict[str, Any]]:
+        obs_data = observation.get("observation", observation)
+        action_mask = observation.get("action_mask", [1, 1, 1, 1])
+        legal_actions = [i for i in range(len(action_mask)) if action_mask[i] == 1]
+
+        render_payload = CardGameRenderPayload(
+            game_type=self._game_type,
+            current_player=self._current_player,
+            legal_actions=legal_actions,
+            last_action=self._last_action,
+            is_game_over=terminated,
+            move_count=self._move_count,
+        ).to_dict()
+
+        state = StepState(
+            active_agent=self._current_player,
+            agents=[AgentSnapshot(name=f"player_{i}", role="player") for i in range(2)],
+            metrics={"move_count": self._move_count},
+            environment={"game": self._game_type},
+        )
+
+        return AdapterStep(observation=observation, reward=reward, terminated=terminated, truncated=truncated, info=info,
+                          render_payload=render_payload, render_hint={"type": "rgb", "use_rgb": True},
+                          agent_id=self._current_player, state=state)
+
+    def gym_kwargs(self) -> dict[str, Any]:
+        return {}
+
+    def apply_wrappers(self, env: Any) -> Any:
+        return env
+
+    def _require_env(self) -> Any:
+        if self._aec_env is None:
+            raise RuntimeError("Environment not loaded.")
+        return self._aec_env
+
+    def _set_env(self, env: Any) -> None:
+        self._aec_env = env
+
+    def _resolve_default_render_mode(self) -> RenderMode:
+        return self.default_render_mode
+
+
+class LeducHoldemEnvironmentAdapter(PokerEnvironmentAdapter):
+    """Adapter for Leduc Hold'em."""
+    id = GameId.LEDUC_HOLDEM.value
+
+    def __init__(self, context: AdapterContext | None = None) -> None:
+        super().__init__(context, game_type="leduc_holdem")
+
+
+class TexasHoldemEnvironmentAdapter(PokerEnvironmentAdapter):
+    """Adapter for Texas Hold'em."""
+    id = GameId.TEXAS_HOLDEM.value
+
+    def __init__(self, context: AdapterContext | None = None) -> None:
+        super().__init__(context, game_type="texas_holdem")
+
+
+class HanabiEnvironmentAdapter(EnvironmentAdapter[Dict[str, Any], int]):
+    """Adapter for PettingZoo Hanabi environment."""
+
+    id = GameId.HANABI.value
+    supported_control_modes = (ControlMode.HUMAN_ONLY,)
+    supported_render_modes = (RenderMode.RGB_ARRAY,)
+    default_render_mode = RenderMode.RGB_ARRAY
+
+    def __init__(self, context: AdapterContext | None = None) -> None:
+        super().__init__(context)
+        self._aec_env: Any = None
+        self._last_action: Optional[int] = None
+        self._move_count: int = 0
+        self._current_player: str = "player_0"
+
+    def load(self) -> None:
+        try:
+            from pettingzoo.classic import hanabi_v5
+            self._aec_env = hanabi_v5.env(render_mode="rgb_array")
+            self.log_constant(LOG_ADAPTER_ENV_CREATED, extra={"env_id": self.id, "render_mode": "rgb_array"})
+        except ImportError as e:
+            raise ImportError("PettingZoo Classic required: pip install 'pettingzoo[classic]'") from e
+
+    def reset(self, *, seed: int | None = None, options: dict[str, Any] | None = None) -> AdapterStep[Dict[str, Any]]:
+        if self._aec_env is None:
+            raise RuntimeError("Environment not loaded. Call load() first.")
+        self._aec_env.reset(seed=seed)
+        self._last_action = None
+        self._move_count = 0
+        self._episode_step = 0
+        self._episode_return = 0.0
+        self._current_player = "player_0"
+        self.log_constant(LOG_ADAPTER_ENV_RESET, extra={"env_id": self.id, "seed": seed if seed is not None else "None"})
+        obs, _, _, _, info = self._aec_env.last()
+        return self._package_step(obs, 0.0, False, False, dict(info))
+
+    def step(self, action: int) -> AdapterStep[Dict[str, Any]]:
+        if self._aec_env is None:
+            raise RuntimeError("Environment not loaded. Call load() first.")
+        self._last_action = action
+        self._move_count += 1
+        self._episode_step += 1
+        self._aec_env.step(action)
+        obs, reward, terminated, truncated, info = self._aec_env.last()
+        self._current_player = self._aec_env.agent_selection
+        self._episode_return += reward
+        self.log_constant(LOG_ADAPTER_STEP_SUMMARY, extra={"env_id": self.id, "episode_step": self._episode_step, "reward": reward})
+        return self._package_step(obs, reward, terminated, truncated, dict(info))
+
+    def close(self) -> None:
+        if self._aec_env is not None:
+            try:
+                self._aec_env.close()
+            except Exception:
+                pass
+        self._aec_env = None
+
+    def render(self) -> np.ndarray | None:
+        if self._aec_env is None:
+            return None
+        try:
+            return self._aec_env.render()
+        except Exception:
+            return None
+
+    def _package_step(self, observation: Dict[str, Any], reward: float, terminated: bool, truncated: bool, info: Mapping[str, Any]) -> AdapterStep[Dict[str, Any]]:
+        obs_data = observation.get("observation", observation)
+        action_mask = observation.get("action_mask", [])
+        legal_actions = [i for i in range(len(action_mask)) if action_mask[i] == 1]
+
+        render_payload = CardGameRenderPayload(
+            game_type="hanabi",
+            current_player=self._current_player,
+            legal_actions=legal_actions,
+            last_action=self._last_action,
+            is_game_over=terminated,
+            move_count=self._move_count,
+        ).to_dict()
+
+        state = StepState(
+            active_agent=self._current_player,
+            agents=[AgentSnapshot(name=f"player_{i}", role="player") for i in range(2)],
+            metrics={"move_count": self._move_count},
+            environment={"game": "hanabi"},
+        )
+
+        return AdapterStep(observation=observation, reward=reward, terminated=terminated, truncated=truncated, info=info,
+                          render_payload=render_payload, render_hint={"type": "rgb", "use_rgb": True},
+                          agent_id=self._current_player, state=state)
+
+    def gym_kwargs(self) -> dict[str, Any]:
+        return {}
+
+    def apply_wrappers(self, env: Any) -> Any:
+        return env
+
+    def _require_env(self) -> Any:
+        if self._aec_env is None:
+            raise RuntimeError("Environment not loaded.")
+        return self._aec_env
+
+    def _set_env(self, env: Any) -> None:
+        self._aec_env = env
+
+    def _resolve_default_render_mode(self) -> RenderMode:
+        return self.default_render_mode
+
+
 # Registry of PettingZoo Classic adapters
 PETTINGZOO_CLASSIC_ADAPTERS: Dict[GameId, type[EnvironmentAdapter]] = {
     GameId.CHESS: ChessEnvironmentAdapter,
     GameId.CONNECT_FOUR: ConnectFourEnvironmentAdapter,
     GameId.GO: GoEnvironmentAdapter,
+    GameId.RPS: RPSEnvironmentAdapter,
+    GameId.LEDUC_HOLDEM: LeducHoldemEnvironmentAdapter,
+    GameId.TEXAS_HOLDEM: TexasHoldemEnvironmentAdapter,
+    GameId.HANABI: HanabiEnvironmentAdapter,
 }
 
 
@@ -1098,5 +1476,11 @@ __all__ = [
     "ConnectFourRenderPayload",
     "GoEnvironmentAdapter",
     "GoRenderPayload",
+    "CardGameRenderPayload",
+    "RPSEnvironmentAdapter",
+    "PokerEnvironmentAdapter",
+    "LeducHoldemEnvironmentAdapter",
+    "TexasHoldemEnvironmentAdapter",
+    "HanabiEnvironmentAdapter",
     "PETTINGZOO_CLASSIC_ADAPTERS",
 ]

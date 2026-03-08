@@ -66,9 +66,9 @@ def get_mjpc_launcher() -> Any:
         if _mjpc_launcher is None:
             raise OptionalDependencyError(
                 package="MuJoCo MPC worker",
-                install_cmd="pip install -e 3rd_party/mujoco_mpc_worker",
+                install_cmd="pip install -e 3rd_party/workers/mujoco_mpc_worker",
                 extra_info="Also requires building the MJPC agent_server binary. "
-                "See: 3rd_party/mujoco_mpc_worker/mujoco_mpc/README.md"
+                "See: 3rd_party/workers/mujoco_mpc_worker/mujoco_mpc/README.md"
             )
         return _mjpc_launcher()
 
@@ -82,9 +82,9 @@ def get_mjpc_launcher() -> Any:
         _mjpc_launcher_loaded = True
         raise OptionalDependencyError(
             package="MuJoCo MPC worker",
-            install_cmd="pip install -e 3rd_party/mujoco_mpc_worker",
+            install_cmd="pip install -e 3rd_party/workers/mujoco_mpc_worker",
             extra_info="Also requires building the MJPC agent_server binary. "
-            "See: 3rd_party/mujoco_mpc_worker/mujoco_mpc/README.md"
+            "See: 3rd_party/workers/mujoco_mpc_worker/mujoco_mpc/README.md"
         )
 
 
@@ -129,8 +129,8 @@ def get_godot_launcher() -> Any:
         if _godot_launcher is None:
             raise OptionalDependencyError(
                 package="Godot worker",
-                install_cmd="pip install -e 3rd_party/godot_worker",
-                extra_info="Also requires the Godot binary in 3rd_party/godot_worker/bin/"
+                install_cmd="pip install -e 3rd_party/workers/godot_worker",
+                extra_info="Also requires the Godot binary in 3rd_party/workers/godot_worker/bin/"
             )
         return _godot_launcher()
 
@@ -144,8 +144,8 @@ def get_godot_launcher() -> Any:
         _godot_launcher_loaded = True
         raise OptionalDependencyError(
             package="Godot worker",
-            install_cmd="pip install -e 3rd_party/godot_worker",
-            extra_info="Also requires the Godot binary in 3rd_party/godot_worker/bin/"
+            install_cmd="pip install -e 3rd_party/workers/godot_worker",
+            extra_info="Also requires the Godot binary in 3rd_party/workers/godot_worker/bin/"
         )
 
 
@@ -310,7 +310,7 @@ def require_cleanrl() -> None:
     if not is_cleanrl_available():
         raise OptionalDependencyError(
             package="CleanRL worker",
-            install_cmd="pip install -e 3rd_party/cleanrl_worker && "
+            install_cmd="pip install -e 3rd_party/workers/cleanrl_worker && "
             "pip install -r requirements/workers/cleanrl.txt",
         )
 

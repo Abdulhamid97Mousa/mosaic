@@ -22,6 +22,7 @@ from dataclasses import dataclass, field
 from enum import IntEnum
 from typing import Any, Dict, List, Optional, Tuple
 
+import gymnasium as gym
 import numpy as np
 
 from gym_gui.core.adapters.base import (
@@ -704,6 +705,31 @@ class BaseDraughtsAdapter(EnvironmentAdapter[Dict[str, Any], int]):
         super().__init__(context)
         self._game: Optional[DraughtsGame] = None
         self._move_history: List[Move] = []
+
+    @property
+    def action_space(self) -> gym.Space[Any]:
+        """Return the action space for this draughts variant."""
+        # Maximum number of possible moves varies by board size
+        # 8x8 boards (American, Russian): ~256 moves max
+        # 10x10 boards (International): ~512 moves max
+        max_moves = 512 if self.GAME_CLASS.BOARD_SIZE == 10 else 256
+        return gym.spaces.Discrete(max_moves)
+
+    @property
+    def observation_space(self) -> gym.Space[Any]:
+        """Return the observation space for this draughts variant."""
+        board_size = self.GAME_CLASS.BOARD_SIZE
+        # Observation is a dictionary with board state and game info
+        # For simplicity, we define a Box space for the board
+        # The full observation includes additional metadata as a dict
+        return gym.spaces.Dict({
+            "board": gym.spaces.Box(
+                low=0, high=4, shape=(board_size, board_size), dtype=np.int32
+            ),
+            "current_player": gym.spaces.Discrete(2),
+            "is_game_over": gym.spaces.Discrete(2),
+            "move_count": gym.spaces.Box(low=0, high=1000, shape=(), dtype=np.int32),
+        })
 
     def load(self) -> None:
         """Load the draughts game."""

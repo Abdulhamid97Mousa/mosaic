@@ -642,6 +642,10 @@ class OperatorLauncher:
         env["OPERATOR_RUN_ID"] = run_id
         env["OPERATOR_ID"] = config.operator_id
 
+        # Pass view_size for MOSAIC MultiGrid environments (XuanCe worker)
+        if config.view_size is not None:
+            env["MOSAIC_VIEW_SIZE"] = str(config.view_size)
+
         LOGGER.info(
             "Launching operator %s (%s) with run_id=%s interactive=%s",
             config.operator_id,
@@ -758,6 +762,7 @@ class OperatorLauncher:
                 env_name="pettingzoo",  # Worker knows it's action-selector mode
                 task=game_name,
                 settings=worker_assignment.settings,
+                view_size=config.view_size,  # Pass view_size from multi-agent config
             )
 
             try:

@@ -45,6 +45,8 @@ class EnvironmentFamily(StrEnum):
     SMAC = "smac"  # SMAC v1: StarCraft Multi-Agent Challenge - hand-designed cooperative micromanagement maps
     SMACV2 = "smacv2"  # SMACv2: StarCraft Multi-Agent Challenge v2 - procedural unit generation
     RWARE = "rware"  # Robotic Warehouse: cooperative multi-agent shelf delivery
+    GRIDDLY = "griddly"  # Griddly: C++ backend high-performance grid world platform
+    HEMAC = "hemac"  # HeMAC: Heterogeneous Multi-Agent Challenge (ThalesGroup ECAI 2025)
     OTHER = "other"  # Fallback for unknown environments (not displayed in UI)
 
 
@@ -288,6 +290,11 @@ class GameId(StrEnum):
     CONNECT_FOUR = "connect_four_v3"
     GO = "go_v5"
     TIC_TAC_TOE = "tictactoe_v3"
+    # PettingZoo Classic Card/Poker Games
+    HANABI = "hanabi_v5"
+    LEDUC_HOLDEM = "leduc_holdem_v4"
+    RPS = "rps_v2"
+    TEXAS_HOLDEM = "texas_holdem_v4"
 
     # ─────────────────────────────────────────────────────────────────────────
     # MiniHack Environments (sandbox RL environments built on NLE)
@@ -572,7 +579,7 @@ class GameId(StrEnum):
     # Overcooked-AI (Cooperative Cooking - Human-AI Coordination)
     # Repository: https://github.com/HumanCompatibleAI/overcooked_ai
     # Paper: https://arxiv.org/abs/1910.05789 (NeurIPS 2019)
-    # Location: 3rd_party/overcooked_ai/
+    # Location: 3rd_party/environments/overcooked_ai/
     # ─────────────────────────────────────────────────────────────────────────
     OVERCOOKED_CRAMPED_ROOM = "overcooked/cramped_room"  # 2 agents, tight kitchen coordination
     OVERCOOKED_ASYMMETRIC_ADVANTAGES = "overcooked/asymmetric_advantages"  # 2 agents, asymmetric resource access
@@ -615,6 +622,57 @@ class GameId(StrEnum):
     RWARE_LARGE_4AG_HARD = "rware-large-4ag-hard-v2"
     RWARE_LARGE_8AG = "rware-large-8ag-v2"
     RWARE_LARGE_8AG_HARD = "rware-large-8ag-hard-v2"
+
+    # ── Griddly single-agent grid world environments (C++ / Vulkan backend) ──
+    GRIDDLY_ZELDA = "GDY-Zelda-v0"
+    GRIDDLY_ZELDA_SEQUENTIAL = "GDY-Zelda-Sequential-v0"
+    GRIDDLY_PO_ZELDA = "GDY-Partially-Observable-Zelda-v0"
+    GRIDDLY_SOKOBAN = "GDY-Sokoban-v0"
+    GRIDDLY_SOKOBAN_2 = "GDY-Sokoban---2-v0"
+    GRIDDLY_PO_SOKOBAN_2 = "GDY-Partially-Observable-Sokoban---2-v0"
+    GRIDDLY_CLUSTERS = "GDY-Clusters-v0"
+    GRIDDLY_PO_CLUSTERS = "GDY-Partially-Observable-Clusters-v0"
+    GRIDDLY_BAIT = "GDY-Bait-v0"
+    GRIDDLY_BAIT_WITH_KEYS = "GDY-Bait-With-Keys-v0"
+    GRIDDLY_PO_BAIT = "GDY-Partially-Observable-Bait-v0"
+    GRIDDLY_ZEN_PUZZLE = "GDY-Zen-Puzzle-v0"
+    GRIDDLY_PO_ZEN_PUZZLE = "GDY-Partially-Observable-Zen-Puzzle-v0"
+    GRIDDLY_LABYRINTH = "GDY-Labyrinth-v0"
+    GRIDDLY_PO_LABYRINTH = "GDY-Partially-Observable-Labyrinth-v0"
+    GRIDDLY_COOK_ME_PASTA = "GDY-Cook-Me-Pasta-v0"
+    GRIDDLY_PO_COOK_ME_PASTA = "GDY-Partially-Observable-Cook-Me-Pasta-v0"
+    GRIDDLY_SPIDERS = "GDY-Spiders-v0"
+    GRIDDLY_SPIDER_NEST = "GDY-Spider-Nest-v0"
+    GRIDDLY_BUTTERFLIES_AND_SPIDERS = "GDY-Butterflies-and-Spiders-v0"
+    GRIDDLY_RANDOM_BUTTERFLIES = "GDY-Random-butterflies-v0"
+    GRIDDLY_EYEBALL = "GDY-Eyeball-v0"
+    GRIDDLY_DRUNK_DWARF = "GDY-Drunk-Dwarf-v0"
+    GRIDDLY_DOGGO = "GDY-Doggo-v0"
+    # ── Griddly multi-agent RTS environments ────────────────────────
+    GRIDDLY_RTS = "GDY-GriddlyRTS-v0"
+    GRIDDLY_PUSH_MANIA = "GDY-Push-Mania-v0"
+    GRIDDLY_KILL_THE_KING = "GDY-Kill-The-King-v0"
+    GRIDDLY_HEAL_OR_DIE = "GDY-Heal-Or-Die-v0"
+    # ── Griddly multi-agent cooperative / competitive environments ───
+    GRIDDLY_ROBOT_TAG_4V4 = "GDY-Robot-Tag-4v4-v0"
+    GRIDDLY_ROBOT_TAG_8V8 = "GDY-Robot-Tag-8v8-v0"
+    GRIDDLY_ROBOT_TAG_12V12 = "GDY-Robot-Tag-12v12-v0"
+    GRIDDLY_FORAGERS = "GDY-Foragers-v0"
+
+    # ─────────────────────────────────────────────────────────────────────────
+    # HeMAC (Heterogeneous Multi-Agent Challenge) - ThalesGroup ECAI 2025
+    # ─────────────────────────────────────────────────────────────────────────
+    # Simple Fleet: Quadcopters + Observers (reach moving targets)
+    HEMAC_SIMPLE_FLEET_1Q1O = "hemac-simple-fleet-1q1o-v0"
+    HEMAC_SIMPLE_FLEET_3Q1O = "hemac-simple-fleet-3q1o-v0"
+    HEMAC_SIMPLE_FLEET_5Q2O = "hemac-simple-fleet-5q2o-v0"
+    # Fleet: Multi-target, energy constraints, obstacles, limited communication
+    HEMAC_FLEET_3Q1O = "hemac-fleet-3q1o-v0"
+    HEMAC_FLEET_10Q3O = "hemac-fleet-10q3o-v0"
+    HEMAC_FLEET_20Q5O = "hemac-fleet-20q5o-v0"
+    # Complex Fleet: High heterogeneity with Provisioners
+    HEMAC_COMPLEX_FLEET_3Q1O1P = "hemac-complex-fleet-3q1o1p-v0"
+    HEMAC_COMPLEX_FLEET_5Q2O1P = "hemac-complex-fleet-5q2o1p-v0"
 
 
 def get_game_display_name(game_id: GameId) -> str:
@@ -834,6 +892,20 @@ class SteppingParadigm(StrEnum):
     """
 
 
+# Griddly games that have continuous dynamics (moving enemies, spawning objects, etc.)
+# These games need idle ticking (GriddlyInteractionController) and state-based input.
+# Turn-based Griddly games (puzzles like Sokoban, Clusters, etc.) are NOT in this set.
+CONTINUOUS_GRIDDLY_GAMES: set[GameId] = {
+    GameId.GRIDDLY_SPIDERS,  # Port of MiniGrid Dynamic Obstacles with moving spiders
+    GameId.GRIDDLY_SPIDER_NEST,  # Moving spiders in a large nest
+    GameId.GRIDDLY_RANDOM_BUTTERFLIES,  # Butterflies and spiders spawn randomly
+    GameId.GRIDDLY_BUTTERFLIES_AND_SPIDERS,  # Moving butterflies and spiders
+    GameId.GRIDDLY_ZELDA,  # Navigate dungeons and avoid moving enemies
+    GameId.GRIDDLY_ZELDA_SEQUENTIAL,  # Sequential version with moving enemies
+    GameId.GRIDDLY_PO_ZELDA,  # Partially observable Zelda with moving enemies
+}
+
+
 ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.FROZEN_LAKE: EnvironmentFamily.TOY_TEXT,
     GameId.FROZEN_LAKE_V2: EnvironmentFamily.TOY_TEXT,
@@ -1048,6 +1120,10 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.CONNECT_FOUR: EnvironmentFamily.PETTINGZOO_CLASSIC,
     GameId.GO: EnvironmentFamily.PETTINGZOO_CLASSIC,
     GameId.TIC_TAC_TOE: EnvironmentFamily.PETTINGZOO_CLASSIC,
+    GameId.HANABI: EnvironmentFamily.PETTINGZOO_CLASSIC,
+    GameId.LEDUC_HOLDEM: EnvironmentFamily.PETTINGZOO_CLASSIC,
+    GameId.RPS: EnvironmentFamily.PETTINGZOO_CLASSIC,
+    GameId.TEXAS_HOLDEM: EnvironmentFamily.PETTINGZOO_CLASSIC,
     # MiniHack environments
     GameId.MINIHACK_ROOM_5X5: EnvironmentFamily.MINIHACK,
     GameId.MINIHACK_ROOM_15X15: EnvironmentFamily.MINIHACK,
@@ -1262,6 +1338,48 @@ ENVIRONMENT_FAMILY_BY_GAME: dict[GameId, EnvironmentFamily] = {
     GameId.RWARE_LARGE_4AG_HARD: EnvironmentFamily.RWARE,
     GameId.RWARE_LARGE_8AG: EnvironmentFamily.RWARE,
     GameId.RWARE_LARGE_8AG_HARD: EnvironmentFamily.RWARE,
+    # Griddly (C++ backend grid world platform)
+    GameId.GRIDDLY_ZELDA: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_ZELDA_SEQUENTIAL: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_PO_ZELDA: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_SOKOBAN: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_SOKOBAN_2: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_PO_SOKOBAN_2: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_CLUSTERS: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_PO_CLUSTERS: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_BAIT: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_BAIT_WITH_KEYS: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_PO_BAIT: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_ZEN_PUZZLE: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_PO_ZEN_PUZZLE: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_LABYRINTH: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_PO_LABYRINTH: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_COOK_ME_PASTA: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_PO_COOK_ME_PASTA: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_SPIDERS: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_SPIDER_NEST: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_BUTTERFLIES_AND_SPIDERS: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_RANDOM_BUTTERFLIES: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_EYEBALL: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_DRUNK_DWARF: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_DOGGO: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_RTS: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_PUSH_MANIA: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_KILL_THE_KING: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_HEAL_OR_DIE: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_ROBOT_TAG_4V4: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_ROBOT_TAG_8V8: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_ROBOT_TAG_12V12: EnvironmentFamily.GRIDDLY,
+    GameId.GRIDDLY_FORAGERS: EnvironmentFamily.GRIDDLY,
+    # HeMAC (Heterogeneous Multi-Agent Challenge)
+    GameId.HEMAC_SIMPLE_FLEET_1Q1O: EnvironmentFamily.HEMAC,
+    GameId.HEMAC_SIMPLE_FLEET_3Q1O: EnvironmentFamily.HEMAC,
+    GameId.HEMAC_SIMPLE_FLEET_5Q2O: EnvironmentFamily.HEMAC,
+    GameId.HEMAC_FLEET_3Q1O: EnvironmentFamily.HEMAC,
+    GameId.HEMAC_FLEET_10Q3O: EnvironmentFamily.HEMAC,
+    GameId.HEMAC_FLEET_20Q5O: EnvironmentFamily.HEMAC,
+    GameId.HEMAC_COMPLEX_FLEET_3Q1O1P: EnvironmentFamily.HEMAC,
+    GameId.HEMAC_COMPLEX_FLEET_5Q2O1P: EnvironmentFamily.HEMAC,
 }
 
 
@@ -1590,6 +1708,39 @@ DEFAULT_RENDER_MODES: dict[GameId, RenderMode] = {
     GameId.RWARE_LARGE_4AG_HARD: RenderMode.RGB_ARRAY,
     GameId.RWARE_LARGE_8AG: RenderMode.RGB_ARRAY,
     GameId.RWARE_LARGE_8AG_HARD: RenderMode.RGB_ARRAY,
+    # Griddly - always RGB array (Vulkan/sprite renderer)
+    GameId.GRIDDLY_ZELDA: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_ZELDA_SEQUENTIAL: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_PO_ZELDA: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_SOKOBAN: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_SOKOBAN_2: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_PO_SOKOBAN_2: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_CLUSTERS: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_PO_CLUSTERS: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_BAIT: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_BAIT_WITH_KEYS: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_PO_BAIT: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_ZEN_PUZZLE: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_PO_ZEN_PUZZLE: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_LABYRINTH: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_PO_LABYRINTH: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_COOK_ME_PASTA: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_PO_COOK_ME_PASTA: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_SPIDERS: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_SPIDER_NEST: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_BUTTERFLIES_AND_SPIDERS: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_RANDOM_BUTTERFLIES: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_EYEBALL: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_DRUNK_DWARF: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_DOGGO: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_RTS: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_PUSH_MANIA: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_KILL_THE_KING: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_HEAL_OR_DIE: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_ROBOT_TAG_4V4: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_ROBOT_TAG_8V8: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_ROBOT_TAG_12V12: RenderMode.RGB_ARRAY,
+    GameId.GRIDDLY_FORAGERS: RenderMode.RGB_ARRAY,
 }
 
 
@@ -2365,6 +2516,40 @@ DEFAULT_CONTROL_MODES: dict[GameId, Iterable[ControlMode]] = {
     GameId.RWARE_LARGE_4AG_HARD: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
     GameId.RWARE_LARGE_8AG: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
     GameId.RWARE_LARGE_8AG_HARD: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    # Griddly single-agent
+    GameId.GRIDDLY_ZELDA: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_ZELDA_SEQUENTIAL: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_PO_ZELDA: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_SOKOBAN: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_SOKOBAN_2: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_PO_SOKOBAN_2: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_CLUSTERS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_PO_CLUSTERS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_BAIT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_BAIT_WITH_KEYS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_PO_BAIT: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_ZEN_PUZZLE: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_PO_ZEN_PUZZLE: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_LABYRINTH: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_PO_LABYRINTH: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_COOK_ME_PASTA: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_PO_COOK_ME_PASTA: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_SPIDERS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_SPIDER_NEST: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_BUTTERFLIES_AND_SPIDERS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_RANDOM_BUTTERFLIES: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_EYEBALL: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_DRUNK_DWARF: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    GameId.GRIDDLY_DOGGO: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY),
+    # Griddly multi-agent (RTS + cooperative/competitive)
+    GameId.GRIDDLY_RTS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.GRIDDLY_PUSH_MANIA: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.GRIDDLY_KILL_THE_KING: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.GRIDDLY_HEAL_OR_DIE: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.GRIDDLY_ROBOT_TAG_4V4: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.GRIDDLY_ROBOT_TAG_8V8: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.GRIDDLY_ROBOT_TAG_12V12: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
+    GameId.GRIDDLY_FORAGERS: (ControlMode.HUMAN_ONLY, ControlMode.AGENT_ONLY, ControlMode.MULTI_AGENT_COOP),
 }
 
 
@@ -2402,6 +2587,7 @@ DEFAULT_PARADIGM_BY_FAMILY: dict[EnvironmentFamily, SteppingParadigm] = {
     EnvironmentFamily.SMAC: SteppingParadigm.SIMULTANEOUS,  # SMAC v1: all units act in parallel each timestep
     EnvironmentFamily.SMACV2: SteppingParadigm.SIMULTANEOUS,  # SMACv2: all units act in parallel (procedural gen)
     EnvironmentFamily.RWARE: SteppingParadigm.SIMULTANEOUS,  # RWARE: all robots act in parallel each timestep
+    EnvironmentFamily.GRIDDLY: SteppingParadigm.SINGLE_AGENT,  # Griddly: single-agent grid worlds (C++ backend)
     EnvironmentFamily.OTHER: SteppingParadigm.SINGLE_AGENT,  # Fallback
 }
 

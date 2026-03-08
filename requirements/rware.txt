@@ -1,10 +1,10 @@
 # Robotic Warehouse (RWARE) multi-agent cooperative environment
 # Paper: Papoudakis et al. (2021). "Benchmarking Multi-Agent Deep RL Algorithms"
 # Repository: https://github.com/uoe-agents/robotic-warehouse
-# Local source: 3rd_party/robotic-warehouse/
+# Local source: 3rd_party/environments/robotic-warehouse/
 #
 # Install from local source:
-#   pip install -e 3rd_party/robotic-warehouse/
+#   pip install -e 3rd_party/environments/robotic-warehouse/
 #
 # Or install from PyPI:
 #   pip install rware

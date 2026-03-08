@@ -6,7 +6,7 @@ from pathlib import Path
 
 _PACKAGE_ROOT = Path(__file__).resolve().parent.parent
 _REPO_ROOT = _PACKAGE_ROOT.parent
-_3RD_PARTY_ROOT = _REPO_ROOT / "3rd_party"
+_3RD_PARTY_ROOT = _REPO_ROOT / "3rd_party" / "workers"
 
 # Writable runtime artifacts (shared with worker stack). Prefer repo-level var/.
 VAR_ROOT = (_REPO_ROOT / "var").resolve()
@@ -41,6 +41,9 @@ VAR_SMAC_MAPS_DIR = VAR_SC2_DIR / "Maps" / "SMAC_Maps"  # SMAC v1 map files
 VAR_SMACV2_MAPS_DIR = VAR_SC2_DIR / "Maps" / "SMACv2_Maps"  # SMACv2 map files
 VAR_SMAC_REPLAYS_DIR = VAR_ROOT / "replay" / "smac"  # SMAC replay files (.SC2Replay)
 
+# Neural MMO generated maps (procedural terrain)
+VAR_NMMO_MAPS_DIR = VAR_DATA_DIR / "nmmo"
+
 # Custom training scripts directories
 CLEANRL_SCRIPTS_DIR = _3RD_PARTY_ROOT / "cleanrl_worker" / "cleanrl_worker" / "scripts"
 XUANCE_SCRIPTS_DIR = _3RD_PARTY_ROOT / "xuance_worker" / "xuance_worker" / "scripts"
@@ -72,6 +75,7 @@ def ensure_var_directories() -> None:
         VAR_BIN_DIR,
         VAR_EVALS_DIR,
         VAR_CUSTOM_SCRIPTS_DIR,
+        VAR_NMMO_MAPS_DIR,
         # VAR_SC2_ROOT is VAR_DATA_DIR (already created above); no extra mkdir needed.
         VAR_SMAC_REPLAYS_DIR,
     ):
@@ -107,6 +111,7 @@ __all__ = [
     "VAR_SMAC_REPLAYS_DIR",
     "VAR_EVALS_DIR",
     "VAR_CUSTOM_SCRIPTS_DIR",
+    "VAR_NMMO_MAPS_DIR",
     "CLEANRL_SCRIPTS_DIR",
     "XUANCE_SCRIPTS_DIR",
     "ensure_var_directories",
