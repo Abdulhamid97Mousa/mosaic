@@ -56,10 +56,16 @@ from .config import (
     RayWorkerConfig,
     load_worker_config,
 )
-from .runtime import (
-    EnvironmentFactory,
-    RayWorkerRuntime,
-)
+try:
+    from .runtime import (
+        EnvironmentFactory,
+        RayWorkerRuntime,
+    )
+    _RAY_AVAILABLE = True
+except ImportError:
+    EnvironmentFactory = None  # type: ignore[assignment,misc]
+    RayWorkerRuntime = None    # type: ignore[assignment,misc]
+    _RAY_AVAILABLE = False
 from .algo_params import (
     SCHEMA_VERSION,
     get_available_algorithms,
@@ -177,4 +183,6 @@ __all__ = [
     "main",
     # Worker Discovery
     "get_worker_metadata",
+    # Ray availability flag
+    "_RAY_AVAILABLE",
 ]
