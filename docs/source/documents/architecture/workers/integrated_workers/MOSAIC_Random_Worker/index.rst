@@ -35,7 +35,7 @@ For a deterministic do-nothing baseline, see the
    * - **GPU required**
      - No
    * - **Source**
-     - ``3rd_party/mosaic/random_worker/random_worker/``
+     - ``3rd_party/workers/mosaic/random_worker/random_worker/``
    * - **Entry point**
      - ``random-worker`` (CLI)
 

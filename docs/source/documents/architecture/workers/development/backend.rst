@@ -2,7 +2,7 @@ Backend: Worker Package
 =======================
 
 This guide walks through creating the backend package for a new
-MOSAIC worker under ``3rd_party/``.  By the end you will have a
+MOSAIC worker under ``3rd_party/workers/``.  By the end you will have a
 fully functional worker that the Daemon can spawn and that emits
 standardized JSONL telemetry.
 
@@ -37,8 +37,8 @@ Step 1: Create the Package
 
 .. code-block:: bash
 
-   mkdir -p 3rd_party/my_worker/my_worker
-   touch 3rd_party/my_worker/my_worker/__init__.py
+   mkdir -p 3rd_party/workers/my_worker/my_worker
+   touch 3rd_party/workers/my_worker/my_worker/__init__.py
 
 Step 2: Configuration (``config.py``)
 --------------------------------------
@@ -212,7 +212,7 @@ Then install in development mode:
 
 .. code-block:: bash
 
-   cd 3rd_party/my_worker
+   cd 3rd_party/workers/my_worker
    pip install -e .
 
 Step 6: CLI Entry Point (``cli.py``)
@@ -254,7 +254,7 @@ Create ``requirements/myworker.txt`` in the MOSAIC root:
 
    # My Worker dependencies
    mylib>=1.0.0
-   -e 3rd_party/my_worker
+   -e 3rd_party/workers/my_worker
 
 And add to MOSAIC's ``pyproject.toml`` optional dependencies:
 

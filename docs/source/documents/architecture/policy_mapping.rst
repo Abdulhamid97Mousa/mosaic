@@ -171,7 +171,7 @@ Example Configurations
 
    # All 4 agents share the same MAPPO checkpoint
    LinkGroup(
-       group_id="link_0",
+       group_id="operator_0_link_0",
        primary_agent="agent_0",
        linked_agents=["agent_1", "agent_2", "agent_3"],
        policy_path="/path/to/checkpoint/final_train_model.pth",
@@ -185,7 +185,7 @@ Example Configurations
 
    # Offense team (agents 0 and 2)
    LinkGroup(
-       group_id="link_0",
+       group_id="operator_0_link_0",
        primary_agent="agent_0",
        linked_agents=["agent_2"],
        policy_path="/path/to/offense_mappo.pth",
@@ -195,7 +195,7 @@ Example Configurations
 
    # Defense team (agents 1 and 3)
    LinkGroup(
-       group_id="link_1",
+       group_id="operator_0_link_1",
        primary_agent="agent_1",
        linked_agents=["agent_3"],
        policy_path="/path/to/defense_mappo.pth",
@@ -209,7 +209,7 @@ Example Configurations
 
    # Only agents 0 and 1 are linked
    LinkGroup(
-       group_id="link_0",
+       group_id="operator_0_link_0",
        primary_agent="agent_0",
        linked_agents=["agent_1"],
        policy_path="/path/to/checkpoint/final_train_model.pth",

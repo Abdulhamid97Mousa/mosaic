@@ -1,0 +1,31 @@
+# Neural MMO: A massively multiagent game environment for reinforcement learning
+# Paper: https://arxiv.org/abs/1903.00784
+# Repository: https://github.com/NeuralMMO/environment
+# Documentation: https://neuralmmo.github.io/
+
+# IMPORTANT: Neural MMO requires Python <3.11 (MOSAIC supports >=3.10,<3.13)
+# If using Python 3.11+, you may encounter compatibility issues
+
+# Installation from local 3rd_party directory
+# Run: pip install -e 3rd_party/environment
+
+# Core dependencies (from Neural MMO setup.py)
+cython>=3.0.0
+numpy>=1.23.3
+scipy>=1.10.0
+imageio>=2.27
+ordered-set==4.1.0
+pettingzoo>=1.24.1
+gymnasium>=0.29.1
+psutil>=5.9.0
+tqdm>=4.0.0
+dill>=0.3.0
+
+# NOTE: Neural MMO has a Cython extension that needs compilation
+# The extension is built automatically during pip install
+
+# System dependencies (Ubuntu/Debian):
+# sudo apt-get install build-essential python3-dev
+
+# Baselines (optional - for training examples)
+# Run: pip install -e 3rd_party/baselines

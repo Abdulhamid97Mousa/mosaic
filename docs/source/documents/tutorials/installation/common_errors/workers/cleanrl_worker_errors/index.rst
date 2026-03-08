@@ -13,7 +13,7 @@ Installation Errors
 ``error: package directory 'cleanrl/cleanrl' does not exist``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-**Error (when running** ``pip install -e 3rd_party/cleanrl_worker`` **):**
+**Error (when running** ``pip install -e 3rd_party/workers/cleanrl_worker`` **):**
 
 .. code-block:: text
 
@@ -25,7 +25,7 @@ Installation Errors
 **Cause:** The CleanRL worker package (``mosaic-cleanrl``) bundles both the
 MOSAIC harness (``cleanrl_worker/``) and the upstream CleanRL library source
 code (``cleanrl/cleanrl/``, ``cleanrl/cleanrl_utils/``).  The upstream source
-lives in a **git submodule** at ``3rd_party/cleanrl_worker/cleanrl/``.
+lives in a **git submodule** at ``3rd_party/workers/cleanrl_worker/cleanrl/``.
 
 If the submodule was never initialised, or if the directory is empty, pip
 cannot find the mapped package directories and the build fails.
@@ -36,16 +36,16 @@ cannot find the mapped package directories and the build fails.
 
    # 1. Initialise the CleanRL submodule
    cd /path/to/mosaic
-   git submodule update --init 3rd_party/cleanrl_worker/cleanrl
+   git submodule update --init 3rd_party/workers/cleanrl_worker/cleanrl
 
    # If the above fails with "did not match any file(s) known to git",
    # clone the submodule manually:
    git clone --depth 1 https://github.com/vwxyzjn/cleanrl.git \
-       3rd_party/cleanrl_worker/cleanrl
+       3rd_party/workers/cleanrl_worker/cleanrl
 
    # 2. Install the worker in editable mode
    source .venv/bin/activate
-   pip install -e 3rd_party/cleanrl_worker
+   pip install -e 3rd_party/workers/cleanrl_worker
 
    # 3. Verify
    python -c "import cleanrl_worker; print('cleanrl_worker OK')"
@@ -65,8 +65,8 @@ cannot find the mapped package directories and the build fails.
       pip install -e ".[cleanrl]"
 
       # Step B: CleanRL source submodule
-      git submodule update --init 3rd_party/cleanrl_worker/cleanrl
-      pip install -e 3rd_party/cleanrl_worker
+      git submodule update --init 3rd_party/workers/cleanrl_worker/cleanrl
+      pip install -e 3rd_party/workers/cleanrl_worker
 
 ``ModuleNotFoundError: No module named 'cleanrl'``
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -78,7 +78,7 @@ cannot find the mapped package directories and the build fails.
    ModuleNotFoundError: No module named 'cleanrl'
 
 **Cause:** Same root cause as above.  The ``cleanrl`` Python package is
-provided by the git submodule at ``3rd_party/cleanrl_worker/cleanrl/``, not
+provided by the git submodule at ``3rd_party/workers/cleanrl_worker/cleanrl/``, not
 by PyPI.  The worker harness (``cleanrl_worker``) was installed but the
 upstream library was not.
 

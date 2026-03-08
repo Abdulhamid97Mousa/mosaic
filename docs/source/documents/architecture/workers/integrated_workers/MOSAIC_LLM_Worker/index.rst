@@ -47,7 +47,7 @@ within the MOSAIC :doc:`Operator <../../concept>` framework.
    * - **GPU required**
      - No (API-based) / Optional (vLLM local inference)
    * - **Source**
-     - ``3rd_party/mosaic/llm_worker/llm_worker/``
+     - ``3rd_party/workers/mosaic/llm_worker/llm_worker/``
    * - **Entry point**
      - ``llm-worker`` (CLI)
 

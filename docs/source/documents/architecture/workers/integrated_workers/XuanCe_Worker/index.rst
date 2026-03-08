@@ -35,7 +35,7 @@ configuration.
    * - **GPU required**
      - No (optional CUDA acceleration)
    * - **Source**
-     - ``3rd_party/xuance_worker/xuance_worker/``
+     - ``3rd_party/workers/xuance_worker/xuance_worker/``
 
 .. note::
 

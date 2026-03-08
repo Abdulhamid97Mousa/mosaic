@@ -2,7 +2,7 @@ Developing an Operator
 ======================
 
 This guide walks through creating a new operator type for MOSAIC.
-Unlike Workers (which are standalone packages in ``3rd_party/``),
+Unlike Workers (which are standalone packages in ``3rd_party/workers/``),
 Operators are lightweight, they need an ``InteractiveRuntime`` inside
 an existing worker subprocess plus a few GUI integration points.
 
@@ -39,7 +39,7 @@ decision-making logic, and writes JSON responses to stdout.
 
 .. code-block:: python
 
-   # 3rd_party/my_worker/my_worker/runtime.py
+   # 3rd_party/workers/my_worker/my_worker/runtime.py
 
    import json
    import sys
@@ -189,7 +189,7 @@ Add the interactive mode flag to your worker's CLI entry point:
 
 .. code-block:: python
 
-   # 3rd_party/my_worker/my_worker/cli.py
+   # 3rd_party/workers/my_worker/my_worker/cli.py
 
    import argparse
 

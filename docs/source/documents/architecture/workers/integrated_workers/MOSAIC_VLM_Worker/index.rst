@@ -31,7 +31,7 @@ solely on text descriptions generated from grid arrays.
    * - **GPU required**
      - No (API-based) / Optional (vLLM local inference)
    * - **Source**
-     - ``3rd_party/mosaic/vlm_worker/vlm_worker/``
+     - ``3rd_party/workers/mosaic/vlm_worker/vlm_worker/``
    * - **Entry point**
      - ``vlm-worker`` (CLI)
 

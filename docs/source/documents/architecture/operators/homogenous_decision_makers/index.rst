@@ -385,8 +385,8 @@ method:
        # Link groups enable one-to-many policy mapping
        # (all agents share the same checkpoint, preventing manual copy-paste errors)
        link_groups={
-           "link_0": LinkGroup(
-               group_id="link_0",
+           "operator_0_link_0": LinkGroup(
+               group_id="operator_0_link_0",
                primary_agent="agent_0",
                linked_agents=["agent_1", "agent_2", "agent_3"],
                policy_path="/path/to/mappo_2v2_checkpoint.pth",

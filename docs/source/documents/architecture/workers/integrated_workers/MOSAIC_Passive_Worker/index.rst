@@ -46,7 +46,7 @@ deterministically takes no action, making it ideal for:
    * - **GPU required**
      - No
    * - **Source**
-     - ``3rd_party/mosaic/passive_worker/passive_worker/``
+     - ``3rd_party/workers/mosaic/passive_worker/passive_worker/``
    * - **Entry point**
      - ``passive-worker`` (CLI)
 
@@ -247,7 +247,7 @@ Installation
 
 .. code-block:: bash
 
-   cd 3rd_party/mosaic/passive_worker
+   cd 3rd_party/workers/mosaic/passive_worker
    pip install -e .
 
 .. toctree::

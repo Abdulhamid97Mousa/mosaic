@@ -45,7 +45,7 @@ The Chess LLM Worker follows the standard MOSAIC
 
 .. code-block:: text
 
-   3rd_party/chess_worker/
+   3rd_party/workers/chess_worker/
    ├── chess_worker/
    │   ├── __init__.py      # package metadata & get_worker_metadata()
    │   ├── cli.py           # CLI entry point (chess-worker command)
@@ -206,7 +206,7 @@ Installation
 .. code-block:: bash
 
    # From the MOSAIC root
-   pip install -e "3rd_party/chess_worker[chess]"
+   pip install -e "3rd_party/workers/chess_worker[chess]"
 
    # This installs: python-chess, pettingzoo[classic], openai
 

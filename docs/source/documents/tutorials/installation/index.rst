@@ -182,7 +182,7 @@ Choose your installation based on your use case:
       .. code-block:: bash
 
          pip install -r requirements/mosaic_llm_worker.txt
-         pip install -e 3rd_party/mosaic/llm_worker
+         pip install -e 3rd_party/workers/mosaic/llm_worker
 
    .. tab:: MOSAIC VLM
 
@@ -191,7 +191,7 @@ Choose your installation based on your use case:
       .. code-block:: bash
 
          pip install -r requirements/mosaic_vlm_worker.txt
-         pip install -e 3rd_party/mosaic/vlm_worker
+         pip install -e 3rd_party/workers/mosaic/vlm_worker
 
    .. tab:: Baselines
 
@@ -199,9 +199,9 @@ Choose your installation based on your use case:
 
       .. code-block:: bash
 
-         pip install -e 3rd_party/mosaic/random_worker
-         pip install -e 3rd_party/mosaic/passive_worker
-         pip install -e 3rd_party/mosaic/human_worker
+         pip install -e 3rd_party/workers/mosaic/random_worker
+         pip install -e 3rd_party/workers/mosaic/passive_worker
+         pip install -e 3rd_party/workers/mosaic/human_worker
 
    .. tab:: Full Development
 
@@ -603,29 +603,29 @@ LLM-based agents using OpenRouter (cloud) or vLLM (local GPU).
 MOSAIC Native Workers
 ^^^^^^^^^^^^^^^^^^^^^
 
-MOSAIC ships five native worker packages in ``3rd_party/mosaic/``.
+MOSAIC ships five native worker packages in ``3rd_party/workers/mosaic/``.
 These cover human, LLM, VLM, random-baseline, and passive-baseline paradigms:
 
 .. code-block:: bash
 
    # Human Worker (human-in-the-loop action selection via GUI)
-   pip install -e 3rd_party/mosaic/human_worker/
+   pip install -e 3rd_party/workers/mosaic/human_worker/
 
    # LLM Worker (multi-agent LLM coordination with Theory of Mind)
    pip install -r requirements/mosaic_llm_worker.txt
-   pip install -e 3rd_party/mosaic/llm_worker/
+   pip install -e 3rd_party/workers/mosaic/llm_worker/
 
    # VLM Worker (vision-language model agents with image observations)
    pip install -r requirements/mosaic_vlm_worker.txt
-   pip install -e 3rd_party/mosaic/vlm_worker/
+   pip install -e 3rd_party/workers/mosaic/vlm_worker/
 
    # Random Worker (uniform random action baseline)
    pip install -r requirements/mosaic_random_worker.txt
-   pip install -e 3rd_party/mosaic/random_worker/
+   pip install -e 3rd_party/workers/mosaic/random_worker/
 
    # Passive Worker (deterministic noop/still baseline)
    pip install -r requirements/mosaic_passive_worker.txt
-   pip install -e 3rd_party/mosaic/passive_worker/
+   pip install -e 3rd_party/workers/mosaic/passive_worker/
 
 .. list-table::
    :widths: 20 55 25
@@ -667,8 +667,8 @@ Model Predictive Control with MuJoCo physics.
 
    pip install -e ".[mujoco-mpc]"
 
-   # The MPC binary is pre-built in 3rd_party/mujoco_mpc_worker/bin/
-   # Or build from source — see 3rd_party/mujoco_mpc_worker/README.md
+   # The MPC binary is pre-built in 3rd_party/workers/mujoco_mpc_worker/bin/
+   # Or build from source — see 3rd_party/workers/mujoco_mpc_worker/README.md
 
 Special Setup: StarCraft II (SMAC / SMACv2)
 -------------------------------------------
@@ -724,29 +724,29 @@ Both SMAC and SMACv2 require the StarCraft II game binary.
 Special Setup: Local 3rd-Party Packages
 ---------------------------------------
 
-Some environment families and workers install from local source in ``3rd_party/``
+Some environment families and workers install from local source in ``3rd_party/`` (workers, environments, tools)
 rather than PyPI:
 
 .. code-block:: bash
 
    # MOSAIC MultiGrid (competitive team sports)
-   pip install -e 3rd_party/mosaic_multigrid/
+   pip install -e 3rd_party/environments/mosaic_multigrid/
 
    # INI MultiGrid (cooperative exploration)
-   pip install -e 3rd_party/multigrid-ini/
+   pip install -e 3rd_party/environments/multigrid-ini/
 
    # Overcooked-AI (cooperative cooking)
-   pip install -e 3rd_party/overcooked_ai/
+   pip install -e 3rd_party/environments/overcooked_ai/
 
    # RWARE (warehouse delivery)
-   pip install -e 3rd_party/robotic-warehouse/
+   pip install -e 3rd_party/environments/robotic-warehouse/
 
    # MOSAIC Native Workers (see "MOSAIC Native Workers" section above)
-   pip install -e 3rd_party/mosaic/human_worker/
-   pip install -r requirements/mosaic_llm_worker.txt && pip install -e 3rd_party/mosaic/llm_worker/
-   pip install -r requirements/mosaic_vlm_worker.txt && pip install -e 3rd_party/mosaic/vlm_worker/
-   pip install -r requirements/mosaic_random_worker.txt && pip install -e 3rd_party/mosaic/random_worker/
-   pip install -r requirements/mosaic_passive_worker.txt && pip install -e 3rd_party/mosaic/passive_worker/
+   pip install -e 3rd_party/workers/mosaic/human_worker/
+   pip install -r requirements/mosaic_llm_worker.txt && pip install -e 3rd_party/workers/mosaic/llm_worker/
+   pip install -r requirements/mosaic_vlm_worker.txt && pip install -e 3rd_party/workers/mosaic/vlm_worker/
+   pip install -r requirements/mosaic_random_worker.txt && pip install -e 3rd_party/workers/mosaic/random_worker/
+   pip install -r requirements/mosaic_passive_worker.txt && pip install -e 3rd_party/workers/mosaic/passive_worker/
 
 .. note::
 
@@ -879,7 +879,7 @@ Overcooked with Python 3.11+, create a separate virtual environment:
    python3.10 -m venv .venv-overcooked
    source .venv-overcooked/bin/activate
    pip install -e ".[overcooked]"
-   pip install -e 3rd_party/overcooked_ai/
+   pip install -e 3rd_party/environments/overcooked_ai/
 
 Dependency Conflicts
 ^^^^^^^^^^^^^^^^^^^^

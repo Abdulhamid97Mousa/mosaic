@@ -34,7 +34,7 @@ flexible policy configurations including self-play and independent learning.
    * - **GPU required**
      - No (optional CUDA acceleration)
    * - **Source**
-     - ``3rd_party/ray_worker/ray_worker/``
+     - ``3rd_party/workers/ray_worker/ray_worker/``
 
 Architecture
 ------------

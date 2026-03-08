@@ -203,7 +203,7 @@ ini_multigrid not available -- cannot preview
 
    ini_multigrid not available - cannot preview: No module named 'multigrid'
 
-**Cause:** The INI multigrid package (``3rd_party/multigrid-ini``) is not on
+**Cause:** The INI multigrid package (``3rd_party/environments/multigrid-ini``) is not on
 the Python path or the submodule was not initialized.
 
 **Fix -- Option A (recommended): Install via pyproject.toml:**
@@ -221,10 +221,10 @@ the Python path or the submodule was not initialized.
    source .venv/bin/activate
 
    # Initialize the submodule if the directory is empty
-   git submodule update --init 3rd_party/multigrid-ini
+   git submodule update --init 3rd_party/environments/multigrid-ini
 
    # Install in editable mode
-   pip install -e 3rd_party/multigrid-ini
+   pip install -e 3rd_party/environments/multigrid-ini
 
 -----
 

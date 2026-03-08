@@ -3,7 +3,7 @@ RWARE (Robotic Warehouse)
 
 Cooperative multi-agent shelf delivery in a simulated warehouse.
 
-:Install: ``pip install -e 3rd_party/robotic-warehouse/``
+:Install: ``pip install -e 3rd_party/environments/robotic-warehouse/``
 :Paradigm: Multi-agent (simultaneous)
 :Stepping: ``SIMULTANEOUS``
 

@@ -85,15 +85,15 @@ Syllabus-RL Setup (Curriculum Learning)
 ---------------------------------------
 
 Curriculum training requires `Syllabus-RL <https://github.com/RyanNavillus/Syllabus>`_,
-which is vendored as a Git submodule under ``3rd_party/Syllabus/``.
+which is vendored as a Git submodule under ``3rd_party/tools/Syllabus/``.
 
 .. code-block:: bash
 
    # Initialize the submodule (first time only)
-   git submodule update --init 3rd_party/Syllabus
+   git submodule update --init 3rd_party/tools/Syllabus
 
    # Install Syllabus in editable mode
-   pip install -e 3rd_party/Syllabus
+   pip install -e 3rd_party/tools/Syllabus
 
 After installation, the following imports should succeed:
 

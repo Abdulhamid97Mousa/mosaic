@@ -106,6 +106,8 @@ customize it for your setup:
    nano .env
    # or: code .env, vim .env, etc.
 
+.. _required-api-keys-ubuntu:
+
 Required API Keys
 ^^^^^^^^^^^^^^^^^
 
@@ -163,49 +165,49 @@ Key settings to verify:
 Install Local 3rd-Party Packages
 ---------------------------------
 
-Some environments install from local source in ``3rd_party/``:
+Some environments install from local source in ``3rd_party/`` (workers, environments, tools):
 
 .. code-block:: bash
 
    # MOSAIC MultiGrid (competitive team sports)
-   pip install -e 3rd_party/mosaic_multigrid/
+   pip install -e 3rd_party/environments/mosaic_multigrid/
 
    # INI MultiGrid (cooperative exploration)
-   pip install -e 3rd_party/multigrid-ini/
+   pip install -e 3rd_party/environments/multigrid-ini/
 
    # Overcooked-AI (cooperative cooking)
-   pip install -e 3rd_party/overcooked_ai/
+   pip install -e 3rd_party/environments/overcooked_ai/
 
    # RWARE (warehouse delivery)
-   pip install -e 3rd_party/robotic-warehouse/
+   pip install -e 3rd_party/environments/robotic-warehouse/
 
 Install MOSAIC Native Workers
 ------------------------------
 
-MOSAIC ships five native worker packages in ``3rd_party/mosaic/``.
+MOSAIC ships five native worker packages in ``3rd_party/workers/mosaic/``.
 These workers cover human, LLM, VLM, random-baseline, and passive-baseline
 paradigms:
 
 .. code-block:: bash
 
    # Human Worker (human-in-the-loop action selection via GUI)
-   pip install -e 3rd_party/mosaic/human_worker/
+   pip install -e 3rd_party/workers/mosaic/human_worker/
 
    # LLM Worker (multi-agent LLM coordination with Theory of Mind)
    pip install -r requirements/mosaic_llm_worker.txt
-   pip install -e 3rd_party/mosaic/llm_worker/
+   pip install -e 3rd_party/workers/mosaic/llm_worker/
 
    # VLM Worker (vision-language model agents with image observations)
    pip install -r requirements/mosaic_vlm_worker.txt
-   pip install -e 3rd_party/mosaic/vlm_worker/
+   pip install -e 3rd_party/workers/mosaic/vlm_worker/
 
    # Random Worker (uniform random action baseline)
    pip install -r requirements/mosaic_random_worker.txt
-   pip install -e 3rd_party/mosaic/random_worker/
+   pip install -e 3rd_party/workers/mosaic/random_worker/
 
    # Passive Worker (deterministic noop/still baseline)
    pip install -r requirements/mosaic_passive_worker.txt
-   pip install -e 3rd_party/mosaic/passive_worker/
+   pip install -e 3rd_party/workers/mosaic/passive_worker/
 
 .. list-table::
    :widths: 25 75
@@ -236,7 +238,7 @@ paradigms:
       # For OpenRouter (recommended - access to multiple models)
       OPENROUTER_API_KEY=sk-or-v1-your_key_here
 
-   See the :ref:`Required API Keys <required-api-keys>` section above.
+   See the :ref:`Required API Keys <required-api-keys-ubuntu>` section above.
 
    Each worker also has a matching requirements file in ``requirements/``
    (e.g., ``requirements/mosaic_llm_worker.txt``) for fine-grained

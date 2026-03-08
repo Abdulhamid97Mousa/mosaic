@@ -37,7 +37,7 @@ Operator vs Worker
    * - **Worker**
      - A *process-level* execution unit inside an Operator.
        Manages library lifecycle, API calls, or scripted behaviors.
-       Lives in ``3rd_party/`` and communicates via stdin/stdout JSON.
+       Lives in ``3rd_party/workers/`` and communicates via stdin/stdout JSON.
      - ``balrog_worker``, ``cleanrl_worker``, ``xuance_worker``,
        ``ray_worker``, ``llm_worker``, ``vlm_worker``,
        ``random_worker``, ``passive_worker``, ``human_worker``
@@ -255,7 +255,7 @@ Agents" button in the GUI.
 
    # All 4 agents share the same MAPPO checkpoint
    LinkGroup(
-       group_id="link_0",
+       group_id="operator_0_link_0",
        primary_agent="agent_0",
        linked_agents=["agent_1", "agent_2", "agent_3"],
        policy_path="/path/to/checkpoint/final_train_model.pth",
@@ -268,7 +268,7 @@ Agents" button in the GUI.
 
    # Offense team (agents 0 and 2)
    LinkGroup(
-       group_id="link_0",
+       group_id="operator_0_link_0",
        primary_agent="agent_0",
        linked_agents=["agent_2"],
        policy_path="/path/to/offense_mappo.pth",
@@ -277,7 +277,7 @@ Agents" button in the GUI.
 
    # Defense team (agents 1 and 3)
    LinkGroup(
-       group_id="link_1",
+       group_id="operator_0_link_1",
        primary_agent="agent_1",
        linked_agents=["agent_3"],
        policy_path="/path/to/defense_mappo.pth",

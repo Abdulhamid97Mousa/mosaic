@@ -22,7 +22,7 @@ configuration.
    * - **GPU required**
      - No (optional CUDA acceleration)
    * - **Source**
-     - ``3rd_party/cleanrl_worker/cleanrl_worker/``
+     - ``3rd_party/workers/cleanrl_worker/cleanrl_worker/``
 
 Architecture
 ------------

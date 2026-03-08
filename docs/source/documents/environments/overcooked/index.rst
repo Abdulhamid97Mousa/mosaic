@@ -11,7 +11,7 @@ Overcooked
 
 Cooperative cooking game for studying human-AI coordination.
 
-:Install: ``pip install -e 3rd_party/overcooked_ai/``
+:Install: ``pip install -e 3rd_party/environments/overcooked_ai/``
 :Paradigm: Multi-agent (simultaneous, 2 agents)
 :Stepping: ``SIMULTANEOUS``
 :Note: **Python 3.10 only** (requires >=3.10,<3.11)

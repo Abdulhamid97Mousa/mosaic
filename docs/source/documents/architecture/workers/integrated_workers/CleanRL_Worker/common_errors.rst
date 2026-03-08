@@ -149,8 +149,8 @@ curriculum training mode and is vendored as a Git submodule.
 
 .. code-block:: bash
 
-   git submodule update --init 3rd_party/Syllabus
-   pip install -e 3rd_party/Syllabus
+   git submodule update --init 3rd_party/tools/Syllabus
+   pip install -e 3rd_party/tools/Syllabus
 
 **``jq: command not found`` in curriculum scripts**
 
