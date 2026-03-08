@@ -6,7 +6,7 @@ them in pots, waiting for them to cook, and delivering the finished soups.
 
 Repository: https://github.com/HumanCompatibleAI/overcooked_ai
 Paper: https://arxiv.org/abs/1910.05789 (NeurIPS 2019)
-Location: 3rd_party/overcooked_ai/
+Location: 3rd_party/environments/overcooked_ai/
 
 Key characteristics:
 - Multi-agent: 2 agents cooperating
@@ -146,7 +146,7 @@ class OvercookedAdapter(EnvironmentAdapter[List[np.ndarray], List[int]]):
         if OvercookedGridworld is None or OvercookedEnv is None:
             raise RuntimeError(
                 "overcooked_ai package not installed. "
-                "Install from: 3rd_party/overcooked_ai/"
+                "Install from: 3rd_party/environments/overcooked_ai/"
             )
 
         try:

@@ -3,7 +3,7 @@ INI MultiGrid
 
 Cooperative exploration multi-agent environments with ``view_size=7``.
 
-:Install: ``pip install -e 3rd_party/multigrid-ini/``
+:Install: ``pip install -e 3rd_party/environments/multigrid-ini/``
 :Paradigm: Multi-agent (simultaneous)
 :Stepping: ``SIMULTANEOUS``
 

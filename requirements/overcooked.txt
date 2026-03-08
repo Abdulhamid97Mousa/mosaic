@@ -31,7 +31,7 @@
 #   https://github.com/HumanCompatibleAI/overcooked_ai
 #
 # LOCAL INSTALLATION (from 3rd_party):
-#   pip install -e 3rd_party/overcooked_ai/
+#   pip install -e 3rd_party/environments/overcooked_ai/
 #
 # IMPORTANT NOTES:
 #   - **Python 3.10 ONLY** - overcooked_ai requires Python >=3.10,<3.11
@@ -46,7 +46,7 @@
 -r base.txt
 
 # Overcooked-AI requires installation from local 3rd_party directory:
-#   pip install -e 3rd_party/overcooked_ai/
+#   pip install -e 3rd_party/environments/overcooked_ai/
 #
 # Core Dependencies (installed automatically):
 dill

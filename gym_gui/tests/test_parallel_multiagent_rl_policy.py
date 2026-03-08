@@ -304,7 +304,7 @@ class TestInteractiveRuntimePlayerIdRouting:
     def _make_runtime(self, method: str = "ippo") -> Any:
         """Build a minimal InteractiveRuntime without touching stdin/stdout."""
         import sys
-        sys.path.insert(0, "3rd_party/xuance_worker")
+        sys.path.insert(0, "3rd_party/workers/xuance_worker")
         from xuance_worker.runtime import InteractiveConfig, InteractiveRuntime
 
         config = InteractiveConfig(

@@ -53,4 +53,4 @@ autorom[accept-rom-license]==0.6.1
 
 # Curriculum Learning (algorithm-agnostic, works with CleanRL, XuanCe, RLlib, etc.)
 # Syllabus-RL provides TaskWrapper for switching environments during training
--e ./3rd_party/Syllabus
+-e ./3rd_party/tools/Syllabus

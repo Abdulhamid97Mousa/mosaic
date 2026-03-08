@@ -2740,6 +2740,88 @@ LOG_OP_GRID_CONFIG_ENV_INIT_CUSTOM = _constant(
     tags=_tags("operators", "grid_config", "env", "init"),
 )
 
+# Agent Linking constants (LOG809-LOG819)
+LOG_OP_AGENT_LINK_DIALOG_OPENED = _constant(
+    "LOG809",
+    "INFO",
+    "Agent link dialog opened",
+    component="Operators",
+    subcomponent="OperatorConfigWidget",
+    tags=_tags("operators", "agent_link", "dialog", "open"),
+)
+
+LOG_OP_AGENT_LINK_GROUP_CREATED = _constant(
+    "LOG810",
+    "INFO",
+    "Agent link group created",
+    component="Operators",
+    subcomponent="OperatorConfigWidget",
+    tags=_tags("operators", "agent_link", "group", "create"),
+)
+
+LOG_OP_AGENT_LINKED = _constant(
+    "LOG811",
+    "INFO",
+    "Agent added to link group",
+    component="Operators",
+    subcomponent="OperatorConfigWidget",
+    tags=_tags("operators", "agent_link", "add"),
+)
+
+LOG_OP_AGENT_UNLINKED = _constant(
+    "LOG812",
+    "INFO",
+    "Agent removed from link group",
+    component="Operators",
+    subcomponent="OperatorConfigWidget",
+    tags=_tags("operators", "agent_link", "remove"),
+)
+
+LOG_OP_AGENT_LINK_GROUP_DISSOLVED = _constant(
+    "LOG813",
+    "INFO",
+    "Agent link group dissolved",
+    component="Operators",
+    subcomponent="OperatorConfigWidget",
+    tags=_tags("operators", "agent_link", "group", "dissolve"),
+)
+
+LOG_OP_AGENT_LINK_VALIDATION_ERROR = _constant(
+    "LOG814",
+    "WARNING",
+    "Agent link validation error",
+    component="Operators",
+    subcomponent="OperatorConfigWidget",
+    tags=_tags("operators", "agent_link", "validation", "error"),
+)
+
+LOG_OP_AGENT_LINK_PRIMARY_PROMOTED = _constant(
+    "LOG815",
+    "INFO",
+    "Primary agent promoted in link group",
+    component="Operators",
+    subcomponent="OperatorConfigWidget",
+    tags=_tags("operators", "agent_link", "primary", "promote"),
+)
+
+LOG_OP_AGENT_LINK_POLICY_SYNCED = _constant(
+    "LOG816",
+    "DEBUG",
+    "Policy path synced to linked agents",
+    component="Operators",
+    subcomponent="OperatorConfigWidget",
+    tags=_tags("operators", "agent_link", "policy", "sync"),
+)
+
+LOG_OP_AGENT_LINK_INCOMPATIBLE_CHANGE = _constant(
+    "LOG817",
+    "WARNING",
+    "Incompatible change triggered automatic unlink",
+    component="Operators",
+    subcomponent="OperatorConfigWidget",
+    tags=_tags("operators", "agent_link", "incompatible", "unlink"),
+)
+
 
 # ---------------------------------------------------------------------------
 # Fast Lane / RunBus telemetry constants (LOG950–LOG959)
@@ -2979,6 +3061,203 @@ LOG_RWARE_DELIVERY = _constant(
     component="Adapter",
     subcomponent="RWARE",
     tags=_tags("rware", "delivery", "reward"),
+)
+
+
+# ---------------------------------------------------------------------------
+# Griddly Adapter constants (LOG4090–LOG4094)
+# ---------------------------------------------------------------------------
+LOG_GRIDDLY_ENV_CREATED = _constant(
+    "LOG4090",
+    "INFO",
+    "Griddly environment created",
+    component="Adapter",
+    subcomponent="Griddly",
+    tags=_tags("griddly", "environment", "lifecycle"),
+)
+LOG_GRIDDLY_ENV_RESET = _constant(
+    "LOG4091",
+    "INFO",
+    "Griddly environment reset",
+    component="Adapter",
+    subcomponent="Griddly",
+    tags=_tags("griddly", "episode", "lifecycle"),
+)
+LOG_GRIDDLY_STEP_SUMMARY = _constant(
+    "LOG4092",
+    "DEBUG",
+    "Griddly step summary",
+    component="Adapter",
+    subcomponent="Griddly",
+    tags=_tags("griddly", "step"),
+)
+LOG_GRIDDLY_ENV_CLOSED = _constant(
+    "LOG4093",
+    "INFO",
+    "Griddly environment closed",
+    component="Adapter",
+    subcomponent="Griddly",
+    tags=_tags("griddly", "environment", "lifecycle"),
+)
+LOG_GRIDDLY_RENDER_ERROR = _constant(
+    "LOG4094",
+    "WARNING",
+    "Griddly render error",
+    component="Adapter",
+    subcomponent="Griddly",
+    tags=_tags("griddly", "render", "error"),
+)
+
+
+# ---------------------------------------------------------------------------
+# PettingZoo Adapter Specific constants (LOG4095–LOG4110)
+# ---------------------------------------------------------------------------
+
+# PettingZoo/butterfly Adapter Specific Environment
+LOG_PETTINGZOO_BUTTERFLY_INPUT_CONFIGURED = _constant(
+    "LOG4095",
+    "INFO",
+    "PettingZoo Butterfly environment input configured",
+    component="Adapter",
+    subcomponent="PettingZoo/Butterfly",
+    tags=_tags("pettingzoo", "butterfly", "input", "keyboard"),
+)
+
+LOG_PISTONBALL_ACTION_RESOLVED = _constant(
+    "LOG4096",
+    "DEBUG",
+    "Pistonball action resolved from keyboard input",
+    component="Adapter",
+    subcomponent="PettingZoo/Butterfly",
+    tags=_tags("pettingzoo", "butterfly", "pistonball", "action"),
+)
+
+LOG_KNIGHTS_ARCHERS_ZOMBIES_ACTION_RESOLVED = _constant(
+    "LOG4097",
+    "DEBUG",
+    "Knights Archers Zombies action resolved from keyboard input",
+    component="Adapter",
+    subcomponent="PettingZoo/Butterfly",
+    tags=_tags("pettingzoo", "butterfly", "knights_archers_zombies", "action"),
+)
+
+LOG_COOPERATIVE_PONG_ACTION_RESOLVED = _constant(
+    "LOG4098",
+    "DEBUG",
+    "Cooperative Pong action resolved from keyboard input",
+    component="Adapter",
+    subcomponent="PettingZoo/Butterfly",
+    tags=_tags("pettingzoo", "butterfly", "cooperative_pong", "action"),
+)
+
+# PettingZoo/classic Adapter Specific Environment
+LOG_PETTINGZOO_CLASSIC_INPUT_CONFIGURED = _constant(
+    "LOG4099",
+    "INFO",
+    "PettingZoo Classic environment input configured",
+    component="Adapter",
+    subcomponent="PettingZoo/Classic",
+    tags=_tags("pettingzoo", "classic", "input", "keyboard"),
+)
+
+LOG_CHESS_MOVE_INPUT = _constant(
+    "LOG4100",
+    "DEBUG",
+    "Chess move input from keyboard",
+    component="Adapter",
+    subcomponent="PettingZoo/Classic",
+    tags=_tags("pettingzoo", "classic", "chess", "input"),
+)
+
+LOG_GO_MOVE_INPUT = _constant(
+    "LOG4101",
+    "DEBUG",
+    "Go move input from keyboard",
+    component="Adapter",
+    subcomponent="PettingZoo/Classic",
+    tags=_tags("pettingzoo", "classic", "go", "input"),
+)
+
+LOG_CONNECT_FOUR_MOVE_INPUT = _constant(
+    "LOG4102",
+    "DEBUG",
+    "Connect Four move input from keyboard",
+    component="Adapter",
+    subcomponent="PettingZoo/Classic",
+    tags=_tags("pettingzoo", "classic", "connect_four", "input"),
+)
+
+LOG_HANABI_ACTION_INPUT = _constant(
+    "LOG4103",
+    "DEBUG",
+    "Hanabi action input from keyboard",
+    component="Adapter",
+    subcomponent="PettingZoo/Classic",
+    tags=_tags("pettingzoo", "classic", "hanabi", "input"),
+)
+
+LOG_LEDUC_HOLDEM_ACTION_INPUT = _constant(
+    "LOG4104",
+    "DEBUG",
+    "Leduc Hold'em action input from keyboard",
+    component="Adapter",
+    subcomponent="PettingZoo/Classic",
+    tags=_tags("pettingzoo", "classic", "leduc_holdem", "input"),
+)
+
+LOG_RPS_ACTION_INPUT = _constant(
+    "LOG4105",
+    "DEBUG",
+    "Rock Paper Scissors action input from keyboard",
+    component="Adapter",
+    subcomponent="PettingZoo/Classic",
+    tags=_tags("pettingzoo", "classic", "rps", "input"),
+)
+
+LOG_TEXAS_HOLDEM_ACTION_INPUT = _constant(
+    "LOG4106",
+    "DEBUG",
+    "Texas Hold'em action input from keyboard",
+    component="Adapter",
+    subcomponent="PettingZoo/Classic",
+    tags=_tags("pettingzoo", "classic", "texas_holdem", "input"),
+)
+
+# HeMAC Adapter Specific Environment
+LOG_HEMAC_ENV_CONFIGURED = _constant(
+    "LOG4107",
+    "INFO",
+    "HeMAC environment configured",
+    component="Adapter",
+    subcomponent="HeMAC",
+    tags=_tags("hemac", "heterogeneous", "multi_agent", "config"),
+)
+
+LOG_HEMAC_AGENT_ACTION = _constant(
+    "LOG4108",
+    "DEBUG",
+    "HeMAC agent action executed",
+    component="Adapter",
+    subcomponent="HeMAC",
+    tags=_tags("hemac", "agent", "action"),
+)
+
+LOG_HEMAC_TARGET_REACHED = _constant(
+    "LOG4109",
+    "INFO",
+    "HeMAC target reached by agent",
+    component="Adapter",
+    subcomponent="HeMAC",
+    tags=_tags("hemac", "target", "success"),
+)
+
+LOG_HEMAC_ENERGY_DEPLETED = _constant(
+    "LOG4110",
+    "WARNING",
+    "HeMAC quadcopter energy depleted",
+    component="Adapter",
+    subcomponent="HeMAC",
+    tags=_tags("hemac", "energy", "warning"),
 )
 
 
@@ -5554,6 +5833,15 @@ __all__ = (
     "LOG_OP_GRID_CONFIG_FACTORY_CREATE",
     "LOG_OP_GRID_CONFIG_UNSUPPORTED_ENV",
     "LOG_OP_GRID_CONFIG_ENV_INIT_CUSTOM",
+    "LOG_OP_AGENT_LINK_DIALOG_OPENED",
+    "LOG_OP_AGENT_LINK_GROUP_CREATED",
+    "LOG_OP_AGENT_LINKED",
+    "LOG_OP_AGENT_UNLINKED",
+    "LOG_OP_AGENT_LINK_GROUP_DISSOLVED",
+    "LOG_OP_AGENT_LINK_VALIDATION_ERROR",
+    "LOG_OP_AGENT_LINK_PRIMARY_PROMOTED",
+    "LOG_OP_AGENT_LINK_POLICY_SYNCED",
+    "LOG_OP_AGENT_LINK_INCOMPATIBLE_CHANGE",
     "LOG_UI_PRESENTER_SIGNAL_CONNECTION_WARNING",
     "LOG_UI_MAIN_WINDOW_SHUTDOWN_WARNING",
     "LOG_UI_TENSORBOARD_KILL_WARNING",
@@ -5756,8 +6044,8 @@ GODOT_NOT_INSTALLED_TITLE = "Godot Not Available"
 GODOT_NOT_INSTALLED_MSG = (
     "Godot worker is not installed.\n\n"
     "Install with:\n\n"
-    "  pip install -e 3rd_party/godot_worker\n\n"
-    "Also requires the Godot binary in 3rd_party/godot_worker/bin/"
+    "  pip install -e 3rd_party/workers/godot_worker\n\n"
+    "Also requires the Godot binary in 3rd_party/workers/godot_worker/bin/"
 )
 
 GODOT_BINARY_NOT_FOUND_TITLE = "Godot Not Available"
@@ -5768,7 +6056,7 @@ GODOT_BINARY_NOT_FOUND_MSG = (
     "You can copy the Godot binary from:\n"
     "  Vesna_RL/Godot_v4.5.1-stable_linux.x86_64\n"
     "to:\n"
-    "  3rd_party/godot_worker/bin/godot"
+    "  3rd_party/workers/godot_worker/bin/godot"
 )
 
 # MuJoCo MPC Worker Messages
@@ -5776,16 +6064,16 @@ MJPC_NOT_INSTALLED_TITLE = "MJPC Not Available"
 MJPC_NOT_INSTALLED_MSG = (
     "MuJoCo MPC worker is not installed.\n\n"
     "Install with:\n\n"
-    "  pip install -e 3rd_party/mujoco_mpc_worker\n\n"
+    "  pip install -e 3rd_party/workers/mujoco_mpc_worker\n\n"
     "Also requires building the MJPC agent_server binary.\n"
-    "See: 3rd_party/mujoco_mpc_worker/mujoco_mpc/README.md"
+    "See: 3rd_party/workers/mujoco_mpc_worker/mujoco_mpc/README.md"
 )
 
 MJPC_NOT_BUILT_TITLE = "MJPC Not Built"
 MJPC_NOT_BUILT_MSG = (
     "MuJoCo MPC needs to be built first.\n\n"
     "Run the following commands:\n\n"
-    "  cd 3rd_party/mujoco_mpc_worker/mujoco_mpc/build\n"
+    "  cd 3rd_party/workers/mujoco_mpc_worker/mujoco_mpc/build\n"
     "  cmake .. -DCMAKE_BUILD_TYPE=Release -G Ninja\n"
     "  ninja -j$(nproc)\n\n"
     "Source dir: {source_dir}\n"

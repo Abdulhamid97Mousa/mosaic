@@ -1,2 +1,0 @@
-[console_scripts]
-mujoco-mpc-worker = mujoco_mpc_worker.cli:main

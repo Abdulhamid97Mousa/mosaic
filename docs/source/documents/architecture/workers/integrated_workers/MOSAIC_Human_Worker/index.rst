@@ -42,7 +42,7 @@ validation.
    * - **GPU required**
      - No
    * - **Source**
-     - ``3rd_party/mosaic/human_worker/human_worker/``
+     - ``3rd_party/workers/mosaic/human_worker/human_worker/``
    * - **Entry point**
      - ``human-worker`` (CLI)
 

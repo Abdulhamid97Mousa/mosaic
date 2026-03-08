@@ -2,11 +2,11 @@ Installation
 ============
 
 The MOSAIC Human Worker is installed as an editable Python package from the
-project's ``3rd_party/mosaic/human_worker`` directory.
+project's ``3rd_party/workers/mosaic/human_worker`` directory.
 
 .. code-block:: bash
 
-   pip install -e 3rd_party/mosaic/human_worker
+   pip install -e 3rd_party/workers/mosaic/human_worker
 
 The worker itself has **zero external dependencies** (pure Python). Environment
 packages must be installed separately.
@@ -35,7 +35,7 @@ use with the human worker:
    pip install -e ".[minigrid]"
 
    # MosaicMultiGrid (Soccer, Basketball, Collect)
-   pip install -e 3rd_party/mosaic_multigrid
+   pip install -e 3rd_party/environments/mosaic_multigrid
 
    # Crafter
    pip install -e ".[crafter]"
@@ -49,7 +49,7 @@ Running Tests
 .. code-block:: bash
 
    # Run all 35 tests
-   python -m pytest 3rd_party/mosaic/human_worker/tests/ -v
+   python -m pytest 3rd_party/workers/mosaic/human_worker/tests/ -v
 
    # Run only config tests (no env dependencies)
-   python -m pytest 3rd_party/mosaic/human_worker/tests/ -v -k "Config"
+   python -m pytest 3rd_party/workers/mosaic/human_worker/tests/ -v -k "Config"

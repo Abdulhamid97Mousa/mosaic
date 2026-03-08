@@ -41,35 +41,35 @@ prune .git
 # =============================================================================
 
 # Deprecated/internal workers
-prune 3rd_party/DI-engine
-prune 3rd_party/unreal_map_worker
-prune 3rd_party/godot_worker
+prune 3rd_party/workers/DI-engine
+prune 3rd_party/workers/unreal_map_worker
+prune 3rd_party/workers/godot_worker
 
 # Submodule directories (users install via pip)
-prune 3rd_party/Syllabus
+prune 3rd_party/tools/Syllabus
 
 # =============================================================================
 # INCLUDE - Essential 3rd party workers (Python packages only)
 # =============================================================================
 
 # Include only the Python source files for workers
-recursive-include 3rd_party/balrog_worker *.py
-recursive-include 3rd_party/chess_worker *.py
-recursive-include 3rd_party/cleanrl_worker *.py
-recursive-include 3rd_party/jumanji_worker *.py
-recursive-include 3rd_party/llm_game_worker *.py
-recursive-include 3rd_party/marllib_worker *.py
-recursive-include 3rd_party/mctx_worker *.py
-recursive-include 3rd_party/mosaic *.py
-recursive-include 3rd_party/mosaic_multigrid *.py
-recursive-include 3rd_party/mujoco_mpc_worker *.py
-recursive-include 3rd_party/multigrid-ini *.py
-recursive-include 3rd_party/pettingzoo_worker *.py
-recursive-include 3rd_party/procgen *.py
-recursive-include 3rd_party/ray_worker *.py
-recursive-include 3rd_party/shimmy_worker *.py
-recursive-include 3rd_party/stockfish_worker *.py
-recursive-include 3rd_party/xuance_worker *.py
+recursive-include 3rd_party/workers/balrog_worker *.py
+recursive-include 3rd_party/workers/chess_worker *.py
+recursive-include 3rd_party/workers/cleanrl_worker *.py
+recursive-include 3rd_party/workers/jumanji_worker *.py
+recursive-include 3rd_party/workers/llm_game_worker *.py
+recursive-include 3rd_party/workers/marllib_worker *.py
+recursive-include 3rd_party/workers/mctx_worker *.py
+recursive-include 3rd_party/workers/mosaic *.py
+recursive-include 3rd_party/environments/mosaic_multigrid *.py
+recursive-include 3rd_party/workers/mujoco_mpc_worker *.py
+recursive-include 3rd_party/environments/multigrid-ini *.py
+recursive-include 3rd_party/workers/pettingzoo_worker *.py
+recursive-include 3rd_party/environments/procgen *.py
+recursive-include 3rd_party/workers/ray_worker *.py
+recursive-include 3rd_party/tools/shimmy *.py
+recursive-include 3rd_party/workers/stockfish_worker *.py
+recursive-include 3rd_party/workers/xuance_worker *.py
 
 # =============================================================================
 # EXCLUDE - Test cache and build artifacts

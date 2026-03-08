@@ -13,6 +13,7 @@ from gym_gui.config.game_configs import (
     CliffWalkingConfig,
     FrozenLakeConfig,
     GameConfig,
+    GriddlyConfig,
     LunarLanderConfig,
     MeltingPotConfig,
     MiniGridConfig,
@@ -226,6 +227,24 @@ except Exception:  # pragma: no cover - rware optional
     RWARE_ADAPTERS: dict[Any, Any] = {}
     RWAREAdapter = None  # type: ignore[misc, assignment]
 
+try:  # Optional dependency - Griddly (C++ backend grid world platform)
+    from gym_gui.core.adapters.griddly import (  # pragma: no cover - optional
+        GRIDDLY_ADAPTERS,
+        GriddlyAdapter,
+    )
+except Exception:  # pragma: no cover - griddly optional
+    GRIDDLY_ADAPTERS: dict[Any, Any] = {}
+    GriddlyAdapter = None  # type: ignore[misc, assignment]
+
+try:  # Optional dependency - HeMAC (Heterogeneous Multi-Agent Challenge)
+    from gym_gui.core.adapters.hemac import (  # pragma: no cover - optional
+        HEMAC_ADAPTERS,
+        HeMACEnvironmentAdapter,
+    )
+except Exception:  # pragma: no cover - hemac optional
+    HEMAC_ADAPTERS: dict[Any, Any] = {}
+    HeMACEnvironmentAdapter = None  # type: ignore[misc, assignment]
+
 from gym_gui.core.enums import GameId
 
 AdapterT = TypeVar("AdapterT", bound=EnvironmentAdapter)
@@ -268,6 +287,8 @@ def _registry() -> Mapping[GameId, type[EnvironmentAdapter]]:
         **SMAC_ADAPTERS,
         **SMACV2_ADAPTERS,
         **RWARE_ADAPTERS,
+        **GRIDDLY_ADAPTERS,
+        **HEMAC_ADAPTERS,
     }
 
 
@@ -450,6 +471,12 @@ def create_adapter(
             RWAREAdapter is not None
             and issubclass(adapter_cls, RWAREAdapter)
             and isinstance(game_config, RWAREConfig)
+        ):
+            adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
+        elif (
+            GriddlyAdapter is not None
+            and issubclass(adapter_cls, GriddlyAdapter)
+            and isinstance(game_config, GriddlyConfig)
         ):
             adapter = adapter_cls(context, config=game_config)  # type: ignore[arg-type]
         else:

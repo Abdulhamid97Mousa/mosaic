@@ -164,8 +164,8 @@ across agent slots:
        # Link groups for one-to-many policy mapping
        # (agents 0 and 2 share the same MAPPO checkpoint)
        link_groups={
-           "link_0": LinkGroup(
-               group_id="link_0",
+           "operator_0_link_0": LinkGroup(
+               group_id="operator_0_link_0",
                primary_agent="agent_0",
                linked_agents=["agent_2"],
                policy_path="/path/to/mappo_agent_0_green_VS_agent_1_blue_checkpoint.pth",

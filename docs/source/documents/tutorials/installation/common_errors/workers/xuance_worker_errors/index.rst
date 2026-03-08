@@ -23,11 +23,11 @@ Installation Errors
 **Cause:** The XuanCe worker has a **two-part installation**:
 
 1. **The MOSAIC harness** (``mosaic-xuance-worker``) -- installed via
-   ``pip install -e 3rd_party/xuance_worker``.  This provides the
+   ``pip install -e 3rd_party/workers/xuance_worker``.  This provides the
    ``xuance_worker`` package that bridges MOSAIC's trainer daemon to XuanCe.
 
 2. **The XuanCe library itself** (``xuance``) -- lives in a git submodule
-   at ``3rd_party/xuance_worker/xuance/`` and must be installed separately.
+   at ``3rd_party/workers/xuance_worker/xuance/`` and must be installed separately.
 
 Unlike the CleanRL worker (which maps the upstream library into its own
 ``pyproject.toml``), the XuanCe worker does **not** bundle the upstream
@@ -42,18 +42,18 @@ but not ``xuance``, so the ``from xuance import get_runner`` call fails.
    source .venv/bin/activate
 
    # 1. Initialise the XuanCe submodule
-   git submodule update --init 3rd_party/xuance_worker/xuance
+   git submodule update --init 3rd_party/workers/xuance_worker/xuance
 
    # If the above fails with "did not match any file(s) known to git",
    # clone the submodule manually:
    git clone --depth 1 https://github.com/agi-brain/xuance.git \
-       3rd_party/xuance_worker/xuance
+       3rd_party/workers/xuance_worker/xuance
 
    # 2. Install the XuanCe library (with PyTorch backend)
-   pip install -e "3rd_party/xuance_worker/xuance[torch]"
+   pip install -e "3rd_party/workers/xuance_worker/xuance[torch]"
 
    # 3. Install the MOSAIC harness
-   pip install -e 3rd_party/xuance_worker
+   pip install -e 3rd_party/workers/xuance_worker
 
    # 4. Install MOSAIC's XuanCe Python dependencies
    pip install -e ".[xuance]"
@@ -136,7 +136,7 @@ Version Compatibility
 
       cd /path/to/mosaic
       source .venv/bin/activate
-      cd 3rd_party/xuance_worker/xuance
+      cd 3rd_party/workers/xuance_worker/xuance
       git pull origin main
       pip install -e ".[torch]"
 

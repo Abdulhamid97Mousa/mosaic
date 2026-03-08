@@ -139,7 +139,7 @@ under a unified, visual-first interface.
      Your browser does not support the video tag.
    </video>
    <p style="text-align:center; font-size:0.95em; color:#555; margin-top:6px;">
-     <strong>Random Agents:</strong> Baseline agents across 26 environment families.
+     <strong>Random Agents:</strong> Baseline agents across 28 environment families.
      See <a href="documents/architecture/workers/integrated_workers/MOSAIC_Random_Worker/index.html">MOSAIC Random Worker</a>
      and <a href="documents/environments/index.html">Supported Environments</a>.
    </p>
@@ -206,61 +206,97 @@ Manual Mode and Script Mode implementation details.
 Policy Mappings for Heterogeneous Multi-Agent Systems
 ------------------------------------------------------
 
-When mixing different decision-making paradigms (RL, LLM, Human, Random) in
-the same environment, each agent must be configured **independently** while
-maintaining the ability to share resources where appropriate. MOSAIC solves
-this with **flexible policy mappings** that enable both independent
-configuration (one-to-one) and resource sharing (one-to-many).
+Heterogeneous multi-agent systems require each agent to be configured
+**independently** while sharing resources where appropriate. MOSAIC enables this
+through **flexible policy mappings**: one-to-one (independent policies) and
+one-to-many (shared policies via link groups).
 
 .. mermaid::
 
    %%{init: {"flowchart": {"curve": "linear"}} }%%
-   graph LR
-       subgraph ONE["One-to-One (Default)"]
-           direction TB
-           A0["agent_0<br/>ppo.pth"]
-           A1["agent_1<br/>dqn.pth"]
+   graph TB
+       subgraph SCENARIO["Policy Mapping Modes"]
+           direction LR
+
+           subgraph ONE["One-to-One (Independent)"]
+               direction TB
+               ONE_TITLE["Each agent has its own policy"]
+               PPO["ppo.pth"]
+               DQN["dqn.pth"]
+               A0["agent_0"]
+               A1["agent_1"]
+
+               PPO -->|"Independent"| A0
+               DQN -->|"Independent"| A1
+
+               style ONE_TITLE fill:#f5f5f5,stroke:none,color:#666
+               style PPO fill:#50c878,stroke:#2e8b57,color:#fff
+               style DQN fill:#4a90d9,stroke:#2e5a87,color:#fff
+               style A0 fill:#a5d6a7,stroke:#2e8b57,color:#333
+               style A1 fill:#90caf9,stroke:#1976d2,color:#333
+           end
+
+           subgraph MANY["One-to-Many (Shared via Link Group)"]
+               direction TB
+               MANY_TITLE["Multiple agents share one policy"]
+               CHECKPOINT["mappo_team.pth<br/>(Shared Checkpoint)"]
+               B0["agent_0<br/>(Primary)"]
+               B1["agent_1<br/>(Linked)"]
+               B2["agent_2<br/>(Linked)"]
+
+               CHECKPOINT -->|"Shared"| B0
+               CHECKPOINT -->|"Shared"| B1
+               CHECKPOINT -->|"Shared"| B2
+
+               style MANY_TITLE fill:#f5f5f5,stroke:none,color:#666
+               style CHECKPOINT fill:#ff7f50,stroke:#cc5500,color:#fff
+               style B0 fill:#9370db,stroke:#6a0dad,color:#fff
+               style B1 fill:#ba68c8,stroke:#8e24aa,color:#fff
+               style B2 fill:#ba68c8,stroke:#8e24aa,color:#fff
+           end
        end
 
-       subgraph MANY["One-to-Many (Link Groups)"]
-           direction TB
-           CHECKPOINT["mappo_team.pth"]
-           B0["agent_0<br/>(Primary)"]
-           B1["agent_1<br/>(Linked)"]
-           B2["agent_2<br/>(Linked)"]
-
-           CHECKPOINT -->|"Shared"| B0
-           CHECKPOINT -->|"Shared"| B1
-           CHECKPOINT -->|"Shared"| B2
-       end
-
+       style SCENARIO fill:#fafafa,stroke:#ddd,color:#333
        style ONE fill:#e8f5e9,stroke:#2e8b57,color:#333
        style MANY fill:#f3e5f5,stroke:#9c27b0,color:#333
-       style A0 fill:#50c878,stroke:#2e8b57,color:#fff
-       style A1 fill:#4a90d9,stroke:#2e5a87,color:#fff
-       style CHECKPOINT fill:#ff7f50,stroke:#cc5500,color:#fff
-       style B0 fill:#9370db,stroke:#6a0dad,color:#fff
-       style B1 fill:#ba68c8,stroke:#8e24aa,color:#fff
-       style B2 fill:#ba68c8,stroke:#8e24aa,color:#fff
 
-**One-to-one mapping (default):**
-   Each agent has its own independent policy checkpoint. Agents are
-   configured individually with separate policy paths.
+**Why this matters:**
 
-**One-to-many mapping (via link groups):**
-   Multiple agents share a single policy checkpoint. The primary
-   agent's policy path is automatically synced to all linked agents.
+Without flexible policy mappings, you're forced to choose between:
 
-This combination is what makes heterogeneous multi-agent systems
-**practical and configurable**. Without flexible policy mappings, you
-would be forced to choose between manual copy-paste errors (configuring
-each agent independently) or no heterogeneity (forcing all agents to use
-the same worker type). With flexible policy mappings, you can configure
-each agent slot independently (RL, LLM, Human, Random) while sharing
-resources where appropriate (link groups for RL agents).
+- **Manual configuration:** Copy-paste errors, update fragility, no visual indication of sharing
+- **Forced homogeneity:** All agents must use the same worker type, no heterogeneity possible
+
+With flexible policy mappings, you can:
+
+- **Mix paradigms freely**: RL, LLM, Human, Random agents in the same environment
+- **Share resources intelligently**: Link groups for RL agents trained together (MAPPO/IPPO)
+- **Configure independently**: Each agent slot has its own settings and worker type
+- **Update automatically**: Change primary agent's policy → all linked agents update
+
+**Example: Heterogeneous 2v2 Soccer**
+
+.. code-block:: python
+
+   # Green team: RL + LLM | Blue team: RL + Random
+   config = OperatorConfig.multi_agent(
+       player_workers={
+           "agent_0": WorkerAssignment(worker_id="xuance_worker", ...),  # RL
+           "agent_1": WorkerAssignment(worker_id="llm_worker", ...),     # LLM
+           "agent_2": WorkerAssignment(worker_id="xuance_worker", ...),  # RL
+           "agent_3": WorkerAssignment(worker_id="random_worker", ...),  # Random
+       },
+       link_groups={
+           "operator_0_link_0": LinkGroup(
+               primary_agent="agent_0",
+               linked_agents=["agent_2"],  # Agents 0 and 2 share MAPPO policy
+               policy_path="/path/to/mappo_2v2.pth",
+           ),
+       },
+   )
 
 See :doc:`documents/architecture/operators/policy_mappings` for complete
-documentation on policy mappings and link groups.
+documentation, including a complex 3vs3 heterogeneous scenario with MAPPO + PPO + Random agents.
 
 Comparison with Existing Frameworks
 ------------------------------------
@@ -414,7 +450,7 @@ reproducible head-to-head evaluation.
          <td>LLM-Game-Bench <a href="#ref14">[14]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-part">&#9673;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-part">&#9673;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>AgentBench <a href="#ref16">[16]</a></td>
@@ -563,7 +599,7 @@ Standard Self-Play vs Cross-Paradigm Transfer
 
    **Standard Self-Play and Cross-Paradigm Transfer.**
 
-   **(a) Standard Self-Play (Baseline):** Agents :math:`\pi^{RL}_1` and :math:`\pi^{RL}_2` are
+**(a) Standard Self-Play (Baseline):** Agents :math:`\pi^{RL}_1` and :math:`\pi^{RL}_2` are
    co-trained, learning implicit partner models that overfit to the specific environment.
    This approach fails the Zero-Shot Coordination (ZSC) challenge because it struggles to
    coordinate with unseen RL partners (who may have learned different features). It
@@ -572,8 +608,8 @@ Standard Self-Play vs Cross-Paradigm Transfer
    (:math:`\mathcal{O}^{\text{RL}} \neq \mathcal{O}^{\text{LLM}}`) and violated behavioral
    expectations.
 
-   **(b) Cross-Paradigm Transfer (MOSAIC):** Agent :math:`\pi^{RL}` is trained solo
-   (:math:`N=1`, zero partner expectations), then deployed in multi-agent teams alongside
+**(b) Cross-Paradigm Transfer (MOSAIC):** Agent :math:`\pi^{RL}` is trained solo
+(:math:`N=1`, zero partner expectations), then deployed in multi-agent teams alongside
    heterogeneous partners such as LLM agents :math:`\lambda^{LLM}`, human players :math:`h`,
    or random baselines. By eliminating co-training dependencies, agents can cooperate
    across paradigm boundaries using a unified action interface.
@@ -743,7 +779,7 @@ as teammates within heterogeneous teams.
 Supported Environment Families
 ------------------------------
 
-MOSAIC supports **26 environment families** spanning single-agent, multi-agent,
+MOSAIC supports **28 environment families** spanning single-agent, multi-agent,
 and cooperative/competitive paradigms.  See the full
 :doc:`Environment Families <documents/environments/index>` reference for
 installation instructions, environment lists, and academic citations.
@@ -772,14 +808,21 @@ installation instructions, environment lists, and academic citations.
      - Language-grounded instruction following
      - .. image:: images/envs/babyai/GoTo.gif
           :width: 200px
+   * - **Griddly**
+     - High-performance grid worlds with C++ backend & Vulkan GPU rendering (34 envs)
+     - .. image:: images/envs/griddly/griddly.gif
+          :width: 200px
    * - **ViZDoom**
      - Doom-based first-person visual RL
      - .. image:: images/envs/vizdoom/vizdoom.gif
           :width: 200px
-   * - **MiniHack / NetHack**
-     - Roguelike dungeon crawling (NLE)
+   * - **MiniHack**
+     - Roguelike sandbox built on NetHack (NLE)
      - .. image:: images/envs/minihack/minihack.gif
           :width: 200px
+   * - **NetHack**
+     - Full NetHack roguelike game via NLE
+     -
    * - **Crafter**
      - Open-world survival benchmark
      - .. image:: images/envs/crafter/crafter.gif
@@ -792,6 +835,10 @@ installation instructions, environment lists, and academic citations.
      - Rule-manipulation puzzles
      - .. image:: images/envs/babaisai/babaisai.png
           :width: 200px
+   * - **TextWorld**
+     - Text-based interactive fiction (Microsoft Research)
+     - .. image:: images/envs/textworld/textworld.gif
+          :width: 200px
    * - **Jumanji**
      - JAX-accelerated logic/routing/packing (25 envs)
      - .. image:: images/envs/jumanji/jumanji.gif
@@ -803,6 +850,10 @@ installation instructions, environment lists, and academic citations.
    * - **PettingZoo Classic**
      - Turn-based board games (AEC)
      - .. image:: images/envs/pettingzoo/pettingzoo.gif
+          :width: 200px
+   * - **OpenSpiel**
+     - Board games via DeepMind's OpenSpiel + Shimmy (Chess, Go, Checkers)
+     - .. image:: images/envs/openspiel/openspiel.gif
           :width: 200px
    * - **MOSAIC MultiGrid**
      - Competitive team sports (view_size=3)
@@ -832,6 +883,9 @@ installation instructions, environment lists, and academic citations.
      - Cooperative warehouse delivery
      - .. image:: images/envs/rware/rware.gif
           :width: 200px
+   * - **HeMAC**
+     - Heterogeneous multi-agent challenge (Quadcopters, Observers, Provisioners)
+     -
    * - **MuJoCo**
      - Continuous-control robotics tasks
      - .. image:: images/envs/mujoco/ant.gif
@@ -848,7 +902,7 @@ Supported Workers (8)
 * :doc:`MOSAIC LLM <documents/architecture/workers/integrated_workers/MOSAIC_LLM_Worker/index>`: Multi-agent LLM with coordination strategies and Theory of Mind (MultiGrid, BabyAI, MeltingPot, PettingZoo)
 * :doc:`Chess LLM <documents/architecture/workers/integrated_workers/Chess_LLM_Worker/index>`: LLM chess play with multi-turn dialog (PettingZoo Chess)
 * :doc:`MOSAIC Human Worker <documents/architecture/workers/integrated_workers/MOSAIC_Human_Worker/index>`: Human-in-the-loop play via keyboard for any Gymnasium-compatible environment (MiniGrid, Crafter, Chess, NetHack)
-* :doc:`MOSAIC Random Worker <documents/architecture/workers/integrated_workers/MOSAIC_Random_Worker/index>`: Baseline agents with random, no-op, and cycling action behaviours across all 26 environment families
+* :doc:`MOSAIC Random Worker <documents/architecture/workers/integrated_workers/MOSAIC_Random_Worker/index>`: Baseline agents with random, no-op, and cycling action behaviours across all 28 environment families
 
 Citing MOSAIC
 -------------

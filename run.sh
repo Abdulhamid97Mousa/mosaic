@@ -9,8 +9,8 @@
 #   PYTHON_BIN=python3.11 ./run.sh   # Use specific Python version
 #
 # Prerequisites:
-#   pip install -e .                        # Install MOSAIC
-#   pip install -e 3rd_party/cleanrl_worker # Install CleanRL worker (optional)
+#   pip install -e .                                # Install MOSAIC
+#   pip install -e 3rd_party/workers/cleanrl_worker # Install CleanRL worker (optional)
 #
 # ==============================================================================
 

@@ -324,3 +324,52 @@ class JumanjiArcadeInteractionController(InteractionController):
 
     def step_dt(self) -> float:
         return 0.0
+
+
+class GriddlyInteractionController(InteractionController):
+    """Idle controller for Griddly: step continuously with NOOP when idle.
+
+    Griddly games are grid-based environments with state-based real-time input.
+    The game should continuously step with NOOP actions when no keys are pressed,
+    allowing the game world to advance (enemies move, timers count, etc.).
+
+    Default 30 FPS provides responsive gameplay for grid-based environments.
+    """
+
+    def __init__(self, owner, target_hz: int = 30):
+        """Initialize Griddly interaction controller.
+
+        Args:
+            owner: SessionController instance.
+            target_hz: Target frame rate (default 30 FPS for responsive play).
+        """
+        self._owner = owner
+        self._interval_ms = max(1, int(1000 / float(target_hz)))  # ~33ms for 30 FPS
+
+    def idle_interval_ms(self) -> Optional[int]:
+        return self._interval_ms
+
+    def should_idle_tick(self) -> bool:
+        """Check if we should advance the game this tick."""
+        o = self._owner
+        if o._adapter is None or o._game_id is None:
+            return False
+        if not getattr(o, "_game_started", False):
+            return False
+        if o._game_paused:
+            return False
+        if getattr(o._control_mode, "name", "") != "HUMAN_ONLY":
+            return False
+        if o._last_step is not None and (o._last_step.terminated or o._last_step.truncated):
+            return False
+        return True
+
+    def maybe_passive_action(self) -> Optional[Any]:
+        """Return NOOP action for Griddly.
+
+        Griddly uses Discrete(5) action space where action 0 is NOOP.
+        """
+        return 0
+
+    def step_dt(self) -> float:
+        return 0.0

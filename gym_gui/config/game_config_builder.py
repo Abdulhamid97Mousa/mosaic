@@ -465,6 +465,21 @@ class GameConfigBuilder:
                 seed=seed,
             )
 
+        # Griddly (C++ backend grid world platform)
+        if family == EnvironmentFamily.GRIDDLY:
+            from gym_gui.config.game_configs import GriddlyConfig
+
+            level = int(overrides.get("level", 0))
+            max_steps = int(overrides.get("max_steps", 1000))
+            seed_val = overrides.get("seed")
+            seed = int(seed_val) if seed_val is not None and int(seed_val) >= 0 else None
+
+            return GriddlyConfig(
+                level=level,
+                max_steps=max_steps,
+                seed=seed,
+            )
+
         return None
 
 

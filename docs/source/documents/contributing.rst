@@ -45,7 +45,7 @@ Adding a New Worker
 See :doc:`architecture/workers/integrated_workers/index` for the worker
 architecture and existing worker implementations.
 
-1. Create ``3rd_party/myworker/`` directory with ``pyproject.toml``
+1. Create ``3rd_party/workers/myworker/`` directory with ``pyproject.toml``
 2. Implement the worker with an ``InteractiveRuntime`` class
 3. Add a CLI entry point (``myworker-worker``)
 4. Support the JSON protocol: ``reset``, ``step``, ``stop`` commands

@@ -30,7 +30,7 @@ Multi-agent RL algorithms like MAPPO and IPPO store all agents' policies in a
 
    %%{init: {"flowchart": {"curve": "linear"}} }%%
    graph TB
-       subgraph CHECKPOINT["MAPPO Checkpoint File (mappo_2v2.pth)"]
+       subgraph CHECKPOINT["MAPPO Checkpoint File (mappo_1v1.pth)"]
            A0_W["actor.agent_0.weights"]
            A1_W["actor.agent_1.weights"]
            A2_W["actor.agent_2.weights"]
@@ -115,26 +115,28 @@ behavior and requires no special configuration.
 .. mermaid::
 
    %%{init: {"flowchart": {"curve": "linear"}} }%%
-   graph LR
-       subgraph AGENT0["Agent 0"]
-           A0_W["cleanrl_worker<br/>PPO"]
-           A0_P["ppo.pth"]
+   graph TB
+       subgraph POLICIES["Policy Checkpoints"]
+           direction LR
+           PPO_FILE["ppo.pth<br/>(CleanRL PPO)"]
+           DQN_FILE["dqn.pth<br/>(CleanRL DQN)"]
        end
 
-       subgraph AGENT1["Agent 1"]
-           A1_W["cleanrl_worker<br/>DQN"]
-           A1_P["dqn.pth"]
+       subgraph AGENTS["Agents (Independent)"]
+           direction LR
+           A0["agent_0<br/>cleanrl_worker<br/>PPO"]
+           A1["agent_1<br/>cleanrl_worker<br/>DQN"]
        end
 
-       A0_P -->|"Independent<br/>Policy"| A0_W
-       A1_P -->|"Independent<br/>Policy"| A1_W
+       PPO_FILE -->|"One-to-One<br/>Independent"| A0
+       DQN_FILE -->|"One-to-One<br/>Independent"| A1
 
-       style AGENT0 fill:#e8f5e9,stroke:#2e8b57,color:#333
-       style AGENT1 fill:#e3f2fd,stroke:#1976d2,color:#333
-       style A0_W fill:#50c878,stroke:#2e8b57,color:#fff
-       style A1_W fill:#4a90d9,stroke:#2e5a87,color:#fff
-       style A0_P fill:#fff,stroke:#2e8b57,color:#333
-       style A1_P fill:#fff,stroke:#1976d2,color:#333
+       style POLICIES fill:#fff3e0,stroke:#f57c00,color:#333
+       style AGENTS fill:#f5f5f5,stroke:#999,color:#333
+       style PPO_FILE fill:#50c878,stroke:#2e8b57,color:#fff
+       style DQN_FILE fill:#4a90d9,stroke:#2e5a87,color:#fff
+       style A0 fill:#a5d6a7,stroke:#2e8b57,color:#333
+       style A1 fill:#90caf9,stroke:#1976d2,color:#333
 
 .. code-block:: python
 
@@ -166,22 +168,24 @@ path is automatically synced to all linked agents.
    graph TB
        CHECKPOINT["mappo_team.pth<br/>(Single Checkpoint)"]
 
-       subgraph LINKGROUP["Link Group (link_0)"]
+       subgraph LINKGROUP["Link Group (operator_0_link_0)"]
            direction TB
-           PRIMARY["agent_0<br/>(Primary)<br/>xuance_worker"]
-           LINKED1["agent_1<br/>(Linked)<br/>xuance_worker"]
-           LINKED2["agent_2<br/>(Linked)<br/>xuance_worker"]
+           PRIMARY["agent_0 &nbsp;(Primary) &nbsp;xuance_worker"]
+
+           subgraph LINKED[" "]
+               direction LR
+               LINKED1["agent_1<br/>(Linked)<br/>xuance_worker"]
+               LINKED2["agent_2<br/>(Linked)<br/>xuance_worker"]
+           end
        end
 
-       CHECKPOINT -->|"Shared Policy<br/>Auto-synced"| PRIMARY
-       CHECKPOINT -->|"Shared Policy<br/>Auto-synced"| LINKED1
-       CHECKPOINT -->|"Shared Policy<br/>Auto-synced"| LINKED2
-
-       PRIMARY -.->|"Updates propagate"| LINKED1
-       PRIMARY -.->|"Updates propagate"| LINKED2
+       CHECKPOINT -->|"Shared Policy"| PRIMARY
+       PRIMARY -.->|"Auto-synced"| LINKED1
+       PRIMARY -.->|"Auto-synced"| LINKED2
 
        style CHECKPOINT fill:#ff7f50,stroke:#cc5500,color:#fff
        style LINKGROUP fill:#f3e5f5,stroke:#9c27b0,color:#333
+       style LINKED fill:none,stroke:none
        style PRIMARY fill:#9370db,stroke:#6a0dad,color:#fff
        style LINKED1 fill:#ba68c8,stroke:#8e24aa,color:#fff
        style LINKED2 fill:#ba68c8,stroke:#8e24aa,color:#fff
@@ -207,8 +211,8 @@ path is automatically synced to all linked agents.
        ),
    },
    link_groups={
-       "link_0": LinkGroup(
-           group_id="link_0",
+       "operator_0_link_0": LinkGroup(
+           group_id="operator_0_link_0",
            primary_agent="agent_0",
            linked_agents=["agent_1", "agent_2"],
            policy_path="/path/to/mappo_team.pth",
@@ -253,7 +257,7 @@ heterogeneous multi-agent systems **practical and configurable**.
 
        subgraph POLICIES["Policy Storage"]
            direction TB
-           MAPPO["mappo_2v2.pth<br/>(Shared via Link Group)"]
+           MAPPO["mappo_1v1.pth<br/>(Shared via Link Group)"]
            LLM_API["OpenRouter API<br/>(GPT-4o)"]
            RANDOM["No Policy<br/>(Random Actions)"]
        end
@@ -282,6 +286,96 @@ heterogeneous multi-agent systems **practical and configurable**.
        style RANDOM fill:#ffb74d,stroke:#f57c00,color:#fff
 
 **Key insight:** Individual agent configuration + flexible policy sharing = heterogeneous teams
+
+Complex Heterogeneous Example: 3vs3 Soccer
+~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+
+**Scenario:** 3vs3 soccer with mixed training paradigms
+
+- **Team Green (3 agents):** 2 MAPPO agents (xuance_worker) + 1 PPO agent (cleanrl_worker trained on solo env)
+- **Team Blue (3 agents):** 2 MAPPO agents (xuance_worker) + 1 Random agent
+
+This demonstrates the full power of heterogeneous multi-agent configuration:
+
+.. mermaid::
+
+   %%{init: {"flowchart": {"curve": "linear"}} }%%
+   graph TB
+       subgraph ENV["Soccer 3v3 Environment"]
+           GAME["MosaicMultiGrid-Soccer-3vs3-IndAgObs-v0"]
+       end
+
+       subgraph GREEN["Green Team (Heterogeneous)"]
+           direction TB
+           G0["agent_0<br/>xuance_worker<br/>MAPPO (2v2)"]
+           G1["agent_1<br/>xuance_worker<br/>MAPPO (2v2)"]
+           G2["agent_2<br/>cleanrl_worker<br/>PPO (Solo)"]
+       end
+
+       subgraph BLUE["Blue Team (RL + Random)"]
+           direction TB
+           B0["agent_3<br/>xuance_worker<br/>MAPPO (2v2)"]
+           B1["agent_4<br/>xuance_worker<br/>MAPPO (2v2)"]
+           B2["agent_5<br/>random_worker"]
+       end
+
+       subgraph POLICIES["Policy Storage"]
+           direction TB
+           MAPPO["mappo_2v2.pth<br/>(4 agents share)"]
+           PPO["ppo_solo.pth<br/>(1 agent)"]
+           RANDOM["No Policy"]
+       end
+
+       MAPPO -->|"Link Group 0"| G0
+       MAPPO -->|"Link Group 0"| G1
+       MAPPO -->|"Link Group 1"| B0
+       MAPPO -->|"Link Group 1"| B1
+       PPO -->|"Independent"| G2
+       RANDOM -->|"No Config"| B2
+
+       G0 --> GAME
+       G1 --> GAME
+       G2 --> GAME
+       B0 --> GAME
+       B1 --> GAME
+       B2 --> GAME
+
+       style ENV fill:#f5f5f5,stroke:#999,color:#333
+       style GAME fill:#4a90d9,stroke:#2e5a87,color:#fff
+       style GREEN fill:#e8f5e9,stroke:#2e8b57,color:#333
+       style BLUE fill:#e3f2fd,stroke:#1976d2,color:#333
+       style POLICIES fill:#fff3e0,stroke:#f57c00,color:#333
+       style G0 fill:#9370db,stroke:#6a0dad,color:#fff
+       style G1 fill:#9370db,stroke:#6a0dad,color:#fff
+       style G2 fill:#50c878,stroke:#2e8b57,color:#fff
+       style B0 fill:#ba68c8,stroke:#8e24aa,color:#fff
+       style B1 fill:#ba68c8,stroke:#8e24aa,color:#fff
+       style B2 fill:#ff7f50,stroke:#cc5500,color:#fff
+       style MAPPO fill:#ba68c8,stroke:#8e24aa,color:#fff
+       style PPO fill:#4db6ac,stroke:#00897b,color:#fff
+       style RANDOM fill:#ffb74d,stroke:#f57c00,color:#fff
+
+**Configuration breakdown:**
+
+1. **4 agents share MAPPO checkpoint** (trained on 2v2):
+   - Green team: agent_0, agent_1 (Link Group 0)
+   - Blue team: agent_3, agent_4 (Link Group 1)
+   - All use the same ``mappo_2v2.pth`` checkpoint
+
+2. **1 agent uses independent PPO** (trained on solo environment):
+   - Green team: agent_2 (cleanrl_worker)
+   - Uses ``ppo_solo.pth`` trained on ``MosaicMultiGrid-Soccer-Solo-Green-IndAgObs-v0``
+
+3. **1 agent is random baseline**:
+   - Blue team: agent_5 (random_worker)
+   - No policy needed
+
+**Why this configuration is interesting:**
+
+- **Transfer learning test:** MAPPO agents trained on 2v2 now play 3v3
+- **Cross-paradigm cooperation:** PPO agent (solo-trained) cooperates with MAPPO agents (team-trained)
+- **Algorithm comparison:** MAPPO vs PPO vs Random in the same environment
+- **Ad-hoc teamwork:** Agents trained separately must coordinate without joint training
 
 The Key Insight
 ~~~~~~~~~~~~~~~
@@ -318,7 +412,7 @@ Real-World Example: Heterogeneous Soccer Team
                worker_type="rl",
                settings={
                    "algorithm": "mappo",
-                   "policy_path": "/path/to/mappo_2v2.pth",
+                   "policy_path": "/path/to/mappo_1v1.pth",
                },
            ),
            "agent_1": WorkerAssignment(
@@ -335,7 +429,7 @@ Real-World Example: Heterogeneous Soccer Team
                worker_type="rl",
                settings={
                    "algorithm": "mappo",
-                   "policy_path": "/path/to/mappo_2v2.pth",
+                   "policy_path": "/path/to/mappo_1v1.pth",
                },
            ),
            "agent_3": WorkerAssignment(
@@ -344,12 +438,13 @@ Real-World Example: Heterogeneous Soccer Team
            ),
        },
        # Link groups: agents 0 and 2 share the same MAPPO checkpoint
+       # IDs are scoped to the operator: {operator_id}_link_{N}
        link_groups={
-           "link_0": LinkGroup(
-               group_id="link_0",
+           "heterogeneous_soccer_link_0": LinkGroup(
+               group_id="heterogeneous_soccer_link_0",
                primary_agent="agent_0",
                linked_agents=["agent_2"],
-               policy_path="/path/to/mappo_2v2.pth",
+               policy_path="/path/to/mappo_1v1.pth",
                algorithm="mappo",
                worker_type="rl",
            ),
@@ -399,7 +494,7 @@ Link groups are the mechanism that enables one-to-many policy mappings:
 
    @dataclass
    class LinkGroup:
-       group_id: str              # Unique identifier (ULID)
+       group_id: str              # Operator-scoped ID (e.g., "operator_0_link_0")
        primary_agent: str         # Primary agent in the group
        linked_agents: list[str]   # Other agents in the group
        policy_path: str           # Group's policy checkpoint
@@ -423,10 +518,11 @@ team configurations:
 .. code-block:: python
 
    # Two independent teams with different policies
+   # Link group IDs are scoped to operator: {operator_id}_link_{N}
    link_groups={
        # Offense team (agents 0 and 1)
-       "link_0": LinkGroup(
-           group_id="link_0",
+       "operator_0_link_0": LinkGroup(
+           group_id="operator_0_link_0",
            primary_agent="agent_0",
            linked_agents=["agent_1"],
            policy_path="/path/to/offense_mappo.pth",
@@ -434,8 +530,8 @@ team configurations:
            worker_type="rl",
        ),
        # Defense team (agents 2 and 3)
-       "link_1": LinkGroup(
-           group_id="link_1",
+       "operator_0_link_1": LinkGroup(
+           group_id="operator_0_link_1",
            primary_agent="agent_2",
            linked_agents=["agent_3"],
            policy_path="/path/to/defense_mappo.pth",

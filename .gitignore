@@ -85,7 +85,6 @@ coverage.xml
 .dmypy.json
 dmypy.json
 .pytype/
-pyrightconfig.json
 
 # =============================================================================
 # Project Runtime Artifacts
@@ -133,8 +132,9 @@ gym_gui/doc.qt.io/
 # Large Binary Files (GitHub 100MB limit)
 # =============================================================================
 
-3rd_party/godot_worker/bin/
-3rd_party/*/bin/
+3rd_party/workers/godot_worker/bin/
+3rd_party/workers/*/bin/
+3rd_party/environments/*/bin/
 *.bin
 ml-agents/
 
@@ -143,34 +143,20 @@ ml-agents/
 # =============================================================================
 
 # Egg-info directories (all workers)
-3rd_party/*/*.egg-info/
-3rd_party/*/*/*.egg-info/
+3rd_party/workers/*/*.egg-info/
+3rd_party/workers/*/*/*.egg-info/
 
 # CleanRL worker
-3rd_party/cleanrl_worker/cleanrl_worker.egg-info/
-3rd_party/cleanrl_worker/mosaic_cleanrl.egg-info/
+3rd_party/workers/cleanrl_worker/cleanrl_worker.egg-info/
+3rd_party/workers/cleanrl_worker/mosaic_cleanrl.egg-info/
 
 # MuJoCo MPC worker
-3rd_party/mujoco_mpc_worker/mosaic_mujoco_mpc.egg-info/
-3rd_party/mujoco_mpc_worker/mujoco_mpc/build/
+3rd_party/workers/mujoco_mpc_worker/mosaic_mujoco_mpc.egg-info/
+3rd_party/workers/mujoco_mpc_worker/mujoco_mpc/build/
 
-
-# PettingZoo worker (submodule content)
-3rd_party/pettingzoo_worker/PettingZoo/
-
-# MARLIB worker )
-3rd_party/marllib_worker/marllib_worker/__pycache__
-3rd_party/marllib_worker/**/__pycache__/
-
-# MARLIB worker )
-3rd_party/marllib_worker/marllib_worker/__pycache__
-3rd_party/marllib_worker/**/__pycache__/
-
-# ViZDoom worker (submodule content)
-3rd_party/vizdoom_worker/ViZDoom/
-
-# Legacy paths
-3rd_party/godot_worker/bin/godot
+# MARLIB worker
+3rd_party/workers/marllib_worker/marllib_worker/__pycache__
+3rd_party/workers/marllib_worker/**/__pycache__/
 
 # =============================================================================
 # Deprecated / Legacy Directories
@@ -228,61 +214,66 @@ docs/workers/
 docs/my_paper/
 
 # Deprecated/internal workers (not for public release)
-3rd_party/dragon_worker/
-3rd_party/test_worker/
+3rd_party/workers/dragon_worker/
+3rd_party/workers/test_worker/
 
 # =============================================================================
 # 3rd Party - Non-submodule directories (not tracked in .gitmodules)
 # =============================================================================
 
-3rd_party/babyai/
-3rd_party/BenchMARL/
-3rd_party/Collab-Overcooked/
-3rd_party/crafter/
-3rd_party/godot_worker/
-3rd_party/Grounding_LLMs_with_online_RL/
-3rd_party/gym-multigrid/
-3rd_party/gym-pybullet-drones/
-3rd_party/hemac/
-3rd_party/Hierarchical-Language-Agent/
-3rd_party/Hypothetical-Minds/
-3rd_party/jumanji_worker/
-3rd_party/llm_coordination/
-3rd_party/llm_game_worker/
-3rd_party/marllib_worker/
-3rd_party/marLo/
-3rd_party/mctx_worker/
-3rd_party/meltingpot/
-3rd_party/Minigrid/
-3rd_party/minihack/
-3rd_party/NetHack/
-3rd_party/obstacle-tower-env/
-3rd_party/overcooked_ai/
-3rd_party/ProAgent/
-3rd_party/robotic-warehouse/
-3rd_party/smac/
-3rd_party/smac_exp/
-3rd_party/smacv2/
-3rd_party/stable-baselines3/
-3rd_party/stockfish_worker/
-3rd_party/sumo/
-3rd_party/tianshou/
-3rd_party/train-procgen/
-3rd_party/unreal_map_worker/
-3rd_party/Verlog/
-3rd_party/vllm/
-3rd_party/di_engine_worker/DI-engine
-3rd_party/jumanji_worker/jumanji
-3rd_party/jumanji
-3rd_party/marllib_worker/MARLlib
-3rd_party/llm_game_worker/LLM-Game-Benchmark
+# Environments
+3rd_party/environments/babyai/
+3rd_party/environments/BenchMARL/
+3rd_party/environments/Collab-Overcooked/
+3rd_party/environments/crafter/
+3rd_party/environments/Grounding_LLMs_with_online_RL/
+3rd_party/environments/gym-multigrid/
+3rd_party/environments/gym-pybullet-drones/
+3rd_party/environments/Hierarchical-Language-Agent/
+3rd_party/environments/Hypothetical-Minds/
+3rd_party/environments/llm_coordination/
+3rd_party/environments/marLo/
+3rd_party/environments/meltingpot/
+3rd_party/environments/Minigrid/
+3rd_party/environments/minihack/
+3rd_party/environments/NetHack/
+3rd_party/environments/obstacle-tower-env/
+3rd_party/environments/overcooked_ai/
+3rd_party/environments/ProAgent/
+3rd_party/environments/robotic-warehouse/
+3rd_party/environments/smac/
+3rd_party/environments/smac_exp/
+3rd_party/environments/smacv2/
+3rd_party/environments/stable-baselines3/
+3rd_party/environments/sumo/
+3rd_party/environments/tianshou/
+3rd_party/environments/train-procgen/
+3rd_party/environments/Verlog/
+3rd_party/environments/hemac/
+3rd_party/environments/malmo/
+3rd_party/environments/mosaic_malmo/
+3rd_party/environments/mosaic_marLo/
+3rd_party/environments/neural-mmo/
+
+# Workers
+3rd_party/workers/godot_worker/
+3rd_party/workers/jumanji_worker/jumanji
+3rd_party/workers/marllib_worker/MARLlib
+3rd_party/workers/llm_game_worker/LLM-Game-Benchmark
+3rd_party/workers/di_engine_worker/
+
+# Tools
+3rd_party/tools/hemac/
+3rd_party/tools/PufferLib/
+3rd_party/tools/vllm/
 
 # Experiment operator configs are tracked
 # experiments/*
 
-# 
-3rd_party/mosaic/llm_worker.backup/llm_worker/environments/nle/tiles.pkl
-3rd_party/mosaic/llm_worker.backup/llm_worker/environments/nle/Hack-Regular.ttf
+# Legacy backup paths
+3rd_party/workers/mosaic/llm_worker.backup/llm_worker/environments/nle/tiles.pkl
+3rd_party/workers/mosaic/llm_worker.backup/llm_worker/environments/nle/Hack-Regular.ttf
+3rd_party.backup/
 
 
 #
@@ -298,4 +289,20 @@ _vizdoom.ini
 logs/
 # XuanCe default result_dir
 results/
-3rd_party/di_engine_worker
+
+
+# 
+gym_gui/game_docs/hemac/
+
+gym_gui/game_docs/MosaicMalmo/
+
+gym_gui/rendering/strategies/mosaic_malmo.py
+
+
+requirements/mosaic_malmo.txt
+
+3rd_party/workers/workers_benchmark
+
+# Patch and diff files (prevent accidental commits)
+*.diff
+*.patch

@@ -35,7 +35,7 @@ as agents on complex, long-horizon interactive tasks behind the standard
    * - **GPU required**
      - No (API-based) / Optional (vLLM local inference)
    * - **Source**
-     - ``3rd_party/balrog_worker/balrog_worker/``
+     - ``3rd_party/workers/balrog_worker/balrog_worker/``
    * - **Upstream**
      - `github.com/balrog-ai/BALROG <https://github.com/balrog-ai/BALROG>`_
    * - **Paper**

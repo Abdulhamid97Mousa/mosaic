@@ -36,6 +36,7 @@ from gym_gui.constants.constants_vector import SUPPORTED_AUTORESET_MODES
 from gym_gui.controllers.interaction import (
     AleInteractionController,
     Box2DInteractionController,
+    GriddlyInteractionController,
     InteractionController,
     JumanjiArcadeInteractionController,
     ProcgenInteractionController,
@@ -45,7 +46,13 @@ from gym_gui.controllers.interaction import (
 )
 from gym_gui.core.adapters.base import AdapterContext, AdapterStep, EnvironmentAdapter
 from gym_gui.core.data_model import EpisodeRollup, StepRecord
-from gym_gui.core.enums import ENVIRONMENT_FAMILY_BY_GAME, ControlMode, EnvironmentFamily, GameId
+from gym_gui.core.enums import (
+    CONTINUOUS_GRIDDLY_GAMES,
+    ENVIRONMENT_FAMILY_BY_GAME,
+    ControlMode,
+    EnvironmentFamily,
+    GameId,
+)
 from gym_gui.core.factories.adapters import create_adapter, get_adapter_cls
 from gym_gui.core.run_counter_manager import RunCounterManager
 from gym_gui.core.schema import schema_registry
@@ -387,6 +394,14 @@ class SessionController(QtCore.QObject, LogConstantMixin):
         if family in (EnvironmentFamily.SMAC, EnvironmentFamily.SMACV2):
             # SMAC is agent-only: auto-step with random valid actions at 5 FPS
             return SMACInteractionController(self, target_hz=5)
+        if family == EnvironmentFamily.GRIDDLY:
+            # Check if this is a continuous Griddly game (moving enemies, spawning objects)
+            if self._game_id in CONTINUOUS_GRIDDLY_GAMES:
+                # Continuous games need idle ticking with NOOP actions at 30 FPS
+                return GriddlyInteractionController(self, target_hz=30)
+            else:
+                # Turn-based puzzle games don't need idle ticking
+                return TurnBasedInteractionController()
         return TurnBasedInteractionController()
 
     def perform_human_action(self, action: int | list[int], *, key_label: str | None = None) -> None:
@@ -1027,9 +1042,9 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             self._stop_idle_tick()
             return
         interaction = getattr(self, "_interaction", None)
-        # For ALE, ViZDoom, Procgen, Jumanji arcade, and SMAC games, do not gate on awaiting_human
+        # For ALE, ViZDoom, Procgen, Jumanji arcade, Griddly, and SMAC games, do not gate on awaiting_human
         # These are continuous games where the world should keep moving regardless of player input
-        require_awaiting = not isinstance(interaction, (AleInteractionController, ViZDoomInteractionController, ProcgenInteractionController, JumanjiArcadeInteractionController, SMACInteractionController))
+        require_awaiting = not isinstance(interaction, (AleInteractionController, ViZDoomInteractionController, ProcgenInteractionController, JumanjiArcadeInteractionController, GriddlyInteractionController, SMACInteractionController))
         if require_awaiting and not self._awaiting_human:
             return
 
@@ -1157,7 +1172,7 @@ class SessionController(QtCore.QObject, LogConstantMixin):
             # Interaction controller uses _passive_action after resolution; fall through for Box2D parity
             pass
         fam = ENVIRONMENT_FAMILY_BY_GAME.get(self._game_id)
-        if fam not in (EnvironmentFamily.BOX2D, EnvironmentFamily.ATARI, EnvironmentFamily.ALE):
+        if fam not in (EnvironmentFamily.BOX2D, EnvironmentFamily.ATARI, EnvironmentFamily.ALE, EnvironmentFamily.GRIDDLY):
             return None
         space = self._adapter.action_space
         if isinstance(space, spaces.Discrete):

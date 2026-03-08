@@ -60,7 +60,7 @@ subprocess.
 
 .. code-block:: text
 
-   3rd_party/cleanrl_worker/
+   3rd_party/workers/cleanrl_worker/
    ├── cleanrl/                  ← Git submodule (upstream)
    │   └── cleanrl/
    │       ├── ppo.py
@@ -104,7 +104,7 @@ subprocess.
 XuanCe Worker
 -------------
 
-**Strategy:** Local package (``3rd_party/xuance_worker/``)
+**Strategy:** Local package (``3rd_party/workers/xuance_worker/``)
 
 The XuanCe worker integrates `XuanCe <https://github.com/agi-brain/xuance>`_,
 a comprehensive multi-agent RL library, for cooperative and competitive
@@ -154,7 +154,7 @@ environment adapters.
 
 .. code-block:: text
 
-   3rd_party/xuance_worker/
+   3rd_party/workers/xuance_worker/
    ├── xuance/                   ← Upstream XuanCe source
    │   └── xuance/
    │       ├── learner/
@@ -235,7 +235,7 @@ telemetry.
 
 .. code-block:: text
 
-   3rd_party/ray_worker/
+   3rd_party/workers/ray_worker/
    ├── ray_worker/               ← MOSAIC shim
    │   ├── __init__.py
    │   ├── cli.py

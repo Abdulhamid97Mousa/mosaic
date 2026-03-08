@@ -1,0 +1,15 @@
+# Griddly - C++ backend, high-performance grid world platform
+# Paper: Bamford et al. (2021). "Griddly: A Platform for AI Research in Games"
+# Repository: https://github.com/Bam4d/Griddly
+# Documentation: https://griddly.readthedocs.io
+#
+# NOTE: Requires Vulkan-capable GPU drivers (or software Vulkan renderer).
+#       On headless servers: apt install libvulkan1 mesa-vulkan-drivers
+#
+# Install:
+#   pip install -r requirements/griddly.txt
+#   OR: pip install -e ".[griddly]"
+# ============================================================
+
+griddly>=1.4.2
+gymnasium>=1.1.0

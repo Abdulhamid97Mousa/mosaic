@@ -81,7 +81,7 @@ MOSAIC distinguishes two concepts that are easy to confuse:
      - Examples
    * - **Worker**
      - A *process-level* execution unit that handles **training**, API
-       calls, or bash script for custom workflows.  Workers live in ``3rd_party/``
+       calls, or bash script for custom workflows.  Workers live in ``3rd_party/workers/``
        and communicate via JSONL over stdout.  The Trainer Daemon
        manages the worker process lifecycle, passing configuration
        via JSON files and environment variables.
@@ -148,7 +148,7 @@ Every worker follows the same structure:
 
 .. code-block:: text
 
-   3rd_party/my_worker/
+   3rd_party/workers/my_worker/
    ├── pyproject.toml              # Package metadata + entry point
    ├── README.md
    ├── my_worker/                  # MOSAIC shim layer

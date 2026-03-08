@@ -515,10 +515,10 @@ for curriculum learning. Syllabus is a local 3rd-party package.
 .. code-block:: bash
 
    # If the directory is empty, initialize the submodule
-   git submodule update --init 3rd_party/Syllabus
+   git submodule update --init 3rd_party/tools/Syllabus
 
    # Install in editable mode
-   pip install -e 3rd_party/Syllabus
+   pip install -e 3rd_party/tools/Syllabus
 
 Worker load warnings (non-fatal)
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
@@ -536,7 +536,7 @@ These are informational -- install the relevant extras to enable each worker:
 .. code-block:: bash
 
    # CleanRL worker
-   pip install -e 3rd_party/Syllabus
+   pip install -e 3rd_party/tools/Syllabus
    pip install matplotlib scipy
 
    # Ray/RLlib worker

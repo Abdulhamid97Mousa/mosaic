@@ -22,7 +22,7 @@ from gym_gui.constants.constants_operator import (
 )
 from gym_gui.logging_config.helpers import log_constant
 from gym_gui.logging_config.log_constants import LOG_OPERATOR_VIEW_SIZE_CONFIGURED
-from gym_gui.services.operator import OperatorConfig, WorkerAssignment
+from gym_gui.services.operator import LinkGroup, OperatorConfig, WorkerAssignment
 from gym_gui.ui.widgets.multi_agent_action_panel import (
     COLOR_PALETTE,
     DEFAULT_AGENT_COLOR_NAMES,
@@ -642,6 +642,295 @@ def _get_registered_envs(prefix: str) -> List[str]:
         return []
 
 
+class LinkAgentDialog(QtWidgets.QDialog):
+    """Dialog for selecting agents to link together.
+
+    Allows users to select which agents should share the same policy checkpoint.
+    """
+
+    def __init__(
+        self,
+        primary_agent: str,
+        compatible_agents: list[str],
+        existing_group: Optional[LinkGroup] = None,
+        parent: Optional[QtWidgets.QWidget] = None,
+    ) -> None:
+        """Initialize the link agent dialog.
+
+        Args:
+            primary_agent: The agent that initiated the linking.
+            compatible_agents: List of compatible agents that can be linked.
+            existing_group: Existing link group if agent is already linked.
+            parent: Parent widget.
+        """
+        super().__init__(parent)
+        self._primary_agent = primary_agent
+        self._compatible_agents = compatible_agents
+        self._existing_group = existing_group
+        self._checkboxes: Dict[str, QtWidgets.QCheckBox] = {}
+
+        self.setWindowTitle("Link Agents")
+        self.setModal(True)
+        self.setMinimumWidth(400)
+
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        layout = QtWidgets.QVBoxLayout(self)
+
+        # Title label
+        title = QtWidgets.QLabel(
+            f"Select agents to link with <b>{self._primary_agent}</b>:",
+            self,
+        )
+        title.setWordWrap(True)
+        layout.addWidget(title)
+
+        # Info label
+        info = QtWidgets.QLabel(
+            "Linked agents will share the same policy checkpoint path.\n"
+            "When the primary agent's policy path changes, all linked agents will update automatically.",
+            self,
+        )
+        info.setWordWrap(True)
+        info.setStyleSheet("color: gray; font-size: 10pt;")
+        layout.addWidget(info)
+
+        layout.addSpacing(10)
+
+        # Scroll area for agent checkboxes
+        scroll = QtWidgets.QScrollArea(self)
+        scroll.setWidgetResizable(True)
+        scroll.setMinimumHeight(200)
+
+        scroll_widget = QtWidgets.QWidget()
+        scroll_layout = QtWidgets.QVBoxLayout(scroll_widget)
+
+        # Add checkbox for each compatible agent
+        for agent_id in self._compatible_agents:
+            checkbox = QtWidgets.QCheckBox(agent_id, scroll_widget)
+
+            # Check if agent is already linked
+            if self._existing_group and agent_id in self._existing_group.linked_agents:
+                checkbox.setChecked(True)
+
+            scroll_layout.addWidget(checkbox)
+            self._checkboxes[agent_id] = checkbox
+
+        scroll_layout.addStretch()
+        scroll.setWidget(scroll_widget)
+        layout.addWidget(scroll)
+
+        # Buttons
+        button_box = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.StandardButton.Ok
+            | QtWidgets.QDialogButtonBox.StandardButton.Cancel,
+            self,
+        )
+        button_box.accepted.connect(self.accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+    def get_selected_agents(self) -> list[str]:
+        """Get list of selected agents.
+
+        Returns:
+            List of agent IDs that were selected.
+        """
+        return [
+            agent_id
+            for agent_id, checkbox in self._checkboxes.items()
+            if checkbox.isChecked()
+        ]
+
+
+class LinkingIndicatorWidget(QtWidgets.QWidget):
+    """Visual indicator showing agents are linked with clickable text to unlink."""
+
+    unlink_requested = pyqtSignal(str, str)  # Emitted when user clicks to unlink (group_id, agent_id)
+
+    def __init__(self, group_id: str, agent_id: str, parent: Optional[QtWidgets.QWidget] = None) -> None:
+        """Initialize the linking indicator.
+
+        Args:
+            group_id: The link group ID.
+            agent_id: The agent ID this indicator represents.
+            parent: Parent widget.
+        """
+        super().__init__(parent)
+        self._group_id = group_id
+        self._agent_id = agent_id
+        self._color = "#4CAF50"  # Default green color
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        layout = QtWidgets.QHBoxLayout(self)
+        layout.setContentsMargins(8, 0, 0, 0)
+        layout.setSpacing(8)
+
+        # Vertical line on the left (bracket connector)
+        self._left_line = QtWidgets.QFrame(self)
+        self._left_line.setFrameShape(QtWidgets.QFrame.Shape.VLine)
+        self._left_line.setFrameShadow(QtWidgets.QFrame.Shadow.Plain)
+        self._left_line.setStyleSheet(f"background-color: {self._color}; min-width: 3px; max-width: 3px;")
+        self._left_line.setMinimumHeight(20)
+        layout.addWidget(self._left_line)
+
+        # Clickable "Linked" label with chain icon
+        self._linked_label = QtWidgets.QPushButton("🔗 Linked", self)
+        self._linked_label.setFlat(True)
+        self._update_label_style()
+        self._linked_label.setCursor(QtCore.Qt.CursorShape.PointingHandCursor)
+        self._linked_label.setToolTip("Click to unlink this agent from the group")
+        self._linked_label.clicked.connect(self._on_clicked)
+        layout.addWidget(self._linked_label, 0)
+
+        layout.addStretch()
+
+    def set_color(self, color: str) -> None:
+        """Set the color of the vertical line and label.
+
+        Args:
+            color: Hex color string (e.g., "#4CAF50")
+        """
+        self._color = color
+        self._left_line.setStyleSheet(f"background-color: {color}; min-width: 3px; max-width: 3px;")
+        self._update_label_style()
+
+    def _update_label_style(self) -> None:
+        """Update the label style with the current color."""
+        self._linked_label.setStyleSheet(
+            f"QPushButton {{"
+            f"  background-color: {self._color};"
+            f"  color: white;"
+            f"  border: none;"
+            f"  border-radius: 8px;"
+            f"  padding: 2px 10px;"
+            f"  font-size: 10px;"
+            f"  font-weight: bold;"
+            f"}}"
+            f"QPushButton:hover {{ background-color: {self._color}; opacity: 0.8; }}"
+        )
+
+    def _on_clicked(self) -> None:
+        """Handle click on the Linked label."""
+        self.unlink_requested.emit(self._group_id, self._agent_id)
+
+
+class LinkGroupDialog(QtWidgets.QDialog):
+    """Dialog for creating a link group with multiple agents sharing a policy.
+
+    This dialog allows users to manually create link groups for multi-agent RL,
+    where multiple agents share the same policy checkpoint from the primary agent.
+    """
+
+    def __init__(
+        self,
+        primary_agent: str,
+        primary_agent_label: str,
+        available_agents: Dict[str, str],  # agent_id -> agent_label
+        currently_linked: List[str] | None = None,  # Currently linked agent IDs
+        parent: Optional[QtWidgets.QWidget] = None,
+    ) -> None:
+        """Initialize the link group dialog.
+
+        Args:
+            primary_agent: The primary agent ID (e.g., "agent_0").
+            primary_agent_label: Human-readable label for primary agent.
+            available_agents: Dict of available agents to link with (agent_id -> label).
+            currently_linked: List of agent IDs currently linked to primary (for editing).
+            parent: Parent widget.
+        """
+        super().__init__(parent)
+        self._primary_agent = primary_agent
+        self._primary_agent_label = primary_agent_label
+        self._available_agents = available_agents
+        self._currently_linked = currently_linked or []
+        self._agent_checkboxes: Dict[str, QtWidgets.QCheckBox] = {}
+
+        self.setWindowTitle("Link Agents" if not currently_linked else "Edit Link Group")
+        self.setMinimumWidth(450)
+        self._build_ui()
+
+    def _build_ui(self) -> None:
+        """Build the dialog UI."""
+        layout = QtWidgets.QVBoxLayout(self)
+        layout.setSpacing(12)
+
+        # Header
+        header = QtWidgets.QLabel(
+            "Link agents to share the same policy checkpoint.\n"
+            "All linked agents will use the primary agent's policy path and algorithm.",
+            self
+        )
+        header.setWordWrap(True)
+        header.setStyleSheet("color: #666; font-size: 11px;")
+        layout.addWidget(header)
+
+        # Primary agent (read-only)
+        primary_group = QtWidgets.QGroupBox("Primary Agent", self)
+        primary_layout = QtWidgets.QVBoxLayout(primary_group)
+        primary_label = QtWidgets.QLabel(f"{self._primary_agent_label} ({self._primary_agent})", self)
+        primary_label.setStyleSheet("font-weight: bold;")
+        primary_layout.addWidget(primary_label)
+        layout.addWidget(primary_group)
+
+        # Agent selection
+        if self._available_agents:
+            agents_group = QtWidgets.QGroupBox("Select Agents to Link", self)
+            agents_layout = QtWidgets.QVBoxLayout(agents_group)
+
+            for agent_id, agent_label in self._available_agents.items():
+                checkbox = QtWidgets.QCheckBox(f"{agent_label} ({agent_id})", self)
+                # Pre-check if this agent is currently linked
+                if agent_id in self._currently_linked:
+                    checkbox.setChecked(True)
+                self._agent_checkboxes[agent_id] = checkbox
+                agents_layout.addWidget(checkbox)
+
+            layout.addWidget(agents_group)
+        else:
+            no_agents_label = QtWidgets.QLabel("No other RL agents available to link.", self)
+            no_agents_label.setStyleSheet("color: #999; font-style: italic;")
+            layout.addWidget(no_agents_label)
+
+        # Buttons
+        button_box = QtWidgets.QDialogButtonBox(
+            QtWidgets.QDialogButtonBox.StandardButton.Ok |
+            QtWidgets.QDialogButtonBox.StandardButton.Cancel,
+            self
+        )
+        button_box.accepted.connect(self._on_accept)
+        button_box.rejected.connect(self.reject)
+        layout.addWidget(button_box)
+
+    def _on_accept(self) -> None:
+        """Validate and accept the dialog."""
+        # Check if at least one agent is selected
+        selected_agents = self.get_selected_agents()
+        if not selected_agents:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "No Agents Selected",
+                "Please select at least one agent to link with the primary agent."
+            )
+            return
+
+        self.accept()
+
+    def get_selected_agents(self) -> List[str]:
+        """Get list of selected agent IDs.
+
+        Returns:
+            List of agent IDs that were checked.
+        """
+        return [
+            agent_id for agent_id, checkbox in self._agent_checkboxes.items()
+            if checkbox.isChecked()
+        ]
+
+
+
 class PlayerAssignmentRow(QtWidgets.QWidget):
     """Single player assignment row within a multi-agent operator.
 
@@ -650,6 +939,9 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
     """
 
     assignment_changed = pyqtSignal()  # Emitted when any field changes
+    policy_path_changed = pyqtSignal(str, str)  # Emitted when policy path changes (player_id, new_path)
+    link_agents_requested = pyqtSignal(str)  # Emitted when "Link Agents" button is clicked (player_id)
+    unlink_agents_requested = pyqtSignal(str)  # Emitted when "Unlink Agents" button is clicked (player_id)
 
     def __init__(
         self,
@@ -813,6 +1105,28 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         self._algorithm_combo.currentIndexChanged.connect(self._on_changed)
         rl_layout.addWidget(self._algorithm_combo)
 
+        # Link Agents button (for creating multi-agent policy groups)
+        self._link_agents_btn = QtWidgets.QPushButton("Link Agents", self._rl_row)
+        self._link_agents_btn.setFixedWidth(100)
+        self._link_agents_btn.setToolTip(
+            "Create a link group with other agents to share the same policy.\n"
+            "Useful for multi-agent RL (MAPPO/IPPO) where multiple agents\n"
+            "use the same checkpoint file."
+        )
+        self._link_agents_btn.clicked.connect(self._on_link_agents_clicked)
+        rl_layout.addWidget(self._link_agents_btn)
+
+        # Unlink Agents button (for removing agent from link group)
+        self._unlink_agents_btn = QtWidgets.QPushButton("Unlink Agents", self._rl_row)
+        self._unlink_agents_btn.setFixedWidth(100)
+        self._unlink_agents_btn.setToolTip(
+            "Remove this agent from its link group.\n"
+            "The agent will use its own policy instead of the shared one."
+        )
+        self._unlink_agents_btn.clicked.connect(self._on_unlink_agents_clicked)
+        self._unlink_agents_btn.hide()  # Hidden by default, shown only for linked agents
+        rl_layout.addWidget(self._unlink_agents_btn)
+
         rl_layout.addStretch()
         main_layout.addWidget(self._rl_row)
         self._rl_row.hide()  # Hidden by default (LLM is default type)
@@ -831,10 +1145,25 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         self._model_combo.currentIndexChanged.connect(self._on_changed)
         self._api_key_edit.textChanged.connect(self._on_changed)
         self._policy_path_edit.textChanged.connect(self._on_changed)
+        self._policy_path_edit.textChanged.connect(self._on_policy_path_changed)
 
     def _on_changed(self) -> None:
         if not self._updating:
             self.assignment_changed.emit()
+
+    def _on_policy_path_changed(self) -> None:
+        """Handle policy path change - emit signal for parent to handle."""
+        if not self._updating:
+            new_path = self._policy_path_edit.text()
+            self.policy_path_changed.emit(self._player_id, new_path)
+
+    def _on_link_agents_clicked(self) -> None:
+        """Handle Link Agents button click - emit signal for parent to handle."""
+        self.link_agents_requested.emit(self._player_id)
+
+    def _on_unlink_agents_clicked(self) -> None:
+        """Handle Unlink Agents button click - emit signal for parent to handle."""
+        self.unlink_agents_requested.emit(self._player_id)
 
     def _on_client_changed(self) -> None:
         if self._updating:
@@ -930,6 +1259,38 @@ class PlayerAssignmentRow(QtWidgets.QWidget):
         )
         if file_path:
             self._policy_path_edit.setText(file_path)
+
+    def set_rl_row_visible(self, visible: bool) -> None:
+        """Set RL row visibility based on link state.
+
+        Args:
+            visible: True to show RL row, False to hide it.
+        """
+        if self._type_combo.currentText().lower() == "rl":
+            self._rl_row.setVisible(visible)
+
+    def set_policy_fields_visible(self, visible: bool) -> None:
+        """Show or hide policy-related fields (for linked agents).
+
+        When an agent is linked, we hide the policy fields but keep the Unlink button visible.
+        This allows linked agents to show only the "Unlink Agents" button.
+
+        Args:
+            visible: True to show policy fields, False to hide them.
+        """
+        # Hide/show policy-related widgets
+        self._policy_path_edit.setVisible(visible)
+        self._browse_btn.setVisible(visible)
+        self._algorithm_combo.setVisible(visible)
+
+        # Find and hide/show the labels
+        for i in range(self._rl_row.layout().count()):
+            item = self._rl_row.layout().itemAt(i)
+            if item and item.widget():
+                widget = item.widget()
+                if isinstance(widget, QtWidgets.QLabel):
+                    if widget.text() in ("Policy:", "Algorithm:"):
+                        widget.setVisible(visible)
 
     def _update_model_dropdown(self) -> None:
         """Update model dropdown based on selected provider."""
@@ -1077,6 +1438,7 @@ class PlayerAssignmentPanel(QtWidgets.QWidget):
         num_agents: int,
         agent_ids: Optional[List[str]] = None,
         agent_labels: Optional[Dict[str, str]] = None,
+        operator_id: str = "",
         parent: Optional[QtWidgets.QWidget] = None,
     ) -> None:
         """Initialize the player assignment panel.
@@ -1089,12 +1451,15 @@ class PlayerAssignmentPanel(QtWidgets.QWidget):
                       If None, auto-generates ["agent_0", "agent_1", ...]
             agent_labels: Optional dict mapping agent_id to display label
                          If None, uses agent_id as label
+            operator_id: Parent operator ID for scoping link group IDs
+                        (e.g., "operator_0" → link groups become "operator_0_link_0").
             parent: Parent widget.
         """
         super().__init__(parent)
         self._env_family = env_family
         self._env_id = env_id
         self._num_agents = num_agents
+        self._operator_id = operator_id
         self._rows: Dict[str, PlayerAssignmentRow] = {}
 
         # Generate agent IDs if not provided
@@ -1106,6 +1471,18 @@ class PlayerAssignmentPanel(QtWidgets.QWidget):
         if agent_labels is None:
             agent_labels = {aid: aid for aid in agent_ids}
         self._agent_labels = agent_labels
+
+        # Agent linking for multi-agent RL (MAPPO/IPPO)
+        self._link_groups: Dict[str, LinkGroup] = {}  # group_id -> LinkGroup
+        self._next_link_group_index: int = 0  # Counter for generating group IDs
+
+        # Environments that support agent linking
+        self._linking_supported_envs = {
+            "mosaic_multigrid",
+            "multigrid_ini",
+            "meltingpot",
+            "overcooked",
+        }
 
         self._build_ui()
 
@@ -1119,13 +1496,34 @@ class PlayerAssignmentPanel(QtWidgets.QWidget):
         header.setStyleSheet("font-weight: bold; color: #555;")
         layout.addWidget(header)
 
+        # Store linking indicator widgets
+        self._linking_indicators: Dict[str, LinkingIndicatorWidget] = {}
+
         # Create row for each agent/player
-        for agent_id in self._agent_ids:
+        for i, agent_id in enumerate(self._agent_ids):
             agent_label = self._agent_labels.get(agent_id, agent_id)
             row = PlayerAssignmentRow(agent_id, agent_label, self)
             row.assignment_changed.connect(self.assignments_changed)
+            row.assignment_changed.connect(self._on_assignment_changed)
+            row.policy_path_changed.connect(self._on_policy_path_changed)
+            row.link_agents_requested.connect(self._on_link_agents_requested)
+            row.unlink_agents_requested.connect(self._on_unlink_agents_requested)
             layout.addWidget(row)
             self._rows[agent_id] = row
+
+            # Add linking indicator between agents (except after the last agent)
+            if i < len(self._agent_ids) - 1:
+                next_agent_id = self._agent_ids[i + 1]
+                # The indicator represents the agent below it (next_agent_id)
+                indicator = LinkingIndicatorWidget("", next_agent_id, self)
+                indicator.unlink_requested.connect(self._on_unlink_requested)
+                indicator.hide()  # Hidden by default, shown when agents are linked
+                layout.addWidget(indicator)
+                # Store indicator with a key based on the current and next agent
+                self._linking_indicators[f"{agent_id}_{next_agent_id}"] = indicator
+
+        # Note: Link groups are now created manually via "Link Agents" button
+        # Automatic grouping has been disabled to support multiple independent groups
 
     def set_vllm_servers(self, servers: List[VLLMServerInfo]) -> None:
         """Update all rows with available vLLM servers."""
@@ -1135,13 +1533,33 @@ class PlayerAssignmentPanel(QtWidgets.QWidget):
     def get_worker_assignments(self) -> Dict[str, WorkerAssignment]:
         """Get all player -> worker assignments.
 
+        For agents in link groups, the policy_path and algorithm are overridden
+        with the group's values to ensure all agents in the group use the same policy.
+
         Returns:
             Dict mapping player_id to WorkerAssignment.
         """
-        return {
-            player_id: row.get_assignment()
-            for player_id, row in self._rows.items()
-        }
+        assignments = {}
+        for player_id, row in self._rows.items():
+            assignment = row.get_assignment()
+
+            # Check if this agent is in a link group
+            group = self._find_link_group_by_agent(player_id)
+            if group and assignment.worker_type == "rl":
+                # Override policy_path and algorithm with group's values
+                settings = assignment.settings.copy()
+                settings["policy_path"] = group.policy_path
+                settings["algorithm"] = group.algorithm
+
+                assignment = WorkerAssignment(
+                    worker_id=assignment.worker_id,
+                    worker_type=assignment.worker_type,
+                    settings=settings,
+                )
+
+            assignments[player_id] = assignment
+
+        return assignments
 
     @property
     def game_name(self) -> str:
@@ -1159,6 +1577,598 @@ class PlayerAssignmentPanel(QtWidgets.QWidget):
             row._type_combo.currentText().lower() == "llm"
             for row in self._rows.values()
         )
+
+    def _supports_linking(self) -> bool:
+        """Check if the current environment supports agent linking.
+
+        Returns:
+            True if the environment supports agent linking (MAPPO/IPPO).
+        """
+        return self._env_family in self._linking_supported_envs
+
+    def _create_default_link_groups(self) -> None:
+        """Create default link groups for all RL agents.
+
+        By default, all RL agents with the same algorithm are linked together.
+        This is called after the UI is built.
+        """
+        if not self._supports_linking():
+            return
+
+        # Group RL agents by algorithm
+        rl_agents_by_algo: Dict[str, List[str]] = {}
+        for agent_id, row in self._rows.items():
+            if row._type_combo.currentText().lower() == "rl":
+                algorithm = row._algorithm_combo.currentText()
+                if algorithm not in rl_agents_by_algo:
+                    rl_agents_by_algo[algorithm] = []
+                rl_agents_by_algo[algorithm].append(agent_id)
+
+        # Create link groups for each algorithm (if 2+ agents)
+        for algorithm, agents in rl_agents_by_algo.items():
+            if len(agents) >= 2:
+                primary_agent = agents[0]
+                linked_agents = agents[1:]
+                self.create_link_group(primary_agent, linked_agents)
+
+    def _on_assignment_changed(self) -> None:
+        """Handle assignment change - update visual indicators only.
+
+        This is called whenever an agent's worker type or algorithm changes.
+        Link groups are now managed manually by the user, so we only update
+        the visual indicators to reflect the current state.
+        """
+        if not self._supports_linking():
+            return
+
+        # Update visual indicators to reflect current state
+        # Note: Link groups are now created manually via "Link Agents" button
+        self._update_link_visual_indicators()
+
+    def _on_unlink_requested(self, group_id: str, agent_id: str) -> None:
+        """Handle unlink request from linking indicator.
+
+        Args:
+            group_id: The group to modify.
+            agent_id: The specific agent to remove from the group.
+        """
+        from gym_gui.logging_config.helpers import log_constant
+        from gym_gui.logging_config.log_constants import LOG_OP_AGENT_UNLINKED
+
+        group = self._link_groups.get(group_id)
+        if not group:
+            return
+
+        # Log the unlinking
+        log_constant(
+            _LOGGER,
+            LOG_OP_AGENT_UNLINKED,
+            extra={
+                "agent_name": agent_id,
+                "group_id": group_id,
+                "primary_agent": group.primary_agent,
+            }
+        )
+
+        # If the agent being removed is the primary agent, dissolve the entire group
+        if agent_id == group.primary_agent:
+            self.remove_link_group(group_id)
+            return
+
+        # Remove the agent from the linked_agents list
+        if agent_id in group.linked_agents:
+            group.linked_agents.remove(agent_id)
+
+        # If only one agent remains in linked_agents, dissolve the group
+        # (a link group needs at least 2 agents: primary + 1 linked)
+        if len(group.linked_agents) == 0:
+            self.remove_link_group(group_id)
+            return
+
+        # Update visual indicators to reflect the change
+        self._update_link_visual_indicators()
+
+    # -------------------------------------------------------------------------
+    # Agent Linking Methods
+    # -------------------------------------------------------------------------
+
+    def _get_compatible_agents(self, player_id: str) -> list[str]:
+        """Get list of agents compatible for linking with the given agent.
+
+        Args:
+            player_id: The agent to find compatible agents for.
+
+        Returns:
+            List of compatible agent IDs (excluding the given agent).
+        """
+        row = self._rows.get(player_id)
+        if not row:
+            return []
+
+        # Only RL workers can be linked
+        if row._type_combo.currentText().lower() != "rl":
+            return []
+
+        worker_type = row._type_combo.currentText()
+        algorithm = row._algorithm_combo.currentText()
+
+        compatible = []
+        for agent_id, agent_row in self._rows.items():
+            if agent_id == player_id:
+                continue
+
+            # Check if agent has same worker type and algorithm
+            if (agent_row._type_combo.currentText() == worker_type and
+                agent_row._algorithm_combo.currentText() == algorithm):
+                compatible.append(agent_id)
+
+        return compatible
+
+    def create_link_group(
+        self,
+        primary_agent: str,
+        linked_agents: list[str],
+    ) -> str:
+        """Create a new link group that shares the primary agent's policy.
+
+        Args:
+            primary_agent: The primary agent (leader).
+            linked_agents: List of agents to link to the primary.
+
+        Returns:
+            The group_id of the created group.
+        """
+        from gym_gui.logging_config.helpers import log_constant
+        from gym_gui.logging_config.log_constants import (
+            LOG_OP_AGENT_LINK_GROUP_CREATED,
+            LOG_OP_AGENT_LINK_VALIDATION_ERROR,
+        )
+
+        # Validate that all agents exist
+        all_agents = [primary_agent] + linked_agents
+        for agent in all_agents:
+            if agent not in self._rows:
+                log_constant(
+                    _LOGGER,
+                    LOG_OP_AGENT_LINK_VALIDATION_ERROR,
+                    extra={
+                        "primary_agent": primary_agent,
+                        "linked_agents": linked_agents,
+                        "reason": f"Agent {agent} not found",
+                    }
+                )
+                return ""
+
+        # Get primary agent's row
+        primary_row = self._rows[primary_agent]
+        worker_type = primary_row._type_combo.currentText()
+
+        # Read policy path and algorithm from primary agent's row
+        policy_path = primary_row._policy_path_edit.text()
+        algorithm = primary_row._algorithm_combo.currentText().lower()
+
+        # Generate group ID
+        prefix = f"{self._operator_id}_" if self._operator_id else ""
+        group_id = f"{prefix}link_{self._next_link_group_index}"
+        self._next_link_group_index += 1
+
+        # Get primary agent's color for the group background
+        color_name = primary_row._color_combo.currentData()
+        if color_name and color_name != "auto":
+            # Use the primary agent's color
+            color = COLOR_PALETTE.get(color_name, ("#E3F2FD", ""))[0]
+        else:
+            # Default to light blue if auto
+            color = "#E3F2FD"
+
+        # Create link group
+        group = LinkGroup(
+            group_id=group_id,
+            primary_agent=primary_agent,
+            linked_agents=linked_agents.copy(),
+            policy_path=policy_path,
+            algorithm=algorithm,
+            worker_type=worker_type,
+            color=color,
+        )
+
+        self._link_groups[group_id] = group
+
+        # Log group creation
+        log_constant(
+            _LOGGER,
+            LOG_OP_AGENT_LINK_GROUP_CREATED,
+            extra={
+                "group_id": group_id,
+                "primary_agent": primary_agent,
+                "linked_agents": linked_agents,
+                "policy_path": policy_path,
+                "algorithm": algorithm,
+            }
+        )
+
+        # Sync policy path from primary to linked agents
+        self._sync_policy_path(group_id)
+
+        # Update visual indicators
+        self._update_link_visual_indicators()
+
+        return group_id
+
+    def _update_link_group(self, group_id: str, primary_agent: str, new_linked_agents: list[str]) -> None:
+        """Update an existing link group with new linked agents.
+
+        Args:
+            group_id: The group to update.
+            primary_agent: The primary agent.
+            new_linked_agents: New list of linked agents.
+        """
+        from gym_gui.logging_config.helpers import log_constant
+        from gym_gui.logging_config.log_constants import (
+            LOG_OP_AGENT_LINKED,
+            LOG_OP_AGENT_UNLINKED,
+        )
+
+        group = self._link_groups.get(group_id)
+        if not group:
+            return
+
+        old_linked = set(group.linked_agents)
+        new_linked = set(new_linked_agents)
+
+        # Find agents that were added
+        added = new_linked - old_linked
+        for agent in added:
+            log_constant(
+                _LOGGER,
+                LOG_OP_AGENT_LINKED,
+                extra={
+                    "agent_name": agent,
+                    "group_id": group_id,
+                    "primary_agent": primary_agent,
+                }
+            )
+
+        # Find agents that were removed
+        removed = old_linked - new_linked
+        for agent in removed:
+            log_constant(
+                _LOGGER,
+                LOG_OP_AGENT_UNLINKED,
+                extra={
+                    "agent_name": agent,
+                    "group_id": group_id,
+                    "primary_agent": primary_agent,
+                }
+            )
+
+        # Update group
+        group.linked_agents = new_linked_agents.copy()
+
+        # If no linked agents remain, dissolve the group
+        if not group.linked_agents:
+            self.remove_link_group(group_id)
+        else:
+            # Update visual indicators and sync policy paths
+            self._update_link_visual_indicators()
+            self._sync_policy_path(group_id)
+
+    def remove_link_group(self, group_id: str) -> None:
+        """Remove a link group and unlink all agents.
+
+        Args:
+            group_id: The group to remove.
+        """
+        from gym_gui.logging_config.helpers import log_constant
+        from gym_gui.logging_config.log_constants import LOG_OP_AGENT_LINK_GROUP_DISSOLVED
+
+        group = self._link_groups.get(group_id)
+        if not group:
+            return
+
+        # Log group dissolution
+        log_constant(
+            _LOGGER,
+            LOG_OP_AGENT_LINK_GROUP_DISSOLVED,
+            extra={
+                "group_id": group_id,
+                "primary_agent": group.primary_agent,
+                "linked_agents": group.linked_agents,
+            }
+        )
+
+        # Remove group
+        del self._link_groups[group_id]
+
+        # Update visual indicators
+        self._update_link_visual_indicators()
+
+    def _update_link_visual_indicators(self) -> None:
+        """Update background colors, RL row visibility, and linking indicators for all linked agents."""
+        # Reset all backgrounds and show all RL rows first
+        for row in self._rows.values():
+            row.setStyleSheet("")
+            row.set_rl_row_visible(True)
+            row.set_policy_fields_visible(True)
+            # Reset button visibility: show "Link Agents", hide "Unlink Agents"
+            if hasattr(row, '_link_agents_btn') and hasattr(row, '_unlink_agents_btn'):
+                row._link_agents_btn.show()
+                row._unlink_agents_btn.hide()
+
+        # Hide all linking indicators first
+        for indicator in self._linking_indicators.values():
+            indicator.hide()
+
+        # Apply background colors and update visibility for linked agents
+        for group in self._link_groups.values():
+            # Apply background color to all agents in the group
+            # Use QWidget-specific styling to constrain the background to the widget bounds
+            for agent in group.all_agents():
+                row = self._rows.get(agent)
+                if row:
+                    row.setStyleSheet(f"PlayerAssignmentRow {{ background-color: {group.color}; }}")
+
+            # Update button visibility for agents in the group
+            # Primary agent: show "Link Agents", hide "Unlink Agents", show all policy fields
+            primary_row = self._rows.get(group.primary_agent)
+            if primary_row:
+                if hasattr(primary_row, '_link_agents_btn') and hasattr(primary_row, '_unlink_agents_btn'):
+                    primary_row._link_agents_btn.show()
+                    primary_row._unlink_agents_btn.hide()
+                primary_row.set_policy_fields_visible(True)
+
+            # Linked agents (not primary): hide "Link Agents", show "Unlink Agents", hide policy fields
+            for agent in group.linked_agents:
+                row = self._rows.get(agent)
+                if row:
+                    if hasattr(row, '_link_agents_btn') and hasattr(row, '_unlink_agents_btn'):
+                        row._link_agents_btn.hide()
+                        row._unlink_agents_btn.show()
+                    # Keep RL row visible but hide policy fields (keep Unlink button visible)
+                    row.set_policy_fields_visible(False)
+
+            # Show linking indicators between consecutive agents in the group
+            all_agents = group.all_agents()
+
+            # Get primary agent's color
+            primary_row = self._rows.get(group.primary_agent)
+            hex_color = "#4CAF50"  # Default green
+            if primary_row:
+                color_name = primary_row._color_combo.currentData()
+                if color_name and color_name != "auto":
+                    hex_color = COLOR_PALETTE.get(color_name, ("#4CAF50", ""))[0]
+
+            for i in range(len(all_agents) - 1):
+                current_agent = all_agents[i]
+                next_agent = all_agents[i + 1]
+
+                # Check if these agents are consecutive in the agent list
+                try:
+                    current_idx = self._agent_ids.index(current_agent)
+                    next_idx = self._agent_ids.index(next_agent)
+
+                    # Only show indicator if agents are consecutive
+                    if next_idx == current_idx + 1:
+                        indicator_key = f"{current_agent}_{next_agent}"
+                        indicator = self._linking_indicators.get(indicator_key)
+                        if indicator:
+                            indicator._group_id = group.group_id
+                            indicator._agent_id = next_agent  # Update agent_id to match the agent below
+                            indicator.set_color(hex_color)
+                            indicator.show()
+                except ValueError:
+                    # Agent not found in list, skip
+                    pass
+
+    def _sync_policy_path(self, group_id: str) -> None:
+        """Sync policy path from primary agent to all linked agents.
+
+        Args:
+            group_id: The group to sync.
+        """
+        from gym_gui.logging_config.helpers import log_constant
+        from gym_gui.logging_config.log_constants import LOG_OP_AGENT_LINK_POLICY_SYNCED
+
+        group = self._link_groups.get(group_id)
+        if not group:
+            return
+
+        # Get primary agent's policy path
+        primary_row = self._rows.get(group.primary_agent)
+        if not primary_row:
+            return
+
+        policy_path = primary_row._policy_path_edit.text()
+
+        # Update group's policy path
+        group.policy_path = policy_path
+
+        # Sync to all linked agents
+        for agent in group.linked_agents:
+            row = self._rows.get(agent)
+            if row:
+                row._policy_path_edit.setText(policy_path)
+
+        # Log sync
+        log_constant(
+            _LOGGER,
+            LOG_OP_AGENT_LINK_POLICY_SYNCED,
+            extra={
+                "group_id": group_id,
+                "primary_agent": group.primary_agent,
+                "linked_agents": group.linked_agents,
+                "policy_path": policy_path,
+            }
+        )
+
+    def _find_link_group_by_agent(self, agent_name: str) -> Optional[LinkGroup]:
+        """Find the link group that contains the given agent.
+
+        Args:
+            agent_name: The agent to search for.
+
+        Returns:
+            The LinkGroup containing the agent, or None if not found.
+        """
+        for group in self._link_groups.values():
+            if group.contains_agent(agent_name):
+                return group
+        return None
+
+    def _on_policy_path_changed(self, player_id: str, new_path: str) -> None:
+        """Handle policy path change - sync to linked agents if primary.
+
+        Args:
+            player_id: The agent whose policy path changed.
+            new_path: The new policy path.
+        """
+        # Check if this agent is a primary agent in a link group
+        group = self._find_link_group_by_agent(player_id)
+        if not group:
+            return
+
+        # Only sync if this is the primary agent
+        if group.primary_agent != player_id:
+            return
+
+        # Update group's policy path
+        group.policy_path = new_path
+
+        # Sync to all linked agents
+        for agent in group.linked_agents:
+            row = self._rows.get(agent)
+            if row:
+                # Temporarily disable updating to prevent signal loops
+                row._updating = True
+                row._policy_path_edit.setText(new_path)
+                row._updating = False
+
+    def _on_link_agents_requested(self, player_id: str) -> None:
+        """Handle Link Agents button click - open dialog to create/edit link group.
+
+        Args:
+            player_id: The agent requesting to create a link group.
+        """
+        # Get the primary agent's row
+        primary_row = self._rows.get(player_id)
+        if not primary_row:
+            return
+
+        # Check if agent is RL type
+        if primary_row._type_combo.currentText().lower() != "rl":
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Invalid Agent Type",
+                "Only RL agents can be linked. Please set the agent type to RL first."
+            )
+            return
+
+        # Check if this agent is already a primary agent in a link group
+        existing_group = None
+        currently_linked = []
+        for group in self._link_groups.values():
+            if group.primary_agent == player_id:
+                existing_group = group
+                currently_linked = group.linked_agents.copy()
+                break
+
+        # Get available RL agents to link with
+        available_agents: Dict[str, str] = {}
+        for agent_id, row in self._rows.items():
+            if agent_id == player_id:
+                continue  # Skip primary agent
+
+            # Only include RL agents
+            if row._type_combo.currentText().lower() != "rl":
+                continue
+
+            # If editing existing group, include currently linked agents
+            if existing_group and agent_id in currently_linked:
+                agent_label = self._agent_labels.get(agent_id, agent_id)
+                available_agents[agent_id] = agent_label
+                continue
+
+            # Skip agents already in OTHER link groups
+            agent_group = self._find_link_group_by_agent(agent_id)
+            if agent_group and agent_group.group_id != (existing_group.group_id if existing_group else None):
+                continue
+
+            # Add to available agents
+            agent_label = self._agent_labels.get(agent_id, agent_id)
+            available_agents[agent_id] = agent_label
+
+        # Get primary agent label
+        primary_label = self._agent_labels.get(player_id, player_id)
+
+        # Open dialog
+        dialog = LinkGroupDialog(
+            primary_agent=player_id,
+            primary_agent_label=primary_label,
+            available_agents=available_agents,
+            currently_linked=currently_linked,
+            parent=self
+        )
+
+        if dialog.exec() == QtWidgets.QDialog.DialogCode.Accepted:
+            # Get selected agents
+            linked_agents = dialog.get_selected_agents()
+
+            if existing_group:
+                # Update existing link group
+                existing_group.linked_agents = linked_agents
+                self._sync_policy_path(existing_group.group_id)
+                self._update_link_visual_indicators()
+
+                QtWidgets.QMessageBox.information(
+                    self,
+                    "Link Group Updated",
+                    f"Successfully updated link group '{existing_group.group_id}' with {len(linked_agents) + 1} agents."
+                )
+            else:
+                # Create new link group
+                group_id = self.create_link_group(
+                    primary_agent=player_id,
+                    linked_agents=linked_agents,
+                )
+
+                if group_id:
+                    QtWidgets.QMessageBox.information(
+                        self,
+                        "Link Group Created",
+                        f"Successfully created link group '{group_id}' with {len(linked_agents) + 1} agents."
+                    )
+
+    def _on_unlink_agents_requested(self, player_id: str) -> None:
+        """Handle Unlink Agents button click - remove agent from its link group.
+
+        Args:
+            player_id: The agent to unlink.
+        """
+        # Find which link group this agent belongs to
+        group = self._find_link_group_by_agent(player_id)
+        if not group:
+            QtWidgets.QMessageBox.warning(
+                self,
+                "Not Linked",
+                f"Agent '{player_id}' is not part of any link group."
+            )
+            return
+
+        # Confirm unlinking
+        agent_label = self._agent_labels.get(player_id, player_id)
+        reply = QtWidgets.QMessageBox.question(
+            self,
+            "Unlink Agent",
+            f"Remove '{agent_label}' from link group '{group.group_id}'?\n\n"
+            f"The agent will use its own policy instead of the shared one.",
+            QtWidgets.QMessageBox.StandardButton.Yes | QtWidgets.QMessageBox.StandardButton.No,
+            QtWidgets.QMessageBox.StandardButton.No
+        )
+
+        if reply == QtWidgets.QMessageBox.StandardButton.Yes:
+            # Call the existing unlink handler
+            self._on_unlink_requested(group.group_id, player_id)
+
 
 
 class OperatorConfigRow(QtWidgets.QWidget):
@@ -1864,6 +2874,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
             num_agents=num_agents,
             agent_ids=agent_ids,
             agent_labels=agent_labels,
+            operator_id=self._operator_id,
             parent=self._player_panel_container,
         )
         self._player_panel.assignments_changed.connect(self._on_config_changed)
@@ -2407,6 +3418,7 @@ class OperatorConfigRow(QtWidgets.QWidget):
                 observation_mode=observation_mode,
                 coordination_level=coordination_level,
                 view_size=view_size,
+                link_groups=self._player_panel._link_groups if self._player_panel else None,
             )
 
         # Single-agent mode: standard LLM/VLM/RL/Human configuration

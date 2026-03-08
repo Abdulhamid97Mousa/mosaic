@@ -101,32 +101,68 @@ class OperatorsTab(QtWidgets.QWidget):
         layout.setContentsMargins(8, 8, 8, 8)
         layout.setSpacing(8)
 
-        # Explanation section (always visible)
-        explanation_group = QtWidgets.QGroupBox("What are Operators?", self)
-        explanation_layout = QtWidgets.QVBoxLayout(explanation_group)
-        explanation_text = QtWidgets.QLabel(
-            "<p><b>Operators</b> are action-selecting entities that control agents in environments. "
-            "MOSAIC introduces a unified <i>Operator</i> abstraction that bridges:</p>"
-            "<ul>"
-            "<li><b>LLM Agents</b> - GPT-4, Claude, Gemini making decisions</li>"
-            "<li><b>RL Policies</b> - Trained neural network policies</li>"
-            "</ul>"
-            "<p>Add multiple operators below to run them in parallel and compare their performance side-by-side.</p>",
-            explanation_group
+        # Explanation section (collapsible, collapsed by default)
+        self._explanation_toggle = QtWidgets.QToolButton(self)
+        self._explanation_toggle.setText("What are Operators?")
+        self._explanation_toggle.setToolButtonStyle(
+            QtCore.Qt.ToolButtonStyle.ToolButtonTextBesideIcon
         )
-        explanation_text.setWordWrap(True)
-        explanation_text.setTextFormat(QtCore.Qt.TextFormat.RichText)
-        # No custom styling - let Qt handle dark/light mode automatically
-        explanation_layout.addWidget(explanation_text)
-        layout.addWidget(explanation_group)
+        self._explanation_toggle.setCheckable(True)
+        self._explanation_toggle.setChecked(False)
+        self._explanation_toggle.setArrowType(QtCore.Qt.ArrowType.RightArrow)
+        self._explanation_toggle.toggled.connect(self._on_explanation_toggled)
+        layout.addWidget(self._explanation_toggle)
 
-        # vLLM Servers section (always visible)
-        vllm_group = QtWidgets.QGroupBox("vLLM Servers (Local Inference)", self)
-        vllm_layout = QtWidgets.QVBoxLayout(vllm_group)
-        self._vllm_server_widget = VLLMServerWidget(max_servers=2, parent=vllm_group)
+        self._explanation_content = QtWidgets.QLabel(
+            "<p><b>Operators</b> are the evaluation-time interface for controlling agents in environments. "
+            "Each operator wraps a decision-making worker and exposes a unified "
+            "<code>select_action(observation) → action</code> protocol. Supported worker types:</p>"
+            "<ul>"
+            "<li><b>LLM Agents</b> - GPT-4, Claude, Gemini with multi-agent coordination and Theory of Mind</li>"
+            "<li><b>VLM Agents</b> - Vision-Language Models that reason over image observations</li>"
+            "<li><b>RL Policies</b> - Trained neural network policies (XuanCe, CleanRL, Ray RLlib)</li>"
+            "<li><b>Human Players</b> - Interactive human-in-the-loop control</li>"
+            "<li><b>Random</b> - Uniform random action sampling baseline</li>"
+            "<li><b>Passive</b> - Environment-aware no-op (do-nothing) agent</li>"
+            "</ul>"
+            "<p>Operators enable <b>heterogeneous evaluation</b>: mix different paradigms "
+            "(e.g. LLM vs RL vs Human) in the same multi-agent environment. "
+            "Add multiple operators below to compare their performance side-by-side.</p>"
+            "<p><b>Policy Mappings for Multi-Agent RL:</b> When deploying RL policies in multi-agent scenarios, "
+            "MOSAIC supports flexible policy-to-agent mappings:</p>"
+            "<ul>"
+            "<li><b>One-to-one Mapping</b> - Each agent has its own independent policy checkpoint (default)</li>"
+            "<li><b>One-to-many Mapping</b> - Multiple agents share a single policy checkpoint via link groups</li>"
+            "</ul>"
+            "<p>Link groups are essential for multi-agent RL evaluation because MAPPO/IPPO checkpoints store "
+            "all agents' policies in a single file. Linking agents prevents manual copy-paste errors, "
+            "ensures automatic policy path updates, and enables complex team configurations "
+            "(e.g., two independent teams with different policies).</p>",
+            self
+        )
+        self._explanation_content.setWordWrap(True)
+        self._explanation_content.setTextFormat(QtCore.Qt.TextFormat.RichText)
+        self._explanation_content.setContentsMargins(20, 0, 0, 0)
+        self._explanation_content.setVisible(False)
+        layout.addWidget(self._explanation_content)
+
+        # vLLM Servers section (collapsible, collapsed by default)
+        self._vllm_toggle = QtWidgets.QToolButton(self)
+        self._vllm_toggle.setText("vLLM Servers (Local Inference)")
+        self._vllm_toggle.setToolButtonStyle(
+            QtCore.Qt.ToolButtonStyle.ToolButtonTextBesideIcon
+        )
+        self._vllm_toggle.setCheckable(True)
+        self._vllm_toggle.setChecked(False)
+        self._vllm_toggle.setArrowType(QtCore.Qt.ArrowType.RightArrow)
+        self._vllm_toggle.toggled.connect(self._on_vllm_toggled)
+        layout.addWidget(self._vllm_toggle)
+
+        self._vllm_server_widget = VLLMServerWidget(max_servers=2, parent=self)
         self._vllm_server_widget.server_status_changed.connect(self._on_vllm_server_status_changed)
-        vllm_layout.addWidget(self._vllm_server_widget)
-        layout.addWidget(vllm_group)
+        self._vllm_server_widget.setContentsMargins(20, 0, 0, 0)
+        self._vllm_server_widget.setVisible(False)
+        layout.addWidget(self._vllm_server_widget)
 
         # Configure Operators section (always visible, takes remaining space)
         config_group = QtWidgets.QGroupBox("Configure Operators", self)
@@ -717,6 +753,20 @@ class OperatorsTab(QtWidgets.QWidget):
     def human_operator_ids(self) -> list[str]:
         """Get the list of human operator IDs."""
         return self._human_operator_ids.copy()
+
+    def _on_explanation_toggled(self, checked: bool) -> None:
+        """Toggle explanation content visibility."""
+        self._explanation_content.setVisible(checked)
+        self._explanation_toggle.setArrowType(
+            QtCore.Qt.ArrowType.DownArrow if checked else QtCore.Qt.ArrowType.RightArrow
+        )
+
+    def _on_vllm_toggled(self, checked: bool) -> None:
+        """Toggle vLLM server widget visibility."""
+        self._vllm_server_widget.setVisible(checked)
+        self._vllm_toggle.setArrowType(
+            QtCore.Qt.ArrowType.DownArrow if checked else QtCore.Qt.ArrowType.RightArrow
+        )
 
     def _on_vllm_server_status_changed(self, server_id: int, status: str, base_url: str) -> None:
         """Handle vLLM server status changes.

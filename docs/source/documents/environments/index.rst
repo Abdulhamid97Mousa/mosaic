@@ -35,6 +35,7 @@ dependency; install only the ones you need.
    babyai/index
    mosaic_multigrid/index
    ini_multigrid/index
+   griddly/index
 
 .. toctree::
    :maxdepth: 1
@@ -76,3 +77,4 @@ dependency; install only the ones you need.
    smac/index
    smacv2/index
    rware/index
+   hemac/index

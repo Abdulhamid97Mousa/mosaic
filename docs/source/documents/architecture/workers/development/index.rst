@@ -7,7 +7,7 @@ A complete worker has two sides:
 .. mermaid::
 
    graph LR
-       subgraph "Backend (3rd_party/)"
+       subgraph "Backend (3rd_party/workers/)"
            CFG["Config<br/>config.py"]
            RT["Runtime<br/>runtime.py"]
            CLI["CLI<br/>cli.py"]
@@ -44,7 +44,7 @@ A complete worker has two sides:
        style HANDLER fill:#50c878,stroke:#2e8b57,color:#fff
        style CLIENT fill:#50c878,stroke:#2e8b57,color:#fff
 
-- **Backend:** the worker package under ``3rd_party/``. Handles training
+- **Backend:** the worker package under ``3rd_party/workers/``. Handles training
   logic, telemetry, and the CLI entry point that the Daemon spawns.
 - **Frontend:** the Qt6 UI integration under ``gym_gui/ui/``. Handles
   the training form dialog, worker catalog entry, presenter, and how

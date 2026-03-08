@@ -104,7 +104,7 @@ minigrid = [
 # Required for: BabyAI-MixedTrainLocal-v0, BabyAI-MixedTestLocal-v0
 # These environments are used by BALROG benchmark and GLAM paper
 # Source: https://github.com/BartekCupial/Minigrid
-# Local path: 3rd_party/Minigrid/
+# Local path: 3rd_party/environments/Minigrid/
 # NOTE: This REPLACES standard minigrid - don't install both!
 minigrid-balrog = [
     "gymnasium>=1.1.0",
@@ -172,18 +172,18 @@ babaisai = [
 #         Action space: noop=0, left=1, right=2, forward=3, pickup=4, drop=5, toggle=6, done=7
 #         Step telemetry: infos[agent]["position"] and infos[agent]["carrying"] every step
 # Features: Gymnasium 1.0+ API, competitive/cooperative, ball passing/stealing, wrappers, PettingZoo API
-# NOTE: Now installs from local dev: pip install -e 3rd_party/mosaic_multigrid/
+# NOTE: Now installs from local dev: pip install -e 3rd_party/environments/mosaic_multigrid/
 mosaic_multigrid = [
     "mosaic-multigrid==6.0.0",
 ]
 
 # multigrid_ini - INI cooperative exploration multi-agent environments
-# Local: 3rd_party/multigrid-ini/
+# Local: 3rd_party/environments/multigrid-ini/
 # GitHub: https://github.com/ini/multigrid
 # Includes: MultiGrid-Empty, MultiGrid-RedBlueDoors, MultiGrid-LockedHallway, etc.
 # Features: Gymnasium 1.0+ API, cooperative puzzle-solving, door-opening, multi-room navigation
 # NOTE: Different from mosaic_multigrid - focuses on exploration, not sports
-# Installation: pip install -e 3rd_party/multigrid-ini/
+# Installation: pip install -e 3rd_party/environments/multigrid-ini/
 multigrid_ini = [
     "gymnasium>=1.1.0",
     "numpy>=1.24.0",
@@ -216,10 +216,10 @@ smacv2 = [
 # Robotic Warehouse (RWARE) multi-agent cooperative environment (University of Edinburgh)
 # Paper: Papoudakis et al. (2021). "Benchmarking Multi-Agent Deep RL Algorithms in Cooperative Tasks"
 # Repository: https://github.com/uoe-agents/robotic-warehouse
-# Local: 3rd_party/robotic-warehouse/
+# Local: 3rd_party/environments/robotic-warehouse/
 # Includes: tiny/small/medium/large warehouses with 2-19 agents, 3 reward types, 4 observation types
 # Features: Cooperative shelf delivery, collision resolution, communication channels
-# Installation: pip install -e 3rd_party/robotic-warehouse/
+# Installation: pip install -e 3rd_party/environments/robotic-warehouse/
 rware = [
     "gymnasium>=1.1.0",
     "pyglet<2.0.0",
@@ -248,6 +248,27 @@ hemac = [
     "pygame>=2.3.0",
     "pymap3d>=3.1.0",
     "shapely>=2.0.5",
+]
+
+# Neural MMO - Massively multiagent game environment (MIT)
+# Paper: Suarez et al. (2019). "Neural MMO: A Massively Multiagent Game Environment"
+# Repository: https://github.com/NeuralMMO/environment
+# Local: 3rd_party/environments/neural-mmo/
+# Includes: Persistent MMO-style environment with 100+ concurrent agents, foraging, combat
+# Features: PettingZoo ParallelEnv API, procedural terrain, resource competition
+# NOTE: Requires Python <3.11, has Cython extension that needs compilation
+# Installation: pip install -e 3rd_party/environments/neural-mmo/
+neuralmmo = [
+    "cython>=3.0.0",
+    "numpy>=1.23.3",
+    "scipy>=1.10.0",
+    "imageio>=2.27",
+    "ordered-set==4.1.0",
+    "pettingzoo>=1.24.1",
+    "gymnasium>=0.29.1",
+    "psutil>=5.9.0",
+    "tqdm>=4.0.0",
+    "dill>=0.3.0",
 ]
 
 # Jumanji JAX-based RL environments (Google DeepMind)
@@ -302,10 +323,10 @@ meltingpot = [
 # Overcooked-AI cooperative cooking (UC Berkeley CHAI)
 # Paper: Carroll et al. (2019). "On the Utility of Learning about Humans for Human-AI Coordination"
 # Repository: https://github.com/HumanCompatibleAI/overcooked_ai
-# Location: 3rd_party/overcooked_ai/
+# Location: 3rd_party/environments/overcooked_ai/
 # Includes: 50+ layouts (cramped_room, asymmetric_advantages, coordination_ring, etc.)
 # Features: 2-agent cooperative, simultaneous stepping, sparse rewards, zero-shot coordination
-# NOTE: Install from local path: pip install -e 3rd_party/overcooked_ai/
+# NOTE: Install from local path: pip install -e 3rd_party/environments/overcooked_ai/
 # WARNING: Python 3.10 ONLY (requires >=3.10,<3.11) - incompatible with Python 3.11+
 overcooked = [
     "dill",
@@ -338,7 +359,7 @@ mujoco-mpc = [
     "mujoco>=3.0.0",
 ]
 
-# Godot worker (binary included in 3rd_party/godot_worker/bin/)
+# Godot worker (binary included in 3rd_party/workers/godot_worker/bin/)
 godot = [
     # Optional: godot-rl for Python RL bridge
     # "godot-rl>=0.6.0",
@@ -365,7 +386,7 @@ ray-rllib = [
 
 # XuanCe worker for MARL training
 # NOTE: The xuance library (>= 1.4.0) must be installed separately from
-# the git submodule: pip install -e "3rd_party/xuance_worker/xuance[torch]"
+# the git submodule: pip install -e "3rd_party/workers/xuance_worker/xuance[torch]"
 # The dependencies below are the Python packages required alongside xuance.
 xuance = [
     "torch>=2.0.0",
@@ -452,20 +473,20 @@ full = [
 [tool.setuptools.packages.find]
 where = [
     ".",
-    "3rd_party/jumanji_worker",
-    "3rd_party/balrog_worker",
-    "3rd_party/cleanrl_worker",
-    "3rd_party/ray_worker",
-    "3rd_party/xuance_worker",
-    "3rd_party/chess_worker",
-    "3rd_party/mctx_worker",
-    "3rd_party/marllib_worker",
+    "3rd_party/workers/jumanji_worker",
+    "3rd_party/workers/balrog_worker",
+    "3rd_party/workers/cleanrl_worker",
+    "3rd_party/workers/ray_worker",
+    "3rd_party/workers/xuance_worker",
+    "3rd_party/workers/chess_worker",
+    "3rd_party/workers/mctx_worker",
+    "3rd_party/workers/marllib_worker",
     # MOSAIC native workers
-    "3rd_party/mosaic/human_worker",
-    "3rd_party/mosaic/llm_worker",
-    "3rd_party/mosaic/vlm_worker",
-    "3rd_party/mosaic/passive_worker",
-    "3rd_party/mosaic/random_worker",
+    "3rd_party/workers/mosaic/human_worker",
+    "3rd_party/workers/mosaic/llm_worker",
+    "3rd_party/workers/mosaic/vlm_worker",
+    "3rd_party/workers/mosaic/passive_worker",
+    "3rd_party/workers/mosaic/random_worker",
 ]
 include = [
     "gym_gui*",
@@ -477,7 +498,7 @@ include = [
     "chess_worker*",
     "mctx_worker*",
     "marllib_worker*",
-    # MOSAIC native workers (under 3rd_party/mosaic/)
+    # MOSAIC native workers (under 3rd_party/workers/mosaic/)
     "human_worker*",
     "llm_worker*",
     "vlm_worker*",
@@ -493,7 +514,7 @@ ray = "ray_worker:get_worker_metadata"
 xuance = "xuance_worker:get_worker_metadata"
 chess = "chess_worker:get_worker_metadata"
 mctx = "mctx_worker:get_worker_metadata"
-# MOSAIC native workers (under 3rd_party/mosaic/)
+# MOSAIC native workers (under 3rd_party/workers/mosaic/)
 human = "human_worker:get_worker_metadata"
 llm = "llm_worker:get_worker_metadata"
 vlm = "vlm_worker:get_worker_metadata"

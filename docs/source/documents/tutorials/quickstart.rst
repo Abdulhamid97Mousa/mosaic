@@ -82,7 +82,7 @@ Running a Multi-Agent Environment
    .. tip::
 
       MOSAIC native workers (LLM, VLM, Random, Passive, Human) can also be
-      assigned as agents. Install them from ``3rd_party/mosaic/`` — see the
+      assigned as agents. Install them from ``3rd_party/workers/mosaic/`` — see the
       :doc:`installation/index` guide for details.
 
 5. Click **Play**

@@ -2,7 +2,7 @@ Installation
 ============
 
 The MOSAIC LLM Worker is installed as an editable Python package from the
-project's ``3rd_party/mosaic/llm_worker`` directory.
+project's ``3rd_party/workers/mosaic/llm_worker`` directory.
 
 .. tabs::
 
@@ -10,7 +10,7 @@ project's ``3rd_party/mosaic/llm_worker`` directory.
 
       .. code-block:: bash
 
-         pip install -e 3rd_party/mosaic/llm_worker[all]
+         pip install -e 3rd_party/workers/mosaic/llm_worker[all]
 
       This installs both the ``openai`` and ``anthropic`` SDK clients.
       OpenRouter and Google Gemini work through these same SDKs.
@@ -19,7 +19,7 @@ project's ``3rd_party/mosaic/llm_worker`` directory.
 
       .. code-block:: bash
 
-         pip install -e 3rd_party/mosaic/llm_worker
+         pip install -e 3rd_party/workers/mosaic/llm_worker
 
       Install only the base package. Add clients individually:
 
@@ -32,7 +32,7 @@ project's ``3rd_party/mosaic/llm_worker`` directory.
 
       .. code-block:: bash
 
-         pip install -e 3rd_party/mosaic/llm_worker[all,vllm]
+         pip install -e 3rd_party/workers/mosaic/llm_worker[all,vllm]
 
       Requires a CUDA-capable GPU for local model inference.
 

@@ -2,11 +2,11 @@ Installation
 ============
 
 The MOSAIC Passive Worker is installed as an editable Python package from the
-project's ``3rd_party/mosaic/passive_worker`` directory.
+project's ``3rd_party/workers/mosaic/passive_worker`` directory.
 
 .. code-block:: bash
 
-   pip install -e 3rd_party/mosaic/passive_worker
+   pip install -e 3rd_party/workers/mosaic/passive_worker
 
 That's it — no API keys, no GPU, no optional extras required.
 
@@ -37,7 +37,7 @@ installed separately depending on which environments you plan to use:
    pip install -e ".[minigrid]"
 
    # For MosaicMultiGrid (Soccer, Basketball, Collect)
-   pip install -e 3rd_party/mosaic_multigrid
+   pip install -e 3rd_party/environments/mosaic_multigrid
 
 Running Tests
 -------------
@@ -45,4 +45,4 @@ Running Tests
 .. code-block:: bash
 
    # Run all tests
-   python -m pytest 3rd_party/mosaic/passive_worker/tests/ -v
+   python -m pytest 3rd_party/workers/mosaic/passive_worker/tests/ -v

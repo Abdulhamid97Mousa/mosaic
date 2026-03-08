@@ -1,16 +1,26 @@
 {
   // Make Pylance/Pyright aware of the vendored worker packages.
   "extraPaths": [
-    "3rd_party/mujoco_mpc_worker",
-    "3rd_party/xuance_worker",
-    "3rd_party/barlog_worker"
+    "3rd_party/workers/mujoco_mpc_worker",
+    "3rd_party/workers/xuance_worker",
+    "3rd_party/workers/balrog_worker",
+    "3rd_party/workers/cleanrl_worker",
+    "3rd_party/workers/ray_worker",
+    "3rd_party/workers/chess_worker",
+    "3rd_party/workers/mctx_worker",
+    "3rd_party/workers/marllib_worker",
+    "3rd_party/workers/jumanji_worker",
+    "3rd_party/workers/llm_game_worker",
+    "3rd_party/workers/mosaic/human_worker",
+    "3rd_party/workers/mosaic/llm_worker",
+    "3rd_party/workers/mosaic/vlm_worker",
+    "3rd_party/workers/mosaic/passive_worker",
+    "3rd_party/workers/mosaic/random_worker"
   ],
   // Keep analysis focused on the project sources.
   "include": [
     "gym_gui",
-    "3rd_party/mujoco_mpc_worker",
-    "3rd_party/xuance_worker",
-    "3rd_party/barlog_worker"
+    "3rd_party/workers"
   ],
   // Match the repo's virtual environment so stubs resolve correctly.
   "venv": ".venv",
