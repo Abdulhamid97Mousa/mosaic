@@ -137,6 +137,7 @@ def _make_griddly_env(env_id: str) -> gym.Env:
     _ensure_griddly()
     try:
         import warnings
+
         import gym as old_gym  # griddly uses legacy gym
 
         # Suppress gym's passive_env_checker warnings for Griddly's legacy API

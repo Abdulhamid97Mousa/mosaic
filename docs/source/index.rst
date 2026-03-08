@@ -244,9 +244,9 @@ one-to-many (shared policies via link groups).
                B1["agent_1<br/>(Linked)"]
                B2["agent_2<br/>(Linked)"]
 
-               CHECKPOINT -->|"Auto-synced"| B0
-               B0 -.->|"Updates propagate"| B1
-               B0 -.->|"Updates propagate"| B2
+               CHECKPOINT -->|"Shared"| B0
+               CHECKPOINT -->|"Shared"| B1
+               CHECKPOINT -->|"Shared"| B2
 
                style MANY_TITLE fill:#f5f5f5,stroke:none,color:#666
                style CHECKPOINT fill:#ff7f50,stroke:#cc5500,color:#fff
@@ -264,8 +264,8 @@ one-to-many (shared policies via link groups).
 
 Without flexible policy mappings, you're forced to choose between:
 
-- **Manual configuration** → Copy-paste errors, update fragility, no visual indication of sharing
-- **Forced homogeneity** → All agents must use the same worker type, no heterogeneity possible
+- **Manual configuration:** Copy-paste errors, update fragility, no visual indication of sharing
+- **Forced homogeneity:** All agents must use the same worker type, no heterogeneity possible
 
 With flexible policy mappings, you can:
 
@@ -294,10 +294,6 @@ With flexible policy mappings, you can:
            ),
        },
    )
-
-This configuration enables novel research questions: cross-paradigm cooperation,
-ad-hoc teamwork, paradigm comparison, and ablation studies—all impossible without
-flexible policy mappings.
 
 See :doc:`documents/architecture/operators/policy_mappings` for complete
 documentation, including a complex 3vs3 heterogeneous scenario with MAPPO + PPO + Random agents.
@@ -603,7 +599,7 @@ Standard Self-Play vs Cross-Paradigm Transfer
 
    **Standard Self-Play and Cross-Paradigm Transfer.**
 
-   **(a) Standard Self-Play (Baseline):** Agents :math:`\pi^{RL}_1` and :math:`\pi^{RL}_2` are
+**(a) Standard Self-Play (Baseline):** Agents :math:`\pi^{RL}_1` and :math:`\pi^{RL}_2` are
    co-trained, learning implicit partner models that overfit to the specific environment.
    This approach fails the Zero-Shot Coordination (ZSC) challenge because it struggles to
    coordinate with unseen RL partners (who may have learned different features). It
@@ -612,8 +608,8 @@ Standard Self-Play vs Cross-Paradigm Transfer
    (:math:`\mathcal{O}^{\text{RL}} \neq \mathcal{O}^{\text{LLM}}`) and violated behavioral
    expectations.
 
-   **(b) Cross-Paradigm Transfer (MOSAIC):** Agent :math:`\pi^{RL}` is trained solo
-   (:math:`N=1`, zero partner expectations), then deployed in multi-agent teams alongside
+**(b) Cross-Paradigm Transfer (MOSAIC):** Agent :math:`\pi^{RL}` is trained solo
+(:math:`N=1`, zero partner expectations), then deployed in multi-agent teams alongside
    heterogeneous partners such as LLM agents :math:`\lambda^{LLM}`, human players :math:`h`,
    or random baselines. By eliminating co-training dependencies, agents can cooperate
    across paradigm boundaries using a unified action interface.

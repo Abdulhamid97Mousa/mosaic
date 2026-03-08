@@ -289,3 +289,4 @@ _vizdoom.ini
 logs/
 # XuanCe default result_dir
 results/
+3rd_party/environments/mosaic_multigrid

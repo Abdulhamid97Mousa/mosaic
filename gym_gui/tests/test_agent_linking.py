@@ -4,9 +4,10 @@ This module tests the agent linking functionality that allows multiple agents
 to share the same policy checkpoint in MAPPO/IPPO scenarios.
 """
 
-import pytest
 from pathlib import Path
 from typing import Dict, List
+
+import pytest
 
 from gym_gui.services.operator import LinkGroup, OperatorConfig, WorkerAssignment
 

@@ -1175,7 +1175,7 @@ class RPSEnvironmentAdapter(EnvironmentAdapter[Dict[str, Any], int]):
             return None
 
     def _package_step(self, observation: Dict[str, Any], reward: float, terminated: bool, truncated: bool, info: Mapping[str, Any]) -> AdapterStep[Dict[str, Any]]:
-        obs_data = observation.get("observation", observation)
+        observation.get("observation", observation)
         action_mask = observation.get("action_mask", [1, 1, 1])
         legal_actions = [i for i in range(len(action_mask)) if action_mask[i] == 1]
 
@@ -1291,7 +1291,7 @@ class PokerEnvironmentAdapter(EnvironmentAdapter[Dict[str, Any], int]):
             return None
 
     def _package_step(self, observation: Dict[str, Any], reward: float, terminated: bool, truncated: bool, info: Mapping[str, Any]) -> AdapterStep[Dict[str, Any]]:
-        obs_data = observation.get("observation", observation)
+        observation.get("observation", observation)
         action_mask = observation.get("action_mask", [1, 1, 1, 1])
         legal_actions = [i for i in range(len(action_mask)) if action_mask[i] == 1]
 
@@ -1415,7 +1415,7 @@ class HanabiEnvironmentAdapter(EnvironmentAdapter[Dict[str, Any], int]):
             return None
 
     def _package_step(self, observation: Dict[str, Any], reward: float, terminated: bool, truncated: bool, info: Mapping[str, Any]) -> AdapterStep[Dict[str, Any]]:
-        obs_data = observation.get("observation", observation)
+        observation.get("observation", observation)
         action_mask = observation.get("action_mask", [])
         legal_actions = [i for i in range(len(action_mask)) if action_mask[i] == 1]
 

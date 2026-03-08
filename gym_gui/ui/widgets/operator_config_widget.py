@@ -1632,8 +1632,8 @@ class PlayerAssignmentPanel(QtWidgets.QWidget):
             group_id: The group to modify.
             agent_id: The specific agent to remove from the group.
         """
-        from gym_gui.logging_config.log_constants import LOG_OP_AGENT_UNLINKED
         from gym_gui.logging_config.helpers import log_constant
+        from gym_gui.logging_config.log_constants import LOG_OP_AGENT_UNLINKED
 
         group = self._link_groups.get(group_id)
         if not group:
@@ -1718,11 +1718,11 @@ class PlayerAssignmentPanel(QtWidgets.QWidget):
         Returns:
             The group_id of the created group.
         """
+        from gym_gui.logging_config.helpers import log_constant
         from gym_gui.logging_config.log_constants import (
             LOG_OP_AGENT_LINK_GROUP_CREATED,
             LOG_OP_AGENT_LINK_VALIDATION_ERROR,
         )
-        from gym_gui.logging_config.helpers import log_constant
 
         # Validate that all agents exist
         all_agents = [primary_agent] + linked_agents
@@ -1803,11 +1803,11 @@ class PlayerAssignmentPanel(QtWidgets.QWidget):
             primary_agent: The primary agent.
             new_linked_agents: New list of linked agents.
         """
+        from gym_gui.logging_config.helpers import log_constant
         from gym_gui.logging_config.log_constants import (
             LOG_OP_AGENT_LINKED,
             LOG_OP_AGENT_UNLINKED,
         )
-        from gym_gui.logging_config.helpers import log_constant
 
         group = self._link_groups.get(group_id)
         if not group:
@@ -1859,8 +1859,8 @@ class PlayerAssignmentPanel(QtWidgets.QWidget):
         Args:
             group_id: The group to remove.
         """
-        from gym_gui.logging_config.log_constants import LOG_OP_AGENT_LINK_GROUP_DISSOLVED
         from gym_gui.logging_config.helpers import log_constant
+        from gym_gui.logging_config.log_constants import LOG_OP_AGENT_LINK_GROUP_DISSOLVED
 
         group = self._link_groups.get(group_id)
         if not group:
@@ -1966,8 +1966,8 @@ class PlayerAssignmentPanel(QtWidgets.QWidget):
         Args:
             group_id: The group to sync.
         """
-        from gym_gui.logging_config.log_constants import LOG_OP_AGENT_LINK_POLICY_SYNCED
         from gym_gui.logging_config.helpers import log_constant
+        from gym_gui.logging_config.log_constants import LOG_OP_AGENT_LINK_POLICY_SYNCED
 
         group = self._link_groups.get(group_id)
         if not group:

@@ -1,5 +1,15 @@
 """Griddly game documentation — re-exports from single_agent/ and multi_agent/."""
 
+from gym_gui.game_docs.Griddly.multi_agent import (
+    GRIDDLY_FORAGERS_HTML,
+    GRIDDLY_HEAL_OR_DIE_HTML,
+    GRIDDLY_KILL_THE_KING_HTML,
+    GRIDDLY_PUSH_MANIA_HTML,
+    GRIDDLY_ROBOT_TAG_4V4_HTML,
+    GRIDDLY_ROBOT_TAG_8V8_HTML,
+    GRIDDLY_ROBOT_TAG_12V12_HTML,
+    GRIDDLY_RTS_HTML,
+)
 from gym_gui.game_docs.Griddly.single_agent import (
     GRIDDLY_BAIT_HTML,
     GRIDDLY_BAIT_WITH_KEYS_HTML,
@@ -25,16 +35,6 @@ from gym_gui.game_docs.Griddly.single_agent import (
     GRIDDLY_ZELDA_HTML,
     GRIDDLY_ZELDA_SEQUENTIAL_HTML,
     GRIDDLY_ZEN_PUZZLE_HTML,
-)
-from gym_gui.game_docs.Griddly.multi_agent import (
-    GRIDDLY_FORAGERS_HTML,
-    GRIDDLY_HEAL_OR_DIE_HTML,
-    GRIDDLY_KILL_THE_KING_HTML,
-    GRIDDLY_PUSH_MANIA_HTML,
-    GRIDDLY_ROBOT_TAG_12V12_HTML,
-    GRIDDLY_ROBOT_TAG_4V4_HTML,
-    GRIDDLY_ROBOT_TAG_8V8_HTML,
-    GRIDDLY_RTS_HTML,
 )
 
 __all__ = [
