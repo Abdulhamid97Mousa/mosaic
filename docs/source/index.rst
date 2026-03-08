@@ -450,7 +450,7 @@ reproducible head-to-head evaluation.
          <td>LLM-Game-Bench <a href="#ref14">[14]</a></td>
          <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-yes">&#10003;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
          <td><span class="cmp-yes">&#10003;</span></td>
-         <td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-part">&#9673;</span></td><td><span class="cmp-no">&#10007;</span></td>
+         <td><span class="cmp-part">&#9673;</span></td><td><span class="cmp-no">&#10007;</span></td><td><span class="cmp-no">&#10007;</span></td>
        </tr>
        <tr>
          <td>AgentBench <a href="#ref16">[16]</a></td>
