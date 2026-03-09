@@ -205,6 +205,7 @@ def _detect_optional_dependencies() -> dict[str, bool]:
         "minigrid": "minigrid",
         "babyai": "minigrid.envs.babyai",  # BabyAI (bundled in minigrid>=2)
         "mosaic_multigrid": "mosaic_multigrid",  # Modern fork (Gymnasium API)
+        ## "mosaic_malmo": "mosaic_malmo",  # Go-based Minecraft RL environment
         "multigrid_ini": "multigrid",  # Original INI version (cooperative exploration)
         "pettingzoo": "pettingzoo",
         "mujoco": "mujoco",
@@ -212,6 +213,16 @@ def _detect_optional_dependencies() -> dict[str, bool]:
         "vizdoom": "vizdoom",
         "crafter": "crafter",
         "nethack": "nle",  # NLE = NetHack Learning Environment (different from ALE!)
+        "procgen": "procgen",  # Procgen procedurally generated benchmark
+        "textworld": "textworld",  # TextWorld text-based game environment
+        "babaisai": "baba_is_ai",  # BabaIsAI rule manipulation puzzle benchmark
+        "griddly": "griddly",  # Griddly C++ backend grid world platform
+        "jumanji": "jumanji",  # Jumanji JAX-based RL environments
+        ## "pybullet_drones": "gym_pybullet_drones",  # PyBullet Drones quadcopter environments
+        "openspiel": "pyspiel",  # OpenSpiel board games via Shimmy
+        "meltingpot": "meltingpot",  # Melting Pot multi-agent social scenarios
+        ## "neuralmmo": "nmmo",  # Neural MMO massively multiagent game environment
+        ## "hemac": "hemac",  # HeMAC Heterogeneous Multi-Agent Challenge
 
         # Overcooked versions
         "overcooked_ai": "overcooked_ai_py",  # Original UC Berkeley version

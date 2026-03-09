@@ -1,12 +1,13 @@
 Griddly
 =======
 
-.. figure:: /images/envs/griddly/griddly.gif
-   :alt: Griddly environments showcase
-   :align: center
-   :width: 80%
+.. raw:: html
 
-   Griddly: High-performance grid-based research platform
+   <video style="width:100%; max-width:100%; height:auto; border-radius:8px; box-shadow:0 2px 8px rgba(0,0,0,0.15);" controls autoplay muted loop playsinline>
+     <source src="https://private-user-images.githubusercontent.com/80536675/560458741-ae51195e-04f2-453d-b2c0-9110fc5c1688.mp4" type="video/mp4">
+     Your browser does not support the video tag.
+   </video>
+   <br><br>
 
 Overview
 --------
@@ -38,6 +39,9 @@ Environment Categories
 
 **Multi-Agent RTS**
    - GriddlyRTS, Push Mania, Kill The King, Heal Or Die
+   - Full human keyboard control supported: each player commands their units
+     with WASD / arrow keys; MOSAIC automatically resolves the target unit
+     via the Griddly game state API
 
 **Multi-Agent Cooperative/Competitive**
    - Robot Tag (4v4, 8v8, 12v12), Foragers
@@ -115,10 +119,11 @@ Common Issues
       # Verify installation
       vulkaninfo
 
-**Multi-agent action space errors**
-   Some Griddly multi-agent environments use ``MultiAgentActionSpace`` which is not
-   compatible with MOSAIC's single-agent adapter. Use the environments listed above
-   which have been verified to work with MOSAIC.
+**Multi-agent action space**
+   All Griddly multi-agent environments are fully supported, including RTS-style
+   games (Push Mania, GriddlyRTS, Kill The King, Heal Or Die) and cooperative
+   games (Foragers, Robot Tag).  Connect two USB keyboards, assign each to a
+   player in the *Keyboard Assignment* panel, and use WASD / arrow keys to play.
 
 Citation
 --------

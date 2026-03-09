@@ -17,9 +17,10 @@ and adds ``reset(seed=..., options=...)`` support.  No extra dependency beyond
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, Mapping
+from typing import Any, Dict, List, Mapping
 
 import gymnasium as gym
+import gymnasium.spaces as gspaces
 import numpy as np
 
 from gym_gui.core.adapters.base import (
@@ -110,6 +111,92 @@ class _GriddlyGymnasiumWrapper(gym.Env):
 
 
 # ---------------------------------------------------------------------------
+# Gymnasium compatibility shim for Griddly multi-agent environments
+# ---------------------------------------------------------------------------
+
+def _to_gymnasium_space(old_space: Any) -> gspaces.Space:
+    """Convert an old gym space to a gymnasium space."""
+    import gym.spaces as old_spaces
+    if isinstance(old_space, old_spaces.Box):
+        return gspaces.Box(
+            low=old_space.low,
+            high=old_space.high,
+            shape=old_space.shape,
+            dtype=old_space.dtype,
+        )
+    if isinstance(old_space, old_spaces.Discrete):
+        return gspaces.Discrete(old_space.n)
+    if isinstance(old_space, old_spaces.MultiDiscrete):
+        return gspaces.MultiDiscrete(old_space.nvec)
+    # Fallback: return as-is and hope for the best
+    return old_space  # type: ignore[return-value]
+
+
+class _GriddlyMultiAgentGymnasiumWrapper(gym.Env):
+    """Gymnasium wrapper for multi-agent Griddly environments.
+
+    Converts ``MultiAgentActionSpace`` / ``MultiAgentObservationSpace`` (both
+    ``list`` subclasses, not ``gym.spaces.Space``) to proper
+    ``gymnasium.spaces.Tuple`` so that MOSAIC's space machinery accepts them.
+
+    Step / reset API is translated from old-gym 4-tuple to Gymnasium 5-tuple.
+    Observations and rewards are returned as tuples (one entry per agent).
+    """
+
+    metadata: dict[str, Any] = {"render_modes": ["rgb_array"]}
+
+    def __init__(self, griddly_env: Any, render_mode: str = "rgb_array") -> None:
+        super().__init__()
+        self._env = griddly_env
+        self.render_mode = render_mode
+        self.player_count: int = griddly_env.player_count
+
+        self.action_space: gspaces.Space[Any] = gspaces.Tuple(
+            tuple(_to_gymnasium_space(s) for s in griddly_env.action_space)
+        )
+        self.observation_space: gspaces.Space[Any] = gspaces.Tuple(
+            tuple(_to_gymnasium_space(s) for s in griddly_env.observation_space)
+        )
+
+    def reset(
+        self,
+        *,
+        seed: int | None = None,
+        options: dict[str, Any] | None = None,
+    ) -> tuple[tuple[Any, ...], dict[str, Any]]:
+        if seed is not None:
+            self._env.seed(seed)
+        obs_list = self._env.reset()  # returns list of per-agent obs
+        return tuple(obs_list), {}
+
+    def step(
+        self, action: Any
+    ) -> tuple[tuple[Any, ...], float, bool, bool, dict[str, Any]]:
+        actions = list(action)
+        result = self._env.step(actions)
+        if len(result) == 5:
+            obs_list, rewards, terminated, truncated, info = result
+        else:
+            obs_list, rewards, done, info = result
+            terminated = done
+            truncated = False
+        total_reward = float(sum(float(r) for r in rewards))
+        return tuple(obs_list), total_reward, bool(terminated), bool(truncated), (info or {})
+
+    def render(self) -> np.ndarray | None:
+        try:
+            try:
+                return self._env.render(mode="rgb_array")
+            except TypeError:
+                return self._env.render()
+        except Exception:
+            return None
+
+    def close(self) -> None:
+        self._env.close()
+
+
+# ---------------------------------------------------------------------------
 # Lazy import + env factory
 # ---------------------------------------------------------------------------
 
@@ -119,11 +206,7 @@ def _ensure_griddly() -> None:
 
 
 def _make_griddly_env(env_id: str) -> gym.Env:
-    """Create and return a Gymnasium-wrapped Griddly environment.
-
-    Griddly registers environments against the *old* ``gym`` namespace.
-    We create them via ``gym.make`` (old gym) and wrap with
-    :class:`_GriddlyGymnasiumWrapper` to expose the Gymnasium protocol.
+    """Create and return a Gymnasium-wrapped single-agent Griddly environment.
 
     Args:
         env_id: Registered Griddly environment ID (e.g. ``"GDY-Zelda-v0"``).
@@ -140,28 +223,56 @@ def _make_griddly_env(env_id: str) -> gym.Env:
 
         import gym as old_gym  # griddly uses legacy gym
 
-        # Suppress gym's passive_env_checker warnings for Griddly's legacy API
-        # Griddly uses old gym API, but our wrapper handles the conversion
+        # Bypass gym's passive_env_checker entirely: Griddly's MultiAgentActionSpace
+        # is a list subclass (not gym.spaces.Space) so the checker raises rather
+        # than warns.  We validate spaces ourselves after construction.
         with warnings.catch_warnings():
-            warnings.filterwarnings("ignore", category=UserWarning, module="gym.utils.passive_env_checker")
-            warnings.filterwarnings("ignore", category=DeprecationWarning, module="gym.utils.passive_env_checker")
-            raw_env = old_gym.make(env_id)
-
-        # Check if this is a multi-agent environment with incompatible action space
-        action_space = getattr(raw_env, 'action_space', None)
-        if action_space is not None:
-            action_space_type = type(action_space).__name__
-            if 'MultiAgent' in action_space_type:
-                raise RuntimeError(
-                    f"Multi-agent Griddly environment '{env_id}' uses {action_space_type} "
-                    "which is not compatible with MOSAIC's single-agent adapter. "
-                    "Multi-agent Griddly games are not currently supported."
-                )
+            warnings.filterwarnings("ignore", category=UserWarning)
+            warnings.filterwarnings("ignore", category=DeprecationWarning)
+            raw_env = old_gym.make(env_id, disable_env_checker=True)
 
         return _GriddlyGymnasiumWrapper(raw_env)
     except Exception as exc:
         raise RuntimeError(
             f"Could not create Griddly environment '{env_id}'. "
+            "Ensure griddly is installed and Vulkan drivers are available. "
+            f"Original error: {exc}"
+        ) from exc
+
+
+def _make_griddly_multi_agent_env(env_id: str) -> _GriddlyMultiAgentGymnasiumWrapper:
+    """Create and return a Gymnasium-wrapped multi-agent Griddly environment.
+
+    Instantiates ``GymWrapper`` directly (bypassing gym.make) so we control
+    how the ``MultiAgentActionSpace`` and ``MultiAgentObservationSpace`` are
+    exposed.
+
+    Args:
+        env_id: Registered Griddly environment ID (e.g. ``"GDY-Foragers-v0"``).
+
+    Returns:
+        A :class:`_GriddlyMultiAgentGymnasiumWrapper` exposing Gymnasium API.
+
+    Raises:
+        RuntimeError: If griddly is not installed or the env cannot be created.
+    """
+    _ensure_griddly()
+    try:
+        import warnings
+
+        import gym as old_gym
+        from griddly import GymWrapper
+
+        spec = old_gym.envs.registry[env_id]
+        with warnings.catch_warnings():
+            warnings.filterwarnings("ignore", category=UserWarning)
+            warnings.filterwarnings("ignore", category=DeprecationWarning)
+            raw_env = GymWrapper(**spec.kwargs, global_observations=False)
+
+        return _GriddlyMultiAgentGymnasiumWrapper(raw_env)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Could not create Griddly multi-agent environment '{env_id}'. "
             "Ensure griddly is installed and Vulkan drivers are available. "
             f"Original error: {exc}"
         ) from exc
@@ -492,7 +603,12 @@ class GriddlyDoggoAdapter(GriddlyAdapter):
 # ---------------------------------------------------------------------------
 
 class _GriddlyMultiAgentAdapter(GriddlyAdapter):
-    """Base for Griddly multi-agent environments."""
+    """Base for Griddly multi-agent environments.
+
+    Uses :func:`_make_griddly_multi_agent_env` which instantiates
+    ``GymWrapper`` directly and wraps ``MultiAgentActionSpace`` /
+    ``MultiAgentObservationSpace`` as ``gymnasium.spaces.Tuple``.
+    """
 
     supported_control_modes = (
         ControlMode.HUMAN_ONLY,
@@ -500,9 +616,193 @@ class _GriddlyMultiAgentAdapter(GriddlyAdapter):
         ControlMode.MULTI_AGENT_COOP,
     )
 
+    def __init__(
+        self,
+        context: AdapterContext | None = None,
+        *,
+        config: Any | None = None,
+    ) -> None:
+        super().__init__(context, config=config)
+        self._multi_env: _GriddlyMultiAgentGymnasiumWrapper | None = None
+        self._player_count: int = 0
+
     @property
     def stepping_paradigm(self) -> SteppingParadigm:  # type: ignore[override]
         return SteppingParadigm.SIMULTANEOUS
+
+    @property
+    def action_space(self) -> gspaces.Space[Any]:
+        if self._multi_env is None:
+            return gspaces.Tuple((gspaces.Discrete(5),))
+        return self._multi_env.action_space
+
+    @property
+    def observation_space(self) -> gspaces.Space[Any]:
+        if self._multi_env is None:
+            return gspaces.Tuple((gspaces.Box(low=0, high=255, shape=(3, 84, 84), dtype=np.uint8),))
+        return self._multi_env.observation_space
+
+    def load(self) -> None:
+        """Create the multi-agent Griddly environment."""
+        _LOGGER.info("Loading multi-agent Griddly environment: %s", self._gym_id)
+        self._multi_env = _make_griddly_multi_agent_env(self._gym_id)
+        self._env = self._multi_env  # keep base class reference consistent
+        self._player_count = self._multi_env.player_count
+        self.log_constant(
+            LOG_GRIDDLY_ENV_CREATED,
+            extra={"env_id": self._gym_id, "player_count": self._player_count},
+        )
+
+    def reset(
+        self,
+        *,
+        seed: int | None = None,
+        options: dict[str, Any] | None = None,
+    ) -> AdapterStep[List[np.ndarray]]:
+        if self._multi_env is None:
+            self.load()
+        assert self._multi_env is not None
+
+        effective_seed = seed if seed is not None else self._config.seed
+        obs_tuple, info = self._multi_env.reset(seed=effective_seed, options=options)
+        self._step_count = 0
+
+        self.log_constant(
+            LOG_GRIDDLY_ENV_RESET,
+            extra={
+                "env_id": self._gym_id,
+                "seed": effective_seed if effective_seed is not None else "None",
+                "player_count": self._player_count,
+            },
+        )
+
+        obs_list = list(obs_tuple)
+        agent_names = [f"agent_{i}" for i in range(self._player_count)]
+        reset_info: Dict[str, Any] = {
+            "num_agents": self._player_count,
+            "agents": agent_names,
+            "env_id": self._gym_id,
+        }
+        reset_info.update(info if isinstance(info, Mapping) else {})
+        return AdapterStep(
+            observation=obs_list,
+            reward=0.0,
+            terminated=False,
+            truncated=False,
+            info=reset_info,
+            render_payload=self._try_render(),
+        )
+
+    def _is_rts_env(self) -> bool:
+        """Return True if the underlying Griddly env uses RTS-style unit selection.
+
+        RTS environments have ``has_avatar=False`` and require a 4-component
+        action ``[src_x, src_y, action_type, direction]`` instead of the simple
+        ``[action_type, direction]`` used by avatar-based environments.
+        """
+        return (
+            self._multi_env is not None
+            and not self._multi_env._env.has_avatar
+            and len(self._multi_env._env.action_space_parts) >= 4
+        )
+
+    def _rts_expand_action(self, player_idx: int, direction: int) -> list:
+        """Expand a simple direction integer into a full RTS action vector.
+
+        Looks up the player's available units via the Griddly game API, selects
+        the first unit that can 'move', and returns the full action:
+        ``[src_x, src_y, move_action_type, direction]``.
+
+        Args:
+            player_idx: Zero-based player index (converted to 1-based internally).
+            direction: Direction integer (0=NOOP, 1-4=LEFT/UP/RIGHT/DOWN).
+
+        Returns:
+            A 4-element list ``[x, y, action_type, direction]`` for the Griddly game.
+        """
+        noop = [0, 0, 0, 0]
+        if direction == 0:
+            return noop
+
+        raw_env = self._multi_env._env  # type: ignore[union-attr]
+        action_names: list = raw_env.action_names
+        move_type = action_names.index("move") if "move" in action_names else 0
+
+        # get_available_actions() uses 1-based player IDs
+        available: dict = raw_env.game.get_available_actions(player_idx + 1)
+        for (x, y), acts in available.items():
+            if "move" in acts:
+                return [x, y, move_type, direction]
+
+        return noop
+
+    def step(self, action: Any) -> AdapterStep[List[np.ndarray]]:
+        if self._multi_env is None:
+            raise RuntimeError("Environment not loaded. Call load() first.")
+
+        # Accept a single action (broadcast) or a list/tuple of per-agent actions
+        if not isinstance(action, (list, tuple)):
+            action = [action] * self._player_count
+
+        # For RTS games (has_avatar=False) the env expects a 4-component action
+        # [src_x, src_y, action_type, direction] per player.  The human-input
+        # resolver only provides a simple direction integer, so we expand it here.
+        if self._is_rts_env():
+            action = [
+                self._rts_expand_action(i, int(a)) if isinstance(a, (int, np.integer)) else a
+                for i, a in enumerate(action)
+            ]
+
+        obs_tuple, reward, terminated, truncated, info = self._multi_env.step(action)
+        self._step_count += 1
+
+        self.log_constant(
+            LOG_GRIDDLY_STEP_SUMMARY,
+            extra={
+                "env_id": self._gym_id,
+                "step": self._step_count,
+                "reward": reward,
+                "terminated": terminated,
+                "truncated": truncated,
+            },
+        )
+
+        obs_list = list(obs_tuple)
+        return AdapterStep(
+            observation=obs_list,
+            reward=float(reward),
+            terminated=terminated,
+            truncated=truncated,
+            info=info if isinstance(info, Mapping) else {},
+            render_payload=self._try_render(),
+        )
+
+    def build_step_state(
+        self,
+        observation: List[np.ndarray],
+        info: Mapping[str, Any],
+    ) -> StepState:
+        agents = [
+            AgentSnapshot(name=f"agent_{i}")
+            for i in range(self._player_count or len(observation))
+        ]
+        return StepState(
+            agents=agents,
+            metrics={"step": self._step_count},
+        )
+
+    def close(self) -> None:
+        if self._multi_env is not None:
+            try:
+                self._multi_env.close()
+            except Exception:
+                pass
+            self._multi_env = None
+            self._env = None
+        self.log_constant(
+            LOG_GRIDDLY_ENV_CLOSED,
+            extra={"env_id": self._gym_id},
+        )
 
 
 class GriddlyRTSAdapter(_GriddlyMultiAgentAdapter):
