@@ -23,10 +23,8 @@ external dependencies beyond what is already installed in the project venv.
 from __future__ import annotations
 
 import pytest
-
 from random_worker.config import RandomWorkerConfig
 from random_worker.runtime import RandomWorkerRuntime
-
 
 # ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -132,8 +130,6 @@ class TestTwoOperatorSeedIsolation:
         The GUI may call reset many times (episode boundaries).  Each reset
         must not corrupt the action-space RNG of either worker.
         """
-        RESET_SEED = 7
-
         w1 = _make_worker("long_run_1", seed=3333)
         w2 = _make_worker("long_run_2", seed=4444)
 

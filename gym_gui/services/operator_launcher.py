@@ -1264,7 +1264,7 @@ class OperatorLauncher:
 
         # Derive a unique seed from run_id if not explicitly provided.
         # This ensures each operator has independent random actions,
-        # while the shared environment seed (passed via send_reset) 
+        # while the shared environment seed (passed via send_reset)
         # ensures identical layouts across operators.
         if seed is None:
             seed = abs(hash(run_id)) % (2**31)
