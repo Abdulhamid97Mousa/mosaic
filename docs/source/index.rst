@@ -281,16 +281,16 @@ With flexible policy mappings, you can:
    # Green team: RL + LLM | Blue team: RL + Random
    config = OperatorConfig.multi_agent(
        player_workers={
-           "agent_0": WorkerAssignment(worker_id="xuance_worker", ...),  # RL
+           "agent_0": WorkerAssignment(worker_id="xuance_worker", ...),  # RL  green agent mosaic_multigrid
            "agent_1": WorkerAssignment(worker_id="llm_worker", ...),     # LLM
-           "agent_2": WorkerAssignment(worker_id="xuance_worker", ...),  # RL
+           "agent_2": WorkerAssignment(worker_id="xuance_worker", ...),  # RL  blue agent mosaic_multigrid
            "agent_3": WorkerAssignment(worker_id="random_worker", ...),  # Random
        },
        link_groups={
            "operator_0_link_0": LinkGroup(
                primary_agent="agent_0",
                linked_agents=["agent_2"],  # Agents 0 and 2 share MAPPO policy
-               policy_path="/path/to/mappo_2v2.pth",
+               policy_path="/path/to/mappo_1v1.pth",
            ),
        },
    )
@@ -983,6 +983,7 @@ References
    documents/architecture/paradigms
    documents/architecture/policy_mapping
    documents/architecture/workers/index
+   documents/architecture/actors/index
    documents/architecture/operators/index
 
 .. toctree::

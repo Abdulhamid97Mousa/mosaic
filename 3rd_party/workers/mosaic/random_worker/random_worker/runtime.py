@@ -202,12 +202,13 @@ class RandomWorkerRuntime:
                 first_key = self._agent_keys[0]
                 self._action_space = self._raw_action_space.spaces[first_key]
 
-        if seed is not None:
-            self._action_space.seed(seed)
-
         self._step_count = 0
         self._episode_reward = 0.0
 
+        # Only seed the env layout — do NOT re-seed the action space here.
+        # Both operators receive the same layout seed (for reproducibility), but
+        # re-seeding the action space would make both workers pick identical actions.
+        # The action space RNG is seeded once at init_agent time from config.seed.
         reset_kwargs: Dict[str, Any] = {}
         if seed is not None:
             reset_kwargs["seed"] = seed
