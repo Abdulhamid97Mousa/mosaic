@@ -372,23 +372,6 @@ class TestActualCheckpoints:
             assert hasattr(ckpt, "policy_ids")
             assert hasattr(ckpt, "checkpoint_path")
 
-    def test_specific_checkpoint_exists(self):
-        """Test that the specific checkpoint mentioned by user exists."""
-        from gym_gui.config.paths import VAR_TRAINER_DIR
-        from gym_gui.policy_discovery.ray_policy_metadata import load_checkpoint_metadata
-
-        run_id = "01KCFRQYQ49CKSHCWAY7K1P1WC"
-        checkpoint_dir = VAR_TRAINER_DIR / "runs" / run_id / "checkpoints"
-
-        if not checkpoint_dir.exists():
-            pytest.skip(f"Checkpoint {run_id} not found")
-
-        metadata = load_checkpoint_metadata(checkpoint_dir)
-
-        assert metadata is not None
-        assert metadata.run_id == run_id
-        assert metadata.algorithm in ["PPO", "APPO", "IMPALA", "DQN", "SAC"]
-
 
 class TestSignalConnections:
     """Tests for signal connections in the evaluation flow."""

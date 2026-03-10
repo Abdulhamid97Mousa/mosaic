@@ -11,7 +11,6 @@ Included presenters:
 - CleanRlWorkerPresenter: Placeholder for analytics-first CleanRL worker
 - HumanWorkerPresenter: Human-in-the-loop action selection via GUI clicks
 - MctxWorkerPresenter: GPU-accelerated MCTS (AlphaZero/MuZero) training
-- PettingZooWorkerPresenter: Multi-agent environments (PettingZoo)
 - RayWorkerPresenter: Ray RLlib distributed training
 - XuanCeWorkerPresenter: XuanCe 46+ algorithm RL library
 
@@ -22,7 +21,6 @@ from .chess_worker_presenter import ChessWorkerPresenter
 from .cleanrl_worker_presenter import CleanRlWorkerPresenter
 from .human_worker_presenter import HumanWorkerPresenter
 from .mctx_worker_presenter import MctxWorkerPresenter
-from .pettingzoo_worker_presenter import PettingZooWorkerPresenter
 from .ray_worker_presenter import RayWorkerPresenter
 from .registry import WorkerPresenter, WorkerPresenterRegistry
 from .xuance_worker_presenter import XuanCeWorkerPresenter
@@ -38,7 +36,6 @@ _registry.register("chess_worker", ChessWorkerPresenter())
 _registry.register("cleanrl_worker", CleanRlWorkerPresenter())
 _registry.register("human_worker", HumanWorkerPresenter())
 _registry.register("mctx_worker", MctxWorkerPresenter())
-_registry.register("pettingzoo_worker", PettingZooWorkerPresenter())
 _registry.register("ray_worker", RayWorkerPresenter())
 _registry.register("xuance_worker", XuanCeWorkerPresenter())
 
@@ -59,7 +56,6 @@ __all__ = [
     "CleanRlWorkerPresenter",
     "HumanWorkerPresenter",
     "MctxWorkerPresenter",
-    "PettingZooWorkerPresenter",
     "RayWorkerPresenter",
     "XuanCeWorkerPresenter",
     "get_worker_presenter_registry",

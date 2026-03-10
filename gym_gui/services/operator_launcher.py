@@ -1262,15 +1262,20 @@ class OperatorLauncher:
         if interactive:
             cmd.append("--interactive")
 
-        # Add seed if provided
-        if seed is not None:
-            cmd.extend(["--seed", str(seed)])
+        # Derive a unique seed from run_id if not explicitly provided.
+        # This ensures each operator has independent random actions,
+        # while the shared environment seed (passed via send_reset) 
+        # ensures identical layouts across operators.
+        if seed is None:
+            seed = abs(hash(run_id)) % (2**31)
+        cmd.extend(["--seed", str(seed)])
 
         LOGGER.info(
-            "Built random command for operator %s | env=%s task=%s",
+            "Built random command for operator %s | env=%s task=%s seed=%s",
             config.operator_id,
             env_name,
             env_id,
+            seed,
         )
 
         return cmd
@@ -1324,15 +1329,19 @@ class OperatorLauncher:
         if interactive:
             cmd.append("--interactive")
 
-        # Add seed if provided
-        if seed is not None:
-            cmd.extend(["--seed", str(seed)])
+        # Derive a unique seed from run_id if not explicitly provided.
+        # While passive worker always selects NOOP (seed doesn't affect behavior),
+        # we apply the same pattern as random_worker for consistency.
+        if seed is None:
+            seed = abs(hash(run_id)) % (2**31)
+        cmd.extend(["--seed", str(seed)])
 
         LOGGER.info(
-            "Built passive command for operator %s | env=%s task=%s",
+            "Built passive command for operator %s | env=%s task=%s seed=%s",
             config.operator_id,
             env_name,
             env_id,
+            seed,
         )
 
         return cmd
