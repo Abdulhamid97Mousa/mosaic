@@ -875,87 +875,6 @@ class ViZDoomKeyCombinationResolver(KeyCombinationResolver):
         return None
 
 
-class MalmoKeyCombinationResolver(KeyCombinationResolver):
-    """Resolve key combinations for MOSAIC Malmo (Minecraft) environments.
-
-    mosaic_malmo action space (10 discrete actions):
-    0: MOVE_FORWARD  - Move forward
-    1: MOVE_BACKWARD - Move backward
-    2: STRAFE_LEFT   - Strafe left
-    3: STRAFE_RIGHT  - Strafe right
-    4: TURN_LEFT     - Turn left
-    5: TURN_RIGHT    - Turn right
-    6: JUMP          - Jump
-    7: CROUCH        - Crouch
-    8: ATTACK        - Attack/break block
-    9: USE           - Use/place block
-
-    Key mappings (Minecraft-style):
-    - W / Up Arrow    -> MOVE_FORWARD (0)
-    - S / Down Arrow  -> MOVE_BACKWARD (1)
-    - A               -> STRAFE_LEFT (2)
-    - D               -> STRAFE_RIGHT (3)
-    - Left Arrow / Q  -> TURN_LEFT (4)
-    - Right Arrow / E -> TURN_RIGHT (5)
-    - Space           -> JUMP (6)
-    - Shift / Ctrl / C -> CROUCH (7)
-    - Z / 1           -> ATTACK (8)
-    - X / 2           -> USE (9)
-    """
-
-    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
-        """Map pressed keys to Malmo/Minecraft actions.
-
-        Priority order:
-        1. Action buttons (attack, use, jump, crouch)
-        2. Turning (Q/E or Left/Right arrows)
-        3. Movement (WASD or arrow keys)
-        """
-        # Check direction keys
-        up = bool(pressed_keys & _KEYS_UP)  # W or Up arrow
-        down = bool(pressed_keys & _KEYS_DOWN)  # S or Down arrow
-        left_arrow = _KEY_LEFT in pressed_keys
-        right_arrow = _KEY_RIGHT in pressed_keys
-        a_key = _KEY_A in pressed_keys
-        d_key = _KEY_D in pressed_keys
-
-        # Action buttons (highest priority)
-        if _KEY_Z in pressed_keys or _KEY_1 in pressed_keys:
-            return 8  # ATTACK
-        if _KEY_X in pressed_keys or _KEY_2 in pressed_keys:
-            return 9  # USE
-        if _KEY_SPACE in pressed_keys:
-            return 6  # JUMP
-        # Check for Shift key (Ctrl is alternative)
-        shift_pressed = False
-        try:
-            shift_key = _get_qt_key("Key_Shift")
-            ctrl_key = _get_qt_key("Key_Control")
-            shift_pressed = shift_key in pressed_keys or ctrl_key in pressed_keys or _KEY_C in pressed_keys
-        except AttributeError:
-            shift_pressed = _KEY_C in pressed_keys
-        if shift_pressed:
-            return 7  # CROUCH
-
-        # Turning (Q/E or arrow keys when not used for strafing)
-        if _KEY_Q in pressed_keys or (left_arrow and not a_key):
-            return 4  # TURN_LEFT
-        if _KEY_E in pressed_keys or (right_arrow and not d_key):
-            return 5  # TURN_RIGHT
-
-        # Movement (WASD for forward/backward/strafe)
-        if up:
-            return 0  # MOVE_FORWARD
-        if down:
-            return 1  # MOVE_BACKWARD
-        if a_key:
-            return 2  # STRAFE_LEFT
-        if d_key:
-            return 3  # STRAFE_RIGHT
-
-        return None  # No action - idle
-
-
 # Map environment families to their resolvers
 def get_key_combination_resolver(
     game_id: GameId,
@@ -1028,9 +947,6 @@ def get_key_combination_resolver(
     if family == EnvironmentFamily.GRIDDLY:
         # Griddly environments (5 actions: NOOP, UP, DOWN, LEFT, RIGHT)
         return GriddlyKeyCombinationResolver()
-    if family == EnvironmentFamily.MOSAIC_MALMO:
-        # MOSAIC Malmo environments (10 actions: Minecraft-style controls)
-        return MalmoKeyCombinationResolver()
 
     # Fallback: check by game ID prefix/name for games not in the mapping
     game_name = game_id.value if hasattr(game_id, 'value') else str(game_id)
