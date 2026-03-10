@@ -580,5 +580,112 @@ for line in sys.stdin:
                 process.kill()
 
 
+@unittest.skipUnless(_has_pyqt6(), "Requires PyQt6")
+class TestBuildRandomCommandSeed(unittest.TestCase):
+    """Tests for _build_random_command seed derivation logic."""
+
+    def _make_random_config(self, settings: dict | None = None) -> OperatorConfig:
+        return OperatorConfig.single_agent(
+            operator_id="rnd_op",
+            worker_id="random_worker",
+            worker_type="random",
+            display_name="Random Agent",
+            env_name="babyai",
+            task="BabyAI-GoToRedBall-v0",
+            settings=settings or {},
+        )
+
+    def test_seed_derived_from_run_id_when_not_set(self) -> None:
+        """When no seed in settings, seed is derived from run_id."""
+        launcher = OperatorLauncher()
+        config = self._make_random_config()
+        cmd = launcher._build_random_command(config, "run-abc", interactive=False)
+        self.assertIn("--seed", cmd)
+        idx = cmd.index("--seed")
+        seed_value = int(cmd[idx + 1])
+        self.assertEqual(seed_value, abs(hash("run-abc")) % (2**31))
+
+    def test_explicit_seed_in_settings_is_used(self) -> None:
+        """When seed is set in settings, it overrides the derived seed."""
+        launcher = OperatorLauncher()
+        config = self._make_random_config(settings={"seed": 42})
+        cmd = launcher._build_random_command(config, "run-abc", interactive=False)
+        idx = cmd.index("--seed")
+        self.assertEqual(cmd[idx + 1], "42")
+
+    def test_two_run_ids_produce_different_seeds(self) -> None:
+        """Different run_ids must produce different seeds."""
+        launcher = OperatorLauncher()
+        config = self._make_random_config()
+        cmd1 = launcher._build_random_command(config, "operator-1", interactive=False)
+        cmd2 = launcher._build_random_command(config, "operator-2", interactive=False)
+        seed1 = cmd1[cmd1.index("--seed") + 1]
+        seed2 = cmd2[cmd2.index("--seed") + 1]
+        self.assertNotEqual(seed1, seed2)
+
+    def test_same_run_id_produces_same_seed(self) -> None:
+        """Same run_id must always produce the same deterministic seed."""
+        launcher = OperatorLauncher()
+        config = self._make_random_config()
+        cmd1 = launcher._build_random_command(config, "stable-run", interactive=False)
+        cmd2 = launcher._build_random_command(config, "stable-run", interactive=False)
+        seed1 = cmd1[cmd1.index("--seed") + 1]
+        seed2 = cmd2[cmd2.index("--seed") + 1]
+        self.assertEqual(seed1, seed2)
+
+    def test_seed_is_valid_numpy_range(self) -> None:
+        """Derived seed must be in [0, 2**31) for NumPy compatibility."""
+        launcher = OperatorLauncher()
+        config = self._make_random_config()
+        cmd = launcher._build_random_command(config, "any-run-id", interactive=False)
+        seed = int(cmd[cmd.index("--seed") + 1])
+        self.assertGreaterEqual(seed, 0)
+        self.assertLess(seed, 2**31)
+
+
+@unittest.skipUnless(_has_pyqt6(), "Requires PyQt6")
+class TestBuildPassiveCommandSeed(unittest.TestCase):
+    """Tests for _build_passive_command seed derivation logic."""
+
+    def _make_passive_config(self, settings: dict | None = None) -> OperatorConfig:
+        return OperatorConfig.single_agent(
+            operator_id="pass_op",
+            worker_id="passive_worker",
+            worker_type="passive",
+            display_name="Passive Agent",
+            env_name="babyai",
+            task="BabyAI-GoToRedBall-v0",
+            settings=settings or {},
+        )
+
+    def test_seed_derived_from_run_id_when_not_set(self) -> None:
+        """When no seed in settings, seed is derived from run_id."""
+        launcher = OperatorLauncher()
+        config = self._make_passive_config()
+        cmd = launcher._build_passive_command(config, "run-xyz", interactive=False)
+        self.assertIn("--seed", cmd)
+        idx = cmd.index("--seed")
+        seed_value = int(cmd[idx + 1])
+        self.assertEqual(seed_value, abs(hash("run-xyz")) % (2**31))
+
+    def test_explicit_seed_in_settings_is_used(self) -> None:
+        """When seed is set in settings, it overrides the derived seed."""
+        launcher = OperatorLauncher()
+        config = self._make_passive_config(settings={"seed": 99})
+        cmd = launcher._build_passive_command(config, "run-xyz", interactive=False)
+        idx = cmd.index("--seed")
+        self.assertEqual(cmd[idx + 1], "99")
+
+    def test_two_run_ids_produce_different_seeds(self) -> None:
+        """Different run_ids must produce different seeds."""
+        launcher = OperatorLauncher()
+        config = self._make_passive_config()
+        cmd1 = launcher._build_passive_command(config, "passive-1", interactive=False)
+        cmd2 = launcher._build_passive_command(config, "passive-2", interactive=False)
+        seed1 = cmd1[cmd1.index("--seed") + 1]
+        seed2 = cmd2[cmd2.index("--seed") + 1]
+        self.assertNotEqual(seed1, seed2)
+
+
 if __name__ == "__main__":
     unittest.main()
