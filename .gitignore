@@ -298,6 +298,10 @@ gym_gui/game_docs/MosaicMalmo/
 
 gym_gui/rendering/strategies/mosaic_malmo.py
 
+3rd_party/environments/mosaic_malmo.backup
+
+3rd_party/environments/mosaic_marLo.backup
+
 
 requirements/mosaic_malmo.txt
 

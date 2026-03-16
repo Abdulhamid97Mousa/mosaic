@@ -1101,7 +1101,7 @@ class OperatorRenderContainer(QtWidgets.QFrame):
                 # Use BoardGameRendererStrategy for board games
                 if not self._board_game_renderer:
                     self._board_game_renderer = BoardGameRendererStrategy(self._render_container)
-                    self._render_layout.addWidget(self._board_game_renderer.widget)
+                    self._render_layout.addWidget(self._board_game_renderer.widget, 1)
                     # Connect board click signals for Human operators
                     _LOGGER.debug(
                         f"Created board game renderer, _is_interactive={self._is_interactive}",
@@ -1112,6 +1112,11 @@ class OperatorRenderContainer(QtWidgets.QFrame):
                 # Switch to board game renderer if needed
                 if not self._is_board_game:
                     self._is_board_game = True
+                    # Remove the "Waiting for data..." placeholder (mirrors _switch_to_renderer)
+                    if self._placeholder and self._placeholder.parent():
+                        self._render_layout.removeWidget(self._placeholder)
+                        self._placeholder.deleteLater()
+                        self._placeholder = None
                     # Hide other renderers
                     if self._grid_renderer:
                         self._grid_renderer.widget.hide()

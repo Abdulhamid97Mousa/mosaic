@@ -817,10 +817,11 @@ class ControlPanelWidget(QtWidgets.QWidget):
         # Connect multi-agent signals
         self._multi_agent_tab.train_requested.connect(self._on_multi_agent_train_requested)
         self._multi_agent_tab.evaluate_requested.connect(self._on_multi_agent_evaluate_requested)
+        self._multi_agent_tab.resume_requested.connect(self._on_multi_agent_resume_requested)
+        self._multi_agent_tab.script_requested.connect(self._on_multi_agent_script_requested)
         self._multi_agent_tab.load_environment_requested.connect(self._on_multi_agent_load_requested)
         self._multi_agent_tab.start_game_requested.connect(self.multi_agent_start_requested)
         self._multi_agent_tab.reset_game_requested.connect(self.multi_agent_reset_requested)
-        self._multi_agent_tab.policy_evaluate_requested.connect(self._on_policy_evaluate_requested)
 
         # MuJoCo MPC Tab - launcher for MPC visualization in Render View
         self._mujoco_mpc_tab = MuJoCoMPCTab(self)
@@ -1163,6 +1164,14 @@ class ControlPanelWidget(QtWidgets.QWidget):
             player_id: The player whose turn it is ("player_0" or "player_1").
         """
         self._operators_tab.set_current_player(player_id)
+
+    def set_step_count(self, count: int) -> None:
+        """Set the step counter (called after each successful env step).
+
+        Args:
+            count: The current step count to display.
+        """
+        self._operators_tab.set_step_count(count)
 
     def _create_control_group(self, parent: QtWidgets.QWidget) -> QtWidgets.QGroupBox:
         group = QtWidgets.QGroupBox("Game Control Flow", parent)
@@ -1997,41 +2006,29 @@ class ControlPanelWidget(QtWidgets.QWidget):
     # ------------------------------------------------------------------
     # Multi-Agent Tab Handlers
     # ------------------------------------------------------------------
-    def _on_multi_agent_train_requested(self, worker_id: str, env_id: str) -> None:
-        """Handle train request from Multi-Agent tab."""
+    def _on_multi_agent_train_requested(self, worker_id: str) -> None:
+        """Handle train request from Multi-Agent Cooperation/Competition tab."""
         self._current_worker_id = worker_id
         self.worker_changed.emit(worker_id)
         self.train_agent_requested.emit(worker_id)
 
-    def _on_multi_agent_evaluate_requested(self, worker_id: str, env_id: str) -> None:
-        """Handle evaluate/policy load request from Multi-Agent tab."""
+    def _on_multi_agent_evaluate_requested(self, worker_id: str) -> None:
+        """Handle evaluate/policy load request from Multi-Agent Cooperation/Competition tab."""
         self._current_worker_id = worker_id
         self.worker_changed.emit(worker_id)
         self.trained_agent_requested.emit(worker_id)
 
-    def _on_policy_evaluate_requested(self, config: dict) -> None:
-        """Handle policy evaluation request from PolicyAssignmentPanel.
+    def _on_multi_agent_resume_requested(self, worker_id: str) -> None:
+        """Handle resume training request from Multi-Agent Cooperation/Competition tab."""
+        self._current_worker_id = worker_id
+        self.worker_changed.emit(worker_id)
+        self.resume_training_requested.emit(worker_id)
 
-        This is triggered when user clicks 'Evaluate Policies' in the
-        Cooperation/Competition tab after assigning policies to agents.
-
-        Args:
-            config: Evaluation configuration containing:
-                - mode: "evaluate"
-                - agent_policies: {agent_id: checkpoint_path}
-                - policy_types: {agent_id: "ray" | "cleanrl" | "random"}
-                - agents: list of agent IDs
-                - env_id: environment ID
-                - env_family: environment family
-                - worker_id: worker ID
-        """
-        import logging
-        _logger = logging.getLogger(__name__)
-
-        _logger.info("Policy evaluation requested: %s", config)
-
-        # Forward to main window via signal
-        self.policy_evaluate_requested.emit(config)
+    def _on_multi_agent_script_requested(self, worker_id: str) -> None:
+        """Handle custom script request from Multi-Agent Cooperation/Competition tab."""
+        self._current_worker_id = worker_id
+        self.worker_changed.emit(worker_id)
+        self.custom_script_requested.emit(worker_id)
 
     def _on_multi_agent_load_requested(self, env_id: str, seed: int) -> None:
         """Handle environment load request from Multi-Agent tab (Human vs Agent mode)."""

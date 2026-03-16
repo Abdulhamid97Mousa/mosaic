@@ -205,7 +205,7 @@ def _detect_optional_dependencies() -> dict[str, bool]:
         "minigrid": "minigrid",
         "babyai": "minigrid.envs.babyai",  # BabyAI (bundled in minigrid>=2)
         "mosaic_multigrid": "mosaic_multigrid",  # Modern fork (Gymnasium API)
-        ## "mosaic_malmo": "mosaic_malmo",  # Go-based Minecraft RL environment
+        "malmoenv": "malmoenv",  # MalmoEnv: Microsoft Malmo Java-based Minecraft (requires running Minecraft server)
         "multigrid_ini": "multigrid",  # Original INI version (cooperative exploration)
         "pettingzoo": "pettingzoo",
         "mujoco": "mujoco",
