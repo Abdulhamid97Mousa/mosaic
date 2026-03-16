@@ -4,8 +4,9 @@ This module tests that the random worker correctly handles Crafter environments,
 including proper gymnasium API compatibility and independent action seeding.
 """
 
-import pytest
 import sys
+
+import pytest
 
 # Skip if crafter not installed
 pytest.importorskip("crafter")
@@ -28,7 +29,7 @@ class TestRandomWorkerCrafterBasics:
             seed=12345,
         )
         runtime = RandomWorkerRuntime(config)
-        
+
         env = runtime._create_env()
         assert env is not None
         assert env.action_space.n == 17  # Crafter has 17 actions
@@ -42,14 +43,14 @@ class TestRandomWorkerCrafterBasics:
             seed=12345,
         )
         runtime = RandomWorkerRuntime(config)
-        
+
         result = runtime.handle_reset({"cmd": "reset", "seed": 42})
-        
+
         assert result["type"] == "ready"
         assert result["env_id"] == "CrafterReward-v1"
         assert result["seed"] == 42
         assert result["observation_shape"] == [512, 512, 3]  # Crafter high-quality observation shape
-        
+
         if runtime._env:
             runtime._env.close()
 
@@ -61,16 +62,16 @@ class TestRandomWorkerCrafterBasics:
             seed=12345,
         )
         runtime = RandomWorkerRuntime(config)
-        
+
         result = runtime.handle_reset({"cmd": "reset", "seed": 42})
-        
+
         assert "render_payload" in result
         payload = result["render_payload"]
         assert payload["mode"] == "rgb"
         # Should be 512x512 (high quality from CrafterConfig defaults)
         assert payload["width"] == 512
         assert payload["height"] == 512
-        
+
         if runtime._env:
             runtime._env.close()
 
@@ -160,17 +161,17 @@ class TestRandomWorkerCrafterStep:
             seed=12345,
         )
         runtime = RandomWorkerRuntime(config)
-        
+
         # Reset first
         runtime.handle_reset({"cmd": "reset", "seed": 42})
-        
+
         # Test _select_action directly instead of capturing stdout
         action = runtime._select_action()
         assert isinstance(action, int)
         assert 0 <= action < 17  # Crafter has 17 actions
-        
+
         # Test step through internal state
         assert runtime._env is not None
-        
+
         if runtime._env:
             runtime._env.close()

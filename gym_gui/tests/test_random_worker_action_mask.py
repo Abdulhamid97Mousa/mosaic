@@ -17,10 +17,8 @@ from unittest.mock import patch
 
 import numpy as np
 import pytest
-
 from random_worker.config import RandomWorkerConfig
 from random_worker.runtime import RandomWorkerRuntime
-
 
 # ---------------------------------------------------------------------------
 # Helpers

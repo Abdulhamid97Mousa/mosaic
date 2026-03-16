@@ -602,7 +602,7 @@ def _get_american_football_html() -> str:
 <h2>MosaicMultiGrid-AmericanFootball (1v1, 2v2, 3v3)</h2>
 
 <p style="background-color: #e8f5e9; padding: 8px; border-radius: 4px; margin-bottom: 10px;">
-<strong>NEW</strong> in v6.3.0. American Football with brown field rendering, end zones, 
+<strong>NEW</strong> in v6.3.0. American Football with brown field rendering, end zones,
 touchdown scoring, and ball stealing mechanics.
 Gymnasium API: <code>env.reset(seed=N)</code> returns <code>(obs, info)</code>.
 Supports <strong>Parallel</strong> (default) and <strong>AEC</strong> execution modes.

@@ -420,22 +420,22 @@ try:  # Optional dependency - MalmoEnv (Microsoft Malmo, Java-based Minecraft)
     from .mosaic_malmo import (
         MALMOENV_ACTIONS,
         MALMOENV_ADAPTERS,
-        MOSAIC_MALMO_ACTIONS,   # legacy alias
+        MOSAIC_MALMO_ACTIONS,  # legacy alias
         MOSAIC_MALMO_ADAPTERS,  # legacy alias
         MalmoEnvAdapter,
-        MalmoEnvMobChaseAdapter,
-        MalmoEnvMazeRunnerAdapter,
-        MalmoEnvVerticalAdapter,
-        MalmoEnvCliffWalkingAdapter,
-        MalmoEnvCatchTheMobAdapter,
-        MalmoEnvFindTheGoalAdapter,
         MalmoEnvAtticAdapter,
+        MalmoEnvCatchTheMobAdapter,
+        MalmoEnvCliffWalkingAdapter,
         MalmoEnvDefaultFlatWorldAdapter,
         MalmoEnvDefaultWorldAdapter,
         MalmoEnvEatingAdapter,
+        MalmoEnvFindTheGoalAdapter,
+        MalmoEnvMazeRunnerAdapter,
+        MalmoEnvMobChaseAdapter,
         MalmoEnvObstaclesAdapter,
-        MalmoEnvTrickyArenaAdapter,
         MalmoEnvTreasureHuntAdapter,
+        MalmoEnvTrickyArenaAdapter,
+        MalmoEnvVerticalAdapter,
     )
     _MOSAIC_MALMO_AVAILABLE = True
 except Exception:  # pragma: no cover - malmoenv optional

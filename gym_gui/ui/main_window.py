@@ -124,6 +124,7 @@ from gym_gui.ui.handlers import (
     HumanVsAgentHandler,
     JumanjiGridClickLoader,
     LogHandler,
+    MalmoEnvLoader,
     MPCHandler,
     # New composed handlers for extracted functionality
     MultiAgentGameHandler,
@@ -134,7 +135,6 @@ from gym_gui.ui.handlers import (
     TrainingFormHandler,
     TrainingMonitorHandler,
     VizdoomEnvLoader,
-    MalmoEnvLoader,
 )
 from gym_gui.ui.panels.analytics_tabs import AnalyticsTabManager
 from gym_gui.ui.widgets.settings import SettingsDialog

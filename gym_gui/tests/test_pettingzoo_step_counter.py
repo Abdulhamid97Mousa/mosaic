@@ -25,7 +25,6 @@ from unittest.mock import MagicMock
 
 import pytest
 
-
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
@@ -192,8 +191,8 @@ class TestControlPanelSetStepCount:
     @pytest.fixture
     def panel(self):
         _make_qapp()
-        from gym_gui.ui.widgets.control_panel import ControlPanelWidget
         from gym_gui.services.operator import MultiOperatorService
+        from gym_gui.ui.widgets.control_panel import ControlPanelWidget
         service = MagicMock(spec=MultiOperatorService)
         service.get_active_operators.return_value = {}
         return ControlPanelWidget(multi_operator_service=service)
