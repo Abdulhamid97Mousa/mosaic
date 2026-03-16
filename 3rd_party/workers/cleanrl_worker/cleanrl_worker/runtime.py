@@ -49,7 +49,7 @@ from .config import CleanRLWorkerConfig, WorkerConfig  # WorkerConfig is backwar
 from gym_gui.core.worker import TelemetryEmitter, WorkerAnalyticsManifest
 from contextlib import contextmanager, redirect_stdout, redirect_stderr
 
-REPO_ROOT = Path(__file__).resolve().parents[2]
+REPO_ROOT = Path(__file__).resolve().parents[4]
 _MODULE_NAME_PATTERN = re.compile(r"^[A-Za-z0-9_.]+$")
 _CMD_COMPONENT_PATTERN = re.compile(r"^[^\n\r\x00]*$")
 

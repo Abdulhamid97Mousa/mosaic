@@ -3262,6 +3262,59 @@ LOG_HEMAC_ENERGY_DEPLETED = _constant(
 
 
 # ---------------------------------------------------------------------------
+# Google Research Football Adapter constants (LOG4120–LOG4125)
+# ---------------------------------------------------------------------------
+LOG_GFOOTBALL_ENV_CREATED = _constant(
+    "LOG4120",
+    "INFO",
+    "GFootball environment created",
+    component="Adapter",
+    subcomponent="GFootball",
+    tags=_tags("gfootball", "environment", "lifecycle"),
+)
+LOG_GFOOTBALL_ENV_RESET = _constant(
+    "LOG4121",
+    "INFO",
+    "GFootball environment reset",
+    component="Adapter",
+    subcomponent="GFootball",
+    tags=_tags("gfootball", "episode", "lifecycle"),
+)
+LOG_GFOOTBALL_STEP_SUMMARY = _constant(
+    "LOG4122",
+    "DEBUG",
+    "GFootball step summary",
+    component="Adapter",
+    subcomponent="GFootball",
+    tags=_tags("gfootball", "step"),
+)
+LOG_GFOOTBALL_ENV_CLOSED = _constant(
+    "LOG4123",
+    "INFO",
+    "GFootball environment closed",
+    component="Adapter",
+    subcomponent="GFootball",
+    tags=_tags("gfootball", "environment", "lifecycle"),
+)
+LOG_GFOOTBALL_RENDER_ERROR = _constant(
+    "LOG4124",
+    "WARNING",
+    "GFootball render error",
+    component="Adapter",
+    subcomponent="GFootball",
+    tags=_tags("gfootball", "render", "error"),
+)
+LOG_GFOOTBALL_GOAL = _constant(
+    "LOG4125",
+    "INFO",
+    "GFootball goal scored",
+    component="Adapter",
+    subcomponent="GFootball",
+    tags=_tags("gfootball", "goal", "reward"),
+)
+
+
+# ---------------------------------------------------------------------------
 # Utility constants (LOG801–LOG809)
 # ---------------------------------------------------------------------------
 LOG_UTIL_QT_RESEED_SKIPPED = _constant(

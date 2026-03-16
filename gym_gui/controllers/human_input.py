@@ -875,6 +875,43 @@ class ViZDoomKeyCombinationResolver(KeyCombinationResolver):
         return None
 
 
+class MalmoEnvKeyCombinationResolver(KeyCombinationResolver):
+    """Resolve key combinations for MalmoEnv (Microsoft Malmo / Minecraft) environments.
+
+    MalmoEnv action indices (matches MALMOENV_ACTIONS in adapters/mosaic_malmo.py):
+    0: move forward  (W / Up)
+    1: move backward (S / Down)
+    2: strafe left   (A / Left)
+    3: strafe right  (D / Right)
+    4: turn left     (Q)
+    5: turn right    (E)
+    6: jump          (Space)
+    7: attack        (F)
+    """
+
+    def resolve(self, pressed_keys: Set[int]) -> Optional[int]:
+        _key_f = _get_qt_key("Key_F")
+
+        if _KEY_SPACE in pressed_keys:
+            return 6  # jump
+        if _key_f in pressed_keys:
+            return 7  # attack / break block
+        if _KEY_Q in pressed_keys:
+            return 4  # turn left
+        if _KEY_E in pressed_keys:
+            return 5  # turn right
+        if pressed_keys & _KEYS_LEFT:
+            return 2  # strafe left
+        if pressed_keys & _KEYS_RIGHT:
+            return 3  # strafe right
+        if pressed_keys & _KEYS_UP:
+            return 0  # move forward
+        if pressed_keys & _KEYS_DOWN:
+            return 1  # move backward
+
+        return None
+
+
 # Map environment families to their resolvers
 def get_key_combination_resolver(
     game_id: GameId,
@@ -947,6 +984,9 @@ def get_key_combination_resolver(
     if family == EnvironmentFamily.GRIDDLY:
         # Griddly environments (5 actions: NOOP, UP, DOWN, LEFT, RIGHT)
         return GriddlyKeyCombinationResolver()
+    if family == EnvironmentFamily.MALMOENV:
+        # MalmoEnv (Microsoft Malmo / Minecraft) environments
+        return MalmoEnvKeyCombinationResolver()
 
     # Fallback: check by game ID prefix/name for games not in the mapping
     game_name = game_id.value if hasattr(game_id, 'value') else str(game_id)
@@ -1195,6 +1235,18 @@ _MULTIGRID_MAPPINGS: Dict[GameId, Tuple[ShortcutMapping, ...]] = {
     GameId.MOSAIC_MULTIGRID_COLLECT2VS2_INDAGOBS: _INI_MULTIGRID_ACTIONS,
     GameId.MOSAIC_MULTIGRID_SOCCER_2VS2_TEAMOBS: _INI_MULTIGRID_ACTIONS,
     GameId.MOSAIC_MULTIGRID_COLLECT2VS2_TEAMOBS: _INI_MULTIGRID_ACTIONS,
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_INDAGOBS: _MOSAIC_MULTIGRID_ACTIONS,
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_TEAMOBS: _MOSAIC_MULTIGRID_ACTIONS,
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_SOLO_GREEN: _MOSAIC_MULTIGRID_ACTIONS,
+    GameId.MOSAIC_MULTIGRID_BASKETBALL_SOLO_BLUE: _MOSAIC_MULTIGRID_ACTIONS,
+    # American Football environments (v6.3.0)
+    GameId.MOSAIC_MULTIGRID_AMERICAN_FOOTBALL_1V1: _MOSAIC_MULTIGRID_ACTIONS,
+    GameId.MOSAIC_MULTIGRID_AMERICAN_FOOTBALL_2V2: _MOSAIC_MULTIGRID_ACTIONS,
+    GameId.MOSAIC_MULTIGRID_AMERICAN_FOOTBALL_3V3: _MOSAIC_MULTIGRID_ACTIONS,
+    GameId.MOSAIC_MULTIGRID_AMERICAN_FOOTBALL_2V2_TEAMOBS: _MOSAIC_MULTIGRID_ACTIONS,
+    GameId.MOSAIC_MULTIGRID_AMERICAN_FOOTBALL_3V3_TEAMOBS: _MOSAIC_MULTIGRID_ACTIONS,
+    GameId.MOSAIC_MULTIGRID_AMERICAN_FOOTBALL_SOLO_GREEN: _MOSAIC_MULTIGRID_ACTIONS,
+    GameId.MOSAIC_MULTIGRID_AMERICAN_FOOTBALL_SOLO_BLUE: _MOSAIC_MULTIGRID_ACTIONS,
     # INI multigrid environments (7 actions, no STILL - same as MiniGrid)
     GameId.INI_MULTIGRID_BLOCKED_UNLOCK_PICKUP: _INI_MULTIGRID_ACTIONS,
     GameId.INI_MULTIGRID_EMPTY_5X5: _INI_MULTIGRID_ACTIONS,

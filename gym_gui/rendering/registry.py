@@ -45,10 +45,12 @@ def create_default_renderer_registry() -> RendererRegistry:
     """Instantiate a registry pre-populated with supported strategies."""
 
     from gym_gui.rendering.strategies.grid import GridRendererStrategy
+    from gym_gui.rendering.strategies.mosaic_malmo import MosaicMalmoRendererStrategy
     from gym_gui.rendering.strategies.rgb import RgbRendererStrategy
 
     registry = RendererRegistry()
     registry.register(RenderMode.GRID, lambda parent=None: GridRendererStrategy(parent=parent))
+    registry.register(RenderMode.MOSAIC_MALMO, lambda parent=None: MosaicMalmoRendererStrategy(parent=parent))
     registry.register(RenderMode.RGB_ARRAY, lambda parent=None: RgbRendererStrategy(parent=parent))
     return registry
 

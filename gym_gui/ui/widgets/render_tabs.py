@@ -128,9 +128,16 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
         self._raw_tab_index = self.addTab(self._raw_tab.widget, "Raw")
         self.setTabEnabled(self._raw_tab_index, True)
 
-        self._video_host = self._create_host(RenderMode.RGB_ARRAY, parent=self)
+        # Video tab — stacked widget hosting RGB and MOSAIC Malmo renderers
+        self._video_stack = QtWidgets.QStackedWidget(self)
+        self._video_host = self._create_host(RenderMode.RGB_ARRAY, parent=self._video_stack)
+        self._malmo_host = self._create_host(RenderMode.MOSAIC_MALMO, parent=self._video_stack)
         if self._video_host is not None:
-            self._video_tab_index = self.addTab(self._video_host.widget, "Video")
+            self._video_stack.addWidget(self._video_host.widget)   # index 0: RGB
+        if self._malmo_host is not None:
+            self._video_stack.addWidget(self._malmo_host.widget)   # index 1: Malmo
+        if self._video_host is not None or self._malmo_host is not None:
+            self._video_tab_index = self.addTab(self._video_stack, "Video")
             self.setTabEnabled(self._video_tab_index, False)
         else:
             self._video_tab_index = -1
@@ -665,6 +672,12 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
                     self._hide_welcome()
                     self.setTabEnabled(self._grid_tab_index, True)
                     self.setCurrentIndex(self._grid_tab_index)
+                elif mode in (RenderMode.RGB_ARRAY, RenderMode.MOSAIC_MALMO):
+                    # Both RGB and MOSAIC Malmo render inside the Video tab stack
+                    self._video_stack.setCurrentWidget(host.widget)
+                    if self._video_tab_index >= 0:
+                        self.setTabEnabled(self._video_tab_index, True)
+                        self.setCurrentIndex(self._video_tab_index)
                 else:
                     self._activate_tab(host.widget)
                 return
@@ -810,7 +823,10 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
         sensitivity: float = 5.0,
         delta_scale: float = 0.5,
     ) -> None:
-        """Configure FPS-style mouse capture on the Video (RGB) tab.
+        """Configure FPS-style mouse capture on the Video tab.
+
+        Configures the RGB host and the Malmo host so that whichever one is
+        currently visible responds to mouse input correctly.
 
         Args:
             enabled: Whether to enable mouse capture support.
@@ -822,30 +838,27 @@ class RenderTabs(QtWidgets.QTabWidget, LogConstantMixin):
             sensitivity: Pixels of movement per action trigger (discrete mode).
             delta_scale: Degrees per pixel (continuous mode, default 0.5).
         """
-        if self._video_host is None:
-            return
-        strategy = self._video_host._strategy
-        # Check if the strategy supports mouse capture (RgbRendererStrategy)
-        if not hasattr(strategy, "set_mouse_capture_enabled"):
-            return
+        for host in (self._video_host, self._malmo_host):
+            if host is None:
+                continue
+            strategy = host._strategy
+            if not hasattr(strategy, "set_mouse_capture_enabled"):
+                continue
 
-        # Cast to MouseCaptureStrategy for proper type checking
-        mouse_strategy = cast(MouseCaptureStrategy, strategy)
-        mouse_strategy.set_mouse_capture_enabled(enabled)
+            mouse_strategy = cast(MouseCaptureStrategy, strategy)
+            mouse_strategy.set_mouse_capture_enabled(enabled)
 
-        # Prefer delta callback (continuous mode) if provided
-        if delta_callback is not None:
-            mouse_strategy.set_mouse_delta_callback(delta_callback)
-            mouse_strategy.set_mouse_delta_scale(delta_scale)
-        elif action_callback is not None:
-            mouse_strategy.set_mouse_action_callback(action_callback)
-            # Configure turn action indices and sensitivity on the underlying view
-            view = getattr(strategy, "_view", None)
-            if view is not None:
-                if hasattr(view, "set_turn_action_indices"):
-                    view.set_turn_action_indices(turn_left_action, turn_right_action)
-                if hasattr(view, "set_mouse_sensitivity"):
-                    view.set_mouse_sensitivity(sensitivity)
+            if delta_callback is not None:
+                mouse_strategy.set_mouse_delta_callback(delta_callback)
+                mouse_strategy.set_mouse_delta_scale(delta_scale)
+            elif action_callback is not None:
+                mouse_strategy.set_mouse_action_callback(action_callback)
+                view = getattr(strategy, "_view", None)
+                if view is not None:
+                    if hasattr(view, "set_turn_action_indices"):
+                        view.set_turn_action_indices(turn_left_action, turn_right_action)
+                    if hasattr(view, "set_mouse_sensitivity"):
+                        view.set_mouse_sensitivity(sensitivity)
 
     def configure_grid_click(
         self,

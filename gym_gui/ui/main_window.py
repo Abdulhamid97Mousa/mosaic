@@ -134,6 +134,7 @@ from gym_gui.ui.handlers import (
     TrainingFormHandler,
     TrainingMonitorHandler,
     VizdoomEnvLoader,
+    MalmoEnvLoader,
 )
 from gym_gui.ui.panels.analytics_tabs import AnalyticsTabManager
 from gym_gui.ui.widgets.settings import SettingsDialog
@@ -231,6 +232,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._pettingzoo_multiagent_mode: bool = False
         self._pettingzoo_player_handles: Dict[str, Any] = {}  # player_id -> handle
         self._pettingzoo_current_seed: int = 42
+        self._pettingzoo_step_index: int = 0  # step counter within current pettingzoo episode
 
         # Parallel multi-agent mode (MultiGrid, MeltingPot, Overcooked)
         # Similar to PettingZoo but uses Parallel API (simultaneous stepping)
@@ -279,6 +281,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         self._go_env_loader: GoEnvLoader
         self._tictactoe_env_loader: TicTacToeEnvLoader
         self._vizdoom_env_loader: VizdoomEnvLoader
+        self._malmo_env_loader: MalmoEnvLoader
         self._jumanji_grid_loader: JumanjiGridClickLoader
         self._smac_camera_loader: SmacCameraLoader
 
@@ -713,6 +716,9 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             status_bar=self._status_bar,
         )
         self._vizdoom_env_loader = VizdoomEnvLoader(
+            render_tabs=self._render_tabs,
+        )
+        self._malmo_env_loader = MalmoEnvLoader(
             render_tabs=self._render_tabs,
         )
         self._jumanji_grid_loader = JumanjiGridClickLoader(
@@ -1597,6 +1603,14 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             self._shared_pettingzoo_env = self._create_pettingzoo_env(task, seed, initial_state)
             self._pettingzoo_multiagent_mode = True
             self._pettingzoo_current_seed = seed
+            self._pettingzoo_step_index = 0  # reset step counter on new episode
+
+            # Stop any existing worker handles before relaunching (handles re-reset)
+            for existing_handle in self._pettingzoo_player_handles.values():
+                try:
+                    existing_handle.stop(timeout=2.0)
+                except Exception:
+                    pass
             self._pettingzoo_player_handles.clear()
 
             self.log_constant(
@@ -1618,9 +1632,11 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         started_ids = []
         failed_ids = []
 
-        # Get all operators and their player assignments
+        # Reset operator states so start_all() returns them even on re-reset
         active_operators = self._multi_operator_service.get_active_operators()
         _OP_LOGGER.debug("active_operators count=%d", len(active_operators))
+        for operator_id in active_operators:
+            self._multi_operator_service.set_operator_state(operator_id, "pending")
         pending_ids = self._multi_operator_service.start_all()
         _OP_LOGGER.debug("pending_ids=%s", pending_ids)
 
@@ -1782,7 +1798,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 # Build chess-specific payload for BoardGameRendererStrategy
                 # Note: "render_payload" key is required for _extract_render_payload
                 payload = {
-                    "step_index": 0,
+                    "step_index": self._pettingzoo_step_index,
                     "episode_index": 0,
                     "render_payload": {
                         "chess": {
@@ -1805,7 +1821,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 rgb_frame = env.render()
                 if rgb_frame is not None and isinstance(rgb_frame, np.ndarray):
                     payload = {
-                        "step_index": 0,
+                        "step_index": self._pettingzoo_step_index,
                         "episode_index": 0,
                         "render_payload": {
                             "mode": "rgb",
@@ -2354,6 +2370,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 extra={"player": current_player, "available": list(self._pettingzoo_player_handles.keys())},
             )
             self._status_bar.showMessage(f"No worker for {current_player}", 3000)
+            self._control_panel.set_current_player(current_player)
             return
 
         _OP_LOGGER.debug("_on_step_pettingzoo_multiagent: Got handle, is_running=%s", handle.is_running)
@@ -2364,10 +2381,20 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 message=f"Worker not running for player: {current_player}",
             )
             self._status_bar.showMessage(f"Worker stopped for {current_player}", 3000)
+            self._control_panel.set_current_player(current_player)
             return
 
         # Get observation for current player
         obs = env.observe(current_player)
+
+        # Extract action_mask (e.g. chess_v6 returns {"observation": ..., "action_mask": ...})
+        action_mask: Optional[List[bool]] = None
+        if isinstance(obs, dict) and "action_mask" in obs:
+            action_mask = obs["action_mask"].tolist()
+            _OP_LOGGER.debug(
+                "_on_step_pettingzoo_multiagent: action_mask extracted, legal=%d/%d",
+                sum(action_mask), len(action_mask),
+            )
 
         # Get legal moves (for chess, convert to UCI strings)
         legal_moves = self._get_chess_legal_moves(env)
@@ -2377,10 +2404,11 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
         obs_str = f"Current player: {current_player}\n"
         obs_str += f"Board state:\n{env.board}\n" if hasattr(env, "board") else str(obs)
 
-        # Send select_action command to worker
+        # Send select_action command to worker; pass action_mask so workers that
+        # sample randomly (e.g. Random Worker) stay within the legal action set.
         info = {"legal_moves": legal_moves}
         _OP_LOGGER.debug("_on_step_pettingzoo_multiagent: Sending select_action to worker...")
-        if handle.send_select_action(obs_str, current_player, info):
+        if handle.send_select_action(obs_str, current_player, info, action_mask=action_mask):
             _OP_LOGGER.debug("_on_step_pettingzoo_multiagent: select_action sent successfully")
             self.log_constant(
                 LOG_UI_MAINWINDOW_TRACE,
@@ -2397,6 +2425,8 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                 LOG_UI_MAINWINDOW_ERROR,
                 message=f"Failed to send select_action to {current_player}",
             )
+            # Re-enable the current player's button so the user can retry
+            self._control_panel.set_current_player(current_player)
 
     def _poll_pettingzoo_action(
         self,
@@ -2538,14 +2568,17 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
                     else:
                         _OP_LOGGER.debug("No legal actions in action_mask")
                         self._status_bar.showMessage("No legal moves available", 3000)
+                        self._control_panel.set_current_player(player_id)
                         return
                 else:
                     _OP_LOGGER.debug("No action_mask available")
                     self._status_bar.showMessage("Cannot determine legal moves", 3000)
+                    self._control_panel.set_current_player(player_id)
                     return
             except Exception as mask_err:
                 _OP_LOGGER.debug("Error getting action_mask: %s", mask_err)
                 self._status_bar.showMessage(f"Error: {mask_err}", 3000)
+                self._control_panel.set_current_player(player_id)
                 return
 
         # Execute the action
@@ -2553,6 +2586,10 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             _OP_LOGGER.debug("Executing env.step(%s)", action_index)
             env.step(action_index)
             _OP_LOGGER.debug("env.step completed successfully")
+
+            # Track step count and sync widget
+            self._pettingzoo_step_index += 1
+            self._control_panel.set_step_count(self._pettingzoo_step_index)
 
             # Check for game end - in PettingZoo AEC, check if ALL agents are terminated
             # or if there are no more agents to act
@@ -2623,7 +2660,7 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
             _OP_LOGGER.debug("_execute_pettingzoo_action completed successfully")
 
         except Exception as e:
-            _OP_LOGGER.debug("_execute_pettingzoo_action EXCEPTION: %s", e, exc_info=True)
+            _OP_LOGGER.warning("_execute_pettingzoo_action EXCEPTION: %s", e, exc_info=True)
             self.log_constant(
                 LOG_UI_MAINWINDOW_ERROR,
                 message=f"Failed to execute action: {e}",
@@ -4880,10 +4917,12 @@ class MainWindow(QtWidgets.QMainWindow, LogConstantMixin):
 
         Delegates to environment-specific loaders:
         - VizdoomEnvLoader: FPS-style mouse capture for ViZDoom games
+        - MalmoEnvLoader: FPS-style mouse capture for MalmoEnv (Minecraft) games
         - JumanjiGridClickLoader: Grid-click for Tetris, Minesweeper, etc.
         - SmacCameraLoader: 3D camera panning for SMAC/SMACv2 environments
         """
         self._vizdoom_env_loader.configure_mouse_capture(self._session)
+        self._malmo_env_loader.configure_mouse_capture(self._session)
         self._jumanji_grid_loader.configure_grid_click(self._session)
         self._smac_camera_loader.configure_mouse_capture(self._session)
 

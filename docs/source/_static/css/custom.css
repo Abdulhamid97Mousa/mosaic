@@ -51,7 +51,11 @@
 .highlight .no { color: #DCA3A3 }                       /* Name.Constant */
 .highlight .nd { color: #DCDCCC }                       /* Name.Decorator */
 .highlight .nn { color: #DCDCCC }                       /* Name.Namespace */
-.highlight .n  { color: #DCDCCC }                       /* Name */
+.highlight .n  { color: #9CDCFE }                       /* Name (Monaco-style variable) */
+.highlight .nv { color: #9CDCFE }                       /* Name.Variable */
+.highlight .vc { color: #9CDCFE }                       /* Name.Variable.Class */
+.highlight .vg { color: #9CDCFE }                       /* Name.Variable.Global */
+.highlight .vi { color: #9CDCFE }                       /* Name.Variable.Instance */
 .highlight .o  { color: #F0EFD0 }                       /* Operator */
 .highlight .ow { color: #F0EFD0 }                       /* Operator.Word */
 .highlight .p  { color: #F0EFD0 }                       /* Punctuation */
